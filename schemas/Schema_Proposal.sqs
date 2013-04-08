@@ -42,7 +42,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[1]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[2]]></labelWindowIndex>
         <uid><![CDATA[0B4FF7C9-A261-4D62-BAAB-204B4C880EA4]]></uid>
     </SQLTable>
     <SQLTable>
@@ -148,7 +148,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[0]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[1]]></labelWindowIndex>
         <uid><![CDATA[31E43896-6284-45C5-A43D-5ECCE6C7FE1B]]></uid>
     </SQLTable>
     <SQLTable>
@@ -193,7 +193,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[2]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[3]]></labelWindowIndex>
         <uid><![CDATA[376C97BA-59E2-49DA-92FD-2CE212A1B6C1]]></uid>
     </SQLTable>
     <SQLTable>
@@ -410,6 +410,51 @@ Constraints: Users can be assigned to groups 0 or 1 times.]]></objectComment>
         <uid><![CDATA[7E701995-9FA7-4C50-9F5C-214C3F6875BF]]></uid>
     </SQLTable>
     <SQLTable>
+        <name><![CDATA[MethodDependencies]]></name>
+        <schema><![CDATA[]]></schema>
+        <location>
+            <x>419.00</x>
+            <y>488.00</y>
+        </location>
+        <size>
+            <width>209.00</width>
+            <height>60.00</height>
+        </size>
+        <zorder>14</zorder>
+        <SQLField>
+            <name><![CDATA[revisionID_Parent]]></name>
+            <type><![CDATA[INTEGER]]></type>
+            <referencesField>revisionID</referencesField>
+            <referencesTable>MethodRevision</referencesTable>
+            <referencesField><![CDATA[revisionID]]></referencesField>
+            <referencesTable><![CDATA[MethodRevision]]></referencesTable>
+            <sourceCardinality>0</sourceCardinality>
+            <destinationCardinality>0</destinationCardinality>
+            <referencesFieldUID><![CDATA[F6C6D800-DC5E-40F5-AC09-27C44D3C7D28]]></referencesFieldUID>
+            <referencesTableUID><![CDATA[6E15AA9E-CB8A-4B84-B8AE-3448012A08F3]]></referencesTableUID>
+            <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+            <uid><![CDATA[30F6D201-7DD2-42A8-A602-1042FAD0BFF6]]></uid>
+        </SQLField>
+        <SQLField>
+            <name><![CDATA[revisionID_Needed]]></name>
+            <type><![CDATA[INTEGER]]></type>
+            <referencesField>revisionID</referencesField>
+            <referencesTable>MethodRevision</referencesTable>
+            <referencesField><![CDATA[revisionID]]></referencesField>
+            <referencesTable><![CDATA[MethodRevision]]></referencesTable>
+            <sourceCardinality>0</sourceCardinality>
+            <destinationCardinality>0</destinationCardinality>
+            <referencesFieldUID><![CDATA[F6C6D800-DC5E-40F5-AC09-27C44D3C7D28]]></referencesFieldUID>
+            <referencesTableUID><![CDATA[6E15AA9E-CB8A-4B84-B8AE-3448012A08F3]]></referencesTableUID>
+            <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+            <uid><![CDATA[69CD2F9E-8672-42C6-855A-7B8AFF01214E]]></uid>
+        </SQLField>
+        <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+        <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
+        <temporaryOriginalName><![CDATA[Table15]]></temporaryOriginalName>
+        <uid><![CDATA[8AA4EEDA-0453-44FF-B7A1-68D8BE082B92]]></uid>
+    </SQLTable>
+    <SQLTable>
         <name><![CDATA[Methods]]></name>
         <schema><![CDATA[]]></schema>
         <comment><![CDATA[Operations on datasets as a group, not particular revisions.]]></comment>
@@ -470,8 +515,8 @@ Step 3: Execute R3, make R3-2 available in the next sandbox.
 
 Last sandbox contains things made available in the N-1 sandbox.]]></comment>
         <location>
-            <x>299.00</x>
-            <y>511.00</y>
+            <x>312.00</x>
+            <y>597.00</y>
         </location>
         <size>
             <width>357.00</width>
@@ -983,8 +1028,8 @@ RmFjdG9yhpKEo56ooQGGhoY=
         <SourceSidebarWidth><![CDATA[360.000000]]></SourceSidebarWidth>
         <uid><![CDATA[1FB60E66-5677-40EC-BAE9-C523BC50D967]]></uid>
         <windowHeight><![CDATA[967.000000]]></windowHeight>
-        <windowLocationX><![CDATA[15.000000]]></windowLocationX>
-        <windowLocationY><![CDATA[77.000000]]></windowLocationY>
+        <windowLocationX><![CDATA[0.000000]]></windowLocationX>
+        <windowLocationY><![CDATA[91.000000]]></windowLocationY>
         <windowWidth><![CDATA[1920.000000]]></windowWidth>
     </SQLDocumentInfo>
     <AllowsIndexRenamingOnInsert><![CDATA[1]]></AllowsIndexRenamingOnInsert>

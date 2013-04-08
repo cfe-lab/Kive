@@ -9,6 +9,12 @@ methodName TEXT NOT NULL UNIQUE,
 methodDescription TEXT NOT NULL
 );
 
+CREATE TABLE MethodDependencies
+(
+revisionID_Parent INTEGER REFERENCES MethodRevision (revisionID),
+revisionID_Needed INTEGER REFERENCES MethodRevision (revisionID)
+);
+
 CREATE TABLE ParentDatasets
 (
 datasetID_Parent INTEGER REFERENCES Datasets (datasetID),
@@ -141,4 +147,3 @@ revisionDate INTEGER NOT NULL
 CREATE UNIQUE INDEX Unique_user_group ON InGroup (userID,userGroupID);
 
 CREATE UNIQUE INDEX DatasetAccess_idx ON DatasetAccess (groupID,datasetID);
-
