@@ -42,7 +42,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[2]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[3]]></labelWindowIndex>
         <uid><![CDATA[0B4FF7C9-A261-4D62-BAAB-204B4C880EA4]]></uid>
     </SQLTable>
     <SQLTable>
@@ -103,7 +103,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[7]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[8]]></labelWindowIndex>
         <uid><![CDATA[241CA1BC-08B7-4149-8DCF-40393408CAB0]]></uid>
     </SQLTable>
     <SQLTable>
@@ -148,7 +148,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[1]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[2]]></labelWindowIndex>
         <uid><![CDATA[31E43896-6284-45C5-A43D-5ECCE6C7FE1B]]></uid>
     </SQLTable>
     <SQLTable>
@@ -193,7 +193,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[3]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[4]]></labelWindowIndex>
         <uid><![CDATA[376C97BA-59E2-49DA-92FD-2CE212A1B6C1]]></uid>
     </SQLTable>
     <SQLTable>
@@ -292,7 +292,7 @@
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[6]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[7]]></labelWindowIndex>
         <uid><![CDATA[6E15AA9E-CB8A-4B84-B8AE-3448012A08F3]]></uid>
     </SQLTable>
     <SQLTable>
@@ -328,11 +328,53 @@ Constraint: All groups must have a name, and no two groups can have identical na
             <unique><![CDATA[1]]></unique>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
-        <labelWindowIndex><![CDATA[12]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[13]]></labelWindowIndex>
         <objectComment><![CDATA[UserGroups
 
 Constraint: All groups must have a name, and no two groups can have identical names.]]></objectComment>
         <uid><![CDATA[71C31B77-21FD-493F-A11B-F2D5B6046A7F]]></uid>
+    </SQLTable>
+    <SQLTable>
+        <name><![CDATA[Pipelines]]></name>
+        <schema><![CDATA[]]></schema>
+        <location>
+            <x>73.00</x>
+            <y>635.00</y>
+        </location>
+        <size>
+            <width>201.00</width>
+            <height>80.00</height>
+        </size>
+        <zorder>15</zorder>
+        <SQLField>
+            <name><![CDATA[pipelineID]]></name>
+            <type><![CDATA[INTEGER]]></type>
+            <primaryKey>1</primaryKey>
+            <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+            <forcedUnique><![CDATA[1]]></forcedUnique>
+            <temporaryOriginalName><![CDATA[id]]></temporaryOriginalName>
+            <uid><![CDATA[EFB11579-29B7-4A55-8695-9C1E22BE9D61]]></uid>
+        </SQLField>
+        <SQLField>
+            <name><![CDATA[pipelineName]]></name>
+            <type><![CDATA[TEXT]]></type>
+            <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+            <notNull><![CDATA[1]]></notNull>
+            <temporaryOriginalName><![CDATA[id_1]]></temporaryOriginalName>
+            <uid><![CDATA[417B3336-3C9E-4CF4-A00A-225A062476F1]]></uid>
+        </SQLField>
+        <SQLField>
+            <name><![CDATA[pipelineDescription]]></name>
+            <type><![CDATA[TEXT]]></type>
+            <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+            <notNull><![CDATA[1]]></notNull>
+            <temporaryOriginalName><![CDATA[id_2]]></temporaryOriginalName>
+            <uid><![CDATA[DA51F5D3-F1D2-418C-A537-C6A6C9F4AB01]]></uid>
+        </SQLField>
+        <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
+        <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
+        <temporaryOriginalName><![CDATA[Table61]]></temporaryOriginalName>
+        <uid><![CDATA[7BA57185-508A-402A-AAD4-5F8DDA92C783]]></uid>
     </SQLTable>
     <SQLTable>
         <name><![CDATA[InGroup]]></name>
@@ -401,7 +443,7 @@ Constraints: Users can be assigned to groups 0 or 1 times.]]></comment>
             <uid><![CDATA[DC55863B-19E2-48A7-ADEB-9474298A46E3]]></uid>
         </SQLIndex>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
-        <labelWindowIndex><![CDATA[11]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[12]]></labelWindowIndex>
         <objectComment><![CDATA[InGroup
 
 Stores User <-> Group mappings
@@ -451,6 +493,7 @@ Constraints: Users can be assigned to groups 0 or 1 times.]]></objectComment>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
+        <labelWindowIndex><![CDATA[1]]></labelWindowIndex>
         <temporaryOriginalName><![CDATA[Table15]]></temporaryOriginalName>
         <uid><![CDATA[8AA4EEDA-0453-44FF-B7A1-68D8BE082B92]]></uid>
     </SQLTable>
@@ -493,7 +536,7 @@ Constraints: Users can be assigned to groups 0 or 1 times.]]></objectComment>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[13]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[14]]></labelWindowIndex>
         <objectComment><![CDATA[Operations on datasets as a group, not particular revisions.]]></objectComment>
         <uid><![CDATA[9F956849-E6E6-4B26-9AC3-EA2642D03534]]></uid>
     </SQLTable>
@@ -515,8 +558,8 @@ Step 3: Execute R3, make R3-2 available in the next sandbox.
 
 Last sandbox contains things made available in the N-1 sandbox.]]></comment>
         <location>
-            <x>312.00</x>
-            <y>597.00</y>
+            <x>324.00</x>
+            <y>595.00</y>
         </location>
         <size>
             <width>357.00</width>
@@ -549,6 +592,14 @@ Last sandbox contains things made available in the N-1 sandbox.]]></comment>
         <SQLField>
             <name><![CDATA[pipelineID]]></name>
             <type><![CDATA[INTEGER]]></type>
+            <referencesField>pipelineID</referencesField>
+            <referencesTable>Pipelines</referencesTable>
+            <referencesField><![CDATA[pipelineID]]></referencesField>
+            <referencesTable><![CDATA[Pipelines]]></referencesTable>
+            <sourceCardinality>0</sourceCardinality>
+            <destinationCardinality>0</destinationCardinality>
+            <referencesFieldUID><![CDATA[EFB11579-29B7-4A55-8695-9C1E22BE9D61]]></referencesFieldUID>
+            <referencesTableUID><![CDATA[7BA57185-508A-402A-AAD4-5F8DDA92C783]]></referencesTableUID>
             <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
             <forcedUnique><![CDATA[1]]></forcedUnique>
             <notNull><![CDATA[1]]></notNull>
@@ -563,7 +614,7 @@ Last sandbox contains things made available in the N-1 sandbox.]]></comment>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[4]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[5]]></labelWindowIndex>
         <objectComment><![CDATA[pipelineDescriptionID: row number
 pipelineID: group by pipeline
 
@@ -621,7 +672,7 @@ Last sandbox contains things made available in the N-1 sandbox.]]></objectCommen
             <uid><![CDATA[024E6918-76EE-4B8B-A5D7-E0CB3DF43339]]></uid>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
-        <labelWindowIndex><![CDATA[5]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[6]]></labelWindowIndex>
         <uid><![CDATA[A4E4F618-9648-4470-ADAB-8A3483633E01]]></uid>
     </SQLTable>
     <SQLTable>
@@ -736,7 +787,7 @@ Last sandbox contains things made available in the N-1 sandbox.]]></objectCommen
             <uid><![CDATA[7E6A9647-7651-4A60-A693-361C2E5C8B3A]]></uid>
         </SQLIndex>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
-        <labelWindowIndex><![CDATA[10]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[11]]></labelWindowIndex>
         <uid><![CDATA[BFA78FB2-B148-4710-87DE-B9A5F7A36F30]]></uid>
     </SQLTable>
     <SQLTable>
@@ -811,7 +862,7 @@ Last sandbox contains things made available in the N-1 sandbox.]]></objectCommen
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
         <labelColor><![CDATA[{0.99919,0.574339,0.139962,1}]]></labelColor>
-        <labelWindowIndex><![CDATA[9]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[10]]></labelWindowIndex>
         <uid><![CDATA[C33A74E3-47F6-423C-90F4-64EA1C0807D3]]></uid>
     </SQLTable>
     <SQLTable>
@@ -862,7 +913,7 @@ Last sandbox contains things made available in the N-1 sandbox.]]></objectCommen
             <uid><![CDATA[BFC9428F-CBD5-4A6A-848A-B3278FE7B919]]></uid>
         </SQLField>
         <didChangeNameDuringValidation><![CDATA[0]]></didChangeNameDuringValidation>
-        <labelWindowIndex><![CDATA[8]]></labelWindowIndex>
+        <labelWindowIndex><![CDATA[9]]></labelWindowIndex>
         <objectComment><![CDATA[Users
 
 1) Storing passwords as SHA-1 hash?
