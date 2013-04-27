@@ -1,10 +1,17 @@
 # Django settings for server project.
 
+# Copperfish-specific things to set:
+# DATABASES: the NAME field must be set to the absolute path of your sqlite3
+#  file
+# When this is set, copy it over to settings.py (but don't have git track it)
+# -- RL April 26, 2013
+
+
+
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
-	('art', 'apoon@cfenet.ubc.ca'),
     # ('Your Name', 'your_email@example.com'),
 )
 
@@ -13,7 +20,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '../db/copperfish.db',                      # Or path to database file if using sqlite3.
+        'NAME': '/Users/rliang/Documents/Research/Copperfish/copperfish/db/copperfish.db',                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
         'USER': '',
         'PASSWORD': '',
