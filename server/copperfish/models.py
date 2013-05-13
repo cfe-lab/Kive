@@ -1,33 +1,79 @@
-from django.db import models
-from django.contrib.auth.models import User
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
+from django.db import models;
+from django.contrib.auth.models import User;
+from django.contrib.contenttypes.models import ContentType;
+from django.contrib.contenttypes import generic;
+from django.db.models.signals import pre_save, post_save;
+from django.dispatch import receiver;
+
+from django.core.exceptions import ValidationError;
+from django.core.validators import MinValueValidator;
+
+import operator;
+# For auto-computing the MD5 of uploaded files.
+import hashlib;
 
 class Datatype(models.Model):
 	# Note that none of these are nullable
 	name = models.CharField(max_length=64)
 	description = models.TextField()
-	dateCreated = models.DateTimeField(auto_now_add = True)
+	date_created = models.DateTimeField(auto_now_add = True)
 	
-	unitTest = models.FileField(upload_to='UnitTests')
-	PythonType = models.CharField(max_length=64);
+	verification_script = models.FileField(upload_to='VerificationScripts')
+	Python_type = models.CharField(max_length=64);
 	
 	# This is an asymmetric many-to-many relationship on itself;
 	# this Datatype is the restrictor, and it can restrict many
 	# other Datatypes.
 	restricts = models.ManyToManyField('self', symmetrical=False,
-					 related_name="restrictedBy");
+	                                   related_name="restricted_by",
+	                                   null=True, blank=True);
 
 	# Implicitly defined:
-	# - restrictedBy: from field 'restricts'
+	# - restricted_by: from field 'restricts'
+
+	def __unicode__(self):
+		return self.name;
 
 class CompoundDatatype(models.Model):
 	# This has a one-to-many relationship with its members
 	
 	# Implicitly defined:
 	# - members: from CompoundDatatypeMember
-	# - conformingDatasets: from Dataset
-	pass
+	# - conforming_datasets: from Dataset
+
+	def __unicode__(self):
+		# Go through the members and stick together a string
+		# representation of the compound datatype.
+
+		string_rep = u"(";
+
+		all_members = self.members.all();
+		member_indices = [member.column_idx for member in all_members];
+		members_with_indices = \
+		    [(member_indices[i], all_members[i]) \
+		     for i in range(len(all_members))];
+		members_with_indices = sorted(members_with_indices,
+		                              key=operator.itemgetter(0));
+		
+		for i, colIdx_and_member in enumerate(members_with_indices):
+			colIdx, member = colIdx_and_member;
+			string_rep += unicode(member);
+			if i != len(members_with_indices) - 1:
+				string_rep += ", ";
+		string_rep += ")";
+		
+		return string_rep;
+
+	# Coherence check: do all of its n members have consecutive indices,
+	# 1 to n?
+	def clean(self):
+		column_indices = [];
+		for member in self.members.all():
+			column_indices += [member.column_idx];
+
+		if sorted(column_indices) != range(1, self.members.count()+1):
+			raise ValidationError(
+					"Column indices are not consecutive starting from 1");
 
 
 class CompoundDatatypeMember(models.Model):
@@ -35,191 +81,558 @@ class CompoundDatatypeMember(models.Model):
 	# foreign key variable names are the names of the models,
 	# lower-case.
 	compounddatatype = models.ForeignKey(CompoundDatatype,
-					     related_name="members");
+	                                     related_name="members");
 	datatype = models.ForeignKey(Datatype);
-	columnName = models.CharField(max_length=128);
-	columnIdx = models.PositiveIntegerField();
-
-class Transformation(models.Model):
-	family = models.ManyToManyField("TransformationFamily");
-	revisionDateTime = models.DateTimeField(auto_now_add = True);
-
-	# In keeping with the instructions on
-	# https://docs.djangoproject.com/en/dev/topics/db/models/
-	# we need to specify the app and class to use when
-	# defining related_name.
-	#revisionParent = \
-	#    models.ForeignKey('self', null=True,
-	#		      related_name="%(app_label)s_%(class)s_descendants");
-	
-	# Since Transformation is an abstract class, we can't make a foreign
-	# key to itself.  We have to use a generic relation.
-	content_type = models.ForeignKey(ContentType);
-	object_id = models.PositiveIntegerField();
-	revisionParent = generic.GenericForeignKey('content_type', 'object_id');
-
-	#descendants = generic.GenericRelation("Transformation");
-	inputs = generic.GenericRelation("TransformationInput");
-	outputs = generic.GenericRelation("TransformationOutput");
-	
-	revisionDesc = models.TextField();
-
-	# Implicitly defined:
-	# - %(app_label)s_%(class)s_descendants: from revisionParent
-	#   (i.e. what Transformations this is a parent of)
-	# - TransformationInput_set: from TransformationInput
-	# - TransformationOutput_set: from TransformationOutput
-
-	# This is an abstract class:
-	class Meta:
-		abstract = True;
-
-
-# Both TransformationInput and TransformationOutput look just like this,
-# so in keeping with the DRY principle...
-class TransformationXput(models.Model):
-	#transformation = \
-	#    models.ForeignKey(Transformation,
-	#		      related_name = "%(app_label)s_%(class)s_set");
-	content_type = models.ForeignKey(ContentType);
-	object_id = models.PositiveIntegerField();
-	transformation = generic.GenericForeignKey("content_type", "object_id");
-	
-	compounddatatype = models.ForeignKey(CompoundDatatype);
-	datasetName = models.CharField(max_length=128);
-	# Nullable fields indicating that this dataset has
-	# restrictions on how many rows it can have
-	minRow = models.PositiveIntegerField(null=True);
-	maxRow = models.PositiveIntegerField(null=True);
+	column_name = models.CharField(max_length=128);
+	column_idx = \
+		models.PositiveIntegerField(validators=[MinValueValidator(1)]);
 
 	class Meta:
-		abstract = True;
+		unique_together = (("compounddatatype", "column_name"),
+		                   ("compounddatatype", "column_idx"));
 
-	
-class TransformationInput(TransformationXput):
-	pass
-
-class TransformationOutput(TransformationXput):
-	pass
-
-
-class TransformationFamily(models.Model):
-	name = models.CharField(max_length=128);
-	description = models.TextField();
-
-	# Implicitly defined:
-	# - Transformation_set: from Transformation (i.e. what Transformations
-	#   belong to this TransformationFamily)
+	def __unicode__(self):
+		return u"{}: <{}> [{}]".format(self.column_idx,
+									   unicode(self.datatype),
+		                               self.column_name);
 
 
 class Dataset(models.Model):
 	user = models.ForeignKey(User);
 	name = models.CharField(max_length=128);
 	description = models.TextField();
-	dateCreated = models.DateTimeField(auto_now_add=True);
+	date_created = models.DateTimeField(auto_now_add=True);
 	
 	# What pipeline step it came from, and which output it was
-	pipelineStep = models.ForeignKey("PipelineStep",
-					 related_name="dataProduced");
-	pipelineStepOutputName = models.CharField(max_length=128);
+	pipeline_step = models.ForeignKey("PipelineStep",
+									  related_name="data_produced",
+									  null=True, blank=True);
+	pipeline_step_output_name = models.CharField(max_length=128,
+												 blank=True);
 	compounddatatype = \
 	    models.ForeignKey(CompoundDatatype,
-			      related_name="conformingDatasets");
+	                      related_name="conforming_datasets");
 
-	parentDatasets = models.ManyToManyField('self',
-					      related_name="descendentDatasets");
-	datasetFile = models.FileField(upload_to="Datasets");
-	MD5Checksum = models.CharField(max_length=64);
+	parent_datasets = \
+		models.ManyToManyField('self', related_name="descendent_datasets",
+							   null=True, blank=True);
+	dataset_file = models.FileField(upload_to="Datasets");
+	MD5_checksum = models.CharField(max_length=64);
 
 	# Implicitly defined:
-	# - descendantDatasets: from field 'parentDatasets' (i.e. what Datasets
+	# - descendant_datasets: from field 'parent_datasets' (i.e. what Datasets
 	#   are produced *from* this Dataset)
-	
 
-
-class CodeResourceFamily(models.Model):
-	name = models.CharField(max_length=128);
-	description = models.TextField();
+	def __unicode__(self):
+		"""Create Unicode string representation of the dataset."""
+		return "{} (created by {} on {})".format(self.name,
+												 unicode(self.user),
+												 self.date_created);
 	
-	# Implicitly defined:
-	# members: from CodeResource
+	def clean(self):
+		"""If there is a file specified, fill in the MD5 checksum."""
+		try:
+			md5gen = hashlib.md5();
+			md5gen.update(self.dataset_file.read());
+			self.MD5_checksum = md5gen.hexdigest();
+		except ValueError as e:
+			print(e);
+			print("No file found; setting MD5 checksum to the empty string.");
+			self.MD5_checksum = "";
+	
 
 class CodeResource(models.Model):
-	family = models.ManyToManyField(CodeResourceFamily,
-				      related_name="members");
-	revisionName = models.CharField(max_length=128);
-	revisionDateTime = models.DateTimeField(auto_now_add=True);
-	revisionParent = models.ForeignKey('self', related_name="descendants");
-	revisionDesc = models.TextField();
+	name = models.CharField(max_length=128);
+	description = models.TextField();
 
-	contentFile = models.FileField(upload_to="CodeResources", null=True);
-	MD5Checksum = models.CharField(max_length=64);
+	# Implicitly defined:
+	# revisions - from CodeResourceRevision
+
+	def __unicode__(self):
+		return self.name;
+
+class CodeResourceRevision(models.Model):
+	coderesource = models.ForeignKey(CodeResource, related_name="revisions");	
+		
+	revision_name = models.CharField(max_length=128);
+	revision_DateTime = models.DateTimeField(auto_now_add=True);
+	revision_parent = models.ForeignKey('self', related_name="descendants",
+										null=True, blank=True);
+	revision_desc = models.TextField();
+
+	content_file = models.FileField(upload_to="CodeResources", null=True,
+									blank=True);
+	MD5_checksum = models.CharField(max_length=64, blank=True);
 
 	# Implicitly defined:
 	# dependencies - from CodeResourceDependency
-	# neededBy - also from CodeResourceDependency
-	# descendants - from field 'revisionParent'
+	# needed_by - also from CodeResourceDependency
+	# descendants - from field 'revision_parent'
+
+	def __unicode__(self):
+		"""Create unicode string representation of model."""
+		
+		# This CodeResourceRevision may have no coderesource yet, e.g. if it is
+		# being created from an inline on the CodeResource admin page.
+		if self.coderesource == None:
+			return u"[currently editing] {}".format(self.revision_name);
+		
+		string_rep = self.coderesource.name + u" " + self.revision_name;
+		return string_rep;
+
+	def clean(self):
+		"""If there is a file specified, fill in the MD5 checksum."""
+		try:
+			md5gen = hashlib.md5();
+			md5gen.update(self.content_file.read());
+			self.MD5_checksum = md5gen.hexdigest();
+		except ValueError as e:
+			print(e);
+			print("No file found; setting MD5 checksum to the empty string.");
+			self.MD5_checksum = "";
+
+	
 
 class CodeResourceDependency(models.Model):
-	coderesource = models.ForeignKey(CodeResource,
-					 related_name="dependencies");
-	# This is the dependency; i.e. coderesource needs this to run
-	requirement = models.ForeignKey(CodeResource,
-					related_name="neededBy");
-	# Where to put it; we can use the parameters to this to restrict
-	# where it can be put (i.e. so that it doesn't go in an intermediate
-	# data directory).  FilePathField requires absolute paths, which is
-	# not appropriate for us.
-	# FIXME: should we go to FilePathField so that it does the
-	# kinds of checking we need it to do when we enter a path (i.e.
-	# make sure it's a reasonable filename?)
+	coderesourcerevision = models.ForeignKey(CodeResourceRevision,
+											 related_name="dependencies");
+
+	# This is the dependency; i.e. coderesourcerevision needs this to run
+	requirement = models.ForeignKey(CodeResourceRevision,
+	                                related_name="needed_by");
+	
+	# Where to put it (relative to the sandbox).
+	# FIXME: should we use a FilePathField?
 	where = models.CharField(max_length=100);
 
 
-# Methods and pipelines are manifestations of Transformation
-class Method(Transformation):
-	# Note: this has to be an executable CodeResource
-	driver = models.ForeignKey(CodeResource);
+# May 10, 2013: this is now in a one-to-many relationship with its members
+class TransformationFamily(models.Model):
+	name = models.CharField(max_length=128);
+	description = models.TextField();
 
+	def __unicode__(self):
+		return self.name;
 
-class Pipeline(Transformation):
+	class Meta:
+		abstract = True;
+
+class MethodFamily(TransformationFamily):
 	# Implicitly defined:
-	# steps: from PipelineStep
+	# members - from Method
 	pass
 
+class PipelineFamily(TransformationFamily):
+	# Implicitly defined:
+	# members - from Method
+	pass
+
+
+class Transformation(models.Model):
+	revision_name = models.CharField(max_length=128);
+	revision_DateTime = models.DateTimeField(auto_now_add = True);
+	revision_desc = models.TextField();
+
+	inputs = generic.GenericRelation("TransformationInput");
+	outputs = generic.GenericRelation("TransformationOutput");
+
+	# This is an abstract class:
+	class Meta:
+		abstract = True;
+
+
+# Methods and pipelines are manifestations of Transformation
+# May 1, 2013: move revision_parent into Method and Pipeline from
+# the abstract class Transformation because really we wouldn't have
+# Methods descending from Pipelines or vice versa, so this makes more
+# sense.
+# May 10, 2013: change to have a one-to-many relationship with
+# MethodFamily/PipelineFamily
+class Method(Transformation):
+	family = models.ForeignKey(MethodFamily, related_name="members");
+		
+	revision_parent = models.ForeignKey("self",
+										related_name = "descendants",
+										null=True, blank=True);
+	# Note: this has to be an executable CodeResourceRevision
+	driver = models.ForeignKey(CodeResourceRevision);
+
+	# Implicitly defined:
+	# descendants: from field 'revision_parent'
+	
+	def __unicode__(self):
+		string_rep = u"Method {} {}".format("{}", self.revision_name);
+		# If family is unset, e.g. if created from the family admin page
+		if self.family == None:
+			string_rep = string_rep.format("[family unset]");
+		else:
+			string_rep = string_rep.format(unicode(self.family));
+		return string_rep;
+
+	def save(self, *args, **kwargs):
+		"""When saving, set up inputs and outputs where appropriate.
+		
+		If this method has no inputs or outputs specified, but it does
+		have a specified parent, then copy over the parent's inputs
+		and outputs.  This must be done after first saving the method
+		itself, otherwise we cannot add inputs and outputs to it.
+		"""
+		super(Method, self).save(*args, **kwargs);
+		
+		if self.revision_parent == None:
+			return None;
+
+		if self.inputs.count() + self.outputs.count() == 0:
+			# Add the inputs and outputs in turn
+			for parent_input in self.revision_parent.inputs.all():
+				self.inputs.create(
+						compounddatatype = parent_input.compounddatatype,
+						dataset_name = parent_input.dataset_name,
+						dataset_idx = parent_input.dataset_idx,
+						min_row = parent_input.min_row,
+						max_row = parent_input.max_row);
+			for parent_output in self.revision_parent.outputs.all():
+				self.outputs.create(
+						compounddatatype = parent_output.compounddatatype,
+						dataset_name = parent_output.dataset_name,
+						dataset_idx = parent_output.dataset_idx,
+						min_row = parent_output.min_row,
+						max_row = parent_output.max_row);
+				
+
+class Pipeline(Transformation):
+	family = models.ForeignKey(PipelineFamily, related_name="members");	
+		
+	revision_parent = models.ForeignKey("self",
+										related_name = "descendants",
+										null=True, blank=True);
+	# Implicitly defined:
+	# steps: from PipelineStep
+	# descendants: from field 'revision_parent'
+	# outmap: from PipelineOutputMapping
+
+	# When defining a pipeline, we don't define the outputs; we define
+	# outmap instead and during the clean stage the outputs are created.
+	
+	def __unicode__(self):
+		string_rep = u"Pipeline {} {}".format("{}", self.revision_name);
+		# If family is unset, e.g. if created from the family admin page
+		if self.family == None:
+			string_rep = string_rep.format("[family unset]");
+		else:
+			string_rep = string_rep.format(unicode(self.family));
+		return string_rep;
+
+	def clean(self):
+		"""Check coherence and finish setup of the pipeline.
+
+		We check the following:
+		 - the steps are properly numbered consecutively starting from 1
+		 - the inputs of each step are available to them when they are needed
+		 and they are of the type expected
+		 - the outputs of the pipeline itself will be properly mapped to outputs
+		 generated by its steps.
+		"""
+
+		all_steps = self.steps.all();
+
+		# Check that the inputs are numbered consecutively starting from 1.
+		input_nums = [];
+		for curr_input in self.inputs.all():
+			input_nums += [curr_input.dataset_idx];
+		if sorted(input_nums) != range(1, self.inputs.count()+1):
+			raise ValidationError(
+					"Inputs are not consecutively numbered starting from 1");
+		
+
+		# Check that the numbering of steps is fine and clean each step.
+		step_nums = [];
+		for step in all_steps:
+			# We don't clean each step; let's assume this is done already
+			#step.full_clean();	
+			step_nums += [step.step_num];
+		if sorted(step_nums) != range(1, len(all_steps)+1):
+			raise ValidationError(
+					"Steps are not consecutively numbered starting from 1");
+
+		# Check that the steps are coherent with each other.
+ 		for step in all_steps:
+			# Check on the PipelineStepInputs
+			for curr_in in step.inputs.all():
+				input_requested = curr_in.provider_output_name;
+				requested_from = curr_in.step_providing_input;
+				feed_to_input = curr_in.transf_input_name;
+
+				# Find the requested input; raise ValidationError on failure.
+				req_input = None;
+				if requested_from == 0:
+					# i.e. this is one of the pipeline inputs
+					try:	
+						req_input = self.inputs.get(
+								dataset_name=input_requested);
+					except TransformationInput.DoesNotExist as e:
+						raise ValidationError(
+								"Pipeline does not have input \"{}\"".
+								format(input_requested));	
+				else:
+					providing_step = all_steps[requested_from-1];
+					try:
+						req_input = \
+							providing_step.transformation.outputs.get(
+									dataset_name=input_requested);
+					except TransformationOutput.DoesNotExist as e:
+						raise ValidationError(
+								"Transformation at step {} does not produce output \"{}\"".
+								format(requested_from, input_requested));
+						
+					# Was this dataset deleted?
+					if providing_step.outputs_to_delete.filter(
+							dataset_to_delete=input_requested).count() != 0:
+						raise ValidationError(
+								"Input \"{}\" from step {} to step {} is deleted prior to request".
+								format(input_requested, requested_from,
+									   step.step_num));
+
+				# Check that the requested input matches the expected prototype.
+				# Note: we don't check for ValidationError because this was
+				# already checked in the clean() step of PipelineStep.
+				transf_input = step.transformation.inputs.get(
+						dataset_name=feed_to_input);
+
+				# FIXME: we're just going to enforce that transf_input
+				# and req_input have the same CompoundDatatype, rather
+				# than making sure that their CompoundDatatypes match;
+				# is this too restrictive?
+				input_matches_prototype = \
+					(req_input.compounddatatype == transf_input.compounddatatype
+					 and req_input.min_row >= transf_input.min_row
+					 and req_input.max_row <= transf_input.max_row);
+				if not input_matches_prototype:
+					raise ValidationError(
+							"Data fed to input \"{}\" of step {} does not match the expected prototype.".
+							format(feed_to_input, step.step_num));
+
+		# Check the output mappings, making sure the wiring is coherent.
+		for mapping in self.outmap.all():
+			output_requested = mapping.provider_output_name;
+			requested_from = mapping.step_providing_output;
+			connect_to_output = mapping.output_name;
+
+			# Is the step number valid?
+			if requested_from > len(all_steps):
+				raise ValidationError(
+						"Output requested from a non-existent step");	
+			
+			providing_step = all_steps[requested_from-1];
+			req_output = None;
+			try:
+				req_output = providing_step.transformation.outputs.get(
+						dataset_name=output_requested);
+			except TransformationOutput.DoesNotExist as e:
+				raise ValidationError(
+						"Transformation at step {} does not produce output \"{}\"".
+						format(requested_from, output_requested));
+
+			# Was this output deleted by the step producing it?
+			if providing_step.outputs_to_delete.filter(
+					dataset_to_delete=output_requested).count() != 0:
+				raise ValidationError(
+						"Output \"{}\" from step {} is deleted prior to request".
+						format(output_requested, requested_from));
+
+	def save(self, *args, **kwargs):
+		"""When saving, set up outputs as specified.
+
+		This must be done after saving, because otherwise the manager for
+		the calling instance's outputs will not have been set up.
+		"""
+		super(Pipeline, self).save(*args, **kwargs);
+
+		# Nuke the outputs -- note that if we ever customize the delete()
+		# method of TransformationOutput we'll need to change this.
+		self.outputs.all().delete();
+
+		all_steps = self.steps.all();
+
+		# Recreate the outputs.
+ 		for mapping in self.outmap.all():
+			output_requested = mapping.provider_output_name;
+			requested_from = mapping.step_providing_output;
+			connect_to_output = mapping.output_name;
+			
+			providing_step = all_steps[requested_from-1];
+			# We don't check for ValidationError because we assume clean()
+			# has already been called.
+			req_output = providing_step.transformation.outputs.get(
+					dataset_name=output_requested);
+				
+			self.outputs.create(compounddatatype=req_output.compounddatatype,
+								dataset_name=connect_to_output,
+								dataset_idx=mapping.output_idx,
+								min_row=req_output.min_row,
+								max_row=req_output.max_row);
+
+ 			
 
 class PipelineStep(models.Model):
 	pipeline = models.ForeignKey(Pipeline, related_name="steps");
 
-	#transformation = models.ForeignKey(Transformation);
-	content_type = models.ForeignKey(ContentType);
+	# Restrict the types to Method and Pipeline; note that the names
+	# must be lower-case.
+	content_type = models.ForeignKey(
+			ContentType,
+			limit_choices_to = {"model__in": ("method", "pipeline")});
 	object_id = models.PositiveIntegerField();
-	transformation = generic.GenericForeignKey("content_type",
-						   "object_id");
-	
-	stepNum = models.PositiveIntegerField();
+	transformation = generic.GenericForeignKey("content_type", "object_id");
+
+	# This is 1-based
+	step_num = \
+		models.PositiveIntegerField(validators=[MinValueValidator(1)]);
 	
 	# Implicitly defined:
 	# inputs: from PipelineStepInput
-	# outputsToDelete: from PipelineStepDelete
+	# outputs_to_delete: from PipelineStepDelete
+
+	def __unicode__(self):
+		# Default value for if pipeline is unset
+		pipeline_name = "[no pipeline assigned]";	
+		if self.pipeline != None:
+			pipeline_name = unicode(self.pipeline);
+		return "{} step {}".format(pipeline_name, self.step_num);
+
+	def clean(self):
+		"""Check coherence of this step of the pipeline.
+
+		The checks we perform are as follows:
+		 - Do the inputs come from prior steps?
+		 - Do the inputs map correctly to the transformation at this step?
+		 - Are the outputs marked for deletion ones that actually come from
+		 this transformation?
+		Raises ValidationError if any checks are failed.
+		"""
+		for curr_in in self.inputs.all():
+			input_requested = curr_in.provider_output_name;
+			requested_from = curr_in.step_providing_input;
+			feed_to_input = curr_in.transf_input_name;
+				
+			# Does this input come from a step prior to this one?
+			if requested_from >= self.step_num:
+				raise ValidationError(
+						"Input \"{}\" to step {} does not come from a prior step".
+						format(input_requested, self.step_num));
+
+			# Does the transformation at this step have an input named
+			# feed_to_input?
+			try:
+				self.transformation.inputs.get(dataset_name=feed_to_input);
+			except TransformationInput.DoesNotExist as e:
+				raise ValidationError(
+						"Transformation at step {} has no input named \"{}\"".
+						format(self.step_num, feed_to_input));
+ 
+		for curr_del in self.outputs_to_delete.all():
+			to_del = curr_del.dataset_to_delete;
+
+			# Check that to_del is one of the outputs of the current step's
+			# Transformation.
+			if self.transformation.outputs.\
+				filter(dataset_name=to_del).count() == 0:
+				raise ValidationError(
+						"Transformation at step {} has no output named \"{}\"".
+						format(self.step_num, to_del));
 
 
 class PipelineStepInput(models.Model):
 	pipelinestep = models.ForeignKey(PipelineStep, related_name = "inputs");
+	transf_input_name = models.CharField(max_length=128);
 
-	# PRE: stepProvidingInput < the step number of the PipelineStep this
+	# PRE: step_providing_input < the step number of the PipelineStep this
 	# input goes into
 	# The coherence of the data here will be enforced at the Python level
 	# (i.e. does this actually refer to a Dataset produced by the
-	# Transformation at the specified step)
-	stepProvidingInput = models.PositiveIntegerField();
-	inputDatasetName = models.CharField(max_length=128);
+	# Transformation at the specified step, etc.)
+	step_providing_input = models.PositiveIntegerField();
+	provider_output_name = models.CharField(max_length=128);
+
+	def __unicode__(self):
+		step_str = "[no pipeline step set]";
+		if self.pipelinestep != None:
+			step_str = unicode(self.pipelinestep);
+		return "{}:{}".format(step_str, self.transf_input_name);	
+
 
 class PipelineStepDelete(models.Model):
 	pipelinestep = models.ForeignKey(PipelineStep,
-					 related_name = "outputsToDelete");
+	                                 related_name="outputs_to_delete");
 
 	# Again, the coherence of this data will be enforced at the Python level
 	# (i.e. does this actually refer to a Dataset that will be produced
 	# by the Transformation at this step)
-	datasetToDelete = models.CharField(max_length=128);
+	dataset_to_delete = models.CharField(max_length=128);
+
+
+class PipelineOutputMapping(models.Model):
+	"""Specifies mapping of PipelineStep outputs to Pipeline outputs."""
+	pipeline = models.ForeignKey(Pipeline, related_name="outmap");
+	output_name = models.CharField(max_length=128);
+	output_idx = models.PositiveIntegerField(
+			validators=[MinValueValidator(1)]);
+
+	# PRE: step_providing_output is an actual step of the pipeline
+	# and provider_output_name actually refers to one of the outputs
+	# at that step
+	# The coherence of the data here will be enforced at the Python level
+	step_providing_output = models.PositiveIntegerField(
+			validators=[MinValueValidator(1)]);
+	provider_output_name = models.CharField(max_length=128);
+
+	def __unicode__(self):
+		pipeline_name = "[no pipeline set]";
+		if self.pipeline != None:
+			pipeline_name = unicode(self.pipeline);
+
+		return "{}:{} ({})".format(pipeline_name, self.output_idx,
+								   self.output_name);
+
+
+# Both TransformationInput and TransformationOutput look just like this,
+# so in keeping with the DRY principle...
+class TransformationXput(models.Model):
+	content_type = models.ForeignKey(
+			ContentType,
+			limit_choices_to = {"model__in": ("method", "pipeline")});
+	object_id = models.PositiveIntegerField();
+	transformation = generic.GenericForeignKey("content_type", "object_id");
+	
+	compounddatatype = models.ForeignKey(CompoundDatatype);
+	dataset_name = models.CharField(max_length=128);
+	dataset_idx = models.PositiveIntegerField(
+			validators=[MinValueValidator(1)]);
+	
+	# Nullable fields indicating that this dataset has
+	# restrictions on how many rows it can have
+	min_row = models.PositiveIntegerField(null=True, blank=True);
+	max_row = models.PositiveIntegerField(null=True, blank=True);
+
+	class Meta:
+		abstract = True;
+
+		unique_together = (("content_type", "object_id", "dataset_name"),
+						   ("content_type", "object_id", "dataset_idx"));
+
+	def __unicode__(self):
+		return u"[{}]:{} {} {}".format(unicode(self.transformation),
+									   self.dataset_idx,
+									   unicode(self.compounddatatype),
+									   self.dataset_name);
+
+	
+class TransformationInput(TransformationXput):
+	# Implicitly defined:
+	# transformations: from MapTransformationToInput
+	pass
+
+class TransformationOutput(TransformationXput):
+	# Implicitly defined:
+	# transformations: from MapTransformationToOutput
+	pass

@@ -1,0 +1,34 @@
+#!/usr/bin/expect -f
+
+# Customize and put in another file in this directory, e.g. nukeDB.expect
+# (this is where the .gitignore file expects it, and will ignore your 
+# customized version).
+
+spawn rm -r CodeResources
+spawn rm -r VerificationScripts
+spawn rm -r Datasets
+spawn rm ../db/copperfish.db
+spawn ./manage.py syncdb
+
+expect -re "(yes/no):"
+send "yes\r"
+
+expect -re "(leave blank to use '.*'):"
+send "\r"
+
+expect -re "Email address:"
+send "[YOUR E-MAIL ADDRESS HERE]\r"
+
+expect -re "Password:"
+send "[YOUR PASSWORD HERE]\r"
+
+expect -re "Password (again): "
+send "[SAME PASSWORD HERE]\r"
+
+spawn ./manage.py shell
+expect ">>>"
+send "execfile('LoadData.py')\r"
+expect ">>>"
+send "exit()\r"
+
+exit
