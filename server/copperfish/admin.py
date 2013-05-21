@@ -48,8 +48,8 @@ class MethodAdmin(admin.ModelAdmin):
 admin.site.register(MethodFamily);
 admin.site.register(Method, MethodAdmin);
 
-#admin.site.register(TransformationInput);
-#admin.site.register(TransformationOutput);
+admin.site.register(TransformationInput);
+admin.site.register(TransformationOutput);
 
 class PipelineStepInputInline(admin.StackedInline):
     model = PipelineStepInput;
