@@ -1806,24 +1806,3 @@ class CopperfishMethodTests(TestCase):
                 "Outputs are not consecutively numbered starting from 1",
                 foo.clean);
 
-
-    def test_pipeline_clean_chainstep_wiring_good(self):
-        """Test good step wiring, chained-step pipeline."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version");
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cd,
-                          dataset_name="oneinput", dataset_idx=1);
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.inputs.create(transf_input_name="input",
-                            step_providing_input=0,
-                            provider_output_name="oneinput");
-        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.inputs.create(transf_input_name="complemented_seqs",
-                            step_providing_input=1,
-                            provider_output_name="output");
-        step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.inputs.create(transf_input_name="input",
-                            step_providing_input=2,
-                            provider_output_name="recomplemented_seqs");
-        self.assertEquals(foo.clean(), None);
