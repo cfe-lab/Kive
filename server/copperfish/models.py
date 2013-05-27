@@ -587,7 +587,7 @@ class Pipeline(Transformation):
 		super(Pipeline, self).clean();
 
 
-		# Internal pipeline step numbers must be consecutive from 1 to n
+		# Internal pipeline STEP numbers must be consecutive from 1 to n
 		all_steps = self.steps.all();
 		step_nums = [];
 
@@ -599,31 +599,31 @@ class Pipeline(Transformation):
 					"Steps are not consecutively numbered starting from 1");
 
 
-
 		# Check that steps are coherent with each other
 		#
 		# Are inputs at each step...
 		#	A) Available? (Produced by a previous step + not deleted, OR an absolute input)
 		#	B) Of the correct CompoundDatatype? And, not have contrary min/max row constraints?
 
+		###### ARE WE CHECKING THAT ONLY A SINGLE WIRE LEADS TO A DESTINATION INPUT? ##########
 
 		# For each Pipeline step
  		for step in all_steps:
 
-			# For each input defined at that step, extract input parameters (From PipelineStepInput)
+			# Extract wiring parameters (PipelineStepInput) for each input
 			for curr_in in step.inputs.all():
-				input_requested = curr_in.provider_output_name;		# Name of pipeline step output (???)
-				requested_from = curr_in.step_providing_input;		# Step the data should come from
-				feed_to_input = curr_in.transf_input_name;			# Where the data should go
+				input_requested = curr_in.provider_output_name;		# Output hole where source data originates
+				requested_from = curr_in.step_providing_input;		# Pipeline step of wiring destination
+				feed_to_input = curr_in.transf_input_name;			# Input hole of wiring destination
 
 				# Find the requested input; raise ValidationError on failure (???)
 				req_input = None;
 
-				# If this is an initial input provided from the beginning
+				# If this pipeline step's input is from step 0, it doesn't come from previous steps
 				if requested_from == 0:
 
-					# Get the inputs of self (Pipeline, a transformation)
-					# Where the name of the input is input_requested from 
+					# Get pipeline inputs of self (Pipeline, a transformation)
+					# Look for pipeline inputs that match the desired wiring source output name
 					try:
 						req_input = self.inputs.get(
 								dataset_name=input_requested);
@@ -633,10 +633,13 @@ class Pipeline(Transformation):
 								"Pipeline does not have input \"{}\"".
 								format(input_requested));	
 
-				# Otherwise, the input comes from a previous pipeline step
-				# (Which is why are are looking at OUTPUTS)
+				# If not from step 0, input derives from the output of a pipeline steps
 				else:
+
+					# Look at the pipeline step referenced by the wiring parameter
 					providing_step = all_steps[requested_from-1];
+
+					# Do any outputs at this pipeline step/transformation have the name requested?
 					try:
 						req_input = providing_step.transformation.outputs.get(
 								dataset_name=input_requested);
@@ -646,23 +649,32 @@ class Pipeline(Transformation):
 								"Transformation at step {} does not produce output \"{}\"".
 								format(requested_from, input_requested));
 						
-					# Was this dataset deleted?
+					# Was the data from this step's transformation output deleted?
 					if providing_step.outputs_to_delete.filter(
 							dataset_to_delete=input_requested).count() != 0:
+
+						# Identify wiring source output name + step number, and desired step availability
 						raise ValidationError(
 								"Input \"{}\" from step {} to step {} is deleted prior to request".
 								format(input_requested, requested_from,
 									   step.step_num));
 
-				# Check that the requested input matches the expected prototype.
-				# Note: we don't check for ValidationError because this was
-				# already checked in the clean() step of PipelineStep.
+				# Get the input from this step's transformation that has an input hole
+				# name matching the wiring destination input hole name
+
+				# That is to say, check that the wiring-requested input matches the prototype
+
+				# Don't check for ValidationError because this was checked in the clean() of PipelineStep.
 				transf_input = step.transformation.inputs.get(dataset_name=feed_to_input);
 
 				# FIXME: we're just going to enforce that transf_input
 				# and req_input have the same CompoundDatatype, rather
 				# than making sure that their CompoundDatatypes match;
-				# is this too restrictive?				
+				# is this too restrictive?
+
+				# For this (input,step) wiring, a matching output (req_input) as determined by
+				# output hole name (dataset_name) was found at the requested step, but we still
+				# need to check that their compounddatatypes match
 				if req_input.compounddatatype != transf_input.compounddatatype:
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} does not have the expected CompoundDatatype".
@@ -670,10 +682,16 @@ class Pipeline(Transformation):
 
 				provided_min_row = 0;
 				required_min_row = 0;
+
+				# Source output row constraint
 				if req_input.min_row != None:
 					providing_min_row = req_input.min_row;
+
+				# Destination input row constraint
 				if transf_input.min_row != None:
 					required_min_row = transf_input.min_row;
+
+				# Check for contradictory min row constraints
 				if (provided_min_row < required_min_row):
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} may have too few rows".
@@ -681,10 +699,14 @@ class Pipeline(Transformation):
 				
 				provided_max_row = float("inf");
 				required_max_row = float("inf");
+
 				if req_input.max_row != None:
 					providing_max_row = req_input.max_row;
+
 				if transf_input.max_row != None:
 					required_max_row = transf_input.max_row;
+
+				# Check for contradictory max row constraints
 				if (provided_max_row > required_max_row):
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} may have too many rows".
