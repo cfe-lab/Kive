@@ -32,13 +32,12 @@ class Datatype(models.Model):
 
 	description = models.TextField()
 
-	# Are we only using python interpreters? Not necesarilly, but we will be using
-	# python to VALIDATE the data...
+	# Datatypes aren't necesarilly generated using python but are VALIDATED with python
 	Python_type = models.CharField(	'Python variable type',
 									max_length=64,
 									help_text="Python type, such as String, Int, Date");
 
-	# Still todo: CHECK FOR CIRCULARLY DEFINED RESTRICTIONS (Into clean())
+	# Todo: Check for circularly defined restrictions
 	restricts = models.ManyToManyField(	'self',
 										symmetrical=False,
 										related_name="restricted_by",
@@ -46,7 +45,6 @@ class Datatype(models.Model):
 										blank=True,
 										help_text="Captures hierarchical is-a classifications among Datatypes");
 
-	# upload_to: path where file is stored
 	verification_script = models.FileField(	"Verification script",
 											upload_to='VerificationScripts',
 											help_text="Validates inputs labelled as a DataType in actually being that DataType")
@@ -73,17 +71,16 @@ class CompoundDatatypeMember(models.Model):
 									max_length=128,
 									help_text="Gives datatype a name - removes the need for collumn indices");
 
-	# MinValueValidator(1) constrains column_idx to be >= 1 (Else, raise ValidationError)
+	# MinValueValidator(1) constrains column_idx to be >= 1
 	column_idx = models.PositiveIntegerField(	validators=[MinValueValidator(1)]
 												help_text="The column number of this DataType");
 
-	# Define unique database indices to ensure uniqueness on particular tuples
-	# A compoundDataType cannot have 2 of the same column name or column number
+	# Define database indexing rules to ensure tuple uniqueness
+	# A compoundDataType cannot have 2 member definitions with the same column name or column number
 	class Meta:
 		unique_together = 	(("compounddatatype", "column_name"),
 							("compounddatatype", "column_idx"));
 
-	# {} returns the variable in the order it was given
 	def __unicode__(self):
 		"""Describe a CompoundDatatypeMember with it's column number, datatype name, and column name"""
 		return u"{}: <{}> [{}]".format(	self.column_idx,
@@ -102,35 +99,37 @@ class CompoundDatatype(models.Model):
 	#   Conforming_datasets (Dataset/ForeignKey)
 
 	def __unicode__(self):
-		""" Create an ordered string representation of this CompoundDatatype's members """
+		""" Represent CompoundDatatype with a list of it's members """
 
 		string_rep = u"(";
+
+		# Get the members for this compound data type
 		all_members = self.members.all();
 
-		# Get the column number for each DataType member in this CompoundDatatype
+		# A) Get the column index for each member
 		member_indices = [member.column_idx for member in all_members];
 
-		# len() returns the number of objects, range(x) returns a sequence from 0 to x
-		# So, get the column index of each Datatype member, along with the Datatype member itself
+		# B) Get the column index of each Datatype member, along with the Datatype member itself
 		members_with_indices = [ (member_indices[i], all_members[i]) for i in range(len(all_members))];
+		# Can we do this? members_with_indices = [ (all_members[i].column_idx, all_members[i]) for i in range(len(all_members))];
 
-		# Sort Datatype members using the index as a basis (Specified by operator.itemgetter(0))
+		# Sort members using column index as a basis (operator.itemgetter(0))
 		members_with_indices = sorted(	members_with_indices,
 										key=operator.itemgetter(0));
 
-		# Add the unicode of the Datatype member to the string representation
+		# Add sorted Datatype members to the string representation
 		for i, colIdx_and_member in enumerate(members_with_indices):
 			colIdx, member = colIdx_and_member;
 			string_rep += unicode(member);
 
-			# Add a comma if we are not at the end of the list
+			# Add comma if not at the end of member list
 			if i != len(members_with_indices) - 1:
 				string_rep += ", ";
 
 		string_rep += ")";
 		return string_rep;
 
-	# Model.clean() is executed prior to save() to validate model contents
+	# clean() is executed prior to save() to perform model validation
 	def clean(self):
 		"""Check if Datatype members have consecutive indices from 1 to n"""
 		column_indices = [];
@@ -146,7 +145,7 @@ class CompoundDatatype(models.Model):
 
 class Dataset(models.Model):
 	"""
-	Datasets uploaded by users.
+	Datasets uploaded by users, to be used as inputs for transformations.
 	Related to :model:`copperfish.PipelineStep`
 	Related to :model:`copperfish.CompoundDatatype`
 	"""
@@ -154,7 +153,7 @@ class Dataset(models.Model):
 	# Implicitly defined
 	#   descendent_datasets (self/ManyToMany)
 
-	# Activating the admin panel creates a Users model
+	# Activating admin panel creates a Users model
 	user = models.ForeignKey(	User,
 								help_text="User that uploaded this dataset.");
 
@@ -166,38 +165,35 @@ class Dataset(models.Model):
 
 	date_created = models.DateTimeField(	auto_now_add=True,
 											help_text="Date of dataset upload.");
-	
-	# What Pipeline step did this Dataset come from, and from which output?
-	# Does null or blank mean that it came from no Pipeline? (WHICH ONE IS IT?) [Both needed for Foreign key]
 
 
-	# Null - if a Dataset was uploaded but not created...
-	pipeline_step = models.ForeignKey(	"PipelineStep",
+	# Pipeline step this Dataset come from (Null if Dataset was manually uploaded)
+	pipeline_step = models.ForeignKey(	"Pipeline Step",
 									  	related_name="data_produced",
 									  	null=True,
 										blank=True);
 
-	# Within a pipeline step, which output is it?
-	pipeline_step_output_name = models.CharField(	"???",
+	# Output 'hole' within a pipeline the Dataset comes from
+	pipeline_step_output_name = models.CharField(	"Output hole",
 													max_length=128,
 													blank=True,
-													help_text="???");
+													help_text="The output 'hole' this dataset comes from (If applicable)");
 
-	# Datasets are a compound data type
-	compounddatatype = models.ForeignKey(	CompoundDatatype,
-											related_name="conforming_datasets");
-
-	# If the dataset is derived from a transformation, it comes from precursor datasets
+	# Parent datasets this dataset is derived from
 	parent_datasets = models.ManyToManyField(	'self',
 												related_name="descendent_datasets",
 												null=True,
 												blank=True);
 
+	# Datasets are restricted by a compound data type
+	compounddatatype = models.ForeignKey(	CompoundDatatype,
+											related_name="conforming_datasets");
+
 	dataset_file = models.FileField(upload_to="Datasets",
-									help_text="Path where datasets are stored");
+									help_text="File path where datasets are stored");
 
 	MD5_checksum = models.CharField(	max_length=64,
-										help_text="Used to check data integrity");
+										help_text="Used to check dataset file integrity");
 
 
 	def __unicode__(self):
@@ -206,7 +202,7 @@ class Dataset(models.Model):
 												 	unicode(self.user),
 												 	self.date_created);
 
-	# Before saving, generate the MD5 hash for this Dataset
+	# Before completing a save(), generate the MD5 hash
 	def clean(self):
 		"""If a file specified, populate the MD5 checksum."""
 
@@ -214,6 +210,7 @@ class Dataset(models.Model):
 			md5gen = hashlib.md5();
 			md5gen.update(self.dataset_file.read());
 			self.MD5_checksum = md5gen.hexdigest();
+
 		except ValueError as e:
 			print(e);
 			print("No file found; setting MD5 checksum to the empty string.");
@@ -244,6 +241,7 @@ class CodeResourceRevision(models.Model):
 
 	Related to :model:`copperfish.CodeResource`
 	Related to :model:`copperfish.CodeResourceDependency`
+	Related to :model:`copperfish.Method`
 	"""
 
 	# Implicitly defined
@@ -252,13 +250,12 @@ class CodeResourceRevision(models.Model):
 	#   needed_by (CodeResourceDependency/ForeignKey)
 	#   method_set (Method/ForeignKey) ???
 
-	coderesource = models.ForeignKey(
-			CodeResource,
-			related_name="revisions");	
+	coderesource = models.ForeignKey(	CodeResource,
+										related_name="revisions");	
 		
 	revision_name = models.CharField(
 			max_length=128,
-			help_text="Identifier for the particular revision of this resource");
+			help_text="A name to differentiate revisions of a CodeResource");
 
 	revision_DateTime = models.DateTimeField(
 			auto_now_add=True,
@@ -278,85 +275,85 @@ class CodeResourceRevision(models.Model):
 			upload_to="CodeResources",
 			null=True,
 			blank=True,
-			help_text="The actual contents of this code resource revision");
+			help_text="File contents of this code resource revision");
 
 	MD5_checksum = models.CharField(
 			max_length=64,
 			blank=True,
-			help_text="Used to validate the contents of this resource revision");
+			help_text="Used to validate file contents of this resource revision");
 
 	def __unicode__(self):
-		"""Represent with CodeResource and CodeResourceRevision name"""
+		"""Represent a resource revision by it's CodeResource name and revision name"""
 		
-		# This CodeResourceRevision may have no coderesource yet
-		# Admin page interface... will cause a CodeResource to be created without being save()ed
-		# and then a code resource REVISION will be instantiated (but not save()ed) ...
+		# The admin can create a CodeResource without save()ing to the database
+		# and allow a corresponding CodeResource Revision to be created in memory
+		# Thus in MEMORY, a revision can temporarily have no corresponding CodeResource
 		if not hasattr(self, "coderesource"):
 			return u"[no code resource set] {}".format(self.revision_name);
 		
 		string_rep = self.coderesource.name + u" " + self.revision_name;
 		return string_rep;
 
-	# Why wouldn't a file be specified?????? - this could be a resource without an actual
-	# file, just dependencies....
+	# A CodeResource can simply be a collection of dependencies, and not actually
+	# contain a file - thus, an MD5 hash may not need to exist
 	def clean(self):
 		"""If there is a file specified, fill in the MD5 checksum."""
+
 		try:
 			md5gen = hashlib.md5();
 			md5gen.update(self.content_file.read());
 			self.MD5_checksum = md5gen.hexdigest();
+
 		except ValueError as e:
-			#print(e);
-			#print("No file found; setting MD5 checksum to the empty string.");
 			self.MD5_checksum = "";
 
 class CodeResourceDependency(models.Model):
 	"""
-	Dependencies of a CodeResource - themselves also CodeResources.
-
-	Related to :model:`copperfish.CodeResource`
+	Dependencies of a CodeResourceRevision - themselves also CodeResources.
+	Related to :model:`copperfish.CodeResourceRevision`
 	"""
 
 	coderesourcerevision = models.ForeignKey(CodeResourceRevision,
 											 related_name="dependencies");
 
-	# The dependency is defined by a particular code resource revision
+	# Dependency is a codeResourceRevision
 	requirement = models.ForeignKey(CodeResourceRevision,
 	                                related_name="needed_by");
-	
-	# Where to put it (relative to the sandbox).
-	# FIXME: should we use a FilePathField?
+
+	# ???????????????????????????	
+	# Where to store it (relative to the sandbox) FIXME: use a FilePathField?
 	where = models.CharField(
+			"Dependency location",
 			max_length=100,
 			help_text="Where a code resource dependency must exist - relative to the sandbox??? or the code resource?");
 
 	def __unicode__(self):
-		"""Represent as [x] requires [y] as [z]."""
+		"""Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
 		return u"{} requires {} as {}".format(
 				unicode(self.coderesourcerevision),
 				unicode(self.requirement),
 				self.where);
 
-# General description of Method and Pipeline familiies
 class TransformationFamily(models.Model):
 	"""
-	TransformationFamily is an abstract class that describes
-	what is common between MethodFamily and PipelineFamily.
+	TransformationFamily is abstract and describes common
+	parameters between MethodFamily and PipelineFamily.
 
 	Extends :model:`copperfish.MethodFamily`
 	Extends :model:`copperfish.PipelineFamily`
 	"""
 
 	name = models.CharField(
-		"Transformation family name",
-		max_length=128);
+			"Transformation family name",
+			max_length=128,
+			help_text="The name given to a group of methods/pipelines");
 
 	description = models.TextField(
-		"Transformation family description"
-		);
+			"Transformation family description",
+			help_text="A description for this collection of methods/pipelines");
 
 	def __unicode__(self):
-		""" Describe a transformation family with it's name """
+		""" Describe transformation family by it's name """
 		return self.name;
 
 	class Meta:
@@ -391,14 +388,21 @@ class PipelineFamily(TransformationFamily):
 
 class Transformation(models.Model):
 	"""
-	Abstract class that defines what is common of transformation
-	revisions (ie, Method and Pipeline revisions)
+	Abstract class that defines common parameters
+	across Method revisions and Pipeline revisions.
 
 	Extends :model:`copperfish.Method`
 	Extends :model:`copperfish.Pipeline`
+	Related to :model:`TransformationInput`
+	Related to :model:`TransformationOutput`
+
+	I DO NOT SEE THE CODE THAT RELATES THIS CLASS TO COMPOUND DATA TYPE
 	"""
 
-	revision_name = models.CharField(max_length=128);
+	revision_name = models.CharField(
+			"Transformation revision name",
+			max_length=128,
+			help_text="The name of this transformation revision");
 
 	revision_DateTime = models.DateTimeField(
 			"Revision creation date",
@@ -408,9 +412,8 @@ class Transformation(models.Model):
 			"Transformation revision description",
 			help_text="Description of this transformation revision");
 
-	# A TransformationInput is associated with a method/pipeline
-	# Using GenericForeignKey in TransformationXput
-	# A transformation can access it's inputs/outputs via GenericRelation
+	# inputs/outputs associated with transformations via GenericForeignKey
+	# And can be accessed from within Transformations via GenericRelation
 	inputs = generic.GenericRelation("TransformationInput");
 	outputs = generic.GenericRelation("TransformationOutput");
 
@@ -418,39 +421,37 @@ class Transformation(models.Model):
 		abstract = True;
 
 	def check_input_indices(self):
-		"""Check that inputs are numbered consecutively from 1"""
+		"""Check that input indices are numbered consecutively from 1"""
 
-		# Start with an empty list
+		# Append each input index (hole number) to a list
 		input_nums = [];
-
-		# For each tranformation input, append dataset index to the list
 		for curr_input in self.inputs.all():
 			input_nums += [curr_input.dataset_idx];
 
-		# If list is not exactly a sequence from 1 to n, raise an error
+		# Indices must be consecutively numbered from 1 to n
 		if sorted(input_nums) != range(1, self.inputs.count()+1):
 			raise ValidationError(
 					"Inputs are not consecutively numbered starting from 1");
 		
 	def check_output_indices(self):
-		"""Check that outputs are numbered consecutively from 1"""
+		"""Check that output indices are numbered consecutively from 1"""
 
-		# Start with an empty list
+		# Append each output index (hole number) to a list
 		output_nums = [];
-
-		# For each tranformation input, append output index to the list
 		for curr_output in self.outputs.all():
 			output_nums += [curr_output.dataset_idx];
 
-		# If list is not exactly a sequence from 1 to n, raise an error
+		# Indices must be consecutively numbered from 1 to n
 		if sorted(output_nums) != range(1, self.outputs.count()+1):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
 
 	def clean(self):
 		"""Validate transformation inputs and outputs."""
+
 		self.check_input_indices();
 		self.check_output_indices();
+		# FIXME: ALSO NEED TO CHECK WE DO NOT HAVE MULTIPLE INPUT/OUTPUTS OF THE SAME NAME
 
 class Method(Transformation):
 	"""
@@ -472,46 +473,41 @@ class Method(Transformation):
 										null=True,
 										blank=True);
 
-	# CodeResourceRevision must be executable
+	# Unenforced constraint - code resource revision must be executable
 	driver = models.ForeignKey(CodeResourceRevision);
 
 	def __unicode__(self):
 		"""Represent a method by it's revision name and method family"""
 		string_rep = u"Method {} {}".format("{}", self.revision_name);
 
-		# Family may not be set (If created from the family admin page)
+		# MethodFamily may not be temporally saved in DB if created by admin
 		if hasattr(self, "family"):
 			string_rep = string_rep.format(unicode(self.family));
 		else:
 			string_rep = string_rep.format("[family unset]");
-		return string_rep;
 
+		return string_rep;
 
 	def save(self, *args, **kwargs):
 		"""
-		Create or update a method revision. If method has no associated
-		inputs or outputs, but has a parent, copy parent input/outputs.
+		Create or update a method revision.
 
-		There are two states when invoking save()
-		1) First time creating the method revision
-		2) Updating a method revision
-
-		When creating a method revision the first time, a standard
-		save() must be called first: inputs/outputs cannot be registered
-		unless this method revision has been entered into the database.	
+		If a method revision being created is derived from a parental
+		method revision, copy the parent input/outputs.
 		"""
 
-		# Execute original save()
+		# Inputs/outputs cannot be stored in the database unless this
+		# method revision has itself first been saved to the database
 		super(Method, self).save(*args, **kwargs);
 
-		# If no parent revision of this method exists, there's nothing to do
+		# If no parent revision exists, there are no input/outputs to copy
 		if self.revision_parent == None:
 			return None;
 
-		# If parent revision exists, and inputs/outputs haven't been registered
+		# If parent revision exists, and inputs/outputs haven't been registered,
+		# copy all inputs and outputs from the parent revision to this revision
 		if self.inputs.count() + self.outputs.count() == 0:
 
-			# Copy all inputs from the parent revision into this revision
 			for parent_input in self.revision_parent.inputs.all():
 				self.inputs.create(
 						compounddatatype = parent_input.compounddatatype,
@@ -520,7 +516,6 @@ class Method(Transformation):
 						min_row = parent_input.min_row,
 						max_row = parent_input.max_row);
 
-			# Copy all outputs from the parent revision into this revision
 			for parent_output in self.revision_parent.outputs.all():
 				self.outputs.create(
 						compounddatatype = parent_output.compounddatatype,
@@ -532,10 +527,12 @@ class Method(Transformation):
 
 class Pipeline(Transformation):
 	"""
-	A particular pipeline revision. (MORE DETAIL NEEDED)
+	A particular pipeline revision.
 
 	Inherits from :model:`copperfish.Transformation`
 	Related to :model:`copperfish.PipelineFamily`
+	Related to :model:`copperfish.PipelineStep`
+	Related to :model:`copperfish.PipelineOutputMapping`
 	"""
 
 	# Implicitly defined
@@ -552,7 +549,7 @@ class Pipeline(Transformation):
 										blank=True);
 
 	# When defining a pipeline, we don't define the outputs; we define
-	# outmap instead and during the clean stage the outputs are created.
+	# outmap instead and during the clean stage the outputs are created. (?????)
 	
 	# outmap describes where a given terminal pipeline output of a pipeline comes from...
 	# with respect to its own steps' outputs
@@ -580,48 +577,53 @@ class Pipeline(Transformation):
 		4) Outputs of the pipeline will be mapped to outputs generated by its steps (???)
 		"""
 
-		# Check that inputs are numbered consecutively from 1
-		# We don't care about the outputs, but if they are set, check them
+		# Check that inputs are numbered consecutively from 1 (???)
+		# We don't care about the outputs, but if they are set, check them (???)
 
-		# Call Transformation (the superclass of Pipeline)'s clean()
+
+
+		# Transformation.clean() - check for consecutive numbering of
+		# input/outputs for this pipeline as a whole
 		super(Pipeline, self).clean();
 
-		# 1) Validate pipeline step numbering
+
+		# Internal pipeline step numbers must be consecutive from 1 to n
 		all_steps = self.steps.all();
 		step_nums = [];
 
 		for step in all_steps:
 			step_nums += [step.step_num];
 
-		# If it is not exactly a sequence from 1 to n, raise error
 		if sorted(step_nums) != range(1, len(all_steps)+1):
 			raise ValidationError(
 					"Steps are not consecutively numbered starting from 1");
 
-		# Check that steps are coherent with each other
-		# Is the inputs of each step... are A) available (produced by a previous step, not delete OR an absolute input)
-		# B) Of the correct CompoundDatatype (There are also constraints on min/max rows that get checked...)
 
-		# a) In Pipeline, steps is implicitly defined by PipelineStep
-		# b) In PipelineStep, inputs is implicitly defined by PipelineStepInput
-		
+
+		# Check that steps are coherent with each other
+		#
+		# Are inputs at each step...
+		#	A) Available? (Produced by a previous step + not deleted, OR an absolute input)
+		#	B) Of the correct CompoundDatatype? And, not have contrary min/max row constraints?
+
+
 		# For each Pipeline step
  		for step in all_steps:
 
-			# For each input for that step, extract the input parameters
+			# For each input defined at that step, extract input parameters (From PipelineStepInput)
 			for curr_in in step.inputs.all():
-				input_requested = curr_in.provider_output_name;		# What name of the pipeline step's output
-				requested_from = curr_in.step_providing_input;		# What step the data should come from
+				input_requested = curr_in.provider_output_name;		# Name of pipeline step output (???)
+				requested_from = curr_in.step_providing_input;		# Step the data should come from
 				feed_to_input = curr_in.transf_input_name;			# Where the data should go
 
 				# Find the requested input; raise ValidationError on failure (???)
 				req_input = None;
 
-				# If this is an initial pipeline input...
+				# If this is an initial input provided from the beginning
 				if requested_from == 0:
 
-					# self is Pipeline, a transformation, which has inputs
-					# So get it from an initial pipeline input (dataset_name)
+					# Get the inputs of self (Pipeline, a transformation)
+					# Where the name of the input is input_requested from 
 					try:
 						req_input = self.inputs.get(
 								dataset_name=input_requested);
@@ -863,29 +865,47 @@ class PipelineStep(models.Model):
 
 class PipelineStepInput(models.Model):
 	"""
-	Represents the "wires" feeding into a pipeline step.
+	Represents the "wires" feeding into the transformation of a
+	particular pipeline step, specifically:
+
+	A) Destination of wire (transf_input_name) - step implicitly defined
+	B) Source of the wire (step_providing_input, provider_output_name)
+
+	Related to :model:`copperfish.PipelineStep`
 	"""
 
+	# The step where we are defining wires
+	# RECALL: a pipeline step involves a single transformation
 	pipelinestep = models.ForeignKey(	PipelineStep,
 										related_name = "inputs");
 
-	# The name of the input hole
-	# This comes from the name attached to TransformationInput
-	# (dataset_name)
-	# This might be changed to a ForeignKey to TransformationInput
+	# Input hole (TransformationInput.dataset_name) of the step's
+	# transformation to which the wire leads
+
 	transf_input_name = models.CharField(	"Transformation input name",
 											max_length=128,
-											help_text="The name of the input hole (FIXME)");
+											help_text="Wiring destination input hole name");
 
-	# PRE: step_providing_input < the step number of the PipelineStep this
-	# input goes into
-	# The coherence of the data here will be enforced at the Python level
-	# (i.e. does this actually refer to a Dataset produced by the
-	# Transformation at the specified step, etc.)
-	step_providing_input = models.PositiveIntegerField();
-	provider_output_name = models.CharField(max_length=128);
+
+	# The tuple (step_providing_input, provider_output_name) unambiguously defines
+	# the source of the wire
+
+	step_providing_input = models.PositiveIntegerField(	"Step providing input",
+														help_text="Wiring source step");
+
+	provider_output_name = models.CharField("Provider output name",
+											max_length=128,
+											help_text="Wiring source output hole name");
+
+	# FIXME: Refactor transf_input_name and provider_output_name as ForeignKeys to
+	# TransformationInput and TransformationOutput objects
+
+	# CONDITIONS: step_providing_input must be PRIOR to this pipeline step (Time moves forward)
+	# Coherence of data here will be enforced at the Python level
+	# IE, does this refer to a Dataset produced by the Transformation at the specified step?
 
 	def __unicode__(self):
+		"""Represent PipelineStepInput with the pipeline step, and the wiring destination input name"""
 		step_str = "[no pipeline step set]";
 		if self.pipelinestep != None:
 			step_str = unicode(self.pipelinestep);
@@ -893,32 +913,70 @@ class PipelineStepInput(models.Model):
 
 
 class PipelineStepDelete(models.Model):
+	"""
+	PipelineStepDelete defines what output datasets can be immediately deleted.
+	(Recall, each pipeline step involves a transformation that generates outputs)
+
+	Related to :model:`copperfish.PipelineStep`
+	"""
 	pipelinestep = models.ForeignKey(PipelineStep,
 	                                 related_name="outputs_to_delete");
 
-	# Again, the coherence of this data will be enforced at the Python level
+	# Again, coherence of data will be enforced at the Python level
 	# (i.e. does this actually refer to a Dataset that will be produced
 	# by the Transformation at this step)
-	dataset_to_delete = models.CharField(max_length=128);
+
+	# dataset_name of TransformationOutput for the transformation at this step
+	dataset_to_delete = models.CharField(	"Dataset to delete",
+											max_length=128,
+											help_text="");
 
 
 class PipelineOutputMapping(models.Model):
-	"""Specifies mapping of PipelineStep outputs to Pipeline outputs."""
+	"""
+	Defines which outputs of internal PipelineSteps are mapped to
+	end-point Pipeline outputs once internal execution is complete.
+
+	Thus, a definition of wires leading to external pipeline outputs.
+
+	Related to :model:`copperfish.Pipeline`
+	Related to :model:`copperfish.TransformationOutput` (Refactoring needed)
+	"""
 
 	pipeline = models.ForeignKey(	Pipeline,
 									related_name="outmap");
 
-	output_name = models.CharField(max_length=128);
-	output_idx = models.PositiveIntegerField(validators=[MinValueValidator(1)]);
+	output_name = models.CharField(	"Destination output hole",
+									max_length=128,
+									help_text="");
+
+	# WHY DO WE NEED BOTH OUTPUT_NAME AND OUTPUT_IDX???????
+	# ISNT THE NAME<->INDEX MAPPING HANDLED ELSEWHERE????
+	output_idx = models.PositiveIntegerField(
+			"",
+			validators=[MinValueValidator(1)],
+			help_text="");
+
+	# FIXME: Refactor (output_name, output_idx) as a TransformationOutput
+
 
 	# PRE: step_providing_output is an actual step of the pipeline
 	# and provider_output_name actually refers to one of the outputs
 	# at that step
 	# The coherence of the data here will be enforced at the Python level
-	step_providing_output = models.PositiveIntegerField(validators=[MinValueValidator(1)]);
-	provider_output_name = models.CharField(max_length=128);
+
+	step_providing_output = models.PositiveIntegerField(
+			"Step providing output",
+			validators=[MinValueValidator(1)],
+			help_text="Source step at which output comes from");
+
+	provider_output_name = models.CharField(
+			"Provider output name",
+			max_length=128,
+			help_text="Source output hole name");
 
 	def __unicode__(self):
+		""" Represent with the pipeline name, output index, and output name (???) """
 		pipeline_name = "[no pipeline set]";
 		if self.pipeline != None:
 			pipeline_name = unicode(self.pipeline);
@@ -929,29 +987,30 @@ class PipelineOutputMapping(models.Model):
 
 class TransformationXput(models.Model):
 	"""
-	Describes parameters common to all inputs
-	and outputs of pipeline steps.
+	Describes parameters common to all inputs and outputs
+	of transformations - the "holes"
 
 	Extends :model:`copperfish.TransformationInput`
 	Extends :model:`copperfish.TransformationOutput`
 	"""
 
-	# TransformationXput is associated with methods and pipelines
+	# TransformationXput describes the input/outputs of transformations
+	# So this class can only be associated with method and pipeline
 	content_type = models.ForeignKey(
 			ContentType,
 			limit_choices_to = {"model__in": ("method", "pipeline")});
 	object_id = models.PositiveIntegerField();
 	transformation = generic.GenericForeignKey("content_type", "object_id");
 
-	# This is either the input or the output
+	# The expected compounddatatype of the input/output
 	compounddatatype = models.ForeignKey(CompoundDatatype);
 
-	# Why does a transformation input/output need a dataset name?
-	# Or did we really mean the "name" of the input/output?
-	# The name of the "hole"
-	dataset_name = models.CharField(max_length=128);
+	# The name of the "input/output" hole
+	dataset_name = models.CharField("Input/output name",
+									max_length=128,
+									help_text="A name for this input/output as an alternative to input/output index");
 
-	# Is this the index on the transformation for this input/output?
+	# Input/output index on the transformation
 	dataset_idx = models.PositiveIntegerField(validators=[MinValueValidator(1)]);
 	
 	# Nullable fields indicating that this dataset has
