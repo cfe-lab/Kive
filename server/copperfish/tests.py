@@ -1,5 +1,5 @@
 """
-Unit tests for the Copperfish.
+Unit tests for ShipYard (Copperfish)
 """
 
 from django.test import TestCase;
@@ -14,14 +14,16 @@ import hashlib;
 
 class DatatypeMethodTests(TestCase):
     def test_unicode(self):
-        """Test that the unicode representation is the instance's name."""
+        """Unicode representation must be the instance's name."""
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
+
 class CopperfishMethodTests(TestCase):
+
     def setUp(self):
         """Define some variables to use in testing Copperfish."""
-        ####
+
         # First, some Datatype and CompoundDatatype stuff
         with open(os.path.join(samplecode_path, "stringUT.py"), "rb") as f:
             string_dt = Datatype(name="string",
