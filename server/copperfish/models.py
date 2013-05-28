@@ -712,21 +712,25 @@ class Pipeline(Transformation):
 							"Data fed to input \"{}\" of step {} may have too many rows".
 							format(feed_to_input, step.step_num));
 
-		# Check the output mappings, making sure the wiring is coherent.
+		# Check pipeline output wiring for coherence
 		output_indices = [];
+
 		for mapping in self.outmap.all():
 			output_requested = mapping.provider_output_name;
 			requested_from = mapping.step_providing_output;
 			connect_to_output = mapping.output_name;
 			output_indices += [mapping.output_idx];
 
-			# Is the step number valid?
+			# Source step number must be in range
 			if requested_from > len(all_steps):
 				raise ValidationError(
 						"Output requested from a non-existent step");	
 			
+			# Given it is valid, access that step for deeper inspection
 			providing_step = all_steps[requested_from-1];
 			req_output = None;
+
+			# Try to find an output hole with a matching name
 			try:
 				req_output = providing_step.transformation.outputs.get(
 						dataset_name=output_requested);
@@ -735,47 +739,52 @@ class Pipeline(Transformation):
 						"Transformation at step {} does not produce output \"{}\"".
 						format(requested_from, output_requested));
 
-			# Was this output deleted by the step producing it?
+			# Also determine if output was deleted by the step producing it
 			if providing_step.outputs_to_delete.filter(
 					dataset_to_delete=output_requested).count() != 0:
 				raise ValidationError(
 						"Output \"{}\" from step {} is deleted prior to request".
 						format(output_requested, requested_from));
 
+		# Also check if pipeline outputs are numbered consecutively
 		if sorted(output_indices) != range(1, self.outmap.count()+1):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
 
-			
 
 	def save(self, *args, **kwargs):
 		"""
-		When saving, set up outputs as specified.
+		When saving, a pipline, set up outputs as specified.
 
 		This must be done after saving, because otherwise the manager for
-		the calling instance's outputs will not have been set up.
+		the calling instance's outputs will not have been set up. (???)
 		"""
+
+		# Call Transformation's save() first
 		super(Pipeline, self).save(*args, **kwargs);
 
-		# Delete existing outputs (if we ever customize delete()
-		# of TransformationOutput we'll need to change this)
+		# Delete existing pipeline outputs
+		# Be careful if customizing delete() of TransformationOutput
 
 		self.outputs.all().delete();
+
+		# Then query all steps and regenerate outputs
 		all_steps = self.steps.all();
 
-		# And then recreate the outputs
-
-		# What is outmap accomplishing????????
-		# outmap (PipelineOutputMapping/ForeignKey)
+		# outmap is derived from (PipelineOutputMapping/ForeignKey)
+		# For each wiring, extract the wiring parameters
  		for mapping in self.outmap.all():
 			output_requested = mapping.provider_output_name;
 			requested_from = mapping.step_providing_output;
 			connect_to_output = mapping.output_name;
-			
+
+			# Access the referenced step and check outputs
+			# for a matching output hole name
 			providing_step = all_steps[requested_from-1];
 			req_output = providing_step.transformation.outputs.get(
 					dataset_name=output_requested);
-				
+
+			# If it matches, save the pipeline output
 			self.outputs.create(compounddatatype=req_output.compounddatatype,
 								dataset_name=connect_to_output,
 								dataset_idx=mapping.output_idx,
@@ -786,9 +795,15 @@ class Pipeline(Transformation):
 
 class PipelineStep(models.Model):
 	"""
-	A particular step within an execution....??????
+	A step within a Pipeline representing a single transformation
+	operating on inputs that are either pre-loaded (Pipeline inputs)
+	or derived from previous pipeline steps within the same pipeline.
 
+	Related to :mode;:`copperfish.Dataset`
 	Related to :model:`copperfish.Pipeline`
+	Related to :model:`copperfish.Transformation`
+	Related to :model:`copperfish.PipelineStepInput`
+	Related to :model:`copperfish.PipelineStepDelete`
 	"""
 
 	# Implicitly defined
