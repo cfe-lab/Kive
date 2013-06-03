@@ -89,7 +89,7 @@ class CompoundDatatypeMember(models.Model):
 
 	# MinValueValidator(1) constrains column_idx to be >= 1
 	column_idx = models.PositiveIntegerField(
-			validators=[MinValueValidator(1)]
+			validators=[MinValueValidator(1)],
 			help_text="The column number of this DataType");
 
 	# Define database indexing rules to ensure tuple uniqueness
@@ -193,7 +193,7 @@ class Dataset(models.Model):
 
 	# Pipeline step this Dataset come from (Null if Dataset was manually uploaded)
 	pipeline_step = models.ForeignKey(
-			"Source pipeline step",
+			"PipelineStep",
 			related_name="data_produced",
 			null=True,
 			blank=True,
@@ -356,8 +356,8 @@ class CodeResourceDependency(models.Model):
 	requirement = models.ForeignKey(CodeResourceRevision,
 	                                related_name="needed_by");
 
-	# ???????????????????????????	
-	# Where to store it (relative to the sandbox) FIXME: use a FilePathField?
+	# Where to place it during runtime relative to the CodeResource that relies on this CodeResourceDependency
+	# FIXME: use a FilePathField?
 	where = models.CharField(
 			"Dependency location",
 			max_length=100,
@@ -485,7 +485,7 @@ class Transformation(models.Model):
 
 		self.check_input_indices();
 		self.check_output_indices();
-		# FIXME: ALSO NEED TO CHECK WE DO NOT HAVE MULTIPLE INPUT/OUTPUTS OF THE SAME NAME
+		# A transformation cannot have multiple definitions for column name or column index (CHECK TRANSFORMATION XPUT)
 
 class Method(Transformation):
 	"""
@@ -639,7 +639,7 @@ class Pipeline(Transformation):
 		#	A) Available? (Produced by a previous step + not deleted, OR an absolute input)
 		#	B) Of the correct CompoundDatatype? And, not have contrary min/max row constraints?
 
-		###### ARE WE CHECKING THAT ONLY A SINGLE WIRE LEADS TO A DESTINATION INPUT? ##########
+		# FIXME: Check that each input is fed with a single wire
 
 		# For each Pipeline step
  		for step in all_steps:
@@ -868,20 +868,20 @@ class PipelineStep(models.Model):
 
 
 	def recursive_pipeline_check(self, pipeline):
-		"""Check if the specified pipeline occurs within this step."""
+		"""Given a pipeline, check if this step pipeline contains """
 
 		contains_pipeline = False;
 
-		# Base case 1: the transformation is a method.
+		# Base case 1: the transformation is a method and can't possibly contain the pipeline.
 		if type(self.transformation) == Method:
 			contains_pipeline = False;
 
-		# Base case 2: the transformation equals the pipeline.
-		# WHY ARE WE NOT CALLING TYPE() HERE???
+		# Base case 2: this step's transformation exactly equals the pipeline specified
 		elif self.transformation == pipeline:
 			contains_pipeline = True;
 
-		# Recursive case: go through all of the pipeline steps.
+		# Recursive case: go through all of the target pipeline steps and check if
+		# any substeps exactly equal the transformation: if it does, we have circular pipeline references
 		else:
 			transf_steps = self.transformation.steps.all();
 			for step in transf_steps:
@@ -975,8 +975,8 @@ class PipelineStepInput(models.Model):
 	# TransformationInput and TransformationOutput objects
 
 	# step_providing_input must be PRIOR to this step (Time moves forward)
-	# Coherence of data will be enforced at the Python level (??????)
-	# IE, does this refer to a Dataset produced by the Transformation at the specified step?
+
+	# Coherence of data is already enforced by Pipeline
 
 	def __unicode__(self):
 		"""Represent PipelineStepInput with the pipeline step, and the wiring destination input name"""
@@ -1026,14 +1026,15 @@ class PipelineOutputMapping(models.Model):
 	output_name = models.CharField(
 			"Output hole name",
 			max_length=128,
-			help_text="");
+			help_text="Pipeline output hole name");
 
-	# WHY DO WE NEED BOTH OUTPUT_NAME AND OUTPUT_IDX???????
-	# ISNT THE NAME<->INDEX MAPPING HANDLED ELSEWHERE????
+	# We need to specify both the output name and the output index because
+	# we are defining the outputs of the Pipeline indirectly through
+	# this wiring information - name/index mapping is stored...?
 	output_idx = models.PositiveIntegerField(
 			"Output hole index",
 			validators=[MinValueValidator(1)],
-			help_text="");
+			help_text="Pipeline output hole index");
 
 	# FIXME: Refactor (output_name, output_idx) as a TransformationOutput
 
@@ -1090,6 +1091,11 @@ class TransformationXput(models.Model):
 			help_text="Name for input/output as an alternative to index");
 
 	# Input/output index on the transformation
+
+	####### NOTE: ONLY METHODS NEED INDICES, NOT TRANSFORMATIONS....!!
+	# If we differentiate between methods/pipelines... dataset_idx would only
+	# belong to methods
+
 	dataset_idx = models.PositiveIntegerField(
 			"Input/output index",
 			validators=[MinValueValidator(1)],
@@ -1112,6 +1118,7 @@ class TransformationXput(models.Model):
 	class Meta:
 		abstract = True;
 
+		# A transformation cannot have multiple definitions for column name or column index
 		unique_together = (("content_type", "object_id", "dataset_name"),
 						   ("content_type", "object_id", "dataset_idx"));
 
@@ -1125,16 +1132,10 @@ class TransformationInput(TransformationXput):
 	"""
 	Inherits from :model:`copperfish.TransformationXput`
 	"""
-
-	# Implicitly defined:
-	#   transformations (MapTransformationToInput - ?????????)
 	pass
 
 class TransformationOutput(TransformationXput):
 	"""
 	Inherits from :model:`copperfish.TransformationXput`
 	"""
-
-	# Implicitly defined:
-	#   transformations (MapTransformationToOutput - ?????????)
 	pass
