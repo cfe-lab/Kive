@@ -16,13 +16,14 @@ samplecode_path = "../samplecode";
 
 class CopperfishMethodTests_setup(TestCase):
     """
-    Sets up a playground for testing:
+    Set up a database state for unit testing
 
-    3 data types (_dt)
-    5 compound data types (_cdt)
+    3 data types (_dt), 5 compound data types (_cdt)
     1 code resource (_cr) with 2 revisions (_crRev)
     3 method families (_mf), 1 pipeline family (_pf)
     5 methods (_m), 1 pipeline (_p)
+
+	Extends all other classes that require this state.
     """
 
     def setUp(self):
@@ -67,8 +68,6 @@ class CopperfishMethodTests_setup(TestCase):
         self.string_dt = string_dt;
         self.DNA_dt = DNA_dt;
         self.RNA_dt = RNA_dt;
-
-
 
         # Define test_cdt as containing 3 members:
         # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
@@ -310,37 +309,100 @@ class CopperfishMethodTests_setup(TestCase):
 
 
 class Datatype_tests(TestCase):
+    
     def test_datatype_unicode(self):
         """Unicode representation must be the instance's name."""
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
-    def test_datatype_clean_restriction_good_none(self):
-        """Datatype has no restriction."""
-        # FILL IN
-        pass
+    def test_datatype_no_restriction_clean_good (self):
+        """Datatype without any restrictions."""
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save();
+        self.assertEqual(dt_1.clean(), None);
 
-    def test_datatype_clean_restriction_good_one_restriction(self):
-        """Datatype restricts one other datatype validly."""
-        # FILL IN
-        pass
+    def test_datatype_nested_valid_restrictions_clean_good(self):
+        """
+        Datatypes with valid restriction pattern A->B, B->C
+        """
 
-    def test_datatype_clean_restriction_good_several_restriction(self):
-        """Datatype restricts several other datatypes validly."""
-        # FILL IN
-        pass
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save();
 
-    # NOTE: let's not bother checking cases where there is only one
-    # vs. there are several
-    def test_datatype_clean_circular_restriction_direct(self):
-        """Datatype restricts itself directly."""
-        # FILL IN
-        pass
+        dt_2 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_2.save();
 
-    def test_datatype_clean_circular_restriction_indirect(self):
-        """Datatype restricts itself through an intermediary."""
-        # FILL IN
-        pass
+        dt_3 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_3.save();
+        
+        dt_1.restricts.add(dt_2);
+        dt_1.save();
+        dt_2.restricts.add(dt_3);
+        dt_2.save();
+
+        self.assertEqual(dt_1.clean(), None);
+        self.assertEqual(dt_2.clean(), None);
+        self.assertEqual(dt_3.clean(), None);
+
+    def test_datatype_direct_circular_restriction_clean_bad(self):
+        """Datatype directly restricts itself: A->A"""
+
+        # Define one datatype
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save();
+
+        # And have it restrict itself
+        dt_1.restricts.add(dt_1);
+        dt_1.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                dt_1.clean);
+
+    def test_datatype_circular_restriction_indirect_clean(self):
+        """Datatype restricts itself through intermediary: A->B, B->A"""
+
+        # Define two datatypes
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save();
+
+        dt_2 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_2.save();
+
+        # And have them form a circular restriction path
+        dt_1.restricts.add(dt_2);
+        dt_1.save();
+        dt_2.restricts.add(dt_1);
+        dt_2.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                dt_1.clean);
 
 class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
     def test_cdtMember_unicode(self):
