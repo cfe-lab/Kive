@@ -66,29 +66,36 @@ class Datatype(models.Model):
 			upload_to='VerificationScripts',
 			help_text="Used to validate correctness of fields labelled as being this DataType");
 
-	def is_circularly_restricted(self, referencedDataType):
+	def is_restricted_by(self, referencedDataType):
 		"""
-		Determine if the referencedDataType restricts self.
-
-		Dataset needs to be save()ed before executing this function.
+		Determine if self is ever directly or indirectly
+		referenced by a given datatype.
 		"""
 
-		restrictions = referencedDataType.restricts.all();
+		# We assume self is not restricted by referencedDataType
+		is_restricted = False
+		restrictions = referencedDataType.restricts.all()
+
 		for restrictedDataType in restrictions:
 
-			# Case 1: Restriction points to self?
+			# Case 1: If restrictions restrict self, return true
 			if restrictedDataType == self:
-				return True
+				is_restricted = True
 
-			# Case 2: Check if restricted Datatypes point to self
+			# Case 2: Check if any restricted Datatypes themselves restrict self
 			else:
-				return self.is_circularly_restricted(restrictedDataType)
+				theValue = self.is_restricted_by(restrictedDataType)
+
+				# If any restricted Datatypes themselves restrict self, propagate
+				# this information to the parent Datatype as restricting self
+				if theValue == True:
+					is_restricted = True
 
 		# Return False if Case 1 is never encountered
-		return False
+		return is_restricted
 
 	def clean(self):
-		if (self.is_circularly_restricted(self)):
+		if (self.is_restricted_by(self)):
 			raise ValidationError("Circular Datatype restriction detected");
 
 	def __unicode__(self):

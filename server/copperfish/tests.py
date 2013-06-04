@@ -311,12 +311,18 @@ class CopperfishMethodTests_setup(TestCase):
 class Datatype_tests(TestCase):
     
     def test_datatype_unicode(self):
-        """Unicode representation must be the instance's name."""
+        """
+        Unicode representation must be the instance's name.
+
+        """
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
     def test_datatype_no_restriction_clean_good (self):
-        """Datatype without any restrictions."""
+        """
+        Datatype without any restrictions.
+
+        """
         f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
         dt_1 = Datatype(name="dt_1",
                         description="A string validated by stringUT.py",
@@ -327,7 +333,8 @@ class Datatype_tests(TestCase):
 
     def test_datatype_nested_valid_restrictions_clean_good(self):
         """
-        Datatypes with valid restriction pattern A->B, B->C
+        Datatypes such that A restricts B, and B restricts C
+        
         """
 
         f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
@@ -358,8 +365,54 @@ class Datatype_tests(TestCase):
         self.assertEqual(dt_2.clean(), None);
         self.assertEqual(dt_3.clean(), None);
 
+    def test_datatype_nested_invalid_restrictions_scrambled_clean_bad(self):
+        """
+        Datatypes are restricted to constrain execution order such that:
+
+        A restricts C
+        A restricts B
+        B restricts C
+        C restricts A
+        """
+
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save();
+
+        dt_2 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_2.save();
+
+        dt_3 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_3.save();
+        
+        dt_1.restricts.add(dt_3);
+        dt_1.save();
+        dt_1.restricts.add(dt_2);
+        dt_1.save();
+        dt_2.restricts.add(dt_3);
+        dt_2.save();
+        dt_3.restricts.add(dt_1);
+        dt_3.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                dt_1.clean);
+
+
     def test_datatype_direct_circular_restriction_clean_bad(self):
-        """Datatype directly restricts itself: A->A"""
+        """
+        Datatype directly restricts itself: A restricts A
+        
+        """
 
         # Define one datatype
         f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
@@ -378,7 +431,13 @@ class Datatype_tests(TestCase):
                                 dt_1.clean);
 
     def test_datatype_circular_restriction_indirect_clean(self):
-        """Datatype restricts itself through intermediary: A->B, B->A"""
+        """
+        Datatype restricts itself through intermediary:
+
+        A restricts B
+        B restricts A
+        
+        """
 
         # Define two datatypes
         f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
@@ -404,11 +463,14 @@ class Datatype_tests(TestCase):
                                 "Circular Datatype restriction detected",
                                 dt_1.clean);
 
+
+
 class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
     def test_cdtMember_unicode(self):
         """
         Unicode of compoundDatatypeMember should return
         (column index, datatype name, column name)
+        
         """
         self.assertEqual(unicode(self.test_cdt.members.all()[0]),
                          "1: <string> [label]");
@@ -420,13 +482,19 @@ class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
 class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_cdt_zero_member_unicode(self):
-        """Unicode of empty CompoundDatatype should just be '()'."""
+        """
+        Unicode of empty CompoundDatatype should just be '()'.
+
+        """
         empty_cdt = CompoundDatatype();
         empty_cdt.save();
         self.assertEqual(unicode(empty_cdt), "[empty CompoundDatatype]");
 
     def test_cdt_single_member_unicode(self):
-        """Unicode of CompoundDatatype should return a list of members"""
+        """
+        Unicode of CompoundDatatype should return a list of members
+
+        """
         self.assertEqual(unicode(self.DNAinput_cdt),
                          "(1: <DNANucSeq> [SeqToComplement])");
 
@@ -434,20 +502,39 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         """
         Unicode of CompoundDatatype should return a list of members
         in the form of unicode(CompoundDatatypeMember)
+        
         """
         self.assertEqual(unicode(self.test_cdt),
                          "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
                          "3: <RNANucSeq> [PLAseq])");
 
     def test_clean_single_index_good (self):
-        """CompoundDatatype with a single index equalling 1."""
-        # FILL IN
-        pass
+        """
+        CompoundDatatype with single index equalling 1
+
+        """
+        sad_cdt = CompoundDatatype();
+        sad_cdt.save();
+        sad_cdt.members.create(	datatype=self.RNA_dt,
+                                column_name="ColumnTwp",
+                                column_idx=1);
+        self.assertEqual(sadd_cdt.clean(), None);
 
     def test_clean_single_index_bad (self):
-        """CompoundDatatype with a single index not equalling 1."""
-        # FILL IN
-        pass
+        """
+        CompoundDatatype with single index not equalling 1.
+
+        """
+        sad_cdt = CompoundDatatype();
+        sad_cdt.save();
+        sad_cdt.members.create(	datatype=self.RNA_dt,
+                                column_name="ColumnTwp",
+                                column_idx=3);
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Column indices are not consecutive starting from 1",
+            sad_cdt.clean);
 
     def test_clean_catches_consecutive_member_indices (self):
         """
@@ -458,10 +545,10 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         """
         # FIXME: make sure docstrings look like this.
 
-        # For a valid cdt, clean() should not throw an exception
+        # test_cdt is valid
         self.assertEqual(self.test_cdt.clean(), None);
 
-        # Create valid cdt with 2 members in reverse index order
+        # Define 2 member cdt with valid indexing
         good_cdt = CompoundDatatype();
         good_cdt.save();
         good_cdt.members.create(datatype=self.RNA_dt,
@@ -472,7 +559,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
                                column_idx=1);
         self.assertEqual(good_cdt.clean(), None);
 
-        # Create invalid cdt with 2 members
+        # Define 2 member cdt with invalid indexing
         bad_cdt = CompoundDatatype();
         bad_cdt.save();
         bad_cdt.members.create(datatype=self.RNA_dt,
