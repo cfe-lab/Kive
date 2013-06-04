@@ -315,6 +315,33 @@ class Datatype_tests(TestCase):
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
+    def test_datatype_clean_restriction_good_none(self):
+        """Datatype has no restriction."""
+        # FILL IN
+        pass
+
+    def test_datatype_clean_restriction_good_one_restriction(self):
+        """Datatype restricts one other datatype validly."""
+        # FILL IN
+        pass
+
+    def test_datatype_clean_restriction_good_several_restriction(self):
+        """Datatype restricts several other datatypes validly."""
+        # FILL IN
+        pass
+
+    # NOTE: let's not bother checking cases where there is only one
+    # vs. there are several
+    def test_datatype_clean_circular_restriction_direct(self):
+        """Datatype restricts itself directly."""
+        # FILL IN
+        pass
+
+    def test_datatype_clean_circular_restriction_indirect(self):
+        """Datatype restricts itself through an intermediary."""
+        # FILL IN
+        pass
+
 class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
     def test_cdtMember_unicode(self):
         """
@@ -330,25 +357,44 @@ class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
 
 class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
+    def test_cdt_zero_member_unicode(self):
+        """Unicode of empty CompoundDatatype should just be '()'."""
+        empty_cdt = CompoundDatatype();
+        empty_cdt.save();
+        self.assertEqual(unicode(empty_cdt), "[empty CompoundDatatype]");
+
     def test_cdt_single_member_unicode(self):
-        """Unicode of compoundDataType should return a list of members"""
+        """Unicode of CompoundDatatype should return a list of members"""
         self.assertEqual(unicode(self.DNAinput_cdt),
                          "(1: <DNANucSeq> [SeqToComplement])");
 
     def test_cdt_multiple_members_unicode(self):
         """
-        Unicode of compoundDataType should return a list of members
-        in the form of unicode(compoundDatatypeMember)
+        Unicode of CompoundDatatype should return a list of members
+        in the form of unicode(CompoundDatatypeMember)
         """
         self.assertEqual(unicode(self.test_cdt),
                          "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
                          "3: <RNANucSeq> [PLAseq])");
 
+    def test_clean_single_index_good (self):
+        """CompoundDatatype with a single index equalling 1."""
+        # FILL IN
+        pass
+
+    def test_clean_single_index_bad (self):
+        """CompoundDatatype with a single index not equalling 1."""
+        # FILL IN
+        pass
+
     def test_clean_catches_consecutive_member_indices (self):
         """
-        CompoundDatatype must have consecutive indices from 1 to n
+        CompoundDatatype must have consecutive indices from 1 to n.
+        
         Otherwise, throw a ValidationError.
+        
         """
+        # FIXME: make sure docstrings look like this.
 
         # For a valid cdt, clean() should not throw an exception
         self.assertEqual(self.test_cdt.clean(), None);
@@ -388,6 +434,12 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         """
         self.assertEquals(unicode(self.comp_cr), "complement.py");
 
+    def test_codeResource_clean(self):
+        """
+        Check that CodeResource.name is valid for a filename.
+        """
+        pass
+
 class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
     def test_codeResourceRevision_unicode(self):
@@ -403,7 +455,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision();
-        self.assertEquals(unicode(no_cr_set), "[no code resource set] ");
+        self.assertEquals(unicode(no_cr_set), "[no code resource set] [no revision name]");
 
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo";
@@ -439,6 +491,13 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
                 md5gen.hexdigest(),
                 self.comp_cr.revisions.get(revision_name="v1").MD5_checksum);
 
+    def test_clean_for_colliding_dependency_paths(self):
+        """
+        CodeResourceDependencies cannot overwrite each other in the sandbox
+        (Or, the original CodeResource that required it!!)
+        """
+        pass
+
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
     def test_codeResourceDependency_unicode(self):
@@ -461,7 +520,23 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
                 unicode(test_crd),
                 "complement.py v1 requires complement.py v2 as subdir/foo.py");
 
-        # WE SHOULD MAKE AN INVALID CONDITION TOO (Invalid where="")
+    def test_codeResourceDependency_bad_path_clean(self):
+        """
+        Check
+        """
+        pass
+
+    def test_codeResourceDependency_good_path_with_filename_clean(self):
+        """
+        Check
+        """
+        pass
+
+    def test_codeResourceDependency_good_path_but_missing_filename_clean(self):
+        """
+        Check
+        """
+        pass
 
 
 class methodFamily_tests(CopperfishMethodTests_setup):
