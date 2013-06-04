@@ -66,15 +66,16 @@ class Datatype(models.Model):
 			upload_to='VerificationScripts',
 			help_text="Used to validate correctness of fields labelled as being this DataType");
 
-	def is_restricted_by(self, referencedDataType):
+	
+	def is_restricted_by(self, possible_restrictor_datatype):
 		"""
 		Determine if self is ever directly or indirectly
-		referenced by a given datatype.
+		restricted by a given datatype.
 		"""
 
-		# We assume self is not restricted by referencedDataType
+		# We assume self is not restricted by possible_restrictor_datatype
 		is_restricted = False
-		restrictions = referencedDataType.restricts.all()
+		restrictions = possible_restrictor_datatype.restricts.all()
 
 		for restrictedDataType in restrictions:
 

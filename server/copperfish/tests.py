@@ -318,6 +318,58 @@ class Datatype_tests(TestCase):
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
+    # UNIT TESTS TO CHECK CLEAN ("self" restriction)
+        
+    # Direct circular cases: start, middle, end
+    # Start   dt1 restricts dt1, dt3, dt4
+    # Middle  dt1 restricts dt3, dt1, dt4
+    # End     dt1 restricts dt3, dt4, dt1
+    # Good    dt1 restricts dt2, dt3, dt4
+
+    # Recursive cases: start, middle, end
+    # Start   dt1 restricts dt2, dt3, dt4 (dt2 restricts dt1)
+    # Middle  dt1 restricts dt2, dt3, dt4 (dt3 restricts dt1)
+    # End     dt1 restricts dt2, dt3, dt4 (dt4 restricts dt1)
+    # Good-1  dt1 restricts dt2, dt3, dt4 (dt2 restricts dt5)
+    # Good-2  dt1 restricts dt2, dt3, dt4 (dt3 restricts dt5)
+    # Good-3  dt1 restricts dt2, dt3, dt4 (dt4 restricts dt5)
+    # Good-4  dt1 restricts dt2, dt3, dt4 (dt2 restricts dt4)
+    # Good-5  dt1 restricts dt2, dt3, dt4 (dt3 restricts dt4)
+    # Good-6  dt1 restricts dt2, dt3, dt4 (dt4 restricts dt2)
+
+
+    # UNIT TESTS TO VALIDATE is_restricted_by IN GENERAL
+    
+    # dt1 restricts dt2
+    # dt1.is_restricted_by(dt2) - FALSE
+    # dt2.is_restricted_by(dt1) - TRUE
+
+    # dt1 exists, dt2 exists
+    # dt1.is_restricted_by(dt2) - FALSE
+
+    # dt1 restricts dt2, dt2 restricts dt3
+    # dt1.is_restricted_by(dt3) - FALSE
+    # dt3.is_restricted_by(dt1) - TRUE
+    # dt1.is_restricted_by(dt2) - FALSE
+    # dt2.is_restricted_by(dt1) - TRUE
+    
+    # dt1 restricts dt[2,3,4]
+    # dt[2,3,4].is_restricted_by(dt1)
+
+    # dt1 restricts dt[2,3,4], 1 of dt[2,3,4] restrict dt5 (3 cases)
+    # dt1.is_restricted_by(dt[2,3,4]) - FALSE
+    # dt1.is_restricted_by(dt5) - FALSE
+    # Not necessary: dt[2,3,4].is_restricted_by(dt1) - TRUE
+    # Not necessary: dt5.is_restricted_by(dt1) - TRUE
+
+    # The following are not necessary:
+    # dt1, dt2, dt3 restrict dt4
+    # dt4.is_restricted_by(dt[1,2,3])
+    # dt[1,2,3].is_restricted_by(dt4)
+
+
+
+
     def test_datatype_no_restriction_clean_good (self):
         """
         Datatype without any restrictions.
@@ -703,8 +755,6 @@ class method_tests(CopperfishMethodTests_setup):
     def test_method_with_family_unicode(self):
         """
         unicode() for method should return "Method revisionName and family name"
-
-        IF YOU LOOK AT CODE, ISN'T FAMILY NAME AND REVISION NAME IN REVERSE??
         """
 
         # DNAcompv1_m has method family DNAcomplement
@@ -720,7 +770,7 @@ class method_tests(CopperfishMethodTests_setup):
         self.assertEqual(unicode(nofamily),
                          "Method [family unset] foo");
 
-    def test_method_one_valid_input_checkInputIndices_good(self):
+    def test_method_single_valid_input_checkInputIndices_good(self):
         """
         check_input_indices() should return no exception if
         it's transformation only has valid input indices defined.
@@ -737,6 +787,30 @@ class method_tests(CopperfishMethodTests_setup):
 
         # check_input_indices() should not raise a ValidationError
         self.assertEquals(foo.check_input_indices(), None);
+        self.assertEquals(foo.clean(), None);
+
+    def test_method_many_ordered_valid_inputs_checkInputIndices_good (self):
+        """
+        check_input_indices should return no exception if
+        it's transformation only has valid input indices defined
+        """
+
+        # Create Method with valid family, revision_name, description, driver
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
+                     revision_desc="Foo version", driver=self.compv1_crRev);
+        foo.save();
+
+        # Add several input cdts that together are valid
+        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="oneinput", dataset_idx=1);
+        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="twoinput", dataset_idx=2);
+        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="threeinput", dataset_idx=3);
+
+        # No ValidationErrors should be raised
+        self.assertEquals(foo.check_input_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_many_valid_inputs_scrambled_checkInputIndices_good (self):
         """
@@ -759,6 +833,7 @@ class method_tests(CopperfishMethodTests_setup):
 
         # No ValidationErrors should be raised
         self.assertEquals(foo.check_input_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_one_invalid_input_checkInputIndices_bad(self):
         """
@@ -780,6 +855,11 @@ class method_tests(CopperfishMethodTests_setup):
                 "Inputs are not consecutively numbered starting from 1",
                 foo.check_input_indices);
 
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Inputs are not consecutively numbered starting from 1",
+                foo.clean);
+
     def test_method_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
@@ -796,6 +876,11 @@ class method_tests(CopperfishMethodTests_setup):
                 "Inputs are not consecutively numbered starting from 1",
                 foo.check_input_indices);
 
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Inputs are not consecutively numbered starting from 1",
+                foo.clean);
+
     def test_method_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
@@ -804,6 +889,7 @@ class method_tests(CopperfishMethodTests_setup):
         foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
                            dataset_name="oneoutput", dataset_idx=1);
         self.assertEquals(foo.check_output_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_many_valid_outputs_scrambled_checkOutputIndices_good (self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
@@ -817,6 +903,7 @@ class method_tests(CopperfishMethodTests_setup):
         foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
                            dataset_name="threeoutput", dataset_idx=2);
         self.assertEquals(foo.check_output_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_one_invalid_output_checkOutputIndices_bad (self):
         """Test output index check, one badly-indexed output case."""
@@ -829,6 +916,11 @@ class method_tests(CopperfishMethodTests_setup):
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
                 foo.check_output_indices);
+
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Outputs are not consecutively numbered starting from 1",
+                foo.clean);
 
     def test_method_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
@@ -847,135 +939,12 @@ class method_tests(CopperfishMethodTests_setup):
                 "Outputs are not consecutively numbered starting from 1",
                 foo.check_output_indices);
 
-    def test_method_one_valid_input_clean_good(self):
-        """
-        Test input index check, one well-indexed input case.
-        """
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_one_invalidly_indexed_input_clean_bad(self):
-        """Test input index check, one badly-indexed input case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=4);
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean);
-
-    def test_method_many_valid_inputs_clean_good(self):
-        """Test input index check, well-indexed multi-input case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=2);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=3);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_many_valid_inputs_scrambled_clean_good(self):
-        """Test input index check, well-indexed multi-input (scrambled order) case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=3);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=1);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=2);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_many_invalid_inputs_clean_bad(self):
-        """Test input index check, badly-indexed multi-input case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=2);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=6);
-        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=1);
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean);
-
-    def test_method_one_valid_output_clean_good(self):
-        """Test output index check, one well-indexed output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=1);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_one_invalid_output_clean_bad(self):
-        """Test output index check, one badly-indexed output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=4);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
                 foo.clean);
 
-    def test_method_many_valid_outputs_clean_good(self):
-        """Test output index check, well-indexed multi-output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=1);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="twooutput", dataset_idx=2);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="threeoutput", dataset_idx=3);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_many_valid_outputs_scrambled_clean_good(self):
-        """Test output index check, well-indexed multi-output (scrambled order) case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=3);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="twooutput", dataset_idx=1);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="threeoutput", dataset_idx=2);
-        self.assertEquals(foo.clean(), None);
-
-    def test_method_many_invalid_outputs_clean_bad(self):
-        """Test output index check, badly-indexed multi-output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=2);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="twooutput", dataset_idx=6);
-        foo.outputs.create(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="threeoutput", dataset_idx=1);
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.clean);
-        
-    def test_method_no_copied_parent_parameters_save(self):
+      def test_method_no_copied_parent_parameters_save(self):
         """Test save when no method revision parent is specified."""
 
         # Define new Method with no parent
@@ -986,8 +955,6 @@ class method_tests(CopperfishMethodTests_setup):
         # There should be no inputs
         self.assertEqual(foo.inputs.count(), 0);
         self.assertEqual(foo.outputs.count(), 0);
-
-
 
         # DNAcompv1_m also has no parents as it is the first revision
         self.DNAcompv1_m.save();
