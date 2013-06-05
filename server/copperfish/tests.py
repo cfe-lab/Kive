@@ -734,10 +734,8 @@ class Datatype_tests(CopperfishMethodTests_setup):
     def test_datatype_direct_circular_restriction_clean_bad(self):
         """
         Datatype directly restricts itself: A restricts A
-        
         """
 
-        # And have it restrict itself
         self.dt_1.restricts.add(self.dt_1);
         self.dt_1.save();
 
@@ -751,10 +749,8 @@ class Datatype_tests(CopperfishMethodTests_setup):
 
         A restricts B
         B restricts A
-        
         """
 
-        # And have them form a circular restriction path
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.save();
         self.dt_2.restricts.add(self.dt_1);
@@ -764,14 +760,11 @@ class Datatype_tests(CopperfishMethodTests_setup):
                                 "Circular Datatype restriction detected",
                                 self.dt_1.clean);
 
-
-
 class CompoundDatatypeMember_tests(CopperfishMethodTests_setup):
     def test_cdtMember_unicode(self):
         """
         Unicode of compoundDatatypeMember should return
         (column index, datatype name, column name)
-        
         """
         self.assertEqual(unicode(self.test_cdt.members.all()[0]),
                          "1: <string> [label]");
@@ -784,8 +777,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_cdt_zero_member_unicode(self):
         """
-        Unicode of empty CompoundDatatype should just be '()'.
-
+        Unicode of empty CompoundDatatype should be empty
         """
         empty_cdt = CompoundDatatype();
         empty_cdt.save();
@@ -793,17 +785,16 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_cdt_single_member_unicode(self):
         """
-        Unicode of CompoundDatatype should return a list of members
-
+        Unicode on single-member cdt returns it's member.
         """
         self.assertEqual(unicode(self.DNAinput_cdt),
                          "(1: <DNANucSeq> [SeqToComplement])");
 
     def test_cdt_multiple_members_unicode(self):
         """
-        Unicode of CompoundDatatype should return a list of members
-        in the form of unicode(CompoundDatatypeMember)
-        
+        Unicode returns a list of it's Datatype members.
+
+        Each member is in the form of unicode(CompoundDatatypeMember)        
         """
         self.assertEqual(unicode(self.test_cdt),
                          "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
@@ -812,19 +803,17 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
     def test_clean_single_index_good (self):
         """
         CompoundDatatype with single index equalling 1
-
         """
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
         sad_cdt.members.create(	datatype=self.RNA_dt,
                                 column_name="ColumnTwp",
                                 column_idx=1);
-        self.assertEqual(sadd_cdt.clean(), None);
+        self.assertEqual(sad_cdt.clean(), None);
 
     def test_clean_single_index_bad (self):
         """
         CompoundDatatype with single index not equalling 1.
-
         """
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
@@ -842,14 +831,9 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         CompoundDatatype must have consecutive indices from 1 to n.
         
         Otherwise, throw a ValidationError.
-        
         """
-        # FIXME: make sure docstrings look like this.
-
-        # test_cdt is valid
         self.assertEqual(self.test_cdt.clean(), None);
 
-        # Define 2 member cdt with valid indexing
         good_cdt = CompoundDatatype();
         good_cdt.save();
         good_cdt.members.create(datatype=self.RNA_dt,
@@ -860,7 +844,6 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
                                column_idx=1);
         self.assertEqual(good_cdt.clean(), None);
 
-        # Define 2 member cdt with invalid indexing
         bad_cdt = CompoundDatatype();
         bad_cdt.save();
         bad_cdt.members.create(datatype=self.RNA_dt,
@@ -880,15 +863,65 @@ class CodeResource_tests(CopperfishMethodTests_setup):
      
     def test_codeResource_unicode(self):
         """
-        codeResource.unicode() should return it's name.
+        unicode should return the codeResource name.
         """
         self.assertEquals(unicode(self.comp_cr), "complement.py");
 
-    def test_codeResource_clean(self):
+    def test_codeResource_valid_name_clean_good(self):
         """
-        Check that CodeResource.name is valid for a filename.
+        Clean passes when codeResource name is file-system valid
         """
-        pass
+        valid_cr = CodeResource(name="validName",
+                                description="desc")
+        valid_cr.save()
+        self.assertEqual(valid_cr.clean(), None);
+
+    def test_codeResource_valid_name_with_special_symbols_clean_good(self):
+        """
+        Clean passes when codeResource name is file-system valid
+        """
+        valid_cr = CodeResource(name="valid.Name with-spaces_and_underscores().py",
+                                description="desc")
+        valid_cr.save()
+        self.assertEqual(valid_cr.clean(), None);
+
+    def test_codeResource_invalid_name_doubledot_clean_bad(self):
+        """
+        Clean fails when CodeResource name isn't file-system valid
+        """
+
+        invalid_cr = CodeResource(name="../test.py",
+                                  description="desc")
+        invalid_cr.save()
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+
+    def test_codeResource_invalid_name_starting_space_clean_bad(self):
+        """  
+        Clean fails when CodeResource name isn't file-system valid
+        """
+        invalid_cr = CodeResource(name=" test.py",
+                                  description="desc")
+        invalid_cr.save()
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+
+    def test_codeResource_invalid_name_invalid_symbol_clean_bad(self):
+        """  
+        Clean fails when CodeResource name isn't file-system valid
+        """
+        invalid_cr = CodeResource(name="test$.py",
+                                  description="desc")
+        invalid_cr.save()
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+
+    def test_codeResource_invalid_name_trailing_space_clean_bad(self):
+        """  
+        Clean fails when CodeResource name isn't file-system valid
+        """
+        invalid_cr = CodeResource(name="test.py ",
+                                  description="desc")
+        invalid_cr.save()
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+
 
 class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
@@ -941,12 +974,352 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
                 md5gen.hexdigest(),
                 self.comp_cr.revisions.get(revision_name="v1").MD5_checksum);
 
-    def test_clean_for_colliding_dependency_paths(self):
+    def test_clean_for_one_valid_dependency_explicit_fileName_good(self):
         """
-        CodeResourceDependencies cannot overwrite each other in the sandbox
-        (Or, the original CodeResource that required it!!)
+        CodeResourceDependencies cannot overwrite the parent
+        """
+
+        # Define a code resource
+        test_cr = CodeResource(name="test_cr.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr.save()
+
+        # Define a code resource revision
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+        # Define a second code resource revision which will be the dependency
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+        test_cr_rev1.dependencies.create(requirement=test_cr_rev2,
+                                         where="subFolder/test.csv")
+
+        self.assertEqual(test_cr_rev1.clean(), None)
+
+    def test_clean_for_one_valid_dependency_implicit_fileName_good(self):
+        """
+        CodeResourceDependencies cannot overwrite the parent
+        """
+
+        # Define a code resource
+        test_cr = CodeResource(name="test_cr.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr.save()
+
+        # Define a code resource revision
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+        # Define a second code resource revision which will be the dependency
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+        test_cr_rev1.dependencies.create(requirement=test_cr_rev2,
+                                         where="subFolder")
+
+        self.assertEqual(test_cr_rev1.clean(), None)
+        
+
+    def test_clean_for_many_valid_dependencies_same_path_different_implicit_name_good(self):
+        """
+        CodeResourceDependencies can have the same path with different names.
+        """
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+
+        # First revision has name test_cr_1.py
+        test_cr_1 = CodeResource(name="test_cr_1.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_1.save()
+
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+        # Second revision has different name test_cr_2.py
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_2.save()
+
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+        # Third revision has still different name test_cr_3.py
+        test_cr_3 = CodeResource(name="test_cr_3.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_3.save()
+
+        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
+                                           revision_name="v3",
+                                           revision_desc="Third version",
+                                           content_file=File(f))
+        test_cr_rev3.save()
+
+        # Register 2 dependencies with different names but the same path
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev2,
+            where="somePath/")
+
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev3,
+            where="somePath/")   
+
+        self.assertEqual(test_cr_rev1.clean(), None)
+
+
+    def test_clean_for_many_valid_dependencies_same_path_different_explicit_names_good(self):
+        """
+        CodeResourceDependencies can have the same path with different names.
+        """
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+
+        # First revision has name test_cr_1.py
+        test_cr_1 = CodeResource(name="test_cr_1.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_1.save()
+
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+        # Second revision has different name test_cr_2.py
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_2.save()
+
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+        # Third revision has still different name test_cr_3.py
+        test_cr_3 = CodeResource(name="test_cr_3.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr_3.save()
+
+        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
+                                           revision_name="v3",
+                                           revision_desc="Third version",
+                                           content_file=File(f))
+        test_cr_rev3.save()
+
+        # Register 2 dependencies with different names but the same path
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev2,
+            where="somePath/file1.csv")
+
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev3,
+            where="somePath/file2.csv")   
+
+        self.assertEqual(test_cr_rev1.clean(), None)
+
+
+    def test_clean_for_many_valid_dependencies_different_paths_same_implicit_name_good(self):
+        """
+        CodeResourceDependencies can have different paths with the same name.
+        """
+
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+
+        # First revision has name test_cr_1.py
+        test_cr_1 = CodeResource(name="test_cr_1.py",
+                                 description="Complement DNA/RNA nucleotide sequences")
+        test_cr_1.save()
+
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
+                                            revision_name="v1",
+                                            revision_desc="First version",
+                                            content_file=File(f))
+        test_cr_rev1.save()
+
+        # Second revision has different name test_cr_2.py
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                                 description="Complement DNA/RNA nucleotide sequences")
+        test_cr_2.save()
+
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
+                                            revision_name="v2",
+                                            revision_desc="Second version",
+                                            content_file=File(f))
+        test_cr_rev2.save()
+
+        # Third revision with same coderesource name
+        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_2,
+                                            revision_name="v3",
+                                            revision_desc="Third version",
+                                            content_file=File(f))
+        test_cr_rev3.save()
+
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev2,
+            where="somePath/")
+
+        test_cr_rev1.dependencies.create(
+            requirement=test_cr_rev3,
+            where="aDifferentPath/")   
+
+        self.assertEqual(test_cr_rev1.clean(), None)
+
+    def test_clean_for_invalid_self_referential_dependency(self):
+        """
+        A code resource cannot have a dependency with itself.
         """
         pass
+
+    def test_clean_for_single_invalid_dependency_colliding_with_parentResource_bad_INCOMPLETE(self):
+        """
+        CodeResourceDependencies cannot overwrite the parent
+        """
+
+        # Define parent code resource
+        test_cr = CodeResource(name="test_cr.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr.save()
+
+        # Assign it a code resource revision
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+        # Assign it a second code resource revision
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+        # Give the first revision a dependency with the second
+        test_cr_rev1.dependencies.create(
+        coderesourcerevision=test_cr_rev2,
+        requirement=test_cr_rev1,
+        where="")
+
+    def test_clean_for_colliding_dependencies_explicit_filename_bad(self):
+        """
+        CodeResourceDependencies cannot overwrite each other in the sandbox
+        """
+
+        # Define a code resource
+        test_cr = CodeResource(name="test_cr.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr.save()
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                                 description="Complement DNA/RNA nucleotide sequences")
+        test_cr_2.save()
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+
+        test_cr_3 = CodeResource(name="test_cr_3.py",
+                                 description="Complement DNA/RNA nucleotide sequences")
+        test_cr_3.save()
+        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
+                                           revision_name="v3",
+                                           revision_desc="Third version",
+                                           content_file=File(f))
+        test_cr_rev3.save()
+
+
+        test_cr_rev1.dependencies.create(
+            coderesourcerevision=test_cr_rev2,
+            requirement=test_cr_rev1,
+            where="somePath/test.csv")
+
+        test_cr_rev1.dependencies.create(
+            coderesourcerevision=test_cr_rev3,
+            requirement=test_cr_rev1,
+            where="somePath/test.csv")        
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Conflicting dependencies",
+                                test_cr_rev1.clean)
+
+    def test_clean_for_colliding_dependencies_implicit_filename_bad(self):
+        """
+        CodeResourceDependencies cannot overwrite each other in the sandbox
+        """
+        # Define a code resource
+        test_cr = CodeResource(name="test_cr.py",
+                               description="Complement DNA/RNA nucleotide sequences")
+        test_cr.save()
+        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
+        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
+                                           revision_name="v1",
+                                           revision_desc="First version",
+                                           content_file=File(f))
+        test_cr_rev1.save()
+
+
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                                 description="Complement DNA/RNA nucleotide sequences")
+        test_cr_2.save()
+        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
+                                           revision_name="v2",
+                                           revision_desc="Second version",
+                                           content_file=File(f))
+        test_cr_rev2.save()
+
+
+        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_2,
+                                           revision_name="v3",
+                                           revision_desc="Third version",
+                                           content_file=File(f))
+        test_cr_rev3.save()
+
+
+        test_cr_rev1.dependencies.create(
+            coderesourcerevision=test_cr_rev2,
+            requirement=test_cr_rev1,
+            where="somePath/")
+
+        test_cr_rev1.dependencies.create(
+            coderesourcerevision=test_cr_rev3,
+            requirement=test_cr_rev1,
+            where="somePath/")        
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Conflicting dependencies",
+                                test_cr_rev1.clean)
+
+
 
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 

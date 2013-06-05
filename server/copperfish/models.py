@@ -16,6 +16,9 @@ from django.core.validators import MinValueValidator;
 
 import operator;		# Python math functions
 import hashlib;			# To calculate MD5 hash
+import re;			# Regular expressions
+import string;			# Augments regular expressions
+import os.path;                 # For checking file paths
 
 class Datatype(models.Model):
 	"""
@@ -137,9 +140,12 @@ class CompoundDatatypeMember(models.Model):
 
 	def __unicode__(self):
 		"""Describe a CompoundDatatypeMember with it's column number, datatype name, and column name"""
-		return u"{}: <{}> [{}]".format(	self.column_idx,
-										unicode(self.datatype),
-										self.column_name);
+
+		returnString = u"{}: <{}> [{}]".format( self.column_idx,
+												unicode(self.datatype),
+												self.column_name);
+
+		return returnString
 
 class CompoundDatatype(models.Model):
 	"""
@@ -186,6 +192,10 @@ class CompoundDatatype(models.Model):
 				string_rep += ", ";
 
 		string_rep += ")";
+
+		if string_rep == "()":
+			string_rep = "[empty CompoundDatatype]";
+
 		return string_rep;
 
 	# clean() is executed prior to save() to perform model validation
@@ -305,13 +315,43 @@ class CodeResource(models.Model):
 
 	description = models.TextField("Resource description");
 
-	def __clean__(self):
+	def isValidResourceName(self):
+
+		# Names cannot start with ..
+		if re.search("^\.\.", self.name):
+			return False
+	
+		# Names cannot start with 1 or more spaces
+		if re.search("^\s+", self.name):
+			return False
+
+		# Names cannot end with 1 or more trailing spaces
+		if re.search("\s+$", self.name):
+			return False
+
+		# Names must be 1 or more of any from {alphanumeric, space, "-._()"}
+		regex = "^[-_.() %s%s]+$" % (string.ascii_letters, string.digits)
+		if re.search(regex, self.name):
+			pass
+		else:
+			return False
+
+		return True
+
+	def clean(self):
 		"""
-		CodeResource name will define a file name and must
-		not contain characters invalid for a file system.
+		CodeResource name must be valid.
+
+		It must not contain a leading space character or "..",
+		must not end in space, and be composed of letters,
+		numbers, dash, underscore, paranthesis, and space.
 		"""
-		pass
 		
+		if self.isValidResourceName():
+			pass
+		else:
+			raise ValidationError("Invalid code resource name");
+
 
 	def __unicode__(self):
 		return self.name;
@@ -378,11 +418,13 @@ class CodeResourceRevision(models.Model):
 		string_rep = unicode(self.coderesource) + u" " + self.revision_name;
 		return string_rep;
 
-	# A CodeResource can simply be a collection of dependencies, and not actually
-	# contain a file - thus, an MD5 hash may not need to exist
+
 	def clean(self):
 		"""If there is a file specified, fill in the MD5 checksum."""
 
+
+		# A CodeResource can be a collection of dependencies and not actually
+		# contain a file - an MD5 hash may not exist
 		try:
 			md5gen = hashlib.md5();
 			md5gen.update(self.content_file.read());
@@ -390,13 +432,48 @@ class CodeResourceRevision(models.Model):
 
 		except ValueError as e:
 			self.MD5_checksum = "";
-			
-		# FIXME: Check if a CodeResourceRevision has Dependencies which would
-		# conflict (have the name / overwrite) on the file system at execution
 
-		# We will be naming codeResourceRevisions on the file system by it's
-		# codeResource name - codeResourceDependencies must have unique
-		# (name, filePath) values - otherwise they will overwrite
+		# FIXME: CHECK IF DEPENDENCY DIRECTLY REFERENCES SELF
+
+		# FIXME: CHECK IF DEPENDENCIES CONFLICT WITH PARENT REVISION
+		# (IE, root path, same name)
+ 			
+		# FIXME: CHECK IF DEPENDENCIES CONFLICT
+		# codeResourceRevisions are named codeResource.name on the file
+		# system - thus, dependencies must have unique (name,path)
+		# (ie, CodeResourceDependency.where, codeResource.name) values,
+		# otherwise they will overwrite each other
+
+		# ALGORITHM
+		# For each dependency in this codeResourceRevision, look at the
+		# (name,path) of all other dependencies in this revision and see
+		# if they are identical. If so, raise a validation error.
+
+		# Compare the (name, path) of each dependency against all other dependencies
+		for dependency1 in self.dependencies.all():
+
+			specifiedPath1 = dependency1.where
+
+			# Extract out the file name - if empty, assign coderesource.name
+			fileName1 = os.path.basename(specifiedPath1)
+			
+			if fileName1 == '':
+				fileName1 = dependency1.requirement.coderesource.name
+
+			path1 = os.path.dirname(specifiedPath1)
+
+			# Compare (fileName,path) against all other dependencies
+			for dependency2 in self.dependencies.all().exclude(pk=dependency1.pk):
+
+				specifiedPath2 = dependency2.where
+				fileName2 = os.path.basename(specifiedPath2)
+				if fileName2 == '':
+					fileName2 = dependency2.requirement.coderesource.name
+
+				path2 = os.path.dirname(specifiedPath2)
+
+				if (fileName1 == fileName2) and (path1 == path2):
+					raise ValidationError("Conflicting dependencies");
 
 
 class CodeResourceDependency(models.Model):
@@ -413,15 +490,15 @@ class CodeResourceDependency(models.Model):
 	                                related_name="needed_by");
 
 	# Where to place it during runtime relative to the CodeResource that relies on this CodeResourceDependency
-	# FIXME: This specifies the subdirectory, and OPTIONALLY, the file name to adopt during execution
+	# FIXME: specifies the subdirectory, and OPTIONALLY, the file name to adopt during execution
 	where = models.CharField(
 			"Dependency full path",
 			max_length=100,
 			help_text="Where a code resource dependency must exist in the sandbox relative to the parent");
 
-	def __clean__(self):
+	def clean(self):
 		"""
-		where cannot reference parent directory (..), must be a valid path
+		Where must be a valid path, and not reference the parent directory
 		"""
 		pass
 
