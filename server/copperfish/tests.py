@@ -35,7 +35,6 @@ class CopperfishMethodTests_setup(TestCase):
                                  description="String (basically anything)",
                                  verification_script=File(f),
                                  Python_type="str");
-            string_dt.full_clean();
             string_dt.save();
 
         # Create Datatype "DNANucSeq" with validation code DNANucSeqUT.py
@@ -48,7 +47,6 @@ class CopperfishMethodTests_setup(TestCase):
 
             # DNA_dt is a restricted type of string
             DNA_dt.restricts.add(string_dt);
-            DNA_dt.full_clean();
             DNA_dt.save();
 
         # Create Datatype "RNANucSeq" with validation code RNANucSeqUT.py, restricted by "string"
@@ -61,7 +59,6 @@ class CopperfishMethodTests_setup(TestCase):
 
             # RNA_dt is a restricted type of string
             RNA_dt.restricts.add(string_dt);
-            RNA_dt.full_clean();
             RNA_dt.save();
 
         # Make accessible outside of this function
@@ -297,8 +294,46 @@ class CopperfishMethodTests_setup(TestCase):
                 dataset_name = "recomplemented_seqs",
                 dataset_idx = 1);
 
+        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
+        dt_1 = Datatype(name="dt_1",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_1.save()
+        self.dt_1 = dt_1
+
+        dt_2 = Datatype(name="dt_2",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_2.save()
+        self.dt_2 = dt_2
+
+        dt_3 = Datatype(name="dt_3",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_3.save()
+        self.dt_3 = dt_3
+
+        dt_4 = Datatype(name="dt_4",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_4.save()
+        self.dt_4 = dt_4
+
+        dt_5 = Datatype(name="dt_5",
+                        description="A string validated by stringUT.py",
+                        verification_script=File(f),
+                        Python_type="str");
+        dt_5.save()
+        self.dt_5 = dt_5
+
     def tearDown(self):
-        filesToDelete = ["stringUT.py", "DNANucSeqUT.py", "RNANucSeqUT.py"];
+        filesToDelete = ["stringUT.py", "stringUT_1.py", "stringUT_2.py",
+						 "stringUT_3.py", "stringUT_4.py", "stringUT_5.py",
+						 "DNANucSeqUT.py", "RNANucSeqUT.py"];
         for f in filesToDelete:
             os.remove(os.path.join("VerificationScripts",f));
 
@@ -308,7 +343,7 @@ class CopperfishMethodTests_setup(TestCase):
             os.remove(os.path.join("CodeResources",f));
 
 
-class Datatype_tests(TestCase):
+class Datatype_tests(CopperfishMethodTests_setup):
     
     def test_datatype_unicode(self):
         """
@@ -318,13 +353,66 @@ class Datatype_tests(TestCase):
         my_datatype = Datatype(name="fhqwhgads");
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
-    # UNIT TESTS TO CHECK CLEAN ("self" restriction)
+    ### Unit tests for datatype.clean (Circular restrictions) ###
         
     # Direct circular cases: start, middle, end
     # Start   dt1 restricts dt1, dt3, dt4
     # Middle  dt1 restricts dt3, dt1, dt4
     # End     dt1 restricts dt3, dt4, dt1
     # Good    dt1 restricts dt2, dt3, dt4
+
+    def test_datatype_circular_direct_start_clean_bad(self):
+        """
+        Circular, direct, start
+        dt1 restricts dt1, dt3, dt4
+        """
+        self.dt_1.restricts.add(self.dt_1);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+    def test_datatype_circular_direct_middle_clean_bad(self):
+        """
+        Circular, direct, middle
+        dt1 restricts dt3, dt1, dt4
+        """
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_1);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+    def test_datatype_circular_direct_end_clean_bad(self):
+        """
+        Circular, direct, middle
+        dt1 restricts dt3, dt4, dt1
+        """
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.restricts.add(self.dt_1);
+        self.dt_1.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+    def test_datatype_circular_direct_clean_good(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+
+        self.assertEqual(self.dt_1.clean(), None);
 
     # Recursive cases: start, middle, end
     # Start   dt1 restricts dt2, dt3, dt4 (dt2 restricts dt1)
@@ -337,6 +425,134 @@ class Datatype_tests(TestCase):
     # Good-5  dt1 restricts dt2, dt3, dt4 (dt3 restricts dt4)
     # Good-6  dt1 restricts dt2, dt3, dt4 (dt4 restricts dt2)
 
+    def test_datatype_circular_recursive_begin_clean_bad(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt2 restricts dt1
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+
+        self.dt_2.restricts.add(self.dt_1);
+        self.dt_2.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+    def test_datatype_circular_recursive_middle_clean_bad(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt3 restricts dt1
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+
+        self.dt_3.restricts.add(self.dt_1);
+        self.dt_3.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+    def test_datatype_circular_recursive_end_clean_bad(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt4 restricts dt1
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_4.restricts.add(self.dt_1);
+        self.dt_4.save();
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Circular Datatype restriction detected",
+                                self.dt_1.clean);
+
+
+    def test_datatype_circular_recursive_clean_good1(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt2 restricts dt5
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_5);
+        self.dt_2.save();
+        self.assertEqual(self.dt_1.clean(), None);
+
+    def test_datatype_circular_recursive_clean_good2(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt3 restricts dt5
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_3.restricts.add(self.dt_5);
+        self.dt_3.save();
+        self.assertEqual(self.dt_1.clean(), None);
+
+    def test_datatype_circular_recursive_clean_good3(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt4 restricts dt5
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_4.restricts.add(self.dt_5);
+        self.dt_4.save();
+        self.assertEqual(self.dt_1.clean(), None);
+
+    def test_datatype_circular_recursive_clean_good4(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt2 restricts dt4
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_4);
+        self.dt_2.save();
+        self.assertEqual(self.dt_1.clean(), None);
+
+    def test_datatype_circular_recursive_clean_good5(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt3 restricts dt4
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_3.restricts.add(self.dt_4);
+        self.dt_3.save();
+        self.assertEqual(self.dt_1.clean(), None);
+
+    def test_datatype_circular_recursive_clean_good6(self):
+        """
+        dt1 restricts dt2, dt3, dt4
+        dt4 restricts dt2
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.save();
+        self.dt_4.restricts.add(self.dt_2);
+        self.dt_4.save();
+        self.assertEqual(self.dt_1.clean(), None);
 
     # UNIT TESTS TO VALIDATE is_restricted_by IN GENERAL
     
@@ -352,70 +568,144 @@ class Datatype_tests(TestCase):
     # dt3.is_restricted_by(dt1) - TRUE
     # dt1.is_restricted_by(dt2) - FALSE
     # dt2.is_restricted_by(dt1) - TRUE
-    
+
+    def test_datatype_direct_is_restricted_by_1(self):
+        """
+        dt1 restricts dt2
+        dt1.is_restricted_by(dt2) - FALSE
+        dt2.is_restricted_by(dt1) - TRUE
+        """
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.save();
+
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True);
+
+    def test_datatype_direct_is_restricted_by_2(self):
+        """
+        dt1 and dt2 exist but do not restrict each other
+        dt1.is_restricted_by(dt2) - FALSE
+        dt2.is_restricted_by(dt1) - FALSE
+        """
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), False);
+
+    def test_datatype_recursive_is_restricted_by_1(self):
+        """
+        dt1 restricts dt2, dt2 restricts dt3
+
+        dt1.is_restricted_by(dt3) - FALSE
+        dt3.is_restricted_by(dt1) - TRUE
+        dt1.is_restricted_by(dt2) - FALSE
+        dt2.is_restricted_by(dt1) - TRUE
+        """
+
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_3);
+        self.dt_2.save();
+        
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
+        self.assertEqual(self.dt_3.is_restricted_by(self.dt_1), True);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True);
+
+        #def test_datatype_direct_is_restricted_by_3(self):
+        #"""
+        #dt1 restricts dt2
+        #dt[2,3,4].is_restricted_by(dt1)
+        #"""
+
+        #self.dt_1.restricts.add(self.dt_2);
+        #self.dt_1.save();
+        #self.dt_2.restricts.add(self.dt_3);
+        #self.dt_2.save();
+        
+        #self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
+
     # dt1 restricts dt[2,3,4]
     # dt[2,3,4].is_restricted_by(dt1)
 
+
+    # Recursive checks
     # dt1 restricts dt[2,3,4], 1 of dt[2,3,4] restrict dt5 (3 cases)
     # dt1.is_restricted_by(dt[2,3,4]) - FALSE
     # dt1.is_restricted_by(dt5) - FALSE
-    # Not necessary: dt[2,3,4].is_restricted_by(dt1) - TRUE
-    # Not necessary: dt5.is_restricted_by(dt1) - TRUE
 
-    # The following are not necessary:
-    # dt1, dt2, dt3 restrict dt4
-    # dt4.is_restricted_by(dt[1,2,3])
-    # dt[1,2,3].is_restricted_by(dt4)
+    def test_datatype_recursive_is_restricted_by_2(self):
+        """
+        dt1 restricts dt[2,3,4]
+        dt2 restricts dt5
+        """
 
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_5);
+        self.dt_2.save();
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
 
+    def test_datatype_recursive_is_restricted_by_3(self):
+        """
+        dt1 restricts dt[2,3,4]
+        dt3 restricts dt5
+        """
 
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+        self.dt_3.restricts.add(self.dt_5);
+        self.dt_3.save();
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
+
+    def test_datatype_recursive_is_restricted_by_4(self):
+        """
+        dt1 restricts dt[2,3,4]
+        dt4 restricts dt5
+        """
+
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.restricts.add(self.dt_4);
+        self.dt_1.save();
+        self.dt_4.restricts.add(self.dt_5);
+        self.dt_4.save();
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
 
     def test_datatype_no_restriction_clean_good (self):
         """
         Datatype without any restrictions.
-
         """
-        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
-        dt_1 = Datatype(name="dt_1",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_1.save();
-        self.assertEqual(dt_1.clean(), None);
+        self.assertEqual(self.dt_1.clean(), None);
 
     def test_datatype_nested_valid_restrictions_clean_good(self):
         """
         Datatypes such that A restricts B, and B restricts C
         
         """
+      
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_3);
+        self.dt_2.save();
 
-        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
-        dt_1 = Datatype(name="dt_1",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_1.save();
-
-        dt_2 = Datatype(name="dt_2",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_2.save();
-
-        dt_3 = Datatype(name="dt_2",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_3.save();
-        
-        dt_1.restricts.add(dt_2);
-        dt_1.save();
-        dt_2.restricts.add(dt_3);
-        dt_2.save();
-
-        self.assertEqual(dt_1.clean(), None);
-        self.assertEqual(dt_2.clean(), None);
-        self.assertEqual(dt_3.clean(), None);
+        self.assertEqual(self.dt_1.clean(), None);
+        self.assertEqual(self.dt_2.clean(), None);
+        self.assertEqual(self.dt_3.clean(), None);
 
     def test_datatype_nested_invalid_restrictions_scrambled_clean_bad(self):
         """
@@ -426,38 +716,19 @@ class Datatype_tests(TestCase):
         B restricts C
         C restricts A
         """
-
-        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
-        dt_1 = Datatype(name="dt_1",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_1.save();
-
-        dt_2 = Datatype(name="dt_2",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_2.save();
-
-        dt_3 = Datatype(name="dt_2",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_3.save();
-        
-        dt_1.restricts.add(dt_3);
-        dt_1.save();
-        dt_1.restricts.add(dt_2);
-        dt_1.save();
-        dt_2.restricts.add(dt_3);
-        dt_2.save();
-        dt_3.restricts.add(dt_1);
-        dt_3.save();
+         
+        self.dt_1.restricts.add(self.dt_3);
+        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_3);
+        self.dt_2.save();
+        self.dt_3.restricts.add(self.dt_1);
+        self.dt_3.save();
 
         self.assertRaisesRegexp(ValidationError,
                                 "Circular Datatype restriction detected",
-                                dt_1.clean);
+                                self.dt_1.clean);
 
 
     def test_datatype_direct_circular_restriction_clean_bad(self):
@@ -466,21 +737,13 @@ class Datatype_tests(TestCase):
         
         """
 
-        # Define one datatype
-        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
-        dt_1 = Datatype(name="dt_1",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_1.save();
-
         # And have it restrict itself
-        dt_1.restricts.add(dt_1);
-        dt_1.save();
+        self.dt_1.restricts.add(self.dt_1);
+        self.dt_1.save();
 
         self.assertRaisesRegexp(ValidationError,
                                 "Circular Datatype restriction detected",
-                                dt_1.clean);
+                                self.dt_1.clean);
 
     def test_datatype_circular_restriction_indirect_clean(self):
         """
@@ -491,29 +754,15 @@ class Datatype_tests(TestCase):
         
         """
 
-        # Define two datatypes
-        f = open(os.path.join(samplecode_path, "stringUT.py"), "rb")
-        dt_1 = Datatype(name="dt_1",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_1.save();
-
-        dt_2 = Datatype(name="dt_2",
-                        description="A string validated by stringUT.py",
-                        verification_script=File(f),
-                        Python_type="str");
-        dt_2.save();
-
         # And have them form a circular restriction path
-        dt_1.restricts.add(dt_2);
-        dt_1.save();
-        dt_2.restricts.add(dt_1);
-        dt_2.save();
+        self.dt_1.restricts.add(self.dt_2);
+        self.dt_1.save();
+        self.dt_2.restricts.add(self.dt_1);
+        self.dt_2.save();
 
         self.assertRaisesRegexp(ValidationError,
                                 "Circular Datatype restriction detected",
-                                dt_1.clean);
+                                self.dt_1.clean);
 
 
 
@@ -940,11 +1189,11 @@ class method_tests(CopperfishMethodTests_setup):
                 foo.check_output_indices);
 
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.clean);
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.clean);
 
-      def test_method_no_copied_parent_parameters_save(self):
+    def test_method_no_copied_parent_parameters_save(self):
         """Test save when no method revision parent is specified."""
 
         # Define new Method with no parent
