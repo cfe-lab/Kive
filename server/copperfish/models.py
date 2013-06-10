@@ -496,9 +496,12 @@ class CodeResourceDependency(models.Model):
 
 	def clean(self):
 		"""
-		Where must be a valid path, and not reference the parent directory
+		depPath cannot reference ".."
 		"""
-		pass
+		if re.search("\.\.", self.depPath):
+			raise ValidationError("depPath cannot reference ..");
+
+		self.depPath = os.path.normpath(self.depPath)
 
 	def __unicode__(self):
 		"""Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
