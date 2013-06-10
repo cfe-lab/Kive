@@ -19,6 +19,7 @@ import hashlib;			# To calculate MD5 hash
 import re;			# Regular expressions
 import string;			# Augments regular expressions
 import os.path;                 # For checking file paths
+import sys;
 
 class Datatype(models.Model):
 	"""
@@ -409,8 +410,7 @@ class CodeResourceRevision(models.Model):
 	def __unicode__(self):
 		"""Represent a resource revision by it's CodeResource name and revision name"""
 		
-		# Admin can create a CodeResource without save()ing to the database
-		# and allow the corresponding CodeResourceRevision to be created in memory
+		# Admin can create CR without save() and allow CRRev to be created in memory
 		# So, in MEMORY, a revision can temporarily have no corresponding CodeResource
 		if not hasattr(self, "coderesource"):
 			return u"[no code resource set] {}".format(self.revision_name);
@@ -418,13 +418,38 @@ class CodeResourceRevision(models.Model):
 		string_rep = unicode(self.coderesource) + u" " + self.revision_name;
 		return string_rep;
 
+	# This CRR includes it's own filename at the root
+	def list_all_filepaths(self):
+		return self.list_all_filepaths_h(self.coderesource.name)
+
+	# Self is be a dependency CRR, base_name is it's file name, specified either
+	# by the parent dependency layer, or in the case of a top-level CR, just CRR.name
+	def list_all_filepaths_h(self, base_name):
+
+		# Filepath includes the original file which has dependencies
+		# FIXME: If just a library of dependencies, don't add base_path
+		all_filepaths = [unicode(base_name)]
+
+		# For each dependency in this code resource revision
+		for dep in self.dependencies.all():
+
+			# Get all file paths of the CR of the child dependency relative to itself
+			inner_dep_paths = dep.requirement.list_all_filepaths_h(dep.depFileName)
+
+			# Convert the paths from being relative to the child CRR to being
+			# relative to the current parent CRR by appending pathing
+			# information from the dependency layer
+			for paths in inner_dep_paths:
+				correctedPath = os.path.join(dep.depPath, paths)
+				all_filepaths.append(unicode(correctedPath))
+
+		return all_filepaths
 
 	def clean(self):
 		"""If there is a file specified, fill in the MD5 checksum."""
 
-
-		# A CodeResource can be a collection of dependencies and not actually
-		# contain a file - an MD5 hash may not exist
+		# CodeResource can be a collection of dependencies and not contain
+		# a file - in this case, MD5 has no meaning and shouldn't exist
 		try:
 			md5gen = hashlib.md5();
 			md5gen.update(self.content_file.read());
@@ -433,47 +458,15 @@ class CodeResourceRevision(models.Model):
 		except ValueError as e:
 			self.MD5_checksum = "";
 
-		# FIXME: CHECK IF DEPENDENCY DIRECTLY REFERENCES SELF
+		# Check if crr has a dependency with self
+		for dependency in self.dependencies.all():
+			if (dependency.coderesourcerevision == self):
+				raise ValidationError("Self-referential dependency"); 
 
-		# FIXME: CHECK IF DEPENDENCIES CONFLICT WITH PARENT REVISION
-		# (IE, root path, same name)
- 			
-		# FIXME: CHECK IF DEPENDENCIES CONFLICT
-		# codeResourceRevisions are named codeResource.name on the file
-		# system - thus, dependencies must have unique (name,path)
-		# (ie, CodeResourceDependency.where, codeResource.name) values,
-		# otherwise they will overwrite each other
-
-		# ALGORITHM
-		# For each dependency in this codeResourceRevision, look at the
-		# (name,path) of all other dependencies in this revision and see
-		# if they are identical. If so, raise a validation error.
-
-		# Compare the (name, path) of each dependency against all other dependencies
-		for dependency1 in self.dependencies.all():
-
-			specifiedPath1 = dependency1.where
-
-			# Extract out the file name - if empty, assign coderesource.name
-			fileName1 = os.path.basename(specifiedPath1)
-			
-			if fileName1 == '':
-				fileName1 = dependency1.requirement.coderesource.name
-
-			path1 = os.path.dirname(specifiedPath1)
-
-			# Compare (fileName,path) against all other dependencies
-			for dependency2 in self.dependencies.all().exclude(pk=dependency1.pk):
-
-				specifiedPath2 = dependency2.where
-				fileName2 = os.path.basename(specifiedPath2)
-				if fileName2 == '':
-					fileName2 = dependency2.requirement.coderesource.name
-
-				path2 = os.path.dirname(specifiedPath2)
-
-				if (fileName1 == fileName2) and (path1 == path2):
-					raise ValidationError("Conflicting dependencies");
+		# Check if dependencies conflict with each other
+		listOfDependencyPaths = self.list_all_filepaths()
+		if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
+			raise ValidationError("Conflicting dependencies"); 
 
 
 class CodeResourceDependency(models.Model):
@@ -483,7 +476,7 @@ class CodeResourceDependency(models.Model):
 	"""
 
 	coderesourcerevision = models.ForeignKey(CodeResourceRevision,
-											 related_name="dependencies");
+						 related_name="dependencies");
 
 	# Dependency is a codeResourceRevision
 	requirement = models.ForeignKey(CodeResourceRevision,
@@ -491,10 +484,15 @@ class CodeResourceDependency(models.Model):
 
 	# Where to place it during runtime relative to the CodeResource that relies on this CodeResourceDependency
 	# FIXME: specifies the subdirectory, and OPTIONALLY, the file name to adopt during execution
-	where = models.CharField(
-			"Dependency full path",
-			max_length=100,
-			help_text="Where a code resource dependency must exist in the sandbox relative to the parent");
+	depPath = models.CharField(
+		"Dependency path",
+		max_length=255,
+		help_text="Where a code resource dependency must exist in the sandbox relative to it's parent");
+
+	depFileName = models.CharField(
+		"Dependency file name",
+		max_length=255,
+		help_text="The file name the dependency is given on the sandbox at execution");
 
 	def clean(self):
 		"""
@@ -507,7 +505,7 @@ class CodeResourceDependency(models.Model):
 		return u"{} requires {} as {}".format(
 				unicode(self.coderesourcerevision),
 				unicode(self.requirement),
-				self.where);
+				os.path.join(self.depPath, self.depFileName));
 
 class TransformationFamily(models.Model):
 	"""

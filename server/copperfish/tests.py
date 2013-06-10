@@ -330,6 +330,32 @@ class CopperfishMethodTests_setup(TestCase):
         dt_5.save()
         self.dt_5 = dt_5
 
+        # The following is for testing code resource dependencies
+        test_cr_1 = CodeResource(name="test_cr_1.py",
+                                 description="CR1")
+        test_cr_1.save()
+        test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
+                                              revision_name="v1",
+                                              revision_desc="CR1-rev1",
+                                              content_file=File(f))
+        test_cr_1_rev1.save()
+        test_cr_2 = CodeResource(name="test_cr_2.py",
+                                 description="CR2")
+        test_cr_2.save()
+        test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
+                                              revision_name="v2",
+                                              revision_desc="CR2-rev1",
+                                              content_file=File(f))
+        test_cr_2_rev1.save()
+        test_cr_3 = CodeResource(name="test_cr_3.py",
+                                 description="CR3")
+        test_cr_3.save()
+        test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
+                                              revision_name="v3",
+                                              revision_desc="CR3-rev1",
+                                              content_file=File(f))
+        test_cr_3_rev1.save()
+
     def tearDown(self):
         filesToDelete = ["stringUT.py", "stringUT_1.py", "stringUT_2.py",
 						 "stringUT_3.py", "stringUT_4.py", "stringUT_5.py",
