@@ -339,6 +339,9 @@ class CopperfishMethodTests_setup(TestCase):
                                               revision_desc="CR1-rev1",
                                               content_file=File(f))
         test_cr_1_rev1.save()
+        self.test_cr_1 = test_cr_1
+        self.test_cr_1_rev1 = test_cr_1_rev1
+        
         test_cr_2 = CodeResource(name="test_cr_2.py",
                                  description="CR2")
         test_cr_2.save()
@@ -347,6 +350,9 @@ class CopperfishMethodTests_setup(TestCase):
                                               revision_desc="CR2-rev1",
                                               content_file=File(f))
         test_cr_2_rev1.save()
+        self.test_cr_2 = test_cr_2
+        self.test_cr_2_rev1 = test_cr_2_rev1
+
         test_cr_3 = CodeResource(name="test_cr_3.py",
                                  description="CR3")
         test_cr_3.save()
@@ -355,15 +361,29 @@ class CopperfishMethodTests_setup(TestCase):
                                               revision_desc="CR3-rev1",
                                               content_file=File(f))
         test_cr_3_rev1.save()
+        self.test_cr_3 = test_cr_3
+        self.test_cr_3_rev1 = test_cr_3_rev1
+
+        test_cr_4 = CodeResource(name="test_cr_4.py",
+                                 description="CR4")
+        test_cr_4.save()
+        test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
+                                              revision_name="v4",
+                                              revision_desc="CR4-rev1",
+                                              content_file=File(f))
+        test_cr_4_rev1.save()
+        self.test_cr_4 = test_cr_3
+        self.test_cr_4_rev1 = test_cr_4_rev1
 
     def tearDown(self):
         filesToDelete = ["stringUT.py", "stringUT_1.py", "stringUT_2.py",
-						 "stringUT_3.py", "stringUT_4.py", "stringUT_5.py",
-						 "DNANucSeqUT.py", "RNANucSeqUT.py"];
+			 "stringUT_3.py", "stringUT_4.py", "stringUT_5.py",
+			 "DNANucSeqUT.py", "RNANucSeqUT.py"];
         for f in filesToDelete:
             os.remove(os.path.join("VerificationScripts",f));
 
-        filesToDelete = ["complement.py", "complement_v2.py"];
+        filesToDelete = ["stringUT.py", "stringUT_1.py", "stringUT_2.py",
+                         "stringUT_3.py", "complement.py", "complement_v2.py"];
 
         for f in filesToDelete:
             os.remove(os.path.join("CodeResources",f));
@@ -1000,352 +1020,483 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
                 md5gen.hexdigest(),
                 self.comp_cr.revisions.get(revision_name="v1").MD5_checksum);
 
-    def test_clean_for_one_valid_dependency_explicit_fileName_good(self):
+    def test_dependency_depends_on_nothing_clean_good (self):
         """
-        CodeResourceDependencies cannot overwrite the parent
+        CodeResourceDependencies can have no dependencies.
         """
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
-        # Define a code resource
-        test_cr = CodeResource(name="test_cr.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr.save()
-
-        # Define a code resource revision
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-        # Define a second code resource revision which will be the dependency
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-        test_cr_rev1.dependencies.create(requirement=test_cr_rev2,
-                                         where="subFolder/test.csv")
-
-        self.assertEqual(test_cr_rev1.clean(), None)
-
-    def test_clean_for_one_valid_dependency_implicit_fileName_good(self):
+    def test_dependency_current_folder_same_name_clean_bad(self):
         """
-        CodeResourceDependencies cannot overwrite the parent
+        A depends on B - current folder, same name
         """
 
-        # Define a code resource
-        test_cr = CodeResource(name="test_cr.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr.save()
-
-        # Define a code resource revision
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-        # Define a second code resource revision which will be the dependency
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-        test_cr_rev1.dependencies.create(requirement=test_cr_rev2,
-                                         where="subFolder")
-
-        self.assertEqual(test_cr_rev1.clean(), None)
-        
-
-    def test_clean_for_many_valid_dependencies_same_path_different_implicit_name_good(self):
-        """
-        CodeResourceDependencies can have the same path with different names.
-        """
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-
-        # First revision has name test_cr_1.py
-        test_cr_1 = CodeResource(name="test_cr_1.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_1.save()
-
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-        # Second revision has different name test_cr_2.py
-        test_cr_2 = CodeResource(name="test_cr_2.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_2.save()
-
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-        # Third revision has still different name test_cr_3.py
-        test_cr_3 = CodeResource(name="test_cr_3.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_3.save()
-
-        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
-                                           revision_name="v3",
-                                           revision_desc="Third version",
-                                           content_file=File(f))
-        test_cr_rev3.save()
-
-        # Register 2 dependencies with different names but the same path
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev2,
-            where="somePath/")
-
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev3,
-            where="somePath/")   
-
-        self.assertEqual(test_cr_rev1.clean(), None)
-
-
-    def test_clean_for_many_valid_dependencies_same_path_different_explicit_names_good(self):
-        """
-        CodeResourceDependencies can have the same path with different names.
-        """
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-
-        # First revision has name test_cr_1.py
-        test_cr_1 = CodeResource(name="test_cr_1.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_1.save()
-
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-        # Second revision has different name test_cr_2.py
-        test_cr_2 = CodeResource(name="test_cr_2.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_2.save()
-
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-        # Third revision has still different name test_cr_3.py
-        test_cr_3 = CodeResource(name="test_cr_3.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr_3.save()
-
-        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
-                                           revision_name="v3",
-                                           revision_desc="Third version",
-                                           content_file=File(f))
-        test_cr_rev3.save()
-
-        # Register 2 dependencies with different names but the same path
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev2,
-            where="somePath/file1.csv")
-
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev3,
-            where="somePath/file2.csv")   
-
-        self.assertEqual(test_cr_rev1.clean(), None)
-
-
-    def test_clean_for_many_valid_dependencies_different_paths_same_implicit_name_good(self):
-        """
-        CodeResourceDependencies can have different paths with the same name.
-        """
-
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-
-        # First revision has name test_cr_1.py
-        test_cr_1 = CodeResource(name="test_cr_1.py",
-                                 description="Complement DNA/RNA nucleotide sequences")
-        test_cr_1.save()
-
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr_1,
-                                            revision_name="v1",
-                                            revision_desc="First version",
-                                            content_file=File(f))
-        test_cr_rev1.save()
-
-        # Second revision has different name test_cr_2.py
-        test_cr_2 = CodeResource(name="test_cr_2.py",
-                                 description="Complement DNA/RNA nucleotide sequences")
-        test_cr_2.save()
-
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
-                                            revision_name="v2",
-                                            revision_desc="Second version",
-                                            content_file=File(f))
-        test_cr_rev2.save()
-
-        # Third revision with same coderesource name
-        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_2,
-                                            revision_name="v3",
-                                            revision_desc="Third version",
-                                            content_file=File(f))
-        test_cr_rev3.save()
-
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev2,
-            where="somePath/")
-
-        test_cr_rev1.dependencies.create(
-            requirement=test_cr_rev3,
-            where="aDifferentPath/")   
-
-        self.assertEqual(test_cr_rev1.clean(), None)
-
-    def test_clean_for_invalid_self_referential_dependency(self):
-        """
-        A code resource cannot have a dependency with itself.
-        """
-        pass
-
-    def test_clean_for_single_invalid_dependency_colliding_with_parentResource_bad_INCOMPLETE(self):
-        """
-        CodeResourceDependencies cannot overwrite the parent
-        """
-
-        # Define parent code resource
-        test_cr = CodeResource(name="test_cr.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr.save()
-
-        # Assign it a code resource revision
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-        # Assign it a second code resource revision
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-        # Give the first revision a dependency with the second
-        test_cr_rev1.dependencies.create(
-        coderesourcerevision=test_cr_rev2,
-        requirement=test_cr_rev1,
-        where="")
-
-    def test_clean_for_colliding_dependencies_explicit_filename_bad(self):
-        """
-        CodeResourceDependencies cannot overwrite each other in the sandbox
-        """
-
-        # Define a code resource
-        test_cr = CodeResource(name="test_cr.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr.save()
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
-
-
-        test_cr_2 = CodeResource(name="test_cr_2.py",
-                                 description="Complement DNA/RNA nucleotide sequences")
-        test_cr_2.save()
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
-
-
-        test_cr_3 = CodeResource(name="test_cr_3.py",
-                                 description="Complement DNA/RNA nucleotide sequences")
-        test_cr_3.save()
-        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_3,
-                                           revision_name="v3",
-                                           revision_desc="Third version",
-                                           content_file=File(f))
-        test_cr_rev3.save()
-
-
-        test_cr_rev1.dependencies.create(
-            coderesourcerevision=test_cr_rev2,
-            requirement=test_cr_rev1,
-            where="somePath/test.csv")
-
-        test_cr_rev1.dependencies.create(
-            coderesourcerevision=test_cr_rev3,
-            requirement=test_cr_rev1,
-            where="somePath/test.csv")        
+        # test_cr_1_rev1 is needed by test_cr_2_rev1
+        # It will have the same file name as test_cr_1
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
 
         self.assertRaisesRegexp(ValidationError,
                                 "Conflicting dependencies",
-                                test_cr_rev1.clean)
+                                self.test_cr_1_rev1.clean)
 
-    def test_clean_for_colliding_dependencies_implicit_filename_bad(self):
+    def test_dependency_current_folder_different_name_clean_good(self):
         """
-        CodeResourceDependencies cannot overwrite each other in the sandbox
+        1 depends on 2 - current folder, different name
         """
-        # Define a code resource
-        test_cr = CodeResource(name="test_cr.py",
-                               description="Complement DNA/RNA nucleotide sequences")
-        test_cr.save()
-        f = open(os.path.join(samplecode_path, "test_cr.py"), "rb")
-        test_cr_rev1 = CodeResourceRevision(coderesource=test_cr,
-                                           revision_name="v1",
-                                           revision_desc="First version",
-                                           content_file=File(f))
-        test_cr_rev1.save()
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="differentName.py")
 
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
-        test_cr_2 = CodeResource(name="test_cr_2.py",
-                                 description="Complement DNA/RNA nucleotide sequences")
-        test_cr_2.save()
-        test_cr_rev2 = CodeResourceRevision(coderesource=test_cr_2,
-                                           revision_name="v2",
-                                           revision_desc="Second version",
-                                           content_file=File(f))
-        test_cr_rev2.save()
+    def test_dependency_inner_folder_same_name_clean_good(self):
+        """
+        1 depends on 2 - current folder, different name
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="innerFolder/",
+            depFileName=self.test_cr_1.name)
 
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
-        test_cr_rev3 = CodeResourceRevision(coderesource=test_cr_2,
-                                           revision_name="v3",
-                                           revision_desc="Third version",
-                                           content_file=File(f))
-        test_cr_rev3.save()
+    def test_dependency_inner_folder_different_name_clean_good(self):
+        """
+        1 depends on 2 - current folder, different name
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="innerFolder/",
+            depFileName="differentName.py")
 
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
-        test_cr_rev1.dependencies.create(
-            coderesourcerevision=test_cr_rev2,
-            requirement=test_cr_rev1,
-            where="somePath/")
+    def test_dependency_A_depends_BC_same_folder_no_conflicts_clean_good(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A
+        Nothing conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="name1.py")
 
-        test_cr_rev1.dependencies.create(
-            coderesourcerevision=test_cr_rev3,
-            requirement=test_cr_rev1,
-            where="somePath/")        
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="name2.py")
 
-        self.assertRaisesRegexp(ValidationError,
-                                "Conflicting dependencies",
-                                test_cr_rev1.clean)
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
+    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, B conflicts with A
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="name1.py")
 
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_BC_same_folder_C_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, C conflicts with A
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="notConflicting.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_C_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, BC conflict
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="colliding_name.py")
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="colliding_name.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_BC_B_in_same_folder_no_conflicts_clean_good(self):
+        """
+        BC in same folder as A, B conflicts with A
+        B in same folder, C in different folder, nothing conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="no_collision.py")
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="diffFolder",
+            depFileName="differentName.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_BC_B_in_same_folder_B_conflicts_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        B in same folder, C in different folder, B conflicts with A
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="diffFolder",
+            depFileName="differentName.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_BC_C_in_same_folder_no_conflict_clean_good(self):
+        """
+        A depends on B, A depends on C
+        B in different folder, C in same folder, nothing conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="diffFolder",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="differentName.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_BC_C_in_same_folder_C_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        B in different folder, C in same folder, C conflicts with A
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="diffFolder",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_B_B_depends_C_all_same_folder_no_conflict_clean_good(self):
+        """
+        A depends on B, B depends on C
+        ABC in same folder - no conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="differentName.py")
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="differetName2.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_B_B_depends_C_all_same_folder_A_conflicts_C_clean_bad(self):
+        """
+        A depends on B, B depends on C
+        ABC in same folder - A conflicts with C
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="differentName.py")
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_B_B_depends_C_all_same_folder_B_conflicts_C_clean_bad(self):
+        """
+        A depends on B, B depends on C
+        ABC in same folder - B conflicts with C
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="differentName.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_B_B_depends_C_BC_is_nested_no_conflicts_clean_good(self):
+        """
+        A depends on B, B depends on C
+        BC in nested folder - no conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nestedFolder",
+            depFileName=self.test_cr_1.name)
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="differentName.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_B_B_depends_C_BC_is_nested_B_conflicts_C_clean_bad(self):
+        """
+        A depends on B, B depends on C
+        BC in nested folder - B conflicts with C
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nestedFolder",
+            depFileName="conflicting.py")
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="conflicting.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_B_B_depends_C_double_nested_clean_good(self):
+        """
+        A depends on B, B depends on C
+        B in nested folder, C in double nested folder - no conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nestedFolder",
+            depFileName="conflicting.py")
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="nestedFolder",
+            depFileName="conflicting.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_B1B2B3_B1_depends_C_all_same_folder_no_conflicts_clean_good(self):
+        """
+        A depends on B1/B2/B3, B1 depends on C
+        A/B1B2B3/C in same folder - no conflicts
+        """
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="1.py")
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="2.py")
+
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="3.py")
+
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="",
+            depFileName="4.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_B1B2B3_B2_depends_C_B1B2B3C_in_nested_B3_conflicts_C_clean_bad(self):
+        """
+        A depends on B1/B2/B3, B2 depends on C
+        B1B2B3C in nested folder - B3 conflicts with C
+        """
+
+        # A depends on B1
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nested",
+            depFileName="1.py")
+
+        # A depends on B2
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nested",
+            depFileName="2.py")
+
+        # A depends on B3***
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="nested",
+            depFileName="conflict.py")
+
+        # B2 depends on C
+        self.test_cr_3_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="",
+            depFileName="conflict.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_A_depends_B1B2B3_B3_depends_C_B2B3C_in_nested_B2_conflicts_B3_clean_bad(self):
+        """
+        A depends on B1/B2/B3, B3 depends on C
+        B2B3 in nested folder - B2 conflicts with B3
+        """
+
+        # A depends on B1
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="1.py")
+
+        # A depends on B2
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="nested",
+            depFileName="conflict.py")
+
+        # A depends on B3
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="nested",
+            depFileName="conflict.py")
+
+        # B3 depends on C
+        self.test_cr_3_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="",
+            depFileName="4.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_cr_1_rev1.clean)
+
+    def test_dependency_list_all_filepaths_recursive_case_1 (self):
+        """
+        Ensure list_all_filepaths generates the correct list
+        A depends on B1/B2, B1 depends on C
+        B1 is nested, B2 is not nested, C is nested wrt B1
+        """
+
+        # A depends on B1 (Which is nested)
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="B1_nested",
+            depFileName="B1.py")
+
+        # A depends on B2 (Which is not nested)
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="B2.py")
+
+        # B1 depends on C (Nested wrt B1)
+        self.test_cr_2_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="C_nested",
+            depFileName="C.py")
+
+        # Set is used as order doesn't matter
+        self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
+                         set([u'test_cr_1.py',
+                          u'B1_nested/B1.py',
+                          u'B1_nested/C_nested/C.py',
+                          u'B2.py']));
+
+    def test_dependency_list_all_filepaths_recursive_case_2 (self):
+        """
+        Ensure list_all_filepaths generates the correct list
+        A depends on B1/B2, B2 depends on C
+        B1 is nested, B2 is not nested, C is nested wrt B2
+        """
+        # A depends on B1 (Which is nested)
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="B1_nested",
+            depFileName="B1.py")
+
+        # A depends on B2 (Which is not nested)
+        self.test_cr_1_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="",
+            depFileName="B2.py")
+
+        # B2 depends on C (Nested wrt B2)
+        self.test_cr_3_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="C_nested",
+            depFileName="C.py")
+
+        # Set is needed as order doesn't matter
+        self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
+                         set([u'test_cr_1.py',
+                          u'B1_nested/B1.py',
+                          u'C_nested/C.py',
+                          u'B2.py']));
 
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
@@ -1362,7 +1513,8 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
         # Define a fake dependency where v1 requires v2 in subdir/foo.py
         test_crd = CodeResourceDependency(coderesourcerevision=v1,
                                           requirement=v2,
-                                          where="subdir/foo.py");
+                                          depPath="subdir",
+                                          depFileName="foo.py");
 
         # Display unicode for this dependency under valid conditions
         self.assertEquals(

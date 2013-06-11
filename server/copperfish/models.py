@@ -413,10 +413,17 @@ class CodeResourceRevision(models.Model):
 		# Admin can create CR without save() and allow CRRev to be created in memory
 		# So, in MEMORY, a revision can temporarily have no corresponding CodeResource
 		if not hasattr(self, "coderesource"):
-			return u"[no code resource set] {}".format(self.revision_name);
+			returnCodeResource = u"[no code resource set]"
+		else:
+			returnCodeResource = unicode(self.coderesource)
 
-		string_rep = unicode(self.coderesource) + u" " + self.revision_name;
-		return string_rep;
+		if self.revision_name == "":
+			returnRevisionName = u"[no revision name]"
+		else:
+			returnRevisionName = unicode(self.revision_name)
+
+		string_rep = unicode(returnCodeResource + ' ' + returnRevisionName)
+		return string_rep
 
 	# This CRR includes it's own filename at the root
 	def list_all_filepaths(self):
@@ -458,9 +465,9 @@ class CodeResourceRevision(models.Model):
 		except ValueError as e:
 			self.MD5_checksum = "";
 
-		# Check if crr has a dependency with self
+		# Check if crr dependency is self
 		for dependency in self.dependencies.all():
-			if (dependency.coderesourcerevision == self):
+			if (dependency.requirement == self):
 				raise ValidationError("Self-referential dependency"); 
 
 		# Check if dependencies conflict with each other
@@ -501,6 +508,7 @@ class CodeResourceDependency(models.Model):
 		if re.search("\.\.", self.depPath):
 			raise ValidationError("depPath cannot reference ..");
 
+		# Collapse down to a canonical path
 		self.depPath = os.path.normpath(self.depPath)
 
 	def __unicode__(self):
