@@ -331,7 +331,8 @@ class CopperfishMethodTests_setup(TestCase):
         self.dt_5 = dt_5
 
         # The following is for testing code resource dependencies
-        test_cr_1 = CodeResource(name="test_cr_1.py",
+        test_cr_1 = CodeResource(name="test_cr_1",
+                                 filename="test_cr_1.py",
                                  description="CR1")
         test_cr_1.save()
         test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
@@ -342,7 +343,8 @@ class CopperfishMethodTests_setup(TestCase):
         self.test_cr_1 = test_cr_1
         self.test_cr_1_rev1 = test_cr_1_rev1
         
-        test_cr_2 = CodeResource(name="test_cr_2.py",
+        test_cr_2 = CodeResource(name="test_cr_2",
+                                 filename="test_cr_2.py",
                                  description="CR2")
         test_cr_2.save()
         test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
@@ -353,7 +355,8 @@ class CopperfishMethodTests_setup(TestCase):
         self.test_cr_2 = test_cr_2
         self.test_cr_2_rev1 = test_cr_2_rev1
 
-        test_cr_3 = CodeResource(name="test_cr_3.py",
+        test_cr_3 = CodeResource(name="test_cr_3",
+                                 filename="test_cr_3.py",
                                  description="CR3")
         test_cr_3.save()
         test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
@@ -364,7 +367,8 @@ class CopperfishMethodTests_setup(TestCase):
         self.test_cr_3 = test_cr_3
         self.test_cr_3_rev1 = test_cr_3_rev1
 
-        test_cr_4 = CodeResource(name="test_cr_4.py",
+        test_cr_4 = CodeResource(name="test_cr_4",
+                                 filename="test_cr_4.py",
                                  description="CR4")
         test_cr_4.save()
         test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
@@ -372,7 +376,7 @@ class CopperfishMethodTests_setup(TestCase):
                                               revision_desc="CR4-rev1",
                                               content_file=File(f))
         test_cr_4_rev1.save()
-        self.test_cr_4 = test_cr_3
+        self.test_cr_4 = test_cr_4
         self.test_cr_4_rev1 = test_cr_4_rev1
 
     def tearDown(self):
@@ -917,7 +921,8 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         """
         Clean passes when codeResource name is file-system valid
         """
-        valid_cr = CodeResource(name="validName",
+        valid_cr = CodeResource(name="name",
+                                filename="validName",
                                 description="desc")
         valid_cr.save()
         self.assertEqual(valid_cr.clean(), None);
@@ -926,7 +931,8 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         """
         Clean passes when codeResource name is file-system valid
         """
-        valid_cr = CodeResource(name="valid.Name with-spaces_and_underscores().py",
+        valid_cr = CodeResource(name="anotherName",
+                                filename="valid.Name with-spaces_and_underscores().py",
                                 description="desc")
         valid_cr.save()
         self.assertEqual(valid_cr.clean(), None);
@@ -936,37 +942,41 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         Clean fails when CodeResource name isn't file-system valid
         """
 
-        invalid_cr = CodeResource(name="../test.py",
+        invalid_cr = CodeResource(name="test",
+                                  filename="../test.py",
                                   description="desc")
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource filename",invalid_cr.clean)
 
     def test_codeResource_invalid_name_starting_space_clean_bad(self):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name=" test.py",
+        invalid_cr = CodeResource(name="test",
+                                  filename=" test.py",
                                   description="desc")
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource filename",invalid_cr.clean)
 
     def test_codeResource_invalid_name_invalid_symbol_clean_bad(self):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name="test$.py",
+        invalid_cr = CodeResource(name="name",
+                                  filename="test$.py",
                                   description="desc")
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource filename",invalid_cr.clean)
 
     def test_codeResource_invalid_name_trailing_space_clean_bad(self):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name="test.py ",
+        invalid_cr = CodeResource(name="name",
+                                  filename="test.py ",
                                   description="desc")
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError,"Invalid code resource name",invalid_cr.clean)
+        self.assertRaisesRegexp(ValidationError,"Invalid code resource filename",invalid_cr.clean)
 
 
 class CodeResourceRevision_tests(CopperfishMethodTests_setup):
@@ -1036,7 +1046,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.assertRaisesRegexp(ValidationError,
                                 "Conflicting dependencies",
@@ -1060,7 +1070,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="innerFolder/",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
@@ -1106,7 +1116,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -1121,7 +1131,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
@@ -1178,7 +1188,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
@@ -1198,7 +1208,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="diffFolder",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
@@ -1215,12 +1225,12 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="diffFolder",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -1257,7 +1267,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_2_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -1272,7 +1282,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
             depPath="",
-            depFileName=self.test_cr_1.name)
+            depFileName=self.test_cr_1.filename)
 
         self.test_cr_2_rev1.dependencies.create(
             requirement=self.test_cr_3_rev1,
@@ -1460,7 +1470,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             depPath="C_nested",
             depFileName="C.py")
 
-        # Set is used as order doesn't matter
+        # Set is used as order doesn't matter (Change set to SORTED)
         self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
                          set([u'test_cr_1.py',
                           u'B1_nested/B1.py',
@@ -1491,12 +1501,16 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             depPath="C_nested",
             depFileName="C.py")
 
-        # Set is needed as order doesn't matter
+        # Set is needed as order doesn't matter (Change set to SORTED)
+        # But just specify the exact order...
         self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
                          set([u'test_cr_1.py',
                           u'B1_nested/B1.py',
                           u'C_nested/C.py',
                           u'B2.py']));
+
+
+# TEST META-PACKAGE FUNCTIONALITY HERE (GOOD CASE, BAD CASE)
 
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
@@ -1539,8 +1553,9 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
         """
         pass
 
+# CHECK FOR PATHS THAT HAVE "../" or "blah/../blah2"
 
-class methodFamily_tests(CopperfishMethodTests_setup):
+class transformationFamily_tests(CopperfishMethodTests_setup):
 
     def test_methodFamily_unicode(self):
         """
@@ -1549,6 +1564,15 @@ class methodFamily_tests(CopperfishMethodTests_setup):
         
         self.assertEqual(unicode(self.DNAcomp_mf),
                          "DNAcomplement");
+
+    def test_pipelineFamily_unicode(self):
+        """
+        unicode() for pipelineFamily should display it's name
+        """
+        
+        self.assertEqual(unicode(self.DNAcomp_pf),
+                         "DNAcomplement");
+
 
 class method_tests(CopperfishMethodTests_setup):
 
@@ -1569,6 +1593,21 @@ class method_tests(CopperfishMethodTests_setup):
 
         self.assertEqual(unicode(nofamily),
                          "Method [family unset] foo");
+
+   def test_method_no_inputs_checkInputIndices_good(self):
+        """
+        check_input_indices() should return no exception if
+        it's transformation only has valid input indices defined.
+        """
+
+        # Create Method with valid family, revision_name, description, driver
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
+                     revision_desc="Foo version", driver=self.compv1_crRev);
+        foo.save();
+
+        # check_input_indices() should not raise a ValidationError
+        self.assertEquals(foo.check_input_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_single_valid_input_checkInputIndices_good(self):
         """
@@ -1680,6 +1719,15 @@ class method_tests(CopperfishMethodTests_setup):
                 ValidationError,
                 "Inputs are not consecutively numbered starting from 1",
                 foo.clean);
+
+    def test_method_no_outputs_checkOutputIndices_good(self):
+        """Test output index check, one well-indexed output case."""
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo",
+                     revision_desc="Foo version", driver=self.compv1_crRev);
+        foo.save();
+
+        self.assertEquals(foo.check_output_indices(), None);
+        self.assertEquals(foo.clean(), None);
 
     def test_method_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""

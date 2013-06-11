@@ -310,29 +310,36 @@ class CodeResource(models.Model):
 	#   revisions (codeResourceRevision/ForeignKey)
 
 	name = models.CharField(
+			"Resource name",
+			max_length=255,
+			help_text="The name for this resource");
+
+	filename = models.CharField(
 			"Resource file name",
 			max_length=255,
-			help_text="The filename for this resource");
+			help_text="The filename for this resource",
+			blank=True);
 
 	description = models.TextField("Resource description");
 
-	def isValidResourceName(self):
+	def isValidFileName(self):
 
-		# Names cannot start with ..
-		if re.search("^\.\.", self.name):
-			return False
+		# Code resources have no filenames if they are a meta-package of dependencies
+		if self.filename == "":
+			return True
 	
-		# Names cannot start with 1 or more spaces
-		if re.search("^\s+", self.name):
+		# File names cannot start with 1 or more spaces
+		if re.search("^\s+", self.filename):
 			return False
 
 		# Names cannot end with 1 or more trailing spaces
-		if re.search("\s+$", self.name):
+		if re.search("\s+$", self.filename):
 			return False
 
 		# Names must be 1 or more of any from {alphanumeric, space, "-._()"}
-		regex = "^[-_.() %s%s]+$" % (string.ascii_letters, string.digits)
-		if re.search(regex, self.name):
+		# This will prevent "../" as it contains a slash
+		regex = "^[-_.() {}{}]+$".format(string.ascii_letters, string.digits)
+		if re.search(regex, self.filename):
 			pass
 		else:
 			return False
@@ -348,10 +355,10 @@ class CodeResource(models.Model):
 		numbers, dash, underscore, paranthesis, and space.
 		"""
 		
-		if self.isValidResourceName():
+		if self.isValidFileName():
 			pass
 		else:
-			raise ValidationError("Invalid code resource name");
+			raise ValidationError("Invalid code resource filename");
 
 
 	def __unicode__(self):
@@ -427,15 +434,17 @@ class CodeResourceRevision(models.Model):
 
 	# This CRR includes it's own filename at the root
 	def list_all_filepaths(self):
-		return self.list_all_filepaths_h(self.coderesource.name)
+		return self.list_all_filepaths_h(self.coderesource.filename)
 
 	# Self is be a dependency CRR, base_name is it's file name, specified either
 	# by the parent dependency layer, or in the case of a top-level CR, just CRR.name
 	def list_all_filepaths_h(self, base_name):
 
 		# Filepath includes the original file which has dependencies
-		# FIXME: If just a library of dependencies, don't add base_path
-		all_filepaths = [unicode(base_name)]
+		# If just a library of dependencies (IE, base_name=""), don't add base_path
+		all_filepaths = []
+		if base_name != "":
+			all_filepaths = [unicode(base_name)]
 
 		# For each dependency in this code resource revision
 		for dep in self.dependencies.all():
@@ -499,17 +508,27 @@ class CodeResourceDependency(models.Model):
 	depFileName = models.CharField(
 		"Dependency file name",
 		max_length=255,
-		help_text="The file name the dependency is given on the sandbox at execution");
+		help_text="The file name the dependency is given on the sandbox at execution",
+		blank=True);
 
 	def clean(self):
 		"""
 		depPath cannot reference ".."
 		"""
-		if re.search("\.\.", self.depPath):
-			raise ValidationError("depPath cannot reference ..");
+		if re.search("^\.\./", self.depPath):
+			raise ValidationError("depPath cannot reference ../");
+
+		if re.search("/\.\./", self.depPath):
+			raise ValidationError("depPath cannot reference ../");
 
 		# Collapse down to a canonical path
 		self.depPath = os.path.normpath(self.depPath)
+
+		# If the child CR is a meta-package (no filename), we cannot
+		# have a depFileName as this makes no sense
+		if self.requirement.filename == "" and self.depFileName != "":
+			raise ValidationError("Empty code resources (packages) cannot have file names");
+				
 
 	def __unicode__(self):
 		"""Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
