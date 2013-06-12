@@ -35,7 +35,8 @@ class CopperfishMethodTests_setup(TestCase):
                                  description="String (basically anything)",
                                  verification_script=File(f),
                                  Python_type="str");
-            string_dt.save();
+            string_dt.save()
+            self.string_dt = string_dt
 
         # Create Datatype "DNANucSeq" with validation code DNANucSeqUT.py
         with open(os.path.join(samplecode_path, "DNANucSeqUT.py"), "rb") as f:
@@ -225,6 +226,138 @@ class CopperfishMethodTests_setup(TestCase):
         self.RNAcompv2_m.full_clean();
         self.RNAcompv2_m.save();
 
+        ################## ERICS SCRIPTS ##########################
+
+
+        # Create a method family that will include these 3 scripts
+        self.test_mf = MethodFamily(name="Test method family",
+                                    description="Holds scripts 1/2/3");
+        self.test_mf.full_clean();
+        self.test_mf.save();
+
+        # script_1_sum_and_outputs.py
+        # INPUT: 1 csv containing (x,y)
+        # OUTPUT: 1 csv containing (x+y,xy)
+        self.script_1_cr = CodeResource(name="Sum and product of x and y",
+                                        filename="script_1_sum_and_products.py",
+                                        description="Addition and multiplication")
+        self.script_1_cr.save()
+
+        # Add code resource revision for code resource (script_1_sum_and_products ) 
+        with open(os.path.join(samplecode_path, "script_1_sum_and_products.py"), "rb") as f:
+            self.script_1_crRev = CodeResourceRevision(
+                coderesource=self.script_1_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            self.script_1_crRev.save()
+
+        # Establish code resource revision as a method
+        self.script_1_method = Method(family = self.test_mf,
+                                      driver = self.script_1_crRev)
+        self.script_1_method.save()
+
+        # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
+        self.tuple_cdt = CompoundDatatype()
+        self.tuple_cdt.save()
+        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="x",column_idx=1)
+        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="y",column_idx=2)
+
+        # Assign tuple as both an input and an output to script_1_method
+        self.script_1_method.inputs.create(compounddatatype = self.tuple_cdt,
+                                           dataset_name = "input_tuple",
+                                           dataset_idx = 1)
+        self.script_1_method.outputs.create(compounddatatype = self.tuple_cdt,
+                                           dataset_name = "input_tuple",
+                                           dataset_idx = 1)
+        self.script_1_method.save()
+
+        # script_2_square_and_means
+        # INPUT: 1 csv containing (a,b,c)
+        # OUTPUT-1: 1 csv containing triplet (a^2,b^2,c^2)
+        # OUTPUT-2: 1 csv containing singlet mean(a,b,c)
+        self.script_2_cr = CodeResource(name="Square and mean of (a,b,c)",
+                                        filename="script_2_square_and_means.py",
+                                        description="Square and mean - 2 CSVs")
+        self.script_2_cr.save()
+
+        # Add code resource revision for code resource (script_2_square_and_means)
+        with open(os.path.join(samplecode_path, "script_2_square_and_means.py"), "rb") as f:
+            self.script_2_crRev = CodeResourceRevision(
+                coderesource=self.script_2_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            self.script_2_crRev.save()
+
+        # Establish code resource revision as a method
+        self.script_2_method = Method(family = self.test_mf,
+                                      driver = self.script_2_crRev)
+        self.script_2_method.save()
+
+        # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
+        self.singlet_cdt = CompoundDatatype()
+        self.singlet_cdt.save()
+        self.singlet_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
+
+        self.triplet_cdt = CompoundDatatype()
+        self.triplet_cdt.save()
+        self.triplet_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
+        self.triplet_cdt.members.create(datatype=self.string_dt,column_name="b",column_idx=2)
+        self.triplet_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
+
+        # Assign triplet as input and output,
+        self.script_2_method.inputs.create(compounddatatype = self.triplet_cdt,
+                                           dataset_name = "a_b_c",
+                                           dataset_idx = 1)
+        self.script_2_method.outputs.create(compounddatatype = self.triplet_cdt,
+                                           dataset_name = "a_b_c_squared",
+                                           dataset_idx = 1)
+        self.script_2_method.outputs.create(compounddatatype = self.singlet_cdt,
+                                           dataset_name = "a_b_c_mean",
+                                           dataset_idx = 2)
+        self.script_2_method.save()
+
+
+        # script_3_product
+        # INPUT-1: Single column (k)
+        # INPUT-2: Single-row, single column (r)
+        # OUTPUT-1: Single column r*(k)
+        self.script_3_cr = CodeResource(name="Scalar multiple of k",
+                                        filename="script_3_product.py",
+                                        description="Product of input")
+        self.script_3_cr.save()
+
+        # Add code resource revision for code resource (script_3_product)
+        with open(os.path.join(samplecode_path, "script_3_product.py"), "rb") as f:
+            self.script_3_crRev = CodeResourceRevision(
+                coderesource=self.script_3_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            self.script_3_crRev.save()
+
+        # Establish code resource revision as a method
+        self.script_3_method = Method(family = self.test_mf,
+                                      driver = self.script_3_crRev)
+        self.script_3_method.save()
+
+        # Assign singlet as input and output
+        self.script_3_method.inputs.create(compounddatatype = self.singlet_cdt,
+                                           dataset_name = "k",
+                                           dataset_idx = 1)
+
+        self.script_3_method.inputs.create(compounddatatype = self.singlet_cdt,
+                                           dataset_name = "r",
+                                           dataset_idx = 2,
+                                           max_row = 1,
+                                           min_row = 1)
+
+        self.script_3_method.outputs.create(compounddatatype = self.singlet_cdt,
+                                           dataset_name = "kr",
+                                           dataset_idx = 1)
+        self.script_3_method.save()
+        
         #################### END OF METHOD DEFINITIONS #########################
 
         # Define DNAcomp_pf
@@ -1594,7 +1727,7 @@ class method_tests(CopperfishMethodTests_setup):
         self.assertEqual(unicode(nofamily),
                          "Method [family unset] foo");
 
-   def test_method_no_inputs_checkInputIndices_good(self):
+    def test_method_no_inputs_checkInputIndices_good(self):
         """
         check_input_indices() should return no exception if
         it's transformation only has valid input indices defined.
@@ -2973,6 +3106,221 @@ class pipeline_tests(CopperfishMethodTests_setup):
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
                 foo.clean);
+
+    def test_pipeline_with_1_step_and_2_inputs_both_wired_good(self):
+        """
+        Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
+        Both inputs are wired (good)
+
+        Reminder on script_3_product
+        Reminder: k is cdt singlet, r is cdt single-row singlet
+        """
+        
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # Pipeline inputs must be singlet_cdt to work with script_3_product
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_1_k",
+                          dataset_idx=1)
+
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_2_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        # Add script_3 as step 1 method
+        step1 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_k");
+
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");        
+
+        # Raising a validation error: provided_min_row = 0, because req_input.min_row == None
+        # requested_from == 0 gets triggered...
+
+        self.assertEquals(foo.clean(), None)
+
+    def test_pipeline_with_1_step_and_2_inputs_but_only_first_is_wired_bad(self):
+        """
+        Pipeline with 1 step with 2 inputs / 1 output
+        Only the first input is wired (bad)
+        """
+
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc")
+        foo.save()
+
+        # Pipeline's two inputs must match inputs for script_3_product
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_1_k",
+                          dataset_idx=1)
+        
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_2_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        # Add script_3 as step 1 method
+        step1 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=1)
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_k")
+
+        self.assertEquals(foo.clean(), None)
+
+    def test_pipeline_with_1_step_and_2_inputs_but_only_second_is_wired_bad(self):
+        """
+        Pipeline with 1 step with 2 inputs / 1 output
+        Only the second input is wired (bad)
+        """
+
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # Pipeline's two inputs must match inputs for script_3_product
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_1_k",
+                          dataset_idx=1)
+        
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_2_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        # Add script_3 as step 1 method
+        step1 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");        
+
+        pass
+
+    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_undeleted_step_1_good(self):
+        """
+        Step 1 (script_2_square_and_means) with 1 input / 2 outputs
+            Method has input "a_b_c" (cdt triplet),
+            output "a_b_c_squared" (cdt triplet),
+            and output "a_b_c_mean" (cdt singlet)
+
+        Step 2 (script_3_product) with 2 inputs / 1 output
+            Method has input "k" (cdt singlet),
+            input "r" (single-row cdt singlet),
+            output "kr" (cdt singlet)
+
+        Pipeline has input triplet (pipe_a_b_c) for step 1 and single-row singlet (pipe_r) for step 2
+        Step 2 depends on step 1 output singlet a_b_c_mean
+
+        Step 1 a_b_c_mean not deleted (good)
+        """
+
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_a_b_c",
+                          dataset_idx=1)
+        
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_a_b_c");
+        
+        step2 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=2);
+
+        # single-row singlet pipe_r from step 0 feeds into r at step 2 
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_r");
+
+        # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=1,
+                            provider_output_name="a_b_c_mean");
+        
+        pass
+
+    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_deleted_step_1_bad(self):
+        """
+        Pipeline with 2 steps, step 1 with 1 input / 1 output, step 2 with 2 inputs / 1 output
+        For step 2, one is wired from step 0, and one is wired from step 1
+
+        Step 1 is deleted (bad)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_that_is_deleted_bad(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 1st output, which is deleted (bad)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_second_output_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 1st output, whhen the second step is deleted (good)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_nothing_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 1st output, nothing is deleted (good)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_that_is_deleted_bad(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, and it is deleted (bad)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_first_output_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, while first output is deleted (good)
+        """
+        pass
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, nothing is deleted (good)
+        """
+        pass
 
 class pipelineSteps_tests(CopperfishMethodTests_setup):
 

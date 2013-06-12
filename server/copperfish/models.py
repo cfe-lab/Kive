@@ -881,12 +881,15 @@ class Pipeline(Transformation):
 							"Data fed to input \"{}\" of step {} does not have the expected CompoundDatatype".
 							format(feed_to_input, step.step_num));
 
+
+				# FIXME: provided_min_row is defined as 0, but is never set... so it always remains as 0
 				provided_min_row = 0;
 				required_min_row = 0;
 
 				# Source output row constraint
 				if req_input.min_row != None:
 					providing_min_row = req_input.min_row;
+					provided_min_row = req_input.min_row; # ERICS MOD
 
 				# Destination input row constraint
 				if transf_input.min_row != None:
@@ -897,12 +900,14 @@ class Pipeline(Transformation):
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} may have too few rows".
 							format(feed_to_input, step.step_num));
-				
+
+				# FIXME: provided_max_row defined as infinite, but is never set... so it always remains as inf
 				provided_max_row = float("inf");
 				required_max_row = float("inf");
 
 				if req_input.max_row != None:
 					providing_max_row = req_input.max_row;
+					provided_max_row = req_input.max_row; # ERICS MOD
 
 				if transf_input.max_row != None:
 					required_max_row = transf_input.max_row;
