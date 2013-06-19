@@ -509,7 +509,9 @@ class CopperfishMethodTests_setup(TestCase):
             os.remove(os.path.join("VerificationScripts",f));
 
         filesToDelete = ["stringUT.py", "stringUT_1.py", "stringUT_2.py",
-                         "stringUT_3.py", "complement.py", "complement_v2.py"];
+                         "stringUT_3.py", "complement.py", "complement_v2.py",
+                         "script_1_sum_and_products.py", "script_2_square_and_means.py",
+                         "script_3_product.py"];
 
         for f in filesToDelete:
             os.remove(os.path.join("CodeResources",f));
@@ -3171,6 +3173,110 @@ class pipeline_tests(CopperfishMethodTests_setup):
         # requested_from == 0 gets triggered...
 
         self.assertEquals(foo.clean(), None)
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+
+    def test_pipeline_with_1_step_and_2_inputs_wired_more_than_once_bad(self):
+        """
+        Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
+        r is wired more than once (bad)
+
+        Reminder on script_3_product
+        Reminder: k is cdt singlet, r is cdt single-row singlet
+        """
+        
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # Pipeline inputs must be singlet_cdt to work with script_3_product
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_1_k",
+                          dataset_idx=1)
+
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_2_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        # Add script_3 as step 1 method
+        step1 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_k");
+
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");        
+
+        # Send a wire to r more than once!
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");
+
+        self.assertEquals(foo.clean(), None)
+        self.assertEquals(step1.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"r\" to transformation at step 1 is wired more than once",
+            step1.complete_clean);
+
+    def test_pipeline_with_1_step_and_2_inputs_wired_more_than_once_different_wires_bad(self):
+        """
+        Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
+        r is wired more than once (bad)
+
+        Reminder on script_3_product
+        Reminder: k is cdt singlet, r is cdt single-row singlet
+        """
+        
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # Pipeline inputs must be singlet_cdt to work with script_3_product
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_1_k",
+                          dataset_idx=1)
+
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_input_2_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        # Add script_3 as step 1 method
+        step1 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_k");
+
+        step1.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");        
+
+        # Send a wire to r more than once!
+        step1.inputs.create(transf_input_name="k",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_2_r");
+
+        self.assertEquals(foo.clean(), None)
+        self.assertEquals(step1.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"k\" to transformation at step 1 is wired more than once",
+            step1.complete_clean);
 
     def test_pipeline_with_1_step_and_2_inputs_but_only_first_input_is_wired_in_step_1_bad(self):
         """
@@ -3204,8 +3310,12 @@ class pipeline_tests(CopperfishMethodTests_setup):
                             step_providing_input=0,
                             provider_output_name="pipe_input_1_k")
 
-        # Not all
-        pass
+        self.assertEquals(step1.clean(), None)
+
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"r\" to transformation at step 1 is not wired",
+                step1.complete_clean);
 
     def test_pipeline_with_1_step_and_2_inputs_but_only_second_input_is_wired_in_step_1_bad(self):
         """
@@ -3238,8 +3348,14 @@ class pipeline_tests(CopperfishMethodTests_setup):
         step1.inputs.create(transf_input_name="r",
                             step_providing_input=0,
                             provider_output_name="pipe_input_2_r");        
+
+        self.assertEquals(step1.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"k\" to transformation at step 1 is not wired",
+            step1.complete_clean);
         
-        pass
 
     def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_undeleted_step_1_good(self):
         """
@@ -3264,51 +3380,6 @@ class pipeline_tests(CopperfishMethodTests_setup):
                        revision_desc="transformation.revision_desc");
         foo.save();
 
-        foo.inputs.create(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
-        
-        foo.inputs.create(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
-
-        step1 = foo.steps.create(transformation=self.script_2_method,
-                                 step_num=1);
-
-        step1.inputs.create(transf_input_name="a_b_c",
-                            step_providing_input=0,
-                            provider_output_name="pipe_a_b_c");
-        
-        step2 = foo.steps.create(transformation=self.script_3_method,
-                                 step_num=2);
-
-        # single-row singlet pipe_r from step 0 feeds into r at step 2 
-        step2.inputs.create(transf_input_name="r",
-                            step_providing_input=0,
-                            provider_output_name="pipe_r");
-
-        # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
-        step2.inputs.create(transf_input_name="k",
-                            step_providing_input=1,
-                            provider_output_name="a_b_c_mean");
-        
-        self.assertEquals(foo.clean(), None)
-
-    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_deleted_step_1_bad(self):
-        """
-        Pipeline with 2 steps, step 1 with 1 input / 1 output, step 2 with 2 inputs / 1 output
-        For step 2, one is wired from step 0, and one is wired from step 1
-
-        Step 1 is deleted (bad)
-        """
-
-        foo = Pipeline(family=self.DNAcomp_pf,
-                       revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc");
-        foo.save();
-
         foo.inputs.create(compounddatatype=self.triplet_cdt,
                           dataset_name="pipe_a_b_c",
                           dataset_idx=1)
@@ -3339,13 +3410,117 @@ class pipeline_tests(CopperfishMethodTests_setup):
                             step_providing_input=1,
                             provider_output_name="a_b_c_mean");
 
-        # Mark step 1 as deleted
-        step1.outputs_to_delete.create(dataset_to_delete="a_b_c_mean")
+        self.assertEquals(step2.clean(), None)
+        self.assertEquals(step2.complete_clean(), None)
+
+    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_step_1_with_irrelevent_deletion_good(self):
+        """
+        Step 1 (script_2_square_and_means) with 1 input / 2 outputs
+            Method has input "a_b_c" (cdt triplet),
+            output "a_b_c_squared" (cdt triplet),
+            and output "a_b_c_mean" (cdt singlet)
+
+        Step 2 (script_3_product) with 2 inputs / 1 output
+            Method has input "k" (cdt singlet),
+            input "r" (single-row cdt singlet),
+            output "kr" (cdt singlet)
+
+        Pipeline has input triplet (pipe_a_b_c) for step 1 and single-row singlet (pipe_r) for step 2
+        Step 2 depends on step 1 output singlet a_b_c_mean
+
+        Step 1 a_b_c_mean not deleted (good)
+        """
+
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_a_b_c",
+                          dataset_idx=1)
+        
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_a_b_c");
+
+        # Delete irrelevant output
+        step1.outputs_to_delete.create(dataset_to_delete = "a_b_c_squared")
+        
+        step2 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=2);
+
+        # single-row singlet pipe_r from step 0 feeds into r at step 2 
+        step2.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_r");
+
+        # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
+        step2.inputs.create(transf_input_name="k",
+                            step_providing_input=1,
+                            provider_output_name="a_b_c_mean");
+
+        self.assertEquals(step2.clean(), None)
+        self.assertEquals(step2.complete_clean(), None)
+        self.assertEquals(foo.clean(), None)
+
+
+    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_deleted_step_1_bad(self):
+        """
+        Step 1 output a_b_c_mean is wired into step 2, but is deleted.
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_a_b_c",
+                          dataset_idx=1)
+        
+        foo.inputs.create(compounddatatype=self.singlet_cdt,
+                          dataset_name="pipe_r",
+                          dataset_idx=2,
+                          max_row=1,
+                          min_row=1)
+
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_a_b_c");
+        # This output required for subsequent steps
+        step1.outputs_to_delete.create(dataset_to_delete = "a_b_c_mean")
+        
+        step2 = foo.steps.create(transformation=self.script_3_method,
+                                 step_num=2);
+
+        # single-row singlet pipe_r from step 0 feeds into r at step 2 
+        step2.inputs.create(transf_input_name="r",
+                            step_providing_input=0,
+                            provider_output_name="pipe_r");
+
+        # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
+        step2.inputs.create(transf_input_name="k",
+                            step_providing_input=1,
+                            provider_output_name="a_b_c_mean");
 
         self.assertRaisesRegexp(
-                ValidationError,
-                "Input \"a_b_c_mean\" from step 1 to step 2 is deleted prior to request",
-                foo.clean);
+            ValidationError,
+            "Input \"a_b_c_mean\" from step 1 to step 2 is deleted prior to request",
+            foo.clean);
+        self.assertEquals(step2.clean(), None)
+        self.assertEquals(step2.complete_clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_that_is_deleted_bad(self):
         """
@@ -3353,11 +3528,11 @@ class pipeline_tests(CopperfishMethodTests_setup):
         Outmap 1st output, which is deleted (bad)
         """
 
-        # Define pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
                        revision_desc="transformation.revision_desc");
         foo.save();
+
 
         # foo has two inputs which must match inputs for script_2
         foo.inputs.create(compounddatatype=self.triplet_cdt,
@@ -3382,23 +3557,28 @@ class pipeline_tests(CopperfishMethodTests_setup):
                           step_providing_output=1,
                           provider_output_name="a_b_c_squared")
 
+
         # Add outmap for 2nd output (Which is not deleted)
         foo.outmap.create(output_name="output_a_b_c_mean",
                           output_idx=2,
                           step_providing_output=1,
                           provider_output_name="a_b_c_squared")
 
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
             foo.clean);
+
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_second_output_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
         Outmap 1st output, whhen the second step is deleted (good)
         """
-        # Define pipeline foo
+
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
                        revision_desc="transformation.revision_desc");
@@ -3427,8 +3607,9 @@ class pipeline_tests(CopperfishMethodTests_setup):
                           step_providing_output=1,
                           provider_output_name="a_b_c_squared")
 
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
         self.assertEquals(foo.clean(), None)
-
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_nothing_deleted_good(self):
         """
@@ -3436,7 +3617,6 @@ class pipeline_tests(CopperfishMethodTests_setup):
         Outmap 1st output, nothing is deleted (good)
         """
 
-        # Define pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
                        revision_desc="transformation.revision_desc");
@@ -3462,11 +3642,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
                           step_providing_output=1,
                           provider_output_name="a_b_c_squared")
 
-        foo.outmap.create(output_name="output_a_b_c_mean",
-                          output_idx=2,
-                          step_providing_output=1,
-                          provider_output_name="a_b_c_mean")
-
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_that_is_deleted_bad(self):
@@ -3508,6 +3685,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
                           step_providing_output=1,
                           provider_output_name="a_b_c_mean")
 
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
@@ -3549,6 +3728,44 @@ class pipeline_tests(CopperfishMethodTests_setup):
                           provider_output_name="a_b_c_mean")
 
         self.assertEquals(foo.clean(), None)
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, nothing is deleted (good)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_a_b_c",
+                          dataset_idx=1)
+
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_a_b_c")
+
+        foo.outmap.create(output_name="aName",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(foo.clean(), None)
+
+        # Create a pipeline with outmaps, save the outmaps, CHANGE them, then see
+        # all of the previous outmaps were eliminated...
+        #
+        # Besides this, incorporate some create_output checks in the above pipeline cases
+
 
 class pipelineSteps_tests(CopperfishMethodTests_setup):
 

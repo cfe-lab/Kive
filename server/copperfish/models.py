@@ -891,8 +891,7 @@ class Pipeline(Transformation):
 
 				# Source output row constraint
 				if req_input.min_row != None:
-					providing_min_row = req_input.min_row;
-					provided_min_row = req_input.min_row; # ERICS MOD
+					provided_min_row = req_input.min_row;
 
 				# Destination input row constraint
 				if transf_input.min_row != None:
@@ -909,8 +908,7 @@ class Pipeline(Transformation):
 				required_max_row = float("inf");
 
 				if req_input.max_row != None:
-					providing_max_row = req_input.max_row;
-					provided_max_row = req_input.max_row; # ERICS MOD
+					provided_max_row = req_input.max_row;
 
 				if transf_input.max_row != None:
 					required_max_row = transf_input.max_row;
@@ -960,21 +958,13 @@ class Pipeline(Transformation):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
 
-
-	def save(self, *args, **kwargs):
-		"""
-		When saving, a pipline, set up outputs as specified.
-
-		This must be done after saving, because otherwise the manager for
-		the calling instance's outputs will not have been set up. (???)
+	def create_outputs(self):
+		"""	
+		Delete existing pipeline outputs, and recreate them
+		from output mappings (outmap)
 		"""
 
-		# Call Transformation's save() first
-		super(Pipeline, self).save(*args, **kwargs);
-
-		# Delete existing pipeline outputs
 		# Be careful if customizing delete() of TransformationOutput
-
 		self.outputs.all().delete();
 
 		# Then query all steps and regenerate outputs
@@ -999,7 +989,6 @@ class Pipeline(Transformation):
 								dataset_idx=mapping.output_idx,
 								min_row=req_output.min_row,
 								max_row=req_output.max_row);
-
  			
 
 class PipelineStep(models.Model):
@@ -1068,11 +1057,13 @@ class PipelineStep(models.Model):
 	def clean(self):
 		"""
 		Check coherence of this step of the pipeline.
-
+		
 		1) Do inputs come from prior steps?
 		2) Do inputs map correctly to the transformation at this step?
 		3) Do outputs marked for deletion come from this transformation?
 		4) Does the transformation at this step contain the parent pipeline?
+
+		A pipeline that is clean is not necessarily complete - check complete_clean()
 		"""
 
 		# Check recursively to see if this step's transformation contains
@@ -1080,12 +1071,13 @@ class PipelineStep(models.Model):
 		if self.recursive_pipeline_check(self.pipeline):
 			raise ValidationError("Step {} contains the parent pipeline".
 								  format(self.step_num));
- 			
+
+			
 		for curr_in in self.inputs.all():
 			input_requested = curr_in.provider_output_name;
 			requested_from = curr_in.step_providing_input;
 			feed_to_input = curr_in.transf_input_name;
-				
+
 			# Does this input come from a step prior to this one?
 			if requested_from >= self.step_num:
 				raise ValidationError(
@@ -1098,7 +1090,7 @@ class PipelineStep(models.Model):
 			except TransformationInput.DoesNotExist as e:
 				raise ValidationError ("Transformation at step {} has no input named \"{}\"".
 						format(self.step_num, feed_to_input));
- 
+
 		for curr_del in self.outputs_to_delete.all():
 			to_del = curr_del.dataset_to_delete;
 
@@ -1110,6 +1102,42 @@ class PipelineStep(models.Model):
 						"Transformation at step {} has no output named \"{}\"".
 						format(self.step_num, to_del));
 
+	def complete_clean(self):
+		"""Executed after the step's wiring has been fully defined, and
+		to see if all inputs are quenched exactly once.
+
+		1) Are all inputs for this step's transformation quenched?
+		2) Are any inputs multiply-wired (with PipelineStepInputs)?
+		"""
+
+		self.clean()	
+
+		# A list of all wires leading into this step
+		wired_inputs = []
+
+		for curr_in in self.inputs.all():
+			feed_to_input = curr_in.transf_input_name;
+			# Add the input to a list
+			wired_inputs.append(feed_to_input)
+			
+		# Check that sorted(wired_inputs) = self.transformation.inputs
+		for transformationInput in self.transformation.inputs.all():
+			# See if the input happens exactly once in wire_inputs
+			numMatches = 0
+			for wired_input in wired_inputs:
+				if transformationInput.dataset_name == wired_input:
+					numMatches += 1	
+
+			if numMatches == 0:
+				raise ValidationError("Input \"{}\" to transformation at step {} is not wired".
+									  format(transformationInput.dataset_name, self.step_num))
+
+			elif numMatches > 1:
+				raise ValidationError("Input \"{}\" to transformation at step {} is wired more than once".
+									  format(transformationInput.dataset_name, self.step_num))
+
+
+		pass	
 
 class PipelineStepInput(models.Model):
 	"""
