@@ -515,18 +515,21 @@ class CodeResourceDependency(models.Model):
 		"""
 		depPath cannot reference ".."
 		"""
+
+		# Collapse down to a canonical path
+		self.depPath = os.path.normpath(self.depPath)
+
+
+		# FIXME: HOW DOES THIS DEAL WITH depPath == ".." ?
 		if re.search("^\.\./", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
 		if re.search("/\.\./", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
-		# Collapse down to a canonical path
-		self.depPath = os.path.normpath(self.depPath)
-
 		# If the child CR is a meta-package (no filename), we cannot
 		# have a depFileName as this makes no sense
-		if self.requirement.filename == "" and self.depFileName != "":
+		if self.requirement.coderesource.filename == "" and self.depFileName != "":
 			raise ValidationError("Empty code resources (packages) cannot have file names");
 				
 
