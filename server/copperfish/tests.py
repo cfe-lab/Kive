@@ -117,8 +117,9 @@ class CopperfishMethodTests_setup(TestCase):
 
         # Define comp_cr
         self.comp_cr = CodeResource(
-                name="complement.py",
-                description="Complement DNA/RNA nucleotide sequences");
+                name="complement",
+                description="Complement DNA/RNA nucleotide sequences",
+                filename="complement.py");
         self.comp_cr.save();
 
         # Define compv1_crRev for comp_cr
@@ -757,15 +758,6 @@ class Datatype_tests(CopperfishMethodTests_setup):
         self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
         self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True);
 
-    # dt1 restricts dt[2,3,4]
-    # dt[2,3,4].is_restricted_by(dt1)
-
-
-    # Recursive checks
-    # dt1 restricts dt[2,3,4], 1 of dt[2,3,4] restrict dt5 (3 cases)
-    # dt1.is_restricted_by(dt[2,3,4]) - FALSE
-    # dt1.is_restricted_by(dt5) - FALSE
-
     def test_datatype_recursive_is_restricted_by_2(self):
         """
         dt1 restricts dt[2,3,4]
@@ -994,7 +986,7 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         """
         unicode should return the codeResource name.
         """
-        self.assertEquals(unicode(self.comp_cr), "complement.py");
+        self.assertEquals(unicode(self.comp_cr), "complement");
 
     def test_codeResource_valid_name_clean_good(self):
         """
@@ -1069,7 +1061,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         """
 
         # Valid crRev should return it's cr.name and crRev.revision_name
-        self.assertEquals(unicode(self.compv1_crRev), "complement.py v1");
+        self.assertEquals(unicode(self.compv1_crRev), "complement v1");
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision();
@@ -1078,6 +1070,31 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo";
         self.assertEquals(unicode(no_cr_set), "[no code resource set] foo");
+
+    def test_codeResourceRevision_metapackage_cannot_have_file_bad_clean(self):
+        """
+        Check
+        """
+
+        cr = CodeResource(
+                name="complement",
+                filename="",
+                description="Complement DNA/RNA nucleotide sequences");
+        cr.save();
+
+        # So it's revision does not have a content_file
+        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
+            cr_rev_v1 = CodeResourceRevision(
+                    coderesource=cr,
+                    revision_name="v1",
+                    revision_desc="First version",
+                    content_file=File(f));
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "If content file exists, it must have a file name",
+            cr_rev_v1.clean)
+
 
     def test_clean_blank_MD5_on_codeResourceRevision_without_file(self):
         """
@@ -1110,9 +1127,6 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
                 self.comp_cr.revisions.get(revision_name="v1").MD5_checksum);
 
     def test_dependency_depends_on_nothing_clean_good (self):
-        """
-        CodeResourceDependencies can have no dependencies.
-        """
         self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
     def test_dependency_current_folder_same_name_clean_bad(self):
@@ -1588,8 +1602,48 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
                           u'C_nested/C.py',
                           u'B2.py']));
 
+    def test_dependency_list_all_filepaths_with_metapackage(self):
 
-# TEST META-PACKAGE FUNCTIONALITY HERE (GOOD CASE, BAD CASE)
+        # Define a code with a blank filename (metapackage)
+        # Give it dependencies
+        # Give one more dependency a nested dependency
+
+        # The following is for testing code resource dependencies
+        test_cr_6 = CodeResource(name="test_cr_1",
+                                 filename="",
+                                 description="CR1")
+        test_cr_6.save()
+
+        # The revision has no content_file because it's a metapackage
+        test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
+                                              revision_name="v1",
+                                              revision_desc="CR1-rev1")
+        test_cr_6_rev1.save()
+
+        # Current-folder dependencies
+        test_cr_6_rev1.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            depPath="",
+            depFileName="B.py")
+
+        # Sub-folder dependencies
+        test_cr_6_rev1.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            depPath="nestedFolder",
+            depFileName="C.py")
+
+        # Nested dependencies
+        self.test_cr_3_rev1.dependencies.create(
+            requirement=self.test_cr_4_rev1,
+            depPath="deeperNestedFolder",
+            depFileName="D.py")
+
+        self.assertEqual(set(test_cr_6_rev1.list_all_filepaths()),
+                         set([u'B.py',
+                              u'nestedFolder/C.py',
+                              u'nestedFolder/deeperNestedFolder/D.py']));
+
+
 
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
@@ -1612,7 +1666,7 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
         # Display unicode for this dependency under valid conditions
         self.assertEquals(
                 unicode(test_crd),
-                "complement.py v1 requires complement.py v2 as subdir/foo.py");
+                "complement v1 requires complement v2 as subdir/foo.py");
 
     def test_codeResourceDependency_invalid_dotdot_path_clean(self):
         """
@@ -1628,7 +1682,7 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
         self.assertRaisesRegexp(
             ValidationError,
-            "depPath cannot reference ../",
+            "depPath cannot reference \.\./",
             bad_crd.clean)
         
     def test_codeResourceDependency_cr_with_filename_dependency_with_good_path_and_filename_clean(self):
@@ -1670,47 +1724,94 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
         self.assertEqual(good_crd.clean(), None)
 
-    def test_codeResourceDependency_cr_without_filename_dependency_with_filename_bad_clean(self):
-        """
-        Check
-        """
+    def test_codeResourceDependency_metapackage_cannot_have_file_names_bad_clean(self):
+
+        # Define a standard code resource
         cr = CodeResource(
                 name="complement",
-                filename="",
+                filename="test.py",
                 description="Complement DNA/RNA nucleotide sequences");
         cr.save();
 
-        # Define cr_rev_v1 for cr
+        # Give it a file
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
             cr_rev_v1 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
-                    content_file=File(f));
+                coderesource=cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f));
             cr_rev_v1.full_clean();
             cr_rev_v1.save();
+        
+        # Define a metapackage code resource (no file name)
+        cr_meta = CodeResource(
+                name="complement",
+                filename="",
+                description="Complement DNA/RNA nucleotide sequences");
+        cr_meta.save();
 
-        # Define cr_rev_v2 for cr
+        # Do not give it a file
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v2 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
-                    content_file=File(f));
-            cr_rev_v2.full_clean();
-            cr_rev_v2.save();
+            cr_meta_rev_v1 = CodeResourceRevision(
+                coderesource=cr_meta,
+                revision_name="v1",
+                revision_desc="First version");
+            cr_meta_rev_v1.full_clean();
+            cr_meta_rev_v1.save();
 
-        # Define a code resource dependency for cr_rev_v1 without a file name
+        # Add metapackage as a dependency to cr_rev_v1, but invalidly give it a depFileName
         bad_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
-                                          requirement=cr_rev_v2,
-                                          depPath="testFolder/anotherFolder",
-                                          depFileName="invalidFileName.py");
+                                         requirement=cr_meta_rev_v1,
+                                         depPath="testFolder/anotherFolder",
+                                         depFileName="foo.py");
 
         self.assertRaisesRegexp(
             ValidationError,
-            "[u'Empty code resources (packages) cannot have file names']",
+            "Metapackage dependencies cannot have a depFileName",
             bad_crd.clean)
 
+    def test_codeResourceDependency_metapackage_good_clean(self):
+
+        # Define a standard code resource
+        cr = CodeResource(
+                name="complement",
+                filename="test.py",
+                description="Complement DNA/RNA nucleotide sequences");
+        cr.save();
+
+        # Give it a file
+        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
+            cr_rev_v1 = CodeResourceRevision(
+                coderesource=cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f));
+            cr_rev_v1.full_clean();
+            cr_rev_v1.save();
+        
+        # Define a metapackage code resource (no file name)
+        cr_meta = CodeResource(
+                name="complement",
+                filename="",
+                description="Complement DNA/RNA nucleotide sequences");
+        cr_meta.save();
+
+        # Do not give it a file
+        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
+            cr_meta_rev_v1 = CodeResourceRevision(
+                coderesource=cr_meta,
+                revision_name="v1",
+                revision_desc="First version");
+            cr_meta_rev_v1.full_clean();
+            cr_meta_rev_v1.save();
+
+        # Add metapackage as a dependency to cr_rev_v1
+        good_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
+                                         requirement=cr_meta_rev_v1,
+                                         depPath="testFolder/anotherFolder",
+                                         depFileName="");
+
+        self.assertEqual(good_crd.clean(), None)
 
 class transformationFamily_tests(CopperfishMethodTests_setup):
 

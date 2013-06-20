@@ -482,8 +482,15 @@ class CodeResourceRevision(models.Model):
 		# Check if dependencies conflict with each other
 		listOfDependencyPaths = self.list_all_filepaths()
 		if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-			raise ValidationError("Conflicting dependencies"); 
+			raise ValidationError("Conflicting dependencies");
 
+		# If content file exists, it must have a file name
+		if self.content_file and self.coderesource.filename == "":
+			raise ValidationError("If content file exists, it must have a file name")
+
+		# If no content file exists, it must not have a file name
+		#if not self.content_file and self.coderesource.filename != "":
+		#	raise ValidationError("Cannot have a filename specified in the absence of a content file")
 
 class CodeResourceDependency(models.Model):
 	"""
@@ -519,18 +526,22 @@ class CodeResourceDependency(models.Model):
 		# Collapse down to a canonical path
 		self.depPath = os.path.normpath(self.depPath)
 
-
-		# FIXME: HOW DOES THIS DEAL WITH depPath == ".." ?
-		if re.search("^\.\./", self.depPath):
+		# Catch ".." on it's own
+		if re.search("^\.\.", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
+		# Catch any occurence of ".." within a larger path (Ex: blah/../bar)
 		if re.search("/\.\./", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
 		# If the child CR is a meta-package (no filename), we cannot
 		# have a depFileName as this makes no sense
 		if self.requirement.coderesource.filename == "" and self.depFileName != "":
-			raise ValidationError("Empty code resources (packages) cannot have file names");
+			raise ValidationError("Metapackage dependencies cannot have a depFileName");
+
+		# FIXME: Check if the dependency is a metapackage AND has a non-blank depFileName (bad)
+		if self.requirement.coderesource.filename == "" and self.depFileName != "":
+			raise ValidationError("Metapackage dependencies cannot have non-blank depFileName")
 				
 
 	def __unicode__(self):
