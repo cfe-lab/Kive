@@ -898,7 +898,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_cdt_zero_member_unicode(self):
         """
-        Unicode of empty CompoundDatatype should be empty
+        Unicode of empty CompoundDatatype should be empty.
         """
         empty_cdt = CompoundDatatype();
         empty_cdt.save();
@@ -906,7 +906,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_cdt_single_member_unicode(self):
         """
-        Unicode on single-member cdt returns it's member.
+        Unicode on single-member cdt returns its member.
         """
         self.assertEqual(unicode(self.DNAinput_cdt),
                          "(1: <DNANucSeq> [SeqToComplement])");
@@ -915,7 +915,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         """
         Unicode returns a list of it's Datatype members.
 
-        Each member is in the form of unicode(CompoundDatatypeMember)        
+        Each member is in the form of unicode(CompoundDatatypeMember).
         """
         self.assertEqual(unicode(self.test_cdt),
                          "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
@@ -923,12 +923,12 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
 
     def test_clean_single_index_good (self):
         """
-        CompoundDatatype with single index equalling 1
+        CompoundDatatype with single index equalling 1.
         """
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
         sad_cdt.members.create(	datatype=self.RNA_dt,
-                                column_name="ColumnTwp",
+                                column_name="ColumnTwo",
                                 column_idx=1);
         self.assertEqual(sad_cdt.clean(), None);
 
@@ -939,7 +939,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
         sad_cdt.members.create(	datatype=self.RNA_dt,
-                                column_name="ColumnTwp",
+                                column_name="ColumnTwo",
                                 column_idx=3);
 
         self.assertRaisesRegexp(
@@ -958,7 +958,7 @@ class CompoundDatatype_tests(CopperfishMethodTests_setup):
         good_cdt = CompoundDatatype();
         good_cdt.save();
         good_cdt.members.create(datatype=self.RNA_dt,
-                               column_name="ColumnTwp",
+                               column_name="ColumnTwo",
                                column_idx=2);
         good_cdt.members.create(datatype=self.DNA_dt,
                                column_name="ColumnOne",
@@ -987,7 +987,7 @@ class CodeResource_tests(CopperfishMethodTests_setup):
         unicode should return the codeResource name.
         """
         self.assertEquals(unicode(self.comp_cr), "complement");
-
+  
     def test_codeResource_valid_name_clean_good(self):
         """
         Clean passes when codeResource name is file-system valid
@@ -1065,15 +1065,177 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision();
-        self.assertEquals(unicode(no_cr_set), "[no code resource set] [no revision name]");
+        self.assertEquals(unicode(no_cr_set),
+                          "[no code resource set] [no revision name]");
 
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo";
         self.assertEquals(unicode(no_cr_set), "[no code resource set] foo");
 
+
+    # Tests of has_circular_dependence and clean
+    def test_has_circular_dependence_nodep(self):
+        """A CRR with no dependencies should not have any circular dependence."""
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          False);
+        self.assertEquals(self.test_cr_1_rev1.clean(), None);
+
+    def test_has_circular_dependence_single_self_direct_dep(self):
+        """A CRR has itself as its lone dependency."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_1_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+
+    def test_has_circular_dependence_single_other_direct_dep(self):
+        """A CRR has a lone dependency (non-self)."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          False);
+        self.assertEquals(self.test_cr_1_rev1.clean(), None);
+
+    def test_has_circular_dependence_several_direct_dep_noself(self):
+        """A CRR with several direct dependencies (none are itself)."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_4_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          False);
+        self.assertEquals(self.test_cr_1_rev1.clean(), None);
+
+    def test_has_circular_dependence_several_direct_dep_self_1(self):
+        """A CRR with several dependencies has itself as the first dependency."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_1_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+        
+    def test_has_circular_dependence_several_direct_dep_self_2(self):
+        """A CRR with several dependencies has itself as the second dependency."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_1_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+        
+    def test_has_circular_dependence_several_direct_dep_self_3(self):
+        """A CRR with several dependencies has itself as the last dependency."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_1_rev1,
+                depPath=".",
+                depFileName="foo");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+
+    def test_has_circular_dependence_several_nested_dep_noself(self):
+        """A CRR with several dependencies including a nested one."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.test_cr_3_rev1.dependencies.create(
+                requirement=self.test_cr_4_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          False);
+        self.assertEquals(self.test_cr_1_rev1.clean(), None);
+        
+    def test_has_circular_dependence_several_nested_dep_selfnested(self):
+        """A CRR with several dependencies including itself as a nested one."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.test_cr_3_rev1.dependencies.create(
+                requirement=self.test_cr_1_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
+                          False);
+        # Note that test_cr_3_rev1 *is* circular, as it depends on 1 and
+        # 1 has a circular dependence.
+        self.assertEquals(self.test_cr_3_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+        
+    def test_has_circular_dependence_nested_dep_has_circ(self):
+        """A nested dependency is circular."""
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_3_rev1,
+                depPath=".");
+        self.test_cr_2_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath=".");
+        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_1_rev1.clean);
+        self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
+                          True);
+        self.assertRaisesRegexp(ValidationError,
+                                "Self-referential dependency",
+                                self.test_cr_2_rev1.clean);
+        
     def test_codeResourceRevision_metapackage_cannot_have_file_bad_clean(self):
         """
-        Check
+        A CRR with a content file should have a filename associated with
+        its parent CodeResource.
         """
 
         cr = CodeResource(
@@ -1095,14 +1257,42 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             "If content file exists, it must have a file name",
             cr_rev_v1.clean)
 
+    def test_codeResourceRevision_non_metapackage_must_have_file_bad_clean(self):
+        """
+        A CRR with no content file should not have a filename associated with
+        its parent CodeResource.
+        """
+
+        cr = CodeResource(
+                name="nonmetapackage",
+                filename="foo",
+                description="Associated CRRs should have a content file");
+        cr.save();
+
+        # Create a revision without a content_file.
+        cr_rev_v1 = CodeResourceRevision(
+                coderesource=cr,
+                revision_name="v1",
+                revision_desc="Has no content file!");
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Cannot have a filename specified in the absence of a content file",
+            cr_rev_v1.clean)
+
 
     def test_clean_blank_MD5_on_codeResourceRevision_without_file(self):
         """
         If no file is specified, MD5 should be empty string.
         """
+        cr = CodeResource(name="foo",
+                          filename="",
+                          description="Some metapackage");
+        cr.save();
+        
         # Create crRev with a codeResource but no file contents
         no_file_crRev = CodeResourceRevision(
-                coderesource=self.comp_cr,
+                coderesource=cr,
                 revision_name="foo",
                 revision_desc="foo");
   
@@ -1158,7 +1348,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
     def test_dependency_inner_folder_same_name_clean_good(self):
         """
-        1 depends on 2 - current folder, different name
+        1 depends on 2 - different folder, same name
         """
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
@@ -1169,7 +1359,7 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
 
     def test_dependency_inner_folder_different_name_clean_good(self):
         """
-        1 depends on 2 - current folder, different name
+        1 depends on 2 - different folder, different name
         """
         self.test_cr_1_rev1.dependencies.create(
             requirement=self.test_cr_2_rev1,
@@ -1563,12 +1753,11 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             depPath="C_nested",
             depFileName="C.py")
 
-        # Set is used as order doesn't matter (Change set to SORTED)
-        self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
-                         set([u'test_cr_1.py',
+        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+                         [u'test_cr_1.py',
                           u'B1_nested/B1.py',
                           u'B1_nested/C_nested/C.py',
-                          u'B2.py']));
+                          u'B2.py']);
 
     def test_dependency_list_all_filepaths_recursive_case_2 (self):
         """
@@ -1594,13 +1783,11 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             depPath="C_nested",
             depFileName="C.py")
 
-        # Set is needed as order doesn't matter (Change set to SORTED)
-        # But just specify the exact order...
-        self.assertEqual(set(self.test_cr_1_rev1.list_all_filepaths()),
-                         set([u'test_cr_1.py',
+        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+                         [u'test_cr_1.py',
                           u'B1_nested/B1.py',
-                          u'C_nested/C.py',
-                          u'B2.py']));
+                          u'B2.py',
+                          u'C_nested/C.py']);
 
     def test_dependency_list_all_filepaths_with_metapackage(self):
 
@@ -1638,11 +1825,31 @@ class CodeResourceRevision_tests(CopperfishMethodTests_setup):
             depPath="deeperNestedFolder",
             depFileName="D.py")
 
-        self.assertEqual(set(test_cr_6_rev1.list_all_filepaths()),
-                         set([u'B.py',
-                              u'nestedFolder/C.py',
-                              u'nestedFolder/deeperNestedFolder/D.py']));
+        self.assertEqual(test_cr_6_rev1.list_all_filepaths(),
+                         [u'B.py',
+                          u'nestedFolder/C.py',
+                          u'nestedFolder/deeperNestedFolder/D.py']);
 
+    def test_dependency_list_all_filepaths_single_unnested_dep_blank_depFileName(self):
+        """List all filepaths when dependency has no depFileName set and is not nested.
+        """
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath="");
+        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+                         [u'test_cr_1.py', u'test_cr_2.py']);
+
+    def test_dependency_list_all_filepaths_single_nested_dep_blank_depFileName(self):
+        """List all filepaths when dependency has no depFileName set and is nested.
+        """
+        self.test_cr_1_rev1.dependencies.create(
+                requirement=self.test_cr_2_rev1,
+                depPath="nest_folder");
+        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+                         [u'test_cr_1.py', u'nest_folder/test_cr_2.py']);
+
+    # This seems like enough tests of the blank depFileName case, as we have
+    # pretty thoroughly checked other paths with the above cases.
 
 
 class CodeResourceDependency_tests(CopperfishMethodTests_setup):
@@ -1670,20 +1877,84 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
 
     def test_codeResourceDependency_invalid_dotdot_path_clean(self):
         """
-        Check
+        Dependency tries to go into a path outside its sandbox.
         """
         v1 = self.comp_cr.revisions.get(revision_name="v1");
         v2 = self.comp_cr.revisions.get(revision_name="v2");
 
         bad_crd = CodeResourceDependency(coderesourcerevision=v1,
-                                          requirement=v2,
-                                          depPath="../test",
-                                          depFileName="foo.py");
-
+                                         requirement=v2,
+                                         depPath="..",
+                                         depFileName="foo.py");
         self.assertRaisesRegexp(
             ValidationError,
             "depPath cannot reference \.\./",
             bad_crd.clean)
+
+        bad_crd_2 = CodeResourceDependency(coderesourcerevision=v1,
+                                           requirement=v2,
+                                           depPath="../test",
+                                           depFileName="foo.py");
+        self.assertRaisesRegexp(
+            ValidationError,
+            "depPath cannot reference \.\./",
+            bad_crd_2.clean)
+        
+    def test_codeResourceDependency_valid_path_with_dotdot_clean(self):
+        """
+        Dependency goes into a path with a directory containing ".." in the name.
+        """
+        v1 = self.comp_cr.revisions.get(revision_name="v1");
+        v2 = self.comp_cr.revisions.get(revision_name="v2");
+
+        good_crd = CodeResourceDependency(coderesourcerevision=v1,
+                                          requirement=v2,
+                                          depPath="..bar",
+                                          depFileName="foo.py");
+        self.assertEquals(good_crd.clean(), None);
+        
+        good_crd_2 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="bar..",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_2.clean(), None);
+
+        good_crd_3 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="baz/bar..",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_3.clean(), None);
+
+        good_crd_4 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="baz/..bar",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_4.clean(), None);
+
+        good_crd_5 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="baz/..bar..",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_5.clean(), None);
+
+        good_crd_6 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="..baz/bar..",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_6.clean(), None);
+
+        # This case works because the ".." doesn't take us out of the sandbox
+        good_crd_7 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="baz/../bar",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_7.clean(), None);
+
+        good_crd_8 = CodeResourceDependency(coderesourcerevision=v1,
+                                            requirement=v2,
+                                            depPath="baz/..bar../blah",
+                                            depFileName="foo.py");
+        self.assertEquals(good_crd_8.clean(), None);
         
     def test_codeResourceDependency_cr_with_filename_dependency_with_good_path_and_filename_clean(self):
         """
@@ -1710,8 +1981,8 @@ class CodeResourceDependency_tests(CopperfishMethodTests_setup):
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
             cr_rev_v2 = CodeResourceRevision(
                     coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
+                    revision_name="v2",
+                    revision_desc="Second version",
                     content_file=File(f));
             cr_rev_v2.full_clean();
             cr_rev_v2.save();
@@ -1854,8 +2125,8 @@ class method_tests(CopperfishMethodTests_setup):
 
     def test_method_no_inputs_checkInputIndices_good(self):
         """
-        check_input_indices() should return no exception if
-        it's transformation only has valid input indices defined.
+        Method with no inputs defined should have
+        check_input_indices() return with no exception.
         """
 
         # Create Method with valid family, revision_name, description, driver
@@ -1869,8 +2140,8 @@ class method_tests(CopperfishMethodTests_setup):
 
     def test_method_single_valid_input_checkInputIndices_good(self):
         """
-        check_input_indices() should return no exception if
-        it's transformation only has valid input indices defined.
+        Method with a single, 1-indexed input should have
+        check_input_indices() return with no exception.
         """
 
         # Create Method with valid family, revision_name, description, driver
@@ -1888,8 +2159,8 @@ class method_tests(CopperfishMethodTests_setup):
 
     def test_method_many_ordered_valid_inputs_checkInputIndices_good (self):
         """
-        check_input_indices should return no exception if
-        it's transformation only has valid input indices defined
+        Test check_input_indices on a method with several inputs,
+        correctly indexed and in order.
         """
 
         # Create Method with valid family, revision_name, description, driver
@@ -1911,8 +2182,8 @@ class method_tests(CopperfishMethodTests_setup):
 
     def test_method_many_valid_inputs_scrambled_checkInputIndices_good (self):
         """
-        check_input_indices should return no exception if
-        it's transformation only has valid input indices defined
+        Test check_input_indices on a method with several inputs,
+        correctly indexed and in scrambled order.
         """
 
         # Create Method with valid family, revision_name, description, driver
@@ -2074,6 +2345,62 @@ class method_tests(CopperfishMethodTests_setup):
         self.assertEqual(self.DNAcompv1_m.outputs.all()[0],
                          self.DNAoutput_to);
 
+        # Test the multiple-input and multiple-output cases, using
+        # script_2_method and script_3_method respectively.  Neither
+        # of these have parents.
+        self.script_2_method.save();
+        # Script 2 has input:
+        # compounddatatype = self.triplet_cdt
+        # dataset_name = "a_b_c"
+        # dataset_idx = 1
+        curr_in = self.script_2_method.inputs.all()[0];
+        self.assertEqual(curr_in.compounddatatype, self.triplet_cdt);
+        self.assertEqual(curr_in.dataset_name, "a_b_c");
+        self.assertEqual(curr_in.dataset_idx, 1);
+        self.assertEqual(curr_in.min_row, None);
+        self.assertEqual(curr_in.max_row, None);
+        # Outputs:
+        # self.triplet_cdt, "a_b_c_squared", 1
+        # self.singlet_cdt, "a_b_c_mean", 2
+        curr_out_1 = self.script_2_method.outputs.all()[0];
+        curr_out_2 = self.script_2_method.outputs.all()[1];
+        self.assertEqual(curr_out_1.compounddatatype, self.triplet_cdt);
+        self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared");
+        self.assertEqual(curr_out_1.dataset_idx, 1);
+        self.assertEqual(curr_out_1.min_row, None);
+        self.assertEqual(curr_out_1.max_row, None);
+        self.assertEqual(curr_out_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_out_2.dataset_name, "a_b_c_mean");
+        self.assertEqual(curr_out_2.dataset_idx, 2);
+        self.assertEqual(curr_out_2.min_row, None);
+        self.assertEqual(curr_out_2.max_row, None);
+
+        self.script_3_method.save();
+        # Script 3 has inputs:
+        # self.singlet_cdt, "k", 1
+        # self.singlet_cdt, "r", 2, min_row = max_row = 1
+        curr_in_1 = self.script_3_method.inputs.all()[0];
+        curr_in_2 = self.script_3_method.inputs.all()[1];
+        self.assertEqual(curr_in_1.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_1.dataset_name, "k");
+        self.assertEqual(curr_in_1.dataset_idx, 1);
+        self.assertEqual(curr_in_1.min_row, None);
+        self.assertEqual(curr_in_1.max_row, None);
+        self.assertEqual(curr_in_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_2.dataset_name, "r");
+        self.assertEqual(curr_in_2.dataset_idx, 2);
+        self.assertEqual(curr_in_2.min_row, 1);
+        self.assertEqual(curr_in_2.max_row, 1);
+        # Outputs:
+        # self.singlet_cdt, "kr", 1
+        curr_out = self.script_3_method.outputs.all()[0];
+        self.assertEqual(curr_out.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_out.dataset_name, "kr");
+        self.assertEqual(curr_out.dataset_idx, 1);
+        self.assertEqual(curr_out.min_row, None);
+        self.assertEqual(curr_out.max_row, None);
+        
+
     def test_method_with_copied_parent_parameters_save(self):
         """Test save when revision parent is specified."""
 
@@ -2095,6 +2422,63 @@ class method_tests(CopperfishMethodTests_setup):
                          self.DNAoutput_to.dataset_name);
         self.assertEqual(curr_out.dataset_idx,
                          self.DNAoutput_to.dataset_idx);
+
+        # Multiple output case (using script_2_method).
+        foo = Method(family=self.test_mf, driver=self.script_2_crRev,
+                     revision_parent=self.script_2_method);
+        foo.save();
+        # Check that it has the same input as script_2_method:
+        # self.triplet_cdt, "a_b_c", 1
+        curr_in = foo.inputs.all()[0];
+        self.assertEqual(curr_in.compounddatatype, self.triplet_cdt);
+        self.assertEqual(curr_in.dataset_name, "a_b_c");
+        self.assertEqual(curr_in.dataset_idx, 1);
+        self.assertEqual(curr_in.min_row, None);
+        self.assertEqual(curr_in.max_row, None);
+        # Outputs:
+        # self.triplet_cdt, "a_b_c_squared", 1
+        # self.singlet_cdt, "a_b_c_mean", 2
+        curr_out_1 = foo.outputs.all()[0];
+        curr_out_2 = foo.outputs.all()[1];
+        self.assertEqual(curr_out_1.compounddatatype, self.triplet_cdt);
+        self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared");
+        self.assertEqual(curr_out_1.dataset_idx, 1);
+        self.assertEqual(curr_out_1.min_row, None);
+        self.assertEqual(curr_out_1.max_row, None);
+        self.assertEqual(curr_out_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_out_2.dataset_name, "a_b_c_mean");
+        self.assertEqual(curr_out_2.dataset_idx, 2);
+        self.assertEqual(curr_out_2.min_row, None);
+        self.assertEqual(curr_out_2.max_row, None);
+
+        # Multiple input case (using script_3_method).
+        bar = Method(family=self.test_mf, driver=self.script_3_crRev,
+                     revision_parent=self.script_3_method);
+        bar.save();
+        # Check that the outputs match script_3_method:
+        # self.singlet_cdt, "k", 1
+        # self.singlet_cdt, "r", 2, min_row = max_row = 1
+        curr_in_1 = bar.inputs.all()[0];
+        curr_in_2 = bar.inputs.all()[1];
+        self.assertEqual(curr_in_1.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_1.dataset_name, "k");
+        self.assertEqual(curr_in_1.dataset_idx, 1);
+        self.assertEqual(curr_in_1.min_row, None);
+        self.assertEqual(curr_in_1.max_row, None);
+        self.assertEqual(curr_in_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_2.dataset_name, "r");
+        self.assertEqual(curr_in_2.dataset_idx, 2);
+        self.assertEqual(curr_in_2.min_row, 1);
+        self.assertEqual(curr_in_2.max_row, 1);
+        # Outputs:
+        # self.singlet_cdt, "kr", 1
+        curr_out = bar.outputs.all()[0];
+        self.assertEqual(curr_out.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_out.dataset_name, "kr");
+        self.assertEqual(curr_out.dataset_idx, 1);
+        self.assertEqual(curr_out.min_row, None);
+        self.assertEqual(curr_out.max_row, None);
+        
         
         # If there are already inputs and outputs specified, then
         # they should not be overwritten.
@@ -2120,6 +2504,42 @@ class method_tests(CopperfishMethodTests_setup):
         self.assertEqual(curr_out.compounddatatype, old_cdt);
         self.assertEqual(curr_out.dataset_name, old_name);
         self.assertEqual(curr_out.dataset_idx, old_idx);
+
+        # Only inputs specified.
+        bar.outputs.all().delete();
+        bar.save();
+        self.assertEqual(bar.inputs.count(), 2);
+        self.assertEqual(bar.outputs.count(), 0);
+        curr_in_1 = bar.inputs.all()[0];
+        curr_in_2 = bar.inputs.all()[1];
+        self.assertEqual(curr_in_1.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_1.dataset_name, "k");
+        self.assertEqual(curr_in_1.dataset_idx, 1);
+        self.assertEqual(curr_in_1.min_row, None);
+        self.assertEqual(curr_in_1.max_row, None);
+        self.assertEqual(curr_in_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_in_2.dataset_name, "r");
+        self.assertEqual(curr_in_2.dataset_idx, 2);
+        self.assertEqual(curr_in_2.min_row, 1);
+        self.assertEqual(curr_in_2.max_row, 1);
+        
+        # Only outputs specified.
+        foo.inputs.all().delete();
+        foo.save();
+        self.assertEqual(foo.inputs.count(), 0);
+        self.assertEqual(foo.outputs.count(), 2);
+        curr_out_1 = foo.outputs.all()[0];
+        curr_out_2 = foo.outputs.all()[1];
+        self.assertEqual(curr_out_1.compounddatatype, self.triplet_cdt);
+        self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared");
+        self.assertEqual(curr_out_1.dataset_idx, 1);
+        self.assertEqual(curr_out_1.min_row, None);
+        self.assertEqual(curr_out_1.max_row, None);
+        self.assertEqual(curr_out_2.compounddatatype, self.singlet_cdt);
+        self.assertEqual(curr_out_2.dataset_name, "a_b_c_mean");
+        self.assertEqual(curr_out_2.dataset_idx, 2);
+        self.assertEqual(curr_out_2.min_row, None);
+        self.assertEqual(curr_out_2.max_row, None);
     
 class pipeline_tests(CopperfishMethodTests_setup):
     
@@ -2188,7 +2608,7 @@ class pipeline_tests(CopperfishMethodTests_setup):
                 "Inputs are not consecutively numbered starting from 1",
                 foo.clean);
 
-    def test_pipeline_one_valid_input_clean(self):
+    def test_pipeline_one_valid_step_clean(self):
         """Test step index check, one well-indexed step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
@@ -2200,7 +2620,7 @@ class pipeline_tests(CopperfishMethodTests_setup):
         
         self.assertEquals(foo.clean(), None);
 
-    def test_pipeline_one_bad_input_clean(self):
+    def test_pipeline_one_bad_step_clean(self):
         """Test step index check, one badly-indexed step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
@@ -2367,7 +2787,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
                 foo.clean);
         
     def test_pipeline_oneStep_wiring_minrow_constraint_may_be_breached_clean (self):
-        """Unverifiable wiring: step requests input with possibly too few rows"""
+        """Unverifiable wiring: step requests input with possibly too
+        few rows (input min_row unspecified)."""
 
         # Define method 'curr_method' with driver compv2_crRev
         curr_method = Method(family=self.DNAcomp_mf,
@@ -2414,7 +2835,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
                 foo.clean);
         
     def test_pipeline_oneStep_wiring_minrow_constraints_may_breach_each_other_clean (self):
-        """Unverifiable wiring: step requests input with possibly too few rows"""
+        """Unverifiable wiring: step requests input with possibly too few rows
+        (input min_row specified)."""
         
         # Define method curr_method
         curr_method = Method(family=self.DNAcomp_mf,
@@ -2462,7 +2884,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
 
 
     def test_pipeline_oneStep_wiring_maxRow_constraints_may_be_breached_clean(self):
-        """Unverifiable wiring: step requests input with possibly too many rows"""
+        """Unverifiable wiring: step requests input with possibly too many rows
+        (input max_row unspecified)"""
 
         # Define curr_method with input of max_row = 10
         curr_method = Method(family=self.DNAcomp_mf,
@@ -2501,7 +2924,8 @@ class pipeline_tests(CopperfishMethodTests_setup):
 
 
     def test_pipeline_oneStep_wiring_maxRow_constraints_may_breach_each_other_clean (self):
-        """Unverifiable wiring: step requests input with possibly too many rows (max_row set for pipeline input)."""
+        """Unverifiable wiring: step requests input with possibly too
+        many rows (max_row set for pipeline input)."""
         
         # Define curr_method as having an input with max_row = 10
         curr_method = Method(family=self.DNAcomp_mf,
@@ -2533,7 +2957,7 @@ class pipeline_tests(CopperfishMethodTests_setup):
                             step_providing_input=0,
                             provider_output_name="oneinput");
 
-        # The pipeline max_row is not good enough to guarentee correctness
+        # The pipeline max_row is not good enough to guarantee correctness
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 1 may have too many rows",
@@ -3270,9 +3694,6 @@ class pipeline_tests(CopperfishMethodTests_setup):
                             step_providing_input=0,
                             provider_output_name="pipe_input_2_r");        
 
-        # Raising a validation error: provided_min_row = 0, because req_input.min_row == None
-        # requested_from == 0 gets triggered...
-
         self.assertEquals(foo.clean(), None)
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
@@ -3677,7 +4098,7 @@ class pipeline_tests(CopperfishMethodTests_setup):
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_second_output_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 1st output, whhen the second step is deleted (good)
+        Outmap 1st output, whhen the second output is deleted (good)
         """
 
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3750,7 +4171,200 @@ class pipeline_tests(CopperfishMethodTests_setup):
     def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_that_is_deleted_bad(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, and it is deleted (bad)
+        Outmap 2nd output, and 2nd is deleted (bad)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # foo has two inputs which must match inputs for script_2
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_input_1_a_b_c",
+                          dataset_idx=1)
+        
+        # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_a_b_c");
+
+        # Delete data in step 1
+        step1.outputs_to_delete.create(dataset_to_delete="a_b_c_mean")
+
+        # Add outmap for 2nd output (Which is deleted)
+        foo.outmap.create(output_name="output_a_b_c_mean",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
+            foo.clean);
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_first_output_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, while first output is deleted (good)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # foo has two inputs which must match inputs for script_2
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_input_1_a_b_c",
+                          dataset_idx=1)
+        
+        # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_a_b_c");
+        
+        # Delete data in step 1
+        step1.outputs_to_delete.create(dataset_to_delete="a_b_c_squared")
+
+        # Add outmap for 2nd output (Which is not deleted)
+        foo.outmap.create(output_name="output_a_b_c_mean",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(foo.clean(), None)
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap 2nd output, nothing is deleted (good)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_a_b_c",
+                          dataset_idx=1)
+
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_a_b_c")
+
+        foo.outmap.create(output_name="aName",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(foo.clean(), None)
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_none_deleted_good(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap both outputs, neither deleted (good)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # foo has two inputs which must match inputs for script_2
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_input_1_a_b_c",
+                          dataset_idx=1)
+        
+        # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_a_b_c");
+
+        # Add outmap for 1st output (Which is not deleted)
+        foo.outmap.create(output_name="output_a_b_c_squared",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_squared")
+
+        # Add outmap for 2nd output (Which is deleted)
+        foo.outmap.create(output_name="output_a_b_c_mean",
+                          output_idx=2,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(foo.clean(), None);
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_1st_is_deleted_bad(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap both outputs, and 1st is deleted (bad)
+        """
+        foo = Pipeline(family=self.DNAcomp_pf,
+                       revision_name="transformation.revision_name",
+                       revision_desc="transformation.revision_desc");
+        foo.save();
+
+        # foo has two inputs which must match inputs for script_2
+        foo.inputs.create(compounddatatype=self.triplet_cdt,
+                          dataset_name="pipe_input_1_a_b_c",
+                          dataset_idx=1)
+        
+        # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
+        step1 = foo.steps.create(transformation=self.script_2_method,
+                                 step_num=1);
+
+        # Add wiring to step 1 from step 0
+        step1.inputs.create(transf_input_name="a_b_c",
+                            step_providing_input=0,
+                            provider_output_name="pipe_input_1_a_b_c");
+
+        # Delete data in step 1
+        step1.outputs_to_delete.create(dataset_to_delete="a_b_c_squared")
+
+        # Add outmap for 1st output (Which is deleted)
+        foo.outmap.create(output_name="output_a_b_c_squared",
+                          output_idx=1,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_squared")
+
+        # Add outmap for 2nd output (Which is not deleted)
+        foo.outmap.create(output_name="output_a_b_c_mean",
+                          output_idx=2,
+                          step_providing_output=1,
+                          provider_output_name="a_b_c_mean")
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
+            foo.clean);
+
+    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_2nd_is_deleted_bad(self):
+        """
+        Pipeline 1 output, with an internal step with 1 input and 2 outputs
+        Outmap both outputs, and 2nd is deleted (bad)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -3793,11 +4407,19 @@ class pipeline_tests(CopperfishMethodTests_setup):
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
             foo.clean);
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_first_output_deleted_good(self):
+
+        # Create a pipeline with outmaps, save the outmaps, CHANGE them, then see
+        # all of the previous outmaps were eliminated...
+        #
+        # Besides this, incorporate some create_output checks in the above pipeline cases
+
+
+    def test_create_outputs(self):
         """
-        Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, while first output is deleted (good)
+        Create outputs from output mappings; also change the output mappings
+        and recreate the outputs to see if they're correct.
         """
+        # This setup is copied from one of the above tests.
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
                        revision_desc="transformation.revision_desc");
@@ -3817,56 +4439,131 @@ class pipeline_tests(CopperfishMethodTests_setup):
                             step_providing_input=0,
                             provider_output_name="pipe_input_1_a_b_c");
 
+        # Add outmap for 1st output (Which is not deleted)
         foo.outmap.create(output_name="output_a_b_c_squared",
                           output_idx=1,
                           step_providing_output=1,
                           provider_output_name="a_b_c_squared")
 
-        # Add outmap for 2nd output (Which is not deleted)
+        # Add outmap for 2nd output (Which is deleted)
         foo.outmap.create(output_name="output_a_b_c_mean",
                           output_idx=2,
                           step_providing_output=1,
                           provider_output_name="a_b_c_mean")
 
-        self.assertEquals(foo.clean(), None)
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(foo.clean(), None);
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
-        """
-        Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, nothing is deleted (good)
-        """
-        foo = Pipeline(family=self.DNAcomp_pf,
-                       revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc");
-        foo.save();
+        foo.create_outputs();
+        # The first output should be as follows:
+        # compounddatatype: self.triplet_cdt
+        # dataset_name: output_a_b_c_squared
+        # dataset_idx: 1
+        # min_row = None
+        # max_row = None
+        # The second:
+        # self.singlet_cdt, output_a_b_c_mean, 2, None, None
+        self.assertEquals(foo.outputs.count(), 2);
+        curr_out_1 = foo.outputs.all()[0];
+        self.assertEquals(curr_out_1.compounddatatype, self.triplet_cdt);
+        self.assertEquals(curr_out_1.dataset_name, "output_a_b_c_squared");
+        self.assertEquals(curr_out_1.dataset_idx, 1);
+        self.assertEquals(curr_out_1.min_row, None);
+        self.assertEquals(curr_out_1.max_row, None);
+        curr_out_2 = foo.outputs.all()[1];
+        self.assertEquals(curr_out_2.compounddatatype, self.singlet_cdt);
+        self.assertEquals(curr_out_2.dataset_name, "output_a_b_c_mean");
+        self.assertEquals(curr_out_2.dataset_idx, 2);
+        self.assertEquals(curr_out_2.min_row, None);
+        self.assertEquals(curr_out_2.max_row, None);
 
-        foo.inputs.create(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
+        # Now delete all the output mappings and make new ones; then check
+        # and see if create_outputs worked.
+        foo.outmap.all().delete();
 
-        step1 = foo.steps.create(transformation=self.script_2_method,
-                                 step_num=1);
-
-        step1.inputs.create(transf_input_name="a_b_c",
-                            step_providing_input=0,
-                            provider_output_name="pipe_a_b_c")
-
-        foo.outmap.create(output_name="aName",
+        # Add outmap for 1st output (Which is not deleted)
+        foo.outmap.create(output_name="foo",
                           output_idx=1,
                           step_providing_output=1,
-                          provider_output_name="a_b_c_mean")
+                          provider_output_name="a_b_c_squared")
 
-        self.assertEquals(step1.clean(), None)
-        self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(foo.clean(), None)
+        self.assertEquals(foo.clean(), None);
 
-        # Create a pipeline with outmaps, save the outmaps, CHANGE them, then see
-        # all of the previous outmaps were eliminated...
-        #
-        # Besides this, incorporate some create_output checks in the above pipeline cases
+        foo.create_outputs();
+        # Now there is one output:
+        # self.triplet_cdt, "foo", 1, None, None
+        self.assertEquals(foo.outputs.count(), 1);
+        curr_out_new = foo.outputs.all()[0];
+        self.assertEquals(curr_out_new.compounddatatype, self.triplet_cdt);
+        self.assertEquals(curr_out_new.dataset_name, "foo");
+        self.assertEquals(curr_out_new.dataset_idx, 1);
+        self.assertEquals(curr_out_new.min_row, None);
+        self.assertEquals(curr_out_new.max_row, None);
 
+
+    def test_create_outputs_multi_step(self):
+        """Testing create_outputs with a multi-step pipeline."""
+        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
+                       revision_desc="Foo version");
+        foo.save();
+        foo.inputs.create(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="oneinput", dataset_idx=1);
+        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
+        step1.inputs.create(transf_input_name="input",
+                            step_providing_input=0,
+                            provider_output_name="oneinput");
+        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
+        step2.inputs.create(transf_input_name="complemented_seqs",
+                            step_providing_input=1,
+                            provider_output_name="output");
+        step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
+        step3.inputs.create(transf_input_name="input",
+                            step_providing_input=2,
+                            provider_output_name="recomplemented_seqs");
+
+        foo.outmap.create(output_name="outputone", output_idx=1,
+                          step_providing_output=3,
+                          provider_output_name="output");
+        foo.outmap.create(output_name="outputtwo", output_idx=2,
+                          step_providing_output=2,
+                          provider_output_name="recomplemented_seqs");
+        self.assertEquals(foo.clean(), None);
+
+        foo.create_outputs();
+        # The outputs look like:
+        # self.DNAoutput_cdt, "outputone", 1, None, None
+        # self.DNAinput_cdt, "outputtwo", 2, None, None
+        self.assertEquals(foo.outputs.count(), 2);
+        curr_out_1 = foo.outputs.all()[0];
+        self.assertEquals(curr_out_1.compounddatatype, self.DNAoutput_cdt);
+        self.assertEquals(curr_out_1.dataset_name, "outputone");
+        self.assertEquals(curr_out_1.dataset_idx, 1);
+        self.assertEquals(curr_out_1.min_row, None);
+        self.assertEquals(curr_out_1.max_row, None);
+        curr_out_2 = foo.outputs.all()[1];
+        self.assertEquals(curr_out_2.compounddatatype, self.DNAinput_cdt);
+        self.assertEquals(curr_out_2.dataset_name, "outputtwo");
+        self.assertEquals(curr_out_2.dataset_idx, 2);
+        self.assertEquals(curr_out_2.min_row, None);
+        self.assertEquals(curr_out_2.max_row, None);
+
+        # Now recreate them and check it worked
+        foo.outmap.all().delete();
+        foo.outmap.create(output_name="foo", output_idx=1,
+                          step_providing_output=2,
+                          provider_output_name="recomplemented_seqs");
+        foo.create_outputs();
+        # Now the only output is:
+        # self.DNAinput_cdt, "foo", 2, None, None
+        self.assertEquals(foo.outputs.count(), 1);
+        curr_out_new = foo.outputs.all()[0];
+        self.assertEquals(curr_out_new.compounddatatype, self.DNAinput_cdt);
+        self.assertEquals(curr_out_new.dataset_name, "foo");
+        self.assertEquals(curr_out_new.dataset_idx, 1);
+        self.assertEquals(curr_out_new.min_row, None);
+        self.assertEquals(curr_out_new.max_row, None);
+ 
 
 class pipelineSteps_tests(CopperfishMethodTests_setup):
 

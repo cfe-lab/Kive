@@ -434,6 +434,11 @@ class CodeResourceRevision(models.Model):
 
 	# This CRR includes it's own filename at the root
 	def list_all_filepaths(self):
+		"""Return all filepaths associated with this CodeResourceRevision.
+
+		Filepaths are listed recursively following a root-first scheme,
+		with the filepaths of the children listed in order.
+		"""
 		return self.list_all_filepaths_h(self.coderesource.filename)
 
 	# Self is be a dependency CRR, base_name is it's file name, specified either
@@ -450,7 +455,14 @@ class CodeResourceRevision(models.Model):
 		for dep in self.dependencies.all():
 
 			# Get all file paths of the CR of the child dependency relative to itself
-			inner_dep_paths = dep.requirement.list_all_filepaths_h(dep.depFileName)
+			dep_fn = dep.depFileName;
+			# If depFileName is blank, check and see if the corresponding CodeResource
+			# had a filename (i.e. if this is a non-metapackage CRR and so there is
+			# an associated file).
+			if dep_fn == "":
+				dep_fn = dep.requirement.coderesource.filename;
+			
+			inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
 
 			# Convert the paths from being relative to the child CRR to being
 			# relative to the current parent CRR by appending pathing
@@ -461,9 +473,36 @@ class CodeResourceRevision(models.Model):
 
 		return all_filepaths
 
-	def clean(self):
-		"""If there is a file specified, fill in the MD5 checksum."""
+	def has_circular_dependence(self):
+		"""Detect any circular dependences defined in this CodeResourceRevision."""
+		return self.has_circular_dependence_h([]);
 
+	def has_circular_dependence_h(self, dependants):
+		"""Helper for has_circular_dependence.
+
+		dependants is an accumulator that tracks all of the all of the
+		CRRs that have this one as a dependency.
+		"""
+		# Base case: self is dependant on itself, in which case, return true.
+		if self in dependants:
+			return True;
+		
+		# Recursive case: go to all dependencies and check them.
+		check_dep = False;
+		for dep in self.dependencies.all():
+			if dep.requirement.has_circular_dependence_h(dependants + [self]):
+				check_dep = True;
+
+		return check_dep;
+
+	def clean(self):
+		"""Check coherence of this CodeResourceRevision.
+
+		Tests for any circular dependency; does this CRR depend on
+		itself at all?  Also, checks for conflicts in the
+		dependencies.  Finally, if there is a file specified, fill in
+		the MD5 checksum.
+		"""
 		# CodeResource can be a collection of dependencies and not contain
 		# a file - in this case, MD5 has no meaning and shouldn't exist
 		try:
@@ -474,10 +513,9 @@ class CodeResourceRevision(models.Model):
 		except ValueError as e:
 			self.MD5_checksum = "";
 
-		# Check if crr dependency is self
-		for dependency in self.dependencies.all():
-			if (dependency.requirement == self):
-				raise ValidationError("Self-referential dependency"); 
+		# Check for a circular dependency.
+		if self.has_circular_dependence():
+			raise ValidationError("Self-referential dependency"); 
 
 		# Check if dependencies conflict with each other
 		listOfDependencyPaths = self.list_all_filepaths()
@@ -489,8 +527,8 @@ class CodeResourceRevision(models.Model):
 			raise ValidationError("If content file exists, it must have a file name")
 
 		# If no content file exists, it must not have a file name
-		#if not self.content_file and self.coderesource.filename != "":
-		#	raise ValidationError("Cannot have a filename specified in the absence of a content file")
+		if not self.content_file and self.coderesource.filename != "":
+			raise ValidationError("Cannot have a filename specified in the absence of a content file")
 
 class CodeResourceDependency(models.Model):
 	"""
@@ -527,10 +565,16 @@ class CodeResourceDependency(models.Model):
 		self.depPath = os.path.normpath(self.depPath)
 
 		# Catch ".." on it's own
-		if re.search("^\.\.", self.depPath):
+		if re.search("^\.\.$", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
-		# Catch any occurence of ".." within a larger path (Ex: blah/../bar)
+		# Catch "../[whatever]"
+		if re.search("^\.\./", self.depPath):
+			raise ValidationError("depPath cannot reference ../");
+
+		# This next case actually should never happen since we've collapsed down
+		# to a canonical path.
+		# Catch any occurrence of "/../" within a larger path (Ex: blah/../bar)
 		if re.search("/\.\./", self.depPath):
 			raise ValidationError("depPath cannot reference ../");
 
@@ -539,10 +583,6 @@ class CodeResourceDependency(models.Model):
 		if self.requirement.coderesource.filename == "" and self.depFileName != "":
 			raise ValidationError("Metapackage dependencies cannot have a depFileName");
 
-		# FIXME: Check if the dependency is a metapackage AND has a non-blank depFileName (bad)
-		if self.requirement.coderesource.filename == "" and self.depFileName != "":
-			raise ValidationError("Metapackage dependencies cannot have non-blank depFileName")
-				
 
 	def __unicode__(self):
 		"""Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
@@ -781,7 +821,6 @@ class Pipeline(Transformation):
 		return string_rep;
  
 	# outmap describes the wiring leading to terminal pipeline outputs of a pipeline
-	# during clean() the outputs are created
 	def clean(self):
 		"""
 		Validate pipeline revision inputs/outputs
@@ -789,7 +828,7 @@ class Pipeline(Transformation):
 		1) Pipeline STEPS must be consecutively starting from 1
 		2) Pipeline INPUTS must be consecutively numbered from 1
 		3) Inputs are available at a needed step and of the type expected
-		4) Outputs of the pipeline will be mapped to outputs generated by its steps (???)
+		4) Pipeline outputs are appropriately mapped from the pipeline's steps
 		"""
 
 		# Check that inputs are numbered consecutively from 1 (???)
@@ -972,7 +1011,10 @@ class Pipeline(Transformation):
 	def create_outputs(self):
 		"""	
 		Delete existing pipeline outputs, and recreate them
-		from output mappings (outmap)
+		from output mappings (outmap).
+
+		PRE: this should only be called after the pipeline has been verified by
+		clean and the outmaps are known to be OK.
 		"""
 
 		# Be careful if customizing delete() of TransformationOutput
@@ -1043,7 +1085,12 @@ class PipelineStep(models.Model):
 
 
 	def recursive_pipeline_check(self, pipeline):
-		"""Given a pipeline, check if this step pipeline contains """
+		"""Given a pipeline, check if this step contains it.
+
+		PRECONDITION: the transformation at this step has been appropriately
+		cleaned and does not contain any circularities.  If it does this
+		function can be fragile!
+		"""
 
 		contains_pipeline = False;
 
@@ -1074,7 +1121,8 @@ class PipelineStep(models.Model):
 		3) Do outputs marked for deletion come from this transformation?
 		4) Does the transformation at this step contain the parent pipeline?
 
-		A pipeline that is clean is not necessarily complete - check complete_clean()
+		A pipeline step that is clean is not necessarily complete - check
+		complete_clean() for that.
 		"""
 
 		# Check recursively to see if this step's transformation contains
@@ -1121,7 +1169,7 @@ class PipelineStep(models.Model):
 		2) Are any inputs multiply-wired (with PipelineStepInputs)?
 		"""
 
-		self.clean()	
+		self.clean()
 
 		# A list of all wires leading into this step
 		wired_inputs = []
