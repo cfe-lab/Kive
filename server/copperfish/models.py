@@ -1,7 +1,7 @@
 """
 copperfish.models
 
-Data model for the ShipYard (Copperfish) project - open source software
+Data model for the Shipyard (Copperfish) project - open source software
 that performs revision control on datasets and bioinformatic pipelines.
 """
 
@@ -250,9 +250,9 @@ class Dataset(models.Model):
 			help_text="The pipeline step this dataset was created by (If applicable)");
 
 	# Output 'hole' within a pipeline the Dataset comes from
-	pipeline_step_output_name = models.CharField(
-			"Source output hole",
-			max_length=128,
+	pipeline_step_output = models.ForeignKey(
+			"TransformationOutput",
+			null=True,
 			blank=True,
 			help_text="The output 'hole' this dataset comes from (If applicable)");
 
@@ -287,7 +287,11 @@ class Dataset(models.Model):
 
 	# Before completing a save(), generate the MD5 hash
 	def clean(self):
-		"""If a file specified, populate the MD5 checksum."""
+		"""Compute MD5 checksum for the dataset and check that its source is correctly specified.
+		
+		If a file specified, populate the MD5 checksum.  Also check that the
+		TransformationOutput that produced it comes from the specified PipelineStep.
+		"""
 
 		try:
 			md5gen = hashlib.md5();
@@ -298,8 +302,24 @@ class Dataset(models.Model):
 			print(e);
 			print("No file found; setting MD5 checksum to the empty string.");
 			self.MD5_checksum = "";
-	
 
+		# Either both pipeline_step and pipeline_step_output are specified or
+		# neither is specified.  If they are both specified, check that they
+		# are consistent with each other, i.e. that the output is actually one
+		# belonging to the specified PipelineStep.
+		if pipeline_step == None and pipeline_step_output != None:
+			raise ValidationError(
+				"No PipelineStep specified but an output from a PipelineStep is");
+		
+		elif pipeline_step != None and pipeline_step_output == None:
+			raise ValidationError(
+				"PipelineStep is specified but no output from it is");
+
+		elif ((pipeline_step != None and pipeline_step_output != None) and
+			  (pipeline_step.transformation != pipeline_step_output.transformation)):
+			raise ValidationError(
+				"Specified PipelineStep does not produce specified TransformationOutput");
+ 
 class CodeResource(models.Model):
 	"""
 	A CodeResource is any file tracked by ShipYard.
@@ -830,16 +850,12 @@ class Pipeline(Transformation):
 		3) Inputs are available at a needed step and of the type expected
 		4) Pipeline outputs are appropriately mapped from the pipeline's steps
 		"""
-
 		# Check that inputs are numbered consecutively from 1 (???)
 		# We don't care about the outputs, but if they are set, check them (???)
-
-
 
 		# Transformation.clean() - check for consecutive numbering of
 		# input/outputs for this pipeline as a whole
 		super(Pipeline, self).clean();
-
 
 		# Internal pipeline STEP numbers must be consecutive from 1 to n
 		all_steps = self.steps.all();
@@ -852,7 +868,6 @@ class Pipeline(Transformation):
 			raise ValidationError(
 					"Steps are not consecutively numbered starting from 1");
 
-
 		# Check that steps are coherent with each other
 		#
 		# Are inputs at each step...
@@ -864,144 +879,125 @@ class Pipeline(Transformation):
 		# For each Pipeline step
  		for step in all_steps:
 
-			# Extract wiring parameters (PipelineStepInput) for each input
-			for curr_in in step.inputs.all():
-				input_requested = curr_in.provider_output_name;		# Output hole where source data originates
-				requested_from = curr_in.step_providing_input;		# Pipeline step of wiring destination
-				feed_to_input = curr_in.transf_input_name;			# Input hole of wiring destination
+			# Extract wiring parameters (PipelineStepInputWire) for each input
+			for curr_wire in step.wires_in.all():
+				# Output hole where source data originates.  This is a
+				# TransformationInput if the step is 0 (i.e. we are
+				# requesting a pipeline input) or a
+				# TransformationOutput if the step is not 0 (i.e. we
+				# are requesting the output from a previous pipeline
+				# step).
+				input_requested = curr_wire.provider_output;
+				requested_from = curr_wire.step_providing_input;		# Pipeline step of wiring destination
+				feed_to_input = curr_wire.transf_input;			# Input hole of wiring destination
 
-				# req_input will store the source input for this (Step, wiring)
-				req_input = None;
-
-				# If this pipeline step's input is from step 0, it doesn't come from previous steps
 				if requested_from == 0:
-
-					# Get pipeline inputs of self (Pipeline; a transformation)
-					# Look for pipeline inputs that match the desired wiring source output name
-					try:
-						req_input = self.inputs.get(
-								dataset_name=input_requested);
-
-					except TransformationInput.DoesNotExist as e:
+					# Get pipeline inputs of self (Pipeline; a
+					# transformation); look for pipeline inputs that
+					# match the desired wiring source output name.
+					pipeline_inputs = self.inputs.all();
+					if input_requested not in pipeline_inputs:
 						raise ValidationError(
-								"Pipeline does not have input \"{}\"".
-								format(input_requested));	
+							"Pipeline does not have input \"{}\"".
+							format(unicode(input_requested)));
 
-				# If not from step 0, input derives from the output of a pipeline steps
+				# If not from step 0, input derives from the output of a pipeline step
 				else:
 
 					# Look at the pipeline step referenced by the wiring parameter
 					providing_step = all_steps[requested_from-1];
 
 					# Do any outputs at this pipeline step/transformation have the name requested?
-					try:
-						req_input = providing_step.transformation.outputs.get(
-								dataset_name=input_requested);
-
-					except TransformationOutput.DoesNotExist as e:
+					source_step_outputs = providing_step.transformation.outputs.all();
+					if input_requested not in source_step_outputs:
 						raise ValidationError(
-								"Transformation at step {} does not produce output \"{}\"".
-								format(requested_from, input_requested));
-						
-					# Was the data from this step's transformation output deleted?
-					if providing_step.outputs_to_delete.filter(
-							dataset_to_delete=input_requested).count() != 0:
+							"Transformation at step {} does not produce output \"{}\"".
+							format(requested_from, unicode(input_requested)));
 
-						# Identify wiring source output name + step number, and desired step availability
+					# Was the data from this step's transformation output deleted?
+					source_deleted_outputs = [x.dataset_to_delete
+											  for x in providing_step.outputs_to_delete.all()];
+					if input_requested in source_deleted_outputs:
 						raise ValidationError(
 								"Input \"{}\" from step {} to step {} is deleted prior to request".
-								format(input_requested, requested_from,
+								format(input_requested.dataset_name, requested_from,
 									   step.step_num));
 
-				# Get the input from this step's transformation that has an input hole
-				# name matching the wiring destination input hole name
+				# Check that the input and output connected by the
+				# wire are compatible.  Don't check for
+				# ValidationError because this was checked in the
+				# clean() of PipelineStep.
 
-				# That is to say, check that the wiring-requested input matches the prototype
-
-				# Don't check for ValidationError because this was checked in the clean() of PipelineStep.
-				transf_input = step.transformation.inputs.get(dataset_name=feed_to_input);
-
-				# FIXME: we're just going to enforce that transf_input
-				# and req_input have the same CompoundDatatype, rather
+				# FIXME: we're just going to enforce that feed_to_input
+				# and input_requested have the same CompoundDatatype, rather
 				# than making sure that their CompoundDatatypes match;
 				# is this too restrictive?
-
-				# For this (input,step) wiring, a matching output (req_input) as determined by
-				# output hole name (dataset_name) was found at the requested step, but we still
-				# need to check that their compounddatatypes match
-				if req_input.compounddatatype != transf_input.compounddatatype:
+				if input_requested.compounddatatype != feed_to_input.compounddatatype:
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} does not have the expected CompoundDatatype".
-							format(feed_to_input, step.step_num));
+							format(feed_to_input.dataset_name, step.step_num));
 
-
-				# FIXME: provided_min_row is defined as 0, but is never set... so it always remains as 0
 				provided_min_row = 0;
 				required_min_row = 0;
 
 				# Source output row constraint
-				if req_input.min_row != None:
-					provided_min_row = req_input.min_row;
+				if input_requested.min_row != None:
+					provided_min_row = input_requested.min_row;
 
 				# Destination input row constraint
-				if transf_input.min_row != None:
-					required_min_row = transf_input.min_row;
+				if feed_to_input.min_row != None:
+					required_min_row = feed_to_input.min_row;
 
 				# Check for contradictory min row constraints
 				if (provided_min_row < required_min_row):
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} may have too few rows".
-							format(feed_to_input, step.step_num));
+							format(feed_to_input.dataset_name, step.step_num));
 
-				# FIXME: provided_max_row defined as infinite, but is never set... so it always remains as inf
 				provided_max_row = float("inf");
 				required_max_row = float("inf");
 
-				if req_input.max_row != None:
-					provided_max_row = req_input.max_row;
+				if input_requested.max_row != None:
+					provided_max_row = input_requested.max_row;
 
-				if transf_input.max_row != None:
-					required_max_row = transf_input.max_row;
+				if feed_to_input.max_row != None:
+					required_max_row = feed_to_input.max_row;
 
 				# Check for contradictory max row constraints
 				if (provided_max_row > required_max_row):
 					raise ValidationError(
 							"Data fed to input \"{}\" of step {} may have too many rows".
-							format(feed_to_input, step.step_num));
+							format(feed_to_input.dataset_name, step.step_num));
 
 		# Check pipeline output wiring for coherence
 		output_indices = [];
 
 		for mapping in self.outmap.all():
-			output_requested = mapping.provider_output_name;
+			# This is a TransformationOutput.
+			output_requested = mapping.provider_output;
 			requested_from = mapping.step_providing_output;
 			connect_to_output = mapping.output_name;
 			output_indices += [mapping.output_idx];
 
-			# Source step number must be in range
+			# Step must actually belong to this pipeline
 			if requested_from > len(all_steps):
 				raise ValidationError(
-						"Output requested from a non-existent step");	
+						"Output requested from a non-existent step");
 			
 			# Given it is valid, access that step for deeper inspection
 			providing_step = all_steps[requested_from-1];
-			req_output = None;
 
 			# Try to find an output hole with a matching name
-			try:
-				req_output = providing_step.transformation.outputs.get(
-						dataset_name=output_requested);
-			except TransformationOutput.DoesNotExist as e:
+			if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
 				raise ValidationError(
 						"Transformation at step {} does not produce output \"{}\"".
 						format(requested_from, output_requested));
-
+			
 			# Also determine if output was deleted by the step producing it
-			if providing_step.outputs_to_delete.filter(
-					dataset_to_delete=output_requested).count() != 0:
+			if providing_step.outputs_to_delete.filter(dataset_to_delete=output_requested).exists():
 				raise ValidationError(
 						"Output \"{}\" from step {} is deleted prior to request".
-						format(output_requested, requested_from));
+						format(output_requested.dataset_name, requested_from));
 
 		# Also check if pipeline outputs are numbered consecutively
 		if sorted(output_indices) != range(1, self.outmap.count()+1):
@@ -1016,32 +1012,22 @@ class Pipeline(Transformation):
 		PRE: this should only be called after the pipeline has been verified by
 		clean and the outmaps are known to be OK.
 		"""
-
 		# Be careful if customizing delete() of TransformationOutput
 		self.outputs.all().delete();
-
-		# Then query all steps and regenerate outputs
-		all_steps = self.steps.all();
 
 		# outmap is derived from (PipelineOutputMapping/ForeignKey)
 		# For each wiring, extract the wiring parameters
  		for mapping in self.outmap.all():
-			output_requested = mapping.provider_output_name;
-			requested_from = mapping.step_providing_output;
+			output_requested = mapping.provider_output;
 			connect_to_output = mapping.output_name;
 
-			# Access the referenced step and check outputs
-			# for a matching output hole name
-			providing_step = all_steps[requested_from-1];
-			req_output = providing_step.transformation.outputs.get(
-					dataset_name=output_requested);
-
-			# If it matches, save the pipeline output
-			self.outputs.create(compounddatatype=req_output.compounddatatype,
+			# Clone the referenced PipelineStep's TransformationOutput
+			# to make the specified output for the pipeline.
+			self.outputs.create(compounddatatype=output_requested.compounddatatype,
 								dataset_name=connect_to_output,
 								dataset_idx=mapping.output_idx,
-								min_row=req_output.min_row,
-								max_row=req_output.max_row);
+								min_row=output_requested.min_row,
+								max_row=output_requested.max_row);
  			
 
 class PipelineStep(models.Model):
@@ -1058,7 +1044,7 @@ class PipelineStep(models.Model):
 	"""
 
 	# Implicitly defined
-	#   inputs (PipelineStepInput/ForeignKey)
+	#   wires_in (PipelineStepInputWire/ForeignKey)
 	#   outputs_to_delete: from PipelineStepDelete
 
 	pipeline = models.ForeignKey(
@@ -1116,11 +1102,11 @@ class PipelineStep(models.Model):
 		"""
 		Check coherence of this step of the pipeline.
 		
-		1) Do inputs come from prior steps?
-		2) Do inputs map correctly to the transformation at this step?
+		1) Do input wires come from prior steps?
+		2) Do input wires map correctly to the transformation at this step?
 		3) Do outputs marked for deletion come from this transformation?
 		4) Does the transformation at this step contain the parent pipeline?
-
+		
 		A pipeline step that is clean is not necessarily complete - check
 		complete_clean() for that.
 		"""
@@ -1132,23 +1118,23 @@ class PipelineStep(models.Model):
 								  format(self.step_num));
 
 			
-		for curr_in in self.inputs.all():
-			input_requested = curr_in.provider_output_name;
-			requested_from = curr_in.step_providing_input;
-			feed_to_input = curr_in.transf_input_name;
+		for curr_wire in self.wires_in.all():
+			input_requested = curr_wire.provider_output;
+			requested_from = curr_wire.step_providing_input;
+			feed_to_input = curr_wire.transf_input;
 
 			# Does this input come from a step prior to this one?
 			if requested_from >= self.step_num:
 				raise ValidationError(
-						"Input \"{}\" to step {} does not come from a prior step".
-						format(input_requested, self.step_num));
+						"Step {} requests input from a later step".
+						format(self.step_num));
 
-			# Does the transformation at this step have an input named feed_to_input?
+			# Does the transformation at this step have the specified input?
 			try:
-				self.transformation.inputs.get(dataset_name=feed_to_input);
+				self.transformation.inputs.get(pk=feed_to_input.pk);
 			except TransformationInput.DoesNotExist as e:
-				raise ValidationError ("Transformation at step {} has no input named \"{}\"".
-						format(self.step_num, feed_to_input));
+				raise ValidationError ("Transformation at step {} does not have input \"{}\"".
+						format(self.step_num, unicode(feed_to_input)));
 
 		for curr_del in self.outputs_to_delete.all():
 			to_del = curr_del.dataset_to_delete;
@@ -1156,10 +1142,10 @@ class PipelineStep(models.Model):
 			# Check that to_del is one of the outputs of the current step's
 			# Transformation.
 			if self.transformation.outputs.\
-				filter(dataset_name=to_del).count() == 0:
+				filter(pk=to_del.pk).count() == 0:
 				raise ValidationError(
-						"Transformation at step {} has no output named \"{}\"".
-						format(self.step_num, to_del));
+						"Transformation at step {} does not have output \"{}\"".
+						format(self.step_num, unicode(to_del)));
 
 	def complete_clean(self):
 		"""Executed after the step's wiring has been fully defined, and
@@ -1168,37 +1154,22 @@ class PipelineStep(models.Model):
 		1) Are all inputs for this step's transformation quenched?
 		2) Are any inputs multiply-wired (with PipelineStepInputs)?
 		"""
-
 		self.clean()
-
-		# A list of all wires leading into this step
-		wired_inputs = []
-
-		for curr_in in self.inputs.all():
-			feed_to_input = curr_in.transf_input_name;
-			# Add the input to a list
-			wired_inputs.append(feed_to_input)
 			
-		# Check that sorted(wired_inputs) = self.transformation.inputs
 		for transformationInput in self.transformation.inputs.all():
-			# See if the input happens exactly once in wire_inputs
-			numMatches = 0
-			for wired_input in wired_inputs:
-				if transformationInput.dataset_name == wired_input:
-					numMatches += 1	
+			# See if the input is specified exactly once.
+			numMatches = self.wires_in.filter(transf_input=transformationInput).count()
 
 			if numMatches == 0:
 				raise ValidationError("Input \"{}\" to transformation at step {} is not wired".
 									  format(transformationInput.dataset_name, self.step_num))
 
 			elif numMatches > 1:
-				raise ValidationError("Input \"{}\" to transformation at step {} is wired more than once".
-									  format(transformationInput.dataset_name, self.step_num))
+				raise ValidationError(
+					"Input \"{}\" to transformation at step {} is wired more than once".
+					format(transformationInput.dataset_name, self.step_num))
 
-
-		pass	
-
-class PipelineStepInput(models.Model):
+class PipelineStepInputWire(models.Model):
 	"""
 	Represents the "wires" feeding into the transformation of a
 	particular pipeline step, specifically:
@@ -1208,33 +1179,32 @@ class PipelineStepInput(models.Model):
 
 	Related to :model:`copperfish.PipelineStep`
 	"""
-
+	
 	# The step (Which has a transformation) where we define incoming wiring
 	pipelinestep = models.ForeignKey(
 			PipelineStep,
-			related_name = "inputs");
-
-	# Input hole (TransformationInput.dataset_name) of the transformation
+			related_name = "wires_in");
+	
+	# Input hole (TransformationInput) of the transformation
 	# at this step to which the wire leads
-	transf_input_name = models.CharField(
-			"Transformation input name",
-			max_length=128,
-			help_text="Wiring destination input hole name");
+	transf_input = models.ForeignKey(
+			"TransformationInput",
+			help_text="Wiring destination input hole");
+	
+	
+	# (step_providing_input, provider_output) unambiguously defines
+	# the source of the wire.  step_providing_input can't refer to a PipelineStep
+	# as it might also refer to the pipeline's inputs (i.e. step 0).
+ 	step_providing_input = models.PositiveIntegerField("Step providing the input source",
+													   help_text="Wiring source step");
 
-
-	# (step_providing_input, provider_output_name) unambiguously defines
-	# the source of the wire
-	step_providing_input = models.PositiveIntegerField(
-			"Step providing input",
-			help_text="Wiring source step");
-
-	provider_output_name = models.CharField(
-			"Provider output name",
-			max_length=128,
-			help_text="Wiring source output hole name");
-
-	# FIXME: Refactor transf_input_name and provider_output_name as ForeignKeys to
-	# TransformationInput and TransformationOutput objects
+	content_type = models.ForeignKey(
+			ContentType,
+			limit_choices_to = {"model__in": ("TransformationOutput",
+											  "TransformationInput")});
+	object_id = models.PositiveIntegerField();
+	# Wiring source output hole.
+	provider_output = generic.GenericForeignKey("content_type", "object_id");
 
 	# step_providing_input must be PRIOR to this step (Time moves forward)
 
@@ -1245,7 +1215,7 @@ class PipelineStepInput(models.Model):
 		step_str = "[no pipeline step set]";
 		if self.pipelinestep != None:
 			step_str = unicode(self.pipelinestep);
-		return "{}:{}".format(step_str, self.transf_input_name);	
+		return "{}:{}".format(step_str, self.transf_input.dataset_name);	
 
 
 class PipelineStepDelete(models.Model):
@@ -1263,10 +1233,9 @@ class PipelineStepDelete(models.Model):
 	# (i.e. does this actually refer to a Dataset that will be produced
 	# by the Transformation at this step)
 
-	# dataset_name of TransformationOutput for the transformation at this step
-	dataset_to_delete = models.CharField(
-			"Dataset to delete",
-			max_length=128,
+	# TransformationOutput of the transformation at this step to delete
+	dataset_to_delete = models.ForeignKey(
+			"TransformationOutput",
 			help_text="Annotation to delete data once generated");
 
 
@@ -1298,23 +1267,22 @@ class PipelineOutputMapping(models.Model):
 			validators=[MinValueValidator(1)],
 			help_text="Pipeline output hole index");
 
-	# FIXME: Refactor (output_name, output_idx) as a TransformationOutput
-
-
-	# PRE: step_providing_output is an actual step of the pipeline
+	# PRE: step_providing_output refers to an actual step of the pipeline
 	# and provider_output_name actually refers to one of the outputs
 	# at that step
 	# The coherence of the data here will be enforced at the Python level
 
+	# step_providing_output = models.ForeignKey(
+	# 		PipelineStep,
+	# 		help_text="Source step at which output comes from");
 	step_providing_output = models.PositiveIntegerField(
-			"Step providing output",
+			"Source pipeline step number",
 			validators=[MinValueValidator(1)],
 			help_text="Source step at which output comes from");
 
-	provider_output_name = models.CharField(
-			"Provider output name",
-			max_length=128,
-			help_text="Source output hole name");
+	provider_output = models.ForeignKey(
+			"TransformationOutput",
+			help_text="Source output hole");
 
 	def __unicode__(self):
 		""" Represent with the pipeline name, output index, and output name (???) """
