@@ -1425,7 +1425,7 @@ class CustomOutputCableWire(models.Model):
 
 	dest_idx =  models.PositiveIntegerField(
 		"Destination column index",
-		validators=[MinValueValidator(1)]
+		validators=[MinValueValidator(1)],
 		help_text="CDT index of this column in the pipeline output");
 
 	# This matches the constraint on compound data type members
