@@ -51,8 +51,8 @@ admin.site.register(Method, MethodAdmin);
 admin.site.register(TransformationInput);
 admin.site.register(TransformationOutput);
 
-class PipelineStepInputInline(admin.StackedInline):
-    model = PipelineStepInput;
+class PipelineStepInputCableInline(admin.StackedInline):
+    model = PipelineStepInputCable;
     extra = 0;
 
 class PipelineStepDeleteInline(admin.StackedInline):
@@ -60,24 +60,24 @@ class PipelineStepDeleteInline(admin.StackedInline):
     extra = 0;
 
 class PipelineStepAdmin(admin.ModelAdmin):
-    inlines = [PipelineStepInputInline, PipelineStepDeleteInline];
+    inlines = [PipelineStepInputCableInline, PipelineStepDeleteInline];
 
 class PipelineStepInline(admin.StackedInline):
     model = PipelineStep;
     extra = 0;
 
-class PipelineOutputMappingInline(admin.TabularInline):
-    model = PipelineOutputMapping;
+class PipelineOutputCableInline(admin.TabularInline):
+    model = PipelineOutputCable;
     extra = 0;
 
 class PipelineAdmin(admin.ModelAdmin):
     inlines = [TransformationInputInline, PipelineStepInline,
-               PipelineOutputMappingInline];
+               PipelineOutputCableInline];
 
 admin.site.register(PipelineStep, PipelineStepAdmin);
 admin.site.register(PipelineFamily);
 admin.site.register(Pipeline, PipelineAdmin);
-admin.site.register(PipelineStepInput);
+admin.site.register(PipelineStepInputCable);
 admin.site.register(PipelineStepDelete);
 
 class DatasetAdmin(admin.ModelAdmin):

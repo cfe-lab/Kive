@@ -73,11 +73,15 @@ class Datatype(models.Model):
 	
 	def is_restricted_by(self, possible_restrictor_datatype):
 		"""
-		Determine if self is ever directly or indirectly
-		restricted by a given datatype.
+		Determine if this datatype is ever *properly* restricted, directly or indirectly,
+		by a given datatype.
+		
+		PRE: there is no circular restriction in the possible restrictor
+		datatype (this would cause an infinite recursion).
 		"""
-
-		# We assume self is not restricted by possible_restrictor_datatype
+		# The default is that self is not restricted by
+		# possible_restrictor_datatype; toggle to True if it turns out
+		# that it is.
 		is_restricted = False
 		restrictions = possible_restrictor_datatype.restricts.all()
 
@@ -909,20 +913,33 @@ class Pipeline(Transformation):
 		from output cables (outcables).
 
 		PRE: this should only be called after the pipeline has been verified by
-		clean and the outcabless are known to be OK.
+		clean and the outcables are known to be OK.
 		"""
 		# Be careful if customizing delete() of TransformationOutput
 		self.outputs.all().delete();
 
 		# outcables is derived from (PipelineOutputCable/ForeignKey)
-		# For each wiring, extract the wiring parameters
+		# For each outcable, extract the cabling parameters
  		for outcable in self.outcables.all():
 			output_requested = outcable.provider_output;
 			connect_to_output = outcable.output_name;
 
+			output_CDT = output_requested.compounddatatype;
+			if outcable.custom_outwires.all().exists():
+				# If there is custom wiring, then we need to define a new
+				# CDT for the output.
+				# Note: the integrity of the custom wiring is already enforced
+				# when you clean() the output cable.
+				output_CDT = CompoundDatatype();
+				output_CDT.save();
+				for outwire in outcable.custom_outwire.all():
+					output_CDT.members.create(datatype=outwire.source_pin.datatype,
+											  column_name=outwire.dest_name,
+											  column_idx=outwire.dest_idx);
+
 			# Clone the referenced PipelineStep's TransformationOutput
 			# to make the specified output for the pipeline.
-			self.outputs.create(compounddatatype=output_requested.compounddatatype,
+			self.outputs.create(compounddatatype=output_CDT,
 								dataset_name=connect_to_output,
 								dataset_idx=outcable.output_idx,
 								min_row=output_requested.min_row,
@@ -1178,6 +1195,7 @@ class PipelineStepInputCable(models.Model):
 						"Custom wiring required for cable \"{}\"".
 						format(unicode(self)));
 
+		if self.custom_wires.all().exists():
 			# Validate individual custom wires
 			for wire in self.custom_wires.all():
 				wire.clean()
@@ -1236,6 +1254,17 @@ class PipelineStepInputCable(models.Model):
 		
  
 class CustomCableWire(models.Model):
+	"""
+	Defines a customized connection between internal steps of a pipeline.
+
+	This allows us to filter/rearrange/repeat columns when handing
+	data from a source TransformationXput (*Input if it's from the
+	pipeline's own input, and *Output if it's from a previous step) to
+	a destination TransformationInput between steps of a pipeline.
+
+	The analogue here is that we have customized a cable by rearranging
+	the connections between the pins.
+	"""
 
 	# cable for which we are creating custom wiring
 	pipelinestepinputcable = models.ForeignKey(
@@ -1277,9 +1306,14 @@ class CustomCableWire(models.Model):
 				"Destination pin \"{}\" does not come from compounddatatype \"{}\"".
 				format(unicode(dest_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
 
-		if source_pin.datatype != dest_pin.datatype:
+		# Check that the datatypes on either side of this wire are
+		# either the same, or that the source datatype is a
+		# restriction of the destination datatype (thus you can feed
+		# the source to the destination).
+		if (source_pin.datatype != dest_pin.datatype and
+				(not dest_pin.datatype.is_restricted_by(source_pin.datatype))):
 			raise ValidationError(
-				"The datatype of the source pin \"{}\" does not match the datatype of the destination pin \"{}\"".
+				"The datatype of the source pin \"{}\" is incompatible with the datatype of the destination pin \"{}\"".
 				format(unicode(source_pin), unicode(dest_pin)))
 		
 
@@ -1325,7 +1359,6 @@ class PipelineOutputCable(models.Model):
 	Related to :model:`copperfish.Pipeline`
 	Related to :model:`copperfish.TransformationOutput` (Refactoring needed)
 	"""
-
 	pipeline = models.ForeignKey(
 			Pipeline,
 			related_name="outcables");
@@ -1392,25 +1425,37 @@ class PipelineOutputCable(models.Model):
 				format(requested_from, output_requested));
 
 		# Also determine if output was deleted by the step producing it
-		if providing_step.outputs_to_delete.filter(dataset_to_delete=output_requested).exists():
+		if (providing_step.outputs_to_delete.
+				filter(dataset_to_delete=output_requested).exists()):
 			raise ValidationError(
 				"Output \"{}\" from step {} is deleted prior to request".
 				format(output_requested.dataset_name, requested_from));
 
-		# If custom wires exist, use them to define a compound datatype, and run validate_unique() to ensure column name uniqueness
-		outwires = self.custom_outwires.all()
+		# If custom wires exist, check that they define columns in a
+		# CSV file that are indexed consecutively from 1 -- uniqueness
+		# of column indices and column names is already enforced by a
+		# constraint on CustomOutputCableWire.
+		outwire_indices = [];
+		for outwire in self.custom_outwires.all():
+			outwire.full_clean();
+			outwire_indices.append(outwire.dest_idx);
 
-		if outwires.exists():
-			# FIXME
-			pass
+		if sorted(outwire_indices) != range(1, len(outwire_indices)+1):
+			raise ValidationError(
+				"Columns defined by custom wiring on output cable \"{}\" are not consecutively indexed from 1".format(unicode(self)));
  
 class CustomOutputCableWire(models.Model):
 	"""
-	FILL ME IN
+	Defines a customized connection from a pipeline's internal step to its output.
+
+	This allows us to filter/rearrange/repeat columns when returning
+	data from a particular step's TransformationOutput as the pipeline's output.
+
+	The analogue here is similar to that of CustomCableWire.
 	"""
 
-	# FIXME: Need to finish pipelineoutputcable.clean()
-	# Need to change pipeline.createoutputs to accomodate custom wiring
+	# FIXME:
+	# Need to change pipeline.create_outputs to accomodate custom wiring
 
 	pipelineoutputcable = models.ForeignKey(
 		PipelineOutputCable,
@@ -1436,9 +1481,8 @@ class CustomOutputCableWire(models.Model):
 	
 	def clean(self):
 		"""
-		source_pin must be a member of the set of CDT members of the cable source (provider_output) transformationXput
+		source_pin must be a member of the set of CDT members of the cable source (provider_output) TransformationOutput
 		"""
-
 		# Get the CDT members of the output-CDT referenced by this PipelineOutputCable
 		source_CDT_members = self.pipelineoutputcable.provider_output.compounddatatype.members.all()
 	

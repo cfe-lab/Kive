@@ -393,10 +393,10 @@ class CopperfishMethodTests_setup(TestCase):
                               provider_output=self.DNAcompv1_p.inputs.get(
                                   dataset_name="seqs_to_complement"));
 
-        # Add output cabling (PipelineOutputMapping) to DNAcompv1_p
+        # Add output cabling (PipelineOutputCable) to DNAcompv1_p
         # From step 1, output hole "output", send output to
         # Pipeline output hole "complemented_seqs" at index 1
-        mapping = self.DNAcompv1_p.outmap.create(
+        outcabling = self.DNAcompv1_p.outcables.create(
                 step_providing_output=1,
                 provider_output=step1.transformation.outputs.get(dataset_name="output"),
                 output_name="complemented_seqs",
@@ -3046,8 +3046,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                 "Data fed to input \"input\" of step 1 may have too many rows",
                 foo.clean);
         
-    def test_pipeline_oneStep_with_valid_outmap_clean(self):
-        """Good output mapping, one-step pipeline."""
+    def test_pipeline_oneStep_with_valid_outcable_clean(self):
+        """Good output cabling, one-step pipeline."""
 
         # Define pipeline foo with unconstrained input
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3069,16 +3069,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Connect the output of step 1 to the output of foo
-        outmap = foo.outmap.create(
+        outcable = foo.outcables.create(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
-        self.assertEquals(outmap.clean(), None);
+        self.assertEquals(outcable.clean(), None);
         self.assertEquals(foo.clean(), None);
 
-    def test_pipeline_oneStep_outmap_references_nonexistent_step_clean(self):
-        """Bad output mapping, one-step pipeline: request from nonexistent step"""
+    def test_pipeline_oneStep_outcable_references_nonexistent_step_clean(self):
+        """Bad output cabling, one-step pipeline: request from nonexistent step"""
 
         # Define pipeline foo with validly indexed input and step 1 cabling
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3094,8 +3094,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
-        # Index a non-existent step to outmap
-        outmap = foo.outmap.create(
+        # Index a non-existent step to outcable
+        outcable = foo.outcables.create(
             output_name="oneoutput", output_idx=1,
             step_providing_output=5,
             provider_output=step1.transformation.outputs.all()[0]);
@@ -3103,15 +3103,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
             ValidationError,
             "Output requested from a non-existent step",
-            outmap.clean);
+            outcable.clean);
         # Check propagation of error.
         self.assertRaisesRegexp(
             ValidationError,
             "Output requested from a non-existent step",
             foo.clean);
         
-    def test_pipeline_oneStep_outmap_references_invalid_output_clean (self):
-        """Bad output mapping, one-step pipeline: request output not belonging to requested step"""
+    def test_pipeline_oneStep_outcable_references_invalid_output_clean (self):
+        """Bad output cabling, one-step pipeline: request output not belonging to requested step"""
 
         # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3128,7 +3128,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
  
         # Reference a correct step but TransformationOutput from another Transformation.
-        outmap = foo.outmap.create(
+        outcable = foo.outcables.create(
             output_name="oneoutput", output_idx=1,
             step_providing_output=1,
             provider_output=self.RNAoutput_to);
@@ -3136,14 +3136,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
-                outmap.clean);
+                outcable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
                 foo.clean);
         
-    def test_pipeline_oneStep_outmap_references_deleted_output_clean (self):
-        """Bad output mapping, one-step pipeline: request deleted step output"""
+    def test_pipeline_oneStep_outcable_references_deleted_output_clean (self):
+        """Bad output cabling, one-step pipeline: request deleted step output"""
 
         # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3164,7 +3164,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=self.DNAcompv2_m.outputs.get(dataset_name="output"));
 
         # Now try to map it to the pipeline output
-        outmap = foo.outmap.create(
+        outcable = foo.outcables.create(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
@@ -3173,14 +3173,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 1 is deleted prior to request",
-                outmap.clean);
+                outcable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 1 is deleted prior to request",
                 foo.clean);
         
     def test_pipeline_oneStep_bad_pipeline_output_indexing_clean(self):
-        """Bad output mapping, one-step pipeline: output not indexed 1"""
+        """Bad output cabling, one-step pipeline: output not indexed 1"""
 
         # Define pipeline with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3196,14 +3196,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
-        # Outmap references a valid step and output, but is itself badly indexed
-        outmap = foo.outmap.create(
+        # Outcable references a valid step and output, but is itself badly indexed
+        outcable = foo.outcables.create(
             output_name="oneoutput",
             output_idx=9,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         
-        self.assertEquals(outmap.clean(), None);
+        self.assertEquals(outcable.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
@@ -3677,8 +3677,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                 foo.clean);
 
         
-    def test_pipeline_manySteps_valid_outmap_clean(self):
-        """Good output mapping, chained-step pipeline."""
+    def test_pipeline_manySteps_valid_outcable_clean(self):
+        """Good output cabling, chained-step pipeline."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -3700,21 +3700,21 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outmap1 = foo.outmap.create(
+        outcable1 = foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
-        self.assertEquals(outmap1.clean(), None);
-        self.assertEquals(outmap2.clean(), None);
+        self.assertEquals(outcable1.clean(), None);
+        self.assertEquals(outcable2.clean(), None);
         self.assertEquals(foo.clean(), None);
 
 
-    def test_pipeline_manySteps_outmap_references_nonexistent_step_clean(self):
-        """Bad output mapping, chained-step pipeline: request from nonexistent step"""
+    def test_pipeline_manySteps_outcable_references_nonexistent_step_clean(self):
+        """Bad output cabling, chained-step pipeline: request from nonexistent step"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -3737,11 +3737,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
         # step 5 doesn't exist
-        outmap1 = foo.outmap.create(
+        outcable1 = foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=5,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -3749,15 +3749,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output requested from a non-existent step",
-                outmap1.clean);
-        self.assertEquals(outmap2.clean(), None);
+                outcable1.clean);
+        self.assertEquals(outcable2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output requested from a non-existent step",
                 foo.clean);
 
-    def test_pipeline_manySteps_outmap_references_invalid_output_clean(self):
-        """Bad output mapping, chained-step pipeline: request output not belonging to requested step"""
+    def test_pipeline_manySteps_outcable_references_invalid_output_clean(self):
+        """Bad output cabling, chained-step pipeline: request output not belonging to requested step"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -3779,28 +3779,28 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outmap1 = foo.outmap.create(
+        outcable1 = foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
 
-        self.assertEquals(outmap1.clean(), None);
+        self.assertEquals(outcable1.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 2 does not produce output \"\[Method DNAcomplement v2\]:1 \(1: <DNANucSeq> \[ComplementedSeq\]\) output\"",
-                outmap2.clean);
+                outcable2.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 2 does not produce output \"\[Method DNAcomplement v2\]:1 \(1: <DNANucSeq> \[ComplementedSeq\]\) output\"",
                 foo.clean);
 
         
-    def test_pipeline_manySteps_outmap_references_deleted_output_clean(self):
-        """Bad output mapping, chained-step pipeline: request deleted step output"""
+    def test_pipeline_manySteps_outcable_references_deleted_output_clean(self):
+        """Bad output cabling, chained-step pipeline: request deleted step output"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -3824,11 +3824,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step3.outputs_to_delete.create(
             dataset_to_delete=step3.transformation.outputs.get(dataset_name="output"));
 
-        outmap1 = foo.outmap.create(
+        outcable1 = foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -3836,15 +3836,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 3 is deleted prior to request",
-                outmap1.clean);
-        self.assertEquals(outmap2.clean(), None);
+                outcable1.clean);
+        self.assertEquals(outcable2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 3 is deleted prior to request",
                 foo.clean);
 
-    def test_pipeline_manySteps_outmap_references_invalid_output_index_clean(self):
-        """Bad output mapping, chain-step pipeline: outputs not consecutively numbered starting from 1"""
+    def test_pipeline_manySteps_outcable_references_invalid_output_index_clean(self):
+        """Bad output cabling, chain-step pipeline: outputs not consecutively numbered starting from 1"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -3866,19 +3866,19 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outmap1 = foo.outmap.create(
+        outcable1 = foo.outcables.create(
             output_name="outputone",
             output_idx=5,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="outputtwo",
             output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        self.assertEquals(outmap1.clean(), None);
-        self.assertEquals(outmap2.clean(), None);
+        self.assertEquals(outcable1.clean(), None);
+        self.assertEquals(outcable2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
@@ -4315,10 +4315,10 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             foo.clean);
 
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_that_is_deleted_bad(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_1st_output_that_is_deleted_bad(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 1st output, which is deleted (bad)
+        Outcable 1st output, which is deleted (bad)
         """
 
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4346,15 +4346,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 1st output (Which is deleted)
-        outmap1 = foo.outmap.create(
+        # Add outcable for 1st output (Which is deleted)
+        outcable1 = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 2nd output (Which is not deleted)
-        outmap2 = foo.outmap.create(
+        # Add outcable for 2nd output (Which is not deleted)
+        outcable2 = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4366,18 +4366,18 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
-            outmap1.clean);
-        self.assertEquals(outmap2.clean(), None)
+            outcable1.clean);
+        self.assertEquals(outcable2.clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
             foo.clean);
 
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_second_output_deleted_good(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_1st_output_with_second_output_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 1st output, whhen the second output is deleted (good)
+        Outcable 1st output, whhen the second output is deleted (good)
         """
 
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4404,8 +4404,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
-        # Add outmap for 1st output (Which is not deleted)
-        outmap = foo.outmap.create(
+        # Add outcable for 1st output (Which is not deleted)
+        outcable = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4413,13 +4413,13 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(outmap.clean(), None)
+        self.assertEquals(outcable.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_nothing_deleted_good(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_1st_output_with_nothing_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 1st output, nothing is deleted (good)
+        Outcable 1st output, nothing is deleted (good)
         """
 
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4442,8 +4442,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
-        # Add outmap for 1st output (Which is not deleted)
-        outmap = foo.outmap.create(
+        # Add outcable for 1st output (Which is not deleted)
+        outcable = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4451,13 +4451,13 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(outmap.clean(), None)
+        self.assertEquals(outcable.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_that_is_deleted_bad(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_2nd_output_that_is_deleted_bad(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, and 2nd is deleted (bad)
+        Outcable 2nd output, and 2nd is deleted (bad)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4483,8 +4483,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
-        # Add outmap for 2nd output (Which is deleted)
-        outmap = foo.outmap.create(
+        # Add outcable for 2nd output (Which is deleted)
+        outcable = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
@@ -4495,16 +4495,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
-            outmap.clean);
+            outcable.clean);
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
             foo.clean);
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_first_output_deleted_good(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_2nd_output_with_first_output_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, while first output is deleted (good)
+        Outcable 2nd output, while first output is deleted (good)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4530,8 +4530,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 2nd output (Which is not deleted)
-        outmap = foo.outmap.create(
+        # Add outcable for 2nd output (Which is not deleted)
+        outcable = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
@@ -4539,13 +4539,13 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(outmap.clean(), None)
+        self.assertEquals(outcable.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_2nd_output_with_nothing_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap 2nd output, nothing is deleted (good)
+        Outcable 2nd output, nothing is deleted (good)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4564,7 +4564,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"))
 
-        outmap = foo.outmap.create(
+        outcable = foo.outcables.create(
             output_name="aName",
             output_idx=1,
             step_providing_output=1,
@@ -4572,13 +4572,13 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(outmap.clean(), None)
+        self.assertEquals(outcable.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_none_deleted_good(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_both_outputs_none_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap both outputs, neither deleted (good)
+        Outcable both outputs, neither deleted (good)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4600,13 +4600,13 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
-        # Add outmaps for both outputs
-        outmap1 = foo.outmap.create(
+        # Add outcables for both outputs
+        outcable1 = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
-        outmap2 = foo.outmap.create(
+        outcable2 = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4614,14 +4614,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertRaisesRegexp(outmap1.clean(), None);
-        self.assertRaisesRegexp(outmap2.clean(), None);
+        self.assertRaisesRegexp(outcable1.clean(), None);
+        self.assertRaisesRegexp(outcable2.clean(), None);
         self.assertRaisesRegexp(foo.clean(), None);
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_1st_is_deleted_bad(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_both_outputs_1st_is_deleted_bad(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap both outputs, and 1st is deleted (bad)
+        Outcable both outputs, and 1st is deleted (bad)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4647,15 +4647,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 1st output (Which is deleted)
-        outmap1 = foo.outmap.create(
+        # Add outcable for 1st output (Which is deleted)
+        outcable1 = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 2nd output (Which is not deleted)
-        outmap2 = foo.outmap.create(
+        # Add outcable for 2nd output (Which is not deleted)
+        outcable2 = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4666,17 +4666,17 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
-            outmap1.clean);
-        self.assertEquals(outmap2.clean(), None)
+            outcable1.clean);
+        self.assertEquals(outcable2.clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
             foo.clean);
 
-    def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_2nd_is_deleted_bad(self):
+    def test_pipeline_with_1_step_and_2_outputs_outcable_both_outputs_2nd_is_deleted_bad(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
-        Outmap both outputs, and 2nd is deleted (bad)
+        Outcable both outputs, and 2nd is deleted (bad)
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4702,15 +4702,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
-        # Add outmap for 1st output (Which is not deleted)
-        outmap1 = foo.outmap.create(
+        # Add outcable for 1st output (Which is not deleted)
+        outcable1 = foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 2nd output (Which is deleted)
-        outmap2 = foo.outmap.create(
+        # Add outcable for 2nd output (Which is deleted)
+        outcable2 = foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4718,26 +4718,26 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-        self.assertEquals(outmap1.clean(), None)
+        self.assertEquals(outcable1.clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
-            outmap2.clean);
+            outcable2.clean);
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
             foo.clean);
 
 
-        # Create a pipeline with outmaps, save the outmaps, CHANGE them, then see
-        # all of the previous outmaps were eliminated...
+        # Create a pipeline with outcables, save the outcables, CHANGE them, then see
+        # all of the previous outcables were eliminated...
         #
         # Besides this, incorporate some create_output checks in the above pipeline cases
 
 
     def test_create_outputs(self):
         """
-        Create outputs from output mappings; also change the output mappings
+        Create outputs from output cablings; also change the output cablings
         and recreate the outputs to see if they're correct.
         """
         # This setup is copied from one of the above tests.
@@ -4761,15 +4761,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
-        # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        # Add outcable for 1st output (Which is not deleted)
+        foo.outcables.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
-        # Add outmap for 2nd output (Which is deleted)
-        foo.outmap.create(
+        # Add outcable for 2nd output (Which is deleted)
+        foo.outcables.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4802,12 +4802,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertEquals(curr_out_2.min_row, None);
         self.assertEquals(curr_out_2.max_row, None);
 
-        # Now delete all the output mappings and make new ones; then check
+        # Now delete all the output cablings and make new ones; then check
         # and see if create_outputs worked.
-        foo.outmap.all().delete();
+        foo.outcables.all().delete();
 
-        # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        # Add outcable for 1st output (Which is not deleted)
+        foo.outcables.create(
             output_name="foo",
             output_idx=1,
             step_providing_output=1,
@@ -4850,11 +4850,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        foo.outmap.create(
+        foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(
+        foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -4879,8 +4879,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         self.assertEquals(curr_out_2.max_row, None);
 
         # Now recreate them and check it worked
-        foo.outmap.all().delete();
-        foo.outmap.create(
+        foo.outcables.all().delete();
+        foo.outcables.create(
             output_name="foo", output_idx=1,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -5079,7 +5079,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Define pipeline output at index 1 from (step 1, output "output")
-        foo.outmap.create(
+        foo.outcables.create(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
@@ -5109,7 +5109,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             provider_output=bar.inputs.get(dataset_name="barinput"));
 
         # Map a single output, from step 1 foo.output = "oneoutput"
-        bar.outmap.create(
+        bar.outcables.create(
             output_name="baroutput",
             output_idx=1,
             step_providing_output=1,
@@ -5146,7 +5146,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
-        foo.outmap.create(
+        foo.outcables.create(
             output_name="oneoutput", output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
@@ -5175,12 +5175,12 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             transf_input=bstep2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=bstep1.transformation.outputs.get(dataset_name="oneoutput"));
-        bar.outmap.create(
+        bar.outcables.create(
             output_name="baroutputone",
             output_idx=1,
             step_providing_output=1,
             provider_output=bstep1.transformation.outputs.get(dataset_name="oneoutput"));
-        bar.outmap.create(
+        bar.outcables.create(
             output_name="baroutputtwo",
             output_idx=2,
             step_providing_output=2,
