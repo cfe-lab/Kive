@@ -1,5 +1,5 @@
 """
-Unit tests for ShipYard (Copperfish)
+Unit tests for Shipyard (Copperfish)
 """
 
 from django.test import TestCase;
@@ -385,15 +385,15 @@ class CopperfishMethodTests_setup(TestCase):
                 transformation=self.DNAcompv2_m,
                 step_num=1);
 
-        # Add wiring (PipelineStepInputWire's) to (step1, DNAcompv1_p)
+        # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
         # From step 0, output hole "seqs_to_comeplement" to
         # input hole "input" (of this step)
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=self.DNAcompv1_p.inputs.get(
                                   dataset_name="seqs_to_complement"));
 
-        # Add output wiring (PipelineOutputMapping) to DNAcompv1_p
+        # Add output cabling (PipelineOutputMapping) to DNAcompv1_p
         # From step 1, output hole "output", send output to
         # Pipeline output hole "complemented_seqs" at index 1
         mapping = self.DNAcompv1_p.outmap.create(
@@ -2569,6 +2569,10 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         self.assertEquals(foo.clean(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Pipeline foo has no steps",
+            foo.complete_clean());
 
 
     def test_pipeline_one_invalid_input_clean(self):
@@ -2582,6 +2586,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                 ValidationError,
                 "Inputs are not consecutively numbered starting from 1",
                 foo.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Inputs are not consecutively numbered starting from 1",
+                foo.complete_clean);
+
 
     def test_pipeline_many_valid_inputs_clean(self):
         """Test input index check, well-indexed multi-input case."""
@@ -2635,8 +2644,17 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_name="oneinput", dataset_idx=1);
 
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        
+
+        self.assertEquals(step1.clean(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"input\" to transformation at step 1 is not cabled",
+            step1.complete_clean);
         self.assertEquals(foo.clean(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"input\" to transformation at step 1 is not cabled",
+            foo.complete_clean);
 
     def test_pipeline_one_bad_step_clean(self):
         """Test step index check, one badly-indexed step case."""
@@ -2696,8 +2714,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                 "Steps are not consecutively numbered starting from 1",
                 foo.clean);
 
-    def test_pipeline_oneStep_valid_wiring_clean(self):
-        """Test good step wiring, one-step pipeline."""
+    def test_pipeline_oneStep_valid_cabling_clean(self):
+        """Test good step cabling, one-step pipeline."""
 
         # Define pipeline 'foo' in family 'DNAcomp_pf'
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -2713,15 +2731,19 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         # Add single validly indexed step, composed of the method DNAcompv2
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
 
-        # Add wiring from step 0 with input name "oneinput"
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
-        self.assertEquals(foo.clean(), None);
+        # Add cabling from step 0 with input name "oneinput"
+        cable = step1.cables_in.create(
+            transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
+        self.assertEquals(cable.clean(), None);
         self.assertEquals(step1.clean(), None);
+        self.assertEquals(step1.complete_clean(), None);
+        self.assertEquals(foo.clean(), None);
+        self.assertEquals(foo.complete_clean(), None);
         
     def test_pipeline_oneStep_invalid_step_numbers_clean(self):
-        """Bad wiring: step not indexed 1."""
+        """Bad pipeline (step not indexed 1), step is complete and clean."""
 
         # Define a pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -2738,18 +2760,23 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=2);
 
-        # Give this step properly mapped wiring from the Pipeline input
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        # Give this step properly mapped cabling from the Pipeline input
+        cable = step1.cables_in.create(
+            transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
+
+        self.assertEquals(cable.clean(), None);
+        self.assertEquals(step1.clean(), None);
+        self.assertEquals(step1.complete_clean(), None);
         
         self.assertRaisesRegexp(
                 ValidationError,
                 "Steps are not consecutively numbered starting from 1",
                 foo.clean);
         
-    def test_pipeline_oneStep_invalid_wiring_invalid_pipeline_input_clean (self):
-        """Bad wiring: step looks for input that does not belong to the pipeline."""
+    def test_pipeline_oneStep_invalid_cabling_invalid_pipeline_input_clean (self):
+        """Bad cabling: step looks for input that does not belong to the pipeline."""
 
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -2766,18 +2793,32 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
 
-        # Wire a pipeline input that does not belong to the pipeline to step 1
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=self.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"));
+        # Cable a pipeline input that does not belong to the pipeline to step 1
+        cable = step1.cables_in.create(
+            transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=self.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"));
         
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Pipeline does not have input \"\[Pipeline DNAcomplement v1\]:1 \(1: <DNANucSeq> \[SeqToComplement\]\) seqs_to_complement\"",
+                cable.clean);
+        # The following are just the same as the above, propagated upwards through clean()s.
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Pipeline does not have input \"\[Pipeline DNAcomplement v1\]:1 \(1: <DNANucSeq> \[SeqToComplement\]\) seqs_to_complement\"",
+                step1.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Pipeline does not have input \"\[Pipeline DNAcomplement v1\]:1 \(1: <DNANucSeq> \[SeqToComplement\]\) seqs_to_complement\"",
+                step1.complete_clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Pipeline does not have input \"\[Pipeline DNAcomplement v1\]:1 \(1: <DNANucSeq> \[SeqToComplement\]\) seqs_to_complement\"",
                 foo.clean);
         
-    def test_pipeline_oneStep_invalid_wiring_incorrect_cdt_clean(self):
-        """Bad wiring: input is of wrong CompoundDatatype."""
+    def test_pipeline_oneStep_invalid_cabling_incorrect_cdt_clean(self):
+        """Bad cabling: input is of wrong CompoundDatatype."""
 
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -2794,18 +2835,20 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
 
-        # Reference correct name "oneinput" and wire to step "input"
+        # Reference correct name "oneinput" and cable to step "input"
         # of DNAcompv2_m - but of the wrong cdt
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Data fed to input \"input\" of step 1 does not have the expected CompoundDatatype",
-                foo.clean);
+        cable = step1.cables_in.create(
+            transf_input=step1.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
         
-    def test_pipeline_oneStep_wiring_minrow_constraint_may_be_breached_clean (self):
-        """Unverifiable wiring: step requests input with possibly too
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 1:input\"",
+            cable.clean);
+        
+    def test_pipeline_oneStep_cabling_minrow_constraint_may_be_breached_clean (self):
+        """Unverifiable cabling: step requests input with possibly too
         few rows (input min_row unspecified)."""
 
         # Define method 'curr_method' with driver compv2_crRev
@@ -2842,18 +2885,24 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                                  step_num=1);
 
         # From row-unconstrained pipeline input, assign to curr_method
-        step1.wires_in.create(transf_input=curr_method.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        cable = step1.cables_in.create(
+            transf_input=curr_method.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # It's possible this step may have too few rows
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 1 may have too few rows",
-                foo.clean);
+                cable.clean);
+        # This is just to check that the above propagated up.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Data fed to input \"input\" of step 1 may have too few rows",
+            foo.clean);
         
-    def test_pipeline_oneStep_wiring_minrow_constraints_may_breach_each_other_clean (self):
-        """Unverifiable wiring: step requests input with possibly too few rows
+    def test_pipeline_oneStep_cabling_minrow_constraints_may_breach_each_other_clean (self):
+        """Unverifiable cabling: step requests input with possibly too few rows
         (input min_row specified)."""
         
         # Define method curr_method
@@ -2891,18 +2940,23 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         
         # Map min_row = 5 pipeline input to this step's input
         # which contains curr_method with min_row = 10
-        step1.wires_in.create(transf_input=curr_method.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        cable = step1.cables_in.create(
+            transf_input=curr_method.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
         
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 1 may have too few rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 1 may have too few rows",
                 foo.clean);
 
 
-    def test_pipeline_oneStep_wiring_maxRow_constraints_may_be_breached_clean(self):
-        """Unverifiable wiring: step requests input with possibly too many rows
+    def test_pipeline_oneStep_cabling_maxRow_constraints_may_be_breached_clean(self):
+        """Unverifiable cabling: step requests input with possibly too many rows
         (input max_row unspecified)"""
 
         # Define curr_method with input of max_row = 10
@@ -2928,21 +2982,27 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_name="oneinput",
                           dataset_idx=1);
 
-        # Assign curr_method to step 1 of foo, and wire the pipeline input to it
+        # Assign curr_method to step 1 of foo, and cable the pipeline input to it
         step1 = foo.steps.create(transformation=curr_method, step_num=1);
-        step1.wires_in.create(transf_input=curr_method.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        cable = step1.cables_in.create(
+            transf_input=curr_method.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # The pipeline input is unrestricted, but step 1 has max_row = 10
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 1 may have too many rows",
+                cable.clean);
+        # Check propagation of error.
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 1 may have too many rows",
                 foo.clean);
 
 
-    def test_pipeline_oneStep_wiring_maxRow_constraints_may_breach_each_other_clean (self):
-        """Unverifiable wiring: step requests input with possibly too
+    def test_pipeline_oneStep_cabling_maxRow_constraints_may_breach_each_other_clean (self):
+        """Unverifiable cabling: step requests input with possibly too
         many rows (max_row set for pipeline input)."""
         
         # Define curr_method as having an input with max_row = 10
@@ -2971,11 +3031,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         # Assign curr_method to foo step 1
         step1 = foo.steps.create(transformation=curr_method,
                                  step_num=1);
-        step1.wires_in.create(transf_input=curr_method.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        cable = step1.cables_in.create(
+            transf_input=curr_method.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # The pipeline max_row is not good enough to guarantee correctness
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 1 may have too many rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 1 may have too many rows",
@@ -2998,23 +3063,24 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                                  step_num=1);
 
         # Map the pipeline input to step 1
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Connect the output of step 1 to the output of foo
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        self.assertEquals(outmap.clean(), None);
         self.assertEquals(foo.clean(), None);
 
     def test_pipeline_oneStep_outmap_references_nonexistent_step_clean(self):
         """Bad output mapping, one-step pipeline: request from nonexistent step"""
 
-        # Define pipeline foo with validly indexed input and step 1 wiring
+        # Define pipeline foo with validly indexed input and step 1 cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
                        revision_desc="Foo version");
@@ -3024,24 +3090,30 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
 
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Index a non-existent step to outmap
-        foo.outmap.create(output_name="oneoutput", output_idx=1,
-                          step_providing_output=5,
-                          provider_output=step1.transformation.outputs.all()[0]);
+        outmap = foo.outmap.create(
+            output_name="oneoutput", output_idx=1,
+            step_providing_output=5,
+            provider_output=step1.transformation.outputs.all()[0]);
         
         self.assertRaisesRegexp(
-                ValidationError,
-                "Output requested from a non-existent step",
-                foo.clean);
+            ValidationError,
+            "Output requested from a non-existent step",
+            outmap.clean);
+        # Check propagation of error.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output requested from a non-existent step",
+            foo.clean);
         
     def test_pipeline_oneStep_outmap_references_invalid_output_clean (self):
         """Bad output mapping, one-step pipeline: request output not belonging to requested step"""
 
-        # Define pipeline foo with validly indexed inputs, steps, and wiring
+        # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
                        revision_desc="Foo version");
@@ -3051,14 +3123,20 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
  
         # Reference a correct step but TransformationOutput from another Transformation.
-        foo.outmap.create(output_name="oneoutput", output_idx=1,
-                          step_providing_output=1,
-                          provider_output=self.RNAoutput_to);
+        outmap = foo.outmap.create(
+            output_name="oneoutput", output_idx=1,
+            step_providing_output=1,
+            provider_output=self.RNAoutput_to);
+        
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
+                outmap.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
@@ -3067,7 +3145,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
     def test_pipeline_oneStep_outmap_references_deleted_output_clean (self):
         """Bad output mapping, one-step pipeline: request deleted step output"""
 
-        # Define pipeline foo with validly indexed inputs, steps, and wiring
+        # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
                        revision_desc="Foo version");
@@ -3077,7 +3155,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=self.DNAcompv2_m.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
@@ -3086,10 +3164,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=self.DNAcompv2_m.outputs.get(dataset_name="output"));
 
         # Now try to map it to the pipeline output
-        foo.outmap.create(output_name="oneoutput",
-                          output_idx=1,
-                          step_providing_output=1,
-                          provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        outmap = foo.outmap.create(
+            output_name="oneoutput",
+            output_idx=1,
+            step_providing_output=1,
+            provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Output \"output\" from step 1 is deleted prior to request",
+                outmap.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 1 is deleted prior to request",
@@ -3098,7 +3182,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
     def test_pipeline_oneStep_bad_pipeline_output_indexing_clean(self):
         """Bad output mapping, one-step pipeline: output not indexed 1"""
 
-        # Define pipeline with validly indexed inputs, steps, and wiring
+        # Define pipeline with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
                        revision_desc="Foo version");
@@ -3108,22 +3192,25 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Outmap references a valid step and output, but is itself badly indexed
-        foo.outmap.create(output_name="oneoutput",
-                          output_idx=9,
-                          step_providing_output=1,
-                          provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        outmap = foo.outmap.create(
+            output_name="oneoutput",
+            output_idx=9,
+            step_providing_output=1,
+            provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        
+        self.assertEquals(outmap.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
                 foo.clean);
 
-    def test_pipeline_manySteps_valid_internal_wiring_clean(self):
-        """Test good step wiring, chained-step pipeline."""
+    def test_pipeline_manySteps_valid_internal_cabling_clean(self):
+        """Test good step cabling, chained-step pipeline."""
 
         # Define pipeline 'foo' with validly indexed input and steps
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3137,27 +3224,40 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         # Map pipeline input to step1
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        cable1 = step1.cables_in.create(
+            transf_input=step1.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Map step 1 to step 2
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
                                  step_num=2);
-        step2.wires_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
-                              step_providing_input=1,
-                              provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        cable2 = step2.cables_in.create(
+            transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
+            step_providing_input=1,
+            provider_output=step1.transformation.outputs.get(dataset_name="output"));
 
         # Map step 2 to step 3
         step3 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=3);
-        step3.wires_in.create(transf_input=step3.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=2,
-                              provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        cable3 = step3.cables_in.create(
+            transf_input=step3.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=2,
+            provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+
+        self.assertEquals(cable1.clean(), None);
+        self.assertEquals(cable2.clean(), None);
+        self.assertEquals(cable3.clean(), None);
+        self.assertEquals(step1.clean(), None);
+        self.assertEquals(step1.complete_clean(), None);
+        self.assertEquals(step2.clean(), None);
+        self.assertEquals(step2.complete_clean(), None);
+        self.assertEquals(step3.clean(), None);
+        self.assertEquals(step3.complete_clean(), None);
         self.assertEquals(foo.clean(), None);
         
-    def test_pipeline_manySteps_wiring_references_invalid_output_clean(self):
-        """Bad wiring: later step requests invalid input from previous."""
+    def test_pipeline_manySteps_cabling_references_invalid_output_clean(self):
+        """Bad cabling: later step requests invalid input from previous."""
 
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3171,29 +3271,40 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         # step1 receives input from Pipeline input
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # step2 receives output not coming from from step1's transformation
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
                                  step_num=2);
-        step2.wires_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
-                              step_providing_input=1,
-                              provider_output=self.RNAoutput_to);
+        cable2 = step2.cables_in.create(
+            transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
+            step_providing_input=1,
+            provider_output=self.RNAoutput_to);
         
         step3 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=3);
-        step3.wires_in.create(transf_input=step3.transformation.inputs.get(dataset_name="input"),
+        step3.cables_in.create(transf_input=step3.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=2,
                               provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
+                cable2.clean);
+
+        # Check propagation of error.
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
+                step2.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 1 does not produce output \"\[Method RNAcomplement v1\]:1 \(1: <RNANucSeq> \[ComplementedSeq\]\) output\"",
                 foo.clean);
         
-    def test_pipeline_manySteps_wiring_references_deleted_input_clean(self):
-        """Bad wiring: later step requests input deleted by producing step."""
+    def test_pipeline_manySteps_cabling_references_deleted_input_clean(self):
+        """Bad cabling: later step requests input deleted by producing step."""
 
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -3207,33 +3318,47 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         # Connect step 1 with pipeline input
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Connect step2 with output of step1
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
                                  step_num=2);
-        step2.wires_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
+        step2.cables_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
                               step_providing_input=1,
                               provider_output=step1.transformation.outputs.get(dataset_name="output"));
 
         # Mark the output of step2 as deleted
         step2.outputs_to_delete.create(dataset_to_delete=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
+        
+        self.assertEquals(foo.clean(), None);
+
         # Connect step3 with the deleted output at step 2
         step3 = foo.steps.create(transformation=self.RNAcompv2_m,
                                  step_num=3);
-        step3.wires_in.create(transf_input=step3.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=2,
-                              provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        cable3 = step3.cables_in.create(
+            transf_input=step3.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=2,
+            provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"recomplemented_seqs\" from step 2 to step 3 is deleted prior to request",
+                cable3.clean);
+        # Check propagation of error.
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"recomplemented_seqs\" from step 2 to step 3 is deleted prior to request",
+                step3.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Input \"recomplemented_seqs\" from step 2 to step 3 is deleted prior to request",
                 foo.clean);
 
-    def test_pipeline_manySteps_wiring_references_incorrect_cdt_clean (self):
-        """Bad wiring: later step requests input of wrong CompoundDatatype."""
+    def test_pipeline_manySteps_cabling_references_incorrect_cdt_clean (self):
+        """Bad cabling: later step requests input of wrong CompoundDatatype."""
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
                        revision_desc="Foo version");
@@ -3244,28 +3369,34 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
+        step1.cables_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
         
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
                                  step_num=2);
-        step2.wires_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
+        step2.cables_in.create(transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
                               step_providing_input=1,
                               provider_output=step1.transformation.outputs.get(dataset_name="output"));
         
         step3 = foo.steps.create(transformation=self.RNAcompv2_m,
                                  step_num=3);
-        step3.wires_in.create(transf_input=step3.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=2,
-                              provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        cable = step3.cables_in.create(
+            transf_input=step3.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=2,
+            provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        
         self.assertRaisesRegexp(
                 ValidationError,
-                "Data fed to input \"input\" of step 3 does not have the expected CompoundDatatype",
+                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
+                cable.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
                 foo.clean);
 
     def test_pipeline_manySteps_minRow_constraint_may_be_breached_clean (self):
-        """Unverifiable wiring: later step requests input with possibly too few rows (min_row unset for providing step)."""
+        """Unverifiable cabling: later step requests input with possibly too few rows (min_row unset for providing step)."""
 
         # Define a method with validly indexed inputs and outputs
         step2method = Method(family=self.DNAcomp_mf,
@@ -3308,24 +3439,31 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
         
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        step1.cables_in.create(
+            transf_input=step1.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=step2method,
                                  step_num=2);
         
-        step2.wires_in.create(transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
-                              step_providing_input=1,
-                              provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        step2.cables_in.create(
+            transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
+            step_providing_input=1,
+            provider_output=step1.transformation.outputs.get(dataset_name="output"));
 
         # Step 3 requires min_row = 5 but step2 does not guarentee this
         step3 = foo.steps.create(transformation=step3method,
                                  step_num=3);
         
-        step3.wires_in.create(transf_input=step3method.inputs.get(dataset_name="input"),
-                              step_providing_input=2,
-                              provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
+        cable = step3.cables_in.create(
+            transf_input=step3method.inputs.get(dataset_name="input"),
+            step_providing_input=2,
+            provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
         
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 3 may have too few rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 3 may have too few rows",
@@ -3333,7 +3471,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
 
     def test_pipeline_manySteps_minrow_constraints_may_breach_each_other_clean(self):
-        """Bad wiring: later step requests input with possibly too few rows (providing step min_row is set)."""
+        """Bad cabling: later step requests input with possibly too few rows (providing step min_row is set)."""
         
         # Define method with outputs having a min row of 5
         step2method = Method(family=self.DNAcomp_mf,
@@ -3375,24 +3513,31 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="input"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="oneinput"));
+        step1.cables_in.create(
+            transf_input=step1.transformation.inputs.get(dataset_name="input"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Recall the output of step2 has min_row = 5
         step2 = foo.steps.create(transformation=step2method,
                                  step_num=2);
-        step2.wires_in.create(transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
-                              step_providing_input=1,
-                              provider_output=step1.transformation.outputs.get(dataset_name="output"));
+        step2.cables_in.create(
+            transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
+            step_providing_input=1,
+            provider_output=step1.transformation.outputs.get(dataset_name="output"));
 
         # Recall the input of step3 has min_row = 10
         step3 = foo.steps.create(transformation=step3method,
                                  step_num=3);
         
-        step3.wires_in.create(transf_input=step3method.inputs.get(dataset_name="input"),
-                              step_providing_input=2,
-                              provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
+        cable = step3.cables_in.create(
+            transf_input=step3method.inputs.get(dataset_name="input"),
+            step_providing_input=2,
+            provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 3 may have too few rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 3 may have too few rows",
@@ -3400,7 +3545,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
 
     def test_pipeline_manySteps_maxRow_constraint_may_be_breached_clean(self):
-        """Bad wiring: later step requests input with possibly too many rows (max_row unset for providing step)."""
+        """Bad cabling: later step requests input with possibly too many rows (max_row unset for providing step)."""
 
         # step2 has no constraints on it's output
         step2method = Method(family=self.DNAcomp_mf,
@@ -3439,22 +3584,26 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=step2method,
                                  step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=step3method,
                                  step_num=3);
-        step3.wires_in.create(
+        cable = step3.cables_in.create(
             transf_input=step3method.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 3 may have too many rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 3 may have too many rows",
@@ -3462,8 +3611,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
 
 
-    def test_pipeline_manySteps_wiring_maxRow_constraints_may_breach_each_other_clean (self):
-        """Bad wiring: later step requests input with possibly too many rows (max_row for providing step is set)."""
+    def test_pipeline_manySteps_cabling_maxRow_constraints_may_breach_each_other_clean (self):
+        """Bad cabling: later step requests input with possibly too many rows (max_row for providing step is set)."""
 
         # step 2 has max_row = 100 on it's output
         step2method = Method(family=self.DNAcomp_mf,
@@ -3502,22 +3651,26 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=step2method,
                                  step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2method.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=step3method,
                                  step_num=3);
-        step3.wires_in.create(
+        cable = step3.cables_in.create(
             transf_input=step3method.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2method.outputs.get(dataset_name="recomplemented_seqs"));
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 3 may have too many rows",
+                cable.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Data fed to input \"input\" of step 3 may have too many rows",
@@ -3532,29 +3685,31 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        self.assertEquals(outmap1.clean(), None);
+        self.assertEquals(outmap2.clean(), None);
         self.assertEquals(foo.clean(), None);
 
 
@@ -3566,30 +3721,36 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
         # step 5 doesn't exist
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="outputone", output_idx=1,
             step_providing_output=5,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(output_name="outputtwo", output_idx=2,
-                          step_providing_output=2,
-                          provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
+        outmap2 = foo.outmap.create(
+            output_name="outputtwo", output_idx=2,
+            step_providing_output=2,
+            provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
         
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Output requested from a non-existent step",
+                outmap1.clean);
+        self.assertEquals(outmap2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output requested from a non-existent step",
@@ -3603,30 +3764,35 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
-        
+
+        self.assertEquals(outmap1.clean(), None);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 2 does not produce output \"\[Method DNAcomplement v2\]:1 \(1: <DNANucSeq> \[ComplementedSeq\]\) output\"",
+                outmap2.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 2 does not produce output \"\[Method DNAcomplement v2\]:1 \(1: <DNANucSeq> \[ComplementedSeq\]\) output\"",
@@ -3641,32 +3807,37 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
         step3.outputs_to_delete.create(
             dataset_to_delete=step3.transformation.outputs.get(dataset_name="output"));
 
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
         
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Output \"output\" from step 3 is deleted prior to request",
+                outmap1.clean);
+        self.assertEquals(outmap2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Output \"output\" from step 3 is deleted prior to request",
@@ -3680,41 +3851,43 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="outputone",
             output_idx=5,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="outputtwo",
             output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
-        
+
+        self.assertEquals(outmap1.clean(), None);
+        self.assertEquals(outmap2.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
                 foo.clean);
 
-    def test_pipeline_with_1_step_and_2_inputs_both_wired_good(self):
+    def test_pipeline_with_1_step_and_2_inputs_both_cabled_good(self):
         """
         Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
-        Both inputs are wired (good)
+        Both inputs are cabled (good)
 
         Reminder on script_3_product
         Reminder: k is cdt singlet, r is cdt single-row singlet
@@ -3740,25 +3913,27 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        cable1 = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="k"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_k"));
 
-        step1.wires_in.create(
+        cable2 = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));
 
-        self.assertEquals(foo.clean(), None)
+        self.assertEquals(cable1.clean(), None)
+        self.assertEquals(cable2.clean(), None)
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(foo.clean(), None)
 
-    def test_pipeline_with_1_step_and_2_inputs_wired_more_than_once_bad(self):
+    def test_pipeline_with_1_step_and_2_inputs_cabled_more_than_once_bad(self):
         """
         Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
-        r is wired more than once (bad)
+        r is cabled more than once (bad)
 
         Reminder on script_3_product
         Reminder: k is cdt singlet, r is cdt single-row singlet
@@ -3784,35 +3959,44 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        cable1 = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="k"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_k"));
 
-        step1.wires_in.create(
+        cable2 = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));        
 
-        # Send a wire to r more than once!
-        step1.wires_in.create(
+        # Send a cable to r more than once!
+        cable3 = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));
 
-        self.assertEquals(foo.clean(), None)
-        self.assertEquals(step1.clean(), None)
-
+        self.assertEquals(cable1.clean(), None);
+        self.assertEquals(cable2.clean(), None);
+        self.assertEquals(cable3.clean(), None);
+        
         self.assertRaisesRegexp(
             ValidationError,
-            "Input \"r\" to transformation at step 1 is wired more than once",
+            "Input \"r\" to transformation at step 1 is cabled more than once",
+            step1.clean);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"r\" to transformation at step 1 is cabled more than once",
             step1.complete_clean);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"r\" to transformation at step 1 is cabled more than once",
+            foo.clean);
 
-    def test_pipeline_with_1_step_and_2_inputs_wired_more_than_once_different_wires_bad(self):
+    def test_pipeline_with_1_step_and_2_inputs_cabled_more_than_once_different_cables_bad(self):
         """
         Pipeline with 1 step (script_3_product) with 2 inputs / 1 output
-        r is wired more than once (bad)
+        r is cabled more than once (bad)
 
         Reminder on script_3_product
         Reminder: k is cdt singlet, r is cdt single-row singlet
@@ -3838,35 +4022,33 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="k"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_k"));
 
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));        
 
-        # Send a wire to k from r.
-        step1.wires_in.create(
+        # Send a cable to k from r.
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="k"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));
 
-        self.assertEquals(foo.clean(), None)
-        self.assertEquals(step1.clean(), None)
-
+        # We don't bother checking cables or propagation.
         self.assertRaisesRegexp(
             ValidationError,
-            "Input \"k\" to transformation at step 1 is wired more than once",
-            step1.complete_clean);
+            "Input \"k\" to transformation at step 1 is cabled more than once",
+            step1.clean);
 
-    def test_pipeline_with_1_step_and_2_inputs_but_only_first_input_is_wired_in_step_1_bad(self):
+    def test_pipeline_with_1_step_and_2_inputs_but_only_first_input_is_cabled_in_step_1_bad(self):
         """
         Pipeline with 1 step with 2 inputs / 1 output
-        Only the first input is wired (bad)
+        Only the first input is cabled (bad)
         """
 
         # Define pipeline foo
@@ -3890,23 +4072,23 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=1)
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="k"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_k"))
 
+        # Step is clean (cables are OK) but not complete (inputs not quenched).
         self.assertEquals(step1.clean(), None)
-
         self.assertRaisesRegexp(
                 ValidationError,
-                "Input \"r\" to transformation at step 1 is not wired",
+                "Input \"r\" to transformation at step 1 is not cabled",
                 step1.complete_clean);
 
-    def test_pipeline_with_1_step_and_2_inputs_but_only_second_input_is_wired_in_step_1_bad(self):
+    def test_pipeline_with_1_step_and_2_inputs_but_only_second_input_is_cabled_in_step_1_bad(self):
         """
         Pipeline with 1 step with 2 inputs / 1 output
-        Only the second input is wired (bad)
+        Only the second input is cabled (bad)
         """
 
         # Define pipeline foo
@@ -3930,20 +4112,20 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(transf_input=self.script_3_method.inputs.get(dataset_name="r"),
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(transf_input=self.script_3_method.inputs.get(dataset_name="r"),
                               step_providing_input=0,
                               provider_output=foo.inputs.get(dataset_name="pipe_input_2_r"));
 
+        # Step is clean (cables are OK) but not complete (inputs not quenched).
         self.assertEquals(step1.clean(), None)
-
         self.assertRaisesRegexp(
             ValidationError,
-            "Input \"k\" to transformation at step 1 is not wired",
+            "Input \"k\" to transformation at step 1 is not cabled",
             step1.complete_clean);
         
 
-    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_undeleted_step_1_good(self):
+    def test_pipeline_with_2_steps_and_2_inputs_one_cabled_from_step_0_other_from_undeleted_step_1_good(self):
         """
         Step 1 (script_2_square_and_means) with 1 input / 2 outputs
             Method has input "a_b_c" (cdt triplet),
@@ -3979,28 +4161,34 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        step1.wires_in.create(transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"));
+        cable1 = step1.cables_in.create(
+            transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"));
         
         step2 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=2);
 
         # single-row singlet pipe_r from step 0 feeds into r at step 2 
-        step2.wires_in.create(transf_input=self.script_3_method.inputs.get(dataset_name="r"),
-                              step_providing_input=0,
-                              provider_output=foo.inputs.get(dataset_name="pipe_r"));
+        cable21 = step2.cables_in.create(
+            transf_input=self.script_3_method.inputs.get(dataset_name="r"),
+            step_providing_input=0,
+            provider_output=foo.inputs.get(dataset_name="pipe_r"));
 
         # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
-        step2.wires_in.create(transf_input=step2.transformation.inputs.get(dataset_name="k"),
-                              step_providing_input=1,
-                              provider_output=step1.transformation.outputs.get(
-                                  dataset_name="a_b_c_mean"));
+        cable22 = step2.cables_in.create(
+            transf_input=step2.transformation.inputs.get(dataset_name="k"),
+            step_providing_input=1,
+            provider_output=step1.transformation.outputs.get(
+                dataset_name="a_b_c_mean"));
 
+        self.assertEquals(cable1.clean(), None)
+        self.assertEquals(cable21.clean(), None)
+        self.assertEquals(cable22.clean(), None)
         self.assertEquals(step2.clean(), None)
         self.assertEquals(step2.complete_clean(), None)
 
-    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_step_1_with_irrelevent_deletion_good(self):
+    def test_pipeline_with_2_steps_and_2_inputs_one_cabled_from_step_0_other_from_step_1_with_irrelevent_deletion_good(self):
         """
         Step 1 (script_2_square_and_means) with 1 input / 2 outputs
             Method has input "a_b_c" (cdt triplet),
@@ -4036,7 +4224,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"));
@@ -4049,25 +4237,26 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                                  step_num=2);
 
         # single-row singlet pipe_r from step 0 feeds into r at step 2 
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_r"));
 
         # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="k"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_mean"));
 
+        # Don't bother checking cables; their errors would propagate here anyway.
         self.assertEquals(step2.clean(), None)
         self.assertEquals(step2.complete_clean(), None)
         self.assertEquals(foo.clean(), None)
 
 
-    def test_pipeline_with_2_steps_and_2_inputs_one_wired_from_step_0_other_from_deleted_step_1_bad(self):
+    def test_pipeline_with_2_steps_and_2_inputs_one_cabled_from_step_0_other_from_deleted_step_1_bad(self):
         """
-        Step 1 output a_b_c_mean is wired into step 2, but is deleted.
+        Step 1 output a_b_c_mean is cabled into step 2, but is deleted.
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
@@ -4087,7 +4276,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"));
@@ -4099,23 +4288,31 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                                  step_num=2);
 
         # single-row singlet pipe_r from step 0 feeds into r at step 2 
-        step2.wires_in.create(
+        cable1 = step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="r"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_r"));
 
-        # singlet a_b_c_mean from step 1 feeds into singlet k at step 2
-        step2.wires_in.create(
+        # singlet a_b_c_mean (deleted!) from step 1 feeds into singlet k at step 2
+        cable2 = step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="k"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_mean"));
 
+        self.assertEquals(cable1.clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"a_b_c_mean\" from step 1 to step 2 is deleted prior to request",
+            cable2.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input \"a_b_c_mean\" from step 1 to step 2 is deleted prior to request",
+            step2.clean)
+        #self.assertEquals(step2.complete_clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Input \"a_b_c_mean\" from step 1 to step 2 is deleted prior to request",
             foo.clean);
-        self.assertEquals(step2.clean(), None)
-        self.assertEquals(step2.complete_clean(), None)
 
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_that_is_deleted_bad(self):
@@ -4139,8 +4336,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4150,14 +4347,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 1st output (Which is deleted)
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 2nd output (Which is not deleted)
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4165,7 +4362,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
-
+        
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
+            outmap1.clean);
+        self.assertEquals(outmap2.clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
@@ -4192,8 +4394,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4203,7 +4405,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4211,6 +4413,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(outmap.clean(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_1st_output_with_nothing_deleted_good(self):
@@ -4233,14 +4436,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
         # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4248,6 +4451,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(outmap.clean(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_that_is_deleted_bad(self):
@@ -4269,8 +4473,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4280,7 +4484,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outmap for 2nd output (Which is deleted)
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
@@ -4288,6 +4492,10 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
+            outmap.clean);
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
@@ -4312,8 +4520,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4323,15 +4531,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 2nd output (Which is not deleted)
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
-        self.assertEquals(foo.clean(), None)
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(outmap.clean(), None)
+        self.assertEquals(foo.clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_2nd_output_with_nothing_deleted_good(self):
         """
@@ -4350,12 +4559,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"))
 
-        foo.outmap.create(
+        outmap = foo.outmap.create(
             output_name="aName",
             output_idx=1,
             step_providing_output=1,
@@ -4363,6 +4572,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(outmap.clean(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_none_deleted_good(self):
@@ -4384,21 +4594,19 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
-        # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        # Add outmaps for both outputs
+        outmap1 = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
-
-        # Add outmap for 2nd output (Which is deleted)
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4406,6 +4614,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(outmap1.clean(), None);
+        self.assertRaisesRegexp(outmap2.clean(), None);
         self.assertRaisesRegexp(foo.clean(), None);
 
     def test_pipeline_with_1_step_and_2_outputs_outmap_both_outputs_1st_is_deleted_bad(self):
@@ -4427,8 +4637,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4438,14 +4648,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 1st output (Which is deleted)
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 2nd output (Which is not deleted)
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4453,6 +4663,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
+            outmap1.clean);
+        self.assertEquals(outmap2.clean(), None)
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_squared\" from step 1 is deleted prior to request",
@@ -4477,8 +4692,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4488,14 +4703,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outmap for 1st output (Which is not deleted)
-        foo.outmap.create(
+        outmap1 = foo.outmap.create(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outmap for 2nd output (Which is deleted)
-        foo.outmap.create(
+        outmap2 = foo.outmap.create(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4503,6 +4718,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(step1.complete_clean(), None)
+        self.assertEquals(outmap1.clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
+            outmap2.clean);
         self.assertRaisesRegexp(
             ValidationError,
             "Output \"a_b_c_mean\" from step 1 is deleted prior to request",
@@ -4535,8 +4755,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1);
 
-        # Add wiring to step 1 from step 0
-        step1.wires_in.create(
+        # Add cabling to step 1 from step 0
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="a_b_c"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
@@ -4615,17 +4835,17 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.inputs.create(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
         step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2);
-        step2.wires_in.create(
+        step2.cables_in.create(
             transf_input=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
         step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3);
-        step3.wires_in.create(
+        step3.cables_in.create(
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -4691,7 +4911,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                           "Pipeline DNAcomplement v1 step 1");
 
     def test_pipelineStep_invalid_request_for_future_step_data_clean(self):
-        """Bad wiring: step requests data from after its execution step."""
+        """Bad cabling: step requests data from after its execution step."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
                        revision_desc="Foo version");
         foo.save();
@@ -4700,7 +4920,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
 
         # Step 1 invalidly requests data from step 2
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
-        step1.wires_in.create(
+        cable = step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
@@ -4708,10 +4928,14 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Step 1 requests input from a later step",
+                cable.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Step 1 requests input from a later step",
                 step1.clean);
 
-    def test_pipelineStep_oneStep_wire_to_invalid_step_input_clean(self):
-        """Bad wiring: step wires to input not belonging to its transformation."""
+    def test_pipelineStep_oneStep_cable_to_invalid_step_input_clean(self):
+        """Bad cabling: step cables to input not belonging to its transformation."""
 
         # Define Pipeline
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
@@ -4726,7 +4950,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1);
 
         # Reference an invalid input name from step 0
-        step1.wires_in.create(
+        cable = step1.cables_in.create(
             transf_input=self.script_1_method.inputs.get(dataset_name="input_tuple"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
@@ -4734,10 +4958,14 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not have input \"\[Method Test method family script1\]:1 \(1: <string> \[x\], 2: <string> \[y\]\) input_tuple\"",
+                cable.clean);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 1 does not have input \"\[Method Test method family script1\]:1 \(1: <string> \[x\], 2: <string> \[y\]\) input_tuple\"",
                 step1.clean);
 
-    def test_pipelineStep_oneStep_valid_wiring_with_valid_delete_clean(self):
-        """Test good step wiring with deleted dataset, one-step pipeline."""
+    def test_pipelineStep_oneStep_valid_cabling_with_valid_delete_clean(self):
+        """Test good step cabling with deleted dataset, one-step pipeline."""
 
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4755,21 +4983,21 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                                  step_num=1);
 
         # Map Pipeline input to step 1
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Mark step 1 "output" as deletable
         # step 1 "output" is defined by DNAcompv2_m
-        step1.outputs_to_delete.create(
+        otd = step1.outputs_to_delete.create(
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="output"));
-        
-        self.assertEquals(step1.clean(),
-                          None);
 
-    def test_pipelineStep_oneStep_valid_wiring_bad_delete_clean(self):
-        """Bad wiring: deleting dataset that doesn't belong to this step, one-step pipeline."""
+        self.assertEquals(otd.clean(), None);
+        self.assertEquals(step1.clean(), None);
+
+    def test_pipelineStep_oneStep_valid_cabling_bad_delete_clean(self):
+        """Bad cabling: deleting dataset that doesn't belong to this step, one-step pipeline."""
 
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4786,23 +5014,27 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
 
-        # Create input wiring for this step
-        step1.wires_in.create(
+        # Create input cabling for this step
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Reference TransformationOutput not belonging to this step's
         # transformation.
-        step1.outputs_to_delete.create(
+        otd = step1.outputs_to_delete.create(
             dataset_to_delete=self.script_2_method.outputs.all()[0]);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Transformation at step 1 does not have output \"\[Method Test method family script2\]:1 \(1: <string> \[a\], 2: <string> \[b\], 3: <string> \[c\]\) a_b_c_squared\"",
+                otd.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not have output \"\[Method Test method family script2\]:1 \(1: <string> \[a\], 2: <string> \[b\], 3: <string> \[c\]\) a_b_c_squared\"",
                 step1.clean);
          
-    def test_pipelineStep_oneStep_wiring_directly_self_referential_transformation_clean(self):
-        """Bad wiring: pipeline step contains the parent pipeline directly."""
+    def test_pipelineStep_oneStep_cabling_directly_self_referential_transformation_clean(self):
+        """Bad step: pipeline step contains the parent pipeline directly."""
 
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4823,8 +5055,8 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                 "Step 1 contains the parent pipeline",
                 step1.clean);
          
-    def test_pipelineStep_oneStep_wiring_referenced_pipeline_references_parent_clean (self):
-        """Bad wiring: pipeline step contains the parent pipeline in its lone recursive sub-step."""
+    def test_pipelineStep_oneStep_cabling_referenced_pipeline_references_parent_clean (self):
+        """Bad step: pipeline step contains the parent pipeline in its lone recursive sub-step."""
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
@@ -4841,7 +5073,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                                  step_num=1);
 
         # Map the input at stpe 1 from Pipeline input "oneinput"
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
@@ -4871,7 +5103,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                                   step_num=1);
 
         # Map to foo.input "oneinput" from bar pipeline output "barinput"
-        bstep1.wires_in.create(
+        bstep1.cables_in.create(
             transf_input=foo.inputs.get(dataset_name="oneinput"),
             step_providing_input=0,
             provider_output=bar.inputs.get(dataset_name="barinput"));
@@ -4897,8 +5129,8 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                 "Step 1 contains the parent pipeline",
                 badstep.clean);
          
-    def test_pipelineStep_manySteps_wiring_referenced_pipeline_references_parent_clean(self):
-        """Bad wiring: pipeline step contains the parent pipeline in some recursive sub-step."""
+    def test_pipelineStep_manySteps_cabling_referenced_pipeline_references_parent_clean(self):
+        """Bad step: pipeline step contains the parent pipeline in some recursive sub-step."""
 
         # foo invokes DNAcompv2_m at step 1
         foo = Pipeline(family=self.DNAcomp_pf,
@@ -4910,7 +5142,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
                           dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
-        step1.wires_in.create(
+        step1.cables_in.create(
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
@@ -4932,14 +5164,14 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
         bstep1 = bar.steps.create(transformation=foo,
                                   step_num=1);
         
-        bstep1.wires_in.create(
+        bstep1.cables_in.create(
             transf_input=bstep1.transformation.inputs.get(dataset_name="oneinput"),
             step_providing_input=0,
             provider_output=bar.inputs.get(dataset_name="barinput"));
         
         bstep2 = bar.steps.create(transformation=self.DNArecomp_m,
                                   step_num=2);
-        bstep2.wires_in.create(
+        bstep2.cables_in.create(
             transf_input=bstep2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=bstep1.transformation.outputs.get(dataset_name="oneoutput"));

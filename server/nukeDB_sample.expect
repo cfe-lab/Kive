@@ -25,10 +25,10 @@ send "[YOUR PASSWORD HERE]\r"
 expect -re "Password (again): "
 send "[SAME PASSWORD HERE]\r"
 
-spawn ./manage.py shell
-expect ">>>"
-send "execfile('LoadData.py')\r"
-expect ">>>"
-send "exit()\r"
+#spawn ./manage.py shell
+#expect ">>>"
+#send "execfile('LoadData.py')\r"
+#expect ">>>"
+#send "exit()\r"
 
 exit

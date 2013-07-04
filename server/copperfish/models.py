@@ -809,13 +809,13 @@ class Pipeline(Transformation):
 	Inherits from :model:`copperfish.Transformation`
 	Related to :model:`copperfish.PipelineFamily`
 	Related to :model:`copperfish.PipelineStep`
-	Related to :model:`copperfish.PipelineOutputMapping`
+	Related to :model:`copperfish.PipelineOutputCable`
 	"""
 
 	# Implicitly defined
 	#   steps (PipelineStep/ForeignKey)
 	#   descendants (self/ForeignKey)
-	#   outmap (PipelineOutputMapping/ForeignKey)
+	#   outcables (PipelineOutputCable/ForeignKey)
 
 	family = models.ForeignKey(
 			PipelineFamily,
@@ -839,16 +839,15 @@ class Pipeline(Transformation):
 			string_rep = string_rep.format("[family unset]");
 
 		return string_rep;
- 
-	# outmap describes the wiring leading to terminal pipeline outputs of a pipeline
+
 	def clean(self):
 		"""
 		Validate pipeline revision inputs/outputs
 
-		1) Pipeline STEPS must be consecutively starting from 1
-		2) Pipeline INPUTS must be consecutively numbered from 1
-		3) Inputs are available at a needed step and of the type expected
-		4) Pipeline outputs are appropriately mapped from the pipeline's steps
+		- Pipeline INPUTS must be consecutively numbered from 1
+		- Pipeline STEPS must be consecutively starting from 1
+		- Steps are complete and clean (complete_clean invokes clean)
+		- PipelineOutputCables are appropriately mapped from the pipeline's steps
 		"""
 		# Check that inputs are numbered consecutively from 1 (???)
 		# We don't care about the outputs, but if they are set, check them (???)
@@ -868,164 +867,64 @@ class Pipeline(Transformation):
 			raise ValidationError(
 					"Steps are not consecutively numbered starting from 1");
 
-		# Check that steps are coherent with each other
-		#
-		# Are inputs at each step...
-		#	A) Available? (Produced by a previous step + not deleted, OR an absolute input)
-		#	B) Of the correct CompoundDatatype? And, not have contrary min/max row constraints?
-
-		# FIXME: Check that each input is fed with a single wire
-
-		# For each Pipeline step
- 		for step in all_steps:
-
-			# Extract wiring parameters (PipelineStepInputWire) for each input
-			for curr_wire in step.wires_in.all():
-				# Output hole where source data originates.  This is a
-				# TransformationInput if the step is 0 (i.e. we are
-				# requesting a pipeline input) or a
-				# TransformationOutput if the step is not 0 (i.e. we
-				# are requesting the output from a previous pipeline
-				# step).
-				input_requested = curr_wire.provider_output;
-				requested_from = curr_wire.step_providing_input;		# Pipeline step of wiring destination
-				feed_to_input = curr_wire.transf_input;			# Input hole of wiring destination
-
-				if requested_from == 0:
-					# Get pipeline inputs of self (Pipeline; a
-					# transformation); look for pipeline inputs that
-					# match the desired wiring source output name.
-					pipeline_inputs = self.inputs.all();
-					if input_requested not in pipeline_inputs:
-						raise ValidationError(
-							"Pipeline does not have input \"{}\"".
-							format(unicode(input_requested)));
-
-				# If not from step 0, input derives from the output of a pipeline step
-				else:
-
-					# Look at the pipeline step referenced by the wiring parameter
-					providing_step = all_steps[requested_from-1];
-
-					# Do any outputs at this pipeline step/transformation have the name requested?
-					source_step_outputs = providing_step.transformation.outputs.all();
-					if input_requested not in source_step_outputs:
-						raise ValidationError(
-							"Transformation at step {} does not produce output \"{}\"".
-							format(requested_from, unicode(input_requested)));
-
-					# Was the data from this step's transformation output deleted?
-					source_deleted_outputs = [x.dataset_to_delete
-											  for x in providing_step.outputs_to_delete.all()];
-					if input_requested in source_deleted_outputs:
-						raise ValidationError(
-								"Input \"{}\" from step {} to step {} is deleted prior to request".
-								format(input_requested.dataset_name, requested_from,
-									   step.step_num));
-
-				# Check that the input and output connected by the
-				# wire are compatible.  Don't check for
-				# ValidationError because this was checked in the
-				# clean() of PipelineStep.
-
-				# FIXME: we're just going to enforce that feed_to_input
-				# and input_requested have the same CompoundDatatype, rather
-				# than making sure that their CompoundDatatypes match;
-				# is this too restrictive?
-				if input_requested.compounddatatype != feed_to_input.compounddatatype:
-					raise ValidationError(
-							"Data fed to input \"{}\" of step {} does not have the expected CompoundDatatype".
-							format(feed_to_input.dataset_name, step.step_num));
-
-				provided_min_row = 0;
-				required_min_row = 0;
-
-				# Source output row constraint
-				if input_requested.min_row != None:
-					provided_min_row = input_requested.min_row;
-
-				# Destination input row constraint
-				if feed_to_input.min_row != None:
-					required_min_row = feed_to_input.min_row;
-
-				# Check for contradictory min row constraints
-				if (provided_min_row < required_min_row):
-					raise ValidationError(
-							"Data fed to input \"{}\" of step {} may have too few rows".
-							format(feed_to_input.dataset_name, step.step_num));
-
-				provided_max_row = float("inf");
-				required_max_row = float("inf");
-
-				if input_requested.max_row != None:
-					provided_max_row = input_requested.max_row;
-
-				if feed_to_input.max_row != None:
-					required_max_row = feed_to_input.max_row;
-
-				# Check for contradictory max row constraints
-				if (provided_max_row > required_max_row):
-					raise ValidationError(
-							"Data fed to input \"{}\" of step {} may have too many rows".
-							format(feed_to_input.dataset_name, step.step_num));
+		# Check that steps are clean; this also checks the cabling between steps.
+		# Note: we don't call *complete_clean* because this may refer to a
+		# "transient" state of the Pipeline whereby it is not complete yet.
+		for step in all_steps:
+			step.clean();
 
 		# Check pipeline output wiring for coherence
 		output_indices = [];
 
-		for mapping in self.outmap.all():
-			# This is a TransformationOutput.
-			output_requested = mapping.provider_output;
-			requested_from = mapping.step_providing_output;
-			connect_to_output = mapping.output_name;
-			output_indices += [mapping.output_idx];
+		# Validate each PipelineOutputCable
+		for outcable in self.outcables.all():
+			outcable.clean()
+			output_indices += [outcable.output_idx];
 
-			# Step must actually belong to this pipeline
-			if requested_from > len(all_steps):
-				raise ValidationError(
-						"Output requested from a non-existent step");
-			
-			# Given it is valid, access that step for deeper inspection
-			providing_step = all_steps[requested_from-1];
-
-			# Try to find an output hole with a matching name
-			if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
-				raise ValidationError(
-						"Transformation at step {} does not produce output \"{}\"".
-						format(requested_from, output_requested));
-			
-			# Also determine if output was deleted by the step producing it
-			if providing_step.outputs_to_delete.filter(dataset_to_delete=output_requested).exists():
-				raise ValidationError(
-						"Output \"{}\" from step {} is deleted prior to request".
-						format(output_requested.dataset_name, requested_from));
-
-		# Also check if pipeline outputs are numbered consecutively
-		if sorted(output_indices) != range(1, self.outmap.count()+1):
+		# PipelineOutputCables must be numbered consecutively
+		if sorted(output_indices) != range(1, self.outcables.count()+1):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
+
+	def complete_clean(self):
+		"""
+		Check that the pipeline is both coherent and complete.
+
+		Coherence is checked using clean(); the tests for completeness are:
+		- there is at least 1 step
+		- steps are complete, not just clean
+		"""
+		self.clean();
+		
+		all_steps = self.steps.all();
+		if all_steps.count == 0:
+			raise ValidationError("Pipeline {} has no steps".format(unicode(self)));
+
+		for step in all_steps:
+			step.complete_clean();
 
 	def create_outputs(self):
 		"""	
 		Delete existing pipeline outputs, and recreate them
-		from output mappings (outmap).
+		from output cables (outcables).
 
 		PRE: this should only be called after the pipeline has been verified by
-		clean and the outmaps are known to be OK.
+		clean and the outcabless are known to be OK.
 		"""
 		# Be careful if customizing delete() of TransformationOutput
 		self.outputs.all().delete();
 
-		# outmap is derived from (PipelineOutputMapping/ForeignKey)
+		# outcables is derived from (PipelineOutputCable/ForeignKey)
 		# For each wiring, extract the wiring parameters
- 		for mapping in self.outmap.all():
-			output_requested = mapping.provider_output;
-			connect_to_output = mapping.output_name;
+ 		for outcable in self.outcables.all():
+			output_requested = outcable.provider_output;
+			connect_to_output = outcable.output_name;
 
 			# Clone the referenced PipelineStep's TransformationOutput
 			# to make the specified output for the pipeline.
 			self.outputs.create(compounddatatype=output_requested.compounddatatype,
 								dataset_name=connect_to_output,
-								dataset_idx=mapping.output_idx,
+								dataset_idx=outcable.output_idx,
 								min_row=output_requested.min_row,
 								max_row=output_requested.max_row);
  			
@@ -1044,7 +943,7 @@ class PipelineStep(models.Model):
 	"""
 
 	# Implicitly defined
-	#   wires_in (PipelineStepInputWire/ForeignKey)
+	#   cables_in (PipelineStepInputCable/ForeignKey)
 	#   outputs_to_delete: from PipelineStepDelete
 
 	pipeline = models.ForeignKey(
@@ -1101,14 +1000,17 @@ class PipelineStep(models.Model):
 	def clean(self):
 		"""
 		Check coherence of this step of the pipeline.
+
+		- Do outputs marked for deletion come from this transformation?
+		- Does the transformation at this step contain the parent pipeline?
+		- Are any inputs multiply-cabled?
 		
-		1) Do input wires come from prior steps?
-		2) Do input wires map correctly to the transformation at this step?
-		3) Do outputs marked for deletion come from this transformation?
-		4) Does the transformation at this step contain the parent pipeline?
-		
-		A pipeline step that is clean is not necessarily complete - check
-		complete_clean() for that.
+		Also, validate each input cable, and each specified output deletion.
+
+		A PipelineStep must be save()d before cables can be connected to
+		it, but it should be clean before being saved. Therefore, this
+		checks coherency rather than completeness, for which we call
+		complete_clean() - such as cabling.
 		"""
 
 		# Check recursively to see if this step's transformation contains
@@ -1117,86 +1019,67 @@ class PipelineStep(models.Model):
 			raise ValidationError("Step {} contains the parent pipeline".
 								  format(self.step_num));
 
-			
-		for curr_wire in self.wires_in.all():
-			input_requested = curr_wire.provider_output;
-			requested_from = curr_wire.step_providing_input;
-			feed_to_input = curr_wire.transf_input;
-
-			# Does this input come from a step prior to this one?
-			if requested_from >= self.step_num:
+		# Check for multiple cabling to any of the step's inputs.
+		for transformationInput in self.transformation.inputs.all():
+			numMatches = self.cables_in.filter(transf_input=transformationInput).count()
+			if numMatches > 1:
 				raise ValidationError(
-						"Step {} requests input from a later step".
-						format(self.step_num));
+					"Input \"{}\" to transformation at step {} is cabled more than once".
+					format(transformationInput.dataset_name, self.step_num))
 
-			# Does the transformation at this step have the specified input?
-			try:
-				self.transformation.inputs.get(pk=feed_to_input.pk);
-			except TransformationInput.DoesNotExist as e:
-				raise ValidationError ("Transformation at step {} does not have input \"{}\"".
-						format(self.step_num, unicode(feed_to_input)));
+		# Validate each cable
+  		for curr_cable in self.cables_in.all():
+			curr_cable.clean()
 
+		# Validate each PipelineStep output deletion
 		for curr_del in self.outputs_to_delete.all():
-			to_del = curr_del.dataset_to_delete;
+			curr_del.clean()
 
-			# Check that to_del is one of the outputs of the current step's
-			# Transformation.
-			if self.transformation.outputs.\
-				filter(pk=to_del.pk).count() == 0:
-				raise ValidationError(
-						"Transformation at step {} does not have output \"{}\"".
-						format(self.step_num, unicode(to_del)));
 
 	def complete_clean(self):
 		"""Executed after the step's wiring has been fully defined, and
 		to see if all inputs are quenched exactly once.
-
-		1) Are all inputs for this step's transformation quenched?
-		2) Are any inputs multiply-wired (with PipelineStepInputs)?
 		"""
 		self.clean()
 			
 		for transformationInput in self.transformation.inputs.all():
-			# See if the input is specified exactly once.
-			numMatches = self.wires_in.filter(transf_input=transformationInput).count()
+			# See if the input is specified more than 0 times (and
+			# since clean() was called above, we know that therefore
+			# it was specified exactly 1 time).
+			numMatches = self.cables_in.filter(transf_input=transformationInput).count()
 
 			if numMatches == 0:
-				raise ValidationError("Input \"{}\" to transformation at step {} is not wired".
+				raise ValidationError("Input \"{}\" to transformation at step {} is not cabled".
 									  format(transformationInput.dataset_name, self.step_num))
 
-			elif numMatches > 1:
-				raise ValidationError(
-					"Input \"{}\" to transformation at step {} is wired more than once".
-					format(transformationInput.dataset_name, self.step_num))
-
-class PipelineStepInputWire(models.Model):
+class PipelineStepInputCable(models.Model):
 	"""
-	Represents the "wires" feeding into the transformation of a
+	Represents the "cables" feeding into the transformation of a
 	particular pipeline step, specifically:
 
-	A) Destination of wire (transf_input_name) - step implicitly defined
-	B) Source of the wire (step_providing_input, provider_output_name)
+	A) Destination of cable (transf_input_name) - step implicitly defined
+	B) Source of the cable (step_providing_input, provider_output_name)
 
 	Related to :model:`copperfish.PipelineStep`
 	"""
 	
-	# The step (Which has a transformation) where we define incoming wiring
+	# The step (Which has a transformation) where we define incoming cabling
 	pipelinestep = models.ForeignKey(
 			PipelineStep,
-			related_name = "wires_in");
+			related_name = "cables_in");
 	
 	# Input hole (TransformationInput) of the transformation
-	# at this step to which the wire leads
+	# at this step to which the cable leads
 	transf_input = models.ForeignKey(
 			"TransformationInput",
 			help_text="Wiring destination input hole");
 	
 	
 	# (step_providing_input, provider_output) unambiguously defines
-	# the source of the wire.  step_providing_input can't refer to a PipelineStep
+	# the source of the cable.  step_providing_input can't refer to a PipelineStep
 	# as it might also refer to the pipeline's inputs (i.e. step 0).
  	step_providing_input = models.PositiveIntegerField("Step providing the input source",
-													   help_text="Wiring source step");
+													   help_text="Cabling source step");
 
 	content_type = models.ForeignKey(
 			ContentType,
@@ -1211,12 +1094,194 @@ class PipelineStepInputWire(models.Model):
 	# Coherence of data is already enforced by Pipeline
 
 	def __unicode__(self):
-		"""Represent PipelineStepInput with the pipeline step, and the wiring destination input name"""
+		"""Represent PipelineStepInput with the pipeline step, and the cabling destination input name"""
 		step_str = "[no pipeline step set]";
 		if self.pipelinestep != None:
 			step_str = unicode(self.pipelinestep);
-		return "{}:{}".format(step_str, self.transf_input.dataset_name);	
+		return "{}:{}".format(step_str, self.transf_input.dataset_name);
 
+	
+	def clean(self):
+		"""Check coherence of the cable.
+		
+		- Does the input come from a prior step?
+		- Does the cable map to an (existent) input of this step's transformation?
+		- Does the requested output exist?
+		- Do the input and output 'work together' (Equal CDT + compatible min/max)
+		"""
+		input_requested = self.provider_output;
+		requested_from = self.step_providing_input;
+		feed_to_input = self.transf_input;
+		step_trans = self.pipelinestep.transformation
+
+		# Does this input cable come from a step prior to this one?
+		if requested_from >= self.pipelinestep.step_num:
+			raise ValidationError(
+				"Step {} requests input from a later step".
+				format(self.pipelinestep.step_num));
+
+		# Does the specified input defined for this transformation exist?
+		if not step_trans.inputs.filter(pk=feed_to_input.pk).exists():
+			raise ValidationError ("Transformation at step {} does not have input \"{}\"".
+								   format(self.pipelinestep.step_num, unicode(feed_to_input)));
+
+		# Do the source and destination work together?
+		# This checks:
+		# - the source produces the requested data
+		# - the source doesn't delete the requested data
+		# - they have the same CompoundDatatype (or, there is valid custom wiring)
+		# - they have compatible min_row and max_row
+
+		if requested_from == 0:
+			# Get pipeline inputs of the cable's parent Pipeline,
+			# and look for pipeline inputs that match the desired input.
+			
+			pipeline_inputs = self.pipelinestep.pipeline.inputs.all();
+			if input_requested not in pipeline_inputs:
+				raise ValidationError(
+					"Pipeline does not have input \"{}\"".
+					format(unicode(input_requested)));
+
+		# If not from step 0, input derives from the output of a pipeline step
+		else:
+
+			# Look at the pipeline step referenced by the wiring parameter
+			providing_step = self.pipelinestep.pipeline.steps.get(step_num=requested_from)
+
+			# Does the source pipeline step produce the output requested?
+			source_step_outputs = providing_step.transformation.outputs.all();
+			if input_requested not in source_step_outputs:
+				raise ValidationError(
+					"Transformation at step {} does not produce output \"{}\"".
+					format(requested_from, unicode(input_requested)));
+
+			# Was the data from this step's transformation output deleted?
+			source_deleted_outputs = [x.dataset_to_delete
+									  for x in providing_step.outputs_to_delete.all()];
+			if input_requested in source_deleted_outputs:
+				raise ValidationError(
+					"Input \"{}\" from step {} to step {} is deleted prior to request".
+					format(input_requested.dataset_name, requested_from,
+						   self.pipelinestep.step_num));
+
+		# Check that the input and output connected by the
+		# cable are compatible.  Don't check for
+		# ValidationError because this was checked in the
+		# clean() of PipelineStep.
+
+		# If CDTs don't match, check validity of custom wiring
+		if input_requested.compounddatatype != feed_to_input.compounddatatype:
+
+			# There should be wires
+			if not self.custom_wires.all().exists():
+				raise ValidationError(
+						"Custom wiring required for cable \"{}\"".
+						format(unicode(self)));
+
+			# Validate individual custom wires
+			for wire in self.custom_wires.all():
+				wire.clean()
+
+			# Each destination CDT member of must be wired to exactly once
+
+			# Get the CDT members of transf_input
+			dest_members = self.transf_input.compounddatatype.members.all()
+
+			# For each CDT member, check that there is exactly 1 custom_wire leading to it (IE, number of occurences of CDT member = dest_pin)
+			for dest_member in dest_members:
+				numwires = self.custom_wires.filter(dest_pin=dest_member).count()
+
+				if numwires == 0:
+					raise ValidationError(
+						"Destination member \"{}\" has no wires leading to it".
+						format(unicode(dest_member)));
+
+				if numwires > 1:
+					raise ValidationError(
+						"Destination member \"{}\" has multiple wires leading to it".
+						format(unicode(dest_member)));
+
+
+		provided_min_row = 0;
+		required_min_row = 0;
+
+		# Source output row constraint
+		if input_requested.min_row != None:
+			provided_min_row = input_requested.min_row;
+
+		# Destination input row constraint
+		if feed_to_input.min_row != None:
+			required_min_row = feed_to_input.min_row;
+
+		# Check for contradictory min row constraints
+		if (provided_min_row < required_min_row):
+			raise ValidationError(
+				"Data fed to input \"{}\" of step {} may have too few rows".
+				format(feed_to_input.dataset_name, self.pipelinestep.step_num));
+
+		provided_max_row = float("inf");
+		required_max_row = float("inf");
+
+		if input_requested.max_row != None:
+			provided_max_row = input_requested.max_row;
+
+		if feed_to_input.max_row != None:
+			required_max_row = feed_to_input.max_row;
+
+		# Check for contradictory max row constraints
+		if (provided_max_row > required_max_row):
+			raise ValidationError(
+				"Data fed to input \"{}\" of step {} may have too many rows".
+				format(feed_to_input.dataset_name, self.pipelinestep.step_num));
+		
+ 
+class CustomCableWire(models.Model):
+
+	# cable for which we are creating custom wiring
+	pipelinestepinputcable = models.ForeignKey(
+		PipelineStepInputCable,
+		related_name = "custom_wires")
+
+	# CDT member on the source output hole
+	# We think of wires as connecting cable pins
+	source_pin = models.ForeignKey(
+		CompoundDatatypeMember,
+		related_name="source_pins")
+
+	# CDT member on the destination input hole
+	dest_pin = models.ForeignKey(
+		CompoundDatatypeMember,
+		related_name="dest_pins")
+
+	def clean(self):
+		"""
+		The wire belongs to a cable which connects a source transformationXput
+		and a destination transformationInput.
+		
+		source_pin must be a member of the set of CDT members of the cable source (provider_output) transformationXput
+		dest_pin must be a member of the set of CDT members of the cable destination (transf_input) transformationInput
+
+		The datatype of the source_pin must match the datatype of the destination_pin
+		"""
+
+		source_CDT_members = self.pipelinestepinputcable.provider_output.compounddatatype.members.all()
+		dest_CDT_members = self.pipelinestepinputcable.transf_input.compounddatatype.members.all()
+
+		if not source_CDT_members.filter(pk=source_pin.pk).exists():
+			raise ValidationError(
+				"Source pin \"{}\" does not come from compounddatatype \"{}\"".
+				format(unicode(source_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+
+		if not dest_CDT_members.filter(pk=dest_pin.pk).exists():
+			raise ValidationError(
+				"Destination pin \"{}\" does not come from compounddatatype \"{}\"".
+				format(unicode(dest_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+
+		if source_pin.datatype != dest_pin.datatype:
+			raise ValidationError(
+				"The datatype of the source pin \"{}\" does not match the datatype of the destination pin \"{}\"".
+				format(unicode(source_pin), unicode(dest_pin)))
+		
 
 class PipelineStepDelete(models.Model):
 	"""
@@ -1238,13 +1303,24 @@ class PipelineStepDelete(models.Model):
 			"TransformationOutput",
 			help_text="Annotation to delete data once generated");
 
+	def clean(self):
+		"""
+		The output to be deleted must exist.
+		"""
+		to_del = self.dataset_to_delete;
 
-class PipelineOutputMapping(models.Model):
+		if not self.pipelinestep.transformation.outputs.filter(pk=to_del.pk).exists():
+			raise ValidationError(
+				"Transformation at step {} does not have output \"{}\"".
+				format(self.pipelinestep.step_num, unicode(to_del)));
+
+
+class PipelineOutputCable(models.Model):
 	"""
 	Defines which outputs of internal PipelineSteps are mapped to
 	end-point Pipeline outputs once internal execution is complete.
 
-	Thus, a definition of wires leading to external pipeline outputs.
+	Thus, a definition of cables leading to external pipeline outputs.
 
 	Related to :model:`copperfish.Pipeline`
 	Related to :model:`copperfish.TransformationOutput` (Refactoring needed)
@@ -1252,7 +1328,7 @@ class PipelineOutputMapping(models.Model):
 
 	pipeline = models.ForeignKey(
 			Pipeline,
-			related_name="outmap");
+			related_name="outcables");
 
 	output_name = models.CharField(
 			"Output hole name",
@@ -1293,6 +1369,83 @@ class PipelineOutputMapping(models.Model):
 		return "{}:{} ({})".format(pipeline_name, self.output_idx,
 								   self.output_name);
 
+
+	def clean(self):
+		"""
+		PipelineOutputCable must reference an existant, undeleted
+		transformation output hole.
+		"""
+		output_requested = self.provider_output;
+		requested_from = self.step_providing_output;
+
+		# Step number must be valid for this pipeline
+		if requested_from > self.pipeline.steps.all().count():
+			raise ValidationError(
+				"Output requested from a non-existent step");
+		
+		providing_step = self.pipeline.steps.get(step_num=requested_from);
+
+		# Try to find a matching output hole
+		if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
+			raise ValidationError(
+				"Transformation at step {} does not produce output \"{}\"".
+				format(requested_from, output_requested));
+
+		# Also determine if output was deleted by the step producing it
+		if providing_step.outputs_to_delete.filter(dataset_to_delete=output_requested).exists():
+			raise ValidationError(
+				"Output \"{}\" from step {} is deleted prior to request".
+				format(output_requested.dataset_name, requested_from));
+
+		# If custom wires exist, use them to define a compound datatype, and run validate_unique() to ensure column name uniqueness
+		outwires = self.custom_outwires.all()
+
+		if outwires.exists():
+			# FIXME
+			pass
+ 
+class CustomOutputCableWire(models.Model):
+	"""
+	FILL ME IN
+	"""
+
+	# FIXME: Need to finish pipelineoutputcable.clean()
+	# Need to change pipeline.createoutputs to accomodate custom wiring
+
+	pipelineoutputcable = models.ForeignKey(
+		PipelineOutputCable,
+		related_name="custom_outwires")
+
+	source_pin = models.ForeignKey(CompoundDatatypeMember)
+
+	dest_name = models.CharField(
+		"Destination column name",
+		max_length=128,
+		help_text="CDT name of this column in the pipeline output")
+
+	dest_idx =  models.PositiveIntegerField(
+		"Destination column index",
+		validators=[MinValueValidator(1)]
+		help_text="CDT index of this column in the pipeline output");
+
+	# This matches the constraint on compound data type members
+	# (Cannot have destination columns with the same name/index)
+	class Meta:
+		unique_together = 	(("pipelineoutputcable", "dest_name"),
+							("pipelineoutputcable", "dest_idx"));
+	
+	def clean(self):
+		"""
+		source_pin must be a member of the set of CDT members of the cable source (provider_output) transformationXput
+		"""
+
+		# Get the CDT members of the output-CDT referenced by this PipelineOutputCable
+		source_CDT_members = self.pipelineoutputcable.provider_output.compounddatatype.members.all()
+	
+		if not source_CDT_members.filter(pk=source_pin.pk).exists():
+			raise ValidationError(
+				"Source pin \"{}\" does not come from compounddatatype \"{}\"".
+				format(unicode(source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
 
 class TransformationXput(models.Model):
 	"""
