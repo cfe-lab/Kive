@@ -696,41 +696,78 @@ class Transformation(models.Model):
 	inputs = generic.GenericRelation("TransformationInput");
 	outputs = generic.GenericRelation("TransformationOutput");
 
+	# Raw inputs/outputs corresponding to non-CSV data, e.g. FASTAs.
+	raw_inputs = generic.GenericRelation("TransformationRawInput");
+	raw_outputs = generic.GenericRelation("TransformationRawOutput");
+
 	class Meta:
 		abstract = True;
 
 	def check_input_indices(self):
-		"""Check that input indices are numbered consecutively from 1"""
+		"""Check that input indices are numbered consecutively from 1.
+
+		This checks both regular inputs and raw inputs.
+		"""
 
 		# Append each input index (hole number) to a list
 		input_nums = [];
 		for curr_input in self.inputs.all():
 			input_nums += [curr_input.dataset_idx];
+		for curr_raw_input in self.raw_inputs.all():
+			input_nums += [curr_raw_input.dataset_idx];
 
 		# Indices must be consecutively numbered from 1 to n
-		if sorted(input_nums) != range(1, self.inputs.count()+1):
+		if sorted(input_nums) != range(1, self.inputs.count()+self.raw_inputs.count()+1):
 			raise ValidationError(
 					"Inputs are not consecutively numbered starting from 1");
+
+	def check_input_names(self):
+		"""Check that input names do not overlap.
+
+		Regular inputs won't have overlapping names due to a uniqueness constraint,
+		nor will raw inputs; this just checks that no pair of regular input and raw input
+		share a name.
+		"""
+		input_names = [curr_input.dataset_name for curr_input in self.inputs.all()];
+		raw_input_names = [curr_raw_input.dataset_name
+						   for curr_raw_input in self.raw_inputs.all()];
+		if len(set(input_names).intersection(set(raw_input_names))) != 0:
+			raise ValidationError("Input names overlap raw input names");
 		
 	def check_output_indices(self):
-		"""Check that output indices are numbered consecutively from 1"""
+		"""Check that output indices are numbered consecutively from 1.
 
+		This checks both regular and raw outputs.
+		"""
 		# Append each output index (hole number) to a list
 		output_nums = [];
 		for curr_output in self.outputs.all():
 			output_nums += [curr_output.dataset_idx];
+		for curr_raw_output in self.raw_outputs.all():
+			output_nums += [curr_raw_output.dataset_idx];
 
 		# Indices must be consecutively numbered from 1 to n
-		if sorted(output_nums) != range(1, self.outputs.count()+1):
+		if sorted(output_nums) != range(1, self.outputs.count()+self.raw_outputs.count()+1):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
 
+	def check_output_names(self):
+		"""Check that output names do not overlap.
+
+		This does the same as check_input_names, but for the outputs.
+		"""
+		output_names = [curr_output.dataset_name for curr_output in self.outputs.all()];
+		raw_output_names = [curr_raw_output.dataset_name
+						   for curr_raw_output in self.raw_outputs.all()];
+		if len(set(output_names).intersection(set(raw_output_names))) != 0:
+			raise ValidationError("Output names overlap raw output names");
+
 	def clean(self):
 		"""Validate transformation inputs and outputs."""
-
 		self.check_input_indices();
+		self.check_input_names();
 		self.check_output_indices();
-		# A transformation cannot have multiple definitions for column name or column index (CHECK TRANSFORMATION XPUT)
+		self.check_output_names();
 
 class Method(Transformation):
 	"""
@@ -786,8 +823,9 @@ class Method(Transformation):
 			return None;
 
 		# If parent revision exists, and inputs/outputs haven't been registered,
-		# copy all inputs and outputs from the parent revision to this revision
-		if self.inputs.count() + self.outputs.count() == 0:
+		# copy all inputs/outputs (Including raws) from parent revision to this revision
+		if (self.inputs.count() + self.outputs.count() +
+				self.raw_inputs.count() + self.raw_outputs.count() == 0):
 
 			for parent_input in self.revision_parent.inputs.all():
 				self.inputs.create(
@@ -804,6 +842,16 @@ class Method(Transformation):
 						dataset_idx = parent_output.dataset_idx,
 						min_row = parent_output.min_row,
 						max_row = parent_output.max_row);
+
+			for parent_raw_input in self.revision_parent.raw_inputs.all():
+				self.raw_inputs.create(
+						dataset_name = parent_raw_input.dataset_name,
+						dataset_idx = parent_raw_input.dataset_idx);
+
+			for parent_raw_output in self.revision_parent.raw_outputs.all():
+				self.raw_outputs.create(
+						dataset_name = parent_raw_output.dataset_name,
+						dataset_idx = parent_raw_output.dataset_idx);
 				
 
 class Pipeline(Transformation):
@@ -1491,13 +1539,14 @@ class CustomOutputCableWire(models.Model):
 				"Source pin \"{}\" does not come from compounddatatype \"{}\"".
 				format(unicode(source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
 
-class TransformationXput(models.Model):
+class TransformationRawXput(models.Model):
 	"""
 	Describes parameters common to all inputs and outputs
 	of transformations - the "holes"
 
-	Extends :model:`copperfish.TransformationInput`
-	Extends :model:`copperfish.TransformationOutput`
+	Extends :model:`copperfish.TransformationXput`
+	Extends :model:`copperfish.TransformationRawInput`
+	Extends :model:`copperfish.TransformationRawOutput`
 	"""
 
 	# TransformationXput describes the input/outputs of transformations
@@ -1507,9 +1556,6 @@ class TransformationXput(models.Model):
 			limit_choices_to = {"model__in": ("method", "pipeline")});
 	object_id = models.PositiveIntegerField();
 	transformation = generic.GenericForeignKey("content_type", "object_id");
-
-	# The expected compounddatatype of the input/output
-	compounddatatype = models.ForeignKey(CompoundDatatype);
 
 	# The name of the "input/output" hole
 	dataset_name = models.CharField(
@@ -1527,6 +1573,45 @@ class TransformationXput(models.Model):
 			"Input/output index",
 			validators=[MinValueValidator(1)],
 			help_text="Index defining the relative order of this input/output");
+
+	class Meta:
+		abstract = True;
+
+		# A transformation cannot have multiple definitions for column name or column index
+		unique_together = (("content_type", "object_id", "dataset_name"),
+						   ("content_type", "object_id", "dataset_idx"));
+
+	def __unicode__(self):
+		return u"[{}]:raw{} {} {}".format(unicode(self.transformation),
+									   self.dataset_idx,
+									   self.dataset_name);
+
+
+class TransformationRawInput(TransformationRawXput):
+	"""
+	Inherits from :model:`copperfish.TransformationRawXput`
+	"""
+	pass
+
+class TransformationRawOutput(TransformationRawXput):
+	"""
+	Inherits from :model:`copperfish.TransformationRawXput`
+	"""
+	pass
+		
+
+class TransformationXput(TransformationRawXput):
+	"""
+	Describes the "holes" that are managed by Shipyard: i.e. the ones
+	that correspond to well-understood CSV formatted data.
+
+	Extends :model:`copperfish.TransformationInput`
+	Extends :model:`copperfish.TransformationOutput`
+	"""
+
+
+	# The expected compounddatatype of the input/output
+	compounddatatype = models.ForeignKey(CompoundDatatype);
 	
 	# Nullable fields indicating that this dataset has
 	# restrictions on how many rows it can have
@@ -1545,9 +1630,10 @@ class TransformationXput(models.Model):
 	class Meta:
 		abstract = True;
 
+		# This stuff is already enforced in TransformationRawXput.
 		# A transformation cannot have multiple definitions for column name or column index
-		unique_together = (("content_type", "object_id", "dataset_name"),
-						   ("content_type", "object_id", "dataset_idx"));
+		#unique_together = (("content_type", "object_id", "dataset_name"),
+		#				   ("content_type", "object_id", "dataset_idx"));
 
 	def __unicode__(self):
 		return u"[{}]:{} {} {}".format(unicode(self.transformation),
