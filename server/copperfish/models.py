@@ -505,6 +505,8 @@ class RawParentDataset(models.Model):
     """
     Specifies raw parents of a (raw or non-raw) dataset.
 
+	Note that this must therefore come from an input to the generating pipeline.
+
     Related to :model:`copperfish.RawDataset`
     Related to :model:`copperfish.TransformationRawInput`
     """
@@ -526,12 +528,12 @@ class RawParentDataset(models.Model):
         """Check coherence of this dataset-raw parent relationship.
 
         Wwe check that the TransformationInput belongs to the
-        Transformation that produced the child.
+        Pipeline that produced the child.
         """
         # Does parent_input belong to the child dataset's pipeline step?
-        if not dataset.pipeline_step.transformation.raw_inputs.filter(pk=parent_raw_input.pk).exists():
+        if not dataset.pipeline_step.pipeline.raw_inputs.filter(pk=parent_raw_input.pk).exists():
             raise ValidationError(
-                "Parent's specified TransformationRawInput does not belong to generating Transformation");
+                "Parent's specified TransformationRawInput does not belong to generating Pipeline");
         
  
 class CodeResource(models.Model):
