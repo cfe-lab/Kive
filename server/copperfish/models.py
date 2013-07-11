@@ -20,6 +20,7 @@ import re;			# Regular expressions
 import string;			# Augments regular expressions
 import os.path;                 # For checking file paths
 import sys;
+import csv;
 
 class Datatype(models.Model):
 	"""
@@ -102,6 +103,15 @@ class Datatype(models.Model):
 
 		# Return False if Case 1 is never encountered
 		return is_restricted
+
+	# FIXME: when we start with execute, we'll use this to test
+	# whether a specified column in a CSV file conforms to this
+	# Datatype.
+	#def check_CSV_column(csv_file, col_num):
+	#	pass
+	# We could also do it with the following:
+	def check_conforming(csv_entry):
+		pass
 
 	def clean(self):
 		if (self.is_restricted_by(self)):
@@ -256,7 +266,8 @@ class AbstractDataset(models.Model):
 
 	dataset_file = models.FileField(
 			upload_to="Datasets",
-			help_text="File path where datasets are stored");
+			help_text="File path where datasets are stored",
+			null=False);
 
 	MD5_checksum = models.CharField(
 			max_length=64,
@@ -295,6 +306,8 @@ class Dataset(AbstractDataset):
 	"""
 	Datasets with a Shipyard-compliant structure; i.e. CSV file with a CDT.
 
+	This CSV file must have a header.
+
 	Inherits from :model:`copperfish.AbstractDataset`
 	 - Related to :model:`copperfish.PipelineStep`
 	Related to :model:`copperfish.CompoundDatatype`
@@ -321,9 +334,28 @@ class Dataset(AbstractDataset):
 		
 		If a file specified, populate the MD5 checksum.  Also check that the
 		TransformationOutput that produced it comes from the specified PipelineStep.
+
+		FIXME: this will have to be amended to also validate the actual data in the
+		file when doing execute.
 		"""
 		# This computes the MD5 checksum if necessary.
 		super(Dataset, self).clean();
+
+		# Check the header for coherence.
+		data_csv = csv.DictReader(self.dataset_file);
+		cdt_members = self.compounddatatype.members.all();
+		if len(data_csv.fieldnames) != cdt_members.count():
+			raise ValidationError(
+				"Dataset \"{}\" does not have the same number of columns as its CDT".
+				format(unicode(self)));
+		for cdtm in self.compounddatatype.members.all():
+			# Check that the member with index i has the same name as the ith column in the CSV.
+			if cdtm.column_name != data_csv[cdtm.column_idx-1]:
+				raise ValidationError(
+					"Column {} of Dataset \"{}\" is not named as specified by its CDT".
+					format(cdtm.column_idx, unicode(self)));
+		# FIXME this is the point at which you can/should validate the
+		# actual data in the file (while you already have the CSV open).
 
 		# Either both pipeline_step and pipeline_step_output are specified or
 		# neither is specified.  If they are both specified, check that they
@@ -337,15 +369,25 @@ class Dataset(AbstractDataset):
 			raise ValidationError(
 				"PipelineStep is specified but no output from it is");
 
-		elif ((pipeline_step != None and pipeline_step_output != None) and
-			  (pipeline_step.transformation != pipeline_step_output.transformation)):
-			raise ValidationError(
-				"Specified PipelineStep does not produce specified TransformationOutput");
+		elif pipeline_step != None and pipeline_step_output != None:
+			# Check that the PS transformation matches pipeline_step_output's
+			if pipeline_step.transformation != pipeline_step_output.transformation:
+				raise ValidationError(
+					"Specified PipelineStep does not produce specified TransformationOutput");
+			if self.compounddatatype != pipeline_step_output.compounddatatype:
+				raise ValidationError(
+					"Dataset CDT does not match the CDT of the generating TransformationOutput");
 
 	def num_rows(self):
-		"""Reports the number of rows belonging to this Dataset."""
-		# FIXME fill this in when we actually have a dataset to play with.
-		pass
+		"""Reports the number of rows belonging to the CSV file (excluding header)."""
+		# From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
+		# Note: we don't check for the integrity of self.dataset_file as that will
+		# be checked when calling clean().
+		# FIXME: do we need to close and reopen self.dataset_file at the end of this
+		# script?  Find out by running twice consecutively and seeing if it barfs
+		# the second time.
+		return (sum(1 for line in self.dataset_file) - 1);
+			
 
 class RawDataset(AbstractDataset):
 	"""
@@ -1136,10 +1178,10 @@ class Pipeline(Transformation):
 	def create_outputs(self):
 		"""	
 		Delete existing pipeline outputs, and recreate them
-		from output cables (outcables).
+		from output cables (outcables and raw_outcables).
 
 		PRE: this should only be called after the pipeline has been verified by
-		clean and the outcables are known to be OK.
+		clean and the (raw) outcables are known to be OK.
 		"""
 		# Be careful if customizing delete() of TransformationOutput
 		self.outputs.all().delete();
@@ -1170,6 +1212,16 @@ class Pipeline(Transformation):
 								dataset_idx=outcable.output_idx,
 								min_row=output_requested.min_row,
 								max_row=output_requested.max_row);
+
+		# Similar (simpler) for raw outcables.
+		for raw_outcable in self.raw_outcables.all():
+			output_requested = raw_outcable.provider_raw_output;
+			connect_to_output = raw_outcable.raw_output_name;
+
+			# Clone the referenced PipelineStep's TransformationOutput
+			# to make the specified output for the pipeline.
+			self.raw_outputs.create(dataset_name=connect_to_output,
+									dataset_idx=raw_outcable.output_idx);
  			
 
 class PipelineStep(models.Model):
