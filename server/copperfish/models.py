@@ -217,11 +217,13 @@ class CompoundDatatype(models.Model):
 			raise ValidationError("Column indices are not consecutive starting from 1");
 
 
-class Dataset(models.Model):
+
+
+class AbstractDataset(models.Model):
 	"""
-	Datasets uploaded by users, to be used as inputs for transformations.
+	Datasets uploaded by users or created by transformations.
+
 	Related to :model:`copperfish.PipelineStep`
-	Related to :model:`copperfish.CompoundDatatype`
 	"""
 
 	# Implicitly defined
@@ -244,33 +246,13 @@ class Dataset(models.Model):
 			auto_now_add=True,
 			help_text="Date of dataset upload.");
 
-
 	# Pipeline step this Dataset come from (Null if Dataset was manually uploaded)
 	pipeline_step = models.ForeignKey(
 			"PipelineStep",
-			related_name="data_produced",
+			related_name="%(app_label)s_%(class)s_data_produced",
 			null=True,
 			blank=True,
 			help_text="The pipeline step this dataset was created by (If applicable)");
-
-	# Output 'hole' within a pipeline the Dataset comes from
-	pipeline_step_output = models.ForeignKey(
-			"TransformationOutput",
-			null=True,
-			blank=True,
-			help_text="The output 'hole' this dataset comes from (If applicable)");
-
-	# Parent datasets this dataset is derived from
-	parent_datasets = models.ManyToManyField(
-			'self',
-			related_name="descendent_datasets",
-			null=True,
-			blank=True);
-
-	# Datasets are restricted by a compound data type
-	compounddatatype = models.ForeignKey(
-			CompoundDatatype,
-			related_name="conforming_datasets");
 
 	dataset_file = models.FileField(
 			upload_to="Datasets",
@@ -280,6 +262,12 @@ class Dataset(models.Model):
 			max_length=64,
 			help_text="Used to check dataset file integrity");
 
+	# For recapitulating how it was produced.
+ 	parent_datasets = generic.GenericRelation("ParentDataset");
+	raw_parent_datasets = generic.GenericRelation("RawParentDataset");
+	
+	class Meta:
+		abstract = True;
 
 	def __unicode__(self):
 		"""Display the Dataset name, user, and date created."""
@@ -291,12 +279,7 @@ class Dataset(models.Model):
 
 	# Before completing a save(), generate the MD5 hash
 	def clean(self):
-		"""Compute MD5 checksum for the dataset and check that its source is correctly specified.
-		
-		If a file specified, populate the MD5 checksum.  Also check that the
-		TransformationOutput that produced it comes from the specified PipelineStep.
-		"""
-
+		"""Compute MD5 checksum for the dataset."""
 		try:
 			md5gen = hashlib.md5();
 			md5gen.update(self.dataset_file.read());
@@ -306,6 +289,41 @@ class Dataset(models.Model):
 			print(e);
 			print("No file found; setting MD5 checksum to the empty string.");
 			self.MD5_checksum = "";
+
+
+class Dataset(AbstractDataset):
+	"""
+	Datasets with a Shipyard-compliant structure; i.e. CSV file with a CDT.
+
+	Inherits from :model:`copperfish.AbstractDataset`
+	 - Related to :model:`copperfish.PipelineStep`
+	Related to :model:`copperfish.CompoundDatatype`
+	Related to :model:`copperfish.TransformationOutput`
+	Related to :model:`copperfish.DatasetParent`
+	Related to :model:`copperfish.DatasetRawParent`
+	"""
+	# Output 'hole' within a pipeline the Dataset comes from.  This,
+	# along with pipeline_step (in the parent class), unambiguously
+	# defines what pipeline and where in the pipeline it came from.
+	pipeline_step_output = models.ForeignKey(
+			"TransformationOutput",
+			null=True,
+			blank=True,
+			help_text="The output 'hole' this dataset comes from (If applicable)");
+
+	# Datasets conform to a compound datatype.
+	compounddatatype = models.ForeignKey(
+			CompoundDatatype,
+			related_name="conforming_datasets");
+
+	def clean(self):
+		"""Compute MD5 checksum for the dataset and check that its source is correctly specified.
+		
+		If a file specified, populate the MD5 checksum.  Also check that the
+		TransformationOutput that produced it comes from the specified PipelineStep.
+		"""
+		# This computes the MD5 checksum if necessary.
+		super(Dataset, self).clean();
 
 		# Either both pipeline_step and pipeline_step_output are specified or
 		# neither is specified.  If they are both specified, check that they
@@ -323,6 +341,156 @@ class Dataset(models.Model):
 			  (pipeline_step.transformation != pipeline_step_output.transformation)):
 			raise ValidationError(
 				"Specified PipelineStep does not produce specified TransformationOutput");
+
+	def num_rows(self):
+		"""Reports the number of rows belonging to this Dataset."""
+		# FIXME fill this in when we actually have a dataset to play with.
+		pass
+
+class RawDataset(AbstractDataset):
+	"""
+	Datasets without a Shipyard-compliant structure; e.g. a FASTA file or a Newick file.
+
+	Inherits from :model:`copperfish.AbstractDataset`
+	 - Related to :model:`copperfish.PipelineStep`
+	Related to :model:`copperfish.TransformationRawOutput`
+	Related to :model:`copperfish.RawDatasetParent`
+	Related to :model:`copperfish.RawDatasetRawParent`
+	"""
+	# Raw output 'hole' within a pipeline the RawDataset comes from.
+	pipeline_step_output = models.ForeignKey(
+			"TransformationRawOutput",
+			null=True,
+			blank=True,
+			help_text="The output 'hole' this dataset comes from (If applicable)");
+
+	def __unicode__(self):
+		"""Display the Dataset name, user, and date created, and mark as raw."""
+		return "{}(raw) (created by {} on {})".format(
+				self.name,
+				unicode(self.user),
+				self.date_created);
+
+
+	def clean(self):
+		"""Compute MD5 checksum for the raw dataset and check that its source is correctly specified.
+		
+		If a file specified, populate the MD5 checksum.  Also check that the
+		TransformationRawOutput that produced it comes from the specified PipelineStep.
+		"""
+		# This computes the MD5 checksum if necessary.
+		super(Dataset, self).clean();
+
+		# Either both pipeline_step and pipeline_step_output are specified or
+		# neither is specified.  If they are both specified, check that they
+		# are consistent with each other, i.e. that the output is actually one
+		# belonging to the specified PipelineStep.
+		if pipeline_step == None and pipeline_step_raw_output != None:
+			raise ValidationError(
+				"No PipelineStep specified but a raw output from a PipelineStep is");
+		
+		elif pipeline_step != None and pipeline_step_raw_output == None:
+			raise ValidationError(
+				"PipelineStep is specified but no raw output from it is");
+
+		elif ((pipeline_step != None and pipeline_step_raw_output != None) and
+			  (pipeline_step.transformation != pipeline_step_raw_output.transformation)):
+			raise ValidationError(
+				"Specified PipelineStep does not produce specified TransformationRawOutput");
+
+class ParentDataset(models.Model):
+	"""
+	Specifies non-raw parents of a (raw or non-raw) dataset.
+
+	Related to :model:`copperfish.Dataset`
+	Related to :model:`copperfish.RawDataset`
+	Related to :model:`copperfish.TransformationInput`
+	"""
+	# This can be either a Dataset or a RawDataset.
+	content_type = models.ForeignKey(
+			ContentType,
+			limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
+	object_id = models.PositiveIntegerField();
+	dataset = generic.GenericForeignKey("content_type", "object_id");
+	
+	# Since this will be inherited by other classes, we need to specify related_name
+	# in a way that will be specialized by the child classes.
+	parent = models.ForeignKey(Dataset, related_name="%(app_label)s_%(class)s_parentof");
+	parent_input = models.ForeignKey("TransformationInput");
+
+	# FIXME write a __unicode__ method
+
+	def clean(self):
+		"""Check coherence of this dataset-parent relationship.
+
+		We check that the specified parent fits into the specified
+		TransformationInput that it supposedly went into to produce
+		the child; also we check that the TransformationInput belongs
+		to the Transformation that produced the child.
+		"""
+		# Does parent_input belong to the child dataset's pipeline step?
+		if not dataset.pipeline_step.transformation.inputs.filter(pk=parent_input.pk).exists():
+			raise ValidationError(
+				"Parent's specified TransformationInput does not belong to generating Transformation");
+		
+		# Check the fit: the parent's CDT matches parent_input's CDT,
+		# and the parent's number of rows is between parent_input's
+		# min_row and max_row.
+		if parent.compounddatatype != parent_input.compounddatatype:
+			# Check for custom wiring.  Note: we assume that the pipeline is complete
+			# and clean, so there is exactly one cable leading to this.
+			cable_in = dataset.pipeline_step.cables_in.get(transf_input=parent_input);
+
+			if not cable_in.custom_wires.all.exists():
+				raise ValidationError(
+					"Parent dataset \"{}\" does not have the same CDT as the TransformationInput it should have fit into, and no custom wiring is defined".format(unicode(parent)));
+
+			# Wires, a priori, quench all of parent_input's columns (we assume
+			# the cable is coherent and complete).
+			for curr_wire in cable_in.custom_wires.all():
+				curr_member = parent.compounddatatype.members.filter(pk=curr_wire.source_pin.pk);
+				if not curr_member.exists():
+					raise ValidationError("Wire requests invalid member of CDT");
+
+		if parent_input.min_rows != None and parent.num_rows() < parent_input.min_rows:
+			raise ValidationError("Parent dataset \"{}\" has too few rows for TransformationInput \"{}\"".format(unicode(parent), unicode(parent_input)))
+		if parent_input.max_rows != None and parent.num_rows() > parent_input.max_rows:
+			raise ValidationError("Parent dataset \"{}\" has too many rows for TransformationInput \"{}\"".format(unicode(parent), unicode(parent_input)))
+
+
+
+class RawParentDataset(models.Model):
+	"""
+	Specifies raw parents of a (raw or non-raw) dataset.
+
+	Related to :model:`copperfish.RawDataset`
+	Related to :model:`copperfish.TransformationRawInput`
+	"""
+	# This can be either a Dataset or a RawDataset.
+	content_type = models.ForeignKey(
+			ContentType,
+			limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
+	object_id = models.PositiveIntegerField();
+	dataset = generic.GenericForeignKey("content_type", "object_id");
+	
+	# Since this will be inherited by other classes, we need to specify related_name
+	# in a way that will be specialized by the child classes.
+	parent = models.ForeignKey(RawDataset, related_name="%(app_label)s_%(class)s_parentof");
+	parent_raw_input = models.ForeignKey("TransformationRawInput");
+	
+	# FIXME write a __unicode__ method
+
+	def clean(self):
+		"""Check coherence of this dataset-raw parent relationship.
+
+		Wwe check that the TransformationInput belongs to the
+		Transformation that produced the child.
+		"""
+		# Does parent_input belong to the child dataset's pipeline step?
+		if not dataset.pipeline_step.transformation.raw_inputs.filter(pk=parent_raw_input.pk).exists():
+			raise ValidationError(
+				"Parent's specified TransformationRawInput does not belong to generating Transformation");
+		
  
 class CodeResource(models.Model):
 	"""
@@ -898,14 +1066,11 @@ class Pipeline(Transformation):
 
 		- Pipeline INPUTS must be consecutively numbered from 1
 		- Pipeline STEPS must be consecutively starting from 1
-		- Steps are complete and clean (complete_clean invokes clean)
-		- PipelineOutputCables are appropriately mapped from the pipeline's steps
+		- Steps are clean
+		- PipelineOutput(Raw)Cables are appropriately mapped from the pipeline's steps
 		"""
-		# Check that inputs are numbered consecutively from 1 (???)
-		# We don't care about the outputs, but if they are set, check them (???)
-
 		# Transformation.clean() - check for consecutive numbering of
-		# input/outputs for this pipeline as a whole
+		# (raw)input/outputs for this pipeline as a whole
 		super(Pipeline, self).clean();
 
 		# Internal pipeline STEP numbers must be consecutive from 1 to n
@@ -917,7 +1082,7 @@ class Pipeline(Transformation):
 
 		if sorted(step_nums) != range(1, len(all_steps)+1):
 			raise ValidationError(
-					"Steps are not consecutively numbered starting from 1");
+				"Steps are not consecutively numbered starting from 1");
 
 		# Check that steps are clean; this also checks the cabling between steps.
 		# Note: we don't call *complete_clean* because this may refer to a
@@ -927,16 +1092,29 @@ class Pipeline(Transformation):
 
 		# Check pipeline output wiring for coherence
 		output_indices = [];
+		output_names = [];
+		raw_output_names = [];
 
-		# Validate each PipelineOutputCable
+		# Validate each PipelineOutput(Raw)Cable
 		for outcable in self.outcables.all():
 			outcable.clean()
 			output_indices += [outcable.output_idx];
+			output_names += [outcable.output_name];
+		for raw_outcable in self.raw_outcables.all():
+			raw_outcable.clean()
+			output_indices += [raw_outcable.raw_output_idx];
+			raw_output_names += [raw_outcable.raw_output_name];
 
-		# PipelineOutputCables must be numbered consecutively
-		if sorted(output_indices) != range(1, self.outcables.count()+1):
+		# Pipeline(Raw)OutputCables must be numbered consecutively
+		if (sorted(output_indices) !=
+				range(1, self.outcables.count()+self.raw_outcables.count()+1)):
 			raise ValidationError(
 					"Outputs are not consecutively numbered starting from 1");
+
+		# Pipeline(Raw)OutputCables should have unique names.
+		if len(set(output_names).intersection(set(raw_output_names))) != 0:
+			raise ValidationError(
+				"Output names overlap raw output names");
 
 	def complete_clean(self):
 		"""
@@ -1006,11 +1184,6 @@ class PipelineStep(models.Model):
 	Related to :model:`copperfish.PipelineStepInput`
 	Related to :model:`copperfish.PipelineStepDelete`
 	"""
-
-	# Implicitly defined
-	#   cables_in (PipelineStepInputCable/ForeignKey)
-	#   outputs_to_delete: from PipelineStepDelete
-
 	pipeline = models.ForeignKey(
 			Pipeline,
 			related_name="steps");
@@ -1023,7 +1196,6 @@ class PipelineStep(models.Model):
 	object_id = models.PositiveIntegerField();
 	transformation = generic.GenericForeignKey("content_type", "object_id");
 	step_num = models.PositiveIntegerField(validators=[MinValueValidator(1)]);
-	
 
 	def __unicode__(self):
 		""" Represent with the pipeline and step number """
@@ -1066,18 +1238,16 @@ class PipelineStep(models.Model):
 		"""
 		Check coherence of this step of the pipeline.
 
-		- Do outputs marked for deletion come from this transformation?
 		- Does the transformation at this step contain the parent pipeline?
-		- Are any inputs multiply-cabled?
+		- Are any (raw) inputs multiply-cabled?
 		
-		Also, validate each input cable, and each specified output deletion.
+		Also, validate each (raw) input cable, and each specified output deletion.
 
 		A PipelineStep must be save()d before cables can be connected to
 		it, but it should be clean before being saved. Therefore, this
 		checks coherency rather than completeness, for which we call
 		complete_clean() - such as cabling.
 		"""
-
 		# Check recursively to see if this step's transformation contains
 		# the specified pipeline at all.
 		if self.recursive_pipeline_check(self.pipeline):
@@ -1085,37 +1255,124 @@ class PipelineStep(models.Model):
 								  format(self.step_num));
 
 		# Check for multiple cabling to any of the step's inputs.
-		for transformationInput in self.transformation.inputs.all():
-			numMatches = self.cables_in.filter(transf_input=transformationInput).count()
-			if numMatches > 1:
+		for transformation_input in self.transformation.inputs.all():
+			num_matches = self.cables_in.filter(transf_input=transformation_input).count()
+			if num_matches > 1:
 				raise ValidationError(
 					"Input \"{}\" to transformation at step {} is cabled more than once".
-					format(transformationInput.dataset_name, self.step_num))
+					format(transformation_input.dataset_name, self.step_num))
+
+		# Same thing for raw inputs.
+		for curr_raw_input in self.transformation.raw_inputs.all():
+			raw_matches = self.raw_cables_in.filter(transf_raw_input=curr_raw_input).count()
+			if raw_matches > 1:
+				raise ValidationError(
+					"Raw input \"{}\" to transformation at step {} is cabled more than once".
+					format(curr_raw_input.dataset_name, self.step_num))
 
 		# Validate each cable
   		for curr_cable in self.cables_in.all():
 			curr_cable.clean()
+  		for curr_raw_cable in self.raw_cables_in.all():
+			curr_raw_cable.clean()
 
 		# Validate each PipelineStep output deletion
 		for curr_del in self.outputs_to_delete.all():
 			curr_del.clean()
+		for curr_raw_del in self.raw_outputs_to_delete.all():
+			curr_raw_del.clean()
 
 
 	def complete_clean(self):
 		"""Executed after the step's wiring has been fully defined, and
-		to see if all inputs are quenched exactly once.
+		to see if all (raw) inputs are quenched exactly once.
 		"""
 		self.clean()
 			
-		for transformationInput in self.transformation.inputs.all():
+		for transformation_input in self.transformation.inputs.all():
 			# See if the input is specified more than 0 times (and
 			# since clean() was called above, we know that therefore
 			# it was specified exactly 1 time).
-			numMatches = self.cables_in.filter(transf_input=transformationInput).count()
-
-			if numMatches == 0:
+			num_matches = self.cables_in.filter(transf_input=transformation_input).count()
+			if num_matches == 0:
 				raise ValidationError("Input \"{}\" to transformation at step {} is not cabled".
-									  format(transformationInput.dataset_name, self.step_num))
+									  format(transformation_input.dataset_name, self.step_num))
+
+		# Same thing for raw inputs.
+		for curr_raw_input in self.transformation.raw_inputs.all():
+			raw_matches = self.raw_cables_in.filter(transf_input=curr_raw_input).count()
+			if raw_matches == 0:
+				raise ValidationError(
+					"Raw input \"{}\" to transformation at step {} is not cabled".
+					format(curr_raw_input.dataset_name, self.step_num))
+
+class PipelineStepRawInputCable(models.Model):
+	"""
+	The "cables" feeding into the raw inputs of a pipeline step's transformation.
+
+	This connects a source pipeline raw input to a pipeline step's raw input.
+	Unlike a PipelineStepInputCable, raw cables cannot have custom wiring (as
+	we don't understand the data handed around by them).
+
+	Related to :model:`copperfish.PipelineStep`
+	"""
+	# The step this cable feeds into.
+	pipelinestep = models.ForeignKey(PipelineStep, related_name = "raw_cables_in");
+	
+	# Raw input hole (TransformationRawInput) of the transformation
+	transf_raw_input = models.ForeignKey(
+		"TransformationRawInput",
+		help_text="Cabling destination raw input hole",
+		related_name="raw_cables_feeding_this_input");
+
+	# Note: in this version we're only allowing raw inputs to connect
+	# from "step 0" (i.e. the pipeline's own inputs) to a pipeline
+	# step; no inter-step raw wiring is allowed.
+	pipeline_raw_input = models.ForeignKey(
+		"TransformationRawInput",
+		help_text="Cabling source raw input hole",
+		related_name="raw_cables_fed_by_this_input");
+
+	def __unicode__(self):
+		"""
+		Unicode representation of PipelineStepRawInputCable.
+
+		The representation gives the pipeline step and the cabling destination input name,
+		and is marked as "raw".
+		"""
+		step_str = "[no pipeline step set]";
+		if self.pipelinestep != None:
+			step_str = unicode(self.pipelinestep);
+		return "{}:{}(raw)".format(step_str, self.transf_raw_input.dataset_name);
+	
+	def clean(self):
+		"""
+		Check coherence of the raw cable.
+		
+		- Does the input map to a pipeline raw input?
+		- Does the cable map to an (existent) raw input of this step's transformation?
+		
+		PRE: the pipeline step's transformation is not the parent pipeline (this should
+		never happen anyway).
+		"""
+		input_requested = self.pipeline_raw_input;
+		feed_to_input = self.transf_raw_input;
+		step_trans = self.pipelinestep.transformation
+
+		# Does this input cable come from a raw input of the parent pipeline?
+		# Note: this depends on the pipeline step's transformation not equalling
+		# the parent pipeline (which shouldn't ever happen).
+		if not self.pipelinestep.pipeline.raw_inputs.filter(pk=input_requested.pk).exists():
+			raise ValidationError(
+				"Step {} requests raw input not coming from parent pipeline".
+				format(self.pipelinestep.step_num));
+
+		# Does the specified input defined for this transformation exist?
+		if not step_trans.raw_inputs.filter(pk=feed_to_input.pk).exists():
+			raise ValidationError(
+				"Transformation at step {} does not have raw input \"{}\"".
+				format(self.pipelinestep.step_num, unicode(feed_to_input)));
+
 
 class PipelineStepInputCable(models.Model):
 	"""
@@ -1159,7 +1416,7 @@ class PipelineStepInputCable(models.Model):
 	# Coherence of data is already enforced by Pipeline
 
 	def __unicode__(self):
-		"""Represent PipelineStepInput with the pipeline step, and the cabling destination input name"""
+		"""Represent PipelineStepInputCable with the pipeline step, and the cabling destination input name"""
 		step_str = "[no pipeline step set]";
 		if self.pipelinestep != None:
 			step_str = unicode(self.pipelinestep);
@@ -1332,13 +1589,16 @@ class CustomCableWire(models.Model):
 
 	def clean(self):
 		"""
-		The wire belongs to a cable which connects a source transformationXput
-		and a destination transformationInput.
-		
-		source_pin must be a member of the set of CDT members of the cable source (provider_output) transformationXput
-		dest_pin must be a member of the set of CDT members of the cable destination (transf_input) transformationInput
+		Check the validity of this wire.
 
-		The datatype of the source_pin must match the datatype of the destination_pin
+		The wire belongs to a cable which connects a source TransformationXput
+		and a destination TransformationInput:
+		- source_pin must be a member of the set of CDT members of the cable source
+		(provider_output) TransformationXput;
+		- dest_pin must be a member of the set of CDT members of the cable
+		destination (transf_input) TransformationInput;
+		- The datatype of the source_pin must match the datatype of the
+		destination_pin.
 		"""
 
 		source_CDT_members = self.pipelinestepinputcable.provider_output.compounddatatype.members.all()
@@ -1396,6 +1656,116 @@ class PipelineStepDelete(models.Model):
 				"Transformation at step {} does not have output \"{}\"".
 				format(self.pipelinestep.step_num, unicode(to_del)));
 
+class PipelineStepRawDelete(models.Model):
+	"""
+	Defines what raw output datasets can be immediately deleted.
+	
+	Recall that each pipeline step involves a transformation that can
+	generate raw outputs along with regular outputs.
+
+	Related to :model:`copperfish.PipelineStep`
+	"""
+	pipelinestep = models.ForeignKey(
+			PipelineStep,
+			related_name="raw_outputs_to_delete");
+
+	# TransformationRawOutput of the transformation at this step to delete
+	raw_dataset_to_delete = models.ForeignKey(
+			"TransformationRawOutput",
+			help_text="Annotation to delete raw data once generated");
+
+	def clean(self):
+		"""
+		The raw output to be deleted must exist.
+		"""
+		to_del = self.raw_dataset_to_delete;
+
+		if not self.pipelinestep.transformation.raw_outputs.filter(pk=to_del.pk).exists():
+			raise ValidationError(
+				"Transformation at step {} does not have raw output \"{}\"".
+				format(self.pipelinestep.step_num, unicode(to_del)));
+
+
+class PipelineRawOutputCable(models.Model):
+	"""
+	As for PipelineOutputCable but for raw outputs.
+
+	This is simpler than the above because there can be no custom wiring.
+
+	Related to :model:`copperfish.Pipeline`
+	Related to :model:`copperfish.TransformationRawOutput`
+	"""
+	pipeline = models.ForeignKey(
+			Pipeline,
+			related_name="raw_outcables");
+
+	raw_output_name = models.CharField(
+			"Raw output hole name",
+			max_length=128,
+			help_text="Pipeline raw output hole name");
+
+	raw_output_idx = models.PositiveIntegerField(
+			"Raw output hole index",
+			validators=[MinValueValidator(1)],
+			help_text="Pipeline raw output hole index");
+
+	# PRE: step_providing_raw_output refers to an actual step of the
+	# pipeline, and provider_raw_output_name actually refers to one of
+	# the raw outputs at that step
+	step_providing_raw_output = models.PositiveIntegerField(
+			"Source pipeline step number",
+			validators=[MinValueValidator(1)],
+			help_text="Source step of raw output");
+
+	provider_raw_output = models.ForeignKey(
+			"TransformationRawOutput",
+			help_text="Source raw output hole");
+	
+	# Enforce uniqueness of raw output names and indices.
+	# Note: in the pipeline, these will still need to be compared with the non-raw
+	# output names and indices.
+	class Meta:
+		unique_together = 	(("pipeline", "raw_output_name"),
+							("pipeline", "raw_output_idx"));
+
+	def __unicode__(self):
+		"""Represent with the pipeline name, output index, and output name, and mark as raw."""
+		pipeline_name = "[no pipeline set]";
+		if self.pipeline != None:
+			pipeline_name = unicode(self.pipeline);
+
+		return "{}:{} ({} (raw))".format(pipeline_name, self.output_idx,
+								   self.output_name);
+
+
+	def clean(self):
+		"""
+		This raw cable must reference an existant, undeleted transformation raw output hole.
+		"""
+		output_requested = self.provider_raw_output;
+		requested_from = self.step_providing_raw_output;
+
+		# Step number must be valid for this pipeline
+		if requested_from > self.pipeline.steps.all().count():
+			raise ValidationError(
+				"Raw output requested from a non-existent step");
+		
+		providing_step = self.pipeline.steps.get(step_num=requested_from);
+
+		# Try to find a matching raw output hole
+		if (not providing_step.transformation.raw_outputs.
+			    filter(pk=output_requested.pk).exists()):
+			raise ValidationError(
+				"Transformation at step {} does not produce raw output \"{}\"".
+				format(requested_from, unicode(output_requested)));
+
+		# Also determine if raw output was deleted by the step producing it
+		if (providing_step.raw_outputs_to_delete.
+				filter(dataset_to_delete=output_requested).exists()):
+			raise ValidationError(
+				"Raw output \"{}\" from step {} is deleted prior to request".
+				format(output_requested.dataset_name, requested_from));
+
 
 class PipelineOutputCable(models.Model):
 	"""
@@ -1440,6 +1810,13 @@ class PipelineOutputCable(models.Model):
 	provider_output = models.ForeignKey(
 			"TransformationOutput",
 			help_text="Source output hole");
+	
+	# Enforce uniqueness of output names and indices.
+	# Note: in the pipeline, these will still need to be compared with the raw
+	# output names and indices.
+	class Meta:
+		unique_together = 	(("pipeline", "output_name"),
+							("pipeline", "output_idx"));
 
 	def __unicode__(self):
 		""" Represent with the pipeline name, output index, and output name (???) """
@@ -1470,7 +1847,7 @@ class PipelineOutputCable(models.Model):
 		if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
 			raise ValidationError(
 				"Transformation at step {} does not produce output \"{}\"".
-				format(requested_from, output_requested));
+				format(requested_from, unicode(output_requested)));
 
 		# Also determine if output was deleted by the step producing it
 		if (providing_step.outputs_to_delete.
