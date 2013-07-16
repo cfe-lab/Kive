@@ -291,16 +291,16 @@ class AbstractDataset(models.Model):
     # Before completing a save(), generate the MD5 hash
     def clean(self):
         """Compute MD5 checksum for the dataset."""
+
         try:
-            md5gen = hashlib.md5();
-            md5gen.update(self.dataset_file.read());
-            self.MD5_checksum = md5gen.hexdigest();
+            md5gen = hashlib.md5()
+            md5gen.update(self.dataset_file.read())
+            self.MD5_checksum = md5gen.hexdigest()
 
         except ValueError as e:
-            print(e);
-            print("No file found; setting MD5 checksum to the empty string.");
-            self.MD5_checksum = "";
-
+            print(e)
+            print("No file found; setting MD5 checksum to the empty string.")
+            self.MD5_checksum = ""
 
 class Dataset(AbstractDataset):
     """
@@ -338,45 +338,48 @@ class Dataset(AbstractDataset):
         FIXME: this will have to be amended to also validate the actual data in the
         file when doing execute.
         """
-        # This computes the MD5 checksum if necessary.
-        super(Dataset, self).clean();
+        # Cmputes MD5 checksum if necessary
+        super(Dataset, self).clean()
 
-        # Check the header for coherence.
-        data_csv = csv.DictReader(self.dataset_file);
-        cdt_members = self.compounddatatype.members.all();
+        # Either both pipeline_step and pipeline_step_output are specified or
+        # neither is specified. If they are both specified, check that they
+        # are consistent with each other.
+
+        if self.pipeline_step == None and self.pipeline_step_output != None:
+            raise ValidationError(
+                "No PipelineStep specified but an output from a PipelineStep is")
+        
+        elif self.pipeline_step != None and self.pipeline_step_output == None:
+            raise ValidationError(
+                "PipelineStep is specified but no output from it is")
+
+        elif self.pipeline_step != None and self.pipeline_step_output != None:
+            # Check that the PS transformation matches pipeline_step_output's
+            if self.pipeline_step.transformation != self.pipeline_step_output.transformation:
+                raise ValidationError(
+                    "Specified PipelineStep does not produce specified TransformationOutput");
+            if self.compounddatatype != self.pipeline_step_output.compounddatatype:
+                raise ValidationError(
+                    "Dataset CDT does not match the CDT of the generating TransformationOutput")
+
+        # Check CSV header for coherence with registered CDT
+        data_csv = csv.DictReader(self.dataset_file)
+	header = data_csv.fieldnames # Eric's mod
+        cdt_members = self.compounddatatype.members.all()
+	
         if len(data_csv.fieldnames) != cdt_members.count():
             raise ValidationError(
                 "Dataset \"{}\" does not have the same number of columns as its CDT".
-                format(unicode(self)));
+                format(unicode(self)))
+
+	# CDT member i must have the same name as the ith column in the CSV header
         for cdtm in self.compounddatatype.members.all():
-            # Check that the member with index i has the same name as the ith column in the CSV.
-            if cdtm.column_name != data_csv[cdtm.column_idx-1]:
+            if cdtm.column_name != header[cdtm.column_idx-1]:
                 raise ValidationError(
-                    "Column {} of Dataset \"{}\" is not named as specified by its CDT".
-                    format(cdtm.column_idx, unicode(self)));
-        # FIXME this is the point at which you can/should validate the
-        # actual data in the file (while you already have the CSV open).
-
-        # Either both pipeline_step and pipeline_step_output are specified or
-        # neither is specified.  If they are both specified, check that they
-        # are consistent with each other, i.e. that the output is actually one
-        # belonging to the specified PipelineStep.
-        if pipeline_step == None and pipeline_step_output != None:
-            raise ValidationError(
-                "No PipelineStep specified but an output from a PipelineStep is");
-        
-        elif pipeline_step != None and pipeline_step_output == None:
-            raise ValidationError(
-                "PipelineStep is specified but no output from it is");
-
-        elif pipeline_step != None and pipeline_step_output != None:
-            # Check that the PS transformation matches pipeline_step_output's
-            if pipeline_step.transformation != pipeline_step_output.transformation:
-                raise ValidationError(
-                    "Specified PipelineStep does not produce specified TransformationOutput");
-            if self.compounddatatype != pipeline_step_output.compounddatatype:
-                raise ValidationError(
-                    "Dataset CDT does not match the CDT of the generating TransformationOutput");
+                    "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
+                    format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
+	    
+        # FIXME: this is where you validate the actual data in the file
 
     def num_rows(self):
         """Reports the number of rows belonging to the CSV file (excluding header)."""
@@ -400,7 +403,7 @@ class RawDataset(AbstractDataset):
     Related to :model:`copperfish.RawDatasetRawParent`
     """
     # Raw output 'hole' within a pipeline the RawDataset comes from.
-    pipeline_step_output = models.ForeignKey(
+    pipeline_step_raw_output = models.ForeignKey(
             "TransformationRawOutput",
             null=True,
             blank=True,
@@ -421,22 +424,22 @@ class RawDataset(AbstractDataset):
         TransformationRawOutput that produced it comes from the specified PipelineStep.
         """
         # This computes the MD5 checksum if necessary.
-        super(Dataset, self).clean();
+        super(RawDataset, self).clean();
 
         # Either both pipeline_step and pipeline_step_output are specified or
         # neither is specified.  If they are both specified, check that they
         # are consistent with each other, i.e. that the output is actually one
         # belonging to the specified PipelineStep.
-        if pipeline_step == None and pipeline_step_raw_output != None:
+        if self.pipeline_step == None and self.pipeline_step_raw_output != None:
             raise ValidationError(
                 "No PipelineStep specified but a raw output from a PipelineStep is");
         
-        elif pipeline_step != None and pipeline_step_raw_output == None:
+        elif self.pipeline_step != None and self.pipeline_step_raw_output == None:
             raise ValidationError(
                 "PipelineStep is specified but no raw output from it is");
 
-        elif ((pipeline_step != None and pipeline_step_raw_output != None) and
-              (pipeline_step.transformation != pipeline_step_raw_output.transformation)):
+        elif ((self.pipeline_step != None and self.pipeline_step_raw_output != None) and
+              (self.pipeline_step.transformation != self.pipeline_step_raw_output.transformation)):
             raise ValidationError(
                 "Specified PipelineStep does not produce specified TransformationRawOutput");
 
@@ -1223,7 +1226,7 @@ class Pipeline(Transformation):
             # Clone the referenced PipelineStep's TransformationOutput
             # to make the specified output for the pipeline.
             self.raw_outputs.create(dataset_name=connect_to_output,
-                                    dataset_idx=raw_outcable.output_idx);
+                                    dataset_idx=raw_outcable.raw_output_idx);
             
 
 class PipelineStep(models.Model):
@@ -1815,7 +1818,7 @@ class PipelineRawOutputCable(models.Model):
 
         # Also determine if raw output was deleted by the step producing it
         if (providing_step.raw_outputs_to_delete.
-                filter(dataset_to_delete=output_requested).exists()):
+                filter(raw_dataset_to_delete=output_requested).exists()):
             raise ValidationError(
                 "Raw output \"{}\" from step {} is deleted prior to request".
                 format(output_requested.dataset_name, requested_from));
@@ -2015,8 +2018,7 @@ class TransformationRawXput(models.Model):
     def __unicode__(self):
         return u"[{}]:raw{} {} {}".format(unicode(self.transformation),
                                        self.dataset_idx,
-                                       self.dataset_name);
-
+                                       self.dataset_name)
 
 class TransformationRawInput(TransformationRawXput):
     """
