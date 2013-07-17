@@ -5261,16 +5261,20 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
-        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         raw_output_unrelated = self.script_4_2_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
-        pipeline_unrelated = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1_unrelated = pipeline_1.steps.create(transformation=self.script_4_2_M,step_num=1)
+        pipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in a different pipeline
         deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output_unrelated)
-        deleted_output.clean()
-
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 a_b_c_squared_raw\"",
+            deleted_output.clean)
+        # FIXME check propagation of error
+        
     def test_pipelineStepRawDelete_delete_existent_tro_good(self):
         # Define raw output for self.script_4_1_M
         raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
@@ -5615,25 +5619,29 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
         self.script_4_1_M.clean()
 
-        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
-        unrelated_raw_output = self.script_4_2_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        unrelated_raw_output = self.script_4_2_M.raw_outputs.create(dataset_name="unrelated_raw_output",dataset_idx=1)
 
-        # Define 2-step pipeline with a single raw pipeline input
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        # Define 1-step pipeline with a single raw pipeline input
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
         pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        # Define second 2 step pipeline with a single raw pipeline input
-        pipeline_2 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        # Define second 1-step pipeline with a single raw pipeline input
+        pipeline_2 = self.test_PF.members.create(revision_name="bar",revision_desc="Bar version");
         pipeline_2.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_unrelated = pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
 
-        # For pipeline 1, mark a raw output to be deleted in a different pipeline
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2
         deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=unrelated_raw_output)
 
-        deleted_output.clean()
-
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 unrelated_raw_output\"",
+            deleted_output.clean)
+        # FIXME: check propagation of error
+        
     def test_pipelineRawOutputCable_outcable_references_deleted_output_bad(self):
 
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
@@ -5701,7 +5709,7 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         unrelated_method = Method(revision_name="s4 - unrelated",revision_desc="s4 - unrelated",family = self.test_MF,driver = self.script_4_1_CRR)
         unrelated_method.save()
         unrelated_method.clean()
-        unrelated_raw_output = unrelated_method.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        unrelated_raw_output = unrelated_method.raw_outputs.create(dataset_name="unrelated raw output",dataset_idx=1)
 
         # Define 1-step pipeline with a single raw pipeline input
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
@@ -5714,7 +5722,10 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             step_providing_raw_output=1,
             provider_raw_output=unrelated_raw_output)
 
-        outcable1.clean()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Transformation at step 1 does not produce raw output \"\[Method test method family s4 - unrelated\]:raw1 unrelated raw output\"",
+            outcable1.clean)
 
     def test_pipelineRawOutputCable_outcable_references_invalid_step_bad(self):
         
@@ -5827,22 +5838,16 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.pipeline_2.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_pipeline_2 = self.pipeline_2.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        # Define a raw cable leading from pipeline_1 to a pipeline 2 raw input (Cross-pipeline contamination!)
-        rawcable1 = step1_pipeline_1.raw_cables_in.create(
+        # Define a raw cable into Pipeline2step1 from Pipeline1's raw inputs (Cross-pipeline contamination!)
+        rawcable1 = step1_pipeline_2.raw_cables_in.create(
             transf_raw_input=step1_pipeline_2.transformation.raw_inputs.get(dataset_name="a_b_c"),
             pipeline_raw_input=self.pipeline_1.raw_inputs.get(dataset_name="a_b_c_pipeline"));
 
-        rawcable1.clean()
-        step1_pipeline_1.clean()
-        step1_pipeline_2.clean()
-        self.pipeline_1.clean()
-        self.pipeline_2.clean()
 
-        #self.assertRaisesRegexp(ValidationError,"Step 1",rawcable1.clean) 
-        #self.assertRaisesRegexp(ValidationError,"Step 1",step1.clean)
-        #self.assertRaisesRegexp(ValidationError,"Step 1",step1.complete_clean) 
-        #self.assertRaisesRegexp(ValidationError,"Step 1",self.pipeline_1.clean)
-        self.assertRaisesRegexp(ValidationError,"THIS SHOULDNT BE WORKING...!!",self.pipeline_1.clean)
+        self.assertRaisesRegexp(ValidationError,"Step 1",rawcable1.clean) 
+        self.assertRaisesRegexp(ValidationError,"Step 1",step1_pipeline_2.clean)
+        self.assertRaisesRegexp(ValidationError,"Step 1",step1_pipeline_2.complete_clean) 
+        self.assertRaisesRegexp(ValidationError,"Step 1",self.pipeline_2.clean)
 
     def test_pipelineStepRawInputCable_does_not_map_to_raw_input_of_this_step_bad(self):
         """
@@ -5869,11 +5874,12 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             pipeline_raw_input=self.pipeline_1.raw_inputs.get(dataset_name="a_b_c_pipeline"));
 
         # FIXME: This might be broken
-        self.assertRaisesRegexp(ValidationError,"Step 1",rawcable1.clean)
-        self.assertRaisesRegexp(ValidationError,"Step 1",step1.clean)
-        self.assertRaisesRegexp(ValidationError,"Step 1",step1.complete_clean)
-        self.assertRaisesRegexp(ValidationError,"Step 1",self.pipeline_1.clean)
-        self.assertRaisesRegexp(ValidationError,"Step 1",self.pipeline_1.complete_clean)
+        error_msg = "Transformation at step 1 does not have raw input \"\[Method test method family s4\]:raw1 a_b_c_method\"";
+        self.assertRaisesRegexp(ValidationError,error_msg,rawcable1.clean)
+        self.assertRaisesRegexp(ValidationError,error_msg,step1.clean)
+        self.assertRaisesRegexp(ValidationError,error_msg,step1.complete_clean)
+        self.assertRaisesRegexp(ValidationError,error_msg,self.pipeline_1.clean)
+        self.assertRaisesRegexp(ValidationError,error_msg,self.pipeline_1.complete_clean)
 
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
         # Give script_4_1_M a raw input
