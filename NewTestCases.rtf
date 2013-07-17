@@ -1,18 +1,20 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;\red0\green61\blue204;\red206\green59\blue0;}
+{\colortbl;\red255\green255\blue255;\red0\green61\blue204;\red206\green59\blue0;\red217\green11\blue0;
+}
 \margl1440\margr1440\vieww26180\viewh9640\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
-\f0\b\fs24 \cf0 Write scripts
+\f0\b\fs24 \cf2 Write scripts
 \b0 \
-\cf2 1A) Takes raw input, outputs CSV input\
+1A) Takes raw input, outputs CSV input\
 script_4_raw_in_CSV_out.py:	Inputs raw (a,b,c) and outputs CSV (a^2, b^2, c^2)\
 1B) Takes CSV input, outputs raw\
 script_5_CSV_in_raw_out.py:	Inputs CSV (a,b,c) and outputs RAW (a^2,b^2,c^2)\
 1C) Takes raw input, outputs raw (Can be dumb)\
-script_6_raw_in_raw_out.py:	Inputs raw (a,b,c) and outputs raw (a^2,b^2,c^2)\cf0 \
-1D) One that "mixes and matches" (??)\
+script_6_raw_in_raw_out.py:	Inputs raw (a,b,c) and outputs raw (a^2,b^2,c^2)\
+1D) One that "mixes and matches"\
+script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outputs CSV and raw (a+d,b+e,c+f)\cf0 \
 \
 
 \b Transformation (Raw inputs incorporated)
@@ -44,8 +46,8 @@ transf_raw_input = destination raw input hole\
 
 \b PipelineStepRawDelete
 \b0 \
- - Has a clean method\
- - 1 or 2 checks on PS.clean (just propagation of errors)\
+\cf4  - Clean: the raw transformation output to be deleted must exist\
+\cf0  - 1 or 2 checks on PS.clean (just propagation of errors)\
  - maybe 1 or 2 checks on Pipeline.clean (but this is just propagation of errors)\
 \
 

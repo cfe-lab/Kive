@@ -5254,6 +5254,36 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
     New tests to take into account raw inputs/outputs/datasets
     """
 
+    def test_pipelineStepRawDelete_delete_non_existent_tro_bad(self):
+        # Define a 1-step pipeline containing self.script_4_1_M which has a raw_output
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
+        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M.save()
+        raw_output_unrelated = self.script_4_2_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        pipeline_unrelated = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1_unrelated = pipeline_1.steps.create(transformation=self.script_4_2_M,step_num=1)
+
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline
+        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output_unrelated)
+        deleted_output.clean()
+
+    def test_pipelineStepRawDelete_delete_existent_tro_good(self):
+        # Define raw output for self.script_4_1_M
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+
+        # Define 1-step pipeline
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline
+        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output)
+
+        self.assertEquals(deleted_output.clean(), None)
+
     def test_rawDataset_pipelineStepRawOutput_set_but_pipeline_step_isnt_bad(self):
         # Define a method with a raw output
         methodRawOutput = self.script_4_1_M.raw_outputs.create(

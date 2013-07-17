@@ -1733,7 +1733,7 @@ class PipelineStepRawDelete(models.Model):
 
     def clean(self):
         """
-        The raw output to be deleted must exist.
+        The raw output to be deleted must exist in this pipeline step.
         """
         to_del = self.raw_dataset_to_delete;
 
