@@ -114,7 +114,7 @@ class Datatype(models.Model):
         pass
 
     def clean(self):
-        if (self.is_restricted_by(self)):
+        if hasattr(self, "restricts") and self.is_restricted_by(self):
             raise ValidationError("Circular Datatype restriction detected");
 
     def __unicode__(self):
