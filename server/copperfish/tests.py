@@ -5232,12 +5232,44 @@ class Copperfish_Raw_Setup (TestCase):
             self.string_dt = Datatype(name="string", description="A String", verification_script=File(f), Python_type="str");
             self.string_dt.save()
 
+        # Create Datatype "DNANucSeq" with validation code DNANucSeqUT.py
+        # and make it a restriction of string_dt
+        with open(os.path.join(samplecode_path, "DNANucSeqUT.py"), "rb") as f:
+            self.DNA_dt = Datatype(name="DNANucSeq",
+                                   description="String consisting of ACGTacgt",
+                                   verification_script=File(f),
+                                   Python_type="str");
+            self.DNA_dt.save();
+
+            # DNA_dt is a restricted type of string
+            self.DNA_dt.restricts.add(self.string_dt);
+            self.DNA_dt.save();
+
         # Define CDT "triplet_cdt" with 3 members for use as an input/output
         self.triplet_cdt = CompoundDatatype()
         self.triplet_cdt.save()
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="a^2",column_idx=1)
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="b^2",column_idx=2)
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="c^2",column_idx=3)
+
+        # A CDT with mixed Datatypes
+        self.mix_triplet_cdt = CompoundDatatype()
+        self.mix_triplet_cdt.save()
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="Col1Str",column_idx=1)
+        self.mix_triplet_cdt.members.create(datatype=self.DNA_dt,column_name="Col2DNA",column_idx=2)
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="Col3Str",column_idx=3)
+
+        # Define CDT "doublet_cdt" with 2 members for use as an input/output
+        self.doublet_cdt = CompoundDatatype()
+        self.doublet_cdt.save();
+        self.doublet_cdt.members.create(datatype=self.string_dt,column_name="StrCol1",column_idx=1)
+        self.doublet_cdt.members.create(datatype=self.string_dt,column_name="StrCol2",column_idx=2)
+        
+        # Define CDT "DNAdoublet_cdt" with 2 members for use as an input/output
+        self.DNAdoublet_cdt = CompoundDatatype()
+        self.DNAdoublet_cdt.save();
+        self.DNAdoublet_cdt.members.create(datatype=self.DNA_dt,column_name="DNACol1",column_idx=1)
+        self.DNAdoublet_cdt.members.create(datatype=self.DNA_dt,column_name="DNACol2",column_idx=2)
 
         # Define PF in order to define pipeline
         self.test_PF = PipelineFamily(name="test pipeline family",description="pipeline family placeholder");
@@ -5249,44 +5281,32 @@ class Copperfish_Raw_Setup (TestCase):
         self.myUser.last_name = 'Lennon'
         self.myUser.save()
 
-class Raw_Datasets_tests(Copperfish_Raw_Setup):
+class Datasets_tests(Copperfish_Raw_Setup):
     """
     New tests to take into account raw inputs/outputs/datasets
     """
 
-    def test_pipelineStepRawDelete_delete_non_existent_tro_bad(self):
-        # Define a 1-step pipeline containing self.script_4_1_M which has a raw_output
-        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+    def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_also_valid_good(self):
+        """ Pipeline_step is set, and pipeline_step_raw_output is also set """
+
+        # Define a method with a raw output
+        methodRawOutput = self.script_4_1_M.raw_outputs.create(
+            dataset_name="theOutput",
+            dataset_idx=1)
+
+        # Define a pipeline
         pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
-        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
-        self.script_4_2_M.save()
-        raw_output_unrelated = self.script_4_2_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
-        pipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
+        # Define a raw Dataset with a defined source pipeline step and pipeline_step_output
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            rawdataset_1 = RawDataset(user=self.myUser,
+                                      name="test dataset",
+                                      dataset_file=File(f),
+                                      pipeline_step=step1,
+                                      pipeline_step_raw_output=methodRawOutput)
 
-        # For pipeline 1, mark a raw output to be deleted in a different pipeline
-        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output_unrelated)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 a_b_c_squared_raw\"",
-            deleted_output.clean)
-        # FIXME check propagation of error
-        
-    def test_pipelineStepRawDelete_delete_existent_tro_good(self):
-        # Define raw output for self.script_4_1_M
-        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
-
-        # Define 1-step pipeline
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # For pipeline 1, mark a raw output to be deleted in a different pipeline
-        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output)
-
-        self.assertEquals(deleted_output.clean(), None)
+        self.assertEquals(rawdataset_1.clean(), None)
 
     def test_rawDataset_pipelineStepRawOutput_set_but_pipeline_step_isnt_bad(self):
         # Define a method with a raw output
@@ -5309,6 +5329,27 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             "No PipelineStep specified but a raw output from a PipelineStep is",
             rawdataset_1.clean)
 
+    def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_notSet_bad(self):
+        # Define a method with a raw output
+        methodRawOutput = self.script_4_1_M.raw_outputs.create(
+            dataset_name="theOutput",
+            dataset_idx=1)
+
+        # Define a pipeline
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # Define a raw Dataset with a defined source pipeline step and pipeline_step_output
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            rawdataset_1 = RawDataset(user=self.myUser,
+                                      name="test dataset",
+                                      dataset_file=File(f),
+                                      pipeline_step=step1)
+
+        self.assertRaisesRegexp(ValidationError,
+            "PipelineStep is specified but no raw output from it is",
+            rawdataset_1.clean)
+
     def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_does_not_belong_to_specified_PS_bad(self):
         # Define a method with a raw output
         methodRawOutput = self.script_4_1_M.raw_outputs.create(
@@ -5317,7 +5358,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
 
         # Define a second method
         script_4_2_M = Method(revision_name="s4-2",revision_desc="s4-2",family = self.test_MF,driver = self.script_4_1_CRR)
-        script_4_2_M.full_clean()
         script_4_2_M.save()
 
         # Give it a raw output
@@ -5342,48 +5382,30 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             "Specified PipelineStep does not produce specified TransformationRawOutput",
             rawdataset_1.clean)
 
-    def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_notSet_bad(self):
-        # Define a method with a raw output
-        methodRawOutput = self.script_4_1_M.raw_outputs.create(
-            dataset_name="theOutput",
-            dataset_idx=1)
 
-        # Define a pipeline
+    def test_dataset_cdt_matches_pipeline_step_CDT_good(self):
+        """Link a dataset with a pipeline output and have CDTs match"""
+        
+        # Give a method a triplet CDT output
+        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
+                                         dataset_name="theOutput",
+                                         dataset_idx=1)
+        
+        # Define pipeline with 1 step containing the triplet CDT output
         pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        # Define a raw Dataset with a defined source pipeline step and pipeline_step_output
+        # Define a Dataset with a defined source pipeline step and pipeline_step_output of matching CDT
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            rawdataset_1 = RawDataset(user=self.myUser,
-                                      name="test dataset",
-                                      dataset_file=File(f),
-                                      pipeline_step=step1)
-
-        self.assertRaisesRegexp(ValidationError,
-            "PipelineStep is specified but no raw output from it is",
-            rawdataset_1.clean)
-
-    def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_also_valid_good(self):
-        """ Pipeline_step is set, and pipeline_step_raw_output is also set """
-
-        # Define a method with a raw output
-        methodRawOutput = self.script_4_1_M.raw_outputs.create(
-            dataset_name="theOutput",
-            dataset_idx=1)
-
-        # Define a pipeline
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # Define a raw Dataset with a defined source pipeline step and pipeline_step_output
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            rawdataset_1 = RawDataset(user=self.myUser,
-                                      name="test dataset",
-                                      dataset_file=File(f),
-                                      pipeline_step=step1,
-                                      pipeline_step_raw_output=methodRawOutput)
-
-        self.assertEquals(rawdataset_1.clean(), None)
+            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
+                                user=self.myUser,
+                                name="test dataset",
+                                dataset_file=File(f),
+                                pipeline_step=step1,
+                                pipeline_step_output=methodOutput)
+            dataset_1.save()
+            
+        self.assertEquals(dataset_1.clean(), None)
 
     def test_dataset_cdt_doesnt_match_pipeline_step_CDT_bad(self):
         """Link a dataset with a pipeline output and have CDTs mismatch"""
@@ -5417,106 +5439,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(ValidationError,
             "Dataset CDT does not match the CDT of the generating TransformationOutput",
             dataset_1.clean)
-
-
-    def test_dataset_cdt_matches_pipeline_step_CDT_good(self):
-        """Link a dataset with a pipeline output and have CDTs match"""
-        
-        # Give a method a triplet CDT output
-        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
-                                         dataset_name="theOutput",
-                                         dataset_idx=1)
-        
-        # Define pipeline with 1 step containing the triplet CDT output
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # Define a Dataset with a defined source pipeline step and pipeline_step_output of matching CDT
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
-                                user=self.myUser,
-                                name="test dataset",
-                                dataset_file=File(f),
-                                pipeline_step=step1,
-                                pipeline_step_output=methodOutput)
-            dataset_1.save()
-            
-        self.assertEquals(dataset_1.clean(), None)
-
-    def test_dataset_CSV_incoherent_header_bad(self):
-        """Loads a coherent vs incoherent dataset"""
-
-        # Give a method a triplet CDT output
-        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
-                                         dataset_name="theOutput",
-                                         dataset_idx=1)
-
-        # Define a pipeline with 1 step containing the triplet CDT output
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # Define an INCOHERENT Dataset with a defined source pipeline step and pipeline_step_output
-        with open(os.path.join(samplecode_path, "script_5_headers_reversed_incoherent.csv"), "rb") as f:
-            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
-                                user=self.myUser,
-                                name="test dataset",
-                                dataset_file=File(f),
-                                pipeline_step=step1,
-                                pipeline_step_output=methodOutput)
-            dataset_1.save()
-        
-        self.assertRaisesRegexp(ValidationError,
-            "Column 1 of Dataset \"test dataset \(created by john on .*\)\" is named",
-            dataset_1.clean)
-
-
-    def test_dataset_numrows(self):
-        # Give a method a triplet CDT output
-        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
-                                         dataset_name="theOutput",
-                                         dataset_idx=1)
-
-        # Define a pipeline with 1 step containing the triplet CDT output
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # Define a Dataset with a defined source pipeline step and pipeline_step_output
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
-                                user=self.myUser,
-                                name="test dataset",
-                                dataset_file=File(f),
-                                pipeline_step=step1,
-                                pipeline_step_output=methodOutput)
-            dataset_1.save()
-            dataset_1.clean()
-
-        self.assertEquals(dataset_1.num_rows(), 5)
-
-    def test_dataset_pipelineStep_set_pipelineStepOutput_valid_good(self):
-        """Dataset comes from a pipeline step with an output of the correct CDT"""
-
-        # Give a method a triplet CDT output
-        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
-                                         dataset_name="theOutput",
-                                         dataset_idx=1)
-
-        # Define a pipeline with 1 step containing the triplet CDT output
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-
-        # Define a Dataset with a defined source pipeline step and pipeline_step_output
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
-                                user=self.myUser,
-                                name="test dataset",
-                                dataset_file=File(f),
-                                pipeline_step=step1,
-                                pipeline_step_output=methodOutput)
-            dataset_1.save()
-            dataset_1.clean()
-
-        self.assertEquals(dataset_1.clean(), None)
 
     def test_dataset_pipelineStep_not_set_pipelineStepOutput_set_bad(self):
         """Dataset is linked to a pipeline step output, but not a pipeline step"""
@@ -5585,7 +5507,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         # Define a pipeline with 1 step containing the triplet CDT output
         pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-        step2 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2)
 
         # Define a Dataset with a defined source pipeline step but no pipeline_step_output
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
@@ -5598,6 +5519,56 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             dataset_1.save()
 
         self.assertRaisesRegexp(ValidationError,"Specified PipelineStep does not produce specified TransformationOutput",dataset_1.clean)
+
+    def test_dataset_CSV_incoherent_header_bad(self):
+        """Loads a coherent vs incoherent dataset"""
+
+        # Give a method a triplet CDT output
+        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
+                                         dataset_name="theOutput",
+                                         dataset_idx=1)
+
+        # Define a pipeline with 1 step containing the triplet CDT output
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # Define an INCOHERENT Dataset with a defined source pipeline step and pipeline_step_output
+        with open(os.path.join(samplecode_path, "script_5_headers_reversed_incoherent.csv"), "rb") as f:
+            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
+                                user=self.myUser,
+                                name="test dataset",
+                                dataset_file=File(f),
+                                pipeline_step=step1,
+                                pipeline_step_output=methodOutput)
+            dataset_1.save()
+        
+        self.assertRaisesRegexp(ValidationError,
+            "Column 1 of Dataset \"test dataset \(created by john on .*\)\" is named",
+            dataset_1.clean)
+
+
+    def test_dataset_numrows(self):
+        # Give a method a triplet CDT output
+        methodOutput = self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt,
+                                         dataset_name="theOutput",
+                                         dataset_idx=1)
+
+        # Define a pipeline with 1 step containing the triplet CDT output
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # Define a Dataset with a defined source pipeline step and pipeline_step_output
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_1 = Dataset(compounddatatype=self.triplet_cdt,
+                                user=self.myUser,
+                                name="test dataset",
+                                dataset_file=File(f),
+                                pipeline_step=step1,
+                                pipeline_step_output=methodOutput)
+            dataset_1.save()
+            dataset_1.clean()
+
+        self.assertEquals(dataset_1.num_rows(), 5)
 
     def test_abstractDataset_clean_for_correct_MD5_checksum(self):
 
@@ -5612,12 +5583,78 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         dataset_1.clean()
         self.assertEquals(dataset_1.MD5_checksum, '5f1821eebedee3b3ca95cf6b25a2abb1')
 
-    def test_pipelineStepRawDelete_clean_raw_output_to_be_deleted_in_different_pipeline_bad(self):
+class PipelineStepRawDelete_tests(Copperfish_Raw_Setup):
+
+    def test_pipelineStepRawDelete_clean_raw_output_to_be_deleted_good(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
         self.script_4_1_M.raw_inputs.create(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
         self.script_4_1_M.clean()
+
+        # Define 1-step pipeline with a single raw pipeline input
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2
+        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output)
+
+        self.assertEquals(deleted_output.clean(), None)
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(pipeline_1.clean(), None)
+
+    def test_pipelineStepRawDelete_delete_existent_tro_good(self):
+        # Define raw output for self.script_4_1_M
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+
+        # Define 1-step pipeline
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline
+        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output)
+
+        self.assertEquals(deleted_output.clean(), None)
+
+    def test_pipelineStepRawDelete_delete_non_existent_tro_bad(self):
+        # Define a 1-step pipeline containing self.script_4_1_M which has a raw_output
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
+        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M.save()
+        raw_output_unrelated = self.script_4_2_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        pipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
+
+        # For pipeline 1, mark a raw output to be deleted in an unrelated method
+        deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=raw_output_unrelated)
+
+        errorMessage = "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 a_b_c_squared_raw\""
+        
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            deleted_output.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            pipeline_1.clean)
+        
+    def test_pipelineStepRawDelete_clean_raw_output_to_be_deleted_in_different_pipeline_bad(self):
+        # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
+        self.script_4_1_M.raw_inputs.create(dataset_name="a_b_c",dataset_idx=1)
+        self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
@@ -5633,14 +5670,50 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         pipeline_2.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_unrelated = pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
 
-        # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2
+        # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2)
         deleted_output = step1.raw_outputs_to_delete.create(raw_dataset_to_delete=unrelated_raw_output)
 
         self.assertRaisesRegexp(
             ValidationError,
             "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 unrelated_raw_output\"",
             deleted_output.clean)
-        # FIXME: check propagation of error
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 unrelated_raw_output\"",
+            step1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Transformation at step 1 does not have raw output \"\[Method test method family s42\]:raw1 unrelated_raw_output\"",
+            pipeline_1.clean)
+
+
+class RawOutputCable_tests(Copperfish_Raw_Setup):
+
+    def test_pipelineRawOutputCable_outcable_references_valid_step_good(self):
+
+        # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
+        self.script_4_1_M.raw_inputs.create(dataset_name="a_b_c",dataset_idx=1)
+        self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
+        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
+
+        # Define 1-step pipeline with a single raw pipeline input
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1);
+
+        # Outmap a raw cable from a valid step
+        outcable1 = self.pipeline_1.raw_outcables.create(raw_output_name="validName",
+            raw_output_idx=1,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output)
+
+        # Note: pipeline + pipeline step 1 complete_clean would fail (not all inputs are quenched)
+        self.pipeline_1.create_outputs()
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(outcable1.clean(), None)
+        self.assertEquals(self.pipeline_1.clean(), None)
         
     def test_pipelineRawOutputCable_outcable_references_deleted_output_bad(self):
 
@@ -5648,7 +5721,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.script_4_1_M.raw_inputs.create(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
-        self.script_4_1_M.clean()
 
         # Define 2-step pipeline with a single raw pipeline input
         pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
@@ -5673,30 +5745,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(ValidationError,errorMessage,outcable1.clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_1.clean)
         self.assertEquals(step1.clean(), None)
-
-    def test_pipelineRawOutputCable_outcable_references_valid_step_good(self):
-
-        # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.raw_inputs.create(dataset_name="a_b_c",dataset_idx=1)
-        self.script_4_1_M.outputs.create(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
-        raw_output = self.script_4_1_M.raw_outputs.create(dataset_name="a_b_c_squared_raw",dataset_idx=2)
-        self.script_4_1_M.clean()
-
-        # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1);
-
-        # Outmap a raw cable from a valid step
-        outcable1 = self.pipeline_1.raw_outcables.create(raw_output_name="validName",
-            raw_output_idx=1,
-            step_providing_raw_output=1,
-            provider_raw_output=raw_output)
-
-        self.pipeline_1.create_outputs()
-        self.assertEquals(step1.clean(), None)
-        self.assertEquals(outcable1.clean(), None)
-        self.assertEquals(self.pipeline_1.clean(), None)
 
     def test_pipelineRawOutputCable_outcable_references_valid_step_but_invalid_TransformationRawOutput_bad(self):
         
@@ -5749,7 +5797,8 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(ValidationError,"Raw output requested from a non-existent step",outcable1.clean)
         self.assertRaisesRegexp(ValidationError,"Raw output requested from a non-existent step",self.pipeline_1.clean)
         self.assertRaisesRegexp(ValidationError,"Raw output requested from a non-existent step",self.pipeline_1.complete_clean)
-            
+
+class RawInputCable_tests(Copperfish_Raw_Setup):
     def test_pipelineStepRawInputCable_comes_from_pipeline_input_good(self):
         """
         pipeline_raw_input comes from a pipeline input
@@ -5873,7 +5922,6 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             transf_raw_input=self.script_4_2_M.raw_inputs.get(dataset_name="a_b_c_method"),
             pipeline_raw_input=self.pipeline_1.raw_inputs.get(dataset_name="a_b_c_pipeline"));
 
-        # FIXME: This might be broken
         error_msg = "Transformation at step 1 does not have raw input \"\[Method test method family s4\]:raw1 a_b_c_method\"";
         self.assertRaisesRegexp(ValidationError,error_msg,rawcable1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,step1.clean)
@@ -5881,6 +5929,7 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(ValidationError,error_msg,self.pipeline_1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,self.pipeline_1.complete_clean)
 
+class RawSave_tests(Copperfish_Raw_Setup):
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
         # Give script_4_1_M a raw input
         self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
@@ -5921,7 +5970,9 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         # The input should have been copied over (SUBOPTIMAL TEST)
         self.assertEqual(self.script_4_1_M.raw_inputs.all()[0].dataset_name,self.script_4_2_M.raw_inputs.all()[0].dataset_name);
         self.assertEqual(self.script_4_1_M.raw_inputs.all()[0].dataset_idx,self.script_4_2_M.raw_inputs.all()[0].dataset_idx);
-    
+
+
+class SingleRawInput_tests(Copperfish_Raw_Setup):
     def test_transformation_rawinput_coexists_with_nonraw_inputs_clean_good(self):
 
         # Define raw input "a_b_c" at index = 1
@@ -5999,6 +6050,163 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
             "Inputs are not consecutively numbered starting from 1",
             self.script_4_1_M.clean)
 
+
+class SeveralRawInput_tests(Copperfish_Raw_Setup):
+    def test_transformation_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
+        # Note that this method wouldn't actually run -- inputs don't match.
+
+        # Define raw input "a_b_c" at index = 1
+        self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw input "RawIn3" at index = 3
+        self.script_4_1_M.raw_inputs.create(dataset_name = "RawIn3",dataset_idx = 3)
+
+        # Define input "a_b_c_squared" of type "triplet_cdt" at index = 2
+        self.script_4_1_M.inputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 2)
+
+        # Define input "Input4" of type "doublet_cdt" at index = 4
+        self.script_4_1_M.inputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Input4",dataset_idx = 4)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(self.script_4_1_M.check_input_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertEquals(self.script_4_1_M.clean(), None);
+        
+    def test_transformation_several_rawinputs_several_nonraw_inputs_indices_clash_bad(self):
+        # Note that this method wouldn't actually run -- inputs don't match.
+
+        # Define raw input "a_b_c" at index = 1
+        self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw input "RawIn3" at index = 2
+        self.script_4_1_M.raw_inputs.create(dataset_name = "RawIn2",dataset_idx = 2)
+        
+        # Define input "a_b_c_squared" of type "triplet_cdt" at index = 2
+        self.script_4_1_M.inputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 2)
+
+        # Define input "Input3" of type "doublet_cdt" at index = 3
+        self.script_4_1_M.inputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Input3",dataset_idx = 3)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.check_input_indices);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.clean);
+
+    def test_transformation_several_rawinputs_several_nonraw_inputs_not1based_bad(self):
+        # Note that this method wouldn't actually run -- inputs don't match.
+
+        # Define raw input "a_b_c" at index = 2
+        self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 2)
+        
+        # Define raw input "RawIn3" at index = 3
+        self.script_4_1_M.raw_inputs.create(dataset_name = "RawIn3",dataset_idx = 3)
+
+        # Define input "a_b_c_squared" of type "triplet_cdt" at index = 4
+        self.script_4_1_M.inputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 4)
+
+        # Define input "Input4" of type "doublet_cdt" at index = 5
+        self.script_4_1_M.inputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Input4",dataset_idx = 5)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.check_input_indices);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.clean);
+
+    def test_transformation_several_rawinputs_several_nonraw_inputs_nonconsecutive_bad(self):
+        # Note that this method wouldn't actually run -- inputs don't match.
+
+        # Define raw input "a_b_c" at index = 2
+        self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 2)
+        
+        # Define raw input "RawIn3" at index = 3
+        self.script_4_1_M.raw_inputs.create(dataset_name = "RawIn3",dataset_idx = 3)
+
+        # Define input "a_b_c_squared" of type "triplet_cdt" at index = 5
+        self.script_4_1_M.inputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 5)
+
+        # Define input "Input4" of type "doublet_cdt" at index = 6
+        self.script_4_1_M.inputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Input6",dataset_idx = 6)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.check_input_indices);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.clean);
+
+    def test_pipeline_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
+
+        # Define 1-step pipeline with conflicting inputs
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_1.raw_inputs.create(dataset_name="input_1_raw",dataset_idx=1)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="input_2",dataset_idx=2)
+        pipeline_1.raw_inputs.create(dataset_name="input_3_raw",dataset_idx=3)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="input_4",dataset_idx=4)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(pipeline_1.check_input_names(), None)
+        self.assertEquals(pipeline_1.check_input_indices(), None)
+        self.assertEquals(pipeline_1.clean(), None)
+
+    def test_pipeline_several_rawinputs_coexists_with_several_nonraw_inputs_indices_clash_clean_bad(self):
+
+        # Define 1-step pipeline with conflicting input indices
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_1.raw_inputs.create(dataset_name="input_1_raw",dataset_idx=1)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="input_2",dataset_idx=1)
+        pipeline_1.raw_inputs.create(dataset_name="input_3_raw",dataset_idx=2)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="input_4",dataset_idx=3)
+
+        self.assertEquals(pipeline_1.check_input_names(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            pipeline_1.check_input_indices)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            pipeline_1.clean)
+
+    def test_pipeline_several_rawinputs_coexists_with_several_nonraw_inputs_names_clash_clean_bad(self):
+
+        # Define 1-step pipeline with conflicting input names
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_1.raw_inputs.create(dataset_name="clashing_name",dataset_idx=1)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="clashing_name",dataset_idx=3)
+        pipeline_1.raw_inputs.create(dataset_name="input_2",dataset_idx=2)
+        pipeline_1.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="input_4",dataset_idx=4)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input names overlap raw input names",
+            pipeline_1.check_input_names)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input names overlap raw input names",
+            pipeline_1.clean)
+
+class SingleRawOutput_tests(Copperfish_Raw_Setup):
     def test_transformation_rawoutput_coexists_with_nonraw_outputs_clean_good(self):
 
         # Define raw output "a_b_c" at index = 1
@@ -6070,5 +6278,117 @@ class Raw_Datasets_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(
             ValidationError,
             "Outputs are not consecutively numbered starting from 1",
-            self.script_4_1_M.clean) 
+            self.script_4_1_M.clean)
 
+
+
+class SeveralRawOutputs_tests(Copperfish_Raw_Setup):
+    def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_clean_good(self):
+        # Note: the method we define here doesn't correspond to reality; the
+        # script doesn't have all of these outputs.
+
+        # Define raw output "a_b_c" at index = 1
+        self.script_4_1_M.raw_outputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw output "RawOutput4" at index = 4
+        self.script_4_1_M.raw_outputs.create(dataset_name = "RawOutput4",dataset_idx = 4)
+
+        # Define output name "foo" of type "doublet_cdt" at index = 3
+        self.script_4_1_M.outputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Output3",dataset_idx = 3)
+            
+        # Define output name "a_b_c_squared" of type "triplet_cdt" at index = 2
+        self.script_4_1_M.outputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 2)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(self.script_4_1_M.check_input_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertEquals(self.script_4_1_M.clean(), None);
+        
+    def test_transformation_several_rawoutputs_with_several_nonraw_outputs_clean_indices_clash_bad(self):
+        # Note: the method we define here doesn't correspond to reality; the
+        # script doesn't have all of these outputs.
+
+        # Define raw output "a_b_c" at index = 1
+        self.script_4_1_M.raw_outputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw output "RawOutput4" at index = 2
+        self.script_4_1_M.raw_outputs.create(dataset_name = "RawOutput2",dataset_idx = 2)
+
+        # Define output name "foo" of type "doublet_cdt" at index = 2
+        self.script_4_1_M.outputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Output2",dataset_idx = 2)
+            
+        # Define output name "a_b_c_squared" of type "triplet_cdt" at index = 3
+        self.script_4_1_M.outputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 3)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(self.script_4_1_M.check_input_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.check_output_indices);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.clean);
+        
+    def test_transformation_several_rawoutputs_with_several_nonraw_outputs_clean_indices_nonconsecutive_bad(self):
+        # Note: the method we define here doesn't correspond to reality; the
+        # script doesn't have all of these outputs.
+
+        # Define raw output "a_b_c" at index = 1
+        self.script_4_1_M.raw_outputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw output "RawOutput4" at index = 2
+        self.script_4_1_M.raw_outputs.create(dataset_name = "RawOutput2",dataset_idx = 2)
+
+        # Define output name "foo" of type "doublet_cdt" at index = 5
+        self.script_4_1_M.outputs.create(compounddatatype = self.doublet_cdt,dataset_name = "Output5",dataset_idx = 5)
+            
+        # Define output name "a_b_c_squared" of type "triplet_cdt" at index = 10
+        self.script_4_1_M.outputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 10)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(self.script_4_1_M.check_input_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.check_output_indices);
+        self.assertEquals(self.script_4_1_M.check_output_names(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            self.script_4_1_M.clean);
+        
+    def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_names_clash_bad(self):
+        # Note: the method we define here doesn't correspond to reality; the
+        # script doesn't have all of these outputs.
+
+        # Define raw output "a_b_c" at index = 1
+        self.script_4_1_M.raw_outputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+        
+        # Define raw output "RawOutput4" at index = 4
+        self.script_4_1_M.raw_outputs.create(dataset_name = "ClashName",dataset_idx = 4)
+
+        # Define output name "foo" of type "doublet_cdt" at index = 3
+        self.script_4_1_M.outputs.create(compounddatatype = self.doublet_cdt,dataset_name = "ClashName",dataset_idx = 3)
+            
+        # Define output name "a_b_c_squared" of type "triplet_cdt" at index = 2
+        self.script_4_1_M.outputs.create(compounddatatype = self.triplet_cdt,dataset_name = "a_b_c_squared",dataset_idx = 2)
+
+        # Neither the names nor the indices conflict - this should pass
+        self.assertEquals(self.script_4_1_M.check_input_indices(), None);
+        self.assertEquals(self.script_4_1_M.check_input_names(), None);
+        self.assertEquals(self.script_4_1_M.check_output_indices(), None);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output names overlap raw output names",
+            self.script_4_1_M.check_output_names);
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output names overlap raw output names",
+            self.script_4_1_M.clean);

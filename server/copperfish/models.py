@@ -304,7 +304,7 @@ class AbstractDataset(models.Model):
 
         except ValueError as e:
             print(e)
-            print("No file found; setting MD5 checksum to the empty string.")
+            #print("No file found; setting MD5 checksum to the empty string.")
             self.MD5_checksum = ""
 
 class Dataset(AbstractDataset):
@@ -364,26 +364,30 @@ class Dataset(AbstractDataset):
                 raise ValidationError(
                     "Specified PipelineStep does not produce specified TransformationOutput");
             if self.compounddatatype != self.pipeline_step_output.compounddatatype:
+
+                # We do not need to check custom wiring, because there is no reason to
+                # reorder an output (Until it is plugged into another PS)
+                
                 raise ValidationError(
                     "Dataset CDT does not match the CDT of the generating TransformationOutput")
 
         # Check CSV header for coherence with registered CDT
         data_csv = csv.DictReader(self.dataset_file)
-	header = data_csv.fieldnames # Eric's mod
+        header = data_csv.fieldnames # Eric's mod
         cdt_members = self.compounddatatype.members.all()
-	
+        
         if len(data_csv.fieldnames) != cdt_members.count():
             raise ValidationError(
                 "Dataset \"{}\" does not have the same number of columns as its CDT".
                 format(unicode(self)))
 
-	# CDT member i must have the same name as the ith column in the CSV header
+        # CDT member i must have the same name as the ith column in the CSV header
         for cdtm in self.compounddatatype.members.all():
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 raise ValidationError(
                     "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
                     format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
-	    
+        
         # FIXME: this is where you validate the actual data in the file
 
     def num_rows(self):
