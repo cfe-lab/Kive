@@ -1,6 +1,7 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;\red38\green64\blue204;}
+{\colortbl;\red255\green255\blue255;\red38\green64\blue204;\red40\green67\blue204;\red44\green65\blue204;
+\red67\green96\blue204;\red40\green74\blue204;\red44\green84\blue204;}
 \margl1440\margr1440\vieww16280\viewh14940\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
 
@@ -72,15 +73,8 @@ script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outp
  - check that if pipeline_step_output is set, then so is pipeline_step\cf0 \
 \
 
-\b CustomOutputCableWire
-\b0 \
-- Check clean - reference an invalid CDTM\
-\
-
 \b Custom wiring
 \b0 \
-       The wire belongs to a cable which connects a source TransformationXput\
-        and a destination TransformationInput:\
         - source_pin must be a member of the set of CDT members of the cable source\
         (provider_output) TransformationXput;\
         - dest_pin must be a member of the set of CDT members of the cable\
@@ -102,15 +96,30 @@ PipelineStepInputCable\
        - 0 wires leading to a CDTM\
 
 \b \
-PipelineStep
+\cf3 CustomOutputCableWire
 \b0 \
-- Complete_clean: Check for quenching of raw inputs (Along with non-raw inputs)\
+- Check clean - reference an invalid CDTM\cf0 \
+
+\b \
+\cf4 PipelineOutputCable\
+
+\b0 - CustomOutputCableWire dest_idx must consecutively start from 1\cf0 \
 \
 
-\b Pipeline
+\b \cf5 Pipeline (Custom output wiring related)
 \b0 \
-- Check Pipeline.clean for indexing and naming collisions (With raw outmaps)\
-- create_outputs: custom wires lead to the correct Pipeline output CDT\
+- create_outputs: custom wires lead to the correct Pipeline output CDT\cf0 \
+
+\b \
+\cf6 PipelineStep (Raw input related tests)
+\b0 \
+- Complete_clean: Check for quenching of raw inputs (Single/Several_Raw_Input_Tests)\
+- Clean: Check for overquenching of raw inputs\cf0 \
+\
+
+\b Pipeline (Raw output related tests)
+\b0 \
+\cf7 - Check Pipeline.clean for indexing and naming collisions (With raw outmaps)\cf0 \
 - create_outputs:  raw outputs are created by raw outmaps\
 \
 

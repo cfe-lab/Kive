@@ -1214,7 +1214,7 @@ class Pipeline(Transformation):
                 # when you clean() the output cable.
                 output_CDT = CompoundDatatype();
                 output_CDT.save();
-                for outwire in outcable.custom_outwire.all():
+                for outwire in outcable.custom_outwires.all():
                     output_CDT.members.create(datatype=outwire.source_pin.datatype,
                                               column_name=outwire.dest_name,
                                               column_idx=outwire.dest_idx);
@@ -1338,7 +1338,7 @@ class PipelineStep(models.Model):
 
         # Validate each cable
         for curr_cable in self.cables_in.all():
-            curr_cable.clean()
+            curr_cable.clean_and_completely_wired()
         for curr_raw_cable in self.raw_cables_in.all():
             curr_raw_cable.clean()
 
@@ -1366,7 +1366,7 @@ class PipelineStep(models.Model):
 
         # Same thing for raw inputs.
         for curr_raw_input in self.transformation.raw_inputs.all():
-            raw_matches = self.raw_cables_in.filter(transf_input=curr_raw_input).count()
+            raw_matches = self.raw_cables_in.filter(transf_raw_input=curr_raw_input).count()
             if raw_matches == 0:
                 raise ValidationError(
                     "Raw input \"{}\" to transformation at step {} is not cabled".
@@ -1495,7 +1495,10 @@ class PipelineStepInputCable(models.Model):
         - Does the input come from a prior step?
         - Does the cable map to an (existent) input of this step's transformation?
         - Does the requested output exist?
-        - Do the input and output 'work together' (Equal CDT + compatible min/max)
+        - Do the input and output 'work together' (compatible min/max)?
+
+        Whether the input and output have compatible CDTs or have valid custom
+        wiring is checked via clean_and_completely_wired.
         """
         input_requested = self.provider_output;
         requested_from = self.step_providing_input;
@@ -1517,7 +1520,6 @@ class PipelineStepInputCable(models.Model):
         # This checks:
         # - the source produces the requested data
         # - the source doesn't delete the requested data
-        # - they have the same CompoundDatatype (or, there is valid custom wiring)
         # - they have compatible min_row and max_row
 
         if requested_from == 0:
@@ -1553,43 +1555,9 @@ class PipelineStepInputCable(models.Model):
                            self.pipelinestep.step_num));
 
         # Check that the input and output connected by the
-        # cable are compatible.  Don't check for
+        # cable are compatible re: number of rows.  Don't check for
         # ValidationError because this was checked in the
         # clean() of PipelineStep.
-
-        # If CDTs don't match, check validity of custom wiring
-        if input_requested.compounddatatype != feed_to_input.compounddatatype:
-
-            # There should be wires
-            if not self.custom_wires.all().exists():
-                raise ValidationError(
-                        "Custom wiring required for cable \"{}\"".
-                        format(unicode(self)));
-
-        if self.custom_wires.all().exists():
-            # Validate individual custom wires
-            for wire in self.custom_wires.all():
-                wire.clean()
-
-            # Each destination CDT member of must be wired to exactly once
-
-            # Get the CDT members of transf_input
-            dest_members = self.transf_input.compounddatatype.members.all()
-
-            # For each CDT member, check that there is exactly 1 custom_wire leading to it (IE, number of occurences of CDT member = dest_pin)
-            for dest_member in dest_members:
-                numwires = self.custom_wires.filter(dest_pin=dest_member).count()
-
-                if numwires == 0:
-                    raise ValidationError(
-                        "Destination member \"{}\" has no wires leading to it".
-                        format(unicode(dest_member)));
-
-                if numwires > 1:
-                    raise ValidationError(
-                        "Destination member \"{}\" has multiple wires leading to it".
-                        format(unicode(dest_member)));
-
 
         provided_min_row = 0;
         required_min_row = 0;
@@ -1622,7 +1590,50 @@ class PipelineStepInputCable(models.Model):
             raise ValidationError(
                 "Data fed to input \"{}\" of step {} may have too many rows".
                 format(feed_to_input.dataset_name, self.pipelinestep.step_num));
+
         
+    def clean_and_completely_wired(self):
+        """Check coherence of the cable, and check that it is correctly wired.
+
+        This will call clean() as well as checking whether the input and output
+        'work together' via having the same CDT or having good wiring.
+        """
+        # Check coherence of this cable otherwise.
+        self.clean();
+        
+        input_requested = self.provider_output;
+        feed_to_input = self.transf_input;
+        
+        # If CDTs don't match, check presence of custom wiring
+        if input_requested.compounddatatype != feed_to_input.compounddatatype:
+            if not self.custom_wires.all().exists():
+                raise ValidationError(
+                        "Custom wiring required for cable \"{}\"".
+                        format(unicode(self)));
+
+        # Validate whatever wires there are.
+        if self.custom_wires.all().exists():
+            for wire in self.custom_wires.all():
+                wire.clean()
+
+            # Each destination CDT member of must be wired to exactly once
+
+            # Get the CDT members of transf_input
+            dest_members = self.transf_input.compounddatatype.members.all()
+
+            # For each CDT member, check that there is exactly 1 custom_wire leading to it (IE, number of occurences of CDT member = dest_pin)
+            for dest_member in dest_members:
+                numwires = self.custom_wires.filter(dest_pin=dest_member).count()
+
+                if numwires == 0:
+                    raise ValidationError(
+                        "Destination member \"{}\" has no wires leading to it".
+                        format(unicode(dest_member)));
+
+                if numwires > 1:
+                    raise ValidationError(
+                        "Destination member \"{}\" has multiple wires leading to it".
+                        format(unicode(dest_member)));
  
 class CustomCableWire(models.Model):
     """
@@ -1670,25 +1681,25 @@ class CustomCableWire(models.Model):
         source_CDT_members = self.pipelinestepinputcable.provider_output.compounddatatype.members.all()
         dest_CDT_members = self.pipelinestepinputcable.transf_input.compounddatatype.members.all()
 
-        if not source_CDT_members.filter(pk=source_pin.pk).exists():
+        if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
             raise ValidationError(
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(source_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+                format(unicode(self.source_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
 
-        if not dest_CDT_members.filter(pk=dest_pin.pk).exists():
+        if not dest_CDT_members.filter(pk=self.dest_pin.pk).exists():
             raise ValidationError(
                 "Destination pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(dest_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+                format(unicode(self.dest_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
 
         # Check that the datatypes on either side of this wire are
         # either the same, or that the source datatype is a
         # restriction of the destination datatype (thus you can feed
         # the source to the destination).
-        if (source_pin.datatype != dest_pin.datatype and
-                (not dest_pin.datatype.is_restricted_by(source_pin.datatype))):
+        if (self.source_pin.datatype != self.dest_pin.datatype and
+                (not self.dest_pin.datatype.is_restricted_by(self.source_pin.datatype))):
             raise ValidationError(
                 "The datatype of the source pin \"{}\" is incompatible with the datatype of the destination pin \"{}\"".
-                format(unicode(source_pin), unicode(dest_pin)))
+                format(unicode(self.source_pin), unicode(self.dest_pin)))
         
 
 class PipelineStepDelete(models.Model):
@@ -1977,10 +1988,10 @@ class CustomOutputCableWire(models.Model):
         # Get the CDT members of the output-CDT referenced by this PipelineOutputCable
         source_CDT_members = self.pipelineoutputcable.provider_output.compounddatatype.members.all()
     
-        if not source_CDT_members.filter(pk=source_pin.pk).exists():
+        if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
             raise ValidationError(
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
+                format(unicode(self.source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
 
 class TransformationRawXput(models.Model):
     """

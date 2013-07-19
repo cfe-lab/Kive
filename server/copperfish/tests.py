@@ -2841,11 +2841,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
-        
+
+        self.assertEquals(cable.clean(), None);
         self.assertRaisesRegexp(
             ValidationError,
             "Custom wiring required for cable \"Pipeline DNAcomplement foo step 1:input\"",
-            cable.clean);
+            cable.clean_and_completely_wired);
         
     def test_pipeline_oneStep_cabling_minrow_constraint_may_be_breached_clean (self):
         """Unverifiable cabling: step requests input with possibly too
@@ -3385,11 +3386,16 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             transf_input=step3.transformation.inputs.get(dataset_name="input"),
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
-        
+
+        self.assertEquals(cable.clean(), None);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-                cable.clean);
+                cable.clean_and_completely_wired);
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
+                step3.clean);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
@@ -5227,6 +5233,9 @@ class Copperfish_Raw_Setup (TestCase):
         self.script_4_1_M.full_clean()
         self.script_4_1_M.save()
 
+        # A shorter alias
+        self.testmethod = self.script_4_1_M;
+
         # Define DT "string" to define CDT with CDT members
         with open(os.path.join(samplecode_path, "stringUT.py"), "rb") as f:
             self.string_dt = Datatype(name="string", description="A String", verification_script=File(f), Python_type="str");
@@ -5255,9 +5264,9 @@ class Copperfish_Raw_Setup (TestCase):
         # A CDT with mixed Datatypes
         self.mix_triplet_cdt = CompoundDatatype()
         self.mix_triplet_cdt.save()
-        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="Col1Str",column_idx=1)
-        self.mix_triplet_cdt.members.create(datatype=self.DNA_dt,column_name="Col2DNA",column_idx=2)
-        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="Col3Str",column_idx=3)
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="StrCol1",column_idx=1)
+        self.mix_triplet_cdt.members.create(datatype=self.DNA_dt,column_name="DNACol2",column_idx=2)
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt,column_name="StrCol3",column_idx=3)
 
         # Define CDT "doublet_cdt" with 2 members for use as an input/output
         self.doublet_cdt = CompoundDatatype()
@@ -6049,6 +6058,100 @@ class SingleRawInput_tests(Copperfish_Raw_Setup):
             ValidationError,
             "Inputs are not consecutively numbered starting from 1",
             self.script_4_1_M.clean)
+        
+    def test_PipelineStep_completeClean_check_quenching_of_raw_inputs_good(self):
+        # Wire 1 raw input to a pipeline step that expects only 1 input
+        method_raw_in = self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+
+        
+        # Define 1-step pipeline with a single raw pipeline input
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        raw_input_cable_1 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input)
+
+        self.assertEquals(step1.clean(), None)
+        self.assertEquals(step1.complete_clean(), None)
+
+    def test_PipelineStep_completeClean_check_overquenching_doubled_source_of_raw_inputs_bad(self):
+
+        # Wire 1 raw input to a pipeline step that expects only 1 input
+        method_raw_in = self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+
+        
+        # Define 1-step pipeline with a single raw pipeline input
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        raw_input_cable_1 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input)
+
+        raw_input_cable_2 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input)
+
+        errorMessage = "Raw input \"a_b_c\" to transformation at step 1 is cabled more than once"
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.complete_clean)
+
+    def test_PipelineStep_completeClean_check_overquenching_different_sources_of_raw_inputs_bad(self):
+
+        # Wire 1 raw input to a pipeline step that expects only 1 input
+        method_raw_in = self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+
+        
+        # Define 1-step pipeline with a single raw pipeline input
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        pipeline_input_2 = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline_2",dataset_idx=2)
+
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        raw_input_cable_1 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input)
+
+        raw_input_cable_2 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input_2)
+
+        errorMessage = "Raw input \"a_b_c\" to transformation at step 1 is cabled more than once"
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.complete_clean)
+
+        
+    def test_PipelineStep_completeClean_check_underquenching_of_raw_inputs_bad(self):
+
+        # Wire 1 raw input to a pipeline step that expects only 1 input
+        method_raw_in = self.script_4_1_M.raw_inputs.create(dataset_name = "a_b_c",dataset_idx = 1)
+
+        
+        # Define 1-step pipeline with a single raw pipeline input
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        errorMessage = "Raw input \"a_b_c\" to transformation at step 1 is not cabled'"
+
+        self.assertEquals(step1.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.complete_clean)
 
 
 class SeveralRawInput_tests(Copperfish_Raw_Setup):
@@ -6206,6 +6309,40 @@ class SeveralRawInput_tests(Copperfish_Raw_Setup):
             "Input names overlap raw input names",
             pipeline_1.clean)
 
+    # We consider this enough for the multiple input case, as the single case was thoroughly checked
+    def test_PipelineStep_completeClean_check_overquenching_different_sources_of_raw_inputs_bad(self):
+
+        # Define 2 inputs for the method
+        method_raw_in = self.script_4_1_M.raw_inputs.create(dataset_name = "method_in_1",dataset_idx = 1)
+        method_raw_in_2 = self.script_4_1_M.raw_inputs.create(dataset_name = "method_in_2",dataset_idx = 2)
+        
+        # Define 1-step pipeline with 2 raw pipeline inputs
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        pipeline_input_2 = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline_2",dataset_idx=2)
+
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        raw_input_cable_1 = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                       pipeline_raw_input = pipeline_input)
+
+        raw_input_cable_2 = step1.raw_cables_in.create(transf_raw_input = method_raw_in_2,
+                                                       pipeline_raw_input = pipeline_input_2)
+
+        raw_input_cable_over = step1.raw_cables_in.create(transf_raw_input = method_raw_in,
+                                                          pipeline_raw_input = pipeline_input_2)
+
+        errorMessage = "Raw input \"method_in_1\" to transformation at step 1 is cabled more than once"
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            step1.complete_clean)
+
 class SingleRawOutput_tests(Copperfish_Raw_Setup):
     def test_transformation_rawoutput_coexists_with_nonraw_outputs_clean_good(self):
 
@@ -6283,6 +6420,7 @@ class SingleRawOutput_tests(Copperfish_Raw_Setup):
 
 
 class SeveralRawOutputs_tests(Copperfish_Raw_Setup):
+
     def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_clean_good(self):
         # Note: the method we define here doesn't correspond to reality; the
         # script doesn't have all of these outputs.
@@ -6392,3 +6530,424 @@ class SeveralRawOutputs_tests(Copperfish_Raw_Setup):
             ValidationError,
             "Output names overlap raw output names",
             self.script_4_1_M.clean);
+
+class CustomWiring_tests(Copperfish_Raw_Setup):
+
+    def test_CustomCableWire_wires_from_pipeline_input_identical_dt_good(self):
+        """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
+        my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_in = my_pipeline.inputs.create(
+            compounddatatype=self.triplet_cdt,dataset_name="pipe_in_1",dataset_idx=1)
+
+        # Give the method the same CDT; assign custom wiring that is effectively the same.
+        method_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,
+                                                  compounddatatype=self.triplet_cdt);
+        
+        my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
+        my_cable1 = my_step1.cables_in.create(transf_input=method_in, step_providing_input=0,
+                                              provider_output=pipeline_in);
+
+        # This cable is clean; both CDTs match.
+        self.assertEquals(my_cable1.clean(), None);
+        self.assertEquals(my_cable1.clean_and_completely_wired(), None);
+         
+        wire1 = my_cable1.custom_wires.create(
+            source_pin=pipeline_in.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_in.compounddatatype.members.get(column_idx=1));
+        # This wire is clean...
+        self.assertEquals(wire1.clean(), None)
+        # ... and so is the cable...
+        self.assertEquals(my_cable1.clean(), None)
+        # ... but it isn't completely wired.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Destination member \"2: <string> \[b\^2\]\" has no wires leading to it",
+            my_cable1.clean_and_completely_wired)
+
+        for i in range(2,4):
+            my_cable1.custom_wires.create(
+                source_pin=pipeline_in.compounddatatype.members.get(column_idx=i),
+                dest_pin=method_in.compounddatatype.members.get(column_idx=i));
+
+        # Check all wires...
+        for wire in my_cable1.custom_wires.all():
+            self.assertEquals(wire.clean(), None)
+        # ... and the cable itself.
+        self.assertEquals(my_cable1.clean(), None);
+        self.assertEquals(my_cable1.clean_and_completely_wired(), None);
+
+    # DO THE FOLLOWING 4 TESTS FROM PIPELINE INPUT INTO STEP 1
+    def test_CustomCableWire_clean_for_datatype_compatibility(self):
+        # Sub test 1: x -> x
+        # Sub test 2: A (DT is compaitible with x) -> x
+        # Sub test 3: R (DT incompaitible with x) -> x
+        pass
+
+    def test_CustomCableWire_clean_source_and_dest_pin_do_not_come_from_cdt_bad(self):
+        # For source_pin and dest_pin, give a CDTM from an unrelated CDT
+        pass
+
+
+    def test_PSIC_clean_from_pipeline_input_triplet_to_doublet_with_shuffled_wiring_good(self):
+        # A -> z
+        # B -> NULL
+        # C -> x
+        pass
+
+    def test_PSIC_clean_from_pipeline_input_multi_from_source_wiring_dt_good(self):
+        # A -> x
+        # A -> y
+        # A -> z
+        pass
+
+    def test_cable_clean_and_completely_wired_not_quenched(self):
+        # x -> x
+        # NULL -> y
+        # z -> z
+        pass
+
+    def test_cable_clean_and_completely_wired_multiply_wired(self):
+        # Sub test 1
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Sub test 2
+        # x -> x
+        # x -> x
+        pass
+
+    # Check propagation on some of these
+
+    # DO THE FOLLOWING 2 UNIT TESTS FROM STEP 1 CUSTOM WIRED TO STEP 2
+    def test_cable_clean_and_completely_wired_multiply_wired_internal_steps(self):
+        # Sub test 1
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Sub test 2
+        # x -> x
+        # x -> x
+        pass
+    
+    def test_cable_clean_and_completely_wired_not_quenched(self):
+        # x -> x
+        # NULL -> y
+        # z -> z
+        pass
+
+
+class PipelineRawOutputCable_tests(Copperfish_Raw_Setup):
+    
+    def test_pipeline_check_for_colliding_outputs_clean_good(self):
+
+        # Define 1-step pipeline with 2 raw pipeline inputs
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        script_4_1_M = self.script_4_1_M
+
+        output_1 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput1",
+            dataset_idx=1)
+
+        output_3 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput3",
+            dataset_idx=3)
+
+        raw_output_2 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput2",
+            dataset_idx=2)
+
+        raw_output_4 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput4",
+            dataset_idx=4)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="pipeline_output_1",
+            raw_output_idx=1,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_2)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="pipeline_output_3",
+            raw_output_idx=3,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_4)
+
+        self.pipeline_1.outcables.create(
+            output_name="pipeline_output_2",
+            output_idx=2,
+            step_providing_output=1,
+            provider_output=output_3)
+
+        self.assertEquals(self.pipeline_1.clean(), None)
+
+    def test_pipeline_colliding_raw_output_name_clean_bad(self):
+        # Define 1-step pipeline with 2 raw pipeline inputs
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        script_4_1_M = self.script_4_1_M
+
+        output_1 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput1",
+            dataset_idx=1)
+
+        output_3 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput3",
+            dataset_idx=3)
+
+        raw_output_2 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput2",
+            dataset_idx=2)
+
+        raw_output_4 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput4",
+            dataset_idx=4)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="pipeline_output_1",
+            raw_output_idx=1,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_2)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="COLLIDE",
+            raw_output_idx=3,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_4)
+
+        self.pipeline_1.outcables.create(
+            output_name="COLLIDE",
+            output_idx=2,
+            step_providing_output=1,
+            provider_output=output_3)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Output names overlap raw output names",
+            self.pipeline_1.clean)
+
+    def test_pipeline_colliding_raw_output_idx_clean_bad(self):
+        # Define 1-step pipeline with 2 raw pipeline inputs
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_input = self.pipeline_1.raw_inputs.create(dataset_name="a_b_c_pipeline",dataset_idx=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+
+        script_4_1_M = self.script_4_1_M
+
+        output_1 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput1",
+            dataset_idx=1)
+
+        output_3 = script_4_1_M.outputs.create(
+            compounddatatype=self.mix_triplet_cdt,
+            dataset_name="scriptOutput3",
+            dataset_idx=3)
+
+        raw_output_2 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput2",
+            dataset_idx=2)
+
+        raw_output_4 = script_4_1_M.raw_outputs.create(
+            dataset_name="scriptOutput4",
+            dataset_idx=4)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="pipeline_output_1",
+            raw_output_idx=1,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_2)
+
+        self.pipeline_1.raw_outcables.create(
+            raw_output_name="foo",
+            raw_output_idx=2,
+            step_providing_raw_output=1,
+            provider_raw_output=raw_output_4)
+
+        self.pipeline_1.outcables.create(
+            output_name="bar",
+            output_idx=2,
+            step_providing_output=1,
+            provider_output=output_3)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            self.pipeline_1.clean)
+
+class CustomOutputWiring_tests(Copperfish_Raw_Setup):
+
+    def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
+
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.inputs.create(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.outputs.create(dataset_name="TestOut",
+                                                    dataset_idx=1,
+                                                    compounddatatype=self.triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
+
+        # Add an output cable
+        outcable1 = self.my_pipeline.outcables.create(output_name="blah",
+                                                          output_idx=1,
+                                                          step_providing_output=1,
+                                                          provider_output=method_out)
+
+        # Add custom wiring from an irrelevent CDTM
+        badwire = outcable1.custom_outwires.create(source_pin=self.doublet_cdt.members.all()[0],
+                                                   dest_idx=1,
+                                                   dest_name="not_good")
+
+
+        errorMessage = "Source pin \"1: <string> \[StrCol1\]\" does not come from compounddatatype \"\(1: <string> \[a\^2\], 2: <string> \[b\^2\], 3: <string> \[c\^2\]\)\""
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            badwire.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            outcable1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            self.my_pipeline.clean)
+
+        
+    def test_PipelineOutputCable_clean_dest_idx_must_consecutively_start_from_1(self):
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.inputs.create(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.outputs.create(dataset_name="TestOut",
+                                                    dataset_idx=1,
+                                                    compounddatatype=self.triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
+
+        # Add an output cable
+        outcable1 = self.my_pipeline.outcables.create(output_name="blah",
+                                                          output_idx=1,
+                                                          step_providing_output=1,
+                                                          provider_output=method_out)
+
+        # Add 3 wires that with dest_idx that do not consecutively increment by 1
+        wire1 = outcable1.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[0],
+                                                   dest_idx=2,
+                                                   dest_name="bad_destination")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
+            outcable1.clean)
+
+        wire2 = outcable1.custom_outwires.create(
+            source_pin=self.triplet_cdt.members.all()[0],
+            dest_idx=3,
+            dest_name="bad_destination2")
+
+        wire3 = outcable1.custom_outwires.create(
+            source_pin=self.triplet_cdt.members.all()[2],
+            dest_idx=4,
+            dest_name="bad_destination3")
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(wire3.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
+            outcable1.clean)
+
+    def test_Pipeline_create_outputs_for_creation_of_output_CDT(self):
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.inputs.create(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.outputs.create(dataset_name="TestOut",
+                                                    dataset_idx=1,
+                                                    compounddatatype=self.mix_triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
+
+        # Add an output cable
+        outcable1 = self.my_pipeline.outcables.create(output_name="blah",
+                                                      output_idx=1,
+                                                      step_providing_output=1,
+                                                      provider_output=method_out)
+
+        # Add wiring
+        wire1 = outcable1.custom_outwires.create(
+            source_pin=method_out.compounddatatype.members.all()[0],
+            dest_idx=1,
+            dest_name="col1_str")
+
+        wire2 = outcable1.custom_outwires.create(
+            source_pin=method_out.compounddatatype.members.all()[1],
+            dest_idx=2,
+            dest_name="col2_DNA")
+
+        wire3 = outcable1.custom_outwires.create(
+            source_pin=method_out.compounddatatype.members.all()[0],
+            dest_idx=3,
+            dest_name="col3_str")
+
+        wire4 = outcable1.custom_outwires.create(
+            source_pin=method_out.compounddatatype.members.all()[2],
+            dest_idx=4,
+            dest_name="col4_str")
+
+        self.assertEquals(self.my_pipeline.outputs.all().count(), 0)
+        self.my_pipeline.create_outputs()
+        self.assertEquals(self.my_pipeline.outputs.all().count(), 1)
+        
+        pipeline_out_members = self.my_pipeline.outputs.all()[0].compounddatatype.members.all()
+        
+        self.assertEquals(pipeline_out_members.count(),4)
+
+        member = pipeline_out_members.get(column_idx=1)
+        self.assertEquals(member.column_name, "col{}_str".format(1))
+        self.assertEquals(member.datatype, self.string_dt)
+
+        member = pipeline_out_members.get(column_idx=2)
+        self.assertEquals(member.column_name, "col{}_DNA".format(2))
+        self.assertEquals(member.datatype, self.DNA_dt)
+
+        member = pipeline_out_members.get(column_idx=3)
+        self.assertEquals(member.column_name, "col{}_str".format(3))
+        self.assertEquals(member.datatype, self.string_dt)
+
+        member = pipeline_out_members.get(column_idx=4)
+        self.assertEquals(member.column_name, "col{}_str".format(4))
+        self.assertEquals(member.datatype, self.string_dt)
