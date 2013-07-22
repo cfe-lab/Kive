@@ -1337,8 +1337,10 @@ class PipelineStep(models.Model):
                     format(curr_raw_input.dataset_name, self.step_num))
 
         # Validate each cable
+        # FIXME: DO WE WANT THIS.......???
         for curr_cable in self.cables_in.all():
             curr_cable.clean_and_completely_wired()
+            
         for curr_raw_cable in self.raw_cables_in.all():
             curr_raw_cable.clean()
 
@@ -1535,15 +1537,17 @@ class PipelineStepInputCable(models.Model):
         # If not from step 0, input derives from the output of a pipeline step
         else:
 
+            
+
             # Look at the pipeline step referenced by the wiring parameter
             providing_step = self.pipelinestep.pipeline.steps.get(step_num=requested_from)
 
             # Does the source pipeline step produce the output requested?
-            source_step_outputs = providing_step.transformation.outputs.all();
+            source_step_outputs = providing_step.transformation.outputs.all()
             if input_requested not in source_step_outputs:
                 raise ValidationError(
                     "Transformation at step {} does not produce output \"{}\"".
-                    format(requested_from, unicode(input_requested)));
+                    format(requested_from, unicode(input_requested)))
 
             # Was the data from this step's transformation output deleted?
             source_deleted_outputs = [x.dataset_to_delete
@@ -1552,44 +1556,49 @@ class PipelineStepInputCable(models.Model):
                 raise ValidationError(
                     "Input \"{}\" from step {} to step {} is deleted prior to request".
                     format(input_requested.dataset_name, requested_from,
-                           self.pipelinestep.step_num));
+                           self.pipelinestep.step_num))
 
         # Check that the input and output connected by the
         # cable are compatible re: number of rows.  Don't check for
         # ValidationError because this was checked in the
         # clean() of PipelineStep.
 
-        provided_min_row = 0;
-        required_min_row = 0;
+        provided_min_row = 0
+        required_min_row = 0
 
         # Source output row constraint
         if input_requested.min_row != None:
-            provided_min_row = input_requested.min_row;
+            provided_min_row = input_requested.min_row
 
         # Destination input row constraint
         if feed_to_input.min_row != None:
-            required_min_row = feed_to_input.min_row;
+            required_min_row = feed_to_input.min_row
 
         # Check for contradictory min row constraints
         if (provided_min_row < required_min_row):
             raise ValidationError(
                 "Data fed to input \"{}\" of step {} may have too few rows".
-                format(feed_to_input.dataset_name, self.pipelinestep.step_num));
+                format(feed_to_input.dataset_name, self.pipelinestep.step_num))
 
-        provided_max_row = float("inf");
-        required_max_row = float("inf");
+        provided_max_row = float("inf")
+        required_max_row = float("inf")
 
         if input_requested.max_row != None:
-            provided_max_row = input_requested.max_row;
+            provided_max_row = input_requested.max_row
 
         if feed_to_input.max_row != None:
-            required_max_row = feed_to_input.max_row;
+            required_max_row = feed_to_input.max_row
 
         # Check for contradictory max row constraints
         if (provided_max_row > required_max_row):
             raise ValidationError(
                 "Data fed to input \"{}\" of step {} may have too many rows".
-                format(feed_to_input.dataset_name, self.pipelinestep.step_num));
+                format(feed_to_input.dataset_name, self.pipelinestep.step_num))
+
+        # Validate whatever wires there already are
+        if self.custom_wires.all().exists():
+            for wire in self.custom_wires.all():
+                wire.clean()
 
         
     def clean_and_completely_wired(self):

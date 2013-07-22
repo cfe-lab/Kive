@@ -6535,109 +6535,191 @@ class CustomWiring_tests(Copperfish_Raw_Setup):
 
     def test_CustomCableWire_wires_from_pipeline_input_identical_dt_good(self):
         """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
+
+        # Define a pipeline with single pipeline input of type triplet_cdt
         my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        pipeline_in = my_pipeline.inputs.create(
-            compounddatatype=self.triplet_cdt,dataset_name="pipe_in_1",dataset_idx=1)
+        pipeline_in = my_pipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipe_in_1",dataset_idx=1)
 
-        # Give the method the same CDT; assign custom wiring that is effectively the same.
-        method_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,
-                                                  compounddatatype=self.triplet_cdt);
-        
-        my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
-        my_cable1 = my_step1.cables_in.create(transf_input=method_in, step_providing_input=0,
-                                              provider_output=pipeline_in);
+        # Define method to have an input with the same CDT, add it as a step, cable it
+        method_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,compounddatatype=self.triplet_cdt)
+        my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
+        my_cable1 = my_step1.cables_in.create(transf_input=method_in, step_providing_input=0, provider_output=pipeline_in)
 
-        # This cable is clean; both CDTs match.
-        self.assertEquals(my_cable1.clean(), None);
-        self.assertEquals(my_cable1.clean_and_completely_wired(), None);
-         
+        # Both CDTs exactly match
+        self.assertEquals(my_cable1.clean(), None)
+        self.assertEquals(my_cable1.clean_and_completely_wired(), None)
+
+        # But we can add custom wires anyways
         wire1 = my_cable1.custom_wires.create(
             source_pin=pipeline_in.compounddatatype.members.get(column_idx=1),
-            dest_pin=method_in.compounddatatype.members.get(column_idx=1));
-        # This wire is clean...
+            dest_pin=method_in.compounddatatype.members.get(column_idx=1))
+        
+        # This wire is clean, and the cable is also clean - but not completely wired
         self.assertEquals(wire1.clean(), None)
-        # ... and so is the cable...
         self.assertEquals(my_cable1.clean(), None)
-        # ... but it isn't completely wired.
+
         self.assertRaisesRegexp(
             ValidationError,
             "Destination member \"2: <string> \[b\^2\]\" has no wires leading to it",
             my_cable1.clean_and_completely_wired)
 
+        # Here, we wire the remaining 2 CDT members
         for i in range(2,4):
             my_cable1.custom_wires.create(
                 source_pin=pipeline_in.compounddatatype.members.get(column_idx=i),
-                dest_pin=method_in.compounddatatype.members.get(column_idx=i));
+                dest_pin=method_in.compounddatatype.members.get(column_idx=i))
 
-        # Check all wires...
+        # All the wires are clean - and now the cable is completely wired
         for wire in my_cable1.custom_wires.all():
             self.assertEquals(wire.clean(), None)
-        # ... and the cable itself.
+
         self.assertEquals(my_cable1.clean(), None);
         self.assertEquals(my_cable1.clean_and_completely_wired(), None);
 
-    # DO THE FOLLOWING 4 TESTS FROM PIPELINE INPUT INTO STEP 1
+
+
     def test_CustomCableWire_clean_for_datatype_compatibility(self):
-        # Sub test 1: x -> x
-        # Sub test 2: A (DT is compaitible with x) -> x
-        # Sub test 3: R (DT incompaitible with x) -> x
-        pass
+        # Wiring test 1 - Datatypes are identical (x -> x)
+        # Wiring test 2 - Datatypes are not identical, but compaitible (y restricts x, y -> x)
+        # Wiring test 3 - Datatypes are not compaitible (z does not restrict x, z -> x) 
+
+        # Define 2 CDTs3 datatypes - one identical, one compaitible, and one incompaitible + make a new CDT composed of them
+        # Regarding datatypes, recall [self.DNA_dt] restricts [self.string_dt]
+
+        # Define a datatype that has nothing to do with anything
+        with open(os.path.join(samplecode_path, "incompaitible_DT.py"), "rb") as f:
+            self.incompaitible_dt = Datatype(
+                name="Not compaitible",
+                description="A datatype not having anything to do with anything",
+                verification_script=File(f),
+                Python_type="str")
+            
+            self.incompaitible_dt.save()
+
+        # Define 2 CDTs that are unequal: (DNA, string, string), and (string, DNA, incompaitible)
+        cdt_1 = CompoundDatatype()
+        cdt_1.save()
+        cdt_1.members.create(datatype=self.DNA_dt,column_name="col_1",column_idx=1)
+        cdt_1.members.create(datatype=self.string_dt,column_name="col_2",column_idx=2)
+        cdt_1.members.create(datatype=self.string_dt,column_name="col_3",column_idx=3)
+
+        cdt_2 = CompoundDatatype()
+        cdt_2.save()
+        cdt_2.members.create(datatype=self.string_dt,column_name="col_1",column_idx=1)
+        cdt_2.members.create(datatype=self.DNA_dt,column_name="col_2",column_idx=2)
+        cdt_2.members.create(datatype=self.incompaitible_dt,column_name="col_3",column_idx=3)
+
+        # Define a pipeline with single pipeline input of type cdt_1
+        my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_in = my_pipeline.inputs.create(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
+
+        # Define method to have an input with cdt_2, add it as a step, cable it
+        method_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,compounddatatype=cdt_2)
+        my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
+        my_cable1 = my_step1.cables_in.create(transf_input=method_in, step_providing_input=0, provider_output=pipeline_in)
+
+        # CDTs are not equal, so this cable requires custom wiring
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Custom wiring required for cable \"Pipeline test pipeline family foo step 1:TestIn\"",
+            my_step1.clean);
+
+        # Wiring case 1: Datatypes are identical (DNA -> DNA)
+        wire1 = my_cable1.custom_wires.create(
+            source_pin=pipeline_in.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_in.compounddatatype.members.get(column_idx=2))
+
+        # Wiring case 2: Datatypes are compaitible (DNA -> string)
+        wire2 = my_cable1.custom_wires.create(
+            source_pin=pipeline_in.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_in.compounddatatype.members.get(column_idx=1))
+        
+        # Wiring case 3: Datatypes are compaitible (DNA -> incompaitible CDT)
+        wire3_bad = my_cable1.custom_wires.create(
+            source_pin=pipeline_in.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_in.compounddatatype.members.get(column_idx=3))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+
+        errorMessage = "The datatype of the source pin \"1: <DNANucSeq> \[col_1\]\" is incompatible with the datatype of the destination pin \"3: <Not compaitible> \[col_3\]\"'\]"
+        
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            wire3_bad.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            my_cable1.clean)
 
     def test_CustomCableWire_clean_source_and_dest_pin_do_not_come_from_cdt_bad(self):
         # For source_pin and dest_pin, give a CDTM from an unrelated CDT
-        pass
 
+        # Define a datatype that has nothing to do with anything
+        with open(os.path.join(samplecode_path, "incompaitible_DT.py"), "rb") as f:
+            self.incompaitible_dt = Datatype(name="poop",description="poop!!",verification_script=File(f),Python_type="str")
+            self.incompaitible_dt.save()
 
-    def test_PSIC_clean_from_pipeline_input_triplet_to_doublet_with_shuffled_wiring_good(self):
-        # A -> z
-        # B -> NULL
-        # C -> x
-        pass
+        # Define 2 different CDTs: (DNA, string, string), and (string, DNA, incompaitible)
+        cdt_1 = CompoundDatatype()
+        cdt_1.save()
+        cdt_1.members.create(datatype=self.DNA_dt,column_name="col_1",column_idx=1)
+        cdt_1.members.create(datatype=self.string_dt,column_name="col_2",column_idx=2)
+        cdt_1.members.create(datatype=self.string_dt,column_name="col_3",column_idx=3)
 
-    def test_PSIC_clean_from_pipeline_input_multi_from_source_wiring_dt_good(self):
-        # A -> x
-        # A -> y
-        # A -> z
-        pass
+        cdt_2 = CompoundDatatype()
+        cdt_2.save()
+        cdt_2.members.create(datatype=self.string_dt,column_name="col_1",column_idx=1)
+        cdt_2.members.create(datatype=self.DNA_dt,column_name="col_2",column_idx=2)
+        cdt_2.members.create(datatype=self.incompaitible_dt,column_name="col_3",column_idx=3)
 
-    def test_cable_clean_and_completely_wired_not_quenched(self):
-        # x -> x
-        # NULL -> y
-        # z -> z
-        pass
+        # Define 2 methods with different inputs
+        method_1 = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        method_1.save()
+        method_1_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,compounddatatype=cdt_1)
+        
+        method_2 = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        method_2.save()
+        method_2_in = self.testmethod.inputs.create(dataset_name="TestIn", dataset_idx=1,compounddatatype=cdt_2)
 
-    def test_cable_clean_and_completely_wired_multiply_wired(self):
-        # Sub test 1
-        # x -> y
-        # y -> y
-        # z -> z
+        # Define 2 pipelines
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_1_in = pipeline_1.inputs.create(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
+        pipeline_1_step = pipeline_1.steps.create(transformation=method_1, step_num=1)
+        pipeline_1_cable = pipeline_1_step.cables_in.create(transf_input=method_1_in, step_providing_input=0, provider_output=pipeline_1_in)
 
-        # Sub test 2
-        # x -> x
-        # x -> x
-        pass
+        pipeline_2 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        pipeline_2_in = pipeline_2.inputs.create(compounddatatype=cdt_2,dataset_name="pipe_in_1",dataset_idx=1)
+        pipeline_2_step = pipeline_2.steps.create(transformation=method_2, step_num=1)
+        pipeline_2_cable = pipeline_2_step.cables_in.create(transf_input=method_2_in, step_providing_input=0, provider_output=pipeline_2_in)
 
-    # Check propagation on some of these
+        # Within pipeline_1_cable, wire into method 1 idx 1 (Expects DNA) a dest_pin from pipeline 2 idx 3
+        # (incompaitible dt, cdtm from unrelated cdt)
+        wire1 = pipeline_1_cable.custom_wires.create(
+            source_pin=pipeline_2_in.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_1_in.compounddatatype.members.get(column_idx=1))
 
-    # DO THE FOLLOWING 2 UNIT TESTS FROM STEP 1 CUSTOM WIRED TO STEP 2
-    def test_cable_clean_and_completely_wired_multiply_wired_internal_steps(self):
-        # Sub test 1
-        # x -> y
-        # y -> y
-        # z -> z
+        errorMessage = "Source pin .* does not come from compounddatatype .*"
 
-        # Sub test 2
-        # x -> x
-        # x -> x
-        pass
-    
-    def test_cable_clean_and_completely_wired_not_quenched(self):
-        # x -> x
-        # NULL -> y
-        # z -> z
-        pass
+        # Within pipeline_1_cable, wire into method 1 idx 1 (Expects DNA) a dest_pin from pipeline 2 idx 1
+        # (same dt, cdtm from unrelated cdt)
+        wire1_alt = pipeline_1_cable.custom_wires.create(
+            source_pin=pipeline_2_in.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_1_in.compounddatatype.members.get(column_idx=1))
 
+        self.assertRaisesRegexp(ValidationError,errorMessage,wire1.clean)
+        self.assertRaisesRegexp(ValidationError,errorMessage,wire1_alt.clean)
 
+        # Try to wire something into cable 2 with a source_pin from cable 1
+        wire2 = pipeline_2_cable.custom_wires.create(
+            source_pin=pipeline_1_in.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_2_in.compounddatatype.members.get(column_idx=1))
+            
+        self.assertRaisesRegexp(ValidationError,errorMessage,wire2.clean)
+
+ 
 class PipelineRawOutputCable_tests(Copperfish_Raw_Setup):
     
     def test_pipeline_check_for_colliding_outputs_clean_good(self):
@@ -6951,3 +7033,233 @@ class CustomOutputWiring_tests(Copperfish_Raw_Setup):
         member = pipeline_out_members.get(column_idx=4)
         self.assertEquals(member.column_name, "col{}_str".format(4))
         self.assertEquals(member.datatype, self.string_dt)
+
+class PipelineStepInputCable_tests(Copperfish_Raw_Setup):
+
+    def test_PSIC_clean_and_completely_wired_CDT_equal_no_wiring_good(self):
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        self.assertEquals(pipeline_cable.clean(), None)
+        self.assertEquals(pipeline_cable.clean_and_completely_wired(), None)
+        self.assertEquals(pipelineStep.clean(), None)
+        self.assertEquals(pipelineStep.complete_clean(), None)
+
+
+    def test_PSIC_clean_and_completely_wired_CDT_not_equal_wires_exist_shuffled_wiring_good(self):
+        # Wire from a triplet into a double:
+        # A -> z
+        # B -> NULL (Not necessary)
+        # C -> x
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+            # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        # The cable is clean but not complete
+        errorMessage = "Destination member .* has no wires leading to it"
+        self.assertEquals(pipeline_cable.clean(), None)
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+
+        # wire2 = DNA->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=2),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(pipeline_cable.clean(), None)
+        self.assertEquals(pipeline_cable.clean_and_completely_wired(), None)
+        self.assertEquals(pipelineStep.clean(), None)
+        self.assertEquals(pipelineStep.complete_clean(), None)
+
+
+    def test_PSIC_clean_and_completely_wired_CDT_not_equal_wires_exist_compaitible_wiring_good(self):
+        # A -> x
+        # A -> y
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=2),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        # wire2 = DNA->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=2),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(pipeline_cable.clean(), None)
+        self.assertEquals(pipelineStep.clean(), None)
+        self.assertEquals(pipelineStep.complete_clean(), None)
+
+    def test_PSIC_clean_and_completely_wired_not_quenched(self):
+        # x -> x
+        # NULL -> y
+        # z -> z
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+        
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+
+        wire3 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=3))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire3.clean(), None)
+        self.assertEquals(pipeline_cable.clean(), None)
+
+        # FIXME: Should pipelineStep.clean invoke pipeline_cable.clean_and_completely_quenched() ?
+        errorMessage = "Destination member \"2.*\" has no wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.complete_clean)
+        self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.complete_clean)
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_different_source(self):
+        # x -> x
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+        
+        # wire1 = string->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        wire3 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=2),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        wire4 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=3))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(wire3.clean(), None)
+        self.assertEquals(wire4.clean(), None)
+
+        errorMessage="Destination member \"2.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_same_source(self):
+        # x -> x
+        # x -> x
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.inputs.create(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+        
+        # wire1 = string->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+
+        errorMessage="Destination member \"1.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
+        self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.clean)
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_internal_steps(self):
+        # Sub test 1
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Define pipeline
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        # Define method with triplet_cdt input/output (string, string, string)
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+
+        # Add method as 2 steps
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        step2 = myPipeline.steps.create(transformation=self.testmethod, step_num=2)
+
+        # Cable the 2 internal steps together
+        internal_cable = step2.cables_in.create(transf_input=method_input, step_providing_input=1, provider_output=method_output)
+
+        wire1 = internal_cable.custom_wires.create(
+            source_pin=method_output.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=1))
+
+        wire2 = internal_cable.custom_wires.create(
+            source_pin=method_output.compounddatatype.members.get(column_idx=1),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        wire3 = internal_cable.custom_wires.create(
+            source_pin=method_output.compounddatatype.members.get(column_idx=2),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=2))
+
+        wire4 = internal_cable.custom_wires.create(
+            source_pin=method_output.compounddatatype.members.get(column_idx=3),
+            dest_pin=method_input.compounddatatype.members.get(column_idx=3))
+
+        errorMessage = "Destination member \"2.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,internal_cable.clean_and_completely_wired)
