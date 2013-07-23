@@ -5290,6 +5290,37 @@ class Copperfish_Raw_Setup (TestCase):
         self.myUser.last_name = 'Lennon'
         self.myUser.save()
 
+    def tearDown(self):
+
+        filesToDelete = ["script_5_input.csv",
+                         "script_5_headers_reversed_incoherent.csv",
+                         "doublet_cdt_data.csv",
+                         "script_5_input_5_rows.csv",
+                         "script_5_input_1.csv",
+                         "script_6_raw_input.raw"]
+
+        for f in filesToDelete:
+            try:
+                os.remove(os.path.join("Datasets",f))
+            except:
+                pass
+
+        filesToDelete = ["script_4_raw_in_CSV_out.py"]
+
+        for f in filesToDelete:
+            try:
+                os.remove(os.path.join("CodeResources",f))
+            except:
+                pass
+            
+        filesToDelete = ["DNANucSeqUT.py", "stringUT.py", "incompaitible_DT.py"]
+
+        for f in filesToDelete:
+            try:
+                os.remove(os.path.join("VerificationScripts",f))
+            except:
+                pass
+
 class Datasets_tests(Copperfish_Raw_Setup):
     """
     New tests to take into account raw inputs/outputs/datasets
