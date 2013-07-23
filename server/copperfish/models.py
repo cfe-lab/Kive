@@ -5,27 +5,27 @@ Data model for the Shipyard (Copperfish) project - open source software
 that performs revision control on datasets and bioinformatic pipelines.
 """
 
-from django.db import models;
-from django.contrib.auth.models import User;
-from django.contrib.contenttypes.models import ContentType;
-from django.contrib.contenttypes import generic;
-from django.db.models.signals import pre_save, post_save;
-from django.dispatch import receiver;
-from django.core.exceptions import ValidationError;
-from django.core.validators import MinValueValidator;
+from django.db import models
+from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes import generic
+from django.db.models.signals import pre_save, post_save
+from django.dispatch import receiver
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 
 # Python math functions
-import operator;
+import operator
 # To calculate MD5 hash
-import hashlib;
+import hashlib
 # Regular expressions
-import re;
+import re
 # Augments regular expressions
-import string;
+import string
 # For checking file paths
-import os.path;
-import sys;
-import csv;
+import os.path
+import sys
+import csv
 
 class Datatype(models.Model):
     """
@@ -373,10 +373,10 @@ class Dataset(AbstractDataset):
 
         # Check CSV header for coherence with registered CDT
         data_csv = csv.DictReader(self.dataset_file)
-        header = data_csv.fieldnames # Eric's mod
+        header = data_csv.fieldnames
         cdt_members = self.compounddatatype.members.all()
         
-        if len(data_csv.fieldnames) != cdt_members.count():
+        if len(header) != cdt_members.count():
             raise ValidationError(
                 "Dataset \"{}\" does not have the same number of columns as its CDT".
                 format(unicode(self)))
@@ -482,34 +482,43 @@ class ParentDataset(models.Model):
         the child; also we check that the TransformationInput belongs
         to the Transformation that produced the child.
         """
-        # Does parent_input belong to the child dataset's pipeline step?
-        if not dataset.pipeline_step.transformation.inputs.filter(pk=parent_input.pk).exists():
+
+        # Does parent_input belong to the CHILD dataset's pipeline step's transformation inputs?
+        if not self.child.pipeline_step.transformation.inputs.filter(pk=self.parent_input.pk).exists():
             raise ValidationError(
                 "Parent's specified TransformationInput does not belong to generating Transformation");
         
-        # Check the fit: the parent's CDT matches parent_input's CDT,
-        # and the parent's number of rows is between parent_input's
-        # min_row and max_row.
-        if parent.compounddatatype != parent_input.compounddatatype:
-            # Check for custom wiring.  Note: we assume that the pipeline is complete
-            # and clean, so there is exactly one cable leading to this.
-            cable_in = dataset.pipeline_step.cables_in.get(transf_input=parent_input);
+        # Parent CDT must match it's parent_input CDT, and parent rows must conform to parent_input min/max_row
+        if self.parent.compounddatatype != self.parent_input.compounddatatype:
+            
+            # If CDT of the parent dataset doesn't match the expected CDT for parent_input, custom wiring
+            # must exist between the cable which parent was assigned to and the parent_input
+            
+            # We ASSUME there is 1 cable leading to this transformation input
+            # FIXME (Eric): Why don't we just run pipeline.clean to confirm this?
 
-            if not cable_in.custom_wires.all.exists():
+            # Load cable that connected the parent into the PS transformation that generated the child
+            cable_in = self.child.pipeline_step.cables_in.get(transf_input=self.parent_input)
+
+            if not cable_in.custom_wires.all().exists():
                 raise ValidationError(
-                    "Parent dataset \"{}\" does not have the same CDT as the TransformationInput it should have fit into, and no custom wiring is defined".format(unicode(parent)));
+                    "Parent dataset \"{}\" does not have the same CDT as the TransformationInput it should have fit into, and no custom wiring is defined".format(unicode(self.parent)));
 
-            # Wires, a priori, quench all of parent_input's columns (we assume
-            # the cable is coherent and complete).
+            # Wires, a priori, quench all parent_input's columns
+            # We ASSUME the cable is coherent and complete
+            # FIXME Eric: Why not directly invoke cable.clean to confirm this then?
+
+            # For each wire, confirm the CDTM exists in the parent
             for curr_wire in cable_in.custom_wires.all():
-                curr_member = parent.compounddatatype.members.filter(pk=curr_wire.source_pin.pk);
+                curr_member = parent.compounddatatype.members.filter(pk=curr_wire.source_pin.pk)
                 if not curr_member.exists():
-                    raise ValidationError("Wire requests invalid member of CDT");
+                    raise ValidationError("Wire requests invalid member of CDT")
 
-        if parent_input.min_rows != None and parent.num_rows() < parent_input.min_rows:
-            raise ValidationError("Parent dataset \"{}\" has too few rows for TransformationInput \"{}\"".format(unicode(parent), unicode(parent_input)))
-        if parent_input.max_rows != None and parent.num_rows() > parent_input.max_rows:
-            raise ValidationError("Parent dataset \"{}\" has too many rows for TransformationInput \"{}\"".format(unicode(parent), unicode(parent_input)))
+        # Parent's num_rows must satisfy the TRI min_row/max_row constraints
+        if self.parent_input.min_row != None and self.parent.num_rows() < self.parent_input.min_row:
+            raise ValidationError("Parent dataset \"{}\" has too few rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
+        if self.parent_input.max_row != None and self.parent.num_rows() > self.parent_input.max_row:
+            raise ValidationError("Parent dataset \"{}\" has too many rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
 
 
 
@@ -539,11 +548,15 @@ class RawParentDataset(models.Model):
     def clean(self):
         """Check coherence of this dataset-raw parent relationship.
 
-        Wwe check that the TransformationInput belongs to the
+        We check that the TransformationInput belongs to the
         Pipeline that produced the child.
         """
-        # Does parent_input belong to the child dataset's pipeline step?
-        if not dataset.pipeline_step.pipeline.raw_inputs.filter(pk=parent_raw_input.pk).exists():
+        # Raw parents must only come from a pipeline input
+        # Is parent_raw_input a member of transformation raw_inputs of the child's pipeline step
+
+        #raise ValidationError(self.child.pipeline_step.pipeline.raw_inputs)
+        
+        if not self.child.pipeline_step.pipeline.raw_inputs.filter(pk=self.parent_raw_input.pk).exists():
             raise ValidationError(
                 "Parent's specified TransformationRawInput does not belong to generating Pipeline");
         
@@ -1198,7 +1211,7 @@ class Pipeline(Transformation):
         clean and the (raw) outcables are known to be OK.
         """
         # Be careful if customizing delete() of TransformationOutput
-        self.outputs.all().delete();
+        self.outputs.all().delete()
 
         # outcables is derived from (PipelineOutputCable/ForeignKey)
         # For each outcable, extract the cabling parameters
@@ -1226,6 +1239,9 @@ class Pipeline(Transformation):
                                 dataset_idx=outcable.output_idx,
                                 min_row=output_requested.min_row,
                                 max_row=output_requested.max_row);
+
+        # ERICS MOD
+        self.raw_outputs.all().delete()
 
         # Similar (simpler) for raw outcables.
         for raw_outcable in self.raw_outcables.all():

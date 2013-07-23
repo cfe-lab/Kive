@@ -1,8 +1,7 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;\red38\green64\blue204;\red0\green61\blue204;\red217\green11\blue0;
-\red40\green67\blue204;\red44\green65\blue204;\red67\green96\blue204;\red40\green74\blue204;\red44\green84\blue204;
-}
+{\colortbl;\red255\green255\blue255;\red38\green64\blue204;\red63\green105\blue30;\red0\green61\blue204;
+\red0\green45\blue153;}
 \margl1440\margr1440\vieww16280\viewh14940\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
@@ -63,7 +62,9 @@ script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outp
  - Check its ability to test that Dataset CDT matches the pipeline_step's CDT\
  - Test its ability to look at the header of a CSV file for coherence\
  - Validate num_rows\
-\cf0 At some point we're going to need to start validating Datasets (With DT verification scripts) - holding off until execute\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf3 At some point we're going to need to start validating Datasets (With DT verification scripts) - holding off until execute\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 \cf2 \
 
 \b RawDataset
@@ -74,7 +75,7 @@ script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outp
  - check that if pipeline_step_output is set, then so is pipeline_step\cf0 \
 \
 
-\b \cf3 CustomCableWire (Custom wiring)
+\b \cf4 CustomCableWire (Custom wiring)
 \b0 \
 - source_pin must be a member of the set of CDT members of the cable source (provider_output)\
 - dest_pin must be a member of the set of CDT members of the cable destination (transf_input) TransformationInput;\
@@ -82,7 +83,7 @@ script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outp
 - Check propagation
 \b \cf0 \
 \
-\cf3 PipelineStepInputCable\
+\cf4 PipelineStepInputCable\
 
 \b0 - CDT not equal and wires do not exist
 \b \
@@ -92,61 +93,72 @@ script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outp
     - And are bad\'85\
         - More than 1 wire leading to CDTM\
        - 0 wires leading to a CDTM\cf0 \
-
-\b \
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
-
-\b0 \cf4 Modified clean() in PipelineStepInputCable to run clean on wires
-\b \cf0 \
+\cf3 Modified clean() in PipelineStepInputCable to run clean on wires
+\b \
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 \cf0 \
-\cf5 CustomOutputCableWire
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf4 CustomOutputCableWire
 \b0 \
-- Check clean - reference an invalid CDTM\cf0 \
+- Check clean - reference an invalid CDTM\
 
 \b \
-\cf6 PipelineOutputCable\
+PipelineOutputCable\
 
-\b0 - CustomOutputCableWire dest_idx must consecutively start from 1\cf0 \
+\b0 - CustomOutputCableWire dest_idx must consecutively start from 1\
 \
 
-\b \cf7 Pipeline (Custom output wiring related)
+\b Pipeline (Custom output wiring related)
 \b0 \
-- create_outputs: custom wires lead to the correct Pipeline output CDT\cf0 \
+- create_outputs: custom wires lead to the correct Pipeline output CDT\
 
 \b \
-\cf8 PipelineStep (Raw input related tests)
+PipelineStep (Raw input related tests)
 \b0 \
 - Complete_clean: Check for quenching of raw inputs (Single/Several_Raw_Input_Tests)\
-- Clean: Check for overquenching of raw inputs\cf0 \
+- Clean: Check for overquenching of raw inputs\
 \
 
 \b Pipeline (Raw output related tests)
 \b0 \
-\cf9 - Check Pipeline.clean for indexing and naming collisions (With raw outmaps)\cf0 \
-- create_outputs:  raw outputs are created by raw outmaps\
-\
+- Check Pipeline.clean for indexing and naming collisions (With raw outmaps)\
+- create_outputs:  RAW outputs are created by RAW outmaps\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf3 Modified create_outputs to also delete raw_outputs before regenerating\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
 
-\b ParentDataset
+\b ParentDataset (Non-raw parents of a dataset which can itself be raw or non-raw)
 \b0 \
- - Test with child being a Dataset and a RawDataset - check a good case for each, maybe alternate between both for bad cases\
- - Test that parent_input belongs to the Transformation of the PS producing the child (Raw)Dataset\
- - Test that parent fits correctly into parent_input, i.e. check CDTs match (or wiring works) and num_rows is compatible\
-   - without wiring\
-   - with wiring\
-\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf4 - Test with raw and non-raw child (Good case)\
+- parent_input belongs to the transformation of the PS producing the child raw/non-raw Dataset\cf5 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+- Parent must "fit" with parent_input\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf4    - CDTs match\'85\
+       - All min_row + max_row constraints are satisfied (Good)\
+       - Parent has less rows than min_row (Bad)\
+       - Parent has more rows than max_row (Bad)\cf0 \
+   - CDTs do not match\'85\
+\cf4        - No wires exist (Bad)\cf0 \
+       - Wires exist\'85\
+            - And all is good (???) (Good)\
+            - Wire requests invalid member of CDT (???) (Bad)\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf3 I don't understand how the current parent dataset clean is different from just validating the cable\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
-\i Notes on ParentDataset
-\i0 \
-dataset - the child which can be raw or non-raw.\
-parent - a non-raw parent dataset that went into producing this child.\
-parent_input - the transformation input that the parent was plugged into.\
-\
-
-\b RawParentDataset
+\b \cf4 RawParentDataset
 \b0 \
  - Test that parent_raw_input is a pipeline input of the generating pipeline \
-(because raw parents can only ever come from the generating pipeline's inputs)\
+(because raw parents can only ever come from the generating pipeline's inputs)\cf0 \
 \
 \
-Check on the issue of whether we need to close and reopen the FieldFile whenever we access.}
+\
+Check on the issue of whether we need to close and reopen the FieldFile whenever we access.\
+Recommendation: prevent impossible min/max row constraints (CHECKME FIRST)}
