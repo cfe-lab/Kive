@@ -299,6 +299,7 @@ class AbstractDataset(models.Model):
 
         try:
             md5gen = hashlib.md5()
+            self.dataset_file.open() # FIXME: PERFORMING OPERATION ON CLOSED FILE
             md5gen.update(self.dataset_file.read())
             self.MD5_checksum = md5gen.hexdigest()
 
@@ -306,6 +307,8 @@ class AbstractDataset(models.Model):
             print(e)
             #print("No file found; setting MD5 checksum to the empty string.")
             self.MD5_checksum = ""
+
+            #self.dataset_file.close()
 
 class Dataset(AbstractDataset):
     """
@@ -433,8 +436,8 @@ class RawDataset(AbstractDataset):
         TransformationRawOutput that produced it comes from the specified PipelineStep.
         """
         # This computes the MD5 checksum if necessary.
-        super(RawDataset, self).clean();
-
+        super(RawDataset, self).clean()
+        
         # Either both pipeline_step and pipeline_step_output are specified or
         # neither is specified.  If they are both specified, check that they
         # are consistent with each other, i.e. that the output is actually one
@@ -552,10 +555,8 @@ class RawParentDataset(models.Model):
         Pipeline that produced the child.
         """
         # Raw parents must only come from a pipeline input
-        # Is parent_raw_input a member of transformation raw_inputs of the child's pipeline step
-
-        #raise ValidationError(self.child.pipeline_step.pipeline.raw_inputs)
-        
+        # Is parent_raw_input a member of transformation raw_inputs of the child's pipeline
+       
         if not self.child.pipeline_step.pipeline.raw_inputs.filter(pk=self.parent_raw_input.pk).exists():
             raise ValidationError(
                 "Parent's specified TransformationRawInput does not belong to generating Pipeline");
