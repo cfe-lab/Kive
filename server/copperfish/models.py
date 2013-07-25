@@ -238,6 +238,18 @@ class AbstractDataset(models.Model):
     """
     Datasets uploaded by users or created by transformations.
 
+    The "clean" functions associated with (Raw)Datasets and their related
+    classes ought to be used when a pipeline is *executed* to see that
+    the results are consistent with what's expected from the pipeline's
+    definition.  Much of the code looks like it's redundantly checking
+    things that our clean functions on Pipeline and its related classes
+    are checking, but it's actually for a different purpose.
+
+    The intuition is that Pipeline clean functions check that the
+    pipeline is well-defined in *theory*, while these checks are to make
+    sure that the Pipeline is actually running as expected; we might catch
+    problems in the scripts themselves, for example.
+        
     Related to :model:`copperfish.PipelineStep`
     """
 
@@ -310,6 +322,38 @@ class AbstractDataset(models.Model):
 
             #self.dataset_file.close()
 
+        # If there are any members of parent_datasets (i.e. this was produced by
+        # a Transformation and not just uploaded), we should clean all of them and
+        # make sure that all of the producing Transformation's inputs were quenched.
+        # Same for raw_parent_datasets.
+        if self.pipeline_step != None:
+            # Clean all parent_datasets and raw_parent_datasets.
+            for curr_parent_dataset in self.parent_datasets.all():
+                curr_parent_dataset.clean()
+            for curr_raw_parent_dataset in self.raw_parent_datasets.all():
+                curr_raw_parent_dataset.clean()
+
+    def complete_clean(self):
+        self.clean()
+
+        if self.pipeline_step != None:
+
+            # Check quenching of producing Transformation's inputs by parent datasets
+            for curr_input in self.pipeline_step.transformation.inputs.all():
+                num_datasets_in = self.parent_datasets.filter(parent_input=curr_input).count()
+                if num_datasets_in == 0:
+                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_input), unicode(self)))
+                if num_datasets_in > 1:
+                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_input), unicode(self)))
+                
+            # Same for raw inputs.
+            for curr_raw_input in self.pipeline_step.transformation.raw_inputs.all():
+                num_raw_datasets_in = self.raw_parent_datasets.filter(parent_raw_input=curr_raw_input).count()
+                if num_raw_datasets_in == 0:
+                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_raw_input), unicode(self)))
+                if num_raw_datasets_in > 1:
+                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_raw_input), unicode(self)))
+ 
 class Dataset(AbstractDataset):
     """
     Datasets with a Shipyard-compliant structure; i.e. CSV file with a CDT.
@@ -374,6 +418,15 @@ class Dataset(AbstractDataset):
                 raise ValidationError(
                     "Dataset CDT does not match the CDT of the generating TransformationOutput")
 
+            # Check number of rows of this Dataset to see if it is between [min_row, max_row]
+            # if they exist.
+            if (self.pipeline_step_output.min_row != None and
+                    self.num_rows() < self.pipeline_step_output.min_row):
+                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".format(unicode(self), unicode(self.pipeline_step_output)))
+            if (self.pipeline_step_output.max_row != None and
+                    self.num_rows() > self.pipeline_step_output.max_row):
+                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".format(unicode(self), unicode(self.pipeline_step_output)))
+                        
         # Check CSV header for coherence with registered CDT
         data_csv = csv.DictReader(self.dataset_file)
         header = data_csv.fieldnames
@@ -392,6 +445,10 @@ class Dataset(AbstractDataset):
                     format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
         
         # FIXME: this is where you validate the actual data in the file
+
+    def complete_clean(self):
+        self.clean()
+        super(Dataset,self).complete_clean()
 
     def num_rows(self):
         """Reports the number of rows belonging to the CSV file (excluding header)."""
@@ -455,6 +512,10 @@ class RawDataset(AbstractDataset):
             raise ValidationError(
                 "Specified PipelineStep does not produce specified TransformationRawOutput");
 
+    def complete_clean(self):
+        self.clean()
+        super(RawDataset,self).complete_clean()
+
 class ParentDataset(models.Model):
     """
     Specifies non-raw parents of a (raw or non-raw) dataset.
@@ -490,32 +551,15 @@ class ParentDataset(models.Model):
         if not self.child.pipeline_step.transformation.inputs.filter(pk=self.parent_input.pk).exists():
             raise ValidationError(
                 "Parent's specified TransformationInput does not belong to generating Transformation");
-        
-        # Parent CDT must match it's parent_input CDT, and parent rows must conform to parent_input min/max_row
-        if self.parent.compounddatatype != self.parent_input.compounddatatype:
-            
-            # If CDT of the parent dataset doesn't match the expected CDT for parent_input, custom wiring
-            # must exist between the cable which parent was assigned to and the parent_input
-            
-            # We ASSUME there is 1 cable leading to this transformation input
-            # FIXME (Eric): Why don't we just run pipeline.clean to confirm this?
 
-            # Load cable that connected the parent into the PS transformation that generated the child
-            cable_in = self.child.pipeline_step.cables_in.get(transf_input=self.parent_input)
+        # Does the CDT of the dataset match the CDT of the source of the cable (provider_output)
+        cable_in = self.child.pipeline_step.cables_in.get(transf_input=self.parent_input)
 
-            if not cable_in.custom_wires.all().exists():
-                raise ValidationError(
-                    "Parent dataset \"{}\" does not have the same CDT as the TransformationInput it should have fit into, and no custom wiring is defined".format(unicode(self.parent)));
-
-            # Wires, a priori, quench all parent_input's columns
-            # We ASSUME the cable is coherent and complete
-            # FIXME Eric: Why not directly invoke cable.clean to confirm this then?
-
-            # For each wire, confirm the CDTM exists in the parent
-            for curr_wire in cable_in.custom_wires.all():
-                curr_member = parent.compounddatatype.members.filter(pk=curr_wire.source_pin.pk)
-                if not curr_member.exists():
-                    raise ValidationError("Wire requests invalid member of CDT")
+        # The cable is valid since it belongs to a defined pipeline - given this, the dataset must match
+        # the CDT of the cable's source (provider_output)
+        if self.parent.compounddatatype != cable_in.provider_output.compounddatatype:
+            raise ValidationError(
+                "Parent dataset \"{}\" of dataset \"{}\" is not of the expected CDT".format(self.parent, self.child));
 
         # Parent's num_rows must satisfy the TRI min_row/max_row constraints
         if self.parent_input.min_row != None and self.parent.num_rows() < self.parent_input.min_row:
@@ -1639,8 +1683,10 @@ class PipelineStepInputCable(models.Model):
 
         # Validate whatever wires there are.
         if self.custom_wires.all().exists():
-            for wire in self.custom_wires.all():
-                wire.clean()
+
+            # July 24, 2013: this bit moved to clean()
+            # for wire in self.custom_wires.all():
+            #     wire.clean()
 
             # Each destination CDT member of must be wired to exactly once
 
