@@ -1,122 +1,12 @@
-{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;\red38\green64\blue204;\red63\green105\blue30;\red0\green61\blue204;
-\red0\green45\blue153;\red0\green0\blue0;}
+{\colortbl;\red255\green255\blue255;\red0\green61\blue204;\red63\green105\blue30;}
 {\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid1\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid2\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li1440\lin1440 }{\listname ;}\listid1}}
 {\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}}
-\margl1440\margr1440\vieww32980\viewh15520\viewkind0
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
+\margl1440\margr1440\vieww29660\viewh11320\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
-\f0\b\fs24 \cf2 Write scripts
-\b0 \
-1A) Takes raw input, outputs CSV input\
-script_4_raw_in_CSV_out.py:	Inputs raw (a,b,c) and outputs CSV (a^2, b^2, c^2)\
-1B) Takes CSV input, outputs raw\
-script_5_CSV_in_raw_out.py:	Inputs CSV (a,b,c) and outputs RAW (a^2,b^2,c^2)\
-1C) Takes raw input, outputs raw (Can be dumb)\
-script_6_raw_in_raw_out.py:	Inputs raw (a,b,c) and outputs raw (a^2,b^2,c^2)\
-1D) One that "mixes and matches"\
-script_7_complex_inputs_and_outputs.py: Inputs CSV (a,b,c) and RAW (d,e,f), outputs CSV and raw (a+d,b+e,c+f)\
-\
-
-\b Transformation (Raw inputs incorporated)
-\b0 \
- - Indices (uniqueness and consecutive-ness), naming uniqueness (check_(in|out)put_(names|indices)) - DONE!\
- - Check clean for propagation - DONE!\
- - Focus on Method, do maybe 1-2 cases for Pipeline (For inputs - outputs are taken care of by Pipeline.clean looking at outcables)\
-\
-
-\b Method
-\b0 \
- - Save: check that raw_xputs are copied, no copying is done if *any* (raw)xputs already defined - DONE!\
-\
-
-\b PipelineStepRawInputCable
-\b0 \
- - pipeline_raw_input must come from this pipeline's TransformationRawInputs (Raw inputs only connect from step 0)\
- - Destination TransformationRawInput must belong to a PS Transformation in this pipeline\
-\
-
-\b PipelineRawOutputCable
-\b0 \
- - Step referenced must be valid (step number <= total number of steps)\
- - Must reference a TransformationRawOutput from the specified PS\
- - Referenced TransformationRawOutput must not be deleted\
-\
-
-\b PipelineStepRawDelete
-\b0 \
- - Clean: the raw transformation output to be deleted must exist\
- - Check propagation of errors\
-\
-
-\b AbstractDataset
-\b0 \
- - Confirm MD5 checksum\
-\
-
-\b Dataset
-\b0 \
- - If AbstractDataset.pipeline_step is set, Dataset.pipeline_step_output must be valid:\
-   - Is specified, not None\
-   - Belongs to the specified PS\
- - Check that if pipeline_step_output is set, then so is pipeline_step\
- - Check its ability to test that Dataset CDT matches the pipeline_step's CDT\
- - Test its ability to look at the header of a CSV file for coherence\
- - Validate num_rows\
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
-\cf3 At some point we're going to need to start validating Datasets (With DT verification scripts) - holding off until execute\
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
-\cf2 \
-
-\b RawDataset
-\b0 \
- - check that if pipeline_step is set, then pipeline_step_raw_output is valid:\
-   - is specified, not None\
-   - belongs to the specified PS\
- - check that if pipeline_step_output is set, then so is pipeline_step\cf0 \
-\
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
-
-\b \cf4 CustomCableWire (Custom wiring)
-\b0 \
-- source_pin must be a member of the set of CDT members of the cable source (provider_output)\
-- dest_pin must be a member of the set of CDT members of the cable destination (transf_input) TransformationInput;\
-- The datatype of the source_pin must match the datatype of the destination_pin\
-- Check propagation
-\b \cf0 \
-\
-\cf4 PipelineStepInputCable\
-
-\b0 - CDT not equal and wires do not exist
-\b \
-
-\b0 - CDT not equal and wires do exist\'85\
-    - And are good/quenched (Exactly 1 wire)\
-    - And are bad\'85\
-        - More than 1 wire leading to CDTM\
-       - 0 wires leading to a CDTM\cf0 \
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
-\cf3 Modified clean() in PipelineStepInputCable to run clean on wires
-\b \
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
-\cf0 \
-\cf4 CustomOutputCableWire
-\b0 \
-- Check clean - reference an invalid CDTM\
-
-\b \
-PipelineOutputCable\
-
-\b0 - CustomOutputCableWire dest_idx must consecutively start from 1\
-\
-
-\b Pipeline (Custom output wiring related)
-\b0 \
-- create_outputs: custom wires lead to the correct Pipeline output CDT\
-
-\b \
-PipelineStep (Raw input related tests)
+\f0\b\fs24 \cf2 PipelineStep (Raw input related tests)
 \b0 \
 - Complete_clean: Check for quenching of raw inputs (Single/Several_Raw_Input_Tests)\
 - Clean: Check for overquenching of raw inputs\
@@ -126,37 +16,44 @@ PipelineStep (Raw input related tests)
 \b0 \
 - Check Pipeline.clean for indexing and naming collisions (With raw outmaps)\
 - create_outputs:  RAW outputs are created by RAW outmaps\
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 \cf3 Modified create_outputs to also delete raw_outputs before regenerating\
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\ql\qnatural\pardirnatural
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 \cf0 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
-\b ParentDataset (Non-raw parents of a dataset which can itself be raw or non-raw)
+\b \cf2 ParentDataset (Non-raw parents of a dataset which can itself be raw or non-raw)
 \b0 \
-\cf4 - Test with raw and non-raw child (Good case)\
-- parent_input belongs to the transformation of the PS producing the child raw/non-raw Dataset\cf5 \
-\cf0 \
+- Test with raw and non-raw child (Good case)\
+- parent_input belongs to the transformation of the PS producing the child raw/non-raw Dataset\
+\
 - Parent must "fit" with parent_input\
-\cf4    - CDTs match\'85\
+   - CDTs match\'85\
        - All min_row + max_row constraints are satisfied (Good)\
        - Parent has less rows than min_row (Bad)\
-       - Parent has more rows than max_row (Bad)\cf0 \
+       - Parent has more rows than max_row (Bad)\
    - CDT of dataset matches provider_output CDT (Good)\
-   - CDT of dataset does not match provider_output CDT (Bad)\
+   - CDT of dataset does not match provider_output CDT (Bad)\cf0 \
 \
 
-\b \cf4 RawParentDataset
+\b \cf2 RawParentDataset
 \b0 \
  - Test that parent_raw_input is a pipeline input of the generating pipeline \
 (because raw parents can only ever come from the generating pipeline's inputs)\cf0 \
-\cf6 \
+\
 
-\b Tests to be done\
+\b \cf2 Dataset
+\b0 \cf0 \
+\cf2 - Dataset.clean(): check whether number of rows matches producing PS TransformationOutput or pipeline input min_row/max_row\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
 
-\b0 - Dataset.clean(): checks whether number of rows matches the producing TransformationOutput (Or pipeline input) min_row/max_row\
-\pard\tx940\tx1440\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\li1440\fi-1440\ql\qnatural\pardirnatural
-\ls1\ilvl1\cf6 \uc0\u8259  AbstractDataset.complete_clean()\
-     Check quenching of this transformation input by parent datasets\
-     Same for raw inputs\
+\b \cf2 Tests to be done
+\b0 \
+\pard\tx940\tx1440\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\li1440\fi-1440\pardirnatural
+\ls1\ilvl1\cf2 \uc0\u8259  AbstractDataset.complete_clean(): check quenching of this transformation input by parent datasets\
+   - non-raw inputs\
+   - raw inputs\cf0 \
 \
 Note: All of the Dataset-related clean() functions check pipeline results *as it is executed*, as opposed to the Pipeline-related clean() functions, which check that the Pipeline is laid out correctly in theory; this wouldn't catch bugs in the actual CodeResourceRevisions, for example.}

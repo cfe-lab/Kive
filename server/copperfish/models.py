@@ -338,7 +338,8 @@ class AbstractDataset(models.Model):
 
         if self.pipeline_step != None:
 
-            # Check quenching of producing Transformation's inputs by parent datasets
+            # If this dataset came from a producing PS transformation, then the producing
+            # transformation must have had all of it's inputs quenched by it's parent
             for curr_input in self.pipeline_step.transformation.inputs.all():
                 num_datasets_in = self.parent_datasets.filter(parent_input=curr_input).count()
                 if num_datasets_in == 0:
@@ -346,7 +347,7 @@ class AbstractDataset(models.Model):
                 if num_datasets_in > 1:
                     raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_input), unicode(self)))
                 
-            # Same for raw inputs.
+            # Same for raw inputs
             for curr_raw_input in self.pipeline_step.transformation.raw_inputs.all():
                 num_raw_datasets_in = self.raw_parent_datasets.filter(parent_raw_input=curr_raw_input).count()
                 if num_raw_datasets_in == 0:

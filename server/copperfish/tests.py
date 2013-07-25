@@ -5626,6 +5626,169 @@ class Datasets_tests(Copperfish_Raw_Setup):
         dataset_1.clean()
         self.assertEquals(dataset_1.MD5_checksum, '5f1821eebedee3b3ca95cf6b25a2abb1')
 
+    def test_Dataset_clean_num_rows_less_than_producing_PS_output_min_row_bad(self):
+        # Dataset.clean(): numRows matches producing PS TransformationOutput min/max row
+
+        # Define pipeline with method at step 1 containing min_row constrained output
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       min_row=10,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+
+        # Define a Dataset coming from step1
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+
+        errorMessage = "Dataset .* was produced by TransformationOutput .* but has too few rows"
+        self.assertRaisesRegexp(ValidationError,errorMessage, created_dataset.clean)
+
+    def test_Dataset_clean_num_rows_more_than_producing_PS_output_max_row_bad(self):
+        # Dataset.clean(): numRows matches producing PS TransformationOutput min/max row
+
+        # Define pipeline with method at step 1 containing min_row constrained output
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       max_row=3,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+
+        # Define a Dataset coming from step1
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+
+        errorMessage = "Dataset .* was produced by TransformationOutput .* but has too many rows"
+        self.assertRaisesRegexp(ValidationError,errorMessage, created_dataset.clean)
+
+    def test_Abstract_Dataset_complete_clean_producing_transformation_raw_inputs_not_quenched_by_raw_parent_bad(self):
+        # If this dataset came from a producing PS transformation, then the producing
+        # transformation must have had all of it's inputs quenched by it's parent
+
+        # Define pipeline with pipeline input cabled to method at step 1
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        
+        pipeline_input = myPipeline.raw_inputs.create(dataset_name="pipeline_in",
+                                                      dataset_idx=1)
+        
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",
+                                                             dataset_idx=1)
+        
+        method_raw_input_2 = self.testmethod.raw_inputs.create(dataset_name="method_in_2",
+                                                               dataset_idx=2)
+        
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+
+        # Only partially quench the method from the pipeline
+        my_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input_2,
+                                              pipeline_raw_input=pipeline_input)
+
+        # Define raw parental Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            uploaded_dataset = RawDataset(
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            uploaded_dataset.save()
+
+        # Define non-raw child Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            created_dataset.save()
+            
+        self.assertEquals(uploaded_dataset.clean(), None)
+        self.assertEquals(created_dataset.clean(), None)
+
+        self.assertEquals(uploaded_dataset.complete_clean(), None)
+
+        errorMessage = "Raw input .* of producing transformation of .* is not quenched"
+        self.assertRaisesRegexp(ValidationError,errorMessage, created_dataset.complete_clean)
+
+    def test_Abstract_Dataset_complete_clean_producing_transformation_inputs_not_quenched_by_parent_bad(self):
+        # If this dataset came from a producing PS transformation, then the producing
+        # transformation must have had all of it's inputs quenched by it's parent
+
+        # Define pipeline with pipeline input cabled to method at step 1
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+
+        pipeline_input = myPipeline.raw_inputs.create(dataset_name="pipeline_in",
+                                                      dataset_idx=1)
+        
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
+                                                     dataset_name="method_in",
+                                                     dataset_idx=1)
+        
+        method_input_2 = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
+                                                       dataset_name="method_in_2",
+                                                       dataset_idx=2)
+        
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+
+        # Only partially quench the method from the pipeline
+        my_cable = step1.cables_in.create(transf_input=method_input_2,
+                                          step_providing_input=0,
+                                          provider_output=pipeline_input)
+
+        # Define parental Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            uploaded_dataset = Dataset(
+                compounddatatype=self.triplet_cdt,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            uploaded_dataset.save()
+
+        
+        # Define non-raw child Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            created_dataset.save()
+
+        self.assertEquals(uploaded_dataset.complete_clean(), None)
+        errorMessage = "Input .* of producing transformation of .* is not quenched"
+        self.assertRaisesRegexp(ValidationError,errorMessage, created_dataset.complete_clean)
+
 class PipelineStepRawDelete_tests(Copperfish_Raw_Setup):
 
     def test_pipelineStepRawDelete_clean_raw_output_to_be_deleted_good(self):
@@ -7702,49 +7865,108 @@ class ParentDataset_tests(Copperfish_Raw_Setup):
         errorMessage = "Parent dataset .* has too many rows for TransformationInput .*"
         self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
 
-    # def test_ParentDataset_clean_CDTs_do_not_match_bad(self):
-    #     # Define pipeline with method at step 1 containing triplet_cdt input/output: METHOD INPUT HAS MIN/MAX ROWS
-    #     myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-    #     method_input = self.testmethod.inputs.create(
-    #         compounddatatype=self.triplet_cdt,
-    #         dataset_name="method_in",
-    #         dataset_idx=1)
-    #     method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-    #     step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-    #     # Define parental non-raw Dataset (Uploaded: No parents -> Pipeline step & pipeline_step_output == null)
-    #     with open(os.path.join(samplecode_path, "script_5_input_5_rows.csv"), "rb") as f:
-    #         uploaded_dataset = Dataset(
-    #             compounddatatype=self.triplet_cdt,
-    #             user=self.myUser,
-    #             name="uploaded_dataset",
-    #             description="hehe",
-    #             dataset_file=File(f))
-    #         uploaded_dataset.save()
-
-    #     # Define non-raw child Dataset
-    #     with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-    #         created_dataset = Dataset(
-    #             pipeline_step_output=method_output,
-    #             compounddatatype=self.triplet_cdt,
-    #             pipeline_step=step1,
-    #             user=self.myUser,
-    #             name="uploaded_dataset",
-    #             description="hehe",
-    #             dataset_file=File(f))
-    #         created_dataset.save()
-
-    #     # Annotate non-raw child with non-raw min/max-row conforming parental information
-    #     parentDataset = ParentDataset(child=created_dataset,
-    #                                   parent=uploaded_dataset,
-    #                                   parent_input=method_input)
-
-    #     self.assertEquals(uploaded_dataset.clean(), None)
-    #     self.assertEquals(created_dataset.clean(), None)
+    def test_ParentDataset_clean_CDT_of_dataset_matches_cable_provider_output_good(self):
+        # Define pipeline with pipeline input cabled to method at step 1
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_input = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,
+                                                 dataset_name="pipeline_in",
+                                                 dataset_idx=1)
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
+                                                     dataset_name="method_in",
+                                                     dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
         
-    #     # The parent dataset did not satisfy the precursor transformation input min_row constraint
-    #     errorMessage = "Parent dataset .* has too many rows for TransformationInput .*"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
+        my_cable = step1.cables_in.create(transf_input=method_input,
+                                          step_providing_input=0,
+                                          provider_output=pipeline_input)
+
+        # Define parental non-raw Dataset with a CDT that cannot feed into the pipeline
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            uploaded_dataset = Dataset(
+                compounddatatype=self.triplet_cdt,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            uploaded_dataset.save()
+            
+        # Define non-raw child Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            created_dataset.save()
+            
+        self.assertEquals(uploaded_dataset.clean(), None)
+        self.assertEquals(created_dataset.clean(), None)
+
+        # Annotate non-raw child with non-raw min/max-row conforming parental information
+        parentDataset = ParentDataset(child=created_dataset,
+                                      parent=uploaded_dataset,
+                                      parent_input=method_input)
+
+        self.assertEquals(parentDataset.clean(), None)
+
+    def test_ParentDataset_clean_CDT_of_dataset_doesnt_match_cable_provider_output_bad(self):
+        # Define pipeline with pipeline input cabled to method at step 1
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_input = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,
+                                                 dataset_name="pipeline_in",
+                                                 dataset_idx=1)
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
+                                                     dataset_name="method_in",
+                                                     dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
+                                                       dataset_name="method_out",
+                                                       dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        
+        my_cable = step1.cables_in.create(transf_input=method_input,
+                                          step_providing_input=0,
+                                          provider_output=pipeline_input)
+
+        # Define parental non-raw Dataset with a CDT that cannot feed into the pipeline
+        with open(os.path.join(samplecode_path, "doublet_cdt_data.csv"), "rb") as f:
+            uploaded_dataset = Dataset(
+                compounddatatype=self.doublet_cdt,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            uploaded_dataset.save()
+
+        # Define non-raw child Dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            created_dataset = Dataset(
+                pipeline_step_output=method_output,
+                compounddatatype=self.triplet_cdt,
+                pipeline_step=step1,
+                user=self.myUser,
+                name="uploaded_dataset",
+                description="hehe",
+                dataset_file=File(f))
+            created_dataset.save()
+            
+        self.assertEquals(uploaded_dataset.clean(), None)
+        self.assertEquals(created_dataset.clean(), None)
+
+        # Annotate non-raw child with non-raw min/max-row conforming parental information
+        parentDataset = ParentDataset(child=created_dataset,
+                                      parent=uploaded_dataset,
+                                      parent_input=method_input)
+
+        # uploaded_dataset could not have been the parent dataset, as it does not have
+        # the CDT needed by method_input
+        errorMessage = "Parent dataset .* of dataset .* is not of the expected CDT"
+        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
 
 class RawParentDataset_tests(Copperfish_Raw_Setup):
 
