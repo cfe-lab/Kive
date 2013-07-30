@@ -231,381 +231,6 @@ class CompoundDatatype(models.Model):
         if sorted(column_indices) != range(1, self.members.count()+1):
             raise ValidationError("Column indices are not consecutive starting from 1");
 
-
-
-
-class AbstractDataset(models.Model):
-    """
-    Datasets uploaded by users or created by transformations.
-
-    The "clean" functions associated with (Raw)Datasets and their related
-    classes ought to be used when a pipeline is *executed* to see that
-    the results are consistent with what's expected from the pipeline's
-    definition.  Much of the code looks like it's redundantly checking
-    things that our clean functions on Pipeline and its related classes
-    are checking, but it's actually for a different purpose.
-
-    The intuition is that Pipeline clean functions check that the
-    pipeline is well-defined in *theory*, while these checks are to make
-    sure that the Pipeline is actually running as expected; we might catch
-    problems in the scripts themselves, for example.
-        
-    Related to :model:`copperfish.PipelineStep`
-    """
-
-    # Implicitly defined
-    #   descendent_datasets (self/ManyToMany)
-
-    # Activating admin panel creates a Users model
-    user = models.ForeignKey(
-            User,
-            help_text="User that uploaded this dataset.");
-
-    name = models.CharField(
-            "Dataset name",
-            max_length=128,
-            help_text="Description of this dataset.");
-
-    description = models.TextField("Dataset description");
-
-    date_created = models.DateTimeField(
-            "Date created",
-            auto_now_add=True,
-            help_text="Date of dataset upload.");
-
-    # Pipeline step this Dataset come from (Null if Dataset was manually uploaded)
-    pipeline_step = models.ForeignKey(
-            "PipelineStep",
-            related_name="%(app_label)s_%(class)s_data_produced",
-            null=True,
-            blank=True,
-            help_text="The pipeline step this dataset was created by (If applicable)");
-
-    dataset_file = models.FileField(
-            upload_to="Datasets",
-            help_text="File path where datasets are stored",
-            null=False);
-
-    MD5_checksum = models.CharField(
-            max_length=64,
-            help_text="Used to check dataset file integrity");
-
-    # For recapitulating how it was produced.
-    parent_datasets = generic.GenericRelation("ParentDataset");
-    raw_parent_datasets = generic.GenericRelation("RawParentDataset");
-    
-    class Meta:
-        abstract = True;
-
-    def __unicode__(self):
-        """Display the Dataset name, user, and date created."""
-
-        return "{} (created by {} on {})".format(
-                self.name,
-                unicode(self.user),
-                self.date_created);
-
-    # Before completing a save(), generate the MD5 hash
-    def clean(self):
-        """Compute MD5 checksum for the dataset."""
-
-        try:
-            md5gen = hashlib.md5()
-            self.dataset_file.open() # FIXME: PERFORMING OPERATION ON CLOSED FILE
-            md5gen.update(self.dataset_file.read())
-            self.MD5_checksum = md5gen.hexdigest()
-
-        except ValueError as e:
-            print(e)
-            #print("No file found; setting MD5 checksum to the empty string.")
-            self.MD5_checksum = ""
-
-            #self.dataset_file.close()
-
-        # If there are any members of parent_datasets (i.e. this was produced by
-        # a Transformation and not just uploaded), we should clean all of them and
-        # make sure that all of the producing Transformation's inputs were quenched.
-        # Same for raw_parent_datasets.
-        if self.pipeline_step != None:
-            # Clean all parent_datasets and raw_parent_datasets.
-            for curr_parent_dataset in self.parent_datasets.all():
-                curr_parent_dataset.clean()
-            for curr_raw_parent_dataset in self.raw_parent_datasets.all():
-                curr_raw_parent_dataset.clean()
-
-    def complete_clean(self):
-        self.clean()
-
-        if self.pipeline_step != None:
-
-            # If this dataset came from a producing PS transformation, then the producing
-            # transformation must have had all of it's inputs quenched by it's parent
-            for curr_input in self.pipeline_step.transformation.inputs.all():
-                num_datasets_in = self.parent_datasets.filter(parent_input=curr_input).count()
-                if num_datasets_in == 0:
-                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_input), unicode(self)))
-                if num_datasets_in > 1:
-                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_input), unicode(self)))
-                
-            # Same for raw inputs
-            for curr_raw_input in self.pipeline_step.transformation.raw_inputs.all():
-                num_raw_datasets_in = self.raw_parent_datasets.filter(parent_raw_input=curr_raw_input).count()
-                if num_raw_datasets_in == 0:
-                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_raw_input), unicode(self)))
-                if num_raw_datasets_in > 1:
-                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_raw_input), unicode(self)))
- 
-class Dataset(AbstractDataset):
-    """
-    Datasets with a Shipyard-compliant structure; i.e. CSV file with a CDT.
-
-    This CSV file must have a header.
-
-    Inherits from :model:`copperfish.AbstractDataset`
-     - Related to :model:`copperfish.PipelineStep`
-    Related to :model:`copperfish.CompoundDatatype`
-    Related to :model:`copperfish.TransformationOutput`
-    Related to :model:`copperfish.DatasetParent`
-    Related to :model:`copperfish.DatasetRawParent`
-    """
-    # Output 'hole' within a pipeline the Dataset comes from.  This,
-    # along with pipeline_step (in the parent class), unambiguously
-    # defines what pipeline and where in the pipeline it came from.
-    pipeline_step_output = models.ForeignKey(
-            "TransformationOutput",
-            null=True,
-            blank=True,
-            help_text="The output 'hole' this dataset comes from (If applicable)");
-
-    # Datasets conform to a compound datatype.
-    compounddatatype = models.ForeignKey(
-            CompoundDatatype,
-            related_name="conforming_datasets");
-
-    def clean(self):
-        """Compute MD5 checksum for the dataset and check that its source is correctly specified.
-        
-        If a file specified, populate the MD5 checksum.  Also check that the
-        TransformationOutput that produced it comes from the specified PipelineStep.
-
-        FIXME: this will have to be amended to also validate the actual data in the
-        file when doing execute.
-        """
-        # Cmputes MD5 checksum if necessary
-        super(Dataset, self).clean()
-
-        # Either both pipeline_step and pipeline_step_output are specified or
-        # neither is specified. If they are both specified, check that they
-        # are consistent with each other.
-
-        if self.pipeline_step == None and self.pipeline_step_output != None:
-            raise ValidationError(
-                "No PipelineStep specified but an output from a PipelineStep is")
-        
-        elif self.pipeline_step != None and self.pipeline_step_output == None:
-            raise ValidationError(
-                "PipelineStep is specified but no output from it is")
-
-        elif self.pipeline_step != None and self.pipeline_step_output != None:
-            # Check that the PS transformation matches pipeline_step_output's
-            if self.pipeline_step.transformation != self.pipeline_step_output.transformation:
-                raise ValidationError(
-                    "Specified PipelineStep does not produce specified TransformationOutput");
-            if self.compounddatatype != self.pipeline_step_output.compounddatatype:
-
-                # We do not need to check custom wiring, because there is no reason to
-                # reorder an output (Until it is plugged into another PS)
-                
-                raise ValidationError(
-                    "Dataset CDT does not match the CDT of the generating TransformationOutput")
-
-            # Check number of rows of this Dataset to see if it is between [min_row, max_row]
-            # if they exist.
-            if (self.pipeline_step_output.min_row != None and
-                    self.num_rows() < self.pipeline_step_output.min_row):
-                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".format(unicode(self), unicode(self.pipeline_step_output)))
-            if (self.pipeline_step_output.max_row != None and
-                    self.num_rows() > self.pipeline_step_output.max_row):
-                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".format(unicode(self), unicode(self.pipeline_step_output)))
-                        
-        # Check CSV header for coherence with registered CDT
-        data_csv = csv.DictReader(self.dataset_file)
-        header = data_csv.fieldnames
-        cdt_members = self.compounddatatype.members.all()
-        
-        if len(header) != cdt_members.count():
-            raise ValidationError(
-                "Dataset \"{}\" does not have the same number of columns as its CDT".
-                format(unicode(self)))
-
-        # CDT member i must have the same name as the ith column in the CSV header
-        for cdtm in self.compounddatatype.members.all():
-            if cdtm.column_name != header[cdtm.column_idx-1]:
-                raise ValidationError(
-                    "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
-                    format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
-        
-        # FIXME: this is where you validate the actual data in the file
-
-    def complete_clean(self):
-        self.clean()
-        super(Dataset,self).complete_clean()
-
-    def num_rows(self):
-        """Reports the number of rows belonging to the CSV file (excluding header)."""
-        # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-        # Note: we don't check for the integrity of self.dataset_file as that will
-        # be checked when calling clean().
-        # FIXME: do we need to close and reopen self.dataset_file at the end of this
-        # script?  Find out by running twice consecutively and seeing if it barfs
-        # the second time.
-        return (sum(1 for line in self.dataset_file) - 1);
-            
-
-class RawDataset(AbstractDataset):
-    """
-    Datasets without a Shipyard-compliant structure; e.g. a FASTA file or a Newick file.
-
-    Inherits from :model:`copperfish.AbstractDataset`
-     - Related to :model:`copperfish.PipelineStep`
-    Related to :model:`copperfish.TransformationRawOutput`
-    Related to :model:`copperfish.RawDatasetParent`
-    Related to :model:`copperfish.RawDatasetRawParent`
-    """
-    # Raw output 'hole' within a pipeline the RawDataset comes from.
-    pipeline_step_raw_output = models.ForeignKey(
-            "TransformationRawOutput",
-            null=True,
-            blank=True,
-            help_text="The output 'hole' this dataset comes from (If applicable)");
-
-    def __unicode__(self):
-        """Display the Dataset name, user, and date created, and mark as raw."""
-        return "{}(raw) (created by {} on {})".format(
-                self.name,
-                unicode(self.user),
-                self.date_created);
-
-
-    def clean(self):
-        """Compute MD5 checksum for the raw dataset and check that its source is correctly specified.
-        
-        If a file specified, populate the MD5 checksum.  Also check that the
-        TransformationRawOutput that produced it comes from the specified PipelineStep.
-        """
-        # This computes the MD5 checksum if necessary.
-        super(RawDataset, self).clean()
-        
-        # Either both pipeline_step and pipeline_step_output are specified or
-        # neither is specified.  If they are both specified, check that they
-        # are consistent with each other, i.e. that the output is actually one
-        # belonging to the specified PipelineStep.
-        if self.pipeline_step == None and self.pipeline_step_raw_output != None:
-            raise ValidationError(
-                "No PipelineStep specified but a raw output from a PipelineStep is");
-        
-        elif self.pipeline_step != None and self.pipeline_step_raw_output == None:
-            raise ValidationError(
-                "PipelineStep is specified but no raw output from it is");
-
-        elif ((self.pipeline_step != None and self.pipeline_step_raw_output != None) and
-              (self.pipeline_step.transformation != self.pipeline_step_raw_output.transformation)):
-            raise ValidationError(
-                "Specified PipelineStep does not produce specified TransformationRawOutput");
-
-    def complete_clean(self):
-        self.clean()
-        super(RawDataset,self).complete_clean()
-
-class ParentDataset(models.Model):
-    """
-    Specifies non-raw parents of a (raw or non-raw) dataset.
-
-    Related to :model:`copperfish.Dataset`
-    Related to :model:`copperfish.RawDataset`
-    Related to :model:`copperfish.TransformationInput`
-    """
-    # This can be either a Dataset or a RawDataset.
-    content_type = models.ForeignKey(
-            ContentType,
-            limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
-    object_id = models.PositiveIntegerField();
-    child = generic.GenericForeignKey("content_type", "object_id");
-    
-    # Since this will be inherited by other classes, we need to specify related_name
-    # in a way that will be specialized by the child classes.
-    parent = models.ForeignKey(Dataset, related_name="%(app_label)s_%(class)s_parentof");
-    parent_input = models.ForeignKey("TransformationInput");
-
-    # FIXME write a __unicode__ method
-
-    def clean(self):
-        """Check coherence of this dataset-parent relationship.
-
-        We check that the specified parent fits into the specified
-        TransformationInput that it supposedly went into to produce
-        the child; also we check that the TransformationInput belongs
-        to the Transformation that produced the child.
-        """
-
-        # Does parent_input belong to the CHILD dataset's pipeline step's transformation inputs?
-        if not self.child.pipeline_step.transformation.inputs.filter(pk=self.parent_input.pk).exists():
-            raise ValidationError(
-                "Parent's specified TransformationInput does not belong to generating Transformation");
-
-        # Does the CDT of the dataset match the CDT of the source of the cable (provider_output)
-        cable_in = self.child.pipeline_step.cables_in.get(transf_input=self.parent_input)
-
-        # The cable is valid since it belongs to a defined pipeline - given this, the dataset must match
-        # the CDT of the cable's source (provider_output)
-        if self.parent.compounddatatype != cable_in.provider_output.compounddatatype:
-            raise ValidationError(
-                "Parent dataset \"{}\" of dataset \"{}\" is not of the expected CDT".format(self.parent, self.child));
-
-        # Parent's num_rows must satisfy the TRI min_row/max_row constraints
-        if self.parent_input.min_row != None and self.parent.num_rows() < self.parent_input.min_row:
-            raise ValidationError("Parent dataset \"{}\" has too few rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
-        if self.parent_input.max_row != None and self.parent.num_rows() > self.parent_input.max_row:
-            raise ValidationError("Parent dataset \"{}\" has too many rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
-
-
-
-class RawParentDataset(models.Model):
-    """
-    Specifies raw parents of a (raw or non-raw) dataset.
-
-	Note that this must therefore come from an input to the generating pipeline.
-
-    Related to :model:`copperfish.RawDataset`
-    Related to :model:`copperfish.TransformationRawInput`
-    """
-    # This can be either a Dataset or a RawDataset.
-    content_type = models.ForeignKey(
-            ContentType,
-            limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
-    object_id = models.PositiveIntegerField();
-    child = generic.GenericForeignKey("content_type", "object_id");
-    
-    # Since this will be inherited by other classes, we need to specify related_name
-    # in a way that will be specialized by the child classes.
-    parent = models.ForeignKey(RawDataset, related_name="%(app_label)s_%(class)s_parentof");
-    parent_raw_input = models.ForeignKey("TransformationRawInput");
-    
-    # FIXME write a __unicode__ method
-
-    def clean(self):
-        """Check coherence of this dataset-raw parent relationship.
-
-        We check that the TransformationInput belongs to the
-        Pipeline that produced the child.
-        """
-        # Raw parents must only come from a pipeline input
-        # Is parent_raw_input a member of transformation raw_inputs of the child's pipeline
-       
-        if not self.child.pipeline_step.pipeline.raw_inputs.filter(pk=self.parent_raw_input.pk).exists():
-            raise ValidationError(
-                "Parent's specified TransformationRawInput does not belong to generating Pipeline");
-        
  
 class CodeResource(models.Model):
     """
@@ -2178,3 +1803,462 @@ class TransformationOutput(TransformationXput):
     Inherits from :model:`copperfish.TransformationXput`
     """
     pass
+
+
+########
+# The following is to do with actual data and actual runs of pipelines.
+
+class Run(models.Model):
+    """
+    Represents a run of a pipeline.
+    """
+    user = models.ForeignKey(User, help_text="User who created this run")
+    start_time = models.DateTimeField(
+        "start time",
+        auto_now_add=True,
+        help_text="Timestamp of start of run")
+    pipeline = models.ForeignKey(Pipeline, help_text="Pipeline used in this run")
+
+    parent_runstep = models.OneToOneField(
+        "RunStep",
+        related_name="child_run",
+        null=True,
+        blank=True,
+        help_text="Step of parent run initiating this one as a sub-run")
+
+    def clean(self):
+        """
+        Checks coherence of the run (possibly in an incomplete state).
+
+        Checks completeness and cleanliness of all registered steps,
+        and checks their numbering.
+        """
+        for run_step in self.run_steps.all():
+            run_step.clean()
+        # FIXME EXECUTE
+            
+    def complete_clean(self):
+        """
+        Checks coherence of a completed run.
+
+        Recursively cleans all the steps (using complete_clean) and checks
+        that the outputs of the run are OK:
+         - there is exactly one (raw) dataset coming from each (raw) output of the pipeline
+         - all non-raw outputs are verified
+         - there is exactly one RunStep for each PipelineStep
+         - all non-raw intermediate datasets are verified (via complete_clean-ing steps)
+        """
+        for run_step in self.run_steps.all():
+            run_step.complete_clean()
+        # FIXME EXECUTE (this will be an important part of execute)
+            
+    def is_finished(self):
+        """
+        Checks if this run is finished running.
+        """
+        result = False
+        if self.run_steps.all().count() == self.pipeline.steps.all().count():
+            result = True
+        return result
+
+class RunStep(models.Model):
+    """
+    Represents the running of a step within the run pipeline.
+    """
+    run = models.ForeignKey(Run)
+    pipelinestep = models.ForeignKey(PipelineStep)
+
+    def clean(self):
+        """Checks coherence of this step (possibly in an incomplete state).
+
+        If any (raw) (in|out)put datasets are registered with this RunStep,
+        check that they are as expected.  Also, if this PipelineStep is a
+        sub-pipeline, check that if child_run is registered it is complete
+        and clean.
+        """
+        pass
+
+    def complete_clean(self):
+        """
+        Checks coherence and completeness of this step.
+
+        Call clean, and then check that all (raw) (in|out)puts are quenched.
+        Then, if the specified PipelineStep is a sub-pipeline, then check
+        that child_run is registered.
+        """
+        pass
+
+# FIXME what remains to be done: change AbstractDataset and its descendants to reflect the updated LucidChart diagram; convert the commented-out (Raw)ParentDataset code to RunStep(Raw)Input
+
+class AbstractDataset(models.Model):
+    """
+    Datasets uploaded by users or created by transformations.
+
+    The "clean" functions associated with (Raw)Datasets and their related
+    classes ought to be used when a pipeline is *executed* to see that
+    the results are consistent with what's expected from the pipeline's
+    definition.  Much of the code looks like it's redundantly checking
+    things that our clean functions on Pipeline and its related classes
+    are checking, but it's actually for a different purpose.
+
+    The intuition is that Pipeline clean functions check that the
+    pipeline is well-defined in *theory*, while these checks are to make
+    sure that the Pipeline is actually running as expected; we might catch
+    problems in the scripts themselves, for example.
+        
+    Related to :model:`copperfish.PipelineStep`
+    """
+
+    # Implicitly defined
+    #   descendent_datasets (self/ManyToMany)
+
+    # Activating admin panel creates a Users model
+    user = models.ForeignKey(
+            User,
+            help_text="User that uploaded this dataset.");
+
+    name = models.CharField(
+            "Dataset name",
+            max_length=128,
+            help_text="Description of this dataset.");
+
+    description = models.TextField("Dataset description");
+
+    date_created = models.DateTimeField(
+            "Date created",
+            auto_now_add=True,
+            help_text="Date of dataset upload.");
+
+    # Pipeline step this Dataset come from (Null if Dataset was manually uploaded)
+    pipeline_step = models.ForeignKey(
+            "PipelineStep",
+            related_name="%(app_label)s_%(class)s_data_produced",
+            null=True,
+            blank=True,
+            help_text="The pipeline step this dataset was created by (If applicable)");
+
+    dataset_file = models.FileField(
+            upload_to="Datasets",
+            help_text="File path where datasets are stored",
+            null=False);
+
+    MD5_checksum = models.CharField(
+            max_length=64,
+            help_text="Used to check dataset file integrity");
+
+    # For recapitulating how it was produced.
+    parent_datasets = generic.GenericRelation("ParentDataset");
+    raw_parent_datasets = generic.GenericRelation("RawParentDataset");
+    
+    class Meta:
+        abstract = True;
+
+    def __unicode__(self):
+        """Display the Dataset name, user, and date created."""
+
+        return "{} (created by {} on {})".format(
+                self.name,
+                unicode(self.user),
+                self.date_created);
+
+    # Before completing a save(), generate the MD5 hash
+    def clean(self):
+        """Compute MD5 checksum for the dataset."""
+
+        try:
+            md5gen = hashlib.md5()
+            self.dataset_file.open() # FIXME: PERFORMING OPERATION ON CLOSED FILE
+            md5gen.update(self.dataset_file.read())
+            self.MD5_checksum = md5gen.hexdigest()
+
+        except ValueError as e:
+            print(e)
+            #print("No file found; setting MD5 checksum to the empty string.")
+            self.MD5_checksum = ""
+
+            #self.dataset_file.close()
+
+        # If there are any members of parent_datasets (i.e. this was produced by
+        # a Transformation and not just uploaded), we should clean all of them and
+        # make sure that all of the producing Transformation's inputs were quenched.
+        # Same for raw_parent_datasets.
+        if self.pipeline_step != None:
+            # Clean all parent_datasets and raw_parent_datasets.
+            for curr_parent_dataset in self.parent_datasets.all():
+                curr_parent_dataset.clean()
+            for curr_raw_parent_dataset in self.raw_parent_datasets.all():
+                curr_raw_parent_dataset.clean()
+
+    def complete_clean(self):
+        self.clean()
+
+        if self.pipeline_step != None:
+
+            # If this dataset came from a producing PS transformation, then the producing
+            # transformation must have had all of it's inputs quenched by it's parent
+            for curr_input in self.pipeline_step.transformation.inputs.all():
+                num_datasets_in = self.parent_datasets.filter(parent_input=curr_input).count()
+                if num_datasets_in == 0:
+                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_input), unicode(self)))
+                if num_datasets_in > 1:
+                    raise ValidationError("Input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_input), unicode(self)))
+                
+            # Same for raw inputs
+            for curr_raw_input in self.pipeline_step.transformation.raw_inputs.all():
+                num_raw_datasets_in = self.raw_parent_datasets.filter(parent_raw_input=curr_raw_input).count()
+                if num_raw_datasets_in == 0:
+                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is not quenched".format(unicode(curr_raw_input), unicode(self)))
+                if num_raw_datasets_in > 1:
+                    raise ValidationError("Raw input \"{}\" of producing transformation of \"{}\" is overquenched".format(unicode(curr_raw_input), unicode(self)))
+ 
+class Dataset(AbstractDataset):
+    """
+    Datasets with a Shipyard-compliant structure; i.e. CSV file with a CDT.
+
+    This CSV file must have a header.
+
+    Inherits from :model:`copperfish.AbstractDataset`
+     - Related to :model:`copperfish.PipelineStep`
+    Related to :model:`copperfish.CompoundDatatype`
+    Related to :model:`copperfish.TransformationOutput`
+    Related to :model:`copperfish.DatasetParent`
+    Related to :model:`copperfish.DatasetRawParent`
+    """
+    # Output 'hole' within a pipeline the Dataset comes from.  This,
+    # along with pipeline_step (in the parent class), unambiguously
+    # defines what pipeline and where in the pipeline it came from.
+    pipeline_step_output = models.ForeignKey(
+            "TransformationOutput",
+            null=True,
+            blank=True,
+            help_text="The output 'hole' this dataset comes from (If applicable)");
+
+    # Datasets conform to a compound datatype.
+    compounddatatype = models.ForeignKey(
+            CompoundDatatype,
+            related_name="conforming_datasets");
+
+    def clean(self):
+        """Compute MD5 checksum for the dataset and check that its source is correctly specified.
+        
+        If a file specified, populate the MD5 checksum.  Also check that the
+        TransformationOutput that produced it comes from the specified PipelineStep.
+
+        FIXME: this will have to be amended to also validate the actual data in the
+        file when doing execute.
+        """
+        # Cmputes MD5 checksum if necessary
+        super(Dataset, self).clean()
+
+        # Either both pipeline_step and pipeline_step_output are specified or
+        # neither is specified. If they are both specified, check that they
+        # are consistent with each other.
+
+        if self.pipeline_step == None and self.pipeline_step_output != None:
+            raise ValidationError(
+                "No PipelineStep specified but an output from a PipelineStep is")
+        
+        elif self.pipeline_step != None and self.pipeline_step_output == None:
+            raise ValidationError(
+                "PipelineStep is specified but no output from it is")
+
+        elif self.pipeline_step != None and self.pipeline_step_output != None:
+            # Check that the PS transformation matches pipeline_step_output's
+            if self.pipeline_step.transformation != self.pipeline_step_output.transformation:
+                raise ValidationError(
+                    "Specified PipelineStep does not produce specified TransformationOutput");
+            if self.compounddatatype != self.pipeline_step_output.compounddatatype:
+
+                # We do not need to check custom wiring, because there is no reason to
+                # reorder an output (Until it is plugged into another PS)
+                
+                raise ValidationError(
+                    "Dataset CDT does not match the CDT of the generating TransformationOutput")
+
+            # Check number of rows of this Dataset to see if it is between [min_row, max_row]
+            # if they exist.
+            if (self.pipeline_step_output.min_row != None and
+                    self.num_rows() < self.pipeline_step_output.min_row):
+                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".format(unicode(self), unicode(self.pipeline_step_output)))
+            if (self.pipeline_step_output.max_row != None and
+                    self.num_rows() > self.pipeline_step_output.max_row):
+                raise ValidationError("Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".format(unicode(self), unicode(self.pipeline_step_output)))
+                        
+        # Check CSV header for coherence with registered CDT
+        data_csv = csv.DictReader(self.dataset_file)
+        header = data_csv.fieldnames
+        cdt_members = self.compounddatatype.members.all()
+        
+        if len(header) != cdt_members.count():
+            raise ValidationError(
+                "Dataset \"{}\" does not have the same number of columns as its CDT".
+                format(unicode(self)))
+
+        # CDT member i must have the same name as the ith column in the CSV header
+        for cdtm in self.compounddatatype.members.all():
+            if cdtm.column_name != header[cdtm.column_idx-1]:
+                raise ValidationError(
+                    "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
+                    format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
+        
+        # FIXME: this is where you validate the actual data in the file
+
+    def complete_clean(self):
+        self.clean()
+        super(Dataset,self).complete_clean()
+
+    def num_rows(self):
+        """Reports the number of rows belonging to the CSV file (excluding header)."""
+        # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
+        # Note: we don't check for the integrity of self.dataset_file as that will
+        # be checked when calling clean().
+        # FIXME: do we need to close and reopen self.dataset_file at the end of this
+        # script?  Find out by running twice consecutively and seeing if it barfs
+        # the second time.
+        return (sum(1 for line in self.dataset_file) - 1);
+            
+
+class RawDataset(AbstractDataset):
+    """
+    Datasets without a Shipyard-compliant structure; e.g. a FASTA file or a Newick file.
+
+    Inherits from :model:`copperfish.AbstractDataset`
+     - Related to :model:`copperfish.PipelineStep`
+    Related to :model:`copperfish.TransformationRawOutput`
+    Related to :model:`copperfish.RawDatasetParent`
+    Related to :model:`copperfish.RawDatasetRawParent`
+    """
+    # Raw output 'hole' within a pipeline the RawDataset comes from.
+    pipeline_step_raw_output = models.ForeignKey(
+            "TransformationRawOutput",
+            null=True,
+            blank=True,
+            help_text="The output 'hole' this dataset comes from (If applicable)");
+
+    def __unicode__(self):
+        """Display the Dataset name, user, and date created, and mark as raw."""
+        return "{}(raw) (created by {} on {})".format(
+                self.name,
+                unicode(self.user),
+                self.date_created);
+
+
+    def clean(self):
+        """Compute MD5 checksum for the raw dataset and check that its source is correctly specified.
+        
+        If a file specified, populate the MD5 checksum.  Also check that the
+        TransformationRawOutput that produced it comes from the specified PipelineStep.
+        """
+        # This computes the MD5 checksum if necessary.
+        super(RawDataset, self).clean()
+        
+        # Either both pipeline_step and pipeline_step_output are specified or
+        # neither is specified.  If they are both specified, check that they
+        # are consistent with each other, i.e. that the output is actually one
+        # belonging to the specified PipelineStep.
+        if self.pipeline_step == None and self.pipeline_step_raw_output != None:
+            raise ValidationError(
+                "No PipelineStep specified but a raw output from a PipelineStep is");
+        
+        elif self.pipeline_step != None and self.pipeline_step_raw_output == None:
+            raise ValidationError(
+                "PipelineStep is specified but no raw output from it is");
+
+        elif ((self.pipeline_step != None and self.pipeline_step_raw_output != None) and
+              (self.pipeline_step.transformation != self.pipeline_step_raw_output.transformation)):
+            raise ValidationError(
+                "Specified PipelineStep does not produce specified TransformationRawOutput");
+
+    def complete_clean(self):
+        self.clean()
+        super(RawDataset,self).complete_clean()
+
+# class ParentDataset(models.Model):
+#     """
+#     Specifies non-raw parents of a (raw or non-raw) dataset.
+
+#     Related to :model:`copperfish.Dataset`
+#     Related to :model:`copperfish.RawDataset`
+#     Related to :model:`copperfish.TransformationInput`
+#     """
+#     # This can be either a Dataset or a RawDataset.
+#     content_type = models.ForeignKey(
+#             ContentType,
+#             limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
+#     object_id = models.PositiveIntegerField();
+#     child = generic.GenericForeignKey("content_type", "object_id");
+    
+#     # Since this will be inherited by other classes, we need to specify related_name
+#     # in a way that will be specialized by the child classes.
+#     parent = models.ForeignKey(Dataset, related_name="%(app_label)s_%(class)s_parentof");
+#     parent_input = models.ForeignKey("TransformationInput");
+
+#     # FIXME write a __unicode__ method
+
+#     def clean(self):
+#         """Check coherence of this dataset-parent relationship.
+
+#         We check that the specified parent fits into the specified
+#         TransformationInput that it supposedly went into to produce
+#         the child; also we check that the TransformationInput belongs
+#         to the Transformation that produced the child.
+#         """
+
+#         # Does parent_input belong to the CHILD dataset's pipeline step's transformation inputs?
+#         if not self.child.pipeline_step.transformation.inputs.filter(pk=self.parent_input.pk).exists():
+#             raise ValidationError(
+#                 "Parent's specified TransformationInput does not belong to generating Transformation");
+
+#         # Does the CDT of the dataset match the CDT of the source of the cable (provider_output)
+#         cable_in = self.child.pipeline_step.cables_in.get(transf_input=self.parent_input)
+
+#         # The cable is valid since it belongs to a defined pipeline - given this, the dataset must match
+#         # the CDT of the cable's source (provider_output)
+#         if self.parent.compounddatatype != cable_in.provider_output.compounddatatype:
+#             raise ValidationError(
+#                 "Parent dataset \"{}\" of dataset \"{}\" is not of the expected CDT".format(self.parent, self.child));
+
+#         # Parent's num_rows must satisfy the TRI min_row/max_row constraints
+#         if self.parent_input.min_row != None and self.parent.num_rows() < self.parent_input.min_row:
+#             raise ValidationError("Parent dataset \"{}\" has too few rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
+#         if self.parent_input.max_row != None and self.parent.num_rows() > self.parent_input.max_row:
+#             raise ValidationError("Parent dataset \"{}\" has too many rows for TransformationInput \"{}\"".format(unicode(self.parent), unicode(self.parent_input)))
+
+
+
+# class RawParentDataset(models.Model):
+#     """
+#     Specifies raw parents of a (raw or non-raw) dataset.
+
+# 	Note that this must therefore come from an input to the generating pipeline.
+
+#     Related to :model:`copperfish.RawDataset`
+#     Related to :model:`copperfish.TransformationRawInput`
+#     """
+#     # This can be either a Dataset or a RawDataset.
+#     content_type = models.ForeignKey(
+#             ContentType,
+#             limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
+#     object_id = models.PositiveIntegerField();
+#     child = generic.GenericForeignKey("content_type", "object_id");
+    
+#     # Since this will be inherited by other classes, we need to specify related_name
+#     # in a way that will be specialized by the child classes.
+#     parent = models.ForeignKey(RawDataset, related_name="%(app_label)s_%(class)s_parentof");
+#     parent_raw_input = models.ForeignKey("TransformationRawInput");
+    
+#     # FIXME write a __unicode__ method
+
+#     def clean(self):
+#         """Check coherence of this dataset-raw parent relationship.
+
+#         We check that the TransformationInput belongs to the
+#         Pipeline that produced the child.
+#         """
+#         # Raw parents must only come from a pipeline input
+#         # Is parent_raw_input a member of transformation raw_inputs of the child's pipeline
+       
+#         if not self.child.pipeline_step.pipeline.raw_inputs.filter(pk=self.parent_raw_input.pk).exists():
+#             raise ValidationError(
+#                 "Parent's specified TransformationRawInput does not belong to generating Pipeline");
+        
