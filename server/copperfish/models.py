@@ -2397,7 +2397,7 @@ class RawDataset(AbstractDataset):
         """
         
         # Compute MD5 checksum if necessary
-        super(Dataset, self).clean()
+        super(RawDataset, self).clean()
         
         # If RawDataset is an intermediary dataset, runstep and
         # intermediate_raw_output must be specified together.

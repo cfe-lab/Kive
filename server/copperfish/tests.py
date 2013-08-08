@@ -7515,458 +7515,34 @@ class PipelineStepInputCable_tests(Copperfish_Raw_Setup):
         errorMessage = "Destination member \"2.* has multiple wires leading to it"
         self.assertRaisesRegexp(ValidationError,errorMessage,internal_cable.clean_and_completely_wired)
 
-class ParentDataset_tests(Copperfish_Raw_Setup):
+class ParentDataset_DEPRACATED_tests(Copperfish_Raw_Setup):
 
     def test_ParentDataset_clean_nonRaw_child_good(self):
-
-        # Define pipeline with a method at step 1 containing triplet_cdt input/output
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
-
-        pipeline_input = myPipeline.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="pipeline_in",
-            dataset_idx=1)
-        
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="method_in",
-            dataset_idx=1)
-
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        step1.cables_in.create(transf_input=method_input,
-                               step_providing_input=0,
-                               provider_output=pipeline_input)
-
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-
-        # Define parental non-raw Dataset (Uploaded: No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define child non-raw Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw child with non-raw parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        self.assertEquals(parentDataset.clean(), None)
-        parentDataset.save()
-
-        # parentDataset must exist before Datasets are capable of being
-        # recapitulated - a necessary requirement in being clean
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
+        pass
 
     def test_ParentDataset_clean_raw_child_good(self):
-
-        # Define pipeline, and method at step 1 with input: triplet_cdt and output: raw
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define parental non-raw Dataset (No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define child raw Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = RawDataset(
-                pipeline_step_raw_output=method_raw_output,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw parent details
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-        parentDataset.save()
-
-        self.assertEquals(uploaded_dataset.clean(), None)
-        
-        self.assertEquals(created_dataset.clean(), None)
-        
-        self.assertEquals(parentDataset.clean(), None)
+        pass
 
     def test_ParentDataset_clean_parent_input_does_not_belong_to_transformation_of_PS_producing_child_bad(self):
-        # parent_input specifies what transformation input the parent dataset was placed into
-        # It must be part of the set of transformation inputs associated with that PS's transformation
-
-        # Define pipeline, and method at step 1 with input: triplet_cdt and output: triplet_cdt
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define unrelated pipeline + unrelated methods
-        unrelatedPipeline = self.test_PF.members.create(revision_name="foo_unrelated",revision_desc="version_unrelated");
-        unrelatedMethod = Method(revision_name="unrelated",revision_desc="poo",family = self.test_MF,driver = self.script_4_1_CRR)
-        unrelatedMethod.save()
-        unrelated_input = unrelatedMethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="unrelated_method_out",dataset_idx=1)
-        unrelated_step1 = unrelatedPipeline.steps.create(transformation=unrelatedMethod, step_num=1)
-
-       # Define parental non-raw Dataset (No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define child non-raw Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw parent details - with an unrelated method input
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=unrelated_input)
-
-        # Datasets were defined properly
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-
-        # But the specified transformation input of the parent is nonsense
-        errorMessage = "Parent's specified TransformationInput does not belong to generating Transformation"
-        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
+        pass
 
     def test_ParentDataset_clean_parent_input_does_not_belong_to_transformation_of_PS_producing_RAW_child_bad(self):
-        # parent_input specifies what transformation input the parent dataset was placed into
-        # It must be part of the set of transformation inputs associated with that PS's transformation
-
-        # Define pipeline, and method at step 1 with input: triplet_cdt and output: triplet_cdt
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define unrelated pipeline + unrelated methods
-        unrelatedPipeline = self.test_PF.members.create(revision_name="foo_unrelated",revision_desc="version_unrelated");
-        unrelatedMethod = Method(revision_name="unrelated",revision_desc="poo",family = self.test_MF,driver = self.script_4_1_CRR)
-        unrelatedMethod.save()
-        unrelated_input = unrelatedMethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="unrelated_method_out",dataset_idx=1)
-        unrelated_step1 = unrelatedPipeline.steps.create(transformation=unrelatedMethod, step_num=1)
-
-       # Define parental non-raw Dataset (No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define child raw Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = RawDataset(
-                pipeline_step_raw_output=method_raw_output,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw parent details - with an unrelated method input
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=unrelated_input)
-
-        # Datasets were defined properly
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-
-        # But the specified transformation input of the parent is nonsense
-        errorMessage = "Parent's specified TransformationInput does not belong to generating Transformation"
-        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
+        pass
 
     def test_ParentDataset_clean_CDTs_match_and_specified_parent_input_min_max_rows_are_satisfied_good(self):
-
-        # Define pipeline with method at step 1 containing triplet_cdt input/output: METHOD INPUT HAS MIN/MAX ROWS
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            min_row=5,
-            max_row=5,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define parental non-raw Dataset (Uploaded: No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input_5_rows.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define non-raw child Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw child with non-raw min/max-row conforming parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-        self.assertEquals(parentDataset.clean(), None)
+        pass
 
     def test_ParentDataset_clean_CDTs_match_but_less_rows_than_min_rows_bad(self):
-
-        # Define pipeline with method at step 1 containing triplet_cdt input/output: METHOD INPUT HAS MIN/MAX ROWS
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            min_row=6,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define parental non-raw Dataset (Uploaded: No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input_5_rows.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define non-raw child Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw child with non-raw min/max-row conforming parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-        
-        # The parent dataset did not satisfy the precursor transformation input min_row constraint
-        errorMessage = "Parent dataset .* has too few rows for TransformationInput .*"
-        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
-
+        pass
 
     def test_ParentDataset_clean_CDTs_match_but_more_rows_than_max_rows_bad(self):
-
-        # Define pipeline with method at step 1 containing triplet_cdt input/output: METHOD INPUT HAS MIN/MAX ROWS
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        method_input = self.testmethod.inputs.create(
-            compounddatatype=self.triplet_cdt,
-            max_row=4,
-            dataset_name="method_in",
-            dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Define parental non-raw Dataset (Uploaded: No parents -> Pipeline step & pipeline_step_output == null)
-        with open(os.path.join(samplecode_path, "script_5_input_5_rows.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define non-raw child Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-
-        # Annotate non-raw child with non-raw min/max-row conforming parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-        
-        # The parent dataset did not satisfy the precursor transformation input min_row constraint
-        errorMessage = "Parent dataset .* has too many rows for TransformationInput .*"
-        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
+        pass
 
     def test_ParentDataset_clean_CDT_of_dataset_matches_cable_provider_output_good(self):
-        # Define pipeline with pipeline input cabled to method at step 1
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
-        pipeline_input = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,
-                                                 dataset_name="pipeline_in",
-                                                 dataset_idx=1)
-        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
-                                                     dataset_name="method_in",
-                                                     dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
-                                                       dataset_name="method_out",
-                                                       dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-        
-        my_cable = step1.cables_in.create(transf_input=method_input,
-                                          step_providing_input=0,
-                                          provider_output=pipeline_input)
-
-        # Define parental non-raw Dataset with a CDT that cannot feed into the pipeline
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.triplet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-            
-        # Define non-raw child Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-            
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-
-        # Annotate non-raw child with non-raw min/max-row conforming parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        self.assertEquals(parentDataset.clean(), None)
+        pass
 
     def test_ParentDataset_clean_CDT_of_dataset_doesnt_match_cable_provider_output_bad(self):
-        # Define pipeline with pipeline input cabled to method at step 1
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
-        pipeline_input = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,
-                                                 dataset_name="pipeline_in",
-                                                 dataset_idx=1)
-        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,
-                                                     dataset_name="method_in",
-                                                     dataset_idx=1)
-        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,
-                                                       dataset_name="method_out",
-                                                       dataset_idx=1)
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-        
-        my_cable = step1.cables_in.create(transf_input=method_input,
-                                          step_providing_input=0,
-                                          provider_output=pipeline_input)
-
-        # Define parental non-raw Dataset with a CDT that cannot feed into the pipeline
-        with open(os.path.join(samplecode_path, "doublet_cdt_data.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                compounddatatype=self.doublet_cdt,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            uploaded_dataset.save()
-
-        # Define non-raw child Dataset
-        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            created_dataset = Dataset(
-                pipeline_step_output=method_output,
-                compounddatatype=self.triplet_cdt,
-                pipeline_step=step1,
-                user=self.myUser,
-                name="uploaded_dataset",
-                description="hehe",
-                dataset_file=File(f))
-            created_dataset.save()
-            
-        self.assertEquals(uploaded_dataset.clean(), None)
-        self.assertEquals(created_dataset.clean(), None)
-
-        # Annotate non-raw child with non-raw min/max-row conforming parental information
-        parentDataset = ParentDataset(child=created_dataset,
-                                      parent=uploaded_dataset,
-                                      parent_input=method_input)
-
-        # uploaded_dataset could not have been the parent dataset, as it does not have
-        # the CDT needed by method_input
-        errorMessage = "Parent dataset .* of dataset .* is not of the expected CDT"
-        self.assertRaisesRegexp(ValidationError,errorMessage, parentDataset.clean)
+        pass
 
 class RunStepRawInput_tests(Copperfish_Raw_Setup):
 
@@ -7977,12 +7553,10 @@ class RunStepRawInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_raw_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_raw_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Raw cable the pipeline raw input into the method
         initial_raw_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
 
         # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
@@ -8002,20 +7576,13 @@ class RunStepRawInput_tests(Copperfish_Raw_Setup):
 
        # Define non-raw child Dataset which comes from a runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with raw parental information
-        raw_parental_annotation = pipelinestep_run.input_raw_datasets.create(
-            rawdataset=uploaded_raw_dataset,
-            raw_cable_fed_to=initial_raw_cable)
+        raw_parental_annotation = pipelinestep_run.input_raw_datasets.create(rawdataset=uploaded_raw_dataset,raw_cable_fed_to=initial_raw_cable)
 
         # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         self.assertEquals(raw_parental_annotation.clean(), None)
@@ -8027,12 +7594,10 @@ class RunStepRawInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_raw_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_raw_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Raw cable the pipeline raw input into the method
         initial_raw_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
 
         # Make an unrelated step with an unrelated cable
@@ -8041,11 +7606,7 @@ class RunStepRawInput_tests(Copperfish_Raw_Setup):
 
         # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
         with open(os.path.join(samplecode_path, "script_6_raw_input.raw"), "rb") as f:
-            uploaded_raw_dataset = RawDataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f))
+            uploaded_raw_dataset = RawDataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f))
             uploaded_raw_dataset.save()
 
        # SIMULATED EXECUTION OCCURS HERE
@@ -8056,25 +7617,17 @@ class RunStepRawInput_tests(Copperfish_Raw_Setup):
 
        # Define non-raw child Dataset which comes from a runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with raw parental information with an INCORRECT RAW CABLE
         # that does not belong to the runstep's PS raw_cables_in
-        raw_parental_annotation = pipelinestep_run.input_raw_datasets.create(
-            rawdataset=uploaded_raw_dataset,
-            raw_cable_fed_to=cable_unrelated)
+        raw_parental_annotation = pipelinestep_run.input_raw_datasets.create(rawdataset=uploaded_raw_dataset,raw_cable_fed_to=cable_unrelated)
 
         errorMessage = "Specified raw cable for RunStepRawInput \"Runstep RunStep object has input raw dataset uploaded_raw_dataset\(raw\) \(created by .*\) feeding into cable Pipeline test pipeline family foo step 2:method_raw_in\(raw\)\" does not belong to the corresponding PipelineStep"
         self.assertRaisesRegexp(ValidationError,errorMessage,raw_parental_annotation.clean)
-
 
 
 class RunStepInput_tests(Copperfish_Raw_Setup):
@@ -8085,46 +7638,33 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
-        # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
+        # Define an uploaded parental raw Dataset (Uploaded implies there is neither a runstep nor a run)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",
+                                       dataset_file=File(f),compounddatatype=self.triplet_cdt)
             uploaded_dataset.save()
 
-       # SIMULATED EXECUTION OCCURS HERE
+        # EXECUTE() WOULD OCCUR HERE
 
-       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        # Annotate execution of the pipeline (A run) and step1 of that pipeline (A runstep)
         pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
         pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
 
-       # Define non-raw child Dataset which comes from a runstep
+        # Define non-raw child Dataset that comes from a runstep (IE, it has an intermediate_output + runstep)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
-        # Annotate non-raw child with non-raw parental information
-        parental_annotation = pipelinestep_run.input_datasets.create(
-            dataset=uploaded_dataset,
-            cable_fed_to=initial_cable)
+        # Annotate child with parental inputs into initial_cable (The cable leading into step1)
+        parental_annotation = pipelinestep_run.input_datasets.create(dataset=uploaded_dataset,cable_fed_to=initial_cable)
 
         # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         self.assertEquals(parental_annotation.clean(), None)
@@ -8135,22 +7675,16 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
-        # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run) with the wrong CDT
+        # Define an uploaded parental raw Dataset (Uploaded implies there is neither a runstep nor a run)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.doublet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.doublet_cdt)
             uploaded_dataset.save()
 
        # SIMULATED EXECUTION OCCURS HERE
@@ -8159,24 +7693,16 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
         pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
 
-       # Define non-raw child Dataset which comes from a runstep
+        # Define non-raw child Dataset that comes from a runstep (IE, it has an intermediate_output + runstep)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run, intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with non-raw parental information - parent cannot fit into initial_cable due to mismatching CDT
-        parental_annotation = pipelinestep_run.input_datasets.create(
-            dataset=uploaded_dataset,
-            cable_fed_to=initial_cable)
+        parental_annotation = pipelinestep_run.input_datasets.create(dataset=uploaded_dataset,cable_fed_to=initial_cable)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* is not of the expected CDT"
         self.assertRaisesRegexp(ValidationError,errorMessage,parental_annotation.clean)
 
@@ -8186,22 +7712,16 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1,min_row=100)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt)
             uploaded_dataset.save()
 
        # SIMULATED EXECUTION OCCURS HERE
@@ -8212,14 +7732,9 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
 
        # Define non-raw child Dataset which comes from a runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with non-raw parental information - parent cannot fit into initial_cable due to mismatching CDT
@@ -8227,7 +7742,6 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
             dataset=uploaded_dataset,
             cable_fed_to=initial_cable)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* has too few rows for TransformationInput .*"
         self.assertRaisesRegexp(ValidationError,errorMessage,parental_annotation.clean)
 
@@ -8237,22 +7751,16 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1,max_row=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt)
             uploaded_dataset.save()
 
        # SIMULATED EXECUTION OCCURS HERE
@@ -8263,22 +7771,14 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
 
        # Define non-raw child Dataset which comes from a runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with non-raw parental information - parent cannot fit into initial_cable due to mismatching CDT
-        parental_annotation = pipelinestep_run.input_datasets.create(
-            dataset=uploaded_dataset,
-            cable_fed_to=initial_cable)
+        parental_annotation = pipelinestep_run.input_datasets.create(dataset=uploaded_dataset,cable_fed_to=initial_cable)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* has too many rows for TransformationInput .*"
         self.assertRaisesRegexp(ValidationError,errorMessage,parental_annotation.clean)
 
@@ -8289,25 +7789,20 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
+        # Define some unrelated steps and cables
         step1_unrelated = myPipeline.steps.create(transformation=self.testmethod, step_num=2)
         initial_cable_unrelated = step1_unrelated.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Define parental raw Dataset which was uploaded (Does not come from a runstep or a run)
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt)
             uploaded_dataset.save()
 
        # SIMULATED EXECUTION OCCURS HERE
@@ -8318,22 +7813,14 @@ class RunStepInput_tests(Copperfish_Raw_Setup):
 
        # Define non-raw child Dataset which comes from a runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            child_dataset = Dataset(
-                user=self.myUser,
-                name="child_dataset",
-                description="hehe",
-                runstep=pipelinestep_run,                
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output = method_output)
+            child_dataset = Dataset(user=self.myUser,name="child_dataset",description="hehe",dataset_file=File(f),
+                                    compounddatatype=self.triplet_cdt,
+                                    runstep=pipelinestep_run,intermediate_output = method_output)
             child_dataset.save()
 
         # Annotate non-raw child with non-raw parental information - parent cannot fit into initial_cable due to mismatching CDT
-        parental_annotation = pipelinestep_run.input_datasets.create(
-            dataset=uploaded_dataset,
-            cable_fed_to=initial_cable_unrelated)
+        parental_annotation = pipelinestep_run.input_datasets.create(dataset=uploaded_dataset,cable_fed_to=initial_cable_unrelated)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Cable .* for RunStepInput .* feeding into cable .* does not belong to the correct PipelineStep"
         self.assertRaisesRegexp(ValidationError,errorMessage,parental_annotation.clean)
 
@@ -8342,30 +7829,20 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
     def test_dataset_clean_incorrect_number_of_CSV_header_fields_bad(self):
 
         with open(os.path.join(samplecode_path, "script_2_output_2.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* does not have the same number of columns as its CDT"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
     def test_dataset_clean_correct_number_of_CSV_header_fields_but_incorrect_contents_bad(self):
 
         with open(os.path.join(samplecode_path, "three_random_columns.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt)
 
-            # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
-            errorMessage = "Column .* of Dataset .* is named .*, not .* as specified by its CDT"
-            self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+        errorMessage = "Column .* of Dataset .* is named .*, not .* as specified by its CDT"
+        self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
     def test_dataset_clean_runstep_specified_but_intermediate_output_not_specified_bad(self):
 
@@ -8373,30 +7850,24 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
         pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
         pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
 
+        # Define a Dataset with a runstep but no intermediate_output
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                runstep=pipelinestep_run)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       runstep=pipelinestep_run)
 
-            # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
-            errorMessage = "RunStep is specified but no output from it is"
-            self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+        errorMessage = "RunStep is specified but no output from it is"
+        self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
 
     def test_dataset_clean_runstep_not_specified_intermediate_output_specified_bad(self):
@@ -8405,12 +7876,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
@@ -8419,15 +7888,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
 
         # This dataset is the output of method_output
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                intermediate_output=method_output)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       intermediate_output=method_output)
 
-            # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
             errorMessage = "No RunStep specified but an intermediate output is"
             self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
@@ -8437,18 +7901,16 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Establish CRR as a method within a given method family
         script_unrelated = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
         script_unrelated.save()
         step2 = myPipeline.steps.create(transformation=script_unrelated, step_num=2)
-
-        # Cable the pipeline input into the method
-        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
         pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
@@ -8458,18 +7920,39 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         
         # The intermediate_output TRO is inconsistent with the pipeline step implied by the runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                runstep= pipelinestep_run_unrelated,
-                intermediate_output=method_output)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       runstep= pipelinestep_run_unrelated,
+                                       intermediate_output=method_output)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "PipelineStep of specified RunStep does not produce specified TransformationOutput"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+
+    def test_dataset_clean_intermediate_output_TRO_from_correct_transformation_but_is_incorrect_CDT_bad(self):
+        
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.doublet_cdt,dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
+
+        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+        
+        # The intermediate_output TRO exists with respect to the runstep, but has a different CDT from the dataset
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            myDataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       runstep= pipelinestep_run,
+                                       intermediate_output=method_output)
+
+        errorMessage = "Dataset CDT does not match the CDT of the generating TransformationOutput"
+        self.assertRaisesRegexp(ValidationError,errorMessage,myDataset.clean)
 
     def test_dataset_clean_dataset_has_too_few_rows_to_feed_be_product_of_intermediate_output_bad(self):
 
@@ -8477,12 +7960,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1,max_row=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
@@ -8491,16 +7972,11 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         
         # The intermediate_output TRO is inconsistent with the pipeline step implied by the runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                runstep= pipelinestep_run,
-                intermediate_output=method_output)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       runstep=pipelinestep_run,
+                                       intermediate_output=method_output)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* was produced by TransformationOutput .* but has too many rows"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
@@ -8510,12 +7986,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1,min_row=100)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
         # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
@@ -8524,16 +7998,11 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         
         # The intermediate_output TRO is inconsistent with the pipeline step implied by the runstep
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                runstep= pipelinestep_run,
-                intermediate_output=method_output)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       runstep=pipelinestep_run,
+                                       intermediate_output=method_output)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Dataset .* was produced by TransformationOutput .* but has too few rows"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
@@ -8543,12 +8012,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
@@ -8556,15 +8023,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
 
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                run=pipeline_run)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       run=pipeline_run)
 
-        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "Run is specified but no final output from it is"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
 
@@ -8575,12 +8037,10 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
         pipeline_out = myPipeline.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_out",dataset_idx=1)
 
-        # Define method at step 1 with raw input and self.triplet_cdt output
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
         method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
         step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-
-        # Cable the pipeline input into the method
         initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
 
        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
@@ -8588,14 +8048,281 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
         pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
 
         with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
-            uploaded_dataset = Dataset(
-                user=self.myUser,
-                name="uploaded_raw_dataset",
-                description="hehe",
-                dataset_file=File(f),
-                compounddatatype=self.triplet_cdt,
-                final_output=pipeline_out)
+            uploaded_dataset = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                       compounddatatype=self.triplet_cdt,
+                                       final_output=pipeline_out)
 
         # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
         errorMessage = "No Run specified but a final output is"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+
+    def test_dataset_clean_final_output_isnt_produced_by_the_pipeline_implied_by_run_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_out = myPipeline.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define unrelated pipeline with an output
+        myPipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_out_unrelated = myPipeline_unrelated.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                                   compounddatatype=self.triplet_cdt,
+                                                   run=pipeline_run,final_output=pipeline_out_unrelated)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Pipeline of specified Run does not produce specified TransformationOutput"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_dataset_clean_final_output_CDTs_dont_match_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_out = myPipeline.outputs.create(compounddatatype=self.doublet_cdt,dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                                   compounddatatype=self.triplet_cdt,
+                                                   run=pipeline_run,final_output=pipeline_out)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Dataset CDT does not match the CDT of the generating TransformationOutput"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_dataset_clean_too_few_rows_for_final_output_TRO_bad(self):
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_out = myPipeline.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_out",dataset_idx=1,min_row=100)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                                   compounddatatype=self.triplet_cdt,
+                                                   run=pipeline_run,final_output=pipeline_out)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Dataset .* was produced by TransformationOutput .* but has too few rows"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_dataset_clean_too_many_rows_for_final_output_TRO_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_in = myPipeline.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_out = myPipeline.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="pipeline_out",dataset_idx=1,max_row=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_input = self.testmethod.inputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.outputs.create(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.cables_in.create(transf_input=method_input,step_providing_input=1,provider_output=pipeline_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = Dataset(user=self.myUser,name="uploaded_raw_dataset",description="hehe",dataset_file=File(f),
+                                                   compounddatatype=self.triplet_cdt,
+                                                   run=pipeline_run,final_output=pipeline_out)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Dataset .* was produced by TransformationOutput .* but has too many rows"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+class RawDataset_new_tests(Copperfish_Raw_Setup):
+
+    def test_rawDataset_clean_intermediate_raw_output_specified_but_not_runstep_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      intermediate_raw_output=pipeline_raw_out)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "No RunStep specified but an intermediate raw output is"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_rawDataset_clean_intermediate_raw_output_unspecified_but_runstep_is_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      runstep=pipelinestep_run)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "RunStep is specified but no raw output from it is"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_rawDataset_clean_intermediate_raw_output_not_from_same_transformation_implied_by_run_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        script_unrelated = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        script_unrelated.save()
+        method_raw_output_unrelated = script_unrelated.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+       # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        # Dataset comes
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      runstep=pipelinestep_run, intermediate_raw_output=method_raw_output_unrelated)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "PipelineStep of specified RunStep does not produce specified TransformationRawOutput"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_rawDataset_clean_final_raw_output_specified_but_not_run_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        # Dataset is produced by a pipeline (But doesn't have run specified)
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      final_raw_output=pipeline_raw_out)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "No Run specified but a final raw output is"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_rawDataset_clean_no_final_raw_output_specified_but_run_is_specified_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        # Dataset is produced by a pipeline (But doesn't have run specified)
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      run=pipeline_run)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Run is specified but no final raw output from it is"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
+    def test_rawDataset_clean_final_raw_output_TRO_doesnt_belong_to_pipeline_linked_to_run_bad(self):
+
+        # Define pipeline with input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_in = myPipeline.raw_inputs.create(dataset_name="pipeline_in",dataset_idx=1)
+        pipeline_raw_out = myPipeline.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        myPipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_raw_out_unrelated = myPipeline_unrelated.raw_outputs.create(dataset_name="pipeline_out",dataset_idx=1)
+
+        # Define method at step 1 with triplet_cdt input and output: cable the pipeline input into the step1 method
+        method_raw_input = self.testmethod.raw_inputs.create(dataset_name="method_in",dataset_idx=1)
+        method_raw_output = self.testmethod.raw_outputs.create(dataset_name="method_out",dataset_idx=1)
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        initial_cable = step1.raw_cables_in.create(transf_raw_input=method_raw_input,pipeline_raw_input=pipeline_raw_in)
+
+        # Annotate execution of the pipeline (Define a run) and step1 of the pipeline
+        pipeline_run = myPipeline.pipeline_instances.create(user=self.myUser)
+        pipelinestep_run = step1.pipelinestep_instances.create(run=pipeline_run,pipelinestep=step1)
+
+        # Dataset is produced by a pipeline (But doesn't have run specified)
+        with open(os.path.join(samplecode_path, "script_5_input.csv"), "rb") as f:
+            dataset_produced_by_pipeline = RawDataset(user=self.myUser,name="blah",description="hehe",dataset_file=File(f),
+                                                      run=pipeline_run,final_raw_output=pipeline_raw_out_unrelated)
+
+        # The referenced cable belongs to the runstep's PS raw_cables_in so nothing is wrong
+        errorMessage = "Pipeline of specified Run does not produce specified TransformationRawOutput"
+        self.assertRaisesRegexp(ValidationError,errorMessage,dataset_produced_by_pipeline.clean)
+
