@@ -1959,9 +1959,6 @@ class RunStep(models.Model):
         
         If the specified PipelineStep is a sub-pipeline, then check
         that child_run is registered.
-
-        FIXME ERIC should we really check quenching of inputs and
-        outputs when we could be deleting intermediate data??
         """
         self.clean()
 
@@ -1974,6 +1971,12 @@ class RunStep(models.Model):
         if hasattr(self,"child_run") == True:
             self.child_run.complete_clean()
 
+    def complete_clean_immediately_following(self):
+        """
+        Immediately following the execution of a runstep, we must confirm
+        that we have registered
+        """
+        pass
         
 
 class RunStepInput(models.Model):
