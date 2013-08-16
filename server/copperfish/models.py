@@ -1236,15 +1236,16 @@ class PipelineStepInputCable(models.Model):
                     "Transformation at step {} does not produce output \"{}\"".
                     format(requested_from, unicode(input_requested)))
 
+            # Removed August 15, 2013: now we are allowing the deletion of
+            # outputs that are subsequently used!
             # Will the data from this step's transformation be deleted?
-            # FIXME: Do we want to remove this?
-            source_deleted_outputs = [x.dataset_to_delete
-                                      for x in providing_step.outputs_to_delete.all()];
-            if input_requested in source_deleted_outputs:
-                raise ValidationError(
-                    "Input \"{}\" from step {} to step {} is deleted prior to request".
-                    format(input_requested.dataset_name, requested_from,
-                           self.pipelinestep.step_num))
+            # source_deleted_outputs = [x.dataset_to_delete
+            #                           for x in providing_step.outputs_to_delete.all()];
+            # if input_requested in source_deleted_outputs:
+            #     raise ValidationError(
+            #         "Input \"{}\" from step {} to step {} is deleted prior to request".
+            #         format(input_requested.dataset_name, requested_from,
+            #                self.pipelinestep.step_num))
 
         # Check that the input and output connected by the
         # cable are compatible re: number of rows.  Don't check for
@@ -1533,14 +1534,14 @@ class PipelineRawOutputCable(models.Model):
 
         # Also determine if raw output was deleted by the step producing it
 
-        # FIXME: WILL WE BE REMOVING THIS? We are deleting the dataset LATER,
-        # so, it is OK that a Dataset is marked as delete, it doesn't break
-        # the pipeline definition
-        if (providing_step.raw_outputs_to_delete.
-                filter(raw_dataset_to_delete=output_requested).exists()):
-            raise ValidationError(
-                "Raw output \"{}\" from step {} is deleted prior to request".
-                format(output_requested.dataset_name, requested_from))
+        # Removed August 15, 2013: under our new scheme of allowing
+        # deletions of intermediate data even when it is used later in
+        # the pipeline, it is now possible to remove such data.
+        # if (providing_step.raw_outputs_to_delete.
+        #         filter(raw_dataset_to_delete=output_requested).exists()):
+        #     raise ValidationError(
+        #         "Raw output \"{}\" from step {} is deleted prior to request".
+        #         format(output_requested.dataset_name, requested_from))
 
 
 class PipelineOutputCable(models.Model):
@@ -1625,13 +1626,14 @@ class PipelineOutputCable(models.Model):
                 "Transformation at step {} does not produce output \"{}\"".
                 format(requested_from, unicode(output_requested)));
 
+        # Removed August 15, 2013: under new deletion scheme (see other comments
+        # marked with this date) this is now allowed.
         # Also determine if output was deleted by the step producing it
-        # FIXME: Do we want to remove this? (Refer to previous comment)
-        if (providing_step.outputs_to_delete.
-                filter(dataset_to_delete=output_requested).exists()):
-            raise ValidationError(
-                "Output \"{}\" from step {} is deleted prior to request".
-                format(output_requested.dataset_name, requested_from));
+        # if (providing_step.outputs_to_delete.
+        #         filter(dataset_to_delete=output_requested).exists()):
+        #     raise ValidationError(
+        #         "Output \"{}\" from step {} is deleted prior to request".
+        #         format(output_requested.dataset_name, requested_from));
 
         # If custom wires exist, check that they define columns in a
         # CSV file that are indexed consecutively from 1 -- uniqueness
@@ -1832,6 +1834,18 @@ class Run(models.Model):
         blank=True,
         help_text="Step of parent run initiating this one as a sub-run")
 
+    # This field will be null if the run occurred as a sub-run of
+    # another run (and if that is the case, then the parent_runstep
+    # will have an ExecRecord).  This is because if it a sub-run, we'd
+    # need to consider the cables feeding into the sub-pipeline at
+    # that RunStep.
+    execrecord = models.ForeignKey(
+        "ExecRecord",
+        null=True,
+        help_text="Record of this run if it is run at the top-level (i.e. not a sub-run)");
+
+    reused = models.BooleanField(
+        help_text="Indicates whether this run uses the record of a previous execution");
 
 
     def clean(self):
@@ -1878,228 +1892,232 @@ class RunStep(models.Model):
 
     Related to :model:`copperfish.Run`
     Related to :model:`copperfish.AbstractDataset`
-    Related to :model:`copperfish.RunStepInput`
-    Related to :model:`copperfish.RunStepRawInput`
+    Related to :model:`copperfish.ExecRecord`
     """
 
     run = models.ForeignKey(Run)
     pipelinestep = models.ForeignKey(
         PipelineStep,
         related_name="pipelinestep_instances")
+    execrecord = models.ForeignKey(
+        "ExecRecord",
+        related_name="runsteps");
+    reused = models.BooleanField(
+        help_text="Denotes whether this run step reuses a previous execution");
 
-    def clean(self):
-        """
-        a) Clean all output datasets and all runstepinputs
-            -> Coherent intermediate_output TRO mapping?
-            -> Valid CDT/row structure wrt intermediate_output?
+    # def clean(self):
+    #     """
+    #     a) Clean all output datasets and all runstepinputs
+    #         -> Coherent intermediate_output TRO mapping?
+    #         -> Valid CDT/row structure wrt intermediate_output?
 
-        b) More than one dataset cannot be an output from a particular TRO
-            -> Cannot use the same intermediate_output
+    #     b) More than one dataset cannot be an output from a particular TRO
+    #         -> Cannot use the same intermediate_output
 
-        c) If this PipelineStep is a sub-pipeline (if child_run is registered),
-        check that it is complete and clean.
+    #     c) If this PipelineStep is a sub-pipeline (if child_run is registered),
+    #     check that it is complete and clean.
 
-        Note: don't need to check inputs for multiple quenching due to uniqueness.
-        We couldn't use this trick for outputs because that would require a
-        uniqueness constraint on Dataset involving (runstep, intermediate_output),
-        which can be null. (Also for final_output)
-        """
+    #     Note: don't need to check inputs for multiple quenching due to uniqueness.
+    #     We couldn't use this trick for outputs because that would require a
+    #     uniqueness constraint on Dataset involving (runstep, intermediate_output),
+    #     which can be null. (Also for final_output)
+    #     """
 
-        # Get all output datasets generated by this runstep
-        outputs_used = []
-        for out_data in self.copperfish_dataset_outputs.all():
+    #     # Get all output datasets generated by this runstep
+    #     outputs_used = []
+    #     for out_data in self.copperfish_dataset_outputs.all():
 
-            # Clean them individually (Validate intermediate_output TRO, and structure/rows if applicable)
-            out_data.clean()
+    #         # Clean them individually (Validate intermediate_output TRO, and structure/rows if applicable)
+    #         out_data.clean()
 
-            # A runstep cannot have multiple Datasets outputs coming from the same intermediate_output TRO
-            if out_data.intermediate_output in outputs_used:
-                raise ValidationError(
-                    "Output \"{}\" of RunStep \"{}\" is multiply-quenched".
-                    format(out_data.intermediate_output, self))
+    #         # A runstep cannot have multiple Datasets outputs coming from the same intermediate_output TRO
+    #         if out_data.intermediate_output in outputs_used:
+    #             raise ValidationError(
+    #                 "Output \"{}\" of RunStep \"{}\" is multiply-quenched".
+    #                 format(out_data.intermediate_output, self))
 
-            # Track TROs annotated as generating a dataset
-            outputs_used.append(out_data.intermediate_output)
+    #         # Track TROs annotated as generating a dataset
+    #         outputs_used.append(out_data.intermediate_output)
 
-        # Analogous process for raw dataset outputs generated by this runstep
-        raw_outputs_used = []
-        for out_raw_data in self.copperfish_rawdataset_outputs.all():
-            out_raw_data.clean()
+    #     # Analogous process for raw dataset outputs generated by this runstep
+    #     raw_outputs_used = []
+    #     for out_raw_data in self.copperfish_rawdataset_outputs.all():
+    #         out_raw_data.clean()
 
-            if out_raw_data.intermediate_raw_output in raw_outputs_used:
-                raise ValidationError(
-                    "Raw output \"{}\" of RunStep \"{}\" is multiply-quenched".
-                    format(out_raw_data.intermediate_raw_output, self))
+    #         if out_raw_data.intermediate_raw_output in raw_outputs_used:
+    #             raise ValidationError(
+    #                 "Raw output \"{}\" of RunStep \"{}\" is multiply-quenched".
+    #                 format(out_raw_data.intermediate_raw_output, self))
 
-            raw_outputs_used.append(out_raw_data.intermediate_raw_output)
+    #         raw_outputs_used.append(out_raw_data.intermediate_raw_output)
 
-        # Clean RunStepInputs to this RunStep (Multiple quenching needn't be checked due to uniqueness)
-        # Note: Input datasets should always have already been clean before being put into the database
-        # FIXME: Improve the name "input_datasets" and "input_raw_datasets" to "runstepinputs" / etc
-        for in_data in self.input_datasets.all():
-            in_data.clean()
+    #     # Clean RunStepInputs to this RunStep (Multiple quenching needn't be checked due to uniqueness)
+    #     # Note: Input datasets should always have already been clean before being put into the database
+    #     # FIXME: Improve the name "input_datasets" and "input_raw_datasets" to "runstepinputs" / etc
+    #     for in_data in self.input_datasets.all():
+    #         in_data.clean()
 
-        for in_raw_data in self.input_raw_datasets.all():
-            in_raw_data.clean()
+    #     for in_raw_data in self.input_raw_datasets.all():
+    #         in_raw_data.clean()
 
-        # If the Transformation of pipelinestep is a method, then child_run should not be set
-        if hasattr(self,"child_run") == True:
-            if type(self.pipelinestep.transformation) == Method:
-                raise ValidationError(
-                    "PipelineStep is not a Pipeline but a child run exists")
+    #     # If the Transformation of pipelinestep is a method, then child_run should not be set
+    #     if hasattr(self,"child_run") == True:
+    #         if type(self.pipelinestep.transformation) == Method:
+    #             raise ValidationError(
+    #                 "PipelineStep is not a Pipeline but a child run exists")
 
-            # If child_run is set, it should be clean
-            self.child_run.clean()
+    #         # If child_run is set, it should be clean
+    #         self.child_run.clean()
             
 
              
-    def complete_clean(self):
-        """
-        Checks coherence and completeness of this step.
+    # def complete_clean(self):
+    #     """
+    #     Checks coherence and completeness of this step.
         
-        If the specified PipelineStep is a sub-pipeline, then check
-        that child_run is registered.
-        """
-        self.clean()
+    #     If the specified PipelineStep is a sub-pipeline, then check
+    #     that child_run is registered.
+    #     """
+    #     self.clean()
 
-        if (type(self.pipelinestep.transformation) == Pipeline and
-                hasattr(self,"child_run") == False):
-            raise ValidationError(
-                "Specified PipelineStep is a Pipeline but no child run exists")
+    #     if (type(self.pipelinestep.transformation) == Pipeline and
+    #             hasattr(self,"child_run") == False):
+    #         raise ValidationError(
+    #             "Specified PipelineStep is a Pipeline but no child run exists")
 
-        # If the child is set, it should be complete_clean
-        if hasattr(self,"child_run") == True:
-            self.child_run.complete_clean()
+    #     # If the child is set, it should be complete_clean
+    #     if hasattr(self,"child_run") == True:
+    #         self.child_run.complete_clean()
 
-    def complete_clean_immediately_following(self):
-        """
-        Immediately following the execution of a runstep, we must confirm
-        that we have registered
-        """
-        pass
+    # def complete_clean_immediately_following(self):
+    #     """
+    #     Immediately following the execution of a runstep, we must confirm
+    #     that we have registered
+    #     """
+    #     pass
         
 
-class RunStepInput(models.Model):
-    """
-    For a runstep, describes which datasets were fed as inputs into
-    each relevent cable for the corresponding pipeline step.
+# class RunStepInput(models.Model):
+#     """
+#     For a runstep, describes which datasets were fed as inputs into
+#     each relevent cable for the corresponding pipeline step.
 
-    Related to :model:`copperfish.RunStep`
-    Related to :model:`copperfish.Dataset`
-    Related to :model:`copperfish.PipelineStepInputCable`
-    """
+#     Related to :model:`copperfish.RunStep`
+#     Related to :model:`copperfish.Dataset`
+#     Related to :model:`copperfish.PipelineStepInputCable`
+#     """
 
-    # FIXME ERIC note! Could we replace more "are these multiply-cabled/wired"
-    # tests using uniqueness constraints? IE, ensure no cable is multiply fed.
+#     # FIXME ERIC note! Could we replace more "are these multiply-cabled/wired"
+#     # tests using uniqueness constraints? IE, ensure no cable is multiply fed.
 
-    runstep = models.ForeignKey(
-        RunStep,
-        related_name="input_datasets",
-        help_text="Run step who's inputs are being described")
+#     runstep = models.ForeignKey(
+#         RunStep,
+#         related_name="input_datasets",
+#         help_text="Run step who's inputs are being described")
     
-    dataset = models.ForeignKey(
-        "Dataset",
-        help_text="Dataset fed as an input")
+#     dataset = models.ForeignKey(
+#         "Dataset",
+#         help_text="Dataset fed as an input")
 
-    cable_fed_to = models.ForeignKey(
-        PipelineStepInputCable,
-        help_text="Cable into which the dataset is fed")
+#     cable_fed_to = models.ForeignKey(
+#         PipelineStepInputCable,
+#         help_text="Cable into which the dataset is fed")
 
-    # Within a run, no cable can have more than 1 dataset fed into it at once
-    class Meta:
-        unique_together =   (("runstep", "cable_fed_to"))
+#     # Within a run, no cable can have more than 1 dataset fed into it at once
+#     class Meta:
+#         unique_together =   (("runstep", "cable_fed_to"))
 
-    def __unicode__(self):
-        """
-        Display the runstep being annotated, along with the dataset and cable.
-        """
-        return "Runstep {} has input dataset {} feeding into cable {}".format(
-                unicode(self.runstep),
-                unicode(self.dataset),
-                unicode(self.cable_fed_to))
+#     def __unicode__(self):
+#         """
+#         Display the runstep being annotated, along with the dataset and cable.
+#         """
+#         return "Runstep {} has input dataset {} feeding into cable {}".format(
+#                 unicode(self.runstep),
+#                 unicode(self.dataset),
+#                 unicode(self.cable_fed_to))
 
-    def clean(self):
-        """
-        Check coherence of this Dataset-to-input cable relationship.
+#     def clean(self):
+#         """
+#         Check coherence of this Dataset-to-input cable relationship.
 
-        A) The referenced cable belongs to the runstep's corresponding pipeline step
-        B) The dataset can be fed into the cable (Matches CDT + min/max row constraints)
-        """
+#         A) The referenced cable belongs to the runstep's corresponding pipeline step
+#         B) The dataset can be fed into the cable (Matches CDT + min/max row constraints)
+#         """
 
-        # The cable (cable_fed_to) must belong to the runstep's PS
-        if not self.runstep.pipelinestep.cables_in.filter(pk=self.cable_fed_to.pk).exists():
-            raise ValidationError(
-                "Cable \"{}\" for RunStepInput \"{}\" does not belong to the correct PipelineStep".
-                format(self.cable_fed_to,
-                       self))
+#         # The cable (cable_fed_to) must belong to the runstep's PS
+#         if not self.runstep.pipelinestep.cables_in.filter(pk=self.cable_fed_to.pk).exists():
+#             raise ValidationError(
+#                 "Cable \"{}\" for RunStepInput \"{}\" does not belong to the correct PipelineStep".
+#                 format(self.cable_fed_to,
+#                        self))
 
-        # CDT of the dataset must match the CDT of the source of the cable (provider_output)
-        if self.dataset.compounddatatype != self.cable_fed_to.provider_output.compounddatatype:
-            raise ValidationError(
-                "Dataset \"{}\" is not of the expected CDT".format(self.dataset))
+#         # CDT of the dataset must match the CDT of the source of the cable (provider_output)
+#         if self.dataset.compounddatatype != self.cable_fed_to.provider_output.compounddatatype:
+#             raise ValidationError(
+#                 "Dataset \"{}\" is not of the expected CDT".format(self.dataset))
 
-        # Input dataset must satisfy the target transformation input min_row/max_row constraints
-        destination_hole = self.cable_fed_to.transf_input
-        if destination_hole.min_row != None and self.dataset.num_rows() < destination_hole.min_row:
-            raise ValidationError(
-                "Dataset \"{}\" has too few rows for TransformationInput \"{}\"".
-                format(self.dataset, destination_hole))
+#         # Input dataset must satisfy the target transformation input min_row/max_row constraints
+#         destination_hole = self.cable_fed_to.transf_input
+#         if destination_hole.min_row != None and self.dataset.num_rows() < destination_hole.min_row:
+#             raise ValidationError(
+#                 "Dataset \"{}\" has too few rows for TransformationInput \"{}\"".
+#                 format(self.dataset, destination_hole))
         
-        if destination_hole.max_row != None and self.dataset.num_rows() > destination_hole.max_row:
-            raise ValidationError(
-                "Dataset \"{}\" has too many rows for TransformationInput \"{}\"".
-                format(self.dataset, destination_hole))
+#         if destination_hole.max_row != None and self.dataset.num_rows() > destination_hole.max_row:
+#             raise ValidationError(
+#                 "Dataset \"{}\" has too many rows for TransformationInput \"{}\"".
+#                 format(self.dataset, destination_hole))
 
 
-class RunStepRawInput(models.Model):
-    """
-    For a runstep, describes which raw datasets were fed as raw inputs into
-    each relevent raw cable for the corresponding pipeline step.
+# class RunStepRawInput(models.Model):
+#     """
+#     For a runstep, describes which raw datasets were fed as raw inputs into
+#     each relevent raw cable for the corresponding pipeline step.
 
-    This must come from an (?) input (?) to the generating pipeline.
+#     This must come from an (?) input (?) to the generating pipeline.
 
-    Related to :model:`copperfish.RunStep`
-    Related to :model:`copperfish.RawDataset`
-    Related to :model:`copperfish.PipelineStepRawInputCable`
-    """
-    runstep = models.ForeignKey(
-        RunStep,
-        related_name="input_raw_datasets",
-        help_text="Run step this raw input feeds")
+#     Related to :model:`copperfish.RunStep`
+#     Related to :model:`copperfish.RawDataset`
+#     Related to :model:`copperfish.PipelineStepRawInputCable`
+#     """
+#     runstep = models.ForeignKey(
+#         RunStep,
+#         related_name="input_raw_datasets",
+#         help_text="Run step this raw input feeds")
     
-    rawdataset = models.ForeignKey(
-        "RawDataset",
-        help_text="RawDataset used as input")
+#     rawdataset = models.ForeignKey(
+#         "RawDataset",
+#         help_text="RawDataset used as input")
 
-    raw_cable_fed_to = models.ForeignKey(
-        PipelineStepRawInputCable,
-        help_text="Raw input cable into which the raw dataset is fed")
+#     raw_cable_fed_to = models.ForeignKey(
+#         PipelineStepRawInputCable,
+#         help_text="Raw input cable into which the raw dataset is fed")
     
-    # Within a run, no cable can have more than 1 dataset fed into it
-    class Meta:
-        unique_together =   (("runstep", "raw_cable_fed_to"));
+#     # Within a run, no cable can have more than 1 dataset fed into it
+#     class Meta:
+#         unique_together =   (("runstep", "raw_cable_fed_to"));
 
-    def __unicode__(self):
-        """
-        Display the runstep being annotated, along with the raw dataset and raw cable.
-        """
-        return "Runstep {} has input raw dataset {} feeding into cable {}".format(
-                unicode(self.runstep),
-                unicode(self.rawdataset),
-                unicode(self.raw_cable_fed_to))
+#     def __unicode__(self):
+#         """
+#         Display the runstep being annotated, along with the raw dataset and raw cable.
+#         """
+#         return "Runstep {} has input raw dataset {} feeding into cable {}".format(
+#                 unicode(self.runstep),
+#                 unicode(self.rawdataset),
+#                 unicode(self.raw_cable_fed_to))
         
-    def clean(self):
-        """Check coherence of this raw dataset-raw input relationship.
+#     def clean(self):
+#         """Check coherence of this raw dataset-raw input relationship.
 
-        We check that the specified cable belongs to the PipelineStep
-        corresponding to the specified RunStep.
-        """
+#         We check that the specified cable belongs to the PipelineStep
+#         corresponding to the specified RunStep.
+#         """
         
-        # The referenced cable (raw_cable_fed_to) must belong to the runstep's PS raw_cables_in
-        if not self.runstep.pipelinestep.raw_cables_in.filter(pk=self.raw_cable_fed_to.pk).exists():
-            raise ValidationError(
-                "Specified raw cable for RunStepRawInput \"{}\" does not belong to the corresponding PipelineStep".
-                format(self));
+#         # The referenced cable (raw_cable_fed_to) must belong to the runstep's PS raw_cables_in
+#         if not self.runstep.pipelinestep.raw_cables_in.filter(pk=self.raw_cable_fed_to.pk).exists():
+#             raise ValidationError(
+#                 "Specified raw cable for RunStepRawInput \"{}\" does not belong to the corresponding PipelineStep".
+#                 format(self));
 
 class AbstractDataset(models.Model):
     """
@@ -2430,3 +2448,117 @@ class RawDataset(AbstractDataset):
             if self.run.pipeline != self.final_raw_output.transformation:
                 raise ValidationError(
                     "Pipeline of specified Run does not produce specified TransformationRawOutput")
+
+class SymbolicDataset(models.Model):
+    """
+    Symbolic representation of a Dataset (that may or may not have been deleted/restored).
+    """
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in": ("Dataset", "RawDataset")});
+    object_id = models.PositiveIntegerField();
+    generic_dataset = generic.GenericForeignKey("content_type", "object_id");
+
+class ExecRecord(models.Model):
+    """
+    Record of a previous execution of a transformation with given inputs (and cables).
+    """
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in": ("Method", "Pipeline")});
+    object_id = models.PositiveIntegerField();
+    transformation = generic.GenericForeignKey("content_type", "object_id");
+
+    # Has this record been called into question by a subsequent execution?
+    tainted = models.BooleanField(
+        help_text="Denotes whether this record's veracity is questionable")
+
+    def clean(self):
+        """
+        Checks coherence of the ExecRecord.
+
+        Calls clean on all of the in/outputs, and makes sure that all
+        of the inputs are either cables or T(R)Is.  (Multiple
+        quenching is checked via a uniqueness condition and does not
+        need to be coded here.)
+        """
+        pass
+
+    def complete_clean(self):
+        """
+        Checks completeness of the ExecRecord.
+
+        Calls clean, and then checks that all in/outputs of the
+        transformation are quenched.
+        """
+        pass
+
+class ExecRecordIn(models.Model):
+    """
+    Denotes a symbolic input fed to the transformation in the parent ExecRecord.
+
+    The symbolic input may map to deleted data, e.g. if it was a deleted output
+    of a previous step in a pipeline.
+    """
+    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord")
+    symbolicdataset = models.ForeignKey(
+        SymbolicDataset,
+        help_text="Symbol for the dataset fed to this input")
+    
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in":
+                            ("PipelineStepInputCable", "PipelineStepRawInputCable",
+                             "TransformationInput", "TransformationRawInput")})
+    object_id = models.PositiveIntegerField()
+    # If it is a PSIC or PSRIC then this denotes the cable feeding
+    # into this input; if it is a TI or TRI then this denotes that a
+    # "virtual" cable fed into a pipeline's input.
+    generic_input = generic.GenericForeignKey("content_type", "object_id")
+
+    class Meta:
+        unique_together = ("execrecord", "content_type", "object_id");
+
+    def clean(self):
+        """
+        Checks coherence of this ExecRecordIn.
+
+        Checks that generic_input is appropriate for the parent
+        ExecRecord's transformation: if it is a cable, then it must feed
+        into the transformation appropriately; if it is a
+        Transformation(Raw)Input, then it must belong to the
+        transformation.
+        """
+        pass
+
+
+class ExecRecordOut(models.Model):
+    """
+    Denotes a symbolic output from the transformation in the parent ExecRecord.
+
+    The symbolic output may map to deleted data, i.e. if it was deleted after
+    being generated.
+    """
+    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord")
+    symbolicdataset = models.ForeignKey(
+        SymbolicDataset,
+        help_text="Symbol for the dataset coming from this output")
+    
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in":
+                            ("TransformationOutput", "TransformationRawOutput")})
+    object_id = models.PositiveIntegerField()
+    generic_output = generic.GenericForeignKey("content_type", "object_id")
+
+    class Meta:
+        unique_together = ("execrecord", "content_type", "object_id");
+
+    def clean(self):
+        """
+        Checks coherence of this ExecRecordOut.
+
+        Checks that generic_output belongs to the parent ExecRecord's
+        transformation.
+        """
+        pass
