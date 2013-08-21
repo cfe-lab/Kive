@@ -13,6 +13,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.db import transaction
 
 # Python math functions
 import operator
@@ -604,78 +605,95 @@ class Transformation(models.Model):
     inputs = generic.GenericRelation("TransformationInput");
     outputs = generic.GenericRelation("TransformationOutput");
 
-    # Raw inputs/outputs corresponding to non-CSV data, e.g. FASTAs.
-    raw_inputs = generic.GenericRelation("TransformationRawInput");
-    raw_outputs = generic.GenericRelation("TransformationRawOutput");
-
     class Meta:
         abstract = True;
 
     def check_input_indices(self):
-        """Check that input indices are numbered consecutively from 1.
-
-        This checks both regular inputs and raw inputs.
-        """
-
+        """Check that input indices are numbered consecutively from 1."""
         # Append each input index (hole number) to a list
         input_nums = [];
         for curr_input in self.inputs.all():
             input_nums += [curr_input.dataset_idx];
-        for curr_raw_input in self.raw_inputs.all():
-            input_nums += [curr_raw_input.dataset_idx];
 
         # Indices must be consecutively numbered from 1 to n
-        if sorted(input_nums) != range(1, self.inputs.count()+self.raw_inputs.count()+1):
+        if sorted(input_nums) != range(1, self.inputs.count()+1):
             raise ValidationError(
-                    "Inputs are not consecutively numbered starting from 1");
-
-    def check_input_names(self):
-        """Check that input names do not overlap.
-
-        Regular inputs won't have overlapping names due to a uniqueness constraint,
-        nor will raw inputs; this just checks that no pair of regular input and raw input
-        share a name.
-        """
-        input_names = [curr_input.dataset_name for curr_input in self.inputs.all()];
-        raw_input_names = [curr_raw_input.dataset_name
-                           for curr_raw_input in self.raw_inputs.all()];
-        if len(set(input_names).intersection(set(raw_input_names))) != 0:
-            raise ValidationError("Input names overlap raw input names");
+                "Inputs are not consecutively numbered starting from 1");
         
     def check_output_indices(self):
-        """Check that output indices are numbered consecutively from 1.
-
-        This checks both regular and raw outputs.
-        """
+        """Check that output indices are numbered consecutively from 1."""
         # Append each output index (hole number) to a list
         output_nums = [];
         for curr_output in self.outputs.all():
             output_nums += [curr_output.dataset_idx];
-        for curr_raw_output in self.raw_outputs.all():
-            output_nums += [curr_raw_output.dataset_idx];
 
         # Indices must be consecutively numbered from 1 to n
-        if sorted(output_nums) != range(1, self.outputs.count()+self.raw_outputs.count()+1):
+        if sorted(output_nums) != range(1, self.outputs.count()+1):
             raise ValidationError(
-                    "Outputs are not consecutively numbered starting from 1");
-
-    def check_output_names(self):
-        """Check that output names do not overlap.
-
-        This does the same as check_input_names, but for the outputs.
-        """
-        output_names = [curr_output.dataset_name for curr_output in self.outputs.all()];
-        raw_output_names = [curr_raw_output.dataset_name
-                           for curr_raw_output in self.raw_outputs.all()];
-        if len(set(output_names).intersection(set(raw_output_names))) != 0:
-            raise ValidationError("Output names overlap raw output names");
+                "Outputs are not consecutively numbered starting from 1");
 
     def clean(self):
         """Validate transformation inputs and outputs."""
         self.check_input_indices();
-        self.check_input_names();
         self.check_output_indices();
-        self.check_output_names();
+
+    # Helper to create inputs, which is now a 2-step operation if the input
+    # is not raw.
+    @transaction.atomic
+    def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
+                     min_row=None, max_row=None):
+        """
+        Create a TI for this transformation.
+
+        Decides whether the created TI should have a structure or not based
+        on the parameters given.
+
+        If CDT is None but min_row or max_row is not None, then a ValueError
+        is raised.
+        """
+        if compounddatatype == None and (min_row != None or max_row != None):
+            raise ValueError("Row restrictions cannot be specified without a CDT")
+
+        new_input = self.inputs.create(dataset_name=dataset_name,
+                                       dataset_idx=dataset_idx)
+        new_input.full_clean()
+
+        if compounddatatype != None:
+            new_input_structure = new_input.structure.create(
+                compounddatatype=compounddatatype,
+                min_row=min_row, max_row=max_row)
+            new_input_structure.full_clean()
+
+        return new_input
+
+    
+    # Same thing to create outputs.
+    @transaction.atomic
+    def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
+                     min_row=None, max_row=None):
+        """
+        Create a TO for this transformation.
+
+        Decides whether the created TO should have a structure or not based
+        on the parameters given.
+
+        If CDT is None but min_row or max_row is not None, then a ValueError
+        is raised.
+        """
+        if compounddatatype == None and (min_row != None or max_row != None):
+            raise ValueError("Row restrictions cannot be specified without a CDT")
+
+        new_output = self.outputs.create(dataset_name=dataset_name,
+                                         dataset_idx=dataset_idx)
+        new_output.full_clean()
+
+        if compounddatatype != None:
+            new_output_structure = new_output.structure.create(
+                compounddatatype=compounddatatype,
+                min_row=min_row, max_row=max_row)
+            new_output_structure.full_clean()
+
+        return new_output
 
 class Method(Transformation):
     """
@@ -724,24 +742,22 @@ class Method(Transformation):
 
         # Inputs/outputs cannot be stored in the database unless this
         # method revision has itself first been saved to the database
-        super(Method, self).save(*args, **kwargs);
+        super(Method, self).save(*args, **kwargs)
 
         # If no parent revision exists, there are no input/outputs to copy
         if self.revision_parent == None:
-            return None;
+            return None
 
         # If parent revision exists, and inputs/outputs haven't been registered,
         # copy all inputs/outputs (Including raws) from parent revision to this revision
-        if (self.inputs.count() + self.outputs.count() +
-                self.raw_inputs.count() + self.raw_outputs.count() == 0):
-
+        if (self.inputs.count() + self.outputs.count() == 0):
             for parent_input in self.revision_parent.inputs.all():
                 self.inputs.create(
                         compounddatatype = parent_input.compounddatatype,
                         dataset_name = parent_input.dataset_name,
                         dataset_idx = parent_input.dataset_idx,
                         min_row = parent_input.min_row,
-                        max_row = parent_input.max_row);
+                        max_row = parent_input.max_row)
 
             for parent_output in self.revision_parent.outputs.all():
                 self.outputs.create(
@@ -749,19 +765,10 @@ class Method(Transformation):
                         dataset_name = parent_output.dataset_name,
                         dataset_idx = parent_output.dataset_idx,
                         min_row = parent_output.min_row,
-                        max_row = parent_output.max_row);
+                        max_row = parent_output.max_row)
 
-            for parent_raw_input in self.revision_parent.raw_inputs.all():
-                self.raw_inputs.create(
-                        dataset_name = parent_raw_input.dataset_name,
-                        dataset_idx = parent_raw_input.dataset_idx);
 
-            for parent_raw_output in self.revision_parent.raw_outputs.all():
-                self.raw_outputs.create(
-                        dataset_name = parent_raw_output.dataset_name,
-                        dataset_idx = parent_raw_output.dataset_idx);
-                
-
+# FIXME come back to this after modifying Cables
 class Pipeline(Transformation):
     """
     A particular pipeline revision.
@@ -771,7 +778,6 @@ class Pipeline(Transformation):
     Related to :model:`copperfish.PipelineStep`
     Related to :model:`copperfish.PipelineOutputCable`
     """
-
     # Implicitly defined
     #   steps (PipelineStep/ForeignKey)
     #   descendants (self/ForeignKey)
@@ -779,26 +785,26 @@ class Pipeline(Transformation):
 
     family = models.ForeignKey(
             PipelineFamily,
-            related_name="members");    
+            related_name="members")
 
     revision_parent = models.ForeignKey(
             "self",
             related_name = "descendants",
             null=True,
-            blank=True);
+            blank=True)
 
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
 
-        string_rep = u"Pipeline {} {}".format("{}", self.revision_name);
+        string_rep = u"Pipeline {} {}".format("{}", self.revision_name)
 
         # If family isn't set (if created from family admin page)
         if hasattr(self, "family"):
-            string_rep = string_rep.format(unicode(self.family));
+            string_rep = string_rep.format(unicode(self.family))
         else:
-            string_rep = string_rep.format("[family unset]");
+            string_rep = string_rep.format("[family unset]")
 
-        return string_rep;
+        return string_rep
 
     def clean(self):
         """
@@ -807,10 +813,10 @@ class Pipeline(Transformation):
         - Pipeline INPUTS must be consecutively numbered from 1
         - Pipeline STEPS must be consecutively starting from 1
         - Steps are clean
-        - PipelineOutput(Raw)Cables are appropriately mapped from the pipeline's steps
+        - PipelineOutputCables are appropriately mapped from the pipeline's steps
         """
         # Transformation.clean() - check for consecutive numbering of
-        # (raw)input/outputs for this pipeline as a whole
+        # input/outputs for this pipeline as a whole
         super(Pipeline, self).clean();
 
         # Internal pipeline STEP numbers must be consecutive from 1 to n
@@ -833,28 +839,17 @@ class Pipeline(Transformation):
         # Check pipeline output wiring for coherence
         output_indices = [];
         output_names = [];
-        raw_output_names = [];
 
         # Validate each PipelineOutput(Raw)Cable
         for outcable in self.outcables.all():
             outcable.clean()
             output_indices += [outcable.output_idx];
             output_names += [outcable.output_name];
-        for raw_outcable in self.raw_outcables.all():
-            raw_outcable.clean()
-            output_indices += [raw_outcable.raw_output_idx];
-            raw_output_names += [raw_outcable.raw_output_name];
 
-        # Pipeline(Raw)OutputCables must be numbered consecutively
-        if (sorted(output_indices) !=
-                range(1, self.outcables.count()+self.raw_outcables.count()+1)):
+        # PipelineOutputCables must be numbered consecutively
+        if sorted(output_indices) != range(1, self.outcables.count()+1):
             raise ValidationError(
-                    "Outputs are not consecutively numbered starting from 1");
-
-        # Pipeline(Raw)OutputCables should have unique names.
-        if len(set(output_names).intersection(set(raw_output_names))) != 0:
-            raise ValidationError(
-                "Output names overlap raw output names");
+                "Outputs are not consecutively numbered starting from 1");
 
     def complete_clean(self):
         """
@@ -874,56 +869,61 @@ class Pipeline(Transformation):
             step.complete_clean();
 
     def create_outputs(self):
-        """ 
-        Delete existing pipeline outputs, and recreate them
-        from output cables (outcables and raw_outcables).
+        """
+        Delete existing pipeline outputs, and recreate them from output cables.
 
         PRE: this should only be called after the pipeline has been verified by
-        clean and the (raw) outcables are known to be OK.
+        clean and the outcables are known to be OK.
         """
-        # Be careful if customizing delete() of TransformationOutput
+        # Be careful if customizing delete() of TransformationOutput.
         self.outputs.all().delete()
 
-        # outcables is derived from (PipelineOutputCable/ForeignKey)
-        # For each outcable, extract the cabling parameters
+        # outcables is derived from (PipelineOutputCable/ForeignKey).
+        # For each outcable, extract the cabling parameters.
         for outcable in self.outcables.all():
-            output_requested = outcable.provider_output;
-            connect_to_output = outcable.output_name;
+            output_requested = outcable.provider_output
 
-            output_CDT = output_requested.compounddatatype;
-            if outcable.custom_outwires.all().exists():
-                # If there is custom wiring, then we need to define a new
-                # CDT for the output.
-                # Note: the integrity of the custom wiring is already enforced
-                # when you clean() the output cable.
-                output_CDT = CompoundDatatype();
-                output_CDT.save();
-                for outwire in outcable.custom_outwires.all():
-                    output_CDT.members.create(datatype=outwire.source_pin.datatype,
-                                              column_name=outwire.dest_name,
-                                              column_idx=outwire.dest_idx);
+            new_pipeline_output = self.outputs.create(
+                dataset_name=outcable.output_name,
+                dataset_idx=outcable.output_idx)
 
-            # Clone the referenced PipelineStep's TransformationOutput
-            # to make the specified output for the pipeline.
-            self.outputs.create(compounddatatype=output_CDT,
-                                dataset_name=connect_to_output,
-                                dataset_idx=outcable.output_idx,
-                                min_row=output_requested.min_row,
-                                max_row=output_requested.max_row);
-
-        # ERICS MOD
-        self.raw_outputs.all().delete()
-
-        # Similar (simpler) for raw outcables.
-        for raw_outcable in self.raw_outcables.all():
-            output_requested = raw_outcable.provider_raw_output;
-            connect_to_output = raw_outcable.raw_output_name;
-
-            # Clone the referenced PipelineStep's TransformationOutput
-            # to make the specified output for the pipeline.
-            self.raw_outputs.create(dataset_name=connect_to_output,
-                                    dataset_idx=raw_outcable.raw_output_idx);
+            if not outcable.is_raw():
+                # Define an XputStructure for new_pipeline_output.
             
+                output_CDT = output_requested.compounddatatype
+                if outcable.custom_outwires.all().exists():
+                    # If there is custom wiring, then we need to define a new
+                    # CDT for the output.
+                    # Note: the integrity of the custom wiring is already enforced
+                    # when you clean() the output cable.
+                    output_CDT = CompoundDatatype()
+                    output_CDT.save()
+                    for outwire in outcable.custom_outwires.all():
+                        output_CDT.members.create(
+                            datatype=outwire.source_pin.datatype,
+                            column_name=outwire.dest_name,
+                            column_idx=outwire.dest_idx)
+
+                new_pipeline_output.structure.create(
+                    compounddatatype=output_CDT,
+                    min_row=output_requested.min_row,
+                    max_row=output_requested.max_row)
+
+    # Helper to create raw outcables.  This is just so that our unit tests
+    # can be easily amended to work in our new scheme, and wouldn't really
+    # be used elsewhere.
+    @transaction.atomic
+    def create_raw_outcable(self, raw_output_name, raw_output_idx,
+                            step_providing_raw_output, provider_raw_output):
+        """Creates a raw outcable."""
+        new_outcable = self.outcables.create(
+            output_name=raw_output_name,
+            output_idx=raw_output_idx,
+            step_providing_output=step_providing_raw_output,
+            provider_output=provider_raw_output)
+        new_outcable.full_clean()
+
+        return new_outcable
 
 class PipelineStep(models.Model):
     """
@@ -966,7 +966,6 @@ class PipelineStep(models.Model):
         cleaned and does not contain any circularities.  If it does this
         function can be fragile!
         """
-
         contains_pipeline = False;
 
         # Base case 1: the transformation is a method and can't possibly contain the pipeline.
@@ -992,9 +991,9 @@ class PipelineStep(models.Model):
         Check coherence of this step of the pipeline.
 
         - Does the transformation at this step contain the parent pipeline?
-        - Are any (raw) inputs multiply-cabled?
+        - Are any inputs multiply-cabled?
         
-        Also, validate each (raw) input cable, and each specified output deletion.
+        Also, validate each input cable, and each specified output deletion.
 
         A PipelineStep must be save()d before cables can be connected to
         it, but it should be clean before being saved. Therefore, this
@@ -1015,32 +1014,17 @@ class PipelineStep(models.Model):
                     "Input \"{}\" to transformation at step {} is cabled more than once".
                     format(transformation_input.dataset_name, self.step_num))
 
-        # Same thing for raw inputs.
-        for curr_raw_input in self.transformation.raw_inputs.all():
-            raw_matches = self.raw_cables_in.filter(transf_raw_input=curr_raw_input).count()
-            if raw_matches > 1:
-                raise ValidationError(
-                    "Raw input \"{}\" to transformation at step {} is cabled more than once".
-                    format(curr_raw_input.dataset_name, self.step_num))
-
         # Validate each cable (Even though we call PS.clean(), we want complete wires)
         for curr_cable in self.cables_in.all():
             curr_cable.clean_and_completely_wired()
-            
-        for curr_raw_cable in self.raw_cables_in.all():
-            curr_raw_cable.clean()
 
         # Validate each PipelineStep output deletion
         for curr_del in self.outputs_to_delete.all():
             curr_del.clean()
-            
-        for curr_raw_del in self.raw_outputs_to_delete.all():
-            curr_raw_del.clean()
-
 
     def complete_clean(self):
         """Executed after the step's wiring has been fully defined, and
-        to see if all (raw) inputs are quenched exactly once.
+        to see if all inputs are quenched exactly once.
         """
         self.clean()
             
@@ -1050,84 +1034,35 @@ class PipelineStep(models.Model):
             # it was specified exactly 1 time).
             num_matches = self.cables_in.filter(transf_input=transformation_input).count()
             if num_matches == 0:
-                raise ValidationError("Input \"{}\" to transformation at step {} is not cabled".
-                                      format(transformation_input.dataset_name, self.step_num))
-
-        # Same thing for raw inputs.
-        for curr_raw_input in self.transformation.raw_inputs.all():
-            raw_matches = self.raw_cables_in.filter(transf_raw_input=curr_raw_input).count()
-            if raw_matches == 0:
                 raise ValidationError(
-                    "Raw input \"{}\" to transformation at step {} is not cabled".
-                    format(curr_raw_input.dataset_name, self.step_num))
+                    "Input \"{}\" to transformation at step {} is not cabled".
+                    format(transformation_input.dataset_name, self.step_num))
 
-class PipelineStepRawInputCable(models.Model):
-    """
-    The "cables" feeding into the raw inputs of a pipeline step's transformation.
-
-    This connects a source pipeline raw input to a pipeline step's raw input.
-    Unlike a PipelineStepInputCable, raw cables cannot have custom wiring (as
-    we don't understand the data handed around by them).
-
-    Related to :model:`copperfish.PipelineStep`
-    """
-    # The step this cable feeds into.
-    pipelinestep = models.ForeignKey(PipelineStep, related_name = "raw_cables_in");
-    
-    # Raw input hole (TransformationRawInput) of the transformation
-    transf_raw_input = models.ForeignKey(
-        "TransformationRawInput",
-        help_text="Cabling destination raw input hole",
-        related_name="raw_cables_feeding_this_input");
-
-    # Note: in this version we're only allowing raw inputs to connect
-    # from "step 0" (i.e. the pipeline's own inputs) to a pipeline
-    # step; no inter-step raw wiring is allowed.
-    pipeline_raw_input = models.ForeignKey(
-        "TransformationRawInput",
-        help_text="Cabling source raw input hole",
-        related_name="raw_cables_fed_by_this_input");
-
-    def __unicode__(self):
+    # Helper to create *raw* cables.  This is really just so that all our
+    # unit tests can be easily amended; going forwards, there's no real reason
+    # to use this.
+    @transaction.atomic
+    def create_raw_cable(transf_raw_input, pipeline_raw_input):
         """
-        Unicode representation of PipelineStepRawInputCable.
-
-        The representation gives the pipeline step and the cabling destination input name,
-        and is marked as "raw".
+        Create a raw cable feeding this PipelineStep.
         """
-        step_str = "[no pipeline step set]";
-        if self.pipelinestep != None:
-            step_str = unicode(self.pipelinestep);
-        return "{}:{}(raw)".format(step_str, self.transf_raw_input.dataset_name);
-    
-    def clean(self):
+        new_cable = self.cables_in.create(
+            transf_input=transf_raw_input,
+            step_providing_input=0,
+            provider_output=pipeline_raw_input)
+        new_cable.full_clean()
+        return new_cable
+
+    # Same for raw deletes.
+    @transaction.atomic
+    def create_raw_delete(raw_dataset_to_delete):
         """
-        Check coherence of the raw cable.
-
-        - Does the input map to a pipeline raw input?
-        - Does the cable map to an (existent) raw input of this step's transformation?
-        
-        PRE: the pipeline step's transformation is not the parent pipeline (this should
-        never happen anyway).
+        Mark a raw TO for deletion.
         """
-        input_requested = self.pipeline_raw_input;
-        feed_to_input = self.transf_raw_input;
-        step_trans = self.pipelinestep.transformation
-
-        # Does this input cable come from a raw input of the parent pipeline?
-        # Note: this depends on the pipeline step's transformation not equalling
-        # the parent pipeline (which shouldn't ever happen).
-        if not self.pipelinestep.pipeline.raw_inputs.filter(pk=input_requested.pk).exists():
-            raise ValidationError(
-                "Step {} requests raw input not coming from parent pipeline".
-                format(self.pipelinestep.step_num));
-
-        # Does the specified input defined for this transformation exist?
-        if not step_trans.raw_inputs.filter(pk=feed_to_input.pk).exists():
-            raise ValidationError(
-                "Transformation at step {} does not have raw input \"{}\"".
-                format(self.pipelinestep.step_num, unicode(feed_to_input)));
-
+        new_raw_deletion = self.outputs_to_delete.create(
+            dataset_to_delete=raw_dataset_to_delete)
+        new_raw_deletion.full_clean()
+        return new_raw_deletion
 
 class PipelineStepInputCable(models.Model):
     """
@@ -1139,17 +1074,16 @@ class PipelineStepInputCable(models.Model):
 
     Related to :model:`copperfish.PipelineStep`
     """
-    
     # The step (Which has a transformation) where we define incoming cabling
     pipelinestep = models.ForeignKey(
-            PipelineStep,
-            related_name = "cables_in");
+        PipelineStep,
+        related_name = "cables_in");
     
     # Input hole (TransformationInput) of the transformation
     # at this step to which the cable leads
     transf_input = models.ForeignKey(
-            "TransformationInput",
-            help_text="Wiring destination input hole");
+        "TransformationInput",
+        help_text="Wiring destination input hole");
     
     
     # (step_providing_input, provider_output) unambiguously defines
@@ -1171,16 +1105,34 @@ class PipelineStepInputCable(models.Model):
     # Coherence of data is already enforced by Pipeline
 
     def __unicode__(self):
-        """Represent PipelineStepInputCable with the pipeline step, and the cabling destination input name"""
-        step_str = "[no pipeline step set]";
+        """
+        Represent PipelineStepInputCable with the pipeline step, and the cabling destination input name.
+
+        If cable is raw, this will look like:
+        [PS]:[input name](raw)
+        If not:
+        [PS]:[input name]
+        """
+        step_str = "[no pipeline step set]"
+        is_raw_str = ""
         if self.pipelinestep != None:
-            step_str = unicode(self.pipelinestep);
-        return "{}:{}".format(step_str, self.transf_input.dataset_name);
+            step_str = unicode(self.pipelinestep)
+        if self.is_raw:
+            is_raw_str = "(raw)"
+        return "{}:{}{}".format(step_str, self.transf_input.dataset_name, is_raw_str);
 
     
     def clean(self):
         """Check coherence of the cable.
-        
+
+        Check in all cases:
+        - Are the input and output either both raw or both non-raw?
+
+        If the cable is raw:
+        - Does the input come from the Pipeline?
+        - Are there any wires defined?  (There shouldn't be!)
+
+        If the cable is not raw:
         - Does the input come from a prior step?
         - Does the cable map to an (existent) input of this step's transformation?
         - Does the requested output exist?
@@ -1189,6 +1141,60 @@ class PipelineStepInputCable(models.Model):
         Whether the input and output have compatible CDTs or have valid custom
         wiring is checked via clean_and_completely_wired.
         """
+        input_requested = self.provider_output;
+        feed_to_input = self.transf_input;
+
+        if input_requested.is_raw() != feed_to_input.is_raw():
+            raise ValidationError(
+                "Cable \"{}\" has mismatched source (\"{}\") and destination (\"{}\")".
+                format(self, input_requested, feed_to_input))
+
+        if self.is_raw():
+            self.raw_clean()
+        else:
+            self.non_raw_clean()
+
+    def raw_clean(self):
+        """
+        Helper function called by clean() to deal with raw cables.
+        
+        PRE: the pipeline step's transformation is not the parent pipeline (this should
+        never happen anyway).
+        PRE: cable is raw (i.e. the source and destination are both raw); this is enforced
+        by clean().
+        """
+        input_requested = self.pipeline_input
+        feed_to_input = self.transf_input
+        step_trans = self.pipelinestep.transformation
+
+        # If this cable is raw, does step_providing_input == 0?
+        if self.is_raw() and step_providing_input != 0:
+            raise ValidationError(
+                "Cable \"{}\" must have step 0 for a source".
+                format(self))
+
+        # Does this input cable come from a raw input of the parent pipeline?
+        # Note: this depends on the pipeline step's transformation not equalling
+        # the parent pipeline (which shouldn't ever happen).
+        if not self.pipelinestep.pipeline.inputs.filter(pk=input_requested.pk).exists():
+            raise ValidationError(
+                "Step {} requests raw input not coming from parent pipeline".
+                format(self.pipelinestep.step_num))
+
+        # Does the specified input defined for this transformation exist?
+        if not step_trans.inputs.filter(pk=feed_to_input.pk).exists():
+            raise ValidationError(
+                "Transformation at step {} does not have raw input \"{}\"".
+                format(self.pipelinestep.step_num, unicode(feed_to_input)))
+
+        # Are there any wires defined?
+        if self.custom_wires.all().exists():
+            raise ValidationError(
+                "Cable \"{}\" is raw and should not have custom wiring defined".
+                format(self))
+
+    def non_raw_clean(self):
+        """Helper function called by clean() to deal with non-raw cables."""
         input_requested = self.provider_output;
         requested_from = self.step_providing_input;
         feed_to_input = self.transf_input;
@@ -1223,9 +1229,6 @@ class PipelineStepInputCable(models.Model):
 
         # If not from step 0, input derives from the output of a pipeline step
         else:
-
-            
-
             # Look at the pipeline step referenced by the wiring parameter
             providing_step = self.pipelinestep.pipeline.steps.get(step_num=requested_from)
 
@@ -1235,17 +1238,6 @@ class PipelineStepInputCable(models.Model):
                 raise ValidationError(
                     "Transformation at step {} does not produce output \"{}\"".
                     format(requested_from, unicode(input_requested)))
-
-            # Removed August 15, 2013: now we are allowing the deletion of
-            # outputs that are subsequently used!
-            # Will the data from this step's transformation be deleted?
-            # source_deleted_outputs = [x.dataset_to_delete
-            #                           for x in providing_step.outputs_to_delete.all()];
-            # if input_requested in source_deleted_outputs:
-            #     raise ValidationError(
-            #         "Input \"{}\" from step {} to step {} is deleted prior to request".
-            #         format(input_requested.dataset_name, requested_from,
-            #                self.pipelinestep.step_num))
 
         # Check that the input and output connected by the
         # cable are compatible re: number of rows.  Don't check for
@@ -1291,13 +1283,18 @@ class PipelineStepInputCable(models.Model):
 
         
     def clean_and_completely_wired(self):
-        """Check coherence of the cable, and check that it is correctly wired.
+        """Check coherence of the cable, and check that it is correctly wired (if it is non-raw).
 
-        This will call clean() as well as checking whether the input and output
-        'work together' via having the same CDT or having good wiring.
+        This will call clean() as well as checking whether the input
+        and output 'work together' via having the same CDT or having
+        good wiring in the non-raw case.
         """
         # Check coherence of this cable otherwise.
         self.clean();
+
+        # There are no checks to be done on wiring if this is a raw cable.
+        if self.is_raw():
+            return
         
         input_requested = self.provider_output;
         feed_to_input = self.transf_input;
@@ -1306,22 +1303,19 @@ class PipelineStepInputCable(models.Model):
         if input_requested.compounddatatype != feed_to_input.compounddatatype:
             if not self.custom_wires.all().exists():
                 raise ValidationError(
-                        "Custom wiring required for cable \"{}\"".
-                        format(unicode(self)));
+                    "Custom wiring required for cable \"{}\"".
+                    format(unicode(self)));
 
         # Validate whatever wires there are.
         if self.custom_wires.all().exists():
-
-            # July 24, 2013: this bit moved to clean()
-            # for wire in self.custom_wires.all():
-            #     wire.clean()
-
-            # Each destination CDT member of must be wired to exactly once
+            # Each destination CDT member of must be wired to exactly once.
 
             # Get the CDT members of transf_input
             dest_members = self.transf_input.compounddatatype.members.all()
 
-            # For each CDT member, check that there is exactly 1 custom_wire leading to it (IE, number of occurences of CDT member = dest_pin)
+            # For each CDT member, check that there is exactly 1
+            # custom_wire leading to it (IE, number of occurences of
+            # CDT member = dest_pin)
             for dest_member in dest_members:
                 numwires = self.custom_wires.filter(dest_pin=dest_member).count()
 
@@ -1334,7 +1328,11 @@ class PipelineStepInputCable(models.Model):
                     raise ValidationError(
                         "Destination member \"{}\" has multiple wires leading to it".
                         format(unicode(dest_member)));
- 
+
+    def is_raw(self):
+        """True if this cable maps raw data; false otherwise."""
+        return self.transf_input.is_raw()
+
 class CustomCableWire(models.Model):
     """
     Defines a customized connection between internal steps of a pipeline.
@@ -1409,8 +1407,8 @@ class PipelineStepDelete(models.Model):
     Related to :model:`copperfish.PipelineStep`
     """
     pipelinestep = models.ForeignKey(
-            PipelineStep,
-            related_name="outputs_to_delete");
+        PipelineStep,
+        related_name="outputs_to_delete");
 
     # Again, coherence of data will be enforced at the Python level
     # (i.e. does this actually refer to a Dataset that will be produced
@@ -1418,8 +1416,8 @@ class PipelineStepDelete(models.Model):
 
     # TransformationOutput of the transformation at this step to delete
     dataset_to_delete = models.ForeignKey(
-            "TransformationOutput",
-            help_text="Annotation to delete data once generated");
+        "TransformationOutput",
+        help_text="Annotation to delete data once generated");
 
     def clean(self):
         """
@@ -1430,119 +1428,7 @@ class PipelineStepDelete(models.Model):
         if not self.pipelinestep.transformation.outputs.filter(pk=to_del.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not have output \"{}\"".
-                format(self.pipelinestep.step_num, unicode(to_del)));
-
-class PipelineStepRawDelete(models.Model):
-    """
-    Annotate that the raw dataset produced by the TRO will be deleted.
-
-    Related to :model:`copperfish.PipelineStep`
-    """
-    pipelinestep = models.ForeignKey(
-            PipelineStep,
-            related_name="raw_outputs_to_delete");
-
-    # TransformationRawOutput of the transformation at this step to delete
-    raw_dataset_to_delete = models.ForeignKey(
-            "TransformationRawOutput",
-            help_text="Annotation to delete raw data once generated");
-
-    def clean(self):
-        """
-        The raw output to be deleted must exist in this pipeline step.
-        """
-        to_del = self.raw_dataset_to_delete;
-
-        if not self.pipelinestep.transformation.raw_outputs.filter(pk=to_del.pk).exists():
-            raise ValidationError(
-                "Transformation at step {} does not have raw output \"{}\"".
-                format(self.pipelinestep.step_num, unicode(to_del)));
-
-
-class PipelineRawOutputCable(models.Model):
-    """
-    As for PipelineOutputCable but for raw outputs.
-
-    This is simpler than the above because there can be no custom wiring.
-
-    Related to :model:`copperfish.Pipeline`
-    Related to :model:`copperfish.TransformationRawOutput`
-    """
-    pipeline = models.ForeignKey(
-            Pipeline,
-            related_name="raw_outcables");
-
-    raw_output_name = models.CharField(
-            "Raw output hole name",
-            max_length=128,
-            help_text="Pipeline raw output hole name");
-
-    raw_output_idx = models.PositiveIntegerField(
-            "Raw output hole index",
-            validators=[MinValueValidator(1)],
-            help_text="Pipeline raw output hole index");
-
-    # PRE: step_providing_raw_output refers to an actual step of the
-    # pipeline, and provider_raw_output_name actually refers to one of
-    # the raw outputs at that step
-    step_providing_raw_output = models.PositiveIntegerField(
-            "Source pipeline step number",
-            validators=[MinValueValidator(1)],
-            help_text="Source step of raw output");
-
-    provider_raw_output = models.ForeignKey(
-            "TransformationRawOutput",
-            help_text="Source raw output hole");
-    
-    # Enforce uniqueness of raw output names and indices.
-    # Note: in the pipeline, these will still need to be compared with the non-raw
-    # output names and indices.
-    class Meta:
-        unique_together =   (("pipeline", "raw_output_name"),
-                            ("pipeline", "raw_output_idx"));
-
-    def __unicode__(self):
-        """Represent with the pipeline name, output index, and output name, and mark as raw."""
-        pipeline_name = "[no pipeline set]";
-        if self.pipeline != None:
-            pipeline_name = unicode(self.pipeline);
-
-        return "{}:{} ({} (raw))".format(pipeline_name, self.output_idx,
-                                   self.output_name);
-
-
-    def clean(self):
-        """
-        This raw cable must reference an existant, undeleted transformation raw output hole.
-        """
-        output_requested = self.provider_raw_output;
-        requested_from = self.step_providing_raw_output;
-
-        # Step number must be valid for this pipeline
-        if requested_from > self.pipeline.steps.all().count():
-            raise ValidationError(
-                "Raw output requested from a non-existent step");
-        
-        providing_step = self.pipeline.steps.get(step_num=requested_from);
-
-        # Try to find a matching raw output hole
-        if (not providing_step.transformation.raw_outputs.
-                filter(pk=output_requested.pk).exists()):
-            raise ValidationError(
-                "Transformation at step {} does not produce raw output \"{}\"".
-                format(requested_from, unicode(output_requested)));
-
-        # Also determine if raw output was deleted by the step producing it
-
-        # Removed August 15, 2013: under our new scheme of allowing
-        # deletions of intermediate data even when it is used later in
-        # the pipeline, it is now possible to remove such data.
-        # if (providing_step.raw_outputs_to_delete.
-        #         filter(raw_dataset_to_delete=output_requested).exists()):
-        #     raise ValidationError(
-        #         "Raw output \"{}\" from step {} is deleted prior to request".
-        #         format(output_requested.dataset_name, requested_from))
-
+                format(self.pipelinestep.step_num, to_del));
 
 class PipelineOutputCable(models.Model):
     """
@@ -1555,45 +1441,41 @@ class PipelineOutputCable(models.Model):
     Related to :model:`copperfish.TransformationOutput` (Refactoring needed)
     """
     pipeline = models.ForeignKey(
-            Pipeline,
-            related_name="outcables");
+        Pipeline,
+        related_name="outcables")
 
     output_name = models.CharField(
-            "Output hole name",
-            max_length=128,
-            help_text="Pipeline output hole name");
+        "Output hole name",
+        max_length=128,
+        help_text="Pipeline output hole name")
 
     # We need to specify both the output name and the output index because
     # we are defining the outputs of the Pipeline indirectly through
     # this wiring information - name/index mapping is stored...?
     output_idx = models.PositiveIntegerField(
-            "Output hole index",
-            validators=[MinValueValidator(1)],
-            help_text="Pipeline output hole index");
+        "Output hole index",
+        validators=[MinValueValidator(1)],
+        help_text="Pipeline output hole index")
 
     # PRE: step_providing_output refers to an actual step of the pipeline
     # and provider_output_name actually refers to one of the outputs
     # at that step
     # The coherence of the data here will be enforced at the Python level
-
-    # step_providing_output = models.ForeignKey(
-    #       PipelineStep,
-    #       help_text="Source step at which output comes from");
     step_providing_output = models.PositiveIntegerField(
-            "Source pipeline step number",
-            validators=[MinValueValidator(1)],
-            help_text="Source step at which output comes from");
+        "Source pipeline step number",
+        validators=[MinValueValidator(1)],
+        help_text="Source step at which output comes from")
 
     provider_output = models.ForeignKey(
-            "TransformationOutput",
-            help_text="Source output hole");
+        "TransformationOutput",
+        help_text="Source output hole")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
     # output names and indices.
     class Meta:
-        unique_together =   (("pipeline", "output_name"),
-                            ("pipeline", "output_idx"));
+        unique_together = (("pipeline", "output_name"),
+                           ("pipeline", "output_idx"));
 
     def __unicode__(self):
         """ Represent with the pipeline name, output index, and output name (???) """
@@ -1601,14 +1483,21 @@ class PipelineOutputCable(models.Model):
         if self.pipeline != None:
             pipeline_name = unicode(self.pipeline);
 
-        return "{}:{} ({})".format(pipeline_name, self.output_idx,
-                                   self.output_name);
+        is_raw_str = ""
+        if self.is_raw():
+            is_raw_str = " (raw)"
 
+        return "{}:{} ({}{})".format(pipeline_name, self.output_idx,
+                                     self.output_name, is_raw_str);
 
     def clean(self):
         """
+        Checks coherence of this output cable.
+        
         PipelineOutputCable must reference an existant, undeleted
-        transformation output hole.
+        transformation output hole.  Also, if the cable is raw, there
+        should be no custom wiring.  If the cable is not raw and there
+        are custom wires, they should be clean.
         """
         output_requested = self.provider_output;
         requested_from = self.step_providing_output;
@@ -1624,29 +1513,33 @@ class PipelineOutputCable(models.Model):
         if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not produce output \"{}\"".
-                format(requested_from, unicode(output_requested)));
+                format(requested_from, output_requested));
 
-        # Removed August 15, 2013: under new deletion scheme (see other comments
-        # marked with this date) this is now allowed.
-        # Also determine if output was deleted by the step producing it
-        # if (providing_step.outputs_to_delete.
-        #         filter(dataset_to_delete=output_requested).exists()):
-        #     raise ValidationError(
-        #         "Output \"{}\" from step {} is deleted prior to request".
-        #         format(output_requested.dataset_name, requested_from));
-
-        # If custom wires exist, check that they define columns in a
-        # CSV file that are indexed consecutively from 1 -- uniqueness
-        # of column indices and column names is already enforced by a
-        # constraint on CustomOutputCableWire.
-        outwire_indices = [];
-        for outwire in self.custom_outwires.all():
-            outwire.full_clean();
-            outwire_indices.append(outwire.dest_idx);
-
-        if sorted(outwire_indices) != range(1, len(outwire_indices)+1):
+        outwires = self.custom_outwires.all()
+        # A raw cable should not have any custom wiring defined.
+        if self.is_raw() and outwires.exists():
             raise ValidationError(
-                "Columns defined by custom wiring on output cable \"{}\" are not consecutively indexed from 1".format(unicode(self)));
+                "Cable \"{}\" is raw and should not have wires defined".
+                format(self))
+        
+        # If cable is not raw and custom wires exist, check that they
+        # define columns in a CSV file that are indexed consecutively
+        # from 1 -- uniqueness of column indices and column names is
+        # already enforced by a constraint on CustomOutputCableWire.
+        elif not self.is_raw():
+            outwire_indices = [];
+            for outwire in outwires:
+                outwire.full_clean();
+                outwire_indices.append(outwire.dest_idx);
+
+            if sorted(outwire_indices) != range(1, len(outwire_indices)+1):
+                raise ValidationError(
+                    "Columns defined by custom wiring on output cable \"{}\" are not consecutively indexed from 1".
+                    format(unicode(self)))
+
+    def is_raw(self):
+        """True if this output cable is raw; False otherwise."""
+        return self.provider_output.is_raw()
  
 class CustomOutputCableWire(models.Model):
     """
@@ -1657,10 +1550,6 @@ class CustomOutputCableWire(models.Model):
 
     The analogue here is similar to that of CustomCableWire.
     """
-
-    # FIXME:
-    # Need to change pipeline.create_outputs to accomodate custom wiring
-
     pipelineoutputcable = models.ForeignKey(
         PipelineOutputCable,
         related_name="custom_outwires")
@@ -1695,40 +1584,39 @@ class CustomOutputCableWire(models.Model):
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
                 format(unicode(self.source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
 
-class TransformationRawXput(models.Model):
+# August 20, 2013: changed the structure of our Xputs so that there is no distinction
+# between raw and non-raw Xputs beyond the existence of an associated "structure"
+class TransformationXput(models.Model):
     """
     Describes parameters common to all inputs and outputs
     of transformations - the "holes"
 
-    Extends :model:`copperfish.TransformationXput`
-    Extends :model:`copperfish.TransformationRawInput`
-    Extends :model:`copperfish.TransformationRawOutput`
+    Related to :models:`copperfish.Transformation`
     """
-
-    # TransformationXput describes the input/outputs of transformations
-    # So this class can only be associated with method and pipeline
+    # TransformationXput describes the input/outputs of transformations,
+    # so this class can only be associated with method and pipeline.
     content_type = models.ForeignKey(
-            ContentType,
-            limit_choices_to = {"model__in": ("method", "pipeline")});
-    object_id = models.PositiveIntegerField();
-    transformation = generic.GenericForeignKey("content_type", "object_id");
+        ContentType,
+        limit_choices_to = {"model__in": ("method", "pipeline")})
+    object_id = models.PositiveIntegerField()
+    transformation = generic.GenericForeignKey("content_type", "object_id")
 
-    # The name of the "input/output" hole
+    # The name of the "input/output" hole.
     dataset_name = models.CharField(
-            "Input/output name",
-            max_length=128,
-            help_text="Name for input/output as an alternative to index");
+        "Input/output name",
+        max_length=128,
+        help_text="Name for input/output as an alternative to index")
 
-    # Input/output index on the transformation
-
+    # Input/output index on the transformation.
     ####### NOTE: ONLY METHODS NEED INDICES, NOT TRANSFORMATIONS....!!
     # If we differentiate between methods/pipelines... dataset_idx would only
     # belong to methods
-
     dataset_idx = models.PositiveIntegerField(
             "Input/output index",
             validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this input/output");
+            help_text="Index defining the relative order of this input/output")
+
+    structure = generic.GenericRelation(XputStructure)
 
     class Meta:
         abstract = True;
@@ -1738,32 +1626,32 @@ class TransformationRawXput(models.Model):
                            ("content_type", "object_id", "dataset_idx"));
 
     def __unicode__(self):
-        return u"[{}]:raw{} {}".format(unicode(self.transformation),
-                                       self.dataset_idx,
-                                       self.dataset_name)
+        unicode_rep = u"";
+        if self.is_raw():
+            unicode_rep = u"[{}]:raw{} {}".format(unicode(self.transformation),
+                                                  self.dataset_idx, self.dataset_name)
+        else:
+            unicode_rep = u"[{}]:{} {} {}".format(unicode(self.transformation),
+                                                  self.dataset_idx,
+                                                  unicode(self.structure.compounddatatype),
+                                                  self.dataset_name);
 
-class TransformationRawInput(TransformationRawXput):
-    """
-    Inherits from :model:`copperfish.TransformationRawXput`
-    """
-    pass
+    def is_raw(self):
+        """True if this Xput is raw, false otherwise."""
+        return structure.all().exists()
 
-class TransformationRawOutput(TransformationRawXput):
-    """
-    Inherits from :model:`copperfish.TransformationRawXput`
-    """
-    pass
-        
-
-class TransformationXput(TransformationRawXput):
+class XputStructure(models.Model):
     """
     Describes the "holes" that are managed by Shipyard: i.e. the ones
     that correspond to well-understood CSV formatted data.
 
-    Extends :model:`copperfish.TransformationInput`
-    Extends :model:`copperfish.TransformationOutput`
+    Related to :model:`copperfish.TransformationXput`
     """
-
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")});
+    object_id = models.PositiveIntegerField();
+    transf_xput = generic.GenericForeignKey("content_type", "object_id")
 
     # The expected compounddatatype of the input/output
     compounddatatype = models.ForeignKey(CompoundDatatype);
@@ -1782,20 +1670,6 @@ class TransformationXput(TransformationRawXput):
         null=True,
         blank=True);
 
-    class Meta:
-        abstract = True;
-
-        # This stuff is already enforced in TransformationRawXput.
-        # A transformation cannot have multiple definitions for column name or column index
-        #unique_together = (("content_type", "object_id", "dataset_name"),
-        #                  ("content_type", "object_id", "dataset_idx"));
-
-    def __unicode__(self):
-        return u"[{}]:{} {} {}".format(unicode(self.transformation),
-                                       self.dataset_idx,
-                                       unicode(self.compounddatatype),
-                                       self.dataset_name);
-
 class TransformationInput(TransformationXput):
     """
     Inherits from :model:`copperfish.TransformationXput`
@@ -1809,14 +1683,13 @@ class TransformationOutput(TransformationXput):
     pass
 
 
-
 class Run(models.Model):
     """
     Stores data associated with an execution of a pipeline.
 
     Related to :model:`copperfish.Pipeline`
     Related to :model:`copperfish.RunStep`
-    Related to :model:`copperfish.AbstractDataset`
+    Related to :model:`copperfish.Dataset`
     """
     
     user = models.ForeignKey(User, help_text="User who performed this run")
@@ -1855,7 +1728,6 @@ class Run(models.Model):
         Checks completeness and cleanliness of all registered steps,
         and checks their numbering.
         """
-
         # Run clean on individual run steps
         for run_step in self.run_steps.all():
             run_step.clean()
@@ -1901,18 +1773,20 @@ class RunStep(models.Model):
         related_name="pipelinestep_instances")
     execrecord = models.ForeignKey(
         "ExecRecord",
-        related_name="runsteps");
+        related_name="runsteps")
     reused = models.BooleanField(
-        help_text="Denotes whether this run step reuses a previous execution");
+        help_text="Denotes whether this run step reuses a previous execution")
 
     def clean(self):
         """
+        Check coherence of this RunStep.
+        
+        PRE: the ExecRecord associated to this RunStep must be complete before
+        the RunStep can be defined.
+        
+        The checks we perform:
         a) Clean all output datasets
-            -> Valid CDT/row structure wrt intermediate_output?
-
-        b) More than one dataset cannot be an output from a particular TRO
-            -> Cannot use the same intermediate_output
-
+        b) More than one dataset cannot be an output from a particular TO
         c) If this PipelineStep is a sub-pipeline (if child_run is registered),
         check that it is complete and clean.
 
@@ -1921,83 +1795,75 @@ class RunStep(models.Model):
         uniqueness constraint on Dataset involving (runstep, intermediate_output),
         which can be null. (Also for final_output)
         """
+        # Clean the associated *complete* ExecRecord.
+        execrecord.complete_clean()
+        
+        # Get all output datasets generated by this runstep.
+        step_outputs = self.outputs.all()
 
-        # FIXME August 19: continue from here
-
-        # Get all output datasets generated by this runstep
-        outputs_used = []
-        for out_data in self.copperfish_dataset_outputs.all():
-
-            # Clean them individually (Validate intermediate_output TRO, and structure/rows if applicable)
+        # If this step reused an execrecord, there should have been no
+        # output datasets generated by this runstep.
+        if self.reused and step_outputs.exists():
+            raise ValidationError(
+                "RunStep \"{}\" reused an ExecRecord and should not have generated any data".
+                format(self))
+        
+        for out_data in self.outputs.all():
+            # Clean them individually.
             out_data.clean()
 
-            # A runstep cannot have multiple Datasets outputs coming from the same intermediate_output TRO
-            if out_data.intermediate_output in outputs_used:
+            # Check that this Dataset belongs to one of the EROs of the
+            # associated ER.
+            if not self.execrecord.execrecordouts.filter(
+                    symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError(
-                    "Output \"{}\" of RunStep \"{}\" is multiply-quenched".
-                    format(out_data.intermediate_output, self))
-
-            # Track TROs annotated as generating a dataset
-            outputs_used.append(out_data.intermediate_output)
-
-        # Analogous process for raw dataset outputs generated by this runstep
-        raw_outputs_used = []
-        for out_raw_data in self.copperfish_rawdataset_outputs.all():
-            out_raw_data.clean()
-
-            if out_raw_data.intermediate_raw_output in raw_outputs_used:
-                raise ValidationError(
-                    "Raw output \"{}\" of RunStep \"{}\" is multiply-quenched".
-                    format(out_raw_data.intermediate_raw_output, self))
-
-            raw_outputs_used.append(out_raw_data.intermediate_raw_output)
-
-    #     # Clean RunStepInputs to this RunStep (Multiple quenching needn't be checked due to uniqueness)
-    #     # Note: Input datasets should always have already been clean before being put into the database
-    #     # FIXME: Improve the name "input_datasets" and "input_raw_datasets" to "runstepinputs" / etc
-    #     for in_data in self.input_datasets.all():
-    #         in_data.clean()
-
-    #     for in_raw_data in self.input_raw_datasets.all():
-    #         in_raw_data.clean()
-
-    #     # If the Transformation of pipelinestep is a method, then child_run should not be set
-    #     if hasattr(self,"child_run") == True:
-    #         if type(self.pipelinestep.transformation) == Method:
-    #             raise ValidationError(
-    #                 "PipelineStep is not a Pipeline but a child run exists")
-
-    #         # If child_run is set, it should be clean
-    #         self.child_run.clean()
+                    "Dataset \"{}\" is not in ExecRecord \"{}\"".
+                    format(out_data, self.execrecord))
             
+        # TOs that are *not* marked for deletion at this step should have
+        # existent Datasets associated with the corresponding EROs.
+        for to in self.pipelinestep.transformation.outputs.all():
+            # If this was marked for deletion, skip it.
+            if self.pipelinestep.outputs_to_delete.filter(dataset_to_delete=to).exists():
+                continue
 
+            corresp_ero = self.execrecord.execrecordouts.get(output=to)
+            if not corresp_ero.has_data():
+                raise ValidationError(
+                    "ExecRecordOut \"{}\" should reference existent data".
+                    format(corresp_ero))
+
+        # If the Transformation of pipelinestep is a method, then child_run should not be set
+        if hasattr(self,"child_run") == True:
+            if type(self.pipelinestep.transformation) == Method:
+                raise ValidationError(
+                    "PipelineStep is not a Pipeline but a child run exists")
+
+            # If child_run is set, it should be clean
+            self.child_run.clean()
              
-    # def complete_clean(self):
-    #     """
-    #     Checks coherence and completeness of this step.
+    def complete_clean(self):
+        """
+        Checks coherence and completeness of this step.
         
-    #     If the specified PipelineStep is a sub-pipeline, then check
-    #     that child_run is registered.
-    #     """
-    #     self.clean()
+        If the specified PipelineStep is a sub-pipeline, then check
+        that child_run is registered.
+        """
+        self.clean()
 
-    #     if (type(self.pipelinestep.transformation) == Pipeline and
-    #             hasattr(self,"child_run") == False):
-    #         raise ValidationError(
-    #             "Specified PipelineStep is a Pipeline but no child run exists")
+        if (type(self.pipelinestep.transformation) == Pipeline and
+                hasattr(self,"child_run") == False):
+            raise ValidationError(
+                "Specified PipelineStep is a Pipeline but no child run exists")
 
-    #     # If the child is set, it should be complete_clean
-    #     if hasattr(self,"child_run") == True:
-    #         self.child_run.complete_clean()
+        # If the child is set, it should be complete_clean
+        if hasattr(self,"child_run") == True:
+            self.child_run.complete_clean()
 
-    # def complete_clean_immediately_following(self):
-    #     """
-    #     Immediately following the execution of a runstep, we must confirm
-    #     that we have registered
-    #     """
-    #     pass
 
-class AbstractDataset(models.Model):
+# August 20, 2013: modified from AbstractDataset.  Now this is a real class that holds
+# all kinds of data, and *maybe* has a DatasetStructure associated with it.
+class Dataset(models.Model):
     """
     Data files uploaded by users or created by transformations.
 
@@ -2005,7 +1871,7 @@ class AbstractDataset(models.Model):
     Related to :model:`copperfish.Run`
     Related to :model:`copperfish.SymbolicDataset`
 
-    The clean() functions associated with Raw/Non-raw datasets should be
+    The clean() function should be
     used when a pipeline is executed to confirm that the dataset structure
     is consistent with what's expected from the pipeline definition.
     
@@ -2018,7 +1884,6 @@ class AbstractDataset(models.Model):
     This would catch deviations between the script and the Pipeline's
     definition of that script.
     """
-
     user = models.ForeignKey(User,help_text="User that uploaded this dataset.")
 
     name = models.CharField(
@@ -2043,7 +1908,7 @@ class AbstractDataset(models.Model):
     # If this is an intermediary dataset, it is produced by a runstep
     runstep = models.ForeignKey(
         "RunStep",
-        related_name="%(app_label)s_%(class)s_outputs",
+        related_name="outputs",
         null=True,
         blank=True,
         help_text="Run step dataset was created by (If applicable)")
@@ -2051,7 +1916,7 @@ class AbstractDataset(models.Model):
     # If this is a final dataset, it is produced by a run
     run = models.ForeignKey(
         "Run",
-        related_name="%(app_label)s_%(class)s_final_outputs",
+        related_name="outputs",
         null=True,
         blank=True,
         help_text="Run step this dataset was created by (If applicable)")
@@ -2062,13 +1927,9 @@ class AbstractDataset(models.Model):
         help_text="Physical file system path where datasets are stored",
         null=False)
 
-    MD5_checksum = models.CharField(max_length=64,help_text="Validates file integrity")
-
-    # Accesses the associated SymbolicDataset.
-    symbolicdataset = generic.GenericRelation(SymbolicDataset)
-    
-    class Meta:
-        abstract = True
+    # Links to this Dataset's SymbolicDataset.
+    symbolicdataset = models.OneToOneField("SymbolicDataset",
+                                           related_name="dataset")
 
     def __unicode__(self):
         """
@@ -2082,34 +1943,67 @@ class AbstractDataset(models.Model):
 
     def clean(self):
         """
-        Compute MD5 checksum for the dataset.
+        If this is a Shipyard-type CSV file, clean the CSV.
         """
+        # If there is an associated DatasetStructure (i.e. if it is a
+        # CSV file), then clean the CSV using
+        # DatasetStructure.clean().
+        if not self.is_raw():
+            self.structure.clean()
 
+        # FIXME should we be calling check_md5 here?  Or is that too resource-intensive?  Or
+        # can we find a better time to run it?
+            
+    def compute_md5(self):
+        """
+        Computes the MD5 checksum of the Dataset and stores it to the associated SymbolicDataset.
+        """
         try:
             md5gen = hashlib.md5()
             self.dataset_file.open()
             md5gen.update(self.dataset_file.read())
-            self.MD5_checksum = md5gen.hexdigest()
+            self.symbolicdataset.MD5_checksum = md5gen.hexdigest()
 
         except ValueError as e:
             print(e)
-            self.MD5_checksum = ""
+            self.symbolicdataset.MD5_checksum = ""
+            
+    def check_md5(self):
+        """
+        Checks that the MD5 checksum of the Dataset equals that in the associated SymbolicDataset.
 
+        This will be used when regenerating data that once existed, as a coherence check.
+        """
+        md5gen = hashlib.md5()
+        self.dataset_file.open()
+        md5gen.update(self.dataset_file.read())
+        return self.symbolicdataset.MD5_checksum == md5gen.hexdigest()
 
-class Dataset(AbstractDataset):
+    def is_raw(self):
+        """True if this Dataset is raw, i.e. not a CSV file."""
+        return not hasattr(self, "structure")
+            
+    def num_rows(self):
+        """
+        Returns number of rows in CSV file if Dataset is a CSV file; None otherwise.
+        """
+        if not self.is_raw():
+            return self.structure.num_rows();
+        return None
+
+class DatasetStructure(models.Model):
     """
     Data with a Shipyard-compliant structure: a CSV file with a header.
     Encodes the CDT, and the transformation output generating this data.
 
-    Inherits from :model:`copperfish.AbstractDataset`
-     - Related to :model:`copperfish.RunStep`
-     - Related to :model:`copperfish.Run`
-     - Related to :model:`copperfish.SymbolicDataset`
+    Related to :model:`copperfish.Dataset`
     Related to :model:`copperfish.CompoundDatatype`
     """
     # Note: previously we were tracking the exact TransformationOutput
     # this came from (both for its Run and its RunStep) but this is
     # now done more cleanly using ExecRecord.
+
+    dataset = models.OneToOneField(Dataset, related_name="structure")
 
     compounddatatype = models.ForeignKey(
         CompoundDatatype,
@@ -2117,16 +2011,12 @@ class Dataset(AbstractDataset):
 
     def clean(self):
         """
-        a) Compute MD5 checksum for the dataset
-        b) Check that it's source (intermediate/final output) is correctly specified
+        Checks the CSV header conforms to CDT definition.
                 
         FIXME: will have to be amended to validate each atomic data field
         in the file when doing execute.
         """
-        # Compute MD5 checksum (if necessary)
-        super(Dataset, self).clean()
-
-        data_csv = csv.DictReader(self.dataset_file)
+        data_csv = csv.DictReader(self.dataset.dataset_file)
         header = data_csv.fieldnames
         cdt_members = self.compounddatatype.members.all()
 
@@ -2134,7 +2024,7 @@ class Dataset(AbstractDataset):
         if len(header) != cdt_members.count():
             raise ValidationError(
                 "Dataset \"{}\" does not have the same number of columns as its CDT".
-                format(unicode(self)))
+                format(self.dataset))
 
         # CDT definition must be coherent with the CSV header: ith cdt member must
         # have the same name as the ith CSV header
@@ -2142,7 +2032,7 @@ class Dataset(AbstractDataset):
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 raise ValidationError(
                     "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
-                    format(cdtm.column_idx, unicode(self), header[cdtm.column_idx-1], cdtm.column_name))
+                    format(cdtm.column_idx, self.dataset, header[cdtm.column_idx-1], cdtm.column_name))
         
         # FIXME: validate the actual data in the file with unit test scripts
 
@@ -2153,44 +2043,17 @@ class Dataset(AbstractDataset):
         # be checked when calling clean().
 
         # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-        return (sum(1 for line in self.dataset_file) - 1);
+        return (sum(1 for line in self.dataset.dataset_file) - 1);
 
         # FIXME: do we need to close and reopen self.dataset_file at the end of this
         # script?  Find out by running twice consecutively.
-    
-class RawDataset(AbstractDataset):
-    """
-    Data without a Shipyard-compliant structure.
-    For example, a FASTA file or a Newick file.
-
-    Annotates the raw TRO from a pipeline step or pipeline that
-    generated this dataset.
-
-    Inherits from :model:`copperfish.AbstractDataset`
-     - Related to :model:`copperfish.RunStep`
-     - Related to :model:`copperfish.Run`
-     - Related to :model:`copperfish.SymbolicDataset`
-    """
-    def __unicode__(self):
-        """
-        Display the name, user, and date created, and mark as a raw Dataset.
-        """
-        return "{}(raw) (created by {} on {})".format(
-                self.name,
-                unicode(self.user),
-                self.date_created);
-
 
 class SymbolicDataset(models.Model):
     """
     Symbolic representation of a Dataset (that may or may not have been deleted/restored).
     """
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {"model__in": ("Dataset", "RawDataset")},
-        null=True, blank=True);
-    object_id = models.PositiveIntegerField(null=True, blank=True);
-    generic_dataset = generic.GenericForeignKey("content_type", "object_id");
+    # For validation of Datasets when being reused, or when being regenerated.
+    MD5_checksum = models.CharField(max_length=64,help_text="Validates file integrity")
 
     def __unicode__(self):
         """
@@ -2200,9 +2063,13 @@ class SymbolicDataset(models.Model):
         if not, S[primary key].
         """
         unicode_rep = u"S{}".format(self.pk)
-        if generic_dataset == None:
+        if dataset == None:
             unicode_rep += u"*"
         return unicode_rep
+
+    def has_data(self):
+        """True if associated Dataset exists; False otherwise."""
+        return hasattr(self, "dataset")
 
 class ExecRecord(models.Model):
     """
@@ -2242,16 +2109,15 @@ class ExecRecord(models.Model):
         # a RunStep; if not, it represents a Run).
         is_cable = False
         if eris.exists():
-            is_cable = type(eris[0]) in (PipelineStepInputCable, PipelineStepRawInputCable)
+            is_cable = (type(eris[0]) == PipelineStepInputCable)
         
         for eri in self.execrecordins.all():
             eri.clean()
-            # Check that they are all of the same type (cable or T(R)I) as the first one.
-            if (is_cable and type(eri) in (TransformationInput, TransformationRawInput)) or
-                    ((not is_cable) and
-                     type(eri) in (PipelineStepInputCable, PipelineStepRawInputCable)):
+            # Check that they are all of the same type (cable or TI) as the first one.
+            if ((is_cable and (type(eri) == TransformationInput)) or
+                    ((not is_cable) and type(eri) == PipelineStepInputCable)):
                 raise ValidationError(
-                    "Inputs to ExecRecord \"{}\" are not all either cables or T(R)Is".
+                    "Inputs to ExecRecord \"{}\" are not all either cables or TIs".
                     format(self))
             
         for ero in self.execrecordouts.all():
@@ -2267,17 +2133,15 @@ class ExecRecord(models.Model):
         self.clean()
 
         # Because we know that each ERI is clean (and therefore each one maps to a
-        # valid T(R)I of our transformation), and because there is no multiple quenching
+        # valid TI of our transformation), and because there is no multiple quenching
         # (due to a uniqueness constraint), all we have to do is check the number of ERIs
         # to make sure everything is quenched.
-        if self.execrecordins.count() != (self.transformation.inputs.count() +
-                                          self.transformation.raw_inputs.count()):
+        if self.execrecordins.count() != self.transformation.inputs.count():
             raise ValidationError(
                 "Input(s) to ExecRecord \"{}\" are not quenched".format(self));
         
         # Similar for EROs.
-        if self.execrecordouts.count() != (self.transformation.outputs.count() +
-                                           self.transformation.raw_outputs.count()):
+        if self.execrecordouts.count() != self.transformation.outputs.count():
             raise ValidationError(
                 "Output(s) to ExecRecord \"{}\" are not quenched".format(self));
         
@@ -2297,12 +2161,11 @@ class ExecRecordIn(models.Model):
     content_type = models.ForeignKey(
         ContentType,
         limit_choices_to = {"model__in":
-                            ("PipelineStepInputCable", "PipelineStepRawInputCable",
-                             "TransformationInput", "TransformationRawInput")})
+                            ("PipelineStepInputCable", "TransformationInput")}
     object_id = models.PositiveIntegerField()
-    # If it is a PSIC or PSRIC then this denotes the cable feeding
-    # into this input; if it is a TI or TRI then this denotes that a
-    # "virtual" cable fed into a pipeline's input.
+    # If it is a PSIC then this denotes the cable feeding into this
+    # input; if it is a TI then this denotes that a "virtual" cable
+    # fed into a pipeline's input.
     generic_input = generic.GenericForeignKey("content_type", "object_id")
 
     class Meta:
@@ -2311,28 +2174,27 @@ class ExecRecordIn(models.Model):
     def __unicode__(self):
         """
         Unicode representation.
-
+        
         If this ERI has no cable, then it looks like
         [symbolic dataset]=>[transformation (raw) input name]
         If it *does* have a cable, then it looks like
         [symbolic dataset]={(raw)cable [pk]}>[transformation (raw) input name]
-
+        
         Examples:
         S552={rawcable1118}=>foo_bar
         S552=>foo_bar
         """
-        
         transf_input_name = "";
         cable_str = "";
-
-        if type(generic_input) == PipelineStepInputCable:
-            cable_str = "{" + "cable{}".format(generic_input.pk) + "}="
-            transf_input_name = generic_input.transf_input.dataset_name
-        elif type(generic_input) == PipelineStepRawInputCable:
-            cable_str = "{" + "rawcable{}".format(generic_input.pk) + "}="
+        
+        if type(self.generic_input) == PipelineStepInputCable:
             transf_input_name = generic_input.transf_raw_input.dataset_name
+            if self.generic_input.is_raw():
+                cable_str = "{" + "rawcable{}".format(generic_input.pk) + "}="
+            else:
+                cable_str = "{" + "cable{}".format(generic_input.pk) + "}="
         else:
-            # This is not a cable, it is a T(R)I.
+            # This is not a cable, it is a TI.
             transf_input_name = generic_input.dataset_name
 
         return "{}={}>{}".format(self.symbolicdataset, cable_str, transf_input_name)
@@ -2345,7 +2207,7 @@ class ExecRecordIn(models.Model):
         Checks that generic_input is appropriate for the parent
         ExecRecord's transformation: if it is a cable, then it must feed
         into the transformation appropriately; if it is a
-        Transformation(Raw)Input, then it must belong to the
+        TransformationInput, then it must belong to the
         transformation.
 
         Also, if symbolicdataset refers to existent data, check that it
@@ -2358,15 +2220,7 @@ class ExecRecordIn(models.Model):
                 raise ValidationError(
                     "Input \"{}\" does not belong to transformation of ExecRecord \"{}\"".
                     format(self.generic_input, self.execrecord))
-
-        elif type(self.generic_input) == TransformationRawInput:
-            # Look instead in execrecord.transformation.raw_inputs.
-            transf_raw_inputs = self.execrecord.transformation.raw_inputs
-            if not transf_raw_inputs.filter(pk=self.generic_input.pk).exists():
-                raise ValidationError(
-                    "Raw input \"{}\" does not belong to transformation of ExecRecord \"{}\"".
-                    format(self.generic_input, self.execrecord))
-            
+                    
         elif type(self.generic_input) == PipelineStepInputCable:
             # Look at the cable and see whether it feeds the transformation
             # of execrecord.
@@ -2375,59 +2229,43 @@ class ExecRecordIn(models.Model):
                 raise ValidationError(
                     "Cable \"{}\" does not feed transformation of ExecRecord \"{}\"".
                     format(input_fed, self.execrecord))
-            
-        elif type(self.generic_input) == PipelineStepRawInputCable:
-            # Same as previous, but for raw inputs.
-            raw_input_fed = self.generic_input.transf_raw_input
-            if not self.execrecord.transformation.raw_inputs.filter(pk=raw_input_fed.pk).exists():
-                raise ValidationError(
-                    "Raw cable \"{}\" does not feed transformation of ExecRecord \"{}\"".
-                    format(raw_input_fed, self.execrecord))
 
         # If the actual data behind symbolicdata still exists, check its coherence.
-        actual_data = self.symbolicdata.generic_dataset
-
-        if type(actual_data) == Dataset:
-            cdt_needed = None
-            transf_input_used = None
-            if type(self.generic_input) == TransformationInput:
-                cdt_needed = self.generic_input.compounddatatype
-                transf_input_used = self.generic_input
-            elif type(self.generic_input) == PipelineStepInputCable:
-                cdt_needed = self.generic_input.compounddatatype
-                transf_input_used = self.generic_input.transf_input
-            else:
+        if self.symbolicdataset.has_data():
+            if self.generic_input.is_raw() != self.symbolicdataset.is_raw():
                 raise ValidationError(
-                    "Dataset \"{}\" cannot feed a raw source".format(actual_data))
+                    "Dataset \"{}\" cannot feed source \"{}\"".
+                    format(self.symbolicdataset.dataset, self.generic_input))
 
-            # CDT of actual_data must match cdt_needed.
-            if actual_data.compounddatatype != cdt_needed:
-                raise ValidationError("Dataset \"{}\" is not of the expected CDT".
-                                      format(actual_data))
+            if not self.symbolicdataset.dataset.is_raw():
+                actual_data = self.symbolicdataset.dataset
+                transf_input_used = None
+                cdt_needed = None
+                if type(self.generic_input) == TransformationInput:
+                    transf_input_used = self.generic_input
+                    cdt_needed = transf_input_used.structure.compounddatatype
+                else:
+                    # generic_input is a PSIC.
+                    transf_input_used = self.generic_input.transf_input
+                    cdt_needed = self.generic_input.provider_output.structure.compounddatatype
 
-            # actual_data must satisfy the target TI's row constraints.
-            if (transf_input_used.min_row != None and
-                    actual_data.num_rows() < transf_input_used.min_row):
-                raise ValidationError(
-                    "Dataset \"{}\" has too few rows for TransformationInput \"{}\"".
-                    format(actual_data, transf_input_used))
+                # CDT of actual_data must match cdt_needed.
+                if actual_data.compounddatatype != cdt_needed:
+                    raise ValidationError("Dataset \"{}\" is not of the expected CDT".
+                                          format(actual_data))
+
+                # actual_data must satisfy the target TI's row constraints.
+                if (transf_input_used.structure.min_row != None and
+                        actual_data.num_rows() < transf_input_used.structure.min_row):
+                    raise ValidationError(
+                        "Dataset \"{}\" has too few rows for TransformationInput \"{}\"".
+                        format(actual_data, transf_input_used))
             
-            if (transf_input_used.max_row != None and
-                    actual_data.num_rows() > transf_input_used.max_row):
-                raise ValidationError(
-                    "Dataset \"{}\" has too many rows for TransformationInput \"{}\"".
-                    format(actual_data, transf_input_used))
-
-        elif type(actual_data) == RawDataset:
-            # This cannot feed a non-raw source.
-            if type(self.generic_input) in (TransformationInput, PipelineStepInputCable):
-                raise ValidationError(
-                    "Raw dataset \"{}\" cannot feed a non-raw source".
-                    format(actual_data));
-
-        # Third, trivial, case is actual_data == None, in which case we do nothing.
-        
-
+                if (transf_input_used.structure.max_row != None and
+                        actual_data.num_rows() > transf_input_used.structure.max_row):
+                    raise ValidationError(
+                        "Dataset \"{}\" has too many rows for TransformationInput \"{}\"".
+                        format(actual_data, transf_input_used))
 
 class ExecRecordOut(models.Model):
     """
@@ -2443,26 +2281,23 @@ class ExecRecordOut(models.Model):
         help_text="Symbol for the dataset coming from this output",
         related_name="execrecordout")
     
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {"model__in":
-                            ("TransformationOutput", "TransformationRawOutput")})
-    object_id = models.PositiveIntegerField()
-    generic_output = generic.GenericForeignKey("content_type", "object_id")
+    output = models.ForeignKey(TransformationOutput,
+                               help_text="Transformation output producing ERO",
+                               related_name="execrecordouts")
 
     class Meta:
-        unique_together = ("execrecord", "content_type", "object_id");
+        unique_together = ("execrecord", "output");
 
     def __unicode__(self):
         """
         Unicode representation of this ExecRecordOut.
 
         This has the structure
-        [T(R)O name]=>[symbolic dataset]
+        [TO name]=>[symbolic dataset]
         e.g.
         output_one=>S458
         """
-        return "{}=>{}".format(generic_output.dataset_name, symbolicdataset)
+        return "{}=>{}".format(output.dataset_name, symbolicdataset)
 
 
     def clean(self):
@@ -2474,45 +2309,37 @@ class ExecRecordOut(models.Model):
         data, then this existent data is compatible with the producing
         TransformationOutput.
         """
-        query_for_outs = None
-        if type(self.generic_output) == TransformationOutput:
-            # Look for this output in self.execrecord.transformation.outputs.
-            query_for_outs = self.execrecord.transformation.outputs
-        else:
-            # Look instead in execrecord.transformation.raw_outputs.
-            query_for_outs = self.execrecord.transformation.raw_outputs
+        query_for_outs = self.execrecord.transformation.outputs
 
-        if not query_for_outs.filter(pk=self.generic_output.pk).exists():
-            raise ValidationError("Output \"{}\" does not belong to transformation of ExecRecord \"{}\"".format(self.generic_output, self.execrecord))
+        if not query_for_outs.filter(pk=self.output.pk).exists():
+            raise ValidationError(
+                "Output \"{}\" does not belong to transformation of ExecRecord \"{}\"".
+                format(self.output, self.execrecord))
 
         # Check that if the SymbolicDataset's contents (i.e. the Dataset it points to)
         # hasn't been deleted, then it is coherent with the output.
-        actual_data = self.symbolicdataset.generic_dataset
-        
-        if type(actual_data) == Dataset:
-            if type(self.generic_output) == TransformationRawOutput:
+        if self.symbolicdataset.has_data():
+            if self.symbolicdataset.is_raw() != self.output.is_raw():
                 raise ValidationError(
-                    "Dataset \"{}\" cannot come from a raw output".format(actual_data))
+                    "Dataset \"{}\" cannot have come from output \"{}\"".
+                    format(self.symbolicdataset.dataset, self.output))
+
+            # If the Dataset is not raw, check its CDT and number of rows against
+            # the producing TO.
+            if not self.symbolicdataset.dataset.is_raw():
+                actualdata = self.symbolicdataset.dataset
             
-            if actualdata.compounddatatype != self.generic_output.compounddatatype:
-                raise ValidationError(
-                    "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".format(actualdata, self.generic_output))
+                if actualdata.compounddatatype != self.output.compounddatatype:
+                    raise ValidationError(
+                        "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
+                        format(actualdata, self.output))
 
-            if (self.generic_output.min_row != None and
-                    actualdata.num_rows() < self.generic_output.min_row):
-                raise ValidationError(
-                    "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
-                    format(actualdata, self.generic_output))
+                if self.output.min_row != None and actualdata.num_rows() < self.output.min_row:
+                    raise ValidationError(
+                        "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
+                        format(actualdata, self.output))
 
-            if (self.generic_output.max_row != None and
-                    actualdata.num_rows() > self.generic_output.max_row):
-                raise ValidationError(
-                    "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
-                    format(actualdata, self.generic_output))
-
-        elif type(actual_data) == RawDataset:
-            if type(self.generic_output) != TransformationRawOutput:
-                raise ValidationError(
-                    "RawDataset \"{}\" cannot come from a non-raw output".format(actual_data)
-
-        # Third case: actual_data == None; there is nothing to check here.
+                if self.output.max_row != None and actualdata.num_rows() > self.output.max_row:
+                    raise ValidationError(
+                        "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
+                        format(actualdata, self.output))
