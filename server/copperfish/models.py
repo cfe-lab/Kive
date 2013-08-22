@@ -639,7 +639,7 @@ class Transformation(models.Model):
 
     # Helper to create inputs, which is now a 2-step operation if the input
     # is not raw.
-    @transaction.atomic
+    @transaction.commit_on_success
     def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
                      min_row=None, max_row=None):
         """
@@ -668,7 +668,7 @@ class Transformation(models.Model):
 
     
     # Same thing to create outputs.
-    @transaction.atomic
+    @transaction.commit_on_success
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
                      min_row=None, max_row=None):
         """
@@ -911,7 +911,7 @@ class Pipeline(Transformation):
     # Helper to create raw outcables.  This is just so that our unit tests
     # can be easily amended to work in our new scheme, and wouldn't really
     # be used elsewhere.
-    @transaction.atomic
+    @transaction.commit_on_success
     def create_raw_outcable(self, raw_output_name, raw_output_idx,
                             step_providing_raw_output, provider_raw_output):
         """Creates a raw outcable."""
@@ -954,7 +954,7 @@ class PipelineStep(models.Model):
     # this is more compact.
     # -- August 21, 2013
     outputs_to_delete = models.ManyToManyField(
-        TransformationOutput,
+        "TransformationOutput",
         help_text="TransformationOutputs whose data should not be retained",
         related_name="pipeline_steps_deleting")
 
@@ -1059,7 +1059,7 @@ class PipelineStep(models.Model):
     # Helper to create *raw* cables.  This is really just so that all our
     # unit tests can be easily amended; going forwards, there's no real reason
     # to use this.
-    @transaction.atomic
+    @transaction.commit_on_success
     def create_raw_cable(transf_raw_input, pipeline_raw_input):
         """
         Create a raw cable feeding this PipelineStep.
@@ -1072,7 +1072,7 @@ class PipelineStep(models.Model):
         return new_cable
 
     # Same for raw deletes.
-    @transaction.atomic
+    @transaction.commit_on_success
     def create_raw_delete(raw_dataset_to_delete):
         """
         Mark a raw TO for deletion.
@@ -1603,7 +1603,7 @@ class TransformationXput(models.Model):
             validators=[MinValueValidator(1)],
             help_text="Index defining the relative order of this input/output")
 
-    structure = generic.GenericRelation(XputStructure)
+    structure = generic.GenericRelation("XputStructure")
 
     class Meta:
         abstract = True;
@@ -1715,6 +1715,7 @@ class Run(models.Model):
         Checks completeness and cleanliness of all registered steps,
         and checks their numbering.
         """
+        
         # Run clean on individual run steps
         for run_step in self.run_steps.all():
             run_step.clean()
@@ -1723,30 +1724,63 @@ class Run(models.Model):
         for run_outcable in self.runoutputcables.all():
             run_outcable.clean()
         
-        # FIXME check overlapping numbering of steps
-            
-        # FIXME EXECUTE
+        # Multiple-quenching of steps and outcables is taken care of already.
+
+        # All steps that exist must be consecutively numbered starting from 1.
+        step_nums = [rs.pipelinestep.step_num for rs in self.run_steps.all()]
+        if sorted(step_nums) != range(1, self.run_steps.count()):
+            raise ValidationError(
+                "RunSteps of Run \"{}\" are not consecutively numbered starting from 1".
+                format(self))
+
+        # If there is an execrecord:
+        if self.execrecord != None:
+            self.execrecord.clean()
+
+            # If there are EROs for this Run's ExecRecord, check that there are
+            # corresponding RunOutputCables (we know it to be clean by checking above).
+            for ero in self.execrecord.execrecordouts.all():
+                curr_output = ero.output
+
+                try:
+                    corresp_roc = self.runoutputcables.get(
+                        general_transf__pipelineoutputcable__output_name=
+                        curr_output.dataset_name)
+
+                    # The corresponding ROC should have the same SymbolicDataset as
+                    # the ERO.
+                    if (corresp_roc.execrecord.execrecordouts.all()[0].symbolicdataset !=
+                            ero.symbolicdataset):
+                        raise ValidationError(
+                            "ExecRecordOut \"{}\" of Run \"{}\" does not match the corresponding RunOutputCable".
+                            format(ero, self))
+                    
+                except DoesNotExist:
+                    # No corresponding ROC exists.
+                    raise ValidationError(
+                        "ExecRecord of Run \"{}\" has an entry for output \"{}\" but no corresponding RunOutputCable exists".
+                        format(self, curr_output))
             
     def complete_clean(self):
         """
         Checks coherence of a completed run.
 
-        Recursively cleans all the steps (using complete_clean) and checks
-        that the outputs of the run are OK:
-         - there is exactly one (raw) dataset coming from each (raw) output of the pipeline
-         - all non-raw outputs are verified
-         - there is exactly one RunStep for each PipelineStep
-         - all non-raw intermediate datasets are verified (via complete_clean-ing steps)
+        Calls clean(), then:
+         - checks that all RunSteps are complete and clean
+         - checks that the run is finished
         """
+        self.clean()
+
         for run_step in self.run_steps.all():
             run_step.complete_clean()
-        # FIXME will we have a complete_clean on ROCs?
-        for run_outcable in self.runoutputcables.all():
-            run_outcable.complete_clean()
         
-        # FIXME check quenching of steps
-        # FIXME EXECUTE (this will be an important part of execute)
-            
+        # Since we have a uniqueness constraint ensuring that each
+        # PipelineStep has *at most* one associated RunStep, we
+        # check quenching by just counting both.
+        if not self.is_finished():
+            raise ValidationError(
+                "Run \"{}\" is not complete")
+    
     def is_finished(self):
         """
         Checks if this run is finished running.
@@ -1774,6 +1808,11 @@ class RunOutputCable(models.Model):
     pipelineoutputcable = models.ForeignKey(
         PipelineOutputCable,
         related_name="pipelineoutputcable_instances")
+
+    class Meta:
+        # Uniqueness constraint ensures that no POC is multiply-represented
+        # within a run.
+        unique_together = ("run", "pipelineoutputcable")
 
     def clean(self):
         """
@@ -1850,6 +1889,11 @@ class RunStep(models.Model):
     pipelinestep = models.ForeignKey(
         PipelineStep,
         related_name="pipelinestep_instances")
+
+    class Meta:
+        # Uniqueness constraint ensures you can't have multiple RunSteps for
+        # a given PipelineStep within a Run.
+        unique_together = ("run", "pipelinestep")
 
     def clean(self):
         """
@@ -2215,7 +2259,6 @@ class ExecRecord(models.Model):
                 is_cable = (type(eris[0].generic_input) == PipelineStepInputCable)
         
             for eri in self.execrecordins.all():
-                eri.clean()
                 # Check that they are all of the same type (cable or TI) as the first one.
                 if ((is_cable and (type(eri) == TransformationInput)) or
                         ((not is_cable) and type(eri) == PipelineStepInputCable)):
@@ -2273,11 +2316,13 @@ class ExecRecordIn(models.Model):
         ContentType,
         limit_choices_to = {"model__in":
                             ("PipelineStepInputCable", "TransformationInput",
-                             "PipelineOutputCable")}
+                             "TransformationOutput")})
     object_id = models.PositiveIntegerField()
     # If it is a PSIC then this denotes the cable feeding into this
     # input; if it is a TI then this denotes that a "virtual" cable
-    # fed into a pipeline's input.
+    # fed into a pipeline's input; if it is a TO then execrecord
+    # denotes a POC and generic_input is the PipelineStep output that
+    # feeds it.
     generic_input = generic.GenericForeignKey("content_type", "object_id")
 
     class Meta:
@@ -2292,7 +2337,7 @@ class ExecRecordIn(models.Model):
         If it represents a TI, then it looks like
         [symbolic dataset]=>[transformation (raw) input name]
         If it represents a PSIC, then it looks like
-        [symbolic dataset]={(raw)cable [pk]}>[transformation (raw) input name]
+        [symbolic dataset]={(raw)cable [pk]}=>[transformation (raw) input name]
         
         Examples:
         S552
@@ -2302,7 +2347,8 @@ class ExecRecordIn(models.Model):
         transf_input_name = "";
         cable_str = "";
 
-        if type(self.generic_input) == PipelineOutputCable:
+        if type(self.generic_input) == TransformationOutput:
+            # The parent ER is a POC.
             return unicode(self.symbolicdataset)
         elif type(self.generic_input) == PipelineStepInputCable:
             transf_input_name = generic_input.transf_raw_input.dataset_name
@@ -2323,7 +2369,8 @@ class ExecRecordIn(models.Model):
 
         Checks that generic_input is appropriate for the parent
         ExecRecord's Method/Pipeline/POC.
-        - If execrecord is for a POC, then this ERI should reflect that.
+        - If execrecord is for a POC, then generic_input should be the TO that
+          feeds it (i.e. the PipelineStep TO that is cabled to a Pipeline output).
         - If execrecord is not for a POC and generic_input is a PSIC, then
           it must feed into execrecord.general_transf appropriately.
         - If execrecord is not for a POC and generic_input is a
@@ -2334,10 +2381,10 @@ class ExecRecordIn(models.Model):
         """
         parent_transf = self.execrecord.general_transf
 
-        if type(parent_transf) == PipelineOutputCable:
-            if self.generic_input != parent_transf:
+        if type(parent_transf) == TransformationOutput:
+            if self.generic_input != parent_transf.provider_output:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" improperly denotes the POC represented by its ExecRecord".
+                    "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord's POC".
                     format(self))
 
         else:
@@ -2374,18 +2421,23 @@ class ExecRecordIn(models.Model):
 
             if not self.symbolicdataset.dataset.is_raw():
                 actual_data = self.symbolicdataset.dataset
-                transf_input_used = None
+                # This gives the row restrictions: for the POC case the restriction
+                # comes from the source TO; for the other cases, the restriction
+                # comes from the destination TI.
+                transf_xput_used = None
                 cdt_needed = None
 
-                if type(self.generic_input) == PipelineOutputCable:
-                    cdt_needed = self.generic_input.provider_output.compounddatatype
-                    
+                # FIXME: cdt_needed should really just check for *compatible* CDTs
+                # and not the same one.
+                if type(self.generic_input) == TransformationOutput:
+                    transf_xput_used = self.generic_input
+                    cdt_needed = self.generic_input.compounddatatype
                 elif type(self.generic_input) == TransformationInput:
-                    transf_input_used = self.generic_input
-                    cdt_needed = transf_input_used.structure.compounddatatype
+                    transf_xput_used = self.generic_input
+                    cdt_needed = transf_xput_used.structure.compounddatatype
                 else:
                     # generic_input is a PSIC.
-                    transf_input_used = self.generic_input.transf_input
+                    transf_xput_used = self.generic_input.transf_input
                     cdt_needed = self.generic_input.provider_output.structure.compounddatatype
 
                 # CDT of actual_data must match cdt_needed.
@@ -2393,19 +2445,26 @@ class ExecRecordIn(models.Model):
                     raise ValidationError("Dataset \"{}\" is not of the expected CDT".
                                           format(actual_data))
 
-                if type(self.generic_input) in (TransformationInput, PipelineStepInputCable):
-                    # actual_data must satisfy the target TI's row constraints.
-                    if (transf_input_used.structure.min_row != None and
-                            actual_data.num_rows() < transf_input_used.structure.min_row):
-                        raise ValidationError(
-                            "Dataset \"{}\" has too few rows for TransformationInput \"{}\"".
-                            format(actual_data, transf_input_used))
-            
-                    if (transf_input_used.structure.max_row != None and
-                            actual_data.num_rows() > transf_input_used.structure.max_row):
-                        raise ValidationError(
-                            "Dataset \"{}\" has too many rows for TransformationInput \"{}\"".
-                            format(actual_data, transf_input_used))
+                # actual_data must satisfy the row constraints imposed by:
+                # - the TO sourcing the cable if the parent ER is a POC, or
+                # - the TI fed if the parent ER is a Method/Pipeline.
+                if (transf_xput_used.structure.min_row != None and
+                        actual_data.num_rows() < transf_xput_used.structure.min_row):
+                    error_str = ""
+                    if type(self.generic_input) == TransformationOutput:
+                        error_str = "Dataset \"{}\" has too few rows to have come from TransformationOutput \"{}\""
+                    else:
+                        error_str = "Dataset \"{}\" has too few rows for TransformationInput \"{}\""
+                    raise ValidationError(error_str.format(actual_data, transf_xput_used))
+                    
+                if (transf_xput_used.structure.max_row != None and
+                        actual_data.num_rows() > transf_xput_used.structure.max_row):
+                    error_str = ""
+                    if type(self.generic_input) == TransformationOutput:
+                        error_str = "Dataset \"{}\" has too many rows to have come from TransformationOutput \"{}\""
+                    else:
+                        error_str = "Dataset \"{}\" has too many rows for TransformationInput \"{}\""
+                    raise ValidationError(error_str.format(actual_data, transf_xput_used))
 
 class ExecRecordOut(models.Model):
     """
