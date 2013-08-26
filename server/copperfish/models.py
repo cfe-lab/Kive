@@ -662,7 +662,13 @@ class Transformation(models.Model):
             new_input_structure = new_input.structure.create(
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
-            new_input_structure.full_clean()
+            # new_input_structure.full_clean()
+            # FIXME August 22, 2013: for some reason full_clean() barfs
+            # on clean_fields().  Seems like the problem is that
+            # it can't find TransformationInput or TransformationOutput
+            # in the ContentTypes table, which is dumb.
+            new_input_structure.clean()
+            new_input_structure.validate_unique()
 
         return new_input
 
@@ -691,7 +697,11 @@ class Transformation(models.Model):
             new_output_structure = new_output.structure.create(
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
-            new_output_structure.full_clean()
+            # new_output_structure.full_clean()
+            # FIXME August 22, 2013: same as for create_input
+            new_output_structure.clean()
+            new_output_structure.validate_unique()
+
 
         return new_output
 
@@ -752,20 +762,24 @@ class Method(Transformation):
         # copy all inputs/outputs (Including raws) from parent revision to this revision
         if (self.inputs.count() + self.outputs.count() == 0):
             for parent_input in self.revision_parent.inputs.all():
-                self.inputs.create(
-                        compounddatatype = parent_input.compounddatatype,
-                        dataset_name = parent_input.dataset_name,
-                        dataset_idx = parent_input.dataset_idx,
-                        min_row = parent_input.min_row,
-                        max_row = parent_input.max_row)
+                new_input = self.inputs.create(
+                    dataset_name = parent_input.dataset_name,
+                    dataset_idx = parent_input.dataset_idx)
+                if not parent_input.is_raw():
+                    new_input.structure.create(
+                        compounddatatype = parent_input.get_cdt(),
+                        min_row = parent_input.get_min_row(),
+                        max_row = parent_input.get_max_row())
 
             for parent_output in self.revision_parent.outputs.all():
-                self.outputs.create(
-                        compounddatatype = parent_output.compounddatatype,
-                        dataset_name = parent_output.dataset_name,
-                        dataset_idx = parent_output.dataset_idx,
-                        min_row = parent_output.min_row,
-                        max_row = parent_output.max_row)
+                new_output = self.outputs.create(
+                    dataset_name = parent_output.dataset_name,
+                    dataset_idx = parent_output.dataset_idx)
+                if not parent_output.is_raw():
+                    new_output.structure.create(
+                        compounddatatype = parent_output.get_cdt(),
+                        min_row = parent_output.get_min_row(),
+                        max_row = parent_output.get_max_row())
 
 
 class Pipeline(Transformation):
@@ -889,7 +903,7 @@ class Pipeline(Transformation):
             if not outcable.is_raw():
                 # Define an XputStructure for new_pipeline_output.
             
-                output_CDT = output_requested.compounddatatype
+                output_CDT = output_requested.get_cdt()
                 if outcable.custom_outwires.all().exists():
                     # If there is custom wiring, then we need to define a new
                     # CDT for the output.
@@ -905,8 +919,8 @@ class Pipeline(Transformation):
 
                 new_pipeline_output.structure.create(
                     compounddatatype=output_CDT,
-                    min_row=output_requested.min_row,
-                    max_row=output_requested.max_row)
+                    min_row=output_requested.get_min_row(),
+                    max_row=output_requested.get_max_row())
 
     # Helper to create raw outcables.  This is just so that our unit tests
     # can be easily amended to work in our new scheme, and wouldn't really
@@ -1034,7 +1048,7 @@ class PipelineStep(models.Model):
         # (if a TO is marked for deletion several times, it will only
         # appear once anyway).  All that remains to check is that the
         # TOs all belong to the transformation at this step.
-        for otd in self.outputs_to_delete:
+        for otd in self.outputs_to_delete.all():
             if not self.transformation.outputs.filter(pk=otd.pk).exists():
                 raise ValidationError(
                     "Transformation at step {} does not have output \"{}\"".
@@ -1060,7 +1074,7 @@ class PipelineStep(models.Model):
     # unit tests can be easily amended; going forwards, there's no real reason
     # to use this.
     @transaction.commit_on_success
-    def create_raw_cable(transf_raw_input, pipeline_raw_input):
+    def create_raw_cable(self, transf_raw_input, pipeline_raw_input):
         """
         Create a raw cable feeding this PipelineStep.
         """
@@ -1068,19 +1082,23 @@ class PipelineStep(models.Model):
             transf_input=transf_raw_input,
             step_providing_input=0,
             provider_output=pipeline_raw_input)
-        new_cable.full_clean()
+        # FIXME August 23, 2013:
+        # Django is barfing on clean_fields.  Seems like this is a problem
+        # with GenericForeignKeys, as this affected Transformation.create_input
+        # and Transformation.create_output.
+        # new_cable.full_clean()
+        # new_cable.clean_fields()
+        new_cable.clean()
+        new_cable.validate_unique()
         return new_cable
 
-    # Same for raw deletes.
+    # Same for deletes.
     @transaction.commit_on_success
-    def create_raw_delete(raw_dataset_to_delete):
+    def add_deletion(self, dataset_to_delete):
         """
-        Mark a raw TO for deletion.
+        Mark a TO for deletion.
         """
-        new_raw_deletion = self.outputs_to_delete.create(
-            dataset_to_delete=raw_dataset_to_delete)
-        new_raw_deletion.full_clean()
-        return new_raw_deletion
+        self.outputs_to_delete.add(dataset_to_delete)
 
 class PipelineStepInputCable(models.Model):
     """
@@ -1135,7 +1153,7 @@ class PipelineStepInputCable(models.Model):
         is_raw_str = ""
         if self.pipelinestep != None:
             step_str = unicode(self.pipelinestep)
-        if self.is_raw:
+        if self.is_raw():
             is_raw_str = "(raw)"
         return "{}:{}{}".format(step_str, self.transf_input.dataset_name, is_raw_str);
 
@@ -1181,12 +1199,12 @@ class PipelineStepInputCable(models.Model):
         PRE: cable is raw (i.e. the source and destination are both raw); this is enforced
         by clean().
         """
-        input_requested = self.pipeline_input
+        input_requested = self.provider_output
         feed_to_input = self.transf_input
         step_trans = self.pipelinestep.transformation
 
         # If this cable is raw, does step_providing_input == 0?
-        if self.is_raw() and step_providing_input != 0:
+        if self.is_raw() and self.step_providing_input != 0:
             raise ValidationError(
                 "Cable \"{}\" must have step 0 for a source".
                 format(self))
@@ -1266,12 +1284,12 @@ class PipelineStepInputCable(models.Model):
         required_min_row = 0
 
         # Source output row constraint
-        if input_requested.min_row != None:
-            provided_min_row = input_requested.min_row
+        if input_requested.get_min_row() != None:
+            provided_min_row = input_requested.get_min_row()
 
         # Destination input row constraint
-        if feed_to_input.min_row != None:
-            required_min_row = feed_to_input.min_row
+        if feed_to_input.get_min_row() != None:
+            required_min_row = feed_to_input.get_min_row()
 
         # Check for contradictory min row constraints
         if (provided_min_row < required_min_row):
@@ -1282,11 +1300,11 @@ class PipelineStepInputCable(models.Model):
         provided_max_row = float("inf")
         required_max_row = float("inf")
 
-        if input_requested.max_row != None:
-            provided_max_row = input_requested.max_row
+        if input_requested.get_max_row() != None:
+            provided_max_row = input_requested.get_max_row()
 
-        if feed_to_input.max_row != None:
-            required_max_row = feed_to_input.max_row
+        if feed_to_input.get_max_row() != None:
+            required_max_row = feed_to_input.get_max_row()
 
         # Check for contradictory max row constraints
         if (provided_max_row > required_max_row):
@@ -1318,7 +1336,7 @@ class PipelineStepInputCable(models.Model):
         feed_to_input = self.transf_input;
         
         # If CDTs don't match, check presence of custom wiring
-        if input_requested.compounddatatype != feed_to_input.compounddatatype:
+        if input_requested.get_cdt() != feed_to_input.get_cdt():
             if not self.custom_wires.all().exists():
                 raise ValidationError(
                     "Custom wiring required for cable \"{}\"".
@@ -1329,7 +1347,7 @@ class PipelineStepInputCable(models.Model):
             # Each destination CDT member of must be wired to exactly once.
 
             # Get the CDT members of transf_input
-            dest_members = self.transf_input.compounddatatype.members.all()
+            dest_members = self.transf_input.get_cdt().members.all()
 
             # For each CDT member, check that there is exactly 1
             # custom_wire leading to it (IE, number of occurences of
@@ -1394,18 +1412,20 @@ class CustomCableWire(models.Model):
         destination_pin.
         """
 
-        source_CDT_members = self.pipelinestepinputcable.provider_output.compounddatatype.members.all()
-        dest_CDT_members = self.pipelinestepinputcable.transf_input.compounddatatype.members.all()
+        source_CDT_members = self.pipelinestepinputcable.provider_output.get_cdt().members.all()
+        dest_CDT_members = self.pipelinestepinputcable.transf_input.get_cdt().members.all()
 
         if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
             raise ValidationError(
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(self.source_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+                format(self.source_pin,
+                       self.pipelinestepinputcable.provider_output.get_cdt()))
 
         if not dest_CDT_members.filter(pk=self.dest_pin.pk).exists():
             raise ValidationError(
                 "Destination pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(self.dest_pin), unicode(self.pipelinestepinputcable.provider_output.compounddatatype)))
+                format(self.dest_pin,
+                       self.pipelinestepinputcable.provider_output.get_cdt()))
 
         # Check that the datatypes on either side of this wire are
         # either the same, or that the source datatype is a
@@ -1415,7 +1435,7 @@ class CustomCableWire(models.Model):
                 (not self.dest_pin.datatype.is_restricted_by(self.source_pin.datatype))):
             raise ValidationError(
                 "The datatype of the source pin \"{}\" is incompatible with the datatype of the destination pin \"{}\"".
-                format(unicode(self.source_pin), unicode(self.dest_pin)))
+                format(self.source_pin, self.dest_pin))
         
 class PipelineOutputCable(models.Model):
     """
@@ -1564,12 +1584,12 @@ class CustomOutputCableWire(models.Model):
         source_pin must be a member of the set of CDT members of the cable source (provider_output) TransformationOutput
         """
         # Get the CDT members of the output-CDT referenced by this PipelineOutputCable
-        source_CDT_members = self.pipelineoutputcable.provider_output.compounddatatype.members.all()
+        source_CDT_members = self.pipelineoutputcable.provider_output.get_cdt().members.all()
     
         if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
             raise ValidationError(
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(unicode(self.source_pin), unicode(self.pipelineoutputcable.provider_output.compounddatatype)))
+                format(self.source_pin, self.pipelineoutputcable.provider_output.get_cdt()))
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -1615,17 +1635,39 @@ class TransformationXput(models.Model):
     def __unicode__(self):
         unicode_rep = u"";
         if self.is_raw():
-            unicode_rep = u"[{}]:raw{} {}".format(unicode(self.transformation),
+            unicode_rep = u"[{}]:raw{} {}".format(self.transformation,
                                                   self.dataset_idx, self.dataset_name)
         else:
-            unicode_rep = u"[{}]:{} {} {}".format(unicode(self.transformation),
+            unicode_rep = u"[{}]:{} {} {}".format(self.transformation,
                                                   self.dataset_idx,
-                                                  unicode(self.structure.compounddatatype),
+                                                  self.get_cdt(),
                                                   self.dataset_name);
+        return unicode_rep
 
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
-        return structure.all().exists()
+        return not self.structure.all().exists()
+
+    def get_cdt(self):
+        """Accessor that returns the CDT of this xput (and None if it is raw)."""
+        my_cdt = None
+        if not self.is_raw():
+            my_cdt = self.structure.all()[0].compounddatatype
+        return my_cdt
+
+    def get_min_row(self):
+        """Accessor that returns min_row for this xput (and None if it is raw)."""
+        my_min_row = None
+        if not self.is_raw():
+            my_min_row = self.structure.all()[0].min_row
+        return my_min_row
+
+    def get_max_row(self):
+        """Accessor that returns max_row for this xput (and None if it is raw)."""
+        my_max_row = None
+        if not self.is_raw():
+            my_max_row = self.structure.all()[0].max_row
+        return my_max_row
 
 class XputStructure(models.Model):
     """
@@ -1656,6 +1698,9 @@ class XputStructure(models.Model):
         help_text="Maximum number of rows this input/output returns",
         null=True,
         blank=True);
+
+    class Meta:
+        unique_together = ("content_type", "object_id")
 
 class TransformationInput(TransformationXput):
     """
