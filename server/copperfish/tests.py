@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError;
 from tests_old import *;
 
 class CopperfishExecRecordTests_setup(TestCase):
-    
+
     def setUp(self):
         """
         Setup scenario to test ExecRecords.
@@ -67,7 +67,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
         self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1)
-        
+
         self.mC = Method(revision_name="Method C",revision_desc="C",family = self.mf,driver = self.generic_crRev); self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
         self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
@@ -86,32 +86,75 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.E3_rawin = self.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
 
         # Pipeline steps
-        self.step_D1 = pD.steps.create(transformation=self.mB,step_num=1)
-        self.step_E1 = pE.steps.create(transformation=self.mA,step_num=1)
-        self.step_E2 = pE.steps.create(transformation=self.pD,step_num=2)
-        self.step_E3 = pE.steps.create(transformation=self.mC,step_num=3)
+        self.step_D1 = self.pD.steps.create(transformation=self.mB,step_num=1)
+        self.step_E1 = self.pE.steps.create(transformation=self.mA,step_num=1)
+        self.step_E2 = self.pE.steps.create(transformation=self.pD,step_num=2)
+        self.step_E3 = self.pE.steps.create(transformation=self.mC,step_num=3)
 
-        # Pipeline cables (method_<sourceStep><index>_<targetStep><index>)
+        # Pipeline cables and outcables
         self.D01_11 = self.step_D1.cables_in.create(transf_input=self.B1_in,step_providing_input=0,provider_output=self.D1_in)
         self.D02_12 = self.step_D1.cables_in.create(transf_input=self.B2_in,step_providing_input=0,provider_output=self.D2_in)
+        self.D11_21 = self.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=self.triplet_cdt,step_providing_output=1,provider_output=self.B1_out)
+        self.pD.create_outputs()
+
         self.E03_11 = self.step_E1.cables_in.create(transf_input=self.A1_rawin,step_providing_input=0,provider_output=self.E3_rawin)
         self.E01_21 = self.step_E2.cables_in.create(transf_input=self.D1_in,step_providing_input=0,provider_output=self.E1_in)
         self.E01_22 = self.step_E2.cables_in.create(transf_input=self.D2_in,step_providing_input=0,provider_output=self.E2_in)
         self.E11_32 = self.step_E3.cables_in.create(transf_input=self.C2_in,step_providing_input=1,provider_output=self.A1_out)
-        self.E21_31 = self.step_E3.cables_in.create(transf_input=self.C1_in,step_providing_input=2,provider_output=self.D1_out)
-
-        # Outcables and pipeline outputs
-        self.D11_21 = self.pD.outcables.create(output_name="D1_out",output_idx=1,step_providing_output=1,provider_output=self.B1_out)
-        self.pD.create_outputs()
-        self.E21_41 = self.pE.outcables.create(output_name="E1_out",output_idx=1,step_providing_output=2,provider_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-        self.E31_42 = self.pE.outcables.create(output_name="E2_out",output_idx=2,step_providing_output=3,provider_outout=self.C1_out)
-        self.E33_43 = self.pE.outcables.create(output_name="E3_rawout",output_idx=3,step_providing_output=3,provider_output=self.C3_rawout)
+        self.E21_31 = self.step_E3.cables_in.create(transf_input=self.C1_in,step_providing_input=2,provider_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+        self.E21_41 = self.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=self.doublet_cdt,step_providing_output=2,provider_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+        self.E31_42 = self.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=self.singlet_cdt,step_providing_output=3,provider_output=self.C1_out)
+        self.E33_43 = self.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,step_providing_output=3,provider_output=self.C3_rawout)
         self.pE.create_outputs()
 
-        # Custom wiring
-        self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
-        self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
-        self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
-        self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
+        # Custom wiring/outwiring
+        self.E01_21_wire1 = self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
+        self.E01_21_wire2 = self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
+        self.E11_32_wire1 = self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
+        self.E11_32_wire2 = self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
+        self.E21_41_wire1 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
+        self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[1])
+        self.pE.clean()
 
-        self.E21_41.custom_wires.create(source_pin=self.triplet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
+        # Define a user
+        self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+        self.myUser.save()
+
+        self.triplet_symDS = SymbolicDataset()
+        self.triplet_symDS.save()
+        self.triplet_DS = None
+        with open(os.path.join(samplecode_path, "step_0_triplet.csv"), "rb") as f:
+            self.triplet_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),symbolicdataset=self.triplet_symDS)
+            self.triplet_DS.save()
+        self.triplet_DS_structure = DatasetStructure(dataset=self.triplet_DS,compounddatatype=self.triplet_cdt)
+        self.triplet_DS_structure.save()
+        self.triplet_DS.clean()
+
+        self.singlet_symDS = SymbolicDataset()
+        self.singlet_symDS.save()
+        self.singlet_DS = None
+        with open(os.path.join(samplecode_path, "step_0_singlet.csv"), "rb") as f:
+            self.singlet_DS = Dataset(user=self.myUser,name="singlet",description="lol",dataset_file=File(f),symbolicdataset=self.singlet_symDS)
+            self.singlet_DS.save()
+        self.singlet_DS_structure = DatasetStructure(dataset=self.singlet_DS,compounddatatype=self.singlet_cdt)
+        self.singlet_DS_structure.save()
+        self.singlet_DS.clean()
+
+        self.raw_symDS = SymbolicDataset()
+        self.raw_symDS.save()
+        self.raw_DS = None
+        with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
+            self.raw_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.raw_symDS)
+            self.raw_DS.save()
+        self.raw_DS.clean()
+       
+
+    def test_ER_links_POC_but_ERI_doesnt_link_TO_that_POC_gets_output_from(self):
+
+        # Define a symbolic dataset
+
+        # Define an ER linked to a POC
+        myER = self.E21_41.POC_execrecords.create(tainted=False)
+
+        # Define an ERI
+        #myER.execrecordins.create(

@@ -714,33 +714,25 @@ class Method(Transformation):
     Related to :model:`copperfish.MethodFamily`
     """
 
-    # Implicitly defined:
-    #   descendants (self/ForeignKey)
-
-    family = models.ForeignKey(
-            MethodFamily,
-            related_name="members");
-
-    revision_parent = models.ForeignKey(
-            "self",
-            related_name = "descendants",
-            null=True,
-            blank=True);
+    family = models.ForeignKey(MethodFamily,related_name="members")
+    revision_parent = models.ForeignKey("self",related_name = "descendants",null=True,blank=True)
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
+    method = models.BooleanField(help_text="Is the output of this method nondeterministic")
+    method_execrecords = generic.GenericRelation("ExecRecord")
 
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""
-        string_rep = u"Method {} {}".format("{}", self.revision_name);
+        string_rep = u"Method {} {}".format("{}", self.revision_name)
 
         # MethodFamily may not be temporally saved in DB if created by admin
         if hasattr(self, "family"):
-            string_rep = string_rep.format(unicode(self.family));
+            string_rep = string_rep.format(unicode(self.family))
         else:
-            string_rep = string_rep.format("[family unset]");
+            string_rep = string_rep.format("[family unset]")
 
-        return string_rep;
+        return string_rep
 
     def save(self, *args, **kwargs):
         """
@@ -791,10 +783,6 @@ class Pipeline(Transformation):
     Related to :model:`copperfish.PipelineStep`
     Related to :model:`copperfish.PipelineOutputCable`
     """
-    # Implicitly defined
-    #   steps (PipelineStep/ForeignKey)
-    #   descendants (self/ForeignKey)
-    #   outcables (PipelineOutputCable/ForeignKey)
 
     family = models.ForeignKey(
             PipelineFamily,
@@ -805,6 +793,8 @@ class Pipeline(Transformation):
             related_name = "descendants",
             null=True,
             blank=True)
+
+    pipeline_execrecords = generic.GenericRelation("ExecRecord")
 
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
@@ -1497,6 +1487,7 @@ class PipelineOutputCable(models.Model):
         help_text="Source output hole")
 
     custom_outwires = generic.GenericRelation("CustomCableWire")
+    POC_execrecords = generic.GenericRelation("ExecRecord")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
@@ -1556,7 +1547,7 @@ class PipelineOutputCable(models.Model):
                 format(self))
 
 
-        # The cable has a raw source
+        # The cable has a raw source (and output_cdt is None)
         if self.is_raw():
 
             # Wires cannot exist
@@ -1565,24 +1556,26 @@ class PipelineOutputCable(models.Model):
                     "Cable \"{}\" is raw and should not have wires defined" .
                     format(self))
 
-         # The cable has a nonraw source
-         else:
-            if self.output_cdt != provider_output.compounddatatype and not outwires.exists():
+        # The cable has a nonraw source (and output_cdt is specified)
+        else:
+            if self.output_cdt != self.provider_output.get_cdt() and not outwires.exists():
                 raise ValidationError(
                     "Cable \"{}\" has a different source cdt from the target cdt, but no wires exist" .
                     format(self))
 
             # Clean all wires
             for outwire in outwires:
-                outwire.full_clean()
+                outwire.clean()
+                outwire.validate_unique()
 
             # Check that each CDT member has a wire leading to it
-            dest_members = self.output_cdt.members.all()
-            for dest_member in dest_members:
-                if not self.custom_outwires.filter(dest_pin=dest_member).exists():
-                    raise ValidationError(
-                        "Destination member \"{}\" has no outwires leading to it".
-                        format(dest_member))
+            if outwires.exists():
+                dest_members = self.output_cdt.members.all()
+                for dest_member in dest_members:
+                    if not self.custom_outwires.filter(dest_pin=dest_member).exists():
+                        raise ValidationError(
+                            "Destination member \"{}\" has no outwires leading to it".
+                            format(dest_member))
 
     def is_raw(self):
         """True if this output cable is raw; False otherwise."""
