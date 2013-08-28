@@ -1136,6 +1136,9 @@ class PipelineStepInputCable(models.Model):
     # Wiring source output hole.
     provider_output = generic.GenericForeignKey("content_type", "object_id");
 
+    custom_wires = generic.GenericRelation("CustomCableWire")
+
+
     # step_providing_input must be PRIOR to this step (Time moves forward)
 
     # Coherence of data is already enforced by Pipeline
@@ -1371,24 +1374,21 @@ class PipelineStepInputCable(models.Model):
 
 class CustomCableWire(models.Model):
     """
-    Defines a customized connection between internal steps of a pipeline.
+    Defines a customized connection within a pipeline.
 
     This allows us to filter/rearrange/repeat columns when handing
-    data from a source TransformationXput (*Input if it's from the
-    pipeline's own input, and *Output if it's from a previous step) to
-    a destination TransformationInput between steps of a pipeline.
+    data from a source TransformationXput to a destination Xput
 
     The analogue here is that we have customized a cable by rearranging
     the connections between the pins.
     """
-
-    # cable for which we are creating custom wiring
-    pipelinestepinputcable = models.ForeignKey(
-        PipelineStepInputCable,
-        related_name = "custom_wires")
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {"model__in": ("PipelineOutputCable", "PipelineStepInputCable")});
+    object_id = models.PositiveIntegerField();
+    cable = generic.GenericForeignKey("content_type", "object_id")
 
     # CDT member on the source output hole
-    # We think of wires as connecting cable pins
     source_pin = models.ForeignKey(
         CompoundDatatypeMember,
         related_name="source_pins")
@@ -1398,39 +1398,53 @@ class CustomCableWire(models.Model):
         CompoundDatatypeMember,
         related_name="dest_pins")
 
+    # A cable cannot have multiple wires leading to the same dest_pin
+    class Meta:
+        unique_together = ("content_type","object_id", "dest_pin")
+
     def clean(self):
         """
         Check the validity of this wire.
 
         The wire belongs to a cable which connects a source TransformationXput
         and a destination TransformationInput:
-        - source_pin must be a member of the set of CDT members of the cable source
-        (provider_output) TransformationXput;
-        - dest_pin must be a member of the set of CDT members of the cable
-        destination (transf_input) TransformationInput;
-        - The datatype of the source_pin must match the datatype of the
-        destination_pin.
+        - wires cannot connect a raw source or a raw destination
+        - source_pin must be a member of the source CDT
+        - dest_pin must be a member of the destination CDT
+        - source_pin datatype matches the dest_pin datatype
         """
 
-        source_CDT_members = self.pipelinestepinputcable.provider_output.get_cdt().members.all()
-        dest_CDT_members = self.pipelinestepinputcable.transf_input.get_cdt().members.all()
+        # You cannot add a wire if the cable is raw
+        if self.cable.is_raw():
+            raise ValidationError(
+                "Cable \"{}\" is raw and should not have wires defined" .
+                format(self.cable))
+
+        # Wires connect either PSIC or POCs, so these cases are separate
+        source_CDT_members = self.cable.provider_output.get_cdt().members.all() # Duck-typing
+        dest_CDT = None
+        dest_CDT_members = None
+        if type(self.cable) == PipelineStepInputCable:
+            dest_CDT = self.cable.transf_input.get_cdt()
+            dest_CDT_members = dest_CDT.members.all()
+        else:
+            dest_CDT = self.cable.output_cdt
+            dest_CDT_members = dest_CDT.members.all()
 
         if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
             raise ValidationError(
                 "Source pin \"{}\" does not come from compounddatatype \"{}\"".
                 format(self.source_pin,
-                       self.pipelinestepinputcable.provider_output.get_cdt()))
+                       self.cable.provider_output.get_cdt()))
 
         if not dest_CDT_members.filter(pk=self.dest_pin.pk).exists():
             raise ValidationError(
                 "Destination pin \"{}\" does not come from compounddatatype \"{}\"".
                 format(self.dest_pin,
-                       self.pipelinestepinputcable.provider_output.get_cdt()))
+                       dest_CDT))
 
         # Check that the datatypes on either side of this wire are
-        # either the same, or that the source datatype is a
-        # restriction of the destination datatype (thus you can feed
-        # the source to the destination).
+        # either the same, or restriction-compatible
         if (self.source_pin.datatype != self.dest_pin.datatype and
                 (not self.dest_pin.datatype.is_restricted_by(self.source_pin.datatype))):
             raise ValidationError(
@@ -1464,6 +1478,11 @@ class PipelineOutputCable(models.Model):
         validators=[MinValueValidator(1)],
         help_text="Pipeline output hole index")
 
+    # If null, the source must be raw
+    output_cdt = models.ForeignKey(CompoundDatatype,
+                                   null=True,
+                                   related_name="cables_leading_to")
+
     # PRE: step_providing_output refers to an actual step of the pipeline
     # and provider_output_name actually refers to one of the outputs
     # at that step
@@ -1476,6 +1495,8 @@ class PipelineOutputCable(models.Model):
     provider_output = models.ForeignKey(
         "TransformationOutput",
         help_text="Source output hole")
+
+    custom_outwires = generic.GenericRelation("CustomCableWire")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
@@ -1523,73 +1544,50 @@ class PipelineOutputCable(models.Model):
                 format(requested_from, output_requested));
 
         outwires = self.custom_outwires.all()
-        # A raw cable should not have any custom wiring defined.
-        if self.is_raw() and outwires.exists():
-            raise ValidationError(
-                "Cable \"{}\" is raw and should not have wires defined".
-                format(self))
-        
-        # If cable is not raw and custom wires exist, check that they
-        # define columns in a CSV file that are indexed consecutively
-        # from 1 -- uniqueness of column indices and column names is
-        # already enforced by a constraint on CustomOutputCableWire.
-        elif not self.is_raw():
-            outwire_indices = [];
-            for outwire in outwires:
-                outwire.full_clean();
-                outwire_indices.append(outwire.dest_idx);
 
-            if sorted(outwire_indices) != range(1, len(outwire_indices)+1):
+        # The cable and destination must both be raw (or non-raw)
+        if self.output_cdt == None and not self.is_raw():
+            raise ValidationError(
+                "Cable \"{}\" has a null output_cdt but its source is non-raw" .
+                format(self))
+        elif self.output_cdt != None and self.is_raw():
+            raise ValidationError(
+                "Cable \"{}\" has a non-null output_cdt but its source is raw" .
+                format(self))
+
+
+        # The cable has a raw source
+        if self.is_raw():
+
+            # Wires cannot exist
+            if outwires.exists():
                 raise ValidationError(
-                    "Columns defined by custom wiring on output cable \"{}\" are not consecutively indexed from 1".
-                    format(unicode(self)))
+                    "Cable \"{}\" is raw and should not have wires defined" .
+                    format(self))
+
+         # The cable has a nonraw source
+         else:
+            if self.output_cdt != provider_output.compounddatatype and not outwires.exists():
+                raise ValidationError(
+                    "Cable \"{}\" has a different source cdt from the target cdt, but no wires exist" .
+                    format(self))
+
+            # Clean all wires
+            for outwire in outwires:
+                outwire.full_clean()
+
+            # Check that each CDT member has a wire leading to it
+            dest_members = self.output_cdt.members.all()
+            for dest_member in dest_members:
+                if not self.custom_outwires.filter(dest_pin=dest_member).exists():
+                    raise ValidationError(
+                        "Destination member \"{}\" has no outwires leading to it".
+                        format(dest_member))
 
     def is_raw(self):
         """True if this output cable is raw; False otherwise."""
         return self.provider_output.is_raw()
  
-class CustomOutputCableWire(models.Model):
-    """
-    Defines a customized connection from a pipeline's internal step to its output.
-
-    This allows us to filter/rearrange/repeat columns when returning
-    data from a particular step's TransformationOutput as the pipeline's output.
-
-    The analogue here is similar to that of CustomCableWire.
-    """
-    pipelineoutputcable = models.ForeignKey(
-        PipelineOutputCable,
-        related_name="custom_outwires")
-
-    source_pin = models.ForeignKey(CompoundDatatypeMember)
-
-    dest_name = models.CharField(
-        "Destination column name",
-        max_length=128,
-        help_text="CDT name of this column in the pipeline output")
-
-    dest_idx =  models.PositiveIntegerField(
-        "Destination column index",
-        validators=[MinValueValidator(1)],
-        help_text="CDT index of this column in the pipeline output");
-
-    # This matches the constraint on compound data type members
-    # (Cannot have destination columns with the same name/index)
-    class Meta:
-        unique_together =   (("pipelineoutputcable", "dest_name"),
-                            ("pipelineoutputcable", "dest_idx"));
-    
-    def clean(self):
-        """
-        source_pin must be a member of the set of CDT members of the cable source (provider_output) TransformationOutput
-        """
-        # Get the CDT members of the output-CDT referenced by this PipelineOutputCable
-        source_CDT_members = self.pipelineoutputcable.provider_output.get_cdt().members.all()
-    
-        if not source_CDT_members.filter(pk=self.source_pin.pk).exists():
-            raise ValidationError(
-                "Source pin \"{}\" does not come from compounddatatype \"{}\"".
-                format(self.source_pin, self.pipelineoutputcable.provider_output.get_cdt()))
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -2426,38 +2424,42 @@ class ExecRecordIn(models.Model):
         """
         parent_transf = self.execrecord.general_transf
 
-        if type(parent_transf) == TransformationOutput:
+        # If ER links to POC, ERI must link to TO which the outcable runs from
+        # Note: redundant, but allows us to avoid nulls in generic_input (true?)
+        if type(parent_transf) == PipelineOutputCable:
             if self.generic_input != parent_transf.provider_output:
                 raise ValidationError(
                     "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord's POC".
                     format(self))
 
         else:
-            # The parent ER represents a Method or a Pipeline, so this ERI should
-            # not have a POC for generic_input.
-            if type(self.generic_input) == PipelineOutputCable:
+            # Else ER represents a Method/Pipeline (not a POC)
+            # And the ERI must not link to a TO (Because it implies the ER should link with a POC)
+            if type(self.generic_input) == TransformationOutput:
                 raise ValidationError(
                     "ExecRecordIn \"{}\" denotes a PipelineOutputCable but parent ExecRecord does not".
                     format(self))
-        
+
+            # If ERI links to a TI, the TI must be a member of the pipeline linked by the ER
+            # FIXME: Don't we have to check that the ER links only with a pipeline?
             elif type(self.generic_input) == TransformationInput:
-                # Look for this input in self.execrecord.general_transf.inputs.
                 transf_inputs = self.execrecord.general_transf.inputs
                 if not transf_inputs.filter(pk=self.generic_input.pk).exists():
                     raise ValidationError(
-                        "Input \"{}\" does not belong to Method/Pipeline of ExecRecord \"{}\"".
+                        "Input \"{}\" does not belong to Pipeline of ExecRecord \"{}\"".
                         format(self.generic_input, self.execrecord))
-                    
+
+            # If ERI links to a PSIC, the destination TI of that ERI PSIC (transf_input) must exist
+            # within the inputs of the ER method/pipeline
             elif type(self.generic_input) == PipelineStepInputCable:
-                # Look at the cable and see whether it feeds the general_transf
-                # of execrecord.
                 input_fed = self.generic_input.transf_input
                 if not self.execrecord.general_transf.inputs.filter(pk=input_fed.pk).exists():
                     raise ValidationError(
                         "Cable \"{}\" does not feed Method/Pipeline of ExecRecord \"{}\"".
                         format(input_fed, self.execrecord))
 
-        # If the actual data behind symbolicdata still exists, check its coherence.
+        # If the ERI has a dataset, then it's raw/unraw state must match the raw/unraw state
+        # of the generic_input that it was marked as fed into
         if self.symbolicdataset.has_data():
             if self.generic_input.is_raw() != self.symbolicdataset.is_raw():
                 raise ValidationError(
@@ -2465,34 +2467,37 @@ class ExecRecordIn(models.Model):
                     format(self.symbolicdataset.dataset, self.generic_input))
 
             if not self.symbolicdataset.dataset.is_raw():
-                actual_data = self.symbolicdataset.dataset
-                # This gives the row restrictions: for the POC case the restriction
-                # comes from the source TO; for the other cases, the restriction
-                # comes from the destination TI.
+               
+                # Row restrictions: for the POC case the restriction comes from the
+                # source TO; else, the restriction comes from the destination TI.
+                
                 transf_xput_used = None
                 cdt_needed = None
 
-                # FIXME: cdt_needed should really just check for *compatible* CDTs
-                # and not the same one.
-                if type(self.generic_input) == TransformationOutput:
+                # If the ERI links with a TO (For a POC leading from the source TO)
+                # the input dataset CDT is constrained by the source TO. If the ERI
+                # links with a TI (For pipeline inputs) the input dataset CDT is
+                # constrained by the pipeline TI
+                if type(self.generic_input) in [TransformationInput, TransformationOutput]:
                     transf_xput_used = self.generic_input
-                    cdt_needed = self.generic_input.compounddatatype
-                elif type(self.generic_input) == TransformationInput:
-                    transf_xput_used = self.generic_input
-                    cdt_needed = transf_xput_used.structure.compounddatatype
-                else:
-                    # generic_input is a PSIC.
-                    transf_xput_used = self.generic_input.transf_input
-                    cdt_needed = self.generic_input.provider_output.structure.compounddatatype
+                    cdt_needed = self.generic_input.get_cdt()
 
-                # CDT of actual_data must match cdt_needed.
+                # Otherwise the ERI links with a PSIC, and the dataset CDT is constrained
+                # by the provider_output of the PSIC
+                else:
+                    transf_xput_used = self.generic_input.transf_input
+                    cdt_needed = self.generic_input.provider_output.get_cdt()
+
+                actual_data = self.symbolicdataset.dataset
+
+                # CDTs must match (FIXME: generalize to compaitible CDTs)
                 if actual_data.compounddatatype != cdt_needed:
                     raise ValidationError("Dataset \"{}\" is not of the expected CDT".
                                           format(actual_data))
 
-                # actual_data must satisfy the row constraints imposed by:
-                # - the TO sourcing the cable if the parent ER is a POC, or
-                # - the TI fed if the parent ER is a Method/Pipeline.
+                # actual_data must satisfy row constraints imposed by:
+                # - TO sourcing the cable if the parent ER is a POC, or
+                # - TI fed if the parent ER is a Method/Pipeline.
                 if (transf_xput_used.structure.min_row != None and
                         actual_data.num_rows() < transf_xput_used.structure.min_row):
                     error_str = ""
@@ -2568,44 +2573,48 @@ class ExecRecordOut(models.Model):
         data, then this existent data is compatible with the producing
         TransformationOutput.
         """
+
+        # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if type(self.execrecord.general_transf) == PipelineOutputCable:
             parent_er_outcable = self.execrecord.general_transf
 
-            # Do self.output and parent_er_outcable even belong to the same pipeline?
-            if self.output.general_transf != parent_er_outcable.pipeline:
+            # ERO TO must belong to the same pipeline as the ER POC
+            if self.output.transformation != parent_er_outcable.pipeline:
                 raise ValidationError(
                     "ExecRecordOut \"{}\" does not belong to the same pipeline as its parent ExecRecord's POC".
                     format(self))
 
-            # Does parent_er_outcable define self.output within the pipeline they belong to?
+            # And the POC defined output name must match the pipeline TO name
             if parent_er_outcable.output_name != self.output.dataset_name:
                 raise ValidationError(
                     "ExecRecordOut \"{}\" does not represent the same output as its parent ExecRecord's POC".
                     format(self))
 
+        # Else the parent ER is linked with either a method or a pipeline
         else:
-            # self.execrecord.general_transf is either a Method or a Pipeline.
             query_for_outs = self.execrecord.general_transf.outputs
-            
+
+            # The ERO output TO must be a member of the ER's method/pipeline
             if not query_for_outs.filter(pk=self.output.pk).exists():
                 raise ValidationError(
                     "Output \"{}\" does not belong to Method/Pipeline of ExecRecord \"{}\"".
                     format(self.output, self.execrecord))
 
-        # Check that if the SymbolicDataset's contents (i.e. the Dataset it points to)
-        # hasn't been deleted, then it is coherent with the output.
+        # If the Dataset is undeleted, it must be coherent with the output
         if self.symbolicdataset.has_data():
+
+            # If the data is raw, the ERO output TO must also be raw
             if self.symbolicdataset.is_raw() != self.output.is_raw():
                 raise ValidationError(
                     "Dataset \"{}\" cannot have come from output \"{}\"".
                     format(self.symbolicdataset.dataset, self.output))
 
-            # If the Dataset is not raw, check its CDT and number of rows against
-            # the producing TO.
+            # The dataset must satisfy the CDT / row constraints of the producing TO
             if not self.symbolicdataset.dataset.is_raw():
                 actual_data = self.symbolicdataset.dataset
-            
-                if actual_data.compounddatatype != self.output.compounddatatype:
+
+                # Dataset CDT must match the ERO TO's CDT
+                if actual_data.structure.compounddatatype != self.output.get_cdt():
                     raise ValidationError(
                         "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
                         format(actual_data, self.output))
