@@ -928,6 +928,22 @@ class Pipeline(Transformation):
 
         return new_outcable
 
+    # Helper to create non-raw outcables with a default output_cdt equalling
+    # that of the providing TO.
+    @transaction.commit_on_success
+    def create_outcable(self, output_name, output_idx, step_providing_output,
+                        provider_output):
+        """Creates a non-raw outcable taking output_cdt from the providing TO."""
+        new_outcable = self.outcables.create(
+            output_name=output_name,
+            output_idx=output_idx,
+            step_providing_output=step_providing_output,
+            provider_output=provider_output,
+            output_cdt=provider_output.get_cdt())
+        new_outcable.full_clean()
+
+        return new_outcable
+
 class PipelineStep(models.Model):
     """
     A step within a Pipeline representing a single transformation
@@ -1470,6 +1486,7 @@ class PipelineOutputCable(models.Model):
 
     # If null, the source must be raw
     output_cdt = models.ForeignKey(CompoundDatatype,
+                                   blank=True,
                                    null=True,
                                    related_name="cables_leading_to")
 
@@ -1580,7 +1597,6 @@ class PipelineOutputCable(models.Model):
     def is_raw(self):
         """True if this output cable is raw; False otherwise."""
         return self.provider_output.is_raw()
- 
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"

@@ -399,7 +399,7 @@ class CopperfishMethodTests_setup(TestCase):
         # Add output cabling (PipelineOutputCable) to DNAcompv1_p
         # From step 1, output hole "output", send output to
         # Pipeline output hole "complemented_seqs" at index 1
-        outcabling = self.DNAcompv1_p.outcables.create(
+        outcabling = self.DNAcompv1_p.create_outcable(
                 step_providing_output=1,
                 provider_output=step1.transformation.outputs.get(dataset_name="output"),
                 output_name="complemented_seqs",
@@ -3069,7 +3069,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Connect the output of step 1 to the output of foo
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
@@ -3098,7 +3098,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         outcable = foo.outcables.create(
             output_name="oneoutput", output_idx=1,
             step_providing_output=5,
-            provider_output=step1.transformation.outputs.all()[0]);
+            provider_output=step1.transformation.outputs.all()[0],
+            output_cdt=step1.transformation.outputs.all()[0].get_cdt());
         
         self.assertRaisesRegexp(
             ValidationError,
@@ -3131,7 +3132,8 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         outcable = foo.outcables.create(
             output_name="oneoutput", output_idx=1,
             step_providing_output=1,
-            provider_output=self.RNAoutput_to);
+            provider_output=self.RNAoutput_to,
+            output_cdt=self.RNAoutput_to.get_cdt());
         
         self.assertRaisesRegexp(
                 ValidationError,
@@ -3165,7 +3167,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=self.DNAcompv2_m.outputs.get(dataset_name="output"));
 
         # Now try to map it to the pipeline output.
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
@@ -3192,7 +3194,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
                               provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Outcable references a valid step and output, but is itself badly indexed
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="oneoutput",
             output_idx=9,
             step_providing_output=1,
@@ -3693,11 +3695,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -3733,8 +3735,9 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         outcable1 = foo.outcables.create(
             output_name="outputone", output_idx=1,
             step_providing_output=5,
-            provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outcable2 = foo.outcables.create(
+            provider_output=step3.transformation.outputs.get(dataset_name="output"),
+            output_cdt=step3.transformation.outputs.get(dataset_name="output").get_cdt());
+        outcable2 = foo.create_outcable(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -3772,14 +3775,15 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
         outcable2 = foo.outcables.create(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
-            provider_output=step1.transformation.outputs.get(dataset_name="output"));
+            provider_output=step1.transformation.outputs.get(dataset_name="output"),
+            output_cdt=step1.transformation.outputs.get(dataset_name="output").get_cdt());
 
         self.assertEquals(outcable1.clean(), None);
         self.assertRaisesRegexp(
@@ -3817,11 +3821,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         step3.add_deletion(
             dataset_to_delete=step3.transformation.outputs.get(dataset_name="output"));
 
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -3854,12 +3858,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="outputone",
             output_idx=5,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="outputtwo",
             output_idx=2,
             step_providing_output=2,
@@ -4328,14 +4332,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         # Add outcable for 1st output (Which is deleted)
         # August 24, 2013: this is now OK
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 2nd output (Which is not deleted)
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4378,7 +4382,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outcable for 1st output (Which is not deleted)
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4416,7 +4420,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
         # Add outcable for 1st output (Which is not deleted)
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4458,7 +4462,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         # Add outcable for 2nd output (Which is deleted)
         # August 24, 2013: this is now OK.
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
@@ -4499,7 +4503,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 2nd output (Which is not deleted)
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=1,
             step_providing_output=1,
@@ -4532,7 +4536,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="pipe_a_b_c"))
 
-        outcable = foo.outcables.create(
+        outcable = foo.create_outcable(
             output_name="aName",
             output_idx=1,
             step_providing_output=1,
@@ -4569,12 +4573,12 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
         # Add outcables for both outputs
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4617,14 +4621,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         # Add outcable for 1st output (Which is deleted)
         # August 24, 2013: this is now allowed, so no error should be raised later.
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 2nd output (Which is not deleted)
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4666,7 +4670,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outcable for 1st output (Which is not deleted)
-        outcable1 = foo.outcables.create(
+        outcable1 = foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
@@ -4674,7 +4678,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         # Add outcable for 2nd output (Which is deleted)
         # August 24, 2013: this is now allowed, so tests should be fine.
-        outcable2 = foo.outcables.create(
+        outcable2 = foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4719,14 +4723,14 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="pipe_input_1_a_b_c"));
 
         # Add outcable for 1st output (Which is not deleted)
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="output_a_b_c_squared",
             output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 2nd output (Which is deleted)
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             step_providing_output=1,
@@ -4764,7 +4768,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
         foo.outcables.all().delete();
 
         # Add outcable for 1st output (Which is not deleted)
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="foo",
             output_idx=1,
             step_providing_output=1,
@@ -4807,11 +4811,11 @@ class Pipeline_tests(CopperfishMethodTests_setup):
             step_providing_input=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
 
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="outputone", output_idx=1,
             step_providing_output=3,
             provider_output=step3.transformation.outputs.get(dataset_name="output"));
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="outputtwo", output_idx=2,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -4837,7 +4841,7 @@ class Pipeline_tests(CopperfishMethodTests_setup):
 
         # Now recreate them and check it worked
         foo.outcables.all().delete();
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="foo", output_idx=1,
             step_providing_output=2,
             provider_output=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
@@ -5031,7 +5035,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             provider_output=foo.inputs.get(dataset_name="oneinput"));
 
         # Define pipeline output at index 1 from (step 1, output "output")
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="oneoutput",
             output_idx=1,
             step_providing_output=1,
@@ -5061,7 +5065,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             provider_output=bar.inputs.get(dataset_name="barinput"));
 
         # Map a single output, from step 1 foo.output = "oneoutput"
-        bar.outcables.create(
+        bar.create_outcable(
             output_name="baroutput",
             output_idx=1,
             step_providing_output=1,
@@ -5098,7 +5102,7 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             transf_input=step1.transformation.inputs.get(dataset_name="input"),
             step_providing_input=0,
             provider_output=foo.inputs.get(dataset_name="oneinput"));
-        foo.outcables.create(
+        foo.create_outcable(
             output_name="oneoutput", output_idx=1,
             step_providing_output=1,
             provider_output=step1.transformation.outputs.get(dataset_name="output"));
@@ -5127,12 +5131,12 @@ class PipelineStep_tests(CopperfishMethodTests_setup):
             transf_input=bstep2.transformation.inputs.get(dataset_name="complemented_seqs"),
             step_providing_input=1,
             provider_output=bstep1.transformation.outputs.get(dataset_name="oneoutput"));
-        bar.outcables.create(
+        bar.create_outcable(
             output_name="baroutputone",
             output_idx=1,
             step_providing_output=1,
             provider_output=bstep1.transformation.outputs.get(dataset_name="oneoutput"));
-        bar.outcables.create(
+        bar.create_outcable(
             output_name="baroutputtwo",
             output_idx=2,
             step_providing_output=2,
@@ -6225,6 +6229,10 @@ class CustomWiring_tests(Copperfish_Raw_Setup):
             dest_pin=method_1_in.get_cdt().members.get(column_idx=1))
 
         errorMessage = "Source pin .* does not come from compounddatatype .*"
+        
+        self.assertRaisesRegexp(ValidationError,errorMessage,wire1.clean)
+
+        wire1.delete()
 
         # Within pipeline_1_cable, wire into method 1 idx 1 (Expects DNA) a dest_pin from pipeline 2 idx 1
         # (same dt, cdtm from unrelated cdt)
@@ -6232,7 +6240,6 @@ class CustomWiring_tests(Copperfish_Raw_Setup):
             source_pin=pipeline_2_in.get_cdt().members.get(column_idx=3),
             dest_pin=method_1_in.get_cdt().members.get(column_idx=1))
 
-        self.assertRaisesRegexp(ValidationError,errorMessage,wire1.clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,wire1_alt.clean)
 
         # Try to wire something into cable 2 with a source_pin from cable 1
@@ -6285,189 +6292,13 @@ class PipelineOutputCable_raw_tests(Copperfish_Raw_Setup):
             step_providing_raw_output=1,
             provider_raw_output=raw_output_4)
 
-        self.pipeline_1.outcables.create(
+        self.pipeline_1.create_outcable(
             output_name="pipeline_output_2",
             output_idx=2,
             step_providing_output=1,
             provider_output=output_3)
 
         self.assertEquals(self.pipeline_1.clean(), None)
-
-class CustomOutputWiring_tests(Copperfish_Raw_Setup):
-
-    def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
-
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-
-        pipeline_in = self.my_pipeline.create_input(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="pipeline_in_1",
-            dataset_idx=1)
-
-        # Give the method self.triplet_cdt output
-        method_out = self.testmethod.create_output(
-            dataset_name="TestOut",
-            dataset_idx=1,
-            compounddatatype=self.triplet_cdt);
-
-        # Add a step
-        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
-
-        # Add an output cable
-        outcable1 = self.my_pipeline.outcables.create(
-            output_name="blah",
-            output_idx=1,
-            step_providing_output=1,
-            provider_output=method_out)
-
-        # Add custom wiring from an irrelevent CDTM
-        badwire = outcable1.custom_outwires.create(
-            source_pin=self.doublet_cdt.members.all()[0],
-            dest_idx=1,
-            dest_name="not_good")
-
-        errorMessage = "Source pin \"1: <string> \[StrCol1\]\" does not come from compounddatatype \"\(1: <string> \[a\^2\], 2: <string> \[b\^2\], 3: <string> \[c\^2\]\)\""
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            errorMessage,
-            badwire.clean)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            errorMessage,
-            outcable1.clean)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            errorMessage,
-            self.my_pipeline.clean)
-
-        
-    def test_PipelineOutputCable_clean_dest_idx_must_consecutively_start_from_1(self):
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-
-        pipeline_in = self.my_pipeline.create_input(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="pipeline_in_1",
-            dataset_idx=1)
-
-        # Give the method self.triplet_cdt output
-        method_out = self.testmethod.create_output(
-            dataset_name="TestOut",
-            dataset_idx=1,
-            compounddatatype=self.triplet_cdt);
-
-        # Add a step
-        my_step1 = self.my_pipeline.steps.create(
-            transformation=self.testmethod, step_num=1);
-
-        # Add an output cable
-        outcable1 = self.my_pipeline.outcables.create(
-            output_name="blah",
-            output_idx=1,
-            step_providing_output=1,
-            provider_output=method_out)
-        
-        # Add 3 wires that with dest_idx that do not consecutively increment by 1
-        wire1 = outcable1.custom_outwires.create(
-            source_pin=self.triplet_cdt.members.all()[0],
-            dest_idx=2,
-            dest_name="bad_destination")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
-            outcable1.clean)
-
-        wire2 = outcable1.custom_outwires.create(
-            source_pin=self.triplet_cdt.members.all()[0],
-            dest_idx=3,
-            dest_name="bad_destination2")
-
-        wire3 = outcable1.custom_outwires.create(
-            source_pin=self.triplet_cdt.members.all()[2],
-            dest_idx=4,
-            dest_name="bad_destination3")
-
-        self.assertEquals(wire1.clean(), None)
-        self.assertEquals(wire2.clean(), None)
-        self.assertEquals(wire3.clean(), None)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
-            outcable1.clean)
-
-    def test_Pipeline_create_outputs_for_creation_of_output_CDT(self):
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-
-        pipeline_in = self.my_pipeline.create_input(
-            compounddatatype=self.triplet_cdt,
-            dataset_name="pipeline_in_1",
-            dataset_idx=1)
-
-        # Give the method self.triplet_cdt output
-        method_out = self.testmethod.create_output(
-            dataset_name="TestOut",
-            dataset_idx=1,
-            compounddatatype=self.mix_triplet_cdt);
-
-        # Add a step
-        my_step1 = self.my_pipeline.steps.create(
-            transformation=self.testmethod, step_num=1);
-
-        # Add an output cable
-        outcable1 = self.my_pipeline.outcables.create(
-            output_name="blah",
-            output_idx=1,
-            step_providing_output=1,
-            provider_output=method_out)
-        
-        # Add wiring
-        wire1 = outcable1.custom_outwires.create(
-            source_pin=method_out.get_cdt().members.all()[0],
-            dest_idx=1,
-            dest_name="col1_str")
-
-        wire2 = outcable1.custom_outwires.create(
-            source_pin=method_out.get_cdt().members.all()[1],
-            dest_idx=2,
-            dest_name="col2_DNA")
-
-        wire3 = outcable1.custom_outwires.create(
-            source_pin=method_out.get_cdt().members.all()[0],
-            dest_idx=3,
-            dest_name="col3_str")
-
-        wire4 = outcable1.custom_outwires.create(
-            source_pin=method_out.get_cdt().members.all()[2],
-            dest_idx=4,
-            dest_name="col4_str")
-
-        self.assertEquals(self.my_pipeline.outputs.all().count(), 0)
-        self.my_pipeline.create_outputs()
-        self.assertEquals(self.my_pipeline.outputs.all().count(), 1)
-        
-        pipeline_out_members = self.my_pipeline.outputs.all()[0].get_cdt().members.all()
-        
-        self.assertEquals(pipeline_out_members.count(),4)
-
-        member = pipeline_out_members.get(column_idx=1)
-        self.assertEquals(member.column_name, "col{}_str".format(1))
-        self.assertEquals(member.datatype, self.string_dt)
-
-        member = pipeline_out_members.get(column_idx=2)
-        self.assertEquals(member.column_name, "col{}_DNA".format(2))
-        self.assertEquals(member.datatype, self.DNA_dt)
-
-        member = pipeline_out_members.get(column_idx=3)
-        self.assertEquals(member.column_name, "col{}_str".format(3))
-        self.assertEquals(member.datatype, self.string_dt)
-
-        member = pipeline_out_members.get(column_idx=4)
-        self.assertEquals(member.column_name, "col{}_str".format(4))
-        self.assertEquals(member.datatype, self.string_dt)
 
 class CustomRawOutputCabling_tests(Copperfish_Raw_Setup):
 
@@ -6639,117 +6470,6 @@ class PipelineStepInputCable_tests(Copperfish_Raw_Setup):
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.complete_clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.complete_clean)
-
-    def test_PSIC_clean_and_completely_wired_multiply_wired_different_source(self):
-        # x -> x
-        # x -> y
-        # y -> y
-        # z -> z
-
-        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
-
-        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
-
-        # wire1 = string->string
-        wire1 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=1))
-        
-        # wire1 = string->string
-        wire2 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=2))
-
-        wire3 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=2),
-            dest_pin=method_input.get_cdt().members.get(column_idx=2))
-
-        wire4 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=3),
-            dest_pin=method_input.get_cdt().members.get(column_idx=3))
-
-        self.assertEquals(wire1.clean(), None)
-        self.assertEquals(wire2.clean(), None)
-        self.assertEquals(wire3.clean(), None)
-        self.assertEquals(wire4.clean(), None)
-
-        errorMessage="Destination member \"2.* has multiple wires leading to it"
-        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
-
-    def test_PSIC_clean_and_completely_wired_multiply_wired_same_source(self):
-        # x -> x
-        # x -> x
-
-        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-        myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
-
-        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
-
-        # wire1 = string->string
-        wire1 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=1))
-        
-        # wire1 = string->string
-        wire2 = pipeline_cable.custom_wires.create(
-            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=1))
-
-        self.assertEquals(wire1.clean(), None)
-        self.assertEquals(wire2.clean(), None)
-
-        errorMessage="Destination member \"1.* has multiple wires leading to it"
-        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
-        self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
-        self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.clean)
-
-    def test_PSIC_clean_and_completely_wired_multiply_wired_internal_steps(self):
-        # Sub test 1
-        # x -> y
-        # y -> y
-        # z -> z
-
-        # Define pipeline
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
-
-        # Define method with triplet_cdt input/output (string, string, string)
-        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
-        method_output = self.testmethod.create_output(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
-
-        # Add method as 2 steps
-        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
-        step2 = myPipeline.steps.create(transformation=self.testmethod, step_num=2)
-
-        # Cable the 2 internal steps together
-        internal_cable = step2.cables_in.create(transf_input=method_input, step_providing_input=1, provider_output=method_output)
-
-        wire1 = internal_cable.custom_wires.create(
-            source_pin=method_output.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=1))
-
-        wire2 = internal_cable.custom_wires.create(
-            source_pin=method_output.get_cdt().members.get(column_idx=1),
-            dest_pin=method_input.get_cdt().members.get(column_idx=2))
-
-        wire3 = internal_cable.custom_wires.create(
-            source_pin=method_output.get_cdt().members.get(column_idx=2),
-            dest_pin=method_input.get_cdt().members.get(column_idx=2))
-
-        wire4 = internal_cable.custom_wires.create(
-            source_pin=method_output.get_cdt().members.get(column_idx=3),
-            dest_pin=method_input.get_cdt().members.get(column_idx=3))
-
-        errorMessage = "Destination member \"2.* has multiple wires leading to it"
-        self.assertRaisesRegexp(ValidationError,errorMessage,internal_cable.clean_and_completely_wired)
 
 class Dataset_new_tests(Copperfish_Raw_Setup):
 

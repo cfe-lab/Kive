@@ -325,3 +325,116 @@ class PipelineRawOutputCable_replaced_by_uniqueness_constraints_tests(Copperfish
             ValidationError,
             "Outputs are not consecutively numbered starting from 1",
             self.pipeline_1.clean)
+        
+class PipelineStepInputCable_replaced_by_uniqueness_constraints_tests(Copperfish_Raw_Setup):
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_same_source(self):
+        # x -> x
+        # x -> x
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=1))
+        
+        # wire1 = string->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=1))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+
+        errorMessage="Destination member \"1.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
+        self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.clean)
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_internal_steps(self):
+        # Sub test 1
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Define pipeline
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        # Define method with triplet_cdt input/output (string, string, string)
+        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        method_output = self.testmethod.create_output(compounddatatype=self.triplet_cdt,dataset_name="method_out",dataset_idx=1)
+
+        # Add method as 2 steps
+        step1 = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        step2 = myPipeline.steps.create(transformation=self.testmethod, step_num=2)
+
+        # Cable the 2 internal steps together
+        internal_cable = step2.cables_in.create(transf_input=method_input, step_providing_input=1, provider_output=method_output)
+
+        wire1 = internal_cable.custom_wires.create(
+            source_pin=method_output.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=1))
+
+        wire2 = internal_cable.custom_wires.create(
+            source_pin=method_output.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=2))
+
+        wire3 = internal_cable.custom_wires.create(
+            source_pin=method_output.get_cdt().members.get(column_idx=2),
+            dest_pin=method_input.get_cdt().members.get(column_idx=2))
+
+        wire4 = internal_cable.custom_wires.create(
+            source_pin=method_output.get_cdt().members.get(column_idx=3),
+            dest_pin=method_input.get_cdt().members.get(column_idx=3))
+
+        errorMessage = "Destination member \"2.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,internal_cable.clean_and_completely_wired)
+
+    def test_PSIC_clean_and_completely_wired_multiply_wired_different_source(self):
+        # x -> x
+        # x -> y
+        # y -> y
+        # z -> z
+
+        # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+        myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
+
+        # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
+        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        pipeline_cable = pipelineStep.cables_in.create(transf_input=method_input, step_providing_input=0, provider_output=myPipeline_input)
+
+        # wire1 = string->string
+        wire1 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=1))
+        
+        # wire1 = string->string
+        wire2 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=1),
+            dest_pin=method_input.get_cdt().members.get(column_idx=2))
+
+        wire3 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=2),
+            dest_pin=method_input.get_cdt().members.get(column_idx=2))
+
+        wire4 = pipeline_cable.custom_wires.create(
+            source_pin=myPipeline_input.get_cdt().members.get(column_idx=3),
+            dest_pin=method_input.get_cdt().members.get(column_idx=3))
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(wire3.clean(), None)
+        self.assertEquals(wire4.clean(), None)
+
+        errorMessage="Destination member \"2.* has multiple wires leading to it"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
