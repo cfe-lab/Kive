@@ -720,7 +720,7 @@ class Method(Transformation):
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
     method = models.BooleanField(help_text="Is the output of this method nondeterministic")
-    method_execrecords = generic.GenericRelation("ExecRecord")
+    execrecords = generic.GenericRelation("ExecRecord")
 
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""
@@ -794,7 +794,7 @@ class Pipeline(Transformation):
             null=True,
             blank=True)
 
-    pipeline_execrecords = generic.GenericRelation("ExecRecord")
+    execrecords = generic.GenericRelation("ExecRecord")
 
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
@@ -1504,7 +1504,7 @@ class PipelineOutputCable(models.Model):
         help_text="Source output hole")
 
     custom_outwires = generic.GenericRelation("CustomCableWire")
-    POC_execrecords = generic.GenericRelation("ExecRecord")
+    execrecords = generic.GenericRelation("ExecRecord")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
@@ -2240,7 +2240,7 @@ class SymbolicDataset(models.Model):
         if not, S[primary key].
         """
         unicode_rep = u"S{}".format(self.pk)
-        if dataset == None:
+        if self.dataset == None:
             unicode_rep += u"*"
         return unicode_rep
 
@@ -2403,14 +2403,14 @@ class ExecRecordIn(models.Model):
             # The parent ER is a POC.
             return unicode(self.symbolicdataset)
         elif type(self.generic_input) == PipelineStepInputCable:
-            transf_input_name = generic_input.transf_raw_input.dataset_name
+            transf_input_name = self.generic_input.transf_input.dataset_name
             if self.generic_input.is_raw():
-                cable_str = "{" + "rawcable{}".format(generic_input.pk) + "}="
+                cable_str = "{" + "rawcable{}".format(self.generic_input.pk) + "}="
             else:
-                cable_str = "{" + "cable{}".format(generic_input.pk) + "}="
+                cable_str = "{" + "cable{}".format(self.generic_input.pk) + "}="
         else:
             # This is not a cable, it is a TI.
-            transf_input_name = generic_input.dataset_name
+            transf_input_name = self.generic_input.dataset_name
 
         return "{}={}>{}".format(self.symbolicdataset, cable_str, transf_input_name)
             
@@ -2470,7 +2470,7 @@ class ExecRecordIn(models.Model):
         # If the ERI has a dataset, then it's raw/unraw state must match the raw/unraw state
         # of the generic_input that it was marked as fed into
         if self.symbolicdataset.has_data():
-            if self.generic_input.is_raw() != self.symbolicdataset.is_raw():
+            if self.generic_input.is_raw() != self.symbolicdataset.dataset.is_raw():
                 raise ValidationError(
                     "Dataset \"{}\" cannot feed source \"{}\"".
                     format(self.symbolicdataset.dataset, self.generic_input))
@@ -2500,14 +2500,14 @@ class ExecRecordIn(models.Model):
                 actual_data = self.symbolicdataset.dataset
 
                 # CDTs must match (FIXME: generalize to compaitible CDTs)
-                if actual_data.compounddatatype != cdt_needed:
+                if actual_data.structure.compounddatatype != cdt_needed:
                     raise ValidationError("Dataset \"{}\" is not of the expected CDT".
                                           format(actual_data))
 
                 # actual_data must satisfy row constraints imposed by:
                 # - TO sourcing the cable if the parent ER is a POC, or
                 # - TI fed if the parent ER is a Method/Pipeline.
-                if (transf_xput_used.structure.min_row != None and
+                if (transf_xput_used.get_min_row() != None and
                         actual_data.num_rows() < transf_xput_used.structure.min_row):
                     error_str = ""
                     if type(self.generic_input) == TransformationOutput:
@@ -2516,7 +2516,7 @@ class ExecRecordIn(models.Model):
                         error_str = "Dataset \"{}\" has too few rows for TransformationInput \"{}\""
                     raise ValidationError(error_str.format(actual_data, transf_xput_used))
                     
-                if (transf_xput_used.structure.max_row != None and
+                if (transf_xput_used.get_max_row() != None and
                         actual_data.num_rows() > transf_xput_used.structure.max_row):
                     error_str = ""
                     if type(self.generic_input) == TransformationOutput:

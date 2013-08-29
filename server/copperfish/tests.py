@@ -58,17 +58,17 @@ class CopperfishExecRecordTests_setup(TestCase):
             self.generic_crRev.save()
 
         # Method family, methods, and their input/outputs
-        self.mf = MethodFamily(name="method family",description="Holds methods A/B/C"); self.mf.save()
-        self.mA = Method(revision_name="Method A",revision_desc="A",family = self.mf,driver = self.generic_crRev); self.mA.save()
+        self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
+        self.mA = Method(revision_name="mA_name",revision_desc="A_desc",family = self.mf,driver = self.generic_crRev); self.mA.save()
         self.A1_rawin = self.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
         self.A1_out = self.mA.create_output(compounddatatype=self.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
 
-        self.mB = Method(revision_name="Method B",revision_desc="B",family = self.mf,driver = self.generic_crRev); self.mB.save()
+        self.mB = Method(revision_name="mB_name",revision_desc="B_desc",family = self.mf,driver = self.generic_crRev); self.mB.save()
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
         self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1)
 
-        self.mC = Method(revision_name="Method C",revision_desc="C",family = self.mf,driver = self.generic_crRev); self.mC.save()
+        self.mC = Method(revision_name="mC_name",revision_desc="C_desc",family = self.mf,driver = self.generic_crRev); self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
         self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
         self.C1_out = self.mC.create_output(compounddatatype=self.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
@@ -76,11 +76,11 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.C3_rawout = self.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
 
         # Pipeline family, pipelines, and their input/outputs
-        self.pf = PipelineFamily(name="Pipeline family", description="PF desc"); self.pf.save()
-        self.pD = Pipeline(family=self.pf, revision_name="Pipeline D",revision_desc="D"); self.pD.save()
+        self.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); self.pf.save()
+        self.pD = Pipeline(family=self.pf, revision_name="pD_name",revision_desc="D"); self.pD.save()
         self.D1_in = self.pD.create_input(compounddatatype=self.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
         self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
-        self.pE = Pipeline(family=self.pf, revision_name="Pipeline E",revision_desc="E"); self.pE.save()
+        self.pE = Pipeline(family=self.pf, revision_name="pE_name",revision_desc="E"); self.pE.save()
         self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
         self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2)
         self.E3_rawin = self.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
@@ -120,6 +120,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
 
+        # Define uploaded datasets
         self.triplet_symDS = SymbolicDataset()
         self.triplet_symDS.save()
         self.triplet_DS = None
@@ -147,14 +148,59 @@ class CopperfishExecRecordTests_setup(TestCase):
             self.raw_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.raw_symDS)
             self.raw_DS.save()
         self.raw_DS.clean()
-       
 
-    def test_ER_links_POC_but_ERI_doesnt_link_TO_that_POC_gets_output_from(self):
 
-        # Define a symbolic dataset
+    def tearDown(self):
+        """ Clear CodeResources, Datasets, and VerificationScripts folders"""
 
-        # Define an ER linked to a POC
-        myER = self.E21_41.POC_execrecords.create(tainted=False)
+        for crr in CodeResourceRevision.objects.all():
+            if crr.coderesource.filename != "":
+                crr.content_file.delete()
+                
+        for ds in Datatype.objects.all():
+            ds.verification_script.delete()
 
-        # Define an ERI
-        #myER.execrecordins.create(
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.delete()
+
+class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
+
+    def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
+        # ER links POC: ERI must link to the TO that the POC gets output from
+        myER = self.E21_41.execrecords.create(tainted=False)
+
+        # Can we put in a good record here?
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
+        #myERI_bad.clean()
+
+    def test_ER_doesnt_link_POC_so_ERI_musnt_link_TO(self):
+        # ER doesn't link POC (So, method/pipeline): ERI must not link a TO (which would imply ER should link POC)
+        myER = self.mA.execrecords.create(tainted=False)
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
+        #myERI_bad.clean()
+
+    def test_ERI_linking_TI_must_be_member_of_pipeline_linked_by_ER(self):
+        # ERI links TI: TI must be a member of the ER's pipeline
+        myER = self.pE.execrecords.create(tainted=False)
+        myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.pE.inputs.get(dataset_name="E1_in"))
+        myERI_good.clean()
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.pD.inputs.get(dataset_name="D2_in"))
+        #myERI_bad.clean()
+
+    def test_ER_links_pipelinemethod_so_ERI_must_link_cable_with_destination_TI_belonging_to_transformation(self):
+        # ERI links PSIC (so input feeds a pipeline step) - destination TI of cable must belong to TI of that transformation
+        myER = self.pD.execrecords.create(tainted=False)
+        myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E01_21)
+        myERI_good.clean()
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
+        #myERI_bad.clean()
+
+    def test_ERI_dataset_must_match_rawunraw_state_of_generic_input_it_was_fed_into(self):
+        # ERI has a dataset: it's raw/unraw state must match the raw/unraw state of the generic_input it was fed into
+
+        myER = self.mC.execrecords.create(tainted=False)
+        myERI_unraw_unraw = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
+        myERI_unraw_unraw.clean()
+
+        myERI_raw_unraw = myER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E11_32)
+        myERI_raw_unraw.clean()
