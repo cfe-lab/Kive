@@ -2438,7 +2438,7 @@ class ExecRecordIn(models.Model):
         if type(parent_transf) == PipelineOutputCable:
             if self.generic_input != parent_transf.provider_output:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord's POC".
+                    "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord POC".
                     format(self))
 
         else:
@@ -2508,7 +2508,7 @@ class ExecRecordIn(models.Model):
                 # - TO sourcing the cable if the parent ER is a POC, or
                 # - TI fed if the parent ER is a Method/Pipeline.
                 if (transf_xput_used.get_min_row() != None and
-                        actual_data.num_rows() < transf_xput_used.structure.min_row):
+                        actual_data.num_rows() < transf_xput_used.get_min_row()):
                     error_str = ""
                     if type(self.generic_input) == TransformationOutput:
                         error_str = "Dataset \"{}\" has too few rows to have come from TransformationOutput \"{}\""
@@ -2517,7 +2517,7 @@ class ExecRecordIn(models.Model):
                     raise ValidationError(error_str.format(actual_data, transf_xput_used))
                     
                 if (transf_xput_used.get_max_row() != None and
-                        actual_data.num_rows() > transf_xput_used.structure.max_row):
+                        actual_data.num_rows() > transf_xput_used.get_max_row()):
                     error_str = ""
                     if type(self.generic_input) == TransformationOutput:
                         error_str = "Dataset \"{}\" has too many rows to have come from TransformationOutput \"{}\""

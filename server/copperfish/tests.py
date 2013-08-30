@@ -66,7 +66,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.mB = Method(revision_name="mB_name",revision_desc="B_desc",family = self.mf,driver = self.generic_crRev); self.mB.save()
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
-        self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1)
+        self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
 
         self.mC = Method(revision_name="mC_name",revision_desc="C_desc",family = self.mf,driver = self.generic_crRev); self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
@@ -82,7 +82,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
         self.pE = Pipeline(family=self.pf, revision_name="pE_name",revision_desc="E"); self.pE.save()
         self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
-        self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2)
+        self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
         self.E3_rawin = self.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
 
         # Pipeline steps
@@ -169,38 +169,77 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
         # ER links POC: ERI must link to the TO that the POC gets output from
         myER = self.E21_41.execrecords.create(tainted=False)
 
-        # Can we put in a good record here?
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
-        #myERI_bad.clean()
+        self.assertRaisesRegexp(ValidationError,"ExecRecordIn \".*\" does not denote the TO that feeds the parent ExecRecord POC",myERI_bad.clean)
 
     def test_ER_doesnt_link_POC_so_ERI_musnt_link_TO(self):
         # ER doesn't link POC (So, method/pipeline): ERI must not link a TO (which would imply ER should link POC)
         myER = self.mA.execrecords.create(tainted=False)
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
-        #myERI_bad.clean()
+        self.assertRaisesRegexp(ValidationError,"ExecRecordIn \".*\" denotes a PipelineOutputCable but parent ExecRecord does not",myERI_bad.clean)
 
     def test_ERI_linking_TI_must_be_member_of_pipeline_linked_by_ER(self):
         # ERI links TI: TI must be a member of the ER's pipeline
         myER = self.pE.execrecords.create(tainted=False)
         myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.pE.inputs.get(dataset_name="E1_in"))
-        myERI_good.clean()
+        self.assertEqual(myERI_good.clean(), None)
+        
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.pD.inputs.get(dataset_name="D2_in"))
-        #myERI_bad.clean()
+        self.assertRaisesRegexp(ValidationError,"Input \".*\" does not belong to Pipeline of ExecRecord \".*\"",myERI_bad.clean)
 
     def test_ER_links_pipelinemethod_so_ERI_must_link_cable_with_destination_TI_belonging_to_transformation(self):
         # ERI links PSIC (so input feeds a pipeline step) - destination TI of cable must belong to TI of that transformation
         myER = self.pD.execrecords.create(tainted=False)
         myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E01_21)
-        myERI_good.clean()
+        self.assertEqual(myERI_good.clean(), None)
+        
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
-        #myERI_bad.clean()
+        self.assertRaisesRegexp(ValidationError,"Cable \".*\" does not feed Method/Pipeline of ExecRecord \".*\"",myERI_bad.clean)
 
     def test_ERI_dataset_must_match_rawunraw_state_of_generic_input_it_was_fed_into(self):
         # ERI has a dataset: it's raw/unraw state must match the raw/unraw state of the generic_input it was fed into
 
-        myER = self.mC.execrecords.create(tainted=False)
-        myERI_unraw_unraw = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
-        myERI_unraw_unraw.clean()
+        myER_C = self.mC.execrecords.create(tainted=False)
 
-        myERI_raw_unraw = myER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E11_32)
-        myERI_raw_unraw.clean()
+        myERI_unraw_unraw = myER_C.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
+        self.assertEqual(myERI_unraw_unraw.clean(), None)
+
+        myERI_raw_unraw_BAD = myER_C.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E11_32)
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_raw_unraw_BAD.clean)
+
+        myER_A = self.mA.execrecords.create(tainted=False)
+        myERI_unraw_raw_BAD = myER_A.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E03_11)
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_unraw_raw_BAD.clean)
+        myERI_unraw_raw_BAD.delete()
+    
+        myERI_raw_raw = myER_A.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        myERI_raw_raw.clean()
+
+    def test_ER_links_POC_ERI_links_TO_which_constrains_input_dataset_CDT(self):
+        # ERI links with a TO (For a POC leading from source TO), the input dataset CDT is constrained by the source TO
+        myER = self.E21_41.execrecords.create(tainted=False)
+
+        # We annotate that triplet was fed into D1_out which was connected by E21_41
+        myERI_wrong_CDT = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" is not of the expected CDT",myERI_wrong_CDT.clean)
+        myERI_wrong_CDT.delete()
+
+        # Right CDT but wrong number of rows (It needs < 5, we have 10)
+        myERI_too_many_rows = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" has too many rows to have come from TransformationOutput \".*\"",myERI_too_many_rows.clean)
+
+    def test_ER_links_pipeline_ERI_links_TI_which_constrains_input_dataset_CDT(self):
+        # ERI links with a TI (for pipeline inputs) - the dataset is constrained by the pipeline TI CDT
+
+        myER = self.pE.execrecords.create(tainted=False)
+        myERI_wrong_CDT = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E1_in)
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" is not of the expected CDT",myERI_wrong_CDT.clean)
+
+        myERI_too_few_rows = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E2_in)
+        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" has too few rows to have come from TransformationInput \".*\"",myERI_too_few_rows.clean)
+        
+
+        # I don't get it - if we feed a dataset into the whole pipeline E this makes sense
+        # but is a NEW dataset made when we feed one into pipeline D?
+
+        
