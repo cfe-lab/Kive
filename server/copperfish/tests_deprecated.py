@@ -438,3 +438,60 @@ class PipelineStepInputCable_replaced_by_uniqueness_constraints_tests(Copperfish
 
         errorMessage="Destination member \"2.* has multiple wires leading to it"
         self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
+
+class CustomOutputWiring_obsolete_tests(Copperfish_Raw_Setup):
+        def test_PipelineOutputCable_clean_dest_idx_must_consecutively_start_from_1(self):
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.create_input(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.create_output(
+            dataset_name="TestOut",
+            dataset_idx=1,
+            compounddatatype=self.triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(
+            transformation=self.testmethod, step_num=1);
+
+        # Add an output cable
+        outcable1 = self.my_pipeline.create_outcable(
+            output_name="blah",
+            output_idx=1,
+            step_providing_output=1,
+            provider_output=method_out)
+        
+        # Add 3 wires that with dest_idx that do not consecutively increment by 1
+        wire1 = outcable1.custom_outwires.create(
+            source_pin=self.triplet_cdt.members.all()[0],
+            dest_idx=2,
+            dest_name="bad_destination")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
+            outcable1.clean)
+
+        wire2 = outcable1.custom_outwires.create(
+            source_pin=self.triplet_cdt.members.all()[0],
+            dest_idx=3,
+            dest_name="bad_destination2")
+
+        wire3 = outcable1.custom_outwires.create(
+            source_pin=self.triplet_cdt.members.all()[2],
+            dest_idx=4,
+            dest_name="bad_destination3")
+
+        self.assertEquals(wire1.clean(), None)
+        self.assertEquals(wire2.clean(), None)
+        self.assertEquals(wire3.clean(), None)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
+            outcable1.clean)
+

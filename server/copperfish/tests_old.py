@@ -6508,3 +6508,139 @@ class Dataset_new_tests(Copperfish_Raw_Setup):
 
         errorMessage = "Column .* of Dataset .* is named .*, not .* as specified by its CDT"
         self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+
+
+
+# August 29, 2013: reworked to handle new design for outcables.
+class CustomOutputWiring_tests(Copperfish_Raw_Setup):
+
+    def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
+
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.create_input(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.create_output(
+            dataset_name="TestOut",
+            dataset_idx=1,
+            compounddatatype=self.triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1);
+
+        # Add an output cable
+        outcable1 = self.my_pipeline.create_outcable(
+            output_name="blah",
+            output_idx=1,
+            step_providing_output=1,
+            provider_output=method_out)
+
+        # Add custom wiring from an irrelevent CDTM
+        badwire = outcable1.custom_outwires.create(
+            source_pin=self.doublet_cdt.members.all()[0],
+            dest_pin=self.triplet_cdt.members.all()[0])
+
+        errorMessage = "Source pin \"1: <string> \[StrCol1\]\" does not come from compounddatatype \"\(1: <string> \[a\^2\], 2: <string> \[b\^2\], 3: <string> \[c\^2\]\)\""
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            badwire.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            outcable1.clean)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            errorMessage,
+            self.my_pipeline.clean)
+
+        
+
+    def test_Pipeline_create_outputs_for_creation_of_output_CDT(self):
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version");
+
+        pipeline_in = self.my_pipeline.create_input(
+            compounddatatype=self.triplet_cdt,
+            dataset_name="pipeline_in_1",
+            dataset_idx=1)
+
+        # Give the method self.triplet_cdt output
+        method_out = self.testmethod.create_output(
+            dataset_name="TestOut",
+            dataset_idx=1,
+            compounddatatype=self.mix_triplet_cdt);
+
+        # Add a step
+        my_step1 = self.my_pipeline.steps.create(
+            transformation=self.testmethod, step_num=1);
+
+        # Add an output cable with the following output CDT:
+        # column 1: "col1_str", type string_dt (from 1st col of triplet)
+        # column 2: "col2_DNA", type DNA_dt (from 2nd col of triplet)
+        # column 3: "col3_str", type string_dt (from 1st col of triplet)
+        # column 4: "col4_str", type string_dt (from 3rd col of triplet)
+        new_cdt = CompoundDatatype()
+        new_cdt.save()
+        pin1 = new_cdt.members.create(column_name="col1_str", column_idx=1,
+                                      datatype=self.string_dt)
+        pin2 = new_cdt.members.create(column_name="col2_DNA", column_idx=2,
+                                      datatype=self.DNA_dt)
+        pin3 = new_cdt.members.create(column_name="col3_str", column_idx=3,
+                                      datatype=self.string_dt)
+        pin4 = new_cdt.members.create(column_name="col4_str", column_idx=4,
+                                      datatype=self.string_dt)
+        
+        outcable1 = self.my_pipeline.outcables.create(
+            output_name="blah",
+            output_idx=1,
+            step_providing_output=1,
+            provider_output=method_out,
+            output_cdt=new_cdt)
+        
+        # Add wiring
+        wire1 = outcable1.custom_outwires.create(
+            source_pin=method_out.get_cdt().members.all()[0],
+            dest_pin=pin1)
+
+        wire2 = outcable1.custom_outwires.create(
+            source_pin=method_out.get_cdt().members.all()[1],
+            dest_pin=pin2)
+
+        wire3 = outcable1.custom_outwires.create(
+            source_pin=method_out.get_cdt().members.all()[0],
+            dest_pin=pin3)
+
+        wire4 = outcable1.custom_outwires.create(
+            source_pin=method_out.get_cdt().members.all()[2],
+            dest_pin=pin4)
+
+        self.assertEquals(self.my_pipeline.outputs.all().count(), 0)
+        self.my_pipeline.create_outputs()
+        self.assertEquals(self.my_pipeline.outputs.all().count(), 1)
+        
+        pipeline_out_members = self.my_pipeline.outputs.all()[0].get_cdt().members.all()
+        
+        self.assertEquals(pipeline_out_members.count(),4)
+
+        member = pipeline_out_members.get(column_idx=1)
+        self.assertEquals(member.column_name, "col{}_str".format(1))
+        self.assertEquals(member.datatype, self.string_dt)
+
+        member = pipeline_out_members.get(column_idx=2)
+        self.assertEquals(member.column_name, "col{}_DNA".format(2))
+        self.assertEquals(member.datatype, self.DNA_dt)
+
+        member = pipeline_out_members.get(column_idx=3)
+        self.assertEquals(member.column_name, "col{}_str".format(3))
+        self.assertEquals(member.datatype, self.string_dt)
+
+        member = pipeline_out_members.get(column_idx=4)
+        self.assertEquals(member.column_name, "col{}_str".format(4))
+        self.assertEquals(member.datatype, self.string_dt)

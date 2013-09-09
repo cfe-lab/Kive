@@ -892,23 +892,8 @@ class Pipeline(Transformation):
 
             if not outcable.is_raw():
                 # Define an XputStructure for new_pipeline_output.
-            
-                output_CDT = output_requested.get_cdt()
-                if outcable.custom_outwires.all().exists():
-                    # If there is custom wiring, then we need to define a new
-                    # CDT for the output.
-                    # Note: the integrity of the custom wiring is already enforced
-                    # when you clean() the output cable.
-                    output_CDT = CompoundDatatype()
-                    output_CDT.save()
-                    for outwire in outcable.custom_outwires.all():
-                        output_CDT.members.create(
-                            datatype=outwire.source_pin.datatype,
-                            column_name=outwire.dest_name,
-                            column_idx=outwire.dest_idx)
-
                 new_pipeline_output.structure.create(
-                    compounddatatype=output_CDT,
+                    compounddatatype=outcable.output_cdt,
                     min_row=output_requested.get_min_row(),
                     max_row=output_requested.get_max_row())
 
@@ -1585,14 +1570,19 @@ class PipelineOutputCable(models.Model):
                 outwire.clean()
                 outwire.validate_unique()
 
+    def complete_clean(self):
+        """Checks completeness and coherence of this POC.
+        
+        Calls clean, and then checks that if this POC is not raw and there
+        are any custom wires defined, then they must quench the output CDT.
+        """
+        if not self.is_raw() and self.custom_outwires.all().exists():
             # Check that each CDT member has a wire leading to it
-            if outwires.exists():
-                dest_members = self.output_cdt.members.all()
-                for dest_member in dest_members:
-                    if not self.custom_outwires.filter(dest_pin=dest_member).exists():
-                        raise ValidationError(
-                            "Destination member \"{}\" has no outwires leading to it".
-                            format(dest_member))
+            for dest_member in self.output_cdt.members.all():
+                if not self.custom_outwires.filter(dest_pin=dest_member).exists():
+                    raise ValidationError(
+                        "Destination member \"{}\" has no outwires leading to it".
+                        format(dest_member))
 
     def is_raw(self):
         """True if this output cable is raw; False otherwise."""
