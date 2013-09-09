@@ -1,0 +1,47 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\paperw15840\paperh12240\margl1440\margr1440\vieww15820\viewh11360\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\b\fs30 \cf0 Notes on Execute
+\b0\fs22 \
+\
+1) Define pipelines/pipelinestep schematics\
+2) Upload datasets - validate header + contents\
+\
+3) Initiate execute() on a pipeline\
+\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 4) Validate input datasets have compatible CDTs / row restrictions for the pipeline input definition\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+5) 	If pre-existing perfectly matching ER exists:\
+		* Create run with reused flag\
+\
+	If this is a novel instantiation of the pipeline:\
+		* Create ER for that pipeline\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 		* Create ERIs for that ER\
+		* Define run for that ER\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+6) For each step i:\
+\
+	6-1) Initiate execute() on step i\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 	6-2) Validate input dataset matches the cable's TO's CDT / row restrictions\
+	       (Or, in the case of no cables, the source TO)\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 \
+	6-3)	If pre-existing perfectly matching ER exists:\
+			* Create run step with reused flag\
+\
+		If this is a novel instantiation of the pipeline step\
+			* Create ER for step i\
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+\cf0 			* Denote ERIs for step i\
+			* Define runstep for pipeline step i\
+			* Execute script with python (Sandbox discussed elsewhere)\
+			* Validate output dataset CDT / rows matches pipeline step definition\
+			* Create EROs for this pipeline step}

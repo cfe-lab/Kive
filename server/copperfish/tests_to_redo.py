@@ -23,6 +23,9 @@ class Datasets_tests(Copperfish_Raw_Setup):
     New tests to take into account raw inputs/outputs/datasets
     """
 
+    # NOT APPLICABLE - Datasets used to specify source pipeline step and output
+    # But Datasets now come from actual execution sessions of pipeline steps - runsteps
+    # (Which have execrecords, which also have EROs linking to Datasets)
     def test_rawDataset_pipelineStep_set_pipelineStepRawOutput_also_valid_good(self):
         """ Pipeline_step is set, and pipeline_step_raw_output is also set """
 

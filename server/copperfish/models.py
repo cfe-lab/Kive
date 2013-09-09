@@ -2038,8 +2038,6 @@ class RunStep(models.Model):
             self.child_run.complete_clean()
 
 
-# August 20, 2013: modified from AbstractDataset.  Now this is a real class that holds
-# all kinds of data, and *maybe* has a DatasetStructure associated with it.
 class Dataset(models.Model):
     """
     Data files uploaded by users or created by transformations.
@@ -2047,89 +2045,68 @@ class Dataset(models.Model):
     Related to :model:`copperfish.RunStep`
     Related to :model:`copperfish.RunOutputCable`
     Related to :model:`copperfish.SymbolicDataset`
+    Related to :model:`copperfish.DatasetStructure`
 
     The clean() function should be used when a pipeline is executed to
     confirm that the dataset structure is consistent with what's
     expected from the pipeline definition.
     
-    The code looks like it's checking for things Pipeline.clean() checks,
-    but it's for a different purpose:
-
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
-
-    This would catch deviations between the script and the Pipeline's
-    definition of that script.
     """
     user = models.ForeignKey(User,help_text="User that uploaded this dataset.")
-
-    name = models.CharField(
-        "Dataset name",
-        max_length=128,
-        help_text="Description of this dataset.")
-
+    name = models.CharField("Dataset name",max_length=128,help_text="Description of this dataset.")
     description = models.TextField("Dataset description")
-
-    date_created = models.DateTimeField(
-        "Date created",
-        auto_now_add=True,
-        help_text="Date of dataset upload.")
+    date_created = models.DateTimeField("Date created",auto_now_add=True,help_text="Date of dataset upload.")
 
     # Four cases from which datasets can originate:
     #
-    # Case 1: Comes from a runstep but not a run
-    # Case 2: Comes from a run but not a run step
-    # Case 3: Comes from neither a run nor a runstep (Is uploaded)
-    # Case 4: Comes from both a run, and also a run step (Run within a run)
+    # Case 1: A runstep, but not a run (Internal step)
+    # Case 2: A run, but not a run step (Normal run)
+    # Case 3: Neither a run, nor a runstep (Uploaded)
+    # Case 4: Both a run, and a run step (Run within a run)
 
-    # If this is an intermediary dataset, it is produced by a runstep
-    runstep = models.ForeignKey(
-        "RunStep",
-        related_name="outputs",
-        null=True,
-        blank=True,
-        help_text="Run step dataset was created by (If applicable)")
+    # If produced by a runstep
+    runstep = models.ForeignKey("RunStep",
+                                related_name="outputs",
+                                null=True,
+                                blank=True,
+                                help_text="Run step dataset was created by (If applicable)")
 
-    # If this is a final dataset, it is produced by a run
-    runoutputcable = models.OneToOneField(
-        "RunOutputCable",
-        related_name="output",
-        null=True,
-        blank=True,
-        help_text="Run output cable this dataset was created by (If applicable)")
+    # If a final dataset
+    runoutputcable = models.OneToOneField("RunOutputCable",
+                                          related_name="output",
+                                          null=True,
+                                          blank=True,
+                                          help_text="Run output cable this dataset was created by (If applicable)")
 
-    # All datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(
-        upload_to="Datasets",
-        help_text="Physical file system path where datasets are stored",
-        null=False)
+    # Datasets are stored in the "Datasets" folder
+    dataset_file = models.FileField(upload_to="Datasets",help_text="Physical path where datasets are stored",null=False)
 
-    # Links to this Dataset's SymbolicDataset.
-    symbolicdataset = models.OneToOneField("SymbolicDataset",
-                                           related_name="dataset")
+    # Datasets always have a referring SymbolicDataset
+    symbolicdataset = models.OneToOneField("SymbolicDataset",related_name="dataset")
 
     def __unicode__(self):
         """
         Display Dataset name, user, and date created.
         """
+        return "{} (created by {} on {})".format(self.name,unicode(self.user),self.date_created)
 
-        return "{} (created by {} on {})".format(
-            self.name,
-            unicode(self.user),
-            self.date_created)
 
     def clean(self):
         """
-        If this is a Shipyard-type CSV file, clean the CSV.
+        If this is a structured data type (IE, a CSV) clean the CSV.
         """
-        # If there is an associated DatasetStructure (i.e. if it is a
-        # CSV file), then clean the CSV using
-        # DatasetStructure.clean().
+        # If there is an associated DatasetStructure, clean the structure
         if not self.is_raw():
             self.structure.clean()
 
-        # FIXME should we be calling check_md5 here?  Or is that too resource-intensive?  Or
-        # can we find a better time to run it?
+        if (self.symbolicdataset.MD5_checksum == ""):
+            self.compute_md5()
+        else:
+            if not self.check_md5():
+                raise ValidationError("File integrity of \"{}\" lost. Current checksum \"{}\" does not equal expected checksum \"{}\"".
+                                      format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
             
     def compute_md5(self):
         """
@@ -2139,7 +2116,9 @@ class Dataset(models.Model):
             md5gen = hashlib.md5()
             self.dataset_file.open()
             md5gen.update(self.dataset_file.read())
-            self.symbolicdataset.MD5_checksum = md5gen.hexdigest()
+            md5 = md5gen.hexdigest()
+            self.symbolicdataset.MD5_checksum = md5
+            return md5
 
         except ValueError as e:
             print(e)
@@ -2148,9 +2127,10 @@ class Dataset(models.Model):
     def check_md5(self):
         """
         Checks that the MD5 checksum of the Dataset equals that in the associated SymbolicDataset.
-
         This will be used when regenerating data that once existed, as a coherence check.
         """
+
+        # Recompute the MD5, see if it equals what is already stored
         md5gen = hashlib.md5()
         self.dataset_file.open()
         md5gen.update(self.dataset_file.read())
@@ -2165,7 +2145,7 @@ class Dataset(models.Model):
         Returns number of rows in CSV file if Dataset is a CSV file; None otherwise.
         """
         if not self.is_raw():
-            return self.structure.num_rows();
+            return self.structure.num_rows()
         return None
 
 class DatasetStructure(models.Model):
@@ -2190,8 +2170,7 @@ class DatasetStructure(models.Model):
         """
         Checks the CSV header conforms to CDT definition.
                 
-        FIXME: will have to be amended to validate each atomic data field
-        in the file when doing execute.
+        FIXME: will have to unit test each data field when doing execute.
         """
         data_csv = csv.DictReader(self.dataset.dataset_file)
         header = data_csv.fieldnames
@@ -2210,9 +2189,6 @@ class DatasetStructure(models.Model):
                 raise ValidationError(
                     "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
                     format(cdtm.column_idx, self.dataset, header[cdtm.column_idx-1], cdtm.column_name))
-        
-        # FIXME: validate the actual data in the file with unit test scripts
-
 
     def num_rows(self):
         """Reports the number of rows belonging to the CSV file (excluding header)."""
@@ -2247,6 +2223,8 @@ class SymbolicDataset(models.Model):
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
         return hasattr(self, "dataset")
+
+    
 
 class ExecRecord(models.Model):
     """
@@ -2560,7 +2538,7 @@ class ExecRecordOut(models.Model):
         output_one=>S458
         """
         unicode_rep = u""
-        if type(execrecord.general_transf) == PipelineOutputCable:
+        if type(self.execrecord.general_transf) == PipelineOutputCable:
             unicode_rep = unicode(self.symbolicdataset)
         else:
             unicode_rep = u"{}=>{}".format(self.output.dataset_name,
@@ -2590,13 +2568,13 @@ class ExecRecordOut(models.Model):
             # ERO TO must belong to the same pipeline as the ER POC
             if self.output.transformation != parent_er_outcable.pipeline:
                 raise ValidationError(
-                    "ExecRecordOut \"{}\" does not belong to the same pipeline as its parent ExecRecord's POC".
+                    "ExecRecordOut \"{}\" does not belong to the same pipeline as its parent ExecRecord POC".
                     format(self))
 
             # And the POC defined output name must match the pipeline TO name
             if parent_er_outcable.output_name != self.output.dataset_name:
                 raise ValidationError(
-                    "ExecRecordOut \"{}\" does not represent the same output as its parent ExecRecord's POC".
+                    "ExecRecordOut \"{}\" does not represent the same output as its parent ExecRecord POC".
                     format(self))
 
         # Else the parent ER is linked with either a method or a pipeline
@@ -2613,7 +2591,7 @@ class ExecRecordOut(models.Model):
         if self.symbolicdataset.has_data():
 
             # If the data is raw, the ERO output TO must also be raw
-            if self.symbolicdataset.is_raw() != self.output.is_raw():
+            if self.symbolicdataset.dataset.is_raw() != self.output.is_raw():
                 raise ValidationError(
                     "Dataset \"{}\" cannot have come from output \"{}\"".
                     format(self.symbolicdataset.dataset, self.output))
@@ -2628,12 +2606,12 @@ class ExecRecordOut(models.Model):
                         "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
                         format(actual_data, self.output))
 
-                if self.output.min_row != None and actual_data.num_rows() < self.output.min_row:
+                if self.output.get_min_row() != None and actual_data.num_rows() < self.output.get_min_row():
                     raise ValidationError(
                         "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
                         format(actual_data, self.output))
 
-                if self.output.max_row != None and actual_data.num_rows() > self.output.max_row:
+                if self.output.get_max_row() != None and actual_data.num_rows() > self.output.get_max_row():
                     raise ValidationError(
                         "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
                         format(actual_data, self.output))
