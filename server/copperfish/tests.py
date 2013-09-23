@@ -12,26 +12,6 @@ from tests_old import *;
 class CopperfishExecRecordTests_setup(TestCase):
 
     def setUp(self):
-        """
-        Setup scenario to test ExecRecords.
-
-        Method A     Inputs: Raw-A1_rawin
-                     Outputs: Doublet-A1_out
-
-        Method B     Inputs: Doublet-B1_in, Singlet-B2_in
-                     Outputs: Triplet-B1_out
-
-        Method C     Inputs: Triplet-C1_in, Doublet-C2_in
-                     OutputS: Singlet-C1_out, Raw-C2_rawout, Raw-C3_rawout
-
-        Pipeline D   Inputs: Doublet-D1_in, Singlet-D2_in
-                     Outputs: Triplet-D1_out (< 5 rows)
-                     Sequence: Method D
-
-        Pipeline E   Inputs: Triplet-E1_in, Singlet-E2_in, Raw-E3_rawin
-                     Outputs: Triplet-E1_out, Singlet-E2_out, Raw-E3_rawout
-                     Sequence: Method A, Pipeline D, Method C
-        """
 
         # Datatypes and CDTs
         with open(os.path.join(samplecode_path, "stringUT.py"), "rb") as f:
@@ -120,7 +100,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
 
-        # Define uploaded datasets
+        # Define singlet, doublet, triplet, and raw uploaded datasets
         self.triplet_symDS = SymbolicDataset()
         self.triplet_symDS.save()
         self.triplet_DS = None
@@ -130,6 +110,16 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.triplet_DS_structure = DatasetStructure(dataset=self.triplet_DS,compounddatatype=self.triplet_cdt)
         self.triplet_DS_structure.save()
         self.triplet_DS.clean()
+
+        self.doublet_symDS = SymbolicDataset()
+        self.doublet_symDS.save()
+        self.doublet_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.doublet_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_symDS)
+            self.doublet_DS.save()
+        self.doublet_DS_structure = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.doublet_cdt)
+        self.doublet_DS_structure.save()
+        self.doublet_DS.clean()
 
         self.singlet_symDS = SymbolicDataset()
         self.singlet_symDS.save()
@@ -148,6 +138,55 @@ class CopperfishExecRecordTests_setup(TestCase):
             self.raw_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.raw_symDS)
             self.raw_DS.save()
         self.raw_DS.clean()
+
+        self.C1_in_symDS = SymbolicDataset()
+        self.C1_in_symDS.save()
+        self.C1_in_DS = None
+        with open(os.path.join(samplecode_path, "step_0_triplet.csv"), "rb") as f:
+            self.C1_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C1_in_symDS)
+            self.C1_in_DS.save()
+        self.C1_in_DS.clean()
+        self.C1_in_DS_structure = DatasetStructure(dataset=self.C1_in_DS,compounddatatype=self.triplet_cdt)
+        self.C1_in_DS_structure.save()
+        self.C1_in_DS.clean()
+
+        self.C2_in_symDS = SymbolicDataset()
+        self.C2_in_symDS.save()
+        self.C2_in_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.C2_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_in_symDS)
+            self.C2_in_DS.save()
+        self.C2_in_DS.clean()
+        self.C2_in_DS_structure = DatasetStructure(dataset=self.C2_in_DS,compounddatatype=self.doublet_cdt)
+        self.C2_in_DS_structure.save()
+        self.C2_in_DS.clean()
+
+        self.C1_out_symDS = SymbolicDataset()
+        self.C1_out_symDS.save()
+        self.C1_out_DS = None
+        with open(os.path.join(samplecode_path, "step_0_singlet.csv"), "rb") as f:
+            self.C1_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C1_out_symDS)
+            self.C1_out_DS.save()
+        self.C1_out_DS.clean()
+        self.C1_out_DS_structure = DatasetStructure(dataset=self.C1_out_DS,compounddatatype=self.singlet_cdt)
+        self.C1_out_DS_structure.save()
+        self.C1_out_DS.clean()
+
+        self.C2_out_symDS = SymbolicDataset()
+        self.C2_out_symDS.save()
+        self.C2_out_DS = None
+        with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
+            self.C2_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_out_symDS)
+            self.C2_out_DS.save()
+        self.C2_out_DS.clean()
+
+        self.C3_out_symDS = SymbolicDataset()
+        self.C3_out_symDS.save()
+        self.C3_out_DS = None
+        with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
+            self.C3_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C3_out_symDS)
+            self.C3_out_DS.save()
+        self.C3_out_DS.clean()
 
         self.triplet_3_rows_symDS = SymbolicDataset()
         self.triplet_3_rows_symDS.save()
@@ -171,6 +210,178 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         for dataset in Dataset.objects.all():
             dataset.dataset_file.delete()
+
+class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
+
+    def test_runstep_ER_must_point_to_same_transformation_this_runstep_points_to(self):
+        
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER for mA
+        mB_ER = self.mA.execrecords.create()
+        mB_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        mB_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+
+        # Define runstep for mB
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=mB_ER)
+        errorMessage = "RunStep points to transformation \".*\" but corresponding ER does not"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.clean)
+
+    def test_runstep_PS_must_belong_to_run_pipeline(self):
+        # Runstep points to a PS and a run - they must be consistent wrt pipeline step
+
+        # Define unrelated pipeline + ER + run
+        self.pX = Pipeline(family=self.pf, revision_name="pX",revision_desc="X")
+        self.pX.save()
+        pX_ER = self.pX.execrecords.create()
+        pX_run = self.pX.pipeline_instances.create(user=self.myUser,execrecord=pX_ER)
+
+        # Define ER + runstep for step E1 - but connect it with the wrong run pX
+        step_E1_ER = self.step_E1.transformation.execrecords.create()
+        step_E1_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        step_E1_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pX_run,execrecord=step_E1_ER)
+
+        errorMessage = "Runsteps PipelineStep \".*\" does not belong to Pipeline \".*\""
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runsteps_that_reuse_ER_cannot_have_associated_output_datasets(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+
+        # Define recycled runstep for mA
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER,reused=True)
+        step_E1_RS.clean()
+
+        # Assign it a Dataset (which is impossible)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+        self.impossible_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.impossible_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),
+                                         runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS.save()
+        self.impossible_DS_structure = DatasetStructure(dataset=self.impossible_DS,compounddatatype=self.doublet_cdt)
+        self.impossible_DS_structure.save()
+        self.impossible_DS.clean()
+
+        errorMessage = "RunStep \".*\" reused an ExecRecord and should not have generated any data"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_output_datasets_from_this_RS_should_also_belong_to_ERO_of_this_ER(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+
+        # Assign it a Dataset (But do not assign the dataset to the corresponding ERO)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+        self.impossible_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.impossible_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),
+                                         runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS.save()
+
+        errorMessage = "Dataset \".*\" is not in an ERO of ExecRecord \".*\""
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_each_undeleted_TO_should_have_ERO_pointing_to_existent_dataset(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Create a symDS (But do not give it actual dataset contents)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+
+        # Define ER and runstep for mA, along with an ERO that does not point to existent data
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        mA_ER.execrecordouts.create(symbolicdataset=self.impossible_symDS,output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+
+        errorMessage = "ExecRecordOut \".*\" should reference existent data"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_if_runstep_PS_stores_a_method_child_run_should_not_be_set(self):
+
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+        pE_run.parent_runstep = step_E1_RS
+        pE_run.save()
+
+        errorMessage = "PipelineStep is not a Pipeline but a child run exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+
+class CopperfishRunTests(CopperfishExecRecordTests_setup):
+    
+    def test_run_RS_must_be_consecutive(self):
+
+        # Define ER for pE, then register a run
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define a complete ER for this PS's transformation, then add a runstep for this pipeline step
+        step_E1_ER = self.step_E1.transformation.execrecords.create()
+        step_E1_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
+        step_E1_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=step_E1_ER)
+        self.assertEqual(pE_run.clean(), None)
+
+        # Do the same thing, but now add step 3
+        step_E3_ER = self.step_E3.transformation.execrecords.create()
+        step_E3_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,generic_input=self.E21_31)
+        step_E3_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,generic_input=self.E11_32)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,output=self.C1_out)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,output=self.C2_rawout)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,output=self.C3_rawout)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run,execrecord=step_E3_ER)
+        errorMessage = "RunSteps of Run \".*\" are not consecutively numbered starting from 1"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
+
+    def test_run_ER_must_point_to_same_pipeline_this_run_points_to(self):
+
+        # Define unrelated ER for pE's run
+        ER_unrelated = self.pD.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=ER_unrelated)
+
+        errorMessage = "Run points to pipeline \".*\" but corresponding ER does not"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
+
+    def test_run_for_EROs_present_must_match_corresponding_RunOutputCables(self):
+
+        # Define an ER + EROs
+        pE_ER = self.pE.execrecords.create()
+        E1_out_ERO = pE_ER.execrecordouts.create(symbolicdataset=self.C2_in_symDS,output=self.pE.outputs.get(dataset_name="E1_out"))
+
+        # Register it with a run
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # If an EROs exists, a corresponding RunOutputCable must exist
+        errorMessage = "ExecRecord of Run \".*\" has an entry for output \".*\" but no corresponding RunOutputCable exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
 
 class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
 
@@ -342,55 +553,32 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
 
 class CopperfishDatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup):
 
-    def test_Dataset_sourced_from_runstep_but_corresponding_ERO_doesnt_exist(self):
-        # If a dataset comes from a runstep, recycled or not, an ER should exist, with an ERO referring to it's symbolic dataset
+    def test_Dataset_sourced_from_runstep_with_corresponding_ER_but_ERO_doesnt_exist(self):
+        # A dataset linked with a runstep is clean if and only if a corresponding ERO must point to it
 
-        # Define an ER for pD
-        pD_ER = self.pD.execrecords.create(tainted=False)
-        ERI_D1_in = pD_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.D1_in)
-        ERI_D2_in = pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.D2_in)
+        # Define ER for pE, then a run using this ER
+        pE_ER = self.pE.execrecords.create(tainted=False)
+        pE_ERI_E1_in = pE_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E1_in)
+        run_pE = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
 
-        pD_ER.clean()
+        # Define ER for mA, then a runstep using this ER
+        mA_ER = self.mA.execrecords.create(tainted=False)
+        ERI_A1_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.A1_rawin)
+        runstep_stepE1 = self.step_E1.pipelinestep_instances.create(run=run_pE,execrecord=mA_ER,reused=False)
 
-        # Define a run for pipeline D
-        #self.pD.pipeline_instances.create(user=self.myUser,
-
-        # Define a runstep for this run
-
-        # Define a dataset generated by a runstep
-        #self.runstep_symDS = SymbolicDataset()
-        #self.runstep_symDS.save()
-        #self.runstep_DS = None
-        #with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
-            #self.runstep_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),runstep=????????,symbolicdataset=self.runstep_symDS)
-            #self.runstep_DS.save()
-        #self.runstep_DS_structure = DatasetStructure(dataset=self.runstep_DS,compounddatatype=self.triplet_cdt)
-        #self.runstep_DS_structure.save()
-
-        # No ERO points to it
-        errorMessage = "Dataset \".*\" comes from runstep \".*\", but has no corresponding ERO"
-        #self.assertRaisesRegexp(ValidationError,errorMessage, self.runstep_DS.clean)
-
-    def test_Dataset_sourced_from_runstep_and_ERO_exists_but_corresponding_ER_points_to_POC(self):
-        # If a dataset comes from a runstep, an ER should exist, with an ERO referring to it
-        # The ER must point to either a method or a pipeline, as a POCs don't relate to a runsteps
-
-        # Define a dataset generated by a runstep
+        # Define dataset that is generated by this this runstep
         self.runstep_symDS = SymbolicDataset()
         self.runstep_symDS.save()
         self.runstep_DS = None
-        with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
-            self.runstep_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),symbolicdataset=self.runstep_symDS)
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.runstep_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),runstep=runstep_stepE1,symbolicdataset=self.runstep_symDS)
             self.runstep_DS.save()
-        self.runstep_DS_structure = DatasetStructure(dataset=self.runstep_DS,compounddatatype=self.triplet_cdt)
+        self.runstep_DS_structure = DatasetStructure(dataset=self.runstep_DS,compounddatatype=self.doublet_cdt)
         self.runstep_DS_structure.save()
 
-        # Erroneously define an ER for POC D11_21 of pipeline D with the ERO to the symbolicdataset
-        D11_21_ER = self.D11_21.execrecords.create(tainted = False)
-        D11_21_ER.execrecordouts.create(symbolicdataset = self.runstep_symDS, output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-
-        errorMessage = "Dataset \".*\" comes from runstep \".*\", but corresponding ERO links with a POC"
+        errorMessage = "Dataset \".*\" comes from runstep \".*\", but has no corresponding ERO"
         #self.assertRaisesRegexp(ValidationError,errorMessage, self.runstep_DS.clean)
+
 
     def test_Dataset_sourced_from_run_so_but_corresponding_ERO_doesnt_exist(self):
         # If a dataset comes from a run, an ER should exist, with an ERO referring to it
