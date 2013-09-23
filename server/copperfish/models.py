@@ -2036,12 +2036,13 @@ class RunStep(models.Model):
         """
         self.clean()
 
+        # If runstep PS references a pipeline and a child_run is not set, it is incomplete
         if (type(self.pipelinestep.transformation) == Pipeline and
                 hasattr(self,"child_run") == False):
             raise ValidationError(
                 "Specified PipelineStep is a Pipeline but no child run exists")
 
-        # If the child is set, it should be complete_clean
+        # If the child is set, it should also be complete and clean
         if hasattr(self,"child_run") == True:
             self.child_run.complete_clean()
 

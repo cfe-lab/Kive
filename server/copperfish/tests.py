@@ -79,7 +79,7 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         self.E03_11 = self.step_E1.cables_in.create(transf_input=self.A1_rawin,step_providing_input=0,provider_output=self.E3_rawin)
         self.E01_21 = self.step_E2.cables_in.create(transf_input=self.D1_in,step_providing_input=0,provider_output=self.E1_in)
-        self.E01_22 = self.step_E2.cables_in.create(transf_input=self.D2_in,step_providing_input=0,provider_output=self.E2_in)
+        self.E02_22 = self.step_E2.cables_in.create(transf_input=self.D2_in,step_providing_input=0,provider_output=self.E2_in)
         self.E11_32 = self.step_E3.cables_in.create(transf_input=self.C2_in,step_providing_input=1,provider_output=self.A1_out)
         self.E21_31 = self.step_E3.cables_in.create(transf_input=self.C1_in,step_providing_input=2,provider_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
         self.E21_41 = self.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=self.doublet_cdt,step_providing_output=2,provider_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
@@ -142,7 +142,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.C1_in_symDS = SymbolicDataset()
         self.C1_in_symDS.save()
         self.C1_in_DS = None
-        with open(os.path.join(samplecode_path, "step_0_triplet.csv"), "rb") as f:
+        with open(os.path.join(samplecode_path, "C1_in_triplet.csv"), "rb") as f:
             self.C1_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C1_in_symDS)
             self.C1_in_DS.save()
         self.C1_in_DS.clean()
@@ -333,6 +333,22 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         errorMessage = "PipelineStep is not a Pipeline but a child run exists"
         self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_complete_clean_PS_stores_pipeline_but_no_child_run(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for pD
+        pD_ER = self.pD.execrecords.create()
+        pD_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E01_21)
+        pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E02_22)
+        pD_ER.execrecordouts.create(symbolicdataset=self.C1_in_symDS,output=self.pD.outputs.get(dataset_name="D1_out"))
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=pD_ER)
+
+        self.assertEqual(step_E2_RS.clean(), None)
+        errorMessage = "Specified PipelineStep is a Pipeline but no child run exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.complete_clean)
 
 
 class CopperfishRunTests(CopperfishExecRecordTests_setup):
