@@ -531,6 +531,9 @@ class CopperfishMethodTests_setup(TestCase):
 
         for ds in Datatype.objects.all():
             ds.verification_script.delete()
+            
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.delete()
 
 
 class Datatype_tests(CopperfishMethodTests_setup):
@@ -5248,6 +5251,9 @@ class Copperfish_Raw_Setup (TestCase):
 
         for ds in Datatype.objects.all():
             ds.verification_script.delete()
+            
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.delete()
 
 class PipelineStepRawDelete_tests(Copperfish_Raw_Setup):
 

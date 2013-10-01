@@ -1129,6 +1129,7 @@ class PipelineStepInputCable(models.Model):
 
     custom_wires = generic.GenericRelation("CustomCableWire")
 
+    execrecords = generic.GenericRelation("ExecRecord")
 
     # step_providing_input must be PRIOR to this step (Time moves forward)
 
@@ -1791,7 +1792,7 @@ class Run(models.Model):
             # If there are EROs for this Run's ExecRecord, check that there are
             # corresponding RunOutputCables (we know it to be clean by checking above).
             for ero in self.execrecord.execrecordouts.all():
-                curr_output = ero.output
+                curr_output = ero.generic_output
 
                 # FIXME: Changed general_transf__pipelineoutputcable to pipelineoutputcable
                 try:
@@ -1993,8 +1994,8 @@ class RunStep(models.Model):
         # Does pipelinestep belong to run.pipeline?
         if not self.run.pipeline.steps.filter(pk=self.pipelinestep.pk).exists():
             raise ValidationError(
-                "RunStep's PipelineStep \"{}\" does not belong to Pipeline \"{}\"".
-                format(self.pipelinestep, self.run.pipeline))
+                "PipelineStep \"{}\" of RunStep \"{}\" does not belong to Pipeline \"{}\"".
+                format(self.pipelinestep, self, self.run.pipeline))
 
         # Clean any existent RunSICs.
         for rsic in self.RSICs.all():
@@ -2021,12 +2022,15 @@ class RunStep(models.Model):
         # an ERO pointing to a non-null dataset
 
         # For each non-deleted TO in this runstep's PS
+        # We need to get the ContentType for a TO.
+        to_type = ContentType.objects.get_for_model(TransformationOutput)
         for to in self.pipelinestep.transformation.outputs.all():
             if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
                 continue
 
             # Get corresponding ERO for this complete_clean ER, see if it points to symDS containing a Dataset
-            corresp_ero = self.execrecord.execrecordouts.get(output=to)
+            corresp_ero = self.execrecord.execrecordouts.get(
+                content_type=to_type, object_id=to.id)
             if not corresp_ero.symbolicdataset.has_data():
                 raise ValidationError(
                     "ExecRecordOut \"{}\" should reference existent data".
@@ -2116,7 +2120,7 @@ class RunSIC(models.Model):
                 "RunSIC points to cable \"{}\" but corresponding ER does not".
                 format(self.PSIC))
 
-        if (not self.runstep.pipelinestep.cables.
+        if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
             raise ValidationError(
                 "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
@@ -2503,7 +2507,7 @@ class ExecRecordIn(models.Model):
             # the ERI must refer to a TI of the parent ER's Method/Pipeline.
             if type(self.generic_input) == TransformationOutput:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" must refer to a TI of the parent ExecRecord's Method/Pipeline".
+                    "ExecRecordIn \"{}\" must refer to a TI of the Method/Pipeline of the parent ExecRecord".
                     format(self))
 
             transf_inputs = self.execrecord.general_transf.inputs
@@ -2683,7 +2687,7 @@ class ExecRecordOut(models.Model):
 
                 # Dataset CDT must match generic_output's CDT.
                 if actual_data.structure.compounddatatype != self.generic_output.get_cdt():
-                    if type(self.generic_output) == PSIC:
+                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
                         raise ValidationError(
                             "CDT of Dataset \"{}\" does not match the CDT of the fed TransformationInput \"{}\"".
                             format(actual_data, self.generic_output))
@@ -2693,7 +2697,7 @@ class ExecRecordOut(models.Model):
                             format(actual_data, self.generic_output))
 
                 if self.generic_output.get_min_row() != None and actual_data.num_rows() < self.generic_output.get_min_row():
-                    if type(self.generic_output) == PSIC:
+                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
                         raise ValidationError(
                             "Dataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
                             format(actual_data, self.generic_output))
@@ -2703,7 +2707,7 @@ class ExecRecordOut(models.Model):
                             format(actual_data, self.generic_output))
 
                 if self.generic_output.get_max_row() != None and actual_data.num_rows() > self.generic_output.get_max_row():
-                    if type(self.generic_output) == PSIC:
+                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
                         raise ValidationError(
                             "Dataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
                             format(actual_data, self.generic_output))
