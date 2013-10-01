@@ -139,6 +139,10 @@ class CopperfishExecRecordTests_setup(TestCase):
             self.raw_DS.save()
         self.raw_DS.clean()
 
+        # Added September 30, 2013: symbolic dataset that results from E_01_21.
+        self.D1_in_symDS = SymbolicDataset()
+        self.D1_in_symDS.save()
+
         self.C1_in_symDS = SymbolicDataset()
         self.C1_in_symDS.save()
         self.C1_in_DS = None
@@ -220,12 +224,14 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
         pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
 
         # Define ER for mA
-        mB_ER = self.mA.execrecords.create()
-        mB_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        mB_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
 
         # Define runstep for mB
-        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=mB_ER)
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
         errorMessage = "RunStep points to transformation \".*\" but corresponding ER does not"
         self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.clean)
 
@@ -238,13 +244,16 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
         pX_ER = self.pX.execrecords.create()
         pX_run = self.pX.pipeline_instances.create(user=self.myUser,execrecord=pX_ER)
 
-        # Define ER + runstep for step E1 - but connect it with the wrong run pX
-        step_E1_ER = self.step_E1.transformation.execrecords.create()
-        step_E1_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        step_E1_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pX_run,execrecord=step_E1_ER)
+        # Define ER + runstep for step E1 (mA) - but connect it with the wrong run pX
+        mA_ER = self.step_E1.transformation.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pX_run, execrecord=mA_ER)
 
-        errorMessage = "Runsteps PipelineStep \".*\" does not belong to Pipeline \".*\""
+        errorMessage = "RunStep's PipelineStep \".*\" does not belong to Pipeline \".*\""
         self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
 
     def test_runsteps_that_reuse_ER_cannot_have_associated_output_datasets(self):
@@ -254,11 +263,14 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         # Define ER for mA
         mA_ER = self.mA.execrecords.create()
-        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
 
         # Define recycled runstep for mA
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER,reused=True)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER, reused=True)
         step_E1_RS.clean()
 
         # Assign it a Dataset (which is impossible)
@@ -266,10 +278,13 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
         self.impossible_symDS.save()
         self.impossible_DS = None
         with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.impossible_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),
-                                         runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f),
+                runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
             self.impossible_DS.save()
-        self.impossible_DS_structure = DatasetStructure(dataset=self.impossible_DS,compounddatatype=self.doublet_cdt)
+        self.impossible_DS_structure = DatasetStructure(
+            dataset=self.impossible_DS, compounddatatype=self.doublet_cdt)
         self.impossible_DS_structure.save()
         self.impossible_DS.clean()
 
@@ -283,17 +298,22 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         # Define ER and runstep for mA
         mA_ER = self.mA.execrecords.create()
-        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
 
         # Assign it a Dataset (But do not assign the dataset to the corresponding ERO)
         self.impossible_symDS = SymbolicDataset()
         self.impossible_symDS.save()
         self.impossible_DS = None
         with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.impossible_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),
-                                         runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f),
+                runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
             self.impossible_DS.save()
 
         errorMessage = "Dataset \".*\" is not in an ERO of ExecRecord \".*\""
@@ -310,9 +330,12 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         # Define ER and runstep for mA, along with an ERO that does not point to existent data
         mA_ER = self.mA.execrecords.create()
-        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        mA_ER.execrecordouts.create(symbolicdataset=self.impossible_symDS,output=self.A1_out)
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.impossible_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
 
         errorMessage = "ExecRecordOut \".*\" should reference existent data"
         self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
@@ -325,8 +348,10 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         # Define ER and runstep for mA
         mA_ER = self.mA.execrecords.create()
-        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
         pE_run.parent_runstep = step_E1_RS
         pE_run.save()
@@ -341,10 +366,14 @@ class CopperfishRunStepTests(CopperfishExecRecordTests_setup):
 
         # Define ER and runstep for pD
         pD_ER = self.pD.execrecords.create()
-        pD_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E01_21)
-        pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E02_22)
-        pD_ER.execrecordouts.create(symbolicdataset=self.C1_in_symDS,output=self.pD.outputs.get(dataset_name="D1_out"))
-        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=pD_ER)
+        pD_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
+                                   generic_input=self.D1_in)
+        pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                   generic_input=self.D2_in)
+        pD_ER.execrecordouts.create(symbolicdataset=self.C1_in_symDS,
+                                    generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(
+            run=pE_run, execrecord=pD_ER)
 
         self.assertEqual(step_E2_RS.clean(), None)
         errorMessage = "Specified PipelineStep is a Pipeline but no child run exists"
@@ -360,20 +389,29 @@ class CopperfishRunTests(CopperfishExecRecordTests_setup):
         pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
 
         # Define a complete ER for this PS's transformation, then add a runstep for this pipeline step
-        step_E1_ER = self.step_E1.transformation.execrecords.create()
-        step_E1_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        step_E1_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,output=self.A1_out)
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=step_E1_ER)
+        mA_ER = self.step_E1.transformation.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
         self.assertEqual(pE_run.clean(), None)
 
         # Do the same thing, but now add step 3
-        step_E3_ER = self.step_E3.transformation.execrecords.create()
-        step_E3_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,generic_input=self.E21_31)
-        step_E3_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,generic_input=self.E11_32)
-        step_E3_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,output=self.C1_out)
-        step_E3_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,output=self.C2_rawout)
-        step_E3_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,output=self.C3_rawout)
-        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run,execrecord=step_E3_ER)
+        mC_ER = self.step_E3.transformation.execrecords.create()
+        mC_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,
+                                   generic_input=self.C1_in)
+        mC_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,
+                                   generic_input=self.C2_in)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,
+                                    generic_output=self.C1_out)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,
+                                    generic_output=self.C2_rawout)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,
+                                    generic_output=self.C3_rawout)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(
+            run=pE_run, execrecord=mC_ER)
         errorMessage = "RunSteps of Run \".*\" are not consecutively numbered starting from 1"
         self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
 
@@ -381,7 +419,8 @@ class CopperfishRunTests(CopperfishExecRecordTests_setup):
 
         # Define unrelated ER for pE's run
         ER_unrelated = self.pD.execrecords.create()
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=ER_unrelated)
+        pE_run = self.pE.pipeline_instances.create(
+            user=self.myUser, execrecord=ER_unrelated)
 
         errorMessage = "Run points to pipeline \".*\" but corresponding ER does not"
         self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
@@ -390,7 +429,9 @@ class CopperfishRunTests(CopperfishExecRecordTests_setup):
 
         # Define an ER + EROs
         pE_ER = self.pE.execrecords.create()
-        E1_out_ERO = pE_ER.execrecordouts.create(symbolicdataset=self.C2_in_symDS,output=self.pE.outputs.get(dataset_name="E1_out"))
+        E1_out_ERO = pE_ER.execrecordouts.create(
+            symbolicdataset=self.C2_in_symDS,
+            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
 
         # Register it with a run
         pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
@@ -405,31 +446,67 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
         # ER links POC: ERI must link to the TO that the POC gets output from
         myER = self.E21_41.execrecords.create(tainted=False)
 
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
-        self.assertRaisesRegexp(ValidationError,"ExecRecordIn \".*\" does not denote the TO that feeds the parent ExecRecord POC",myERI_bad.clean)
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                              generic_input=self.C1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordIn \".*\" does not denote the TO that feeds the parent ExecRecord POC",
+            myERI_bad.clean)
 
-    def test_ER_doesnt_link_POC_so_ERI_musnt_link_TO(self):
-        # ER doesn't link POC (So, method/pipeline): ERI must not link a TO (which would imply ER should link POC)
+    def test_ER_links_PSIC_so_ERI_must_link_TX_that_PSIC_is_fed_by(self):
+        # ER links PSIC: ERI must link to the TO/TI that the PSIC is fed by
+        myER = self.E_11_32.execrecords.create(tainted=False)
+
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                              generic_input=self.C1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordIn \".*\" does not denote the TO/TI that feeds the parent ExecRecord PSIC",
+            myERI_bad.clean)
+        
+        yourER = self.E_02_22.execrecords.create(tainted=False)
+
+        yourERI_bad = yourER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                                  generic_input=self.D2_in)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordIn \".*\" does not denote the TO/TI that feeds the parent ExecRecord PSIC",
+            yourERI_bad.clean)
+
+    def test_ER_doesnt_link_cable_so_ERI_mustnt_link_TO(self):
+        # ER doesn't refer to a cable (So, method/pipeline): ERI must refer to a TI
         myER = self.mA.execrecords.create(tainted=False)
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.C1_out)
-        self.assertRaisesRegexp(ValidationError,"ExecRecordIn \".*\" denotes a PipelineOutputCable but parent ExecRecord does not",myERI_bad.clean)
+        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                              generic_input=self.C1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordIn \".*\" must refer to a TI of the parent ExecRecord's Method/Pipeline",
+            myERI_bad.clean)
 
-    def test_ERI_linking_TI_must_be_member_of_pipeline_linked_by_ER(self):
-        # ERI links TI: TI must be a member of the ER's pipeline
+    def test_ER_links_toplevel_pipeline_so_TI_of_ERI_must_be_member_of_pipeline(self):
+        # ERI links TI: TI must be a member of the ER's method/pipeline
         myER = self.pE.execrecords.create(tainted=False)
-        myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.pE.inputs.get(dataset_name="E1_in"))
+        myERI_good = myER.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.pE.inputs.get(dataset_name="E1_in"))
         self.assertEqual(myERI_good.clean(), None)
         
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.pD.inputs.get(dataset_name="D2_in"))
-        self.assertRaisesRegexp(ValidationError,"Input \".*\" does not belong to Pipeline of ExecRecord \".*\"",myERI_bad.clean)
+        myERI_bad = myER.execrecordins.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_input=self.pD.inputs.get(dataset_name="D2_in"))
+        self.assertRaisesRegexp(ValidationError,"Input \".*\" does not belong to Method/Pipeline of ExecRecord \".*\"",myERI_bad.clean)
 
-    def test_ER_links_pipelinemethod_so_ERI_must_link_cable_with_destination_TI_belonging_to_transformation(self):
-        # ERI links PSIC (so input feeds a pipeline step) - destination TI of cable must belong to TI of that transformation
+    def test_ER_links_sub_pipelinemethod_so_ERI_must_link_TI_belonging_to_transformation(self):
+        # ER is a sub-pipeline/method - ERI must refer to TI of that transformation
         myER = self.pD.execrecords.create(tainted=False)
-        myERI_good = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E01_21)
+        myERI_good = myER.execrecordins.create(
+            symbolicdataset=self.D1_in_symDS,
+            generic_input=self.D1_in)
         self.assertEqual(myERI_good.clean(), None)
         
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
+        myERI_bad = myER.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.D1_out)
         self.assertRaisesRegexp(ValidationError,"Cable \".*\" does not feed Method/Pipeline of ExecRecord \".*\"",myERI_bad.clean)
 
     def test_ERI_dataset_must_match_rawunraw_state_of_generic_input_it_was_fed_into(self):
@@ -437,64 +514,127 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
 
         myER_C = self.mC.execrecords.create(tainted=False)
 
-        myERI_unraw_unraw = myER_C.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E21_31)
+        myERI_unraw_unraw = myER_C.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.C1_in)
         self.assertEqual(myERI_unraw_unraw.clean(), None)
 
-        myERI_raw_unraw_BAD = myER_C.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E11_32)
+        myERI_raw_unraw_BAD = myER_C.execrecordins.create(
+            symbolicdataset=self.raw_symDS,
+            generic_input=self.C2_in)
         self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_raw_unraw_BAD.clean)
+        myERI_raw_unraw_BAD.delete()
 
         myER_A = self.mA.execrecords.create(tainted=False)
-        myERI_unraw_raw_BAD = myER_A.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E03_11)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_unraw_raw_BAD.clean)
+        myERI_unraw_raw_BAD = myER_A.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.A1_rawin)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" cannot feed source \".*\"",
+            myERI_unraw_raw_BAD.clean)
         myERI_unraw_raw_BAD.delete()
     
-        myERI_raw_raw = myER_A.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.E03_11)
-        myERI_raw_raw.clean()
+        myERI_raw_raw = myER_A.execrecordins.create(
+            symbolicdataset=self.raw_symDS,
+            generic_input=self.A1_rawin)
+        self.assertEqual(myERI_raw_raw.clean(), None)
 
     def test_ER_links_POC_ERI_links_TO_which_constrains_input_dataset_CDT(self):
         # ERI links with a TO (For a POC leading from source TO), the input dataset CDT is constrained by the source TO
         myER = self.E21_41.execrecords.create(tainted=False)
 
-        # We annotate that triplet was fed into D1_out which was connected by E21_41
-        myERI_wrong_CDT = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.pD.outputs.get(dataset_name="D1_out"))
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" is not of the expected CDT",myERI_wrong_CDT.clean)
+        # We annotate that triplet was fed from D1_out into E21_41
+        myERI_wrong_CDT = myER.execrecordins.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" is not of the expected CDT",
+            myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
         # Right CDT but wrong number of rows (It needs < 5, we have 10)
-        myERI_too_many_rows = myER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.pD.outputs.get(dataset_name="D1_out"))
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" has too many rows to have come from TransformationOutput \".*\"",myERI_too_many_rows.clean)
+        myERI_too_many_rows = myER.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" has too many rows to have come from TransformationOutput \".*\"",
+            myERI_too_many_rows.clean)
 
     def test_ER_links_pipeline_ERI_links_TI_which_constrains_input_dataset_CDT(self):
         # ERI links with a TI (for pipeline inputs) - the dataset is constrained by the pipeline TI CDT
 
         myER = self.pE.execrecords.create(tainted=False)
-        myERI_wrong_CDT = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E1_in)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" is not of the expected CDT",myERI_wrong_CDT.clean)
+        myERI_wrong_CDT = myER.execrecordins.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_input=self.E1_in)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" is not of the expected CDT",
+            myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
-        myERI_too_few_rows = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E2_in)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" has too few rows for TransformationInput \".*\"",myERI_too_few_rows.clean)
+        myERI_too_few_rows = myER.execrecordins.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_input=self.E2_in)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" has too few rows for TransformationInput \".*\"",
+            myERI_too_few_rows.clean)
 
-        # Define dataset of correct CDT (singlet) with > 10 rows
+        # A dataset of correct triplet CDT.
         self.triplet_large_symDS = SymbolicDataset()
         self.triplet_large_symDS.save()
         self.triplet_large_DS = None
         with open(os.path.join(samplecode_path, "triplet_cdt_large.csv"), "rb") as f:
-            self.triplet_large_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),symbolicdataset=self.triplet_large_symDS)
+            self.triplet_large_DS = Dataset(
+                user=self.myUser, name="triplet", description="lol",
+                dataset_file=File(f), symbolicdataset=self.triplet_large_symDS)
             self.triplet_large_DS.save()
-        self.triplet_large_DS_structure = DatasetStructure(dataset=self.triplet_large_DS,compounddatatype=self.triplet_cdt)
+        self.triplet_large_DS_structure = DatasetStructure(
+            dataset=self.triplet_large_DS,
+            compounddatatype=self.triplet_cdt)
         self.triplet_large_DS_structure.save()
         self.triplet_large_DS.clean()
+        
+        # Define dataset of correct CDT (singlet) with > 10 rows
+        self.singlet_large_symDS = SymbolicDataset()
+        self.singlet_large_symDS.save()
+        self.singlet_large_DS = None
+        with open(os.path.join(samplecode_path, "singlet_cdt_large.csv"), "rb") as f:
+            self.singlet_large_DS = Dataset(
+                user=self.myUser, name="singlet", description="lol",
+                dataset_file=File(f), symbolicdataset=self.singlet_large_symDS)
+            self.singlet_large_DS.save()
+        self.singlet_large_DS_structure = DatasetStructure(
+            dataset=self.singlet_large_DS,
+            compounddatatype=self.singlet_cdt)
+        self.singlet_large_DS_structure.save()
+        self.singlet_large_DS.clean()
 
-        myERI_right_CDT = myER.execrecordins.create(symbolicdataset=self.triplet_large_symDS,generic_input=self.E1_in)
-        self.assertEqual(myERI_right_CDT.clean(), None)
+        myERI_right_E1 = myER.execrecordins.create(
+            symbolicdataset=self.triplet_large_symDS,
+            generic_input=self.E1_in)
+        self.assertEqual(myERI_right_E1.clean(), None)
 
-    def test_ER_links_pipelinestep_ERI_links_PSIC_provider_output_constrains_input_CDT(self):
-        # The provider_output of a cable (PSIC) constrains the dataset of when the ER links with a method
+        myERI_right_E2 = myER.execrecordins.create(
+            symbolicdataset=self.singlet_large_symDS,
+            generic_input=self.E2_in)
+        self.assertEqual(myERI_right_E2.clean(), None)
+
+    def test_ER_links_pipelinestep_ERI_links_TI_which_constrains_input_CDT(self):
+        # The transformation input of its PipelineStep constrains the dataset when the ER links with a method
         
         myER = self.mC.execrecords.create(tainted=False)
-        myERI_wrong_CDT = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,generic_input=self.E11_32)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" is not of the expected CDT",myERI_wrong_CDT.clean)
+        myERI_wrong_CDT = myER.execrecordins.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_input=self.C2_in)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" is not of the expected CDT",
+            myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
         # Define dataset with correct CDT (doublet)
@@ -502,13 +642,17 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
         self.doublet_symDS.save()
         self.doublet_DS = None
         with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.doublet_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_symDS)
+            self.doublet_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f), symbolicdataset=self.doublet_symDS)
             self.doublet_DS.save()
-        self.doublet_DS_structure = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.doublet_cdt)
+        self.doublet_DS_structure = DatasetStructure(
+            dataset=self.doublet_DS, compounddatatype=self.doublet_cdt)
         self.doublet_DS_structure.save()
         self.doublet_DS.clean()
 
-        myERI_right_CDT = myER.execrecordins.create(symbolicdataset=self.doublet_symDS,generic_input=self.E11_32)
+        myERI_right_CDT = myER.execrecordins.create(
+            symbolicdataset=self.doublet_symDS, generic_input=self.C2_in)
         self.assertEqual(myERI_right_CDT.clean(), None)
 
     def test_ER_links_with_POC_ERO_TO_must_belong_to_same_pipeline_as_ER_POC(self):
@@ -518,13 +662,20 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
         myER = self.E31_42.execrecords.create(tainted=False)
 
         # This ERO has a TO that belongs to this pipeline
-        myERO_good = myER.execrecordouts.create(symbolicdataset=self.singlet_symDS,output=self.pE.outputs.get(dataset_name="E2_out"))
+        myERO_good = myER.execrecordouts.create(
+            symbolicdataset=self.singlet_symDS,
+            generic_output=self.pE.outputs.get(dataset_name="E2_out"))
         self.assertEqual(myERO_good.clean(), None)
         myERO_good.delete()
 
         # This ERO has a TO that does NOT belong to this pipeline
-        myERO_bad = myER.execrecordouts.create(symbolicdataset=self.triplet_3_rows_symDS,output=self.pD.outputs.get(dataset_name="D1_out"))
-        self.assertRaisesRegexp(ValidationError,"ExecRecordOut \".*\" does not belong to the same pipeline as its parent ExecRecord POC", myERO_bad.clean)
+        myERO_bad = myER.execrecordouts.create(
+            symbolicdataset=self.triplet_3_rows_symDS,
+            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordOut \".*\" does not belong to the same pipeline as its parent ExecRecord POC",
+            myERO_bad.clean)
 
     def test_ER_links_with_POC_and_POC_output_name_must_match_pipeline_TO_name(self):
         # The TO must have the same name as the POC which supposedly created it
@@ -533,61 +684,94 @@ class CopperfishExecRecordTests(CopperfishExecRecordTests_setup):
         myER = self.E21_41.execrecords.create(tainted=False)
 
         # Define ERO with a TO that is part of pipeline E but with the wrong name from the POC
-        myERO_bad = myER.execrecordouts.create(symbolicdataset=self.triplet_3_rows_symDS,output=self.pE.outputs.get(dataset_name="E2_out"))
-        self.assertRaisesRegexp(ValidationError,"ExecRecordOut \".*\" does not represent the same output as its parent ExecRecord POC", myERO_bad.clean)
+        myERO_bad = myER.execrecordouts.create(
+            symbolicdataset=self.triplet_3_rows_symDS,
+            generic_output=self.pE.outputs.get(dataset_name="E2_out"))
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordOut \".*\" does not represent the same output as its parent ExecRecord POC",
+            myERO_bad.clean)
 
     def test_ER_if_dataset_is_undeleted_it_must_be_coherent_with_output(self):
         # 1) If the data is raw, the ERO output TO must also be raw
         myER = self.mC.execrecords.create(tainted=False)
 
-        myERO_rawDS_rawTO = myER.execrecordouts.create(symbolicdataset=self.raw_symDS,output=self.C3_rawout)
+        myERO_rawDS_rawTO = myER.execrecordouts.create(
+            symbolicdataset=self.raw_symDS, generic_output=self.C3_rawout)
         self.assertEqual(myERO_rawDS_rawTO.clean(), None)
         myERO_rawDS_rawTO.delete()
 
-        myERO_rawDS_nonrawTO = myER.execrecordouts.create(symbolicdataset=self.raw_symDS,output=self.C1_out)
-        self.assertRaisesRegexp(ValidationError,"Dataset \"raw .*\" cannot have come from output \".*\"", myERO_rawDS_nonrawTO.clean)
+        myERO_rawDS_nonrawTO = myER.execrecordouts.create(
+            symbolicdataset=self.raw_symDS, generic_output=self.C1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \"raw .*\" cannot have come from output \".*\"",
+            myERO_rawDS_nonrawTO.clean)
         myERO_rawDS_nonrawTO.delete()
 
-        myERO_DS_rawTO = myER.execrecordouts.create(symbolicdataset=self.singlet_symDS,output=self.C3_rawout)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot have come from output \".*\"", myERO_DS_rawTO.clean)
+        myERO_DS_rawTO = myER.execrecordouts.create(
+            symbolicdataset=self.singlet_symDS, generic_output=self.C3_rawout)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" cannot have come from output \".*\"",
+            myERO_DS_rawTO.clean)
         myERO_DS_rawTO.delete()
 
-        myERO_DS_TO = myER.execrecordouts.create(symbolicdataset=self.singlet_symDS,output=self.C1_out)
+        myERO_DS_TO = myER.execrecordouts.create(
+            symbolicdataset=self.singlet_symDS, generic_output=self.C1_out)
         self.assertEqual(myERO_DS_TO.clean(), None)
         myERO_DS_TO.delete()
         
         # 2) Dataset must have the same CDT of the producing TO
-        myERO_invalid_CDT = myER.execrecordouts.create(symbolicdataset=self.triplet_symDS,output=self.C1_out)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot have come from output \".*\"", myERO_DS_rawTO.clean)
+        myERO_invalid_CDT = myER.execrecordouts.create(
+            symbolicdataset=self.triplet_symDS, generic_output=self.C1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" cannot have come from output \".*\"",
+            myERO_DS_rawTO.clean)
         myERO_invalid_CDT.delete()
 
         # Dataset must have num rows within the row constraints of the producing TO
         myER_2 = self.mB.execrecords.create(tainted=False)
-        myERO_too_many_rows = myER_2.execrecordouts.create(symbolicdataset=self.triplet_symDS,output=self.B1_out)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" was produced by TransformationOutput \".*\" but has too many rows", myERO_too_many_rows.clean)
+        myERO_too_many_rows = myER_2.execrecordouts.create(
+            symbolicdataset=self.triplet_symDS, generic_output=self.B1_out)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset \".*\" was produced by TransformationOutput \".*\" but has too many rows",
+            myERO_too_many_rows.clean)
         myERO_too_many_rows.delete()
 
+# FIXME Note to self (Richard) September 30, 2013: go through these tomorrow and fix them.
 class CopperfishDatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup):
 
     def test_Dataset_sourced_from_runstep_with_corresponding_ER_but_ERO_doesnt_exist(self):
+        # Appears to be checked at the RunStep level.
         # A dataset linked with a runstep is clean if and only if a corresponding ERO must point to it
 
         # Define ER for pE, then a run using this ER
         pE_ER = self.pE.execrecords.create(tainted=False)
-        pE_ERI_E1_in = pE_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,generic_input=self.E1_in)
+        pE_ERI_E1_in = pE_ER.execrecordins.create(
+            symbolicdataset=self.triplet_symDS,
+            generic_input=self.E1_in)
         run_pE = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
 
         # Define ER for mA, then a runstep using this ER
         mA_ER = self.mA.execrecords.create(tainted=False)
-        ERI_A1_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,generic_input=self.A1_rawin)
-        runstep_stepE1 = self.step_E1.pipelinestep_instances.create(run=run_pE,execrecord=mA_ER,reused=False)
+        ERI_A1_in = mA_ER.execrecordins.create(
+            symbolicdataset=self.raw_symDS,
+            generic_input=self.A1_rawin)
+        runstep_stepE1 = self.step_E1.pipelinestep_instances.create(
+            run=run_pE, execrecord=mA_ER, reused=False)
 
         # Define dataset that is generated by this this runstep
         self.runstep_symDS = SymbolicDataset()
         self.runstep_symDS.save()
         self.runstep_DS = None
         with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.runstep_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),runstep=runstep_stepE1,symbolicdataset=self.runstep_symDS)
+            self.runstep_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f), runstep=runstep_stepE1,
+                symbolicdataset=self.runstep_symDS)
             self.runstep_DS.save()
         self.runstep_DS_structure = DatasetStructure(dataset=self.runstep_DS,compounddatatype=self.doublet_cdt)
         self.runstep_DS_structure.save()
@@ -596,8 +780,9 @@ class CopperfishDatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup)
         #self.assertRaisesRegexp(ValidationError,errorMessage, self.runstep_DS.clean)
 
 
-    def test_Dataset_sourced_from_run_so_but_corresponding_ERO_doesnt_exist(self):
-        # If a dataset comes from a run, an ER should exist, with an ERO referring to it
+    def test_Dataset_sourced_from_ROC_so_but_corresponding_ERO_doesnt_exist(self):
+        # INCOMPLETE
+        # If a dataset comes from a ROC, an ER should exist, with an ERO referring to it
 
         # Define a dataset generated by a run
         self.run_symDS = SymbolicDataset()
@@ -614,6 +799,8 @@ class CopperfishDatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup)
         #self.assertRaisesRegexp(ValidationError,errorMessage, self.runstep_DS.clean)
 
     def test_Dataset_sourced_from_run_and_ERO_exists_but_corresponding_ER_points_to_method_or_pipeline(self):
+        # Appears to be redundant; this would be checked at the RunStep level (the ER
+        # must refer to the transformation of the RunStep, and not a POC).
         # If a dataset comes from a run, an ER should exist, with an ERO referring to it
         # The ER must point to a POC, as method/pipelines have to do with runsteps, not runs
 
@@ -629,7 +816,7 @@ class CopperfishDatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup)
 
         # Erroneously define an ER for POC D11_21 of pipeline D with the ERO to the symbolicdataset
         D11_21_ER = self.D11_21.execrecords.create(tainted = False)
-        D11_21_ER.execrecordouts.create(symbolicdataset = self.runstep_symDS, output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+        D11_21_ER.execrecordouts.create(symbolicdataset = self.runstep_symDS, generic_output=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
 
         errorMessage = "Dataset \".*\" comes from runstep \".*\", but corresponding ERO links with a POC"
         #self.assertRaisesRegexp(ValidationError,errorMessage, self.runstep_DS.clean)
