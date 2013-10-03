@@ -515,6 +515,9 @@ class CopperfishMethodTests_setup(TestCase):
         self.test_cr_4 = test_cr_4
         self.test_cr_4_rev1 = test_cr_4_rev1
 
+        f.close()
+        
+
     def tearDown(self):
         # Go through all CodeResourceRevisions and VerificationScripts
         # and delete them.
@@ -527,12 +530,15 @@ class CopperfishMethodTests_setup(TestCase):
             # it still entered the above.  This seems to be a bug
             # in Django!
             if crr.coderesource.filename != "":
+                crr.content_file.close()
                 crr.content_file.delete()
 
         for ds in Datatype.objects.all():
+            ds.verification_script.close()
             ds.verification_script.delete()
             
         for dataset in Dataset.objects.all():
+            dataset.dataset_file.close()
             dataset.dataset_file.delete()
 
 
@@ -5247,12 +5253,15 @@ class Copperfish_Raw_Setup (TestCase):
         # Go through all CodeResourceRevisions and VerificationScripts
         # and delete them.
         for crr in CodeResourceRevision.objects.all():
+            crr.content_file.close()
             crr.content_file.delete()
 
         for ds in Datatype.objects.all():
+            ds.verification_script.close()
             ds.verification_script.delete()
             
         for dataset in Dataset.objects.all():
+            dataset.dataset_file.close()
             dataset.dataset_file.delete()
 
 class PipelineStepRawDelete_tests(Copperfish_Raw_Setup):

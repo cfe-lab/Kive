@@ -225,12 +225,15 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         for crr in CodeResourceRevision.objects.all():
             if crr.coderesource.filename != "":
+                crr.content_file.close()
                 crr.content_file.delete()
                 
         for ds in Datatype.objects.all():
+            ds.verification_script.close()
             ds.verification_script.delete()
 
         for dataset in Dataset.objects.all():
+            dataset.dataset_file.close()
             dataset.dataset_file.delete()
 
 class RunStepTests(CopperfishExecRecordTests_setup):
