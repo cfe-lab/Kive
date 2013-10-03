@@ -1859,7 +1859,7 @@ class RunOutputCable(models.Model):
         help_text="Denotes whether this run reused the action of an output cable")
     pipelineoutputcable = models.ForeignKey(
         PipelineOutputCable,
-        related_name="pipelineoutputcable_instances")
+        related_name="poc_instances")
 
     class Meta:
         # Uniqueness constraint ensures that no POC is multiply-represented
@@ -1896,31 +1896,12 @@ class RunOutputCable(models.Model):
                 filter(pk=self.pipelineoutputcable.pk).exists()):
             raise ValidationError(
                 "POC \"{}\" does not belong to Pipeline \"{}\"".
-                format(self.pipelineoutputcable, self.pipeline))
+                format(self.pipelineoutputcable, self.run.pipeline))
 
         if self.reused and self.has_data():
             raise ValidationError(
                 "RunOutputCable \"{}\" reused an ExecRecord and should not have generated Dataset \"{}\"".
                 format(self, self.output))
-
-        # If this ROC's output was not marked for deletion (either
-        # this Run is a top-level run or the run was a sub-pipeline
-        # and the parent RunStep did not mark this output for
-        # deletion), then the ERO should have existent data.  That is,
-        # the actual data is required to be retained.
-        
-        # We know there is only one ERO because we called execrecord.complete_clean().
-        corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
-        if self.run.parent_runstep != None:
-            # Was this marked for deletion?
-            ROC_deleted = self.run.parent_runstep.outputs_to_delete.filter(
-                dataset_name=self.pipelineoutputcable.output_name).exists()
-
-            # If not, then the ER must contain real data for the ERO.
-            if not ROC_deleted and not corresp_ero.has_data():
-                raise ValidationError(
-                    "ExecRecordOut \"{}\" should reference existent data".
-                    format(corresp_ero))
                     
         # If there is existent data associated, clean it and check that it belongs
         # to the ERO of self.execrecord.   
@@ -1933,7 +1914,7 @@ class RunOutputCable(models.Model):
                     format(self.output, self.execrecord))
 
 
-    def has_data():
+    def has_data(self):
         """True if associated output exists; False if not."""
         return hasattr(self, "output")
         

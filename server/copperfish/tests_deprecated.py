@@ -532,3 +532,79 @@ class CopperfishDatasetAndDatasetStructureTests_changedbyrestructure(CopperfishE
         errorMessage = "Dataset \".*\" comes from runstep \".*\", but has no corresponding ERO"
         self.assertRaisesRegexp(ValidationError, errorMessage, self.runstep_DS.clean)
 
+class RunOutputCableTests_deprecated(CopperfishExecRecordTests_setup):
+
+    # This test is deprecated (and incomplete, but why finish it?)
+    # - RL, October 3, 2013
+    def test_ROC_ERO_must_have_data_if_ROC_is_not_deleted(self):
+        """If the POC is not marked for deletion, the ERO must have real data."""
+        # Define ER for pE, then register a run.
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Create an ER for mA and its input cable, and then a corresponding RunStep
+        # and RSIC.
+        E03_11_ER = self.E03_11.execrecords.create()
+        E03_11_ER.execrecordins.create(
+            symbolicdataset=self.raw_symDS, generic_input=self.E3_rawin)
+        E03_11_ER.execrecordouts.create(
+            symbolicdataset=self.raw_symDS, generic_output=self.A1_rawin)
+        
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(
+            symbolicdataset=self.raw_symDS, generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(
+            symbolicdataset=self.doublet_symDS,
+            generic_output=self.mA.outputs.get(dataset_name="A1_out"))
+
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
+        E03_11_RSIC = self.E03_11.psic_instances.create(
+            runstep=step_E1_RS, execrecord=E03_11_ER)
+
+        # Quick check: pE_run should be OK.
+        self.assertEquals(pE_run.clean(), None)
+        
+        # Same for pD
+        pD_ER = self.pD.execrecords.create()
+        pD_run = self.pD.pipeline_instances.create(user=self.myUser,execrecord=pD_ER)
+        
+        # Create an execrecord for one of the POCs of pD.
+        D11_21_ER = self.D11_21.execrecords.create()
+        empty_sd = SymbolicDataset()
+        empty_sd.save()
+        source = D11_21_ER.execrecordins.create(
+            symbolicdataset=empty_sd,
+            generic_input=self.mB.outputs.get(dataset_name="B1_out"))
+        dest = D11_21_ER.execrecordouts.create(
+            symbolicdataset=empty_sd,
+            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+
+        # Bad case 1: sub-pipeline POC is not marked for deletion;
+        # ERO does not have real data.
+        D11_21_ROC = self.D11_21.poc_instances.create(
+            run=pD_run, execrecord=D11_21_ER)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordOut .* should reference existent data",
+            D11_21_ROC.clean)
+
+        # Good case 1: sub-pipeline POC is not marked for deletion and ERO
+        # has real data.
+        source.symbolicdataset = self.triplet_3_rows_symDS
+        source.save()
+        dest.symbolicdataset = self.triplet_3_rows_symDS
+        dest.save()
+        self.assertEquals(D11_21_ROC.clean(), None)
+
+        # Mark output D1_out of step 2 (pD) for deletion.
+        self.step_E2.add_deletion(self.pD.outputs.get(dataset_name="D1_out"))
+        
+        # Good cases 2 and 3: sub-pipeline POC is marked for deletion;
+        # ERO can have real data or not, either is OK.
+        self.assertEquals(D11_21_ROC.clean(), None)
+
+        source.symbolicdataset = empty_sd
+        dest.symbolicdataset = empty_sd
+        self.assertEquals(D11_21_ROC.clean(), None)
+        
