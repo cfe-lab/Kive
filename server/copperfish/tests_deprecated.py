@@ -608,3 +608,378 @@ class RunOutputCableTests_deprecated(CopperfishExecRecordTests_setup):
         dest.symbolicdataset = empty_sd
         self.assertEquals(D11_21_ROC.clean(), None)
         
+
+    def test_ROC_poc_belongs_to_pipeline_of_parent_Run(self):
+        """POC belongs to the parent Run's Pipeline."""
+        # Define ER for pE, then register a run.
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+        
+        # Same for pD
+        pD_ER = self.pD.execrecords.create()
+        pD_run = self.pD.pipeline_instances.create(user=self.myUser,execrecord=pD_ER)
+
+        # Create an execrecord for one of the POCs.
+        E21_41_ER = self.E21_41.execrecords.create()
+        empty_sd_source = SymbolicDataset()
+        empty_sd_source.save()
+        empty_sd_dest = SymbolicDataset()
+        empty_sd_dest.save()
+        E21_41_ER.execrecordins.create(
+            symbolicdataset=empty_sd_source,
+            generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        E21_41_ER.execrecordouts.create(
+            symbolicdataset=empty_sd_dest,
+            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
+
+        # Create an execrecord for one of the POCs of pD.
+        D11_21_ER = self.D11_21.execrecords.create()
+        empty_sd_source_2 = SymbolicDataset()
+        empty_sd_source_2.save()
+        empty_sd_dest_2 = SymbolicDataset()
+        empty_sd_dest_2.save()
+        D11_21_ER.execrecordins.create(
+            symbolicdataset=empty_sd_source_2,
+            generic_input=self.mB.outputs.get(dataset_name="B1_out"))
+        D11_21_ER.execrecordouts.create(
+            symbolicdataset=empty_sd_dest_2,
+            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+
+        
+        # Good case: the ROC for E21_41 lists pE_run as its parent run.
+        E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run,
+                                                      execrecord=E21_41_ER)
+        self.assertEquals(E21_41_ROC.clean(), None)
+
+        # Bad case: the ROC for E21_41 lists pD_run as its parent run.
+        E21_41_ROC.run = pD_run
+        self.assertRaisesRegexp(
+            ValidationError,
+            "POC .* does not belong to Pipeline .*",
+            E21_41_ROC.clean)
+
+    def test_ROC_reusing_ER_should_have_no_attached_data(self):
+        """A ROC that reuses an ER should have no associated Dataset."""
+        # Define ER for pE, then register a run.
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        E21_41_ER = self.E21_41.execrecords.create()
+        empty_sd_source = SymbolicDataset()
+        empty_sd_source.save()
+        empty_sd_dest = SymbolicDataset()
+        empty_sd_dest.save()
+        E21_41_ER.execrecordins.create(
+            symbolicdataset=empty_sd_source,
+            generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        E21_41_ER.execrecordouts.create(
+            symbolicdataset=empty_sd_dest,
+            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
+
+        # Good case: the reused ROC for E21_41 has no associated data.
+        E21_41_ROC = self.E21_41.poc_instances.create(
+            run=pE_run, execrecord=E21_41_ER, reused=True)
+        self.assertEquals(E21_41_ROC.clean(), None)
+
+        # Bad case: the ROC has associated data.
+        self.singlet_DS.runoutputcable = E21_41_ROC
+        self.singlet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunOutputCable .* reused an ExecRecord and should not have generated Dataset .*",
+            E21_41_ROC.clean)
+
+
+
+
+        
+    def test_ROC_produces_output_so_ERO_must_be_consistent(self):
+        # If a dataset comes from a ROC, the corresponding ERO should
+        # have the correct data attached; if not, anything can be
+        # attached to the ERO.
+        
+        # Define ER for pE, then register a run.
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+        
+        # Create an execrecord for one of the POCs.
+        E31_42_ER = self.E31_42.execrecords.create()
+
+        # First: check when it has no data.
+        empty_sd = SymbolicDataset()
+        empty_sd.save()
+
+        source = E31_42_ER.execrecordins.create(
+            symbolicdataset=empty_sd,
+            generic_input=self.mC.outputs.get(dataset_name="C1_out"))
+        # This is a trivial outcable so its symbolic dataset should be
+        # the same as the ERI.
+        dest = E31_42_ER.execrecordouts.create(
+            symbolicdataset=empty_sd,
+            generic_output=self.pE.outputs.get(dataset_name="E2_out"))
+        
+        E31_42_ROC = self.E31_42.poc_instances.create(
+            run=pE_run, execrecord=E31_42_ER)
+        # No associated data and ERO has no data, so this should be fine.
+        self.assertEquals(E31_42_ROC.clean(), None)
+
+        # Add real data to the ERO and do the same test (should be fine;
+        # this is the case where data is added on a subsequent run of the
+        # same cable).
+        source.symbolicdataset = self.C1_out_symDS
+        source.save()
+        dest.symbolicdataset = self.C1_out_symDS
+        dest.save()
+        self.assertEquals(E31_42_ROC.clean(), None)
+
+        # Register the real data we attached to the ERO with this ROC.
+        # This should be fine.
+        self.C1_out_symDS.dataset.runoutputcable = E31_42_ROC
+        self.C1_out_symDS.dataset.save()
+        self.assertEquals(E31_42_ROC.clean(), None)
+
+        # Unregister the real data in preparation for the bad case.
+        self.C1_out_symDS.dataset.runoutputcable = None
+        self.C1_out_symDS.dataset.save()
+        
+        # Bad case: define a different dataset as generated by this ROC.
+        self.singlet_DS.runoutputcable = E31_42_ROC
+        self.singlet_DS.save()
+        errorMessage = "Dataset \".*\" is not in an ERO of ExecRecord \".*\""
+        self.assertRaisesRegexp(ValidationError, errorMessage, E31_42_ROC.clean)
+
+    def test_ROC_ER_must_point_to_POC(self):
+        # The ER must point to a POC, as method/pipelines have to do
+        # with runsteps, not runs
+        
+        # Define a run for pE.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+
+        # Create ER for mA.
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+
+        # Create an execrecord for one of the POCs.
+        E21_41_ER = self.E21_41.execrecords.create()
+        empty_sd_source = SymbolicDataset()
+        empty_sd_source.save()
+        empty_sd_dest = SymbolicDataset()
+        empty_sd_dest.save()
+        E21_41_ER.execrecordins.create(
+            symbolicdataset=empty_sd_source,
+            generic_input=self.pD.outputs.get(dataset_name="D1_out"))
+        E21_41_ER.execrecordouts.create(
+            symbolicdataset=empty_sd_dest,
+            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
+        
+        # Create an execrecord for another POC.
+        E31_42_ER = self.E31_42.execrecords.create()
+        E31_42_ER.execrecordins.create(
+            symbolicdataset=self.C1_out_symDS,
+            generic_input=self.mC.outputs.get(dataset_name="C1_out"))
+        E31_42_ER.execrecordouts.create(
+            symbolicdataset=self.C1_out_symDS,
+            generic_output=self.pE.outputs.get(dataset_name="E2_out"))
+        
+        # Good case: the ROC for E21_41 points to the correct ER.
+        E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run,
+                                                      execrecord=E21_41_ER)
+        self.assertEquals(E21_41_ROC.clean(), None)
+
+        # Bad case 1: the ROC points to an ER linked to the wrong
+        # thing (another POC).
+        E21_41_ROC.execrecord = E31_42_ER
+        error_msg = "RunOutputCable points to cable .* but corresponding ER does not"
+        self.assertRaisesRegexp(ValidationError, error_msg, E21_41_ROC.clean)
+
+        # Bad case 2: the ROC points to an ER linked to another wrong
+        # thing (not a POC).
+        E21_41_ROC.execrecord = mA_ER
+        self.assertRaisesRegexp(ValidationError, error_msg, E21_41_ROC.clean)
+
+
+class RunStepTests_deprecated(CopperfishExecRecordTests_setup):
+        
+
+    def test_runstep_ER_must_point_to_same_transformation_this_runstep_points_to(self):
+        
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+
+        # Define runstep for mB
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+        errorMessage = "RunStep points to transformation \".*\" but corresponding ER does not"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.clean)
+
+    def test_runstep_PS_must_belong_to_run_pipeline(self):
+        # Runstep points to a PS and a run - they must be consistent wrt pipeline step
+
+        # Define unrelated pipeline + ER + run
+        self.pX = Pipeline(family=self.pf, revision_name="pX",revision_desc="X")
+        self.pX.save()
+        pX_ER = self.pX.execrecords.create()
+        pX_run = self.pX.pipeline_instances.create(user=self.myUser,execrecord=pX_ER)
+
+        # Define ER + runstep for step E1 (mA) - but connect it with the wrong run pX
+        mA_ER = self.step_E1.transformation.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pX_run, execrecord=mA_ER)
+
+        errorMessage = "PipelineStep \".*\" of RunStep \".*\" does not belong to Pipeline \".*\""
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runsteps_that_reuse_ER_cannot_have_associated_output_datasets(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+
+        # Define recycled runstep for mA
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER, reused=True)
+        step_E1_RS.clean()
+
+        # Assign it a Dataset (which is impossible)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+        self.impossible_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.impossible_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f),
+                runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS.save()
+        self.impossible_DS_structure = DatasetStructure(
+            dataset=self.impossible_DS, compounddatatype=self.doublet_cdt)
+        self.impossible_DS_structure.save()
+        self.impossible_DS.clean()
+
+        errorMessage = "RunStep \".*\" reused an ExecRecord and should not have generated any data"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_output_datasets_from_this_RS_should_also_belong_to_ERO_of_this_ER(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
+
+        # Assign it a Dataset (But do not assign the dataset to the corresponding ERO)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+        self.impossible_DS = None
+        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+            self.impossible_DS = Dataset(
+                user=self.myUser, name="doublet", description="lol",
+                dataset_file=File(f),
+                runstep=step_E1_RS,symbolicdataset=self.impossible_symDS)
+            self.impossible_DS.save()
+
+        errorMessage = "Dataset \".*\" is not in an ERO of ExecRecord \".*\""
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_each_undeleted_TO_should_have_ERO_pointing_to_existent_dataset(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Create a symDS (But do not give it actual dataset contents)
+        self.impossible_symDS = SymbolicDataset()
+        self.impossible_symDS.save()
+
+        # Define ER and runstep for mA, along with an ERO that does not point to existent data
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.impossible_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
+
+        errorMessage = "ExecRecordOut \".*\" should reference existent data"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_if_runstep_PS_stores_a_method_child_run_should_not_be_set(self):
+
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for mA
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run,execrecord=mA_ER)
+        pE_run.parent_runstep = step_E1_RS
+        pE_run.save()
+
+        errorMessage = "PipelineStep is not a Pipeline but a child run exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E1_RS.clean)
+
+    def test_runstep_complete_clean_PS_stores_pipeline_but_no_child_run(self):
+        # Define ER + run for pE
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define ER and runstep for pD
+        pD_ER = self.pD.execrecords.create()
+        pD_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
+                                   generic_input=self.D1_in)
+        pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                   generic_input=self.D2_in)
+        pD_ER.execrecordouts.create(
+            symbolicdataset=self.triplet_3_rows_symDS,
+            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(
+            run=pE_run, execrecord=pD_ER)
+
+        # Define RSICs and corresponding ERs.
+        E01_21_ER = self.E01_21.execrecords.create()
+        E01_21_ER.execrecordins.create(symbolicdataset=self.triplet_symDS,
+                                       generic_input=self.E1_in)
+        E01_21_ER.execrecordouts.create(symbolicdataset=self.D1_in_symDS,
+                                        generic_output=self.D1_in)
+        E01_21_RSIC = self.E01_21.psic_instances.create(
+            runstep=step_E2_RS, execrecord=E01_21_ER)
+
+        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                       generic_input=self.E2_in)
+        E02_22_ER.execrecordouts.create(symbolicdataset=self.singlet_symDS,
+                                        generic_output=self.D2_in)
+        E02_22_RSIC = self.E02_22.psic_instances.create(
+            runstep=step_E2_RS, execrecord=E02_22_ER)
+
+        self.assertEqual(step_E2_RS.clean(), None)
+        errorMessage = "Specified PipelineStep is a Pipeline but no child run exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.complete_clean)

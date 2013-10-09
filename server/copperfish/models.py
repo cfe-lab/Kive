@@ -1589,6 +1589,17 @@ class PipelineOutputCable(models.Model):
         """True if this output cable is raw; False otherwise."""
         return self.provider_output.is_raw()
 
+    def is_trivial(self):
+        """
+        True if this output cable is trivial; False otherwise.
+
+        Note that a raw cable is trivial.
+
+        FIXME: at the moment this just tells you whether or not there are any
+        custom wires.  We should make it so it also looks for trivial wiring.
+        """
+        return self.is_raw() or not self.custom_outwires.all().exists()
+
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
 class TransformationXput(models.Model):
@@ -1726,13 +1737,15 @@ class Run(models.Model):
     """
     
     user = models.ForeignKey(User, help_text="User who performed this run")
-    start_time = models.DateTimeField("start time",auto_now_add=True,help_text="Time at start of run")
+    start_time = models.DateTimeField("start time", auto_now_add=True,
+                                      help_text="Time at start of run")
     pipeline = models.ForeignKey(
         Pipeline,
         related_name="pipeline_instances",
         help_text="Pipeline used in this run")
 
-    # If run was spawned within another run, parent_runstep denotes the run step that initiated it
+    # If run was spawned within another run, parent_runstep denotes
+    # the run step that initiated it
     parent_runstep = models.OneToOneField(
         "RunStep",
         related_name="child_run",
@@ -1740,108 +1753,164 @@ class Run(models.Model):
         blank=True,
         help_text="Step of parent run initiating this one as a sub-run")
 
-    # This field will be null if the run occurred as a sub-run of
-    # another run (and if that is the case, then the parent_runstep
-    # will have an ExecRecord).  This is because if it a sub-run, we'd
-    # need to consider the cables feeding into the sub-pipeline at
-    # that RunStep.
     execrecord = models.ForeignKey(
         "ExecRecord",
         null=True,
-        help_text="Record of this run if it is run at the top-level (i.e. not a sub-run)");
+        blank=True,
+        help_text="Record of this run");
 
-    reused = models.BooleanField(
-        help_text="Indicates whether this run uses the record of a previous execution");
+    reused = models.NullBooleanField(
+        help_text="Indicates whether this run uses the record of a previous execution",
+        default=None);
 
     def clean(self):
         """
         Checks coherence of the run (possibly in an incomplete state).
 
-        Checks completeness and cleanliness of all registered steps,
-        and checks their numbering.
+        The procedure:
+         - if reused is None, then execrecord should not be set and there should be
+           no RunSteps or RunOutputCables associated, and exit
+        (from here on reused is assumed to be set)
+         - if reused is True:
+           - there should not be any RunSteps or RunOutputCables associated
+         - else (reused is False):
+           - check RSs; no RS should be associated without the previous ones being
+             complete
+           - if not all RSs are complete, no ROCs should be associated, ER should
+             not be set
+          (from here on all RSs are assumed to be complete)
+           - clean all associated ROCs
+           - if not all ROCs are complete, ER should not be set
+          (from here on all ROCs are assumed to be complete)
+        (from here on execrecord is assumed to be set)
+         - check that execrecord is clean and complete
+         - check that execrecord is consistent with pipeline
+         - if this run did not reuse an ER, check that all EROs have a corresponding ROC
         """
-
-        # Run clean on individual run steps
-        for run_step in self.runsteps.all():
-            run_step.clean()
-
-        # Run clean on all of its outcables.
-        for run_outcable in self.runoutputcables.all():
-            run_outcable.clean()
-
-        # Multiple-quenching of steps and outcables is taken care of already.
-
-        # All steps that exist must be consecutively numbered starting from 1.
-        step_nums = [rs.pipelinestep.step_num for rs in self.runsteps.all()]
- 
-        if sorted(step_nums) != range(1, self.runsteps.count() + 1):
-            raise ValidationError(
-                "RunSteps of Run \"{}\" are not consecutively numbered starting from 1".
-                format(self))
-
-        # If there is an execrecord:
-        if self.execrecord != None:
-            self.execrecord.clean()
-
-            # The ER must point to the same pipeline that this run points to
-            if self.pipeline != self.execrecord.general_transf:
+        if self.reused == None:
+            if self.runsteps.all().exists():
                 raise ValidationError(
-                    "Run points to pipeline \"{}\" but corresponding ER does not".
-                    format(self.pipeline))
+                    "Run \"{}\" has not decided whether or not to reuse an ER yet, so there should be no associated RunSteps".
+                    format(self))
 
-            # If there are EROs for this Run's ExecRecord, check that there are
-            # corresponding RunOutputCables (we know it to be clean by checking above).
+            if self.runoutputcables.all().exists():
+                raise ValidationError(
+                    "Run \"{}\" has not decided whether or not to reuse an ER yet, so there should be no associated RunOutputCables".
+                    format(self))
+
+            if self.execrecord != None:
+                raise ValidationError(
+                    "Run \"{}\" has not decided whether or not to reuse an ER yet, so execrecord should not be set")
+            
+            return
+
+        # From here on reused is assumed to be set.
+        elif self.reused:
+            if self.runsteps.all().exists():
+                raise ValidationError(
+                    "Run \"{}\" reuses an ER, so there should be no associated RunSteps".
+                    format(self))
+
+            if self.runoutputcables.all().exists():
+                raise ValidationError(
+                    "Run \"{}\" reuses an ER, so there should be no associated RunOutputCables".
+                    format(self))
+
+        else:
+            # Check that steps are proceeding in order.  (Multiple quenching
+            # of steps is taken care of already.)
+            steps_associated = sorted(
+                [rs.pipelinestep.step_num for rs in self.runsteps.all()])
+
+            if steps_associated != range(1, len(steps_associated)+1):
+                raise ValidationError(
+                    "RunSteps of Run \"{}\" are not consecutively numbered starting from 1".
+                    format(self))
+
+            # All steps prior to the last registered one must be complete.
+            for curr_step_num in steps_associated[:-1]:
+                self.runsteps.get(pipelinestep__step_num=curr_step_num).complete_clean()
+
+            # Consider the last step: it should definitely be clean.  If it is
+            # not complete, then no ROCs should be associated.
+            most_recent_step = self.runsteps.get(
+                pipelinestep__step_num=steps_associated[-1])
+            most_recent_step.clean()
+            if not most_recent_step.is_complete():
+                if self.runoutputcables.all().exists():
+                    raise ValidationError(
+                        "Run \"{}\" has not completed all of its RunSteps, so there should be no associated RunOutputCables".
+                        format(self))
+                
+                if self.execrecord != None:
+                    raise ValidationError(
+                        "Run \"{}\" has not completed all of its RunSteps, so execrecord should not be set".
+                        format(self))
+                return
+
+            # From this point on, all RunSteps are assumed to be complete.
+
+            # Run clean on all of its outcables.
+            for run_outcable in self.runoutputcables.all():
+                run_outcable.clean()
+
+            # If not all ROCs are complete, there should be no ER set.
+            all_outcables_complete = True
+            for outcable in self.pipeline.outcables.all():
+                corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
+                if not corresp_roc.exists() or not corresp_roc[0].is_complete():
+                    all_outcables_complete = False
+                    break
+
+            if not all_outcables_complete and self.execrecord != None:
+                raise ValidationError(
+                    "Run \"{}\" has not completed all of its RunOutputCables, so execrecord should not be set".
+                    format(self))
+
+        if self.execrecord == None:
+            return
+
+        # From this point on, execrecord is assumed to be set.
+        self.execrecord.complete_clean()
+
+        # The ER must point to the same pipeline that this run points to
+        if self.pipeline != self.execrecord.general_transf:
+            raise ValidationError(
+                "Run points to pipeline \"{}\" but corresponding ER does not".
+                format(self.pipeline))
+
+        # If this run did not reuse an ER, check that every ERO has a corresponding
+        # RunOutputCable (we know it to be clean by checking above).
+        if not self.reused:
             for ero in self.execrecord.execrecordouts.all():
                 curr_output = ero.generic_output
 
-                # FIXME: Changed general_transf__pipelineoutputcable to pipelineoutputcable
-                try:
-                    corresp_roc = self.runoutputcables.get(pipelineoutputcable__output_name=curr_output.dataset_name)
+                corresp_roc = self.runoutputcables.filter(
+                    pipelineoutputcable__output_name=curr_output.dataset_name)
 
-                    # The corresponding ROC should have the same SymbolicDataset as
-                    # the ERO.
-                    if (corresp_roc.execrecord.execrecordouts.all()[0].symbolicdataset !=
-                            ero.symbolicdataset):
-                        raise ValidationError(
-                            "ExecRecordOut \"{}\" of Run \"{}\" does not match the corresponding RunOutputCable".
-                            format(ero, self))
-
-                # ERIC FIXME - this requires from django.core.exceptions import ObjectDoesNotExist
-                except ObjectDoesNotExist:
-                    # No corresponding ROC exists.
+                if not corresp_roc.exists():
                     raise ValidationError(
                         "ExecRecord of Run \"{}\" has an entry for output \"{}\" but no corresponding RunOutputCable exists".
                         format(self, curr_output))
+
+                # Now corresp_roc is assumed to exist: it should have the
+                # same SymbolicDataset as the ERO.
+                if (corresp_roc[0].execrecord.execrecordouts.all()[0].symbolicdataset !=
+                        ero.symbolicdataset):
+                    raise ValidationError(
+                        "ExecRecordOut \"{}\" of Run \"{}\" does not match the corresponding RunOutputCable".
+                        format(ero, self))
+    
+    def is_complete(self):
+        """True if this run is complete; false otherwise."""
+        return self.execrecord != None
             
     def complete_clean(self):
-        """
-        Checks coherence of a completed run.
-
-        Calls clean(), then:
-         - checks that all RunSteps are complete and clean
-         - checks that the run is finished
-        """
+        """Checks completeness and coherence of a run."""
         self.clean()
-
-        for run_step in self.run_steps.all():
-            run_step.complete_clean()
-        
-        # Since we have a uniqueness constraint ensuring that each
-        # PipelineStep has *at most* one associated RunStep, we
-        # check quenching by just counting both.
-        if not self.is_finished():
+        if not self.is_complete():
             raise ValidationError(
-                "Run \"{}\" is not complete")
-    
-    def is_finished(self):
-        """
-        Checks if this run is finished running.
-        """
-        enough_steps = (self.run_steps.all().count() ==
-                        self.pipeline.steps.all().count())
-        enough_outcables = (self.runoutputcables.all().count() ==
-                            self.pipeline.outcables.all().count())
-        return (enough_steps and enough_outcables)
+                "Run \"{}\" has no ExecRecord".format(self))
 
 class RunOutputCable(models.Model):
     """
@@ -1854,9 +1923,11 @@ class RunOutputCable(models.Model):
     run = models.ForeignKey(Run, related_name="runoutputcables")
     execrecord = models.ForeignKey(
         "ExecRecord",
+        null=True, blank=True,
         related_name="runoutputcables")
-    reused = models.BooleanField(
-        help_text="Denotes whether this run reused the action of an output cable")
+    reused = models.NullBooleanField(
+        help_text="Denotes whether this run reused the action of an output cable",
+        default=None)
     pipelineoutputcable = models.ForeignKey(
         PipelineOutputCable,
         related_name="poc_instances")
@@ -1870,19 +1941,56 @@ class RunOutputCable(models.Model):
         """
         Check coherence of this RunOutputCable.
 
-        PRE: the ExecRecord associated to this RunOutputCable must be
-        complete before the ROC can be defined.
-
-        Checks:
-        a) pipelineoutputcable belongs to run.pipeline
-        b) if this reused an execrecord, then there should be no
-           Datasets directly associated to this ROC.
-        c) if this ROC's output was not marked for deletion (i.e. it belongs
-           to a run that represented a sub-pipeline within another run's pipeline)
-           then the corresponding ERO should have existent data associated.
-        b) Clean the associated output dataset (if it exists)
+        In sequence, the checks we perform are:
+         - pipelineoutputcable belongs to run.pipeline
+         - if it has been decided not to reuse an ER:
+           - if this cable is trivial, there should be no associated dataset
+           - otherwise, clean any associated dataset
+         - else if it has been decided to reuse an ER, check that there are no associated datasets
+         - else if no decision has been made, check that ER is unset.
+        (after this point it is assumed that ER is set)
+         - check that it is complete and clean
+         - check that it's coherent with pipelineoutputcable
+         - if this ROC was not reused, any associated dataset should belong
+           to the corresponding ERO
+         - if this ROC's output was not marked for deletion, the corresponding
+           ERO should have existent data associated
+         - if this ROC's output was not marked for deletion, the ROC is not trivial,
+           and this ROC did not reuse an ER, then this ROC should have existent
+           data associated
         """
-        # First, clean the associated *complete* ExecRecord.
+        if (not self.run.pipeline.outcables.
+                filter(pk=self.pipelineoutputcable.pk).exists()):
+            raise ValidationError(
+                "POC \"{}\" does not belong to Pipeline \"{}\"".
+                format(self.pipelineoutputcable, self.run.pipeline))
+
+        if self.reused == None:
+            if self.execrecord != None:
+                raise ValidationError(
+                    "ExecRecord of ROC \"{}\" should not be set yet".
+                    format(self))
+        elif self.reused:
+            if self.has_data():
+                raise ValidationError(
+                    "RunOutputCable \"{}\" reused an ExecRecord and should not have generated Dataset \"{}\"".
+                    format(self, self.output))
+        else:
+            # If this cable is trivial, there should be no data associated.
+            if self.pipelineoutputcable.is_trivial():
+                if self.has_data():
+                    raise ValidationError(
+                        "RunOutputCable \"{}\" is trivial and should not have generated Dataset \"{}\"".
+                        format(self, self.output))
+            # Otherwise, clean whatever data is attached.
+            else:
+                if self.has_data():
+                    self.output.clean()
+
+        if self.execrecord == None:
+            return
+
+        # self.execrecord is set, so complete_clean it.
         self.execrecord.complete_clean()
 
         # The ER must point to the same cable that this RunOutputCable points to
@@ -1892,33 +2000,61 @@ class RunOutputCable(models.Model):
                 "RunOutputCable points to cable \"{}\" but corresponding ER does not".
                 format(self.pipelineoutputcable))
 
-        if (not self.run.pipeline.outcables.
-                filter(pk=self.pipelineoutputcable.pk).exists()):
-            raise ValidationError(
-                "POC \"{}\" does not belong to Pipeline \"{}\"".
-                format(self.pipelineoutputcable, self.run.pipeline))
+        is_deleted = False
+        if self.run.parent_runstep != None:
+            is_deleted = self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
+                dataset_name=self.pipelineoutputcable.output_name).exists()
 
-        if self.reused and self.has_data():
-            raise ValidationError(
-                "RunOutputCable \"{}\" reused an ExecRecord and should not have generated Dataset \"{}\"".
-                format(self, self.output))
-                    
-        # If there is existent data associated, clean it and check that it belongs
-        # to the ERO of self.execrecord.   
-        if self.has_data():
-            self.output.clean()
-            if not self.execrecord.execrecordouts.filter(
-                    symbolicdataset=self.output.symbolicdataset).exists():
+        # If the output of this ROC is marked for deletion, there should be no data
+        # associated.
+        if is_deleted:
+            if self.has_data():
                 raise ValidationError(
-                    "Dataset \"{}\" is not in an ERO of ExecRecord \"{}\"".
-                    format(self.output, self.execrecord))
+                    "RunOutputCable \"{}\" is marked for deletion; no data should be produced".
+                    format(self))
+        # If it isn't marked for deletion:
+        else:
+            # The corresponding ERO should have existent data.
+            corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
+            if not corresp_ero.has_data():
+                raise ValidationError(
+                    "ExecRecordOut \"{}\" should reference existent data".
+                    format(corresp_ero))
 
+            # If the step was not reused and the cable was not
+            # trivial, there should be data associated to this ROC.
+            if not self.reused and not self.pipelineoutputcable.is_trivial():
+                if not self.has_data():
+                    raise ValidationError(
+                        "RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                        format(self))
+
+                # The associated data should belong to the ERO of
+                # self.execrecord (which has already been checked for
+                # completeness and cleanliness).
+                if not self.execrecord.execrecordouts.filter(
+                        symbolicdataset=self.output.symbolicdataset).exists():
+                    raise ValidationError(
+                        "Dataset \"{}\" is not in an ERO of ExecRecord \"{}\"".
+                        format(self.output, self.execrecord))
+
+            
+
+    def is_complete(self):
+        """True if ROC is finished running; false otherwise."""
+        return self.execrecord != None
+
+    def complete_clean(self):
+        """Check completeness and coherence of this RunOutputCable."""
+        self.clean()
+        if not self.is_complete():
+            raise ValidationError(
+                "RunOutputCable \"{}\" has no ExecRecord".format(self))
 
     def has_data(self):
         """True if associated output exists; False if not."""
         return hasattr(self, "output")
         
-
 class RunStep(models.Model):
     """
     Annotates the execution of a pipeline step within a run.
@@ -1928,11 +2064,15 @@ class RunStep(models.Model):
     Related to :model:`copperfish.PipelineStep`
     """
     run = models.ForeignKey(Run, related_name="runsteps")
+
+    # If this RunStep has a child_run, then this execrecord may be null
+    # (and you would look at child_run's execrecord).
     execrecord = models.ForeignKey(
         "ExecRecord",
+        null=True, blank=True,
         related_name="runsteps")
-    reused = models.BooleanField(
-        default=False,
+    reused = models.NullBooleanField(
+        default=None,
         help_text="Denotes whether this run step reuses a previous execution")
     pipelinestep = models.ForeignKey(
         PipelineStep,
@@ -1946,115 +2086,179 @@ class RunStep(models.Model):
     def clean(self):
         """
         Check coherence of this RunStep.
-        
-        PRE: the ExecRecord associated to this RunStep must be complete before
-        the RunStep can be defined.
-        
-        The checks we perform:
-        a) Check that the PipelineStep belongs to the specified run
-        b) Clean all output datasets
-        c) More than one dataset cannot be an output from a particular TO
-        d) If this PipelineStep is a sub-pipeline (if child_run is registered),
-        check that it is complete and clean.
-        e) If any RunSICs exist, clean them.
 
+        The checks we perform, in sequence:
+         - pipelinestep is consistent with run
+         - if pipelinestep is for a method, there should be no child_run
+         - if any RSICs exist, check they are clean and complete.
+         - if all RSICs are not quenched, reused, child_run, and execrecord should not be set.
+        (from here on all RSICs are assumed to be quenched)
+         - if we haven't decided whether or not to reuse an ER, child_run and execrecord should not be set.
+        (from here on, reused is assumed to be set)
+         - if we are reusing an ER, check that:
+           - there are no associated Datasets.
+           - there is no child_run
+         - else if we are not reusing an ER:
+           - clean any associated Datasets
+           - clean child_run if it exists
+           - if child_run exists, execrecord should not be set
+        (from here on, child_run is assumed to be appropriately set or blank)
+        (from here on, execrecord or child_run.execrecord is assumed to be set)
+         - check that it is complete and clean
+         - check that it's coherent with pipelinestep
+         - if an output is marked for deletion, there should be no associated Dataset
+         - else:
+           - the corresponding ERO should have an associated Dataset.
+           - if this RunStep was not reused, that ERO's dataset should be associated
+             to this RunStep.
+         - any associated Dataset belongs to an ERO (this checks for Datasets that
+           have been wrongly assigned to this RunStep)
+        
         Note: don't need to check inputs for multiple quenching due to uniqueness.
-        We couldn't use this trick for outputs because that would require a
-        uniqueness constraint on Dataset involving (runstep, intermediate_output),
-        which can be null. (Also for final_output)
+        Quenching of outputs is checked by ExecRecord.
         """
-        # Clean the associated *complete* ExecRecord.
-        self.execrecord.complete_clean()
-
-        # ER must point to the same transformation that this runstep points to
-        if self.pipelinestep.transformation != self.execrecord.general_transf:
-            raise ValidationError(
-                "RunStep points to transformation \"{}\" but corresponding ER does not".
-                format(self.pipelinestep))
-
         # Does pipelinestep belong to run.pipeline?
         if not self.run.pipeline.steps.filter(pk=self.pipelinestep.pk).exists():
             raise ValidationError(
                 "PipelineStep \"{}\" of RunStep \"{}\" does not belong to Pipeline \"{}\"".
                 format(self.pipelinestep, self, self.run.pipeline))
 
-        # Clean any existent RunSICs.
-        for rsic in self.RSICs.all():
-            rsic.clean()
-        
-        # Get all output datasets generated by this runstep.
-        step_outputs = self.outputs.all()
-
-        # If RS reused an ER, there should be no datasets coming from this RS
-        if self.reused and step_outputs.exists():
+        # If the PS stores a method, it should have no child_run.
+        # (Should not act as a parent runstep)
+        if (type(self.pipelinestep.transformation) == Method and
+                hasattr(self,"child_run") == True):
             raise ValidationError(
-                "RunStep \"{}\" reused an ExecRecord and should not have generated any data".
+                "PipelineStep of RunStep \"{}\" is not a Pipeline but a child run exists".
                 format(self))
+        
+        for rsic in self.RSICs.all():
+            rsic.complete_clean()
 
-        # Otherwise, clean each dataset and check that it belongs to an ERO of this ER
-        for out_data in self.outputs.all():
-            out_data.clean()
-            if not self.execrecord.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
+        if (self.pipelinestep.cables_in.count() != self.RSICs.count()):
+            if (self.reused != None or self.execrecord != None):
                 raise ValidationError(
-                    "Dataset \"{}\" is not in an ERO of ExecRecord \"{}\"".
-                    format(out_data, self.execrecord))
-            
-        # For this runstep's PS, each TO not marked for deletion should have
-        # an ERO pointing to a non-null dataset
+                    "RunStep \"{}\" inputs not quenched; reused and execrecord should not be set".
+                    format(self))
+            if (type(self.pipelinestep.transformation) == Pipeline and
+                    hasattr(self, "child_run")):
+                raise ValidationError(
+                    "RunStep \"{}\" inputs not quenched; child_run should not be set".
+                    format(self))
+            return
 
-        # For each non-deleted TO in this runstep's PS
-        # We need to get the ContentType for a TO.
+        # From here on, RSICs are assumed to be quenched.
+        if self.reused == None:
+            if self.execrecord != None:
+                raise ValidationError(
+                    "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set".
+                    format(self))
+            if (type(self.pipelinestep.transformation) == Pipeline and
+                    hasattr(self, "child_run")):
+                raise ValidationError(
+                    "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; child_run should not be set".
+                    format(self))
+            return
+
+        # From here on, reused is assumed to be set.
+        elif self.reused:
+            if self.outputs.all().exists():
+                raise ValidationError(
+                    "RunStep \"{}\" reused an ExecRecord and should not have generated any data".
+                    format(self))
+            if hasattr(self, "child_run") == True:
+                raise ValidationError(
+                    "RunStep \"{}\" reused an ExecRecord and should not have a child run".
+                    format(self))
+        else:
+            # If there is a child_run associated, clean it; if child_run is set,
+            # there should be no associated output data, and ER should not be set.
+            if hasattr(self, "child_run"):
+                self.child_run.clean()
+
+                if self.outputs.all().exists():
+                    raise ValidationError(
+                        "RunStep \"{}\" has a child run so should not have generated any data".
+                        format(self))
+                
+                if self.execrecord != None:
+                    raise ValidationError(
+                        "RunStep \"{}\" has a child run so execrecord should not be set".
+                        format(self))
+            else:
+                for out_data in self.outputs.all():
+                    out_data.clean()
+
+        # From here on, child_run is assumed to be appropriately set or blank.
+        step_er = self.execrecord
+        if hasattr(self, "child_run"):
+            step_er = self.child_run.execrecord
+
+        if step_er == None:
+            return
+
+        # From here on, the appropriate ER is assumed to be set.
+        step_er.complete_clean()
+
+        # ER must point to the same transformation that this runstep points to
+        if self.pipelinestep.transformation != step_er.general_transf:
+            raise ValidationError(
+                "RunStep \"{}\" points to transformation \"{}\" but corresponding ER does not".
+                format(self, self.pipelinestep))
+
+        # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(TransformationOutput)
         for to in self.pipelinestep.transformation.outputs.all():
-            if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
-                continue
+            if self.pipelinestep.outputs_to_delete.filter(
+                    dataset_name=to.dataset_name).exists():
+                # This output is deleted; there should be no associated Dataset.
+                # Get the associated ERO.
+                corresp_ero = step_er.execrecordouts.get(
+                    content_type=to_type, object_id=to.id)
+                if self.outputs.filter(symbolicdataset=corresp_ero.symbolicdataset).exists():
+                    raise ValidationError(
+                        "Output \"{}\" of RunStep \"{}\" is deleted; no data should be associated".
+                        format(to, self))
+            else:
+                # The output is not deleted.  The corresponding ERO should have
+                # existent data.
+                corresp_ero = step_er.execrecordouts.get(
+                    content_type=to_type, object_id=to.id)
+                if not corresp_ero.symbolicdataset.has_data():
+                    raise ValidationError(
+                        "ExecRecordOut \"{}\" of RunStep \"{}\" should reference existent data".
+                        format(corresp_ero, self))
 
-            # Get corresponding ERO for this complete_clean ER, see if it points to symDS containing a Dataset
-            corresp_ero = self.execrecord.execrecordouts.get(
-                content_type=to_type, object_id=to.id)
-            if not corresp_ero.symbolicdataset.has_data():
+                # If this RunStep did not reuse an ER and did not have
+                # a child run, then there should be a corresponding
+                # real Dataset.
+                if (not self.reused and not hasattr(self, "child_run") and
+                        not self.outputs.filter(
+                            symbolicdataset=corresp_ero.symbolicdataset).exists()):
+                    raise ValidationError(
+                        "RunStep \"{}\" did not reuse an ExecRecord, had no child run, and output \"{}\" was not deleted; a corresponding Dataset should be associated".
+                        format(self, to))
+
+        # Check that any associated data belongs to an ERO of this ER
+        for out_data in self.outputs.all():
+            if not step_er.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError(
-                    "ExecRecordOut \"{}\" should reference existent data".
-                    format(corresp_ero))
+                    "RunStep \"{}\" generated Dataset \"{}\" but it is not in its ExecRecord".
+                    format(self, out_data))
+            
 
-        # If the PS stores a method, it should have no child_run (Should not act as a parent runstep)
-        if hasattr(self,"child_run") == True:
-            if type(self.pipelinestep.transformation) == Method:
-                raise ValidationError(
-                    "PipelineStep is not a Pipeline but a child run exists")
-
-            # If child_run is set, it should be clean
-            self.child_run.clean()
-             
+    def is_complete(self):
+        """True if RunStep is complete; false otherwise."""
+        step_er = self.execrecord
+        if hasattr(self, "child_run"):
+            step_er = self.child_run.execrecord
+        return step_er != None
+    
     def complete_clean(self):
-        """
-        Checks coherence and completeness of this step.
-        
-        If the specified PipelineStep is a sub-pipeline, then check
-        that child_run is registered.  Also check quenching
-        of RunSICs.
-        """
+        """Checks coherence and completeness of this RunStep."""
         self.clean()
-
-        # Check quenching of PSICs by RSICs; thanks to uniqueness constraints,
-        # we can just check the counts.
-        if self.pipelinestep.cables_in.count() != self.RSICs.count():
+        if not self.is_complete():
             raise ValidationError(
-                "RunStep \"{}\" does not quench all of its PipelineStep's input cables".
-                format(self))
-                
-
-        # If runstep PS references a pipeline and a child_run is not set, it is incomplete
-        if (type(self.pipelinestep.transformation) == Pipeline and
-                hasattr(self,"child_run") == False):
-            raise ValidationError(
-                "Specified PipelineStep is a Pipeline but no child run exists")
-
-        # If the child is set, it should also be complete and clean
-        if hasattr(self,"child_run") == True:
-            self.child_run.complete_clean()
-
-
+                "RunStep \"{}\" has no ExecRecord".format(self))
 
 class RunSIC(models.Model):
     """
@@ -2067,10 +2271,12 @@ class RunSIC(models.Model):
     runstep = models.ForeignKey(RunStep, related_name="RSICs")
     execrecord = models.ForeignKey(
         "ExecRecord",
+        null=True,
+        blank=True,
         related_name="RSICs")
-    reused = models.BooleanField(
+    reused = models.NullBooleanField(
         help_text="Denotes whether this run reused the action of an output cable",
-        default=False)
+        default=None)
     PSIC = models.ForeignKey(
         PipelineStepInputCable,
         related_name="psic_instances")
@@ -2084,29 +2290,50 @@ class RunSIC(models.Model):
         """
         Check coherence of this RunSIC.
 
-        PRE: the ExecRecord associated to this RunSIC must be
-        complete before the RunSIC can be defined.
-
-        Checks:
-        a) PSIC belongs to runstep.pipelinestep
-        b) PSIC is the same as (or compatible to) self.execrecord.general_transf
+        In sequence, the checks we perform:
+         - PSIC belongs to runstep.pipelinestep
+         - if reused is None (no decision on reusing has been made), execrecord
+           should not be set
+         - if there is an execrecord defined:
+           - it must be complete and clean
+           - PSIC is the same as (or compatible to) self.execrecord.general_transf
         """
-        # First, clean the associated *complete* ExecRecord.
-        self.execrecord.complete_clean()
-
         # The ER must point to the same cable that this RunOutputCable points to
         # FIXME: or, a compatible one!
-        if self.PSIC != self.execrecord.general_transf:
-            raise ValidationError(
-                "RunSIC points to cable \"{}\" but corresponding ER does not".
-                format(self.PSIC))
-
         if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
             raise ValidationError(
                 "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
                 format(self.PSIC, self.runstep.pipelinestep))
 
+        if self.reused == None and self.execrecord != None:
+            raise ValidationError(
+                "ExecRecord of RunSIC \"{}\" should not be set yet".
+                format(self))
+        
+        # If there is no execrecord defined, then exit.
+        if self.execrecord == None:
+            return
+        
+        # At this point there must be an associated ER; check that it is
+        # clean and complete.
+        self.execrecord.complete_clean()
+
+        if self.PSIC != self.execrecord.general_transf:
+            raise ValidationError(
+                "RunSIC points to cable \"{}\" but corresponding ER does not".
+                format(self.PSIC))
+
+    def is_complete(self):
+        """True if RunSIC is complete; false otherwise."""
+        return self.execrecord != None
+
+    def complete_clean(self):
+        """Check completeness and coherence of this RunSIC."""
+        self.clean()
+        if not self.is_complete():
+            raise ValidationError(
+                "RunSIC \"{}\" has no ExecRecord".format(self))
 
 class Dataset(models.Model):
     """
@@ -2172,27 +2399,29 @@ class Dataset(models.Model):
             self.structure.clean()
 
         if (self.symbolicdataset.MD5_checksum == ""):
-            self.compute_md5()
+            self.set_md5()
         else:
             if not self.check_md5():
-                raise ValidationError("File integrity of \"{}\" lost. Current checksum \"{}\" does not equal expected checksum \"{}\"".
-                                      format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
+                raise ValidationError(
+                    "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".
+                    format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
             
     def compute_md5(self):
-        """
-        Computes the MD5 checksum of the Dataset and stores it to the associated SymbolicDataset.
-        """
+        """Computes the MD5 checksum of the Dataset."""
         try:
             md5gen = hashlib.md5()
             self.dataset_file.open()
             md5gen.update(self.dataset_file.read())
             md5 = md5gen.hexdigest()
-            self.symbolicdataset.MD5_checksum = md5
             return md5
 
         except ValueError as e:
             print(e)
-            self.symbolicdataset.MD5_checksum = ""
+            return ""
+
+    def set_md5(self):
+        """Computes the MD5 checksum of the Dataset and stores it to the associated SymbolicDataset."""
+        self.symbolicdataset.MD5_checksum = self.compute_md5()
             
     def check_md5(self):
         """
@@ -2545,10 +2774,10 @@ class ExecRecordOut(models.Model):
     """
     execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord",
                                    related_name="execrecordouts")
-    symbolicdataset = models.OneToOneField(
+    symbolicdataset = models.ForeignKey(
         SymbolicDataset,
         help_text="Symbol for the dataset coming from this output",
-        related_name="execrecordout")
+        related_name="execrecordouts")
 
     content_type = models.ForeignKey(
         ContentType,
@@ -2696,3 +2925,7 @@ class ExecRecordOut(models.Model):
                         raise ValidationError(
                             "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
                             format(actual_data, self.generic_output))
+
+    def has_data(self):
+        """True if associated Dataset exists; False otherwise."""
+        return self.symbolicdataset.has_data()
