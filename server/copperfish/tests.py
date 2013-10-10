@@ -76,6 +76,7 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.D02_12 = self.step_D1.cables_in.create(transf_input=self.B2_in,step_providing_input=0,provider_output=self.D2_in)
         self.D11_21 = self.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=self.triplet_cdt,step_providing_output=1,provider_output=self.B1_out)
         self.pD.create_outputs()
+        self.D1_out = self.pD.outputs.get(dataset_name="D1_out")
 
         self.E03_11 = self.step_E1.cables_in.create(transf_input=self.A1_rawin,step_providing_input=0,provider_output=self.E3_rawin)
         self.E01_21 = self.step_E2.cables_in.create(transf_input=self.D1_in,step_providing_input=0,provider_output=self.E1_in)
@@ -86,14 +87,17 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.E31_42 = self.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=self.singlet_cdt,step_providing_output=3,provider_output=self.C1_out)
         self.E33_43 = self.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,step_providing_output=3,provider_output=self.C3_rawout)
         self.pE.create_outputs()
+        self.E1_out = self.pE.outputs.get(dataset_name="E1_out")
+        self.E2_out = self.pE.outputs.get(dataset_name="E2_out")
+        self.E3_rawout = self.pE.outputs.get(dataset_name="E3_rawout")
 
         # Custom wiring/outwiring
         self.E01_21_wire1 = self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
         self.E01_21_wire2 = self.E01_21.custom_wires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
         self.E11_32_wire1 = self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[0],dest_pin=self.doublet_cdt.members.all()[1])
         self.E11_32_wire2 = self.E11_32.custom_wires.create(source_pin=self.doublet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
-        self.E21_41_wire1 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[0])
-        self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[1])
+        self.E21_41_wire1 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[1])
+        self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
         self.pE.clean()
 
         # Define a user
@@ -174,14 +178,15 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         self.C2_in_symDS = SymbolicDataset()
         self.C2_in_symDS.save()
-        self.C2_in_DS = None
-        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.C2_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_in_symDS)
-            self.C2_in_DS.save()
-        self.C2_in_DS.clean()
-        self.C2_in_DS_structure = DatasetStructure(dataset=self.C2_in_DS,compounddatatype=self.doublet_cdt)
-        self.C2_in_DS_structure.save()
-        self.C2_in_DS.clean()
+        # October 9, 2013: C2_in_symDS should be empty!
+        # self.C2_in_DS = None
+        # with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+        #     self.C2_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_in_symDS)
+        #     self.C2_in_DS.save()
+        # self.C2_in_DS.clean()
+        # self.C2_in_DS_structure = DatasetStructure(dataset=self.C2_in_DS,compounddatatype=self.doublet_cdt)
+        # self.C2_in_DS_structure.save()
+        # self.C2_in_DS.clean()
 
         self.C1_out_symDS = SymbolicDataset()
         self.C1_out_symDS.save()
@@ -220,8 +225,23 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.triplet_3_rows_DS_structure.save()
         self.triplet_3_rows_DS.clean()
 
+        # October 9, 2013: added as the result of cable E21_41.
+        self.E1_out_symDS = SymbolicDataset()
+        self.E1_out_symDS.save()
+        self.E1_out_DS = None
+        with open(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"), "rb") as f:
+            self.E1_out_DS = Dataset(
+                user=self.myUser, name="E1_out",
+                description="doublet remuxed from triplet", dataset_file=File(f),
+                symbolicdataset=self.E1_out_symDS)
+            self.E1_out_DS.save()
+        self.E1_out_DS_structure = DatasetStructure(
+            dataset=self.E1_out_DS, compounddatatype=self.doublet_cdt)
+        self.E1_out_DS_structure.save()
+        self.E1_out_DS.clean()
+
     def tearDown(self):
-        """ Clear CodeResources, Datasets, and VerificationScripts folders"""
+        """Clear CodeResources, Datasets, and VerificationScripts folders."""
 
         for crr in CodeResourceRevision.objects.all():
             if crr.coderesource.filename != "":
@@ -383,7 +403,7 @@ class RunStepTests(CopperfishExecRecordTests_setup):
 
         # Bad case: reused = True, there is data associated to this RS.
         step_E1_RS.reused = True
-        self.doublet_DS.runstep = step_E1_RS
+        self.doublet_DS.created_by = step_E1_RS
         self.doublet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
@@ -400,7 +420,7 @@ class RunStepTests(CopperfishExecRecordTests_setup):
             step_E2_RS.clean)
 
         # Reset....
-        self.doublet_DS.runstep = None
+        self.doublet_DS.created_by = None
         self.doublet_DS.save()
         pD_run.parent_runstep = None
         pD_run.save()
@@ -411,7 +431,7 @@ class RunStepTests(CopperfishExecRecordTests_setup):
         
         # Bad propagation case: reused = False and associated data is not clean.
         step_E1_RS.reused = False
-        self.doublet_DS.runstep = step_E1_RS
+        self.doublet_DS.created_by = step_E1_RS
         self.doublet_symDS.MD5_checksum = "foo"
         self.doublet_DS.save()
         self.doublet_symDS.save()
@@ -448,14 +468,14 @@ class RunStepTests(CopperfishExecRecordTests_setup):
 
         # Bad case: child run is set and clean, but there is data
         # associated with the RunStep.
-        self.C1_in_DS.runstep = step_E2_RS
+        self.C1_in_DS.created_by = step_E2_RS
         self.C1_in_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* has a child run so should not have generated any data",
             step_E2_RS.clean)
         # Reset....
-        self.C1_in_DS.runstep = None
+        self.C1_in_DS.created_by = None
         self.C1_in_DS.save()
 
         # Bad case: child run is set and clean, but ER is also set.
@@ -561,26 +581,26 @@ class RunStepTests(CopperfishExecRecordTests_setup):
         pD_ER_out.save()
 
         # Bad case: ER is not reused, output was not deleted, but no Dataset is associated.
-        self.doublet_DS.runstep = None
+        self.doublet_DS.created_by = None
         self.doublet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* did not reuse an ExecRecord, had no child run, and output .* was not deleted; a corresponding Dataset should be associated",
             step_E1_RS.clean)
         # Reset....
-        self.doublet_DS.runstep = step_E1_RS
+        self.doublet_DS.created_by = step_E1_RS
         self.doublet_DS.save()
 
         # Bad case: there is an associated dataset that does not belong to any ERO
         # of this ER.
-        self.triplet_DS.runstep = step_E1_RS
+        self.triplet_DS.created_by = step_E1_RS
         self.triplet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* generated Dataset .* but it is not in its ExecRecord",
             step_E1_RS.clean)
         # Reset....
-        self.triplet_DS.runstep = None
+        self.triplet_DS.created_by = None
         self.triplet_DS.save()
         
         # Let's check some of the above cases for step E2 when it's *not* reused.
@@ -621,7 +641,7 @@ class RunStepTests(CopperfishExecRecordTests_setup):
         mB_ER.execrecordouts.create(
             symbolicdataset=self.C1_in_symDS,
             generic_output=self.mB.outputs.get(dataset_name="B1_out"))
-        self.C1_in_DS.runstep = step_D1_RS
+        self.C1_in_DS.created_by = step_D1_RS
         self.C1_in_DS.save()
         step_D1_RS.execrecord = mB_ER
         step_D1_RS.save()
@@ -679,64 +699,521 @@ class RunStepTests(CopperfishExecRecordTests_setup):
 
 
 class RunTests(CopperfishExecRecordTests_setup):
+
+    def test_Run_clean_early(self):
+        """Check coherence of a Run at all stages of its creation before reused is set."""
+        # Create a top-level run.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        # Good case: nothing has happened yet.
+        self.assertEquals(pE_run.clean(), None)
+
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+
+        # Bad case: parent_runstep is set, but pipeline is not consistent with it.
+        pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        pD_run.parent_runstep = step_E1_RS
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Pipeline of Run .* is not consistent with its parent RunStep",
+            pD_run.clean)
+
+        # Good case: parent_runstep is set, and pipeline is consistent with it.
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+        pD_run.parent_runstep = step_E2_RS
+        self.assertEquals(pD_run.clean(), None)
+        # Reset....
+        pD_run.delete()
+        step_E2_RS.delete()
+
+        # Bad case: reused == None, but there is a RS associated to the Run.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunSteps",
+            pE_run.clean)
+        # Reset....
+        step_E1_RS.delete()
+
+        # Bad case: reused == None, but there is an ROC associated.
+        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunOutputCables",
+            pE_run.clean)
+        # Reset....
+        E33_43_ROC.delete()
+
+        # Bad case: reused == None, but there is an execrecord associated.
+        pE_ER = self.pE.execrecords.create()
+        pE_run.execrecord = pE_ER
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = None
+        pE_run.save()
+        pE_ER.delete()
+
+
+    def test_Run_clean_reused(self):
+        """Check coherence of a Run after it has decided to reuse an ExecRecord."""
+        # Create a top-level run.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        pE_run.reused = True
+
+        # Good case: no RS or ROC associated, no ER yet.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: RS associated.
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* reuses an ER, so there should be no associated RunSteps",
+            pE_run.clean)
+        # Reset....
+        step_E1_RS.delete()
+
+        # Bad case: ROC associated.
+        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* reuses an ER, so there should be no associated RunOutputCables",
+            pE_run.clean)
+        # Reset....
+        E33_43_ROC.delete()
+
+        # Set an ER.
+        pE_ER = self.pE.execrecords.create()
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+
+        # Bad propagation case: execrecord is not complete.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input\(s\) to ExecRecord .* are not quenched",
+            pE_run.clean)
+
+        # Proceed:
+        pE_ER_in1 = pE_ER.execrecordins.create(
+            generic_input=self.E1_in,
+            symbolicdataset=self.triplet_symDS)
+        pE_ER_in2 = pE_ER.execrecordins.create(
+            generic_input=self.E2_in,
+            symbolicdataset=self.singlet_symDS)
+        pE_ER_in3 = pE_ER.execrecordins.create(
+            generic_input=self.E3_rawin,
+            symbolicdataset=self.raw_symDS)
+        
+        pE_ER_out1 = pE_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+        pE_ER_out2 = pE_ER.execrecordouts.create(
+            generic_output=self.E2_out,
+            symbolicdataset=self.C1_out_symDS)
+        pE_ER_out3 = pE_ER.execrecordouts.create(
+            generic_output=self.E3_rawout,
+            symbolicdataset=self.C3_out_symDS)
+
+        # Bad case: ER and pipeline are not consistent.
+        pE_run.pipeline = self.pD
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* points to pipeline .* but corresponding ER does not",
+            pE_run.clean)
+
+        # Now test is_complete, complete_clean.
+        self.assertEquals(pE_run.is_complete(), True)
+        # Propagation bad case: clean fails.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* points to pipeline .* but corresponding ER does not",
+            pE_run.complete_clean)
+        
+        # Good case: the run is complete and clean.
+        pE_run.pipeline = self.pE
+        pE_run.save()
+        self.assertEquals(pE_run.is_complete(), True)
+        self.assertEquals(pE_run.complete_clean(), None)
+
+        # Bad case: the run is incomplete but clean.
+        pE_run.execrecord = None
+        self.assertEquals(pE_run.is_complete(), False)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has no ExecRecord",
+            pE_run.complete_clean)
+
+
+        
+    def test_Run_clean_not_reused(self):
+        """Check coherence of a Run after it has decided not to reuse an ExecRecord."""
+        # Create a top-level run.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        pE_run.reused = False
+
+        # Good case: no RS or ROC associated, no ER yet.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Good case: first RS is associated and incomplete, nothing else is.
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: second RS is associated before first is complete.
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* has no ExecRecord",
+            pE_run.clean)
+
+        # Bad case: second RS is associated, first one is not.
+        step_E1_RS.delete()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSteps of Run .* are not consecutively numbered starting from 1",
+            pE_run.clean)
+
+        # Reset....
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        step_E2_RS.delete()
+
+        # Bad case: first RS is not clean, no others associated.
+        step_E1_RS.reused = False
+        step_E1_RS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* inputs not quenched; reused and execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        step_E1_RS.reused = None
+        step_E1_RS.save()
+        
+        # Good case: first RS is complete, nothing else associated.
+        step_E1_RS.reused = False
+        E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS,
+                                                        reused=False)
+        E03_11_ER = self.E03_11.execrecords.create()
+        E03_11_ER.execrecordins.create(generic_input=self.E3_rawin,
+                                       symbolicdataset=self.raw_symDS)
+        E03_11_ER.execrecordouts.create(generic_output=self.A1_rawin,
+                                        symbolicdataset=self.raw_symDS)
+        E03_11_RSIC.execrecord = E03_11_ER
+        E03_11_RSIC.save()
+        self.doublet_DS.created_by = step_E1_RS
+        self.doublet_DS.save()
+        mA_ER = self.mA.execrecords.create()
+        mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                              generic_input=self.A1_rawin)
+        mA_ER_out = mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                                generic_output=self.A1_out)
+        step_E1_RS.execrecord = mA_ER
+        step_E1_RS.save()
+        self.assertEquals(pE_run.clean(), None)
+
+        # Good case: first RS is complete, second one is associated and clean.
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: first RS is complete, second one is unclean.
+        step_E2_RS.reused = False
+        step_E2_RS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* inputs not quenched; reused and execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        step_E2_RS.reused = None
+        step_E2_RS.save()
+
+        # Bad case: there aren't enough RSs and an ROC is associated.
+        E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunSteps, so there should be no associated RunOutputCables",
+            pE_run.clean)
+        # Reset....
+        E31_42_ROC.delete()
+
+        # Bad case: not enough RSs and an ER is associated.
+        pE_ER = self.pE.execrecords.create()
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunSteps, so execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = None
+        pE_run.save()
+        # NOTE: can't delete this before setting pE_run.execrecord =
+        # None, or else it will cascade deletions and break stuff
+        # afterwards!
+        pE_ER.delete()
+        
+        # Bad case: enough RSs, but last one is not complete.
+        # To save time, let's just reuse the second step.
+        E01_21_RSIC = self.E01_21.psic_instances.create(
+            runstep=step_E2_RS, reused=True)
+        E01_21_ER = self.E01_21.execrecords.create()
+        E01_21_ER.execrecordins.create(generic_input=self.E1_in,
+                                       symbolicdataset=self.triplet_symDS)
+        E01_21_ER.execrecordouts.create(generic_output=self.D1_in,
+                                        symbolicdataset=self.D1_in_symDS)
+        E01_21_RSIC.execrecord = E01_21_ER
+        E01_21_RSIC.save()
+
+        E02_22_RSIC = self.E02_22.psic_instances.create(
+            runstep=step_E2_RS, reused=True)
+        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER.execrecordins.create(generic_input=self.E2_in,
+                                       symbolicdataset=self.singlet_symDS)
+        E02_22_ER.execrecordouts.create(generic_output=self.D2_in,
+                                        symbolicdataset=self.singlet_symDS)
+        E02_22_RSIC.execrecord = E02_22_ER
+        E02_22_RSIC.save()
+        step_E2_RS.reused = True
+        pD_ER = self.pD.execrecords.create()
+        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
+                                              generic_input=self.D1_in)
+        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                              generic_input=self.D2_in)
+        pD_ER_out = pD_ER.execrecordouts.create(
+            symbolicdataset=self.C1_in_symDS,
+            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
+        step_E2_RS.execrecord = pD_ER
+        step_E2_RS.save()
+        
+        # Good case: two complete RSs, no last one.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Create an incomplete last RS.
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run)
+
+        # Good case: two complete RSs, clean but incomplete last one.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Repeat the last two bad cases.
+        # Bad case: enough RSs but last is incomplete; ROC associated.
+        E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunSteps, so there should be no associated RunOutputCables",
+            pE_run.clean)
+        # Reset....
+        E31_42_ROC.delete()
+
+        # Bad case: enough RSs but last is incomplete; ER is associated.
+        pE_ER = self.pE.execrecords.create()
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunSteps, so execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = None
+        pE_run.save()
+        pE_ER.delete()
+
+        # Proceed: complete the last RunStep.
+        E21_31_RSIC = self.E21_31.psic_instances.create(
+            runstep=step_E3_RS, reused=False)
+        E21_31_ER = self.E21_31.execrecords.create()
+        E21_31_ER.execrecordins.create(
+            generic_input=self.D1_out, symbolicdataset=self.C1_in_symDS)
+        E21_31_ER.execrecordouts.create(
+            generic_output=self.C1_in, symbolicdataset=self.C1_in_symDS)
+        E21_31_RSIC.execrecord = E21_31_ER
+        E21_31_RSIC.save()
+        
+        E11_32_RSIC = self.E11_32.psic_instances.create(
+            runstep=step_E3_RS, reused=False)
+        E11_32_ER = self.E11_32.execrecords.create()
+        E11_32_ER.execrecordins.create(
+            generic_input=self.A1_out, symbolicdataset=self.doublet_symDS)
+        E11_32_ER.execrecordouts.create(
+            generic_output=self.C2_in, symbolicdataset=self.C2_in_symDS)
+        E11_32_RSIC.execrecord = E11_32_ER
+        E11_32_RSIC.save()
+        
+        step_E3_RS.reused = False
+        
+        mC_ER = self.mC.execrecords.create()
+        mC_ER_in1 = mC_ER.execrecordins.create(
+            generic_input=self.C1_in,
+            symbolicdataset=self.C1_in_symDS)
+        mC_ER_in2 = mC_ER.execrecordins.create(
+            generic_input=self.C2_in,
+            symbolicdataset=self.C2_in_symDS)
+        mC_ER_out1 = mC_ER.execrecordouts.create(
+            generic_output=self.C1_out,
+            symbolicdataset=self.C1_out_symDS)
+        mC_ER_out2 = mC_ER.execrecordouts.create(
+            generic_output=self.C2_rawout,
+            symbolicdataset=self.C2_out_symDS)
+        mC_ER_out3 = mC_ER.execrecordouts.create(
+            generic_output=self.C3_rawout,
+            symbolicdataset=self.C3_out_symDS)
+        self.C1_out_DS.created_by = step_E3_RS
+        self.C1_out_DS.save()
+        self.C2_out_DS.created_by = step_E3_RS
+        self.C2_out_DS.save()
+        self.C3_out_DS.created_by = step_E3_RS
+        self.C3_out_DS.save()
+
+        step_E3_RS.execrecord = mC_ER
+        step_E3_RS.save()
+
+        # Good case: all RSs complete, no outcables set.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad propagation case: bad ROC associated.
+        E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run)
+        E21_41_ER = self.E21_41.execrecords.create()
+        E21_41_ER.execrecordins.create(
+            generic_input=self.D1_out,
+            symbolicdataset=self.C1_in_symDS)
+        E21_41_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+        E21_41_ROC.execrecord = E21_41_ER
+        E21_41_ROC.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunOutputCable .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet",
+            pE_run.clean)
+
+        # Proceed....
+        E21_41_ROC.reused = False
+        self.E1_out_DS.created_by = E21_41_ROC
+        self.E1_out_DS.save()
+        E21_41_ROC.save()
+        # Good propagation case: one good ROC associated.
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: ER is set, only one output cable is set and done.
+        pE_ER = self.pE.execrecords.create()
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = None
+        pE_run.save()
+
+        # Good case: one output cable is done, the other two are clean
+        # but incomplete.
+        E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
+        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: only one output cable is done, but all 3 are set,
+        # but ER is set.
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = None
+        pE_run.save()
+
+        # Good case: all 3 output cables are done, ER not set.
+        E31_42_ROC.reused = False
+        E31_42_ER = self.E31_42.execrecords.create()
+        E31_42_ER.execrecordins.create(
+            generic_input=self.C1_out, symbolicdataset=self.C1_out_symDS)
+        E31_42_ER.execrecordouts.create(
+            generic_output=self.E2_out, symbolicdataset=self.C1_out_symDS)
+        self.C1_out_DS.created_by = E31_42_ROC
+        E31_42_ROC.execrecord = E31_42_ER
+        E31_42_ROC.save()
+        
+        E33_43_ROC.reused = False
+        E33_43_ER = self.E33_43.execrecords.create()
+        E33_43_ER.execrecordins.create(
+            generic_input=self.C3_rawout, symbolicdataset=self.C3_out_symDS)
+        E33_43_ER.execrecordouts.create(
+            generic_output=self.E3_rawout, symbolicdataset=self.C3_out_symDS)
+        self.C3_out_DS.created_by = E33_43_ROC
+        E33_43_ROC.execrecord = E33_43_ER
+        E33_43_ROC.save()
+        self.assertEquals(pE_run.clean(), None)
+
+        # Propagation bad case: ER set but not complete.
+        pE_run.execrecord = pE_ER
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input\(s\) to ExecRecord .* are not quenched",
+            pE_run.clean)
+
+        # Propagation good case: ER is complete.
+        pE_ER_in1 = pE_ER.execrecordins.create(
+            generic_input=self.E1_in,
+            symbolicdataset=self.triplet_symDS)
+        pE_ER_in2 = pE_ER.execrecordins.create(
+            generic_input=self.E2_in,
+            symbolicdataset=self.singlet_symDS)
+        pE_ER_in3 = pE_ER.execrecordins.create(
+            generic_input=self.E3_rawin,
+            symbolicdataset=self.raw_symDS)
+        
+        pE_ER_out1 = pE_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+        pE_ER_out2 = pE_ER.execrecordouts.create(
+            generic_output=self.E2_out,
+            symbolicdataset=self.C1_out_symDS)
+        pE_ER_out3 = pE_ER.execrecordouts.create(
+            generic_output=self.E3_rawout,
+            symbolicdataset=self.C3_out_symDS)
+        self.assertEquals(pE_run.clean(), None)
+
+        # Bad case: ER and pipeline are not consistent.
+        pE_run.execrecord = mA_ER
+        pE_run.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* points to pipeline .* but corresponding ER does not",
+            pE_run.clean)
+        # Reset....
+        pE_run.execrecord = pE_ER
+        pE_run.save()
+
+        # Bad case: ERO has a symbolic dataset different from that
+        # of the corresponding ROC.
+        pE_ER_out2.symbolicdataset = self.singlet_3rows_symDS
+        pE_ER_out2.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
+            pE_run.clean)
+
+        # Before we reset, check is_complete and complete_clean.
+        self.assertEquals(pE_run.is_complete(), True)
+        # Propagation bad case: pE_run is not clean.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
+            pE_run.complete_clean)
+        
+        # Reset....
+        pE_ER_out2.symbolicdataset = self.C1_out_symDS
+        pE_ER_out2.save()
+        self.assertEquals(pE_run.is_complete(), True)
+        self.assertEquals(pE_run.complete_clean(), None)
+
+        pE_run.execrecord = None
+        pE_run.save()
+        self.assertEquals(pE_run.is_complete(), False)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Run .* has no ExecRecord",
+            pE_run.complete_clean)
     
-    def test_run_RS_must_be_consecutive(self):
-
-        # Define ER for pE, then register a run
-        pE_ER = self.pE.execrecords.create()
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
-
-        # Define a complete ER for this PS's transformation, then add a runstep for this pipeline step
-        mA_ER = self.step_E1.transformation.execrecords.create()
-        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
-                                   generic_input=self.A1_rawin)
-        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
-                                    generic_output=self.A1_out)
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(
-            run=pE_run, execrecord=mA_ER)
-        self.assertEqual(pE_run.clean(), None)
-
-        # Do the same thing, but now add step 3
-        mC_ER = self.step_E3.transformation.execrecords.create()
-        mC_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,
-                                   generic_input=self.C1_in)
-        mC_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,
-                                   generic_input=self.C2_in)
-        mC_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,
-                                    generic_output=self.C1_out)
-        mC_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,
-                                    generic_output=self.C2_rawout)
-        mC_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,
-                                    generic_output=self.C3_rawout)
-        step_E3_RS = self.step_E3.pipelinestep_instances.create(
-            run=pE_run, execrecord=mC_ER)
-        errorMessage = "RunSteps of Run \".*\" are not consecutively numbered starting from 1"
-        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
-
-    def test_run_ER_must_point_to_same_pipeline_this_run_points_to(self):
-
-        # Define unrelated ER for pE's run
-        ER_unrelated = self.pD.execrecords.create()
-        pE_run = self.pE.pipeline_instances.create(
-            user=self.myUser, execrecord=ER_unrelated)
-
-        errorMessage = "Run points to pipeline \".*\" but corresponding ER does not"
-        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
-
-    def test_run_for_EROs_present_must_match_corresponding_RunOutputCables(self):
-
-        # Define an ER + EROs
-        pE_ER = self.pE.execrecords.create()
-        E1_out_ERO = pE_ER.execrecordouts.create(
-            symbolicdataset=self.C2_in_symDS,
-            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
-
-        # Register it with a run
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
-
-        # If an EROs exists, a corresponding RunOutputCable must exist
-        errorMessage = "ExecRecord of Run \".*\" has an entry for output \".*\" but no corresponding RunOutputCable exists"
-        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
 
 class ExecRecordTests(CopperfishExecRecordTests_setup):
 
@@ -1155,12 +1632,23 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         # Reset the ROC.
         E31_42_ROC.run = pE_run
 
+        # Bad case: reused is not set but data is associated.
+        self.C1_out_DS.created_by = E31_42_ROC
+        self.C1_out_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunOutputCable .* has not decided whether or not to reuse an ExecRecord; no Datasets should be associated",
+            E31_42_ROC.clean)
+        # Reset....
+        self.C1_out_DS.created_by = None
+        self.C1_out_DS.save()
+
         # Bad case: reused is not set but execrecord is.
         E31_42_ER = self.E31_42.execrecords.create()
         E31_42_ROC.execrecord = E31_42_ER
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecord of ROC .* should not be set yet",
+            "RunOutputCable .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet",
             E31_42_ROC.clean)
         # Reset....
         E31_42_ROC.execrecord = None
@@ -1168,14 +1656,14 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         # Now set reused.  First we do the reused = True case.
         E31_42_ROC.reused = True
         # Bad case: ROC has associated data.
-        self.singlet_DS.runoutputcable = E31_42_ROC
+        self.singlet_DS.created_by = E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunOutputCable .* reused an ExecRecord and should not have generated Dataset .*",
+            "RunOutputCable .* reused an ExecRecord and should not have generated any Datasets",
             E31_42_ROC.clean)
         # Reset....
-        self.singlet_DS.runoutputcable = None
+        self.singlet_DS.created_by = None
         self.singlet_DS.save()
 
         # Next, the reused = False case.
@@ -1184,21 +1672,32 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         self.assertEquals(E31_42_ROC.clean(), None)
 
         # Bad case: trivial cable, data associated.
-        self.singlet_DS.runoutputcable = E31_42_ROC
+        self.singlet_DS.created_by = E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunOutputCable .* is trivial and should not have generated Dataset .*",
+            "RunOutputCable .* is trivial and should not have generated any Datasets",
             E31_42_ROC.clean)
         # Reset....
-        self.singlet_DS.runoutputcable = None
+        self.singlet_DS.created_by = None
         self.singlet_DS.save()
         
         # Good case 2: non-trivial cable, good data attached.
         E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run, reused=False)
-        self.doublet_DS.runoutputcable = E21_41_ROC
+        self.doublet_DS.created_by = E21_41_ROC
         self.doublet_DS.save()
         self.assertEquals(E21_41_ROC.clean(), None)
+
+        # Bad case: non-trivial cable, multiple datasets attached.
+        self.E1_out_DS.created_by = E21_41_ROC
+        self.E1_out_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunOutputCable .* should generate at most one Dataset",
+            E21_41_ROC.clean)
+        # Reset....
+        self.E1_out_DS.created_by = None
+        self.E1_out_DS.save()
         
         # Propagation bad case: bad data attached.
         self.doublet_DS.symbolicdataset.MD5_checksum = "foo"
@@ -1209,7 +1708,7 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
             E21_41_ROC.clean)
         # Reset....
         self.doublet_DS.set_md5()
-        self.doublet_DS.runoutputcable = None
+        self.doublet_DS.created_by = None
         self.doublet_DS.symbolicdataset.save()
 
         # Now set an ER.  Propagation bad case: ER is not complete and clean.
@@ -1306,14 +1805,14 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
             source_pin=self.triplet_cdt.members.all()[1],
             dest_pin=self.triplet_cdt.members.all()[0])
         
-        self.triplet_3_rows_DS.runoutputcable = D11_21_ROC
+        self.triplet_3_rows_DS.created_by = D11_21_ROC
         self.triplet_3_rows_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunOutputCable .* is marked for deletion; no data should be produced",
             D11_21_ROC.clean)
         # Reset....
-        self.triplet_3_rows_DS.runoutputcable = None
+        self.triplet_3_rows_DS.created_by = None
         self.triplet_3_rows_DS.save()
 
         # Bad case: output of D11_21 is not marked for deletion,
@@ -1365,7 +1864,7 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
                 user=self.myUser, name="triplet", description="lol",
                 dataset_file=File(f),
                 symbolicdataset=other_triplet_3_rows_symDS,
-                runoutputcable = D11_21_ROC)
+                created_by = D11_21_ROC)
             other_triplet_3_rows_DS.save()
         other_triplet_3_rows_DS_structure = DatasetStructure(
             dataset=other_triplet_3_rows_DS,
@@ -1380,9 +1879,9 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
 
         # Good case: associated data is the same as that of the
         # corresponding ERO.
-        other_triplet_3_rows_DS.runoutputcable = None
+        other_triplet_3_rows_DS.created_by = None
         other_triplet_3_rows_DS.save()
-        self.triplet_3_rows_DS.runoutputcable = D11_21_ROC
+        self.triplet_3_rows_DS.created_by = D11_21_ROC
         self.triplet_3_rows_DS.save()
 
         self.assertEquals(D11_21_ROC.clean(), None)
@@ -1391,16 +1890,16 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         # and whether cable is trivial is properly set.
 
         # Good case: trivial top-level cable, no data is associated.
-        self.singlet_DS.runoutputcable = None
+        self.singlet_DS.created_by = None
         self.singlet_DS.save()
         self.assertEquals(E31_42_ROC.clean(), None)
         
         # Bad case: trivial top-level cable, data is associated.
-        self.singlet_DS.runoutputcable = E31_42_ROC
+        self.singlet_DS.created_by = E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunOutputCable .* is trivial and should not have generated Dataset .*",
+            "RunOutputCable .* is trivial and should not have generated any Datasets",
             E31_42_ROC.clean)
 
         # Good case: non-trivial top-level cable, data is associated and it
@@ -1411,12 +1910,12 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         E21_41_ER_out.save()
         E21_41_ROC.execrecord = E21_41_ER
         E21_41_ROC.save()
-        self.doublet_DS.runoutputcable = E21_41_ROC
+        self.doublet_DS.created_by = E21_41_ROC
         self.doublet_DS.save()
         self.assertEquals(E21_41_ROC.clean(), None)
 
         # Bad case: non-trivial top-level cable, no data is associated.
-        self.doublet_DS.runoutputcable = None
+        self.doublet_DS.created_by = None
         self.doublet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
@@ -1491,7 +1990,7 @@ class DatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup):
         self.raw_DS.dataset_file.close()
         self.raw_DS.dataset_file.open(mode='w')
         self.raw_DS.dataset_file.close()
-        errorMessage = "File integrity of \".*\" lost. Current checksum \".*\" does not equal expected checksum \".*\""
+        errorMessage = "File integrity of \".*\" lost.  Current checksum \".*\" does not equal expected checksum \".*\""
         self.assertRaisesRegexp(ValidationError,errorMessage, self.raw_DS.clean)
 
     def test_Dataset_is_raw(self):

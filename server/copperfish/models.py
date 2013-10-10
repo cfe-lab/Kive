@@ -1735,7 +1735,6 @@ class Run(models.Model):
     Related to :model:`copperfish.RunStep`
     Related to :model:`copperfish.Dataset`
     """
-    
     user = models.ForeignKey(User, help_text="User who performed this run")
     start_time = models.DateTimeField("start time", auto_now_add=True,
                                       help_text="Time at start of run")
@@ -1768,6 +1767,7 @@ class Run(models.Model):
         Checks coherence of the run (possibly in an incomplete state).
 
         The procedure:
+         - if parent_runstep is not None, then pipeline should be consistent with it
          - if reused is None, then execrecord should not be set and there should be
            no RunSteps or RunOutputCables associated, and exit
         (from here on reused is assumed to be set)
@@ -1787,6 +1787,12 @@ class Run(models.Model):
          - check that execrecord is consistent with pipeline
          - if this run did not reuse an ER, check that all EROs have a corresponding ROC
         """
+        if (self.parent_runstep != None and
+                self.pipeline != self.parent_runstep.pipelinestep.transformation):
+            raise ValidationError(
+                "Pipeline of Run \"{}\" is not consistent with its parent RunStep".
+                format(self))
+        
         if self.reused == None:
             if self.runsteps.all().exists():
                 raise ValidationError(
@@ -1817,6 +1823,10 @@ class Run(models.Model):
                     format(self))
 
         else:
+            # If no steps are registered yet, simply return.
+            if not self.runsteps.all().exists():
+                return
+            
             # Check that steps are proceeding in order.  (Multiple quenching
             # of steps is taken care of already.)
             steps_associated = sorted(
@@ -1831,12 +1841,15 @@ class Run(models.Model):
             for curr_step_num in steps_associated[:-1]:
                 self.runsteps.get(pipelinestep__step_num=curr_step_num).complete_clean()
 
-            # Consider the last step: it should definitely be clean.  If it is
-            # not complete, then no ROCs should be associated.
+            # The most recent step should be clean.
             most_recent_step = self.runsteps.get(
                 pipelinestep__step_num=steps_associated[-1])
             most_recent_step.clean()
-            if not most_recent_step.is_complete():
+
+            # If the last step is not complete, then no ROCs should be
+            # associated.
+            if (steps_associated[-1] < self.pipeline.steps.count() or 
+                    not most_recent_step.is_complete()):
                 if self.runoutputcables.all().exists():
                     raise ValidationError(
                         "Run \"{}\" has not completed all of its RunSteps, so there should be no associated RunOutputCables".
@@ -1876,22 +1889,23 @@ class Run(models.Model):
         # The ER must point to the same pipeline that this run points to
         if self.pipeline != self.execrecord.general_transf:
             raise ValidationError(
-                "Run points to pipeline \"{}\" but corresponding ER does not".
-                format(self.pipeline))
+                "Run \"{}\" points to pipeline \"{}\" but corresponding ER does not".
+                format(self, self.pipeline))
 
         # If this run did not reuse an ER, check that every ERO has a corresponding
         # RunOutputCable (we know it to be clean by checking above).
         if not self.reused:
             for ero in self.execrecord.execrecordouts.all():
                 curr_output = ero.generic_output
-
                 corresp_roc = self.runoutputcables.filter(
                     pipelineoutputcable__output_name=curr_output.dataset_name)
 
-                if not corresp_roc.exists():
-                    raise ValidationError(
-                        "ExecRecord of Run \"{}\" has an entry for output \"{}\" but no corresponding RunOutputCable exists".
-                        format(self, curr_output))
+                # October 9, 2013: this actually cannot happen, because by this
+                # point we have to have quenched all of the ROCs.
+                # if not corresp_roc.exists():
+                #     raise ValidationError(
+                #         "ExecRecord of Run \"{}\" has an entry for output \"{}\" but no corresponding RunOutputCable exists".
+                #         format(self, curr_output))
 
                 # Now corresp_roc is assumed to exist: it should have the
                 # same SymbolicDataset as the ERO.
@@ -1931,6 +1945,8 @@ class RunOutputCable(models.Model):
     pipelineoutputcable = models.ForeignKey(
         PipelineOutputCable,
         related_name="poc_instances")
+    
+    output = generic.GenericRelation("Dataset")
 
     class Meta:
         # Uniqueness constraint ensures that no POC is multiply-represented
@@ -1946,8 +1962,10 @@ class RunOutputCable(models.Model):
          - if it has been decided not to reuse an ER:
            - if this cable is trivial, there should be no associated dataset
            - otherwise, clean any associated dataset
-         - else if it has been decided to reuse an ER, check that there are no associated datasets
-         - else if no decision has been made, check that ER is unset.
+         - else if it has been decided to reuse an ER, check that there
+           are no associated datasets
+         - else if no decision has been made, check that no data has
+           been associated, and that ER is unset
         (after this point it is assumed that ER is set)
          - check that it is complete and clean
          - check that it's coherent with pipelineoutputcable
@@ -1966,26 +1984,37 @@ class RunOutputCable(models.Model):
                 format(self.pipelineoutputcable, self.run.pipeline))
 
         if self.reused == None:
+            if self.has_data():
+                raise ValidationError(
+                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
+                    format(self))
+
             if self.execrecord != None:
                 raise ValidationError(
-                    "ExecRecord of ROC \"{}\" should not be set yet".
+                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
                     format(self))
+
         elif self.reused:
             if self.has_data():
                 raise ValidationError(
-                    "RunOutputCable \"{}\" reused an ExecRecord and should not have generated Dataset \"{}\"".
-                    format(self, self.output))
+                    "RunOutputCable \"{}\" reused an ExecRecord and should not have generated any Datasets".
+                    format(self))
         else:
             # If this cable is trivial, there should be no data associated.
             if self.pipelineoutputcable.is_trivial():
                 if self.has_data():
                     raise ValidationError(
-                        "RunOutputCable \"{}\" is trivial and should not have generated Dataset \"{}\"".
-                        format(self, self.output))
-            # Otherwise, clean whatever data is attached.
-            else:
-                if self.has_data():
-                    self.output.clean()
+                        "RunOutputCable \"{}\" is trivial and should not have generated any Datasets".
+                        format(self))
+
+            # Otherwise, check that there is at most one Dataset attached, and
+            # clean it.
+            elif self.has_data():
+                if self.output.count() > 1:
+                    raise ValidationError(
+                        "RunOutputCable \"{}\" should generate at most one Dataset".
+                        format(self))
+                self.output.all()[0].clean()
 
         if self.execrecord == None:
             return
@@ -2033,10 +2062,10 @@ class RunOutputCable(models.Model):
                 # self.execrecord (which has already been checked for
                 # completeness and cleanliness).
                 if not self.execrecord.execrecordouts.filter(
-                        symbolicdataset=self.output.symbolicdataset).exists():
+                        symbolicdataset=self.output.all()[0].symbolicdataset).exists():
                     raise ValidationError(
                         "Dataset \"{}\" is not in an ERO of ExecRecord \"{}\"".
-                        format(self.output, self.execrecord))
+                        format(self.output.all()[0], self.execrecord))
 
             
 
@@ -2053,7 +2082,7 @@ class RunOutputCable(models.Model):
 
     def has_data(self):
         """True if associated output exists; False if not."""
-        return hasattr(self, "output")
+        return self.output.all().exists()
         
 class RunStep(models.Model):
     """
@@ -2077,6 +2106,8 @@ class RunStep(models.Model):
     pipelinestep = models.ForeignKey(
         PipelineStep,
         related_name="pipelinestep_instances")
+
+    outputs = generic.GenericRelation("Dataset")
 
     class Meta:
         # Uniqueness constraint ensures you can't have multiple RunSteps for
@@ -2358,24 +2389,32 @@ class Dataset(models.Model):
 
     # Four cases from which datasets can originate:
     #
-    # Case 1: A runstep, but not a run (Internal step)
-    # Case 2: A run, but not a run step (Normal run)
-    # Case 3: Neither a run, nor a runstep (Uploaded)
-    # Case 4: Both a run, and a run step (Run within a run)
+    # Case 1: uploaded
+    # Case 2: from the transformation of a RunStep
+    # Case 3: from the execution of a POC (i.e. from a ROC)
+    content_type = models.ForeignKey(
+        ContentType,
+        limit_choices_to = {
+            "model__in": ("PipelineStep", "PipelineOutputCable")
+        },
+        null=True,
+        blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    created_by = generic.GenericForeignKey("content_type", "object_id")
 
-    # If produced by a runstep
-    runstep = models.ForeignKey("RunStep",
-                                related_name="outputs",
-                                null=True,
-                                blank=True,
-                                help_text="Run step dataset was created by (If applicable)")
+    # # If produced by a runstep
+    # runstep = models.ForeignKey("RunStep",
+    #                             related_name="outputs",
+    #                             null=True,
+    #                             blank=True,
+    #                             help_text="Run step dataset was created by (If applicable)")
 
-    # If a final dataset
-    runoutputcable = models.OneToOneField("RunOutputCable",
-                                          related_name="output",
-                                          null=True,
-                                          blank=True,
-                                          help_text="Run output cable this dataset was created by (If applicable)")
+    # # If a final dataset
+    # runoutputcable = models.OneToOneField("RunOutputCable",
+    #                                       related_name="output",
+    #                                       null=True,
+    #                                       blank=True,
+    #                                       help_text="Run output cable this dataset was created by (If applicable)")
 
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to="Datasets",help_text="Physical path where datasets are stored",null=False)

@@ -983,3 +983,64 @@ class RunStepTests_deprecated(CopperfishExecRecordTests_setup):
         self.assertEqual(step_E2_RS.clean(), None)
         errorMessage = "Specified PipelineStep is a Pipeline but no child run exists"
         self.assertRaisesRegexp(ValidationError,errorMessage,step_E2_RS.complete_clean)
+
+
+class RunTests_deprecated(CopperfishExecRecordTests_setup):
+
+    def test_run_RS_must_be_consecutive(self):
+
+        # Define ER for pE, then register a run
+        pE_ER = self.pE.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # Define a complete ER for this PS's transformation, then add a runstep for this pipeline step
+        mA_ER = self.step_E1.transformation.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(
+            run=pE_run, execrecord=mA_ER)
+        self.assertEqual(pE_run.clean(), None)
+
+        # Do the same thing, but now add step 3
+        mC_ER = self.step_E3.transformation.execrecords.create()
+        mC_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,
+                                   generic_input=self.C1_in)
+        mC_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,
+                                   generic_input=self.C2_in)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,
+                                    generic_output=self.C1_out)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,
+                                    generic_output=self.C2_rawout)
+        mC_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,
+                                    generic_output=self.C3_rawout)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(
+            run=pE_run, execrecord=mC_ER)
+        errorMessage = "RunSteps of Run \".*\" are not consecutively numbered starting from 1"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
+
+    def test_run_ER_must_point_to_same_pipeline_this_run_points_to(self):
+
+        # Define unrelated ER for pE's run
+        ER_unrelated = self.pD.execrecords.create()
+        pE_run = self.pE.pipeline_instances.create(
+            user=self.myUser, execrecord=ER_unrelated)
+
+        errorMessage = "Run points to pipeline \".*\" but corresponding ER does not"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
+
+    def test_run_for_EROs_present_must_match_corresponding_RunOutputCables(self):
+
+        # Define an ER + EROs
+        pE_ER = self.pE.execrecords.create()
+        E1_out_ERO = pE_ER.execrecordouts.create(
+            symbolicdataset=self.C2_in_symDS,
+            generic_output=self.pE.outputs.get(dataset_name="E1_out"))
+
+        # Register it with a run
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser,execrecord=pE_ER)
+
+        # If an EROs exists, a corresponding RunOutputCable must exist
+        errorMessage = "ExecRecord of Run \".*\" has an entry for output \".*\" but no corresponding RunOutputCable exists"
+        self.assertRaisesRegexp(ValidationError,errorMessage,pE_run.clean)
