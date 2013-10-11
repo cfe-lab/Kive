@@ -1770,9 +1770,11 @@ class PipelineOutputCable(models.Model):
 
         # The cable has a nonraw source (and output_cdt is specified)
         else:
-            if self.output_cdt != self.provider_output.get_cdt() and not outwires.exists():
+            if (not self.output_cdt.is_restriction(
+                    self.provider_output.get_cdt()) and
+                    not outwires.exists()):
                 raise ValidationError(
-                    "Cable \"{}\" has a different source cdt from the target cdt, but no wires exist" .
+                    "Cable \"{}\" has a source CDT that is not a restriction of its target CDT, but no wires exist".
                     format(self))
 
             # Clean all wires
