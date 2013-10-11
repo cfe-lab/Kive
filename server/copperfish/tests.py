@@ -30,6 +30,23 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="b",column_idx=2)
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
 
+        # October 11, 2013: more Datatypes.
+        with open(os.path.join(samplecode_path, "DNANucSeqUT.py"), "rb") as f:
+            self.DNA_dt = Datatype(
+                name="DNANucSeq",
+                description="DNA nucleotide sequence",
+                verification_script=File(f), Python_type="str");
+            self.DNA_dt.save()
+            self.DNA_dt.restricts.add(self.string_dt);
+            
+        with open(os.path.join(samplecode_path, "RNANucSeqUT.py"), "rb") as f:
+            self.RNA_dt = Datatype(
+                name="RNANucSeq",
+                description="RNA nucleotide sequence",
+                verification_script=File(f), Python_type="str");
+            self.RNA_dt.save()
+            self.RNA_dt.restricts.add(self.string_dt);
+
         # CRs and CRRs
         self.generic_cr = CodeResource(name="genericCR",description="Just a CR",filename="complement.py")
         self.generic_cr.save()
@@ -308,8 +325,19 @@ class RunStepTests(CopperfishExecRecordTests_setup):
         E03_11_RSIC.save()
         self.assertEquals(step_E1_RS.clean(), None)
 
-        # Bad case: cables not quenched, but reused is set.
+        # Bad case: cables not quenched, but there is an associated dataset.
         E03_11_RSIC.delete()
+        self.doublet_DS.created_by = step_E1_RS
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* inputs not quenched; no data should have been generated",
+            step_E1_RS.clean)
+        # Reset....
+        self.doublet_DS.created_by = None
+        self.doublet_DS.save()
+
+        # Bad case: cables not quenched, but reused is set.
         step_E1_RS.reused = False
         self.assertRaisesRegexp(
             ValidationError,
@@ -373,6 +401,18 @@ class RunStepTests(CopperfishExecRecordTests_setup):
         E02_22_RSIC.execrecord = E02_22_ER
         E02_22_RSIC.save()
         self.assertEquals(step_E2_RS.clean(), None)
+
+        
+        # Bad case: reused is not set, but there is an associated dataset.
+        self.doublet_DS.created_by = step_E1_RS
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* has not decided whether or not to reuse an ExecRecord; no data should have been generated",
+            step_E1_RS.clean)
+        # Reset....
+        self.doublet_DS.created_by = None
+        self.doublet_DS.save()
 
         # Bad case: reused not set, but ER is.
         step_E1_RS.execrecord = mA_ER
@@ -679,11 +719,10 @@ class RunStepTests(CopperfishExecRecordTests_setup):
 
         # Propagation check on complete_clean:
         step_E1_RS.reused = None
-        step_E1_RS.execrecord = mA_ER
         step_E1_RS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
+            "RunStep .* has not decided whether or not to reuse an ExecRecord; no data should have been generated",
             step_E1_RS.complete_clean)
 
         self.assertEquals(step_E2_RS.is_complete(), True)
@@ -1328,7 +1367,7 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
-            "Dataset \".*\" is not of the expected CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
@@ -1350,7 +1389,7 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             generic_input=self.E1_in)
         self.assertRaisesRegexp(
             ValidationError,
-            "Dataset \".*\" is not of the expected CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
@@ -1412,7 +1451,7 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             generic_input=self.C2_in)
         self.assertRaisesRegexp(
             ValidationError,
-            "Dataset \".*\" is not of the expected CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
@@ -1519,6 +1558,13 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             "Dataset \".*\" was produced by TransformationOutput \".*\" but has too many rows",
             myERO_too_many_rows.clean)
         myERO_too_many_rows.delete()
+
+    # def test_ERI_associated_Dataset_must_be_restriction_of_input_CDT(self):
+    #     """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
+    #     mC_ER = self.mC.execrecords.create()
+    #     mC_ER_in_1 = mC_ER.execrecordins.create(
+    #         generic_input=self.C1_in,
+    #         symbolicdataset=self.C1_in_symDS)
 
 class RunSICTests(CopperfishExecRecordTests_setup):
 
@@ -1940,7 +1986,7 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
             D11_21_ROC.complete_clean)
 
 
-class DatasetAndDatasetStructureTests(CopperfishExecRecordTests_setup):
+class DatasetTests(CopperfishExecRecordTests_setup):
 
     def test_Dataset_clean_must_be_coherent_with_structure_if_applicable(self):
 

@@ -135,23 +135,23 @@ class CompoundDatatypeMember(models.Model):
     """
 
     compounddatatype = models.ForeignKey(
-            "CompoundDatatype",
-            related_name="members",
-            help_text="Links this DataType member to a particular CompoundDataType");
+        "CompoundDatatype",
+        related_name="members",
+        help_text="Links this DataType member to a particular CompoundDataType");
 
     datatype = models.ForeignKey(
-            Datatype,
-            help_text="Specifies which DataType this member is");
+        Datatype,
+        help_text="Specifies which DataType this member is");
 
     column_name = models.CharField(
-            "Column name",
-            max_length=128,
-            help_text="Gives datatype a 'collumn name' as an alternative to collumn index");
+        "Column name",
+        max_length=128,
+        help_text="Gives datatype a 'column name' as an alternative to column index");
 
     # MinValueValidator(1) constrains column_idx to be >= 1
     column_idx = models.PositiveIntegerField(
-            validators=[MinValueValidator(1)],
-            help_text="The column number of this DataType");
+        validators=[MinValueValidator(1)],
+        help_text="The column number of this DataType");
 
     # Define database indexing rules to ensure tuple uniqueness
     # A compoundDataType cannot have 2 member definitions with the same column name or column number
@@ -162,9 +162,9 @@ class CompoundDatatypeMember(models.Model):
     def __unicode__(self):
         """Describe a CompoundDatatypeMember with it's column number, datatype name, and column name"""
 
-        returnString = u"{}: <{}> [{}]".format( self.column_idx,
-                                                unicode(self.datatype),
-                                                self.column_name);
+        returnString = u"{}: <{}> [{}]".format(self.column_idx,
+                                               unicode(self.datatype),
+                                               self.column_name);
 
         return returnString
 
@@ -231,6 +231,75 @@ class CompoundDatatype(models.Model):
         # Check if the sorted list is exactly a sequence from 1 to n
         if sorted(column_indices) != range(1, self.members.count()+1):
             raise ValidationError("Column indices are not consecutive starting from 1");
+
+    def is_restriction(self, other_CDT):
+        """
+        True if this CDT is a column-wise restriction of its parameter.
+
+        This is trivially true if they are the same CDT; otherwise
+        the column names must be exactly the same and each column
+        of this CDT is a restriction of the corresponding column
+        of the parameter CDT.
+
+        Note that this induces a partial order on CDTs.
+
+        PRE: this CDT and other_CDT are clean.
+        """
+        if self == other_CDT:
+            return True
+        
+        # Make sure they have the same number of columns.
+        if self.members.count() != other_CDT.members.count():
+            return False
+
+        # Since they have the same number of columns at this point,
+        # and we have enforced that the numbering of members is
+        # consecutive starting from one, we can go through all of this
+        # CDT's members and look for the matching one.
+        for member in self.members.all():
+            counterpart = other_CDT.members.get(
+                column_idx=member.column_idx)
+            if (member.column_name != counterpart.column_name or
+                    not counterpart.datatype.is_restricted_by(
+                        member.datatype)):
+                return False
+        
+        # Having reached this point, this CDT must be a restriction
+        # of other_CDT.
+        return True
+
+    # Note that this could be implemented as checking whether self is
+    # a restriction of other_CDT and vice versa, but coding it
+    # separately is slightly quicker.
+    def is_identical(self, other_CDT):
+        """
+        True if this CDT is identical with its parameter; False otherwise.
+        
+        This is trivially true if they are the same CDT; otherwise
+        the column names and column types must be exactly the same.
+
+        PRE: this CDT and other_CDT are clean.
+        """
+        if self == other_CDT:
+            return True
+        
+        # Make sure they have the same number of columns.
+        if self.members.count() != other_CDT.members.count():
+            return False
+
+        # Since they have the same number of columns at this point,
+        # and we have enforced that the numbering of members is
+        # consecutive starting from one, we can go through all of this
+        # CDT's members and look for the matching one.
+        for member in self.members.all():
+            counterpart = other_CDT.members.get(
+                column_idx=member.column_idx)
+            if (member.column_name != counterpart.column_name or
+                    member.datatype != counterpart.datatype):
+                return False
+        
+        # Having reached this point, they must be identical.
+        return True
 
  
 class CodeResource(models.Model):
@@ -1091,6 +1160,36 @@ class PipelineStep(models.Model):
         """
         self.outputs_to_delete.add(dataset_to_delete)
 
+
+# A helper function that will be called both by PSICs and
+# POCs to tell whether they are trivial.
+def cable_trivial_h(cable, cable_wires):
+    """
+    Helper called by both PSICs and POCs to check triviality.
+    
+    If a cable is raw, it is trivial.  If it is not raw, then it
+    is trivial if it either has no wiring, or if the wiring is
+    trivial (i.e. mapping corresponding pin to corresponding pin
+    without changing names or anything).
+    
+    PRE: cable is clean; cable_wires is a QuerySet containing cable's
+    custom wires.
+    """
+    if cable.is_raw():
+        return True
+        
+    if not cable_wires.exists():
+        return True
+
+    # At this point, we know there are wires.
+    for wire in cable_wires:
+        if (wire.source_pin.column_idx != wire.dest_pin.column_idx or
+                wire.source_pin.column_name != wire.dest_pin.column_name):
+            return False
+
+    # All the wiring was trivial, so....
+    return True
+
 class PipelineStepInputCable(models.Model):
     """
     Represents the "cables" feeding into the transformation of a
@@ -1314,11 +1413,14 @@ class PipelineStepInputCable(models.Model):
 
         
     def clean_and_completely_wired(self):
-        """Check coherence of the cable, and check that it is correctly wired (if it is non-raw).
+        """
+        Check coherence of the cable, and check that it is correctly wired (if it is non-raw).
 
         This will call clean() as well as checking whether the input
-        and output 'work together' via having the same CDT or having
-        good wiring in the non-raw case.
+        and output 'work together'.  That is, either both are raw, or
+        neither are non-raw and:
+         - the source CDT is a restriction of the destination CDT; or
+         - there is good wiring defined.
         """
         # Check coherence of this cable otherwise.
         self.clean();
@@ -1330,8 +1432,9 @@ class PipelineStepInputCable(models.Model):
         input_requested = self.provider_output;
         feed_to_input = self.transf_input;
         
-        # If CDTs don't match, check presence of custom wiring
-        if input_requested.get_cdt() != feed_to_input.get_cdt():
+        # If source CDT cannot feed (i.e. is not a restriction of)
+        # destination CDT, check presence of custom wiring
+        if not input_requested.get_cdt().is_restriction(feed_to_input.get_cdt()):
             if not self.custom_wires.all().exists():
                 raise ValidationError(
                     "Custom wiring required for cable \"{}\"".
@@ -1363,6 +1466,112 @@ class PipelineStepInputCable(models.Model):
     def is_raw(self):
         """True if this cable maps raw data; false otherwise."""
         return self.transf_input.is_raw()
+
+    def is_trivial(self):
+        """
+        True if this cable is trivial; False otherwise.
+        
+        If a cable is raw, it is trivial.  If it is not raw, then it
+        is trivial if it either has no wiring, or if the wiring is
+        trivial (i.e. mapping corresponding pin to corresponding pin
+        without changing names or anything).
+
+        PRE: cable is clean.
+        """
+        return cable_trivial_h(self, self.custom_wires.all())
+
+    def is_restriction(self, other_cable):
+        """
+        Returns whether this cable is a restriction of the specified.
+
+        More specifically, this cable is a restriction of the
+        parameter if they feed the same TransformationInput and, if
+        they are not raw:
+         - source CDT is a restriction of parameter's source CDT
+         - wiring matches
+
+        PRE: both self and other_cable are clean.
+        """
+        # Trivial case.
+        if self == other_cable:
+            return True
+
+        if self.transf_input != other_cable.transf_input:
+            return False
+
+        # Now we know that they feed the same TransformationInput.
+        if self.is_raw():
+            return True
+
+        # From here on, we assume both cables are non-raw.
+        # (They must be, since both feed the same TI and self
+        # is not raw.)
+        if not self.provider_output.get_cdt().is_restriction(
+                other_cable.provider_output.get_cdt()):
+            return False
+
+        # If there is non-trivial custom wiring on either, then
+        # the wiring must match.
+        if self.is_trivial() and other_cable.is_trivial():
+            return True
+        elif self.is_trivial() != other_cable.is_trivial():
+            return False
+
+        # Now we know that both have non-trivial wiring.  Check both
+        # cables' wires and see if they connect corresponding pins.
+        # (We already know they feed the same TransformationInput,
+        # so we only have to check the indices.)
+        for wire in self.custom_wires.all():
+            corresp_wire = other_cable.custom_wires.get(
+                dest_pin=wire.dest_pin)
+            if (wire.source_pin.column_idx !=
+                    corresp_wire.source_pin.column_idx):
+                return False
+
+        # Having reached this point, we know that the wiring matches.
+        return True
+    
+    def is_compatible(self, other_cable, source_CDT):
+        """
+        Checks if a cable is compatible wrt specified CDT.
+        
+        The specified cable and this one are compatible if:
+         - both can be fed by source_CDT
+         - both feed the same TransformationInput
+         - both are trivial, or the wiring matches
+        
+        For two cables' wires to match, any wire connecting column
+        indices (source_idx, dest_idx) must appear in both cables.
+
+        PRE: self, other_cable are clean.
+        """
+        # Both cables can be fed by source_CDT if source_CDT is
+        # a restriction of their provider_outputs' CDTs.
+        if (not source_CDT.is_restriction(self.provider_output.get_cdt()) or
+                not source_CDT.is_restriction(
+                    other_cable.provider_output.get_cdt())):
+            return False
+        
+        if self.transf_input != other_outcable.transf_input:
+            return False
+
+        if self.is_trivial() and other_outcable.is_trivial():
+            return True
+
+        # We know they aren't trivial at this point, so check wiring.
+        for wire in self.custom_wires.all():
+            # Get the corresponding wire in other_cable.
+            corresp_wire = other_cable.custom_wires.get(
+                dest_pin=wire.dest_pin)
+
+            if (wire.source_pin.column_idx !=
+                    corresp_wire.source_pin.column_idx):
+                return False
+
+        # By the fact that self and other_cable are clean, we know
+        # that we have checked all the wires.  Having made sure all of
+        # the wiring matches, we can....
+        return True
 
 class CustomCableWire(models.Model):
     """
@@ -1589,16 +1798,103 @@ class PipelineOutputCable(models.Model):
         """True if this output cable is raw; False otherwise."""
         return self.provider_output.is_raw()
 
+
     def is_trivial(self):
         """
         True if this output cable is trivial; False otherwise.
+        
+        This basically does exactly what the corresponding method for
+        PipelineStepInputCable does, by calling cable_trivial_h.
 
-        Note that a raw cable is trivial.
-
-        FIXME: at the moment this just tells you whether or not there are any
-        custom wires.  We should make it so it also looks for trivial wiring.
+        PRE: cable is clean.
         """
-        return self.is_raw() or not self.custom_outwires.all().exists()
+        return cable_trivial_h(self, self.custom_outwires.all())
+    
+    def is_restriction(self, other_outcable):
+        """
+        Returns whether this cable is a restriction of the specified.
+
+        More specifically, this cable is a restriction of the
+        parameter if they come from the same TransformationOutput and, if
+        they are not raw:
+         - destination CDT is a restriction of parameter's destination CDT
+         - wiring matches
+
+        PRE: both self and other_cable are clean.
+        """
+        # Trivial case.
+        if self == other_outcable:
+            return True
+
+        if self.provider_output != other_outcable.provider_output:
+            return False
+
+        # Now we know that they are fed by the same TransformationOutput.
+        if self.is_raw():
+            return True
+
+        # From here on, we assume both cables are non-raw.
+        # (They must be, since both are fed by the same TO and self
+        # is not raw.)
+        if not self.output_cdt.is_restriction(other_outcable.output_cdt):
+            return False
+
+        # If there is non-trivial custom wiring on either, then
+        # the wiring must match.
+        if self.is_trivial() and other_outcable.is_trivial():
+            return True
+        elif self.is_trivial() != other_outcable.is_trivial():
+            return False
+        
+        # Now we know that both have non-trivial wiring.  Check both
+        # cables' wires and see if they connect corresponding pins.
+        # (We already know they feed the same TransformationInput,
+        # so we only have to check the indices.)
+        for wire in self.custom_outwires.all():
+            corresp_wire = other_outcable.custom_outwires.get(
+                dest_pin=wire.dest_pin)
+            if (wire.source_pin.column_idx !=
+                    corresp_wire.source_pin.column_idx):
+                return False
+
+        # Having reached this point, we know that the wiring matches.
+        return True
+
+    def is_compatible(self, other_outcable):
+        """
+        Checks if an outcable is compatible.
+        
+        The specified cable and this one are compatible if:
+         - both are fed by the same TransformationOutput
+         - both are trivial, or the wiring matches
+        
+        For two cables' wires to match, any wire connecting column
+        indices (source_idx, dest_idx) must appear in both cables.
+
+        PRE: self, other_outcable are clean.
+        """
+        if self.provider_output != other_outcable.provider_output:
+            return False
+
+        if self.is_trivial() and other_outcable.is_trivial():
+            return True
+
+        # We know they are fed by the same TransformationOutput
+        # and are non-trivial.  As such, we have to check that
+        # their wiring matches.
+        for wire in self.custom_outwires.all():
+            # Get the corresponding wire in other_outcable.
+            corresp_wire = other_outcable.custom_outwires.get(
+                dest_pin=wire.dest_pin)
+
+            if (wire.source_pin.column_idx !=
+                    corresp_wire.source_pin.column_idx):
+                return False
+
+        # By the fact that self and other_outcable are clean, we know
+        # that we have checked all the wires.  Having made sure all of
+        # the wiring matches, we can....
+        return True
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -1725,8 +2021,6 @@ class TransformationOutput(TransformationXput):
     """
     pass
 
-# FIXME we have to come back to this after making all of the changes
-# relating to RunOutputCables
 class Run(models.Model):
     """
     Stores data associated with an execution of a pipeline.
@@ -2122,9 +2416,9 @@ class RunStep(models.Model):
          - pipelinestep is consistent with run
          - if pipelinestep is for a method, there should be no child_run
          - if any RSICs exist, check they are clean and complete.
-         - if all RSICs are not quenched, reused, child_run, and execrecord should not be set.
+         - if all RSICs are not quenched, reused, child_run, and execrecord should not be set, and no Datasets should be associated
         (from here on all RSICs are assumed to be quenched)
-         - if we haven't decided whether or not to reuse an ER, child_run and execrecord should not be set.
+         - if we haven't decided whether or not to reuse an ER, child_run and execrecord should not be set, and no Datasets should be associated.
         (from here on, reused is assumed to be set)
          - if we are reusing an ER, check that:
            - there are no associated Datasets.
@@ -2175,10 +2469,18 @@ class RunStep(models.Model):
                 raise ValidationError(
                     "RunStep \"{}\" inputs not quenched; child_run should not be set".
                     format(self))
+            if self.outputs.all().exists():
+                raise ValidationError(
+                    "RunStep \"{}\" inputs not quenched; no data should have been generated".
+                    format(self))
             return
 
         # From here on, RSICs are assumed to be quenched.
         if self.reused == None:
+            if self.outputs.all().exists():
+                raise ValidationError(
+                    "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; no data should have been generated".
+                    format(self))
             if self.execrecord != None:
                 raise ValidationError(
                     "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set".
@@ -2619,19 +2921,57 @@ class ExecRecord(models.Model):
             ero.clean()
 
         if type(self.general_transf) not in (Method, Pipeline):
-            # If the cable is trivial, then the ERI and ERO should have the same
-            # SymbolicDataset (if they both exist).
-            has_wires = None
-            if type(self.general_transf) == PipelineStepInputCable:
-                has_wires = self.general_transf.custom_wires.all().exists()
-            else:
-                has_wires = self.general_transf.custom_outwires.all().exists()
+            # If the cable is quenched:
+            if eris.exists() and eros.exists():
+                
+                # If the cable is trivial, then the ERI and ERO should
+                # have the same SymbolicDataset (if they both exist).
+                if (self.general_transf.is_trivial() and
+                        eris[0].symbolicdataset != eros[0].symbolicdataset):
+                    raise ValidationError(
+                        "ER \"{}\" represents a trivial cable but its input and output do not match".
+                        format(self))
 
-            if (not has_wires and eris.exists() and eros.exists() and
-                eris[0].symbolicdataset != eros[0].symbolicdataset):
-                raise ValidationError(
-                    "ER \"{}\" represents a trivial cable but its input and output do not match".
-                    format(self))
+                # If the cable is not trivial and both sides have
+                # data, then the column *Datatypes* on the destination
+                # side are the same as the corresponding column on the
+                # source side.  For example, if a CDT like (DNA col1,
+                # int col2) is fed through a cable that maps col1 to
+                # produce (string foo), then the actual Datatype of
+                # the column in the corresponding Dataset would be
+                # DNA.
+
+                # Note that because the ERI and ERO are both clean,
+                # and because we checked general_transf is not
+                # trivial, we know that both have well-defined
+                # DatasetStructures.
+                elif (not self.general_transf.is_trivial() and
+                         eris[0].symbolicdataset.has_data() and
+                         eros[0].symbolicdataset.has_data()):
+                    cable_wires = None
+                    if type(self.general_transf) == PipelineStepInputCable:
+                        cable_wires = self.general_transf.custom_wires.all()
+                    else:
+                        cable_wires = self.general_transf.custom_outwires.all()
+
+                    source_CDT = (eris[0].symbolicdataset.dataset.structure.
+                                  compounddatatype)
+                    dest_CDT = (eros[0].symbolicdataset.dataset.structure.
+                                compounddatatype)
+
+                    for wire in cable_wires:
+                        source_idx = wire.source_pin.column_idx
+                        dest_idx = wire.dest_pin.column_idx
+                        
+                        dest_dt = dest_CDT.members.get(column_idx=dest_idx)
+                        source_dt = source_CDT.members.get(
+                            column_idx=source_idx)
+
+                        if source_dt != dest_dt:
+                            raise ValidationError(
+                                "ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source".
+                                format(self, dest_dt))
+                    
 
     def complete_clean(self):
         """
@@ -2780,10 +3120,13 @@ class ExecRecordIn(models.Model):
                 cdt_needed = self.generic_input.get_cdt()
                 actual_data = self.symbolicdataset.dataset
 
-                # CDTs must match (FIXME: generalize to compaitible CDTs)
-                if actual_data.structure.compounddatatype != cdt_needed:
-                    raise ValidationError("Dataset \"{}\" is not of the expected CDT".
-                                          format(actual_data))
+                # CDT of Dataset must be a restriction of cdt_needed,
+                # i.e. we can feed the Dataset into cdt_needed.
+                if not actual_data.structure.compounddatatype.is_restriction(
+                        cdt_needed):
+                    raise ValidationError(
+                        "CDT of Dataset \"{}\" is not a restriction of the required CDT".
+                        format(actual_data))
 
                 # Check row constraints.
                 if (transf_xput_used.get_min_row() != None and
@@ -2934,13 +3277,26 @@ class ExecRecordOut(models.Model):
             if not self.symbolicdataset.dataset.is_raw():
                 actual_data = self.symbolicdataset.dataset
 
+                # If this execrecord refers to a Method/Pipeline,
                 # Dataset CDT must match generic_output's CDT.
-                if actual_data.structure.compounddatatype != self.generic_output.get_cdt():
-                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
+                if type(self.execrecord.general_transf) in (Method, Pipeline):
+                    if not actual_data.structure.compounddatatype.is_identical(
+                            self.generic_output.get_cdt()):
                         raise ValidationError(
-                            "CDT of Dataset \"{}\" does not match the CDT of the fed TransformationInput \"{}\"".
+                            "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
                             format(actual_data, self.generic_output))
-                    else:
+                    
+                # If it refers to a cable, then Dataset CDT must be
+                # a restriction of generic_output's CDT.
+                elif type(self.execrecord.general_transf) == PipelineStepInputCable:
+                    if not actual_data.structure.compounddatatype.is_restriction(
+                            self.generic_output.get_cdt()):
+                        raise ValidationError(
+                            "CDT of Dataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
+                            format(actual_data, self.generic_output))
+                else:
+                    if not actual_data.structure.compounddatatype.is_restriction(
+                            self.generic_output.get_cdt()):
                         raise ValidationError(
                             "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
                             format(actual_data, self.generic_output))
