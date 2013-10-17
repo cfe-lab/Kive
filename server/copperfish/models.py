@@ -110,6 +110,17 @@ class Datatype(models.Model):
         # Return False if Case 1 is never encountered
         return is_restricted
 
+    def is_restriction(self, possible_restrictor_datatype):
+        """
+        True if this Datatype restricts the parameter, directly or indirectly.
+
+        This induces a partial ordering A <= B if A is a restriction of B.
+        For example, a DNA sequence is a restriction of a string.
+        """
+        return (self == possible_restrictor_datatype or
+                possible_restrictor_datatype.is_restricted_by(self))
+    
+
     # FIXME: when we start with execute, we'll use this to test
     # whether a specified column in a CSV file conforms to this
     # Datatype.
@@ -260,17 +271,14 @@ class CompoundDatatype(models.Model):
             counterpart = other_CDT.members.get(
                 column_idx=member.column_idx)
             if (member.column_name != counterpart.column_name or
-                    not counterpart.datatype.is_restricted_by(
-                        member.datatype)):
+                    not member.datatype.is_restriction(
+                        counterpart.datatype)):
                 return False
         
         # Having reached this point, this CDT must be a restriction
         # of other_CDT.
         return True
 
-    # Note that this could be implemented as checking whether self is
-    # a restriction of other_CDT and vice versa, but coding it
-    # separately is slightly quicker.
     def is_identical(self, other_CDT):
         """
         True if this CDT is identical with its parameter; False otherwise.
@@ -280,26 +288,8 @@ class CompoundDatatype(models.Model):
 
         PRE: this CDT and other_CDT are clean.
         """
-        if self == other_CDT:
-            return True
-        
-        # Make sure they have the same number of columns.
-        if self.members.count() != other_CDT.members.count():
-            return False
-
-        # Since they have the same number of columns at this point,
-        # and we have enforced that the numbering of members is
-        # consecutive starting from one, we can go through all of this
-        # CDT's members and look for the matching one.
-        for member in self.members.all():
-            counterpart = other_CDT.members.get(
-                column_idx=member.column_idx)
-            if (member.column_name != counterpart.column_name or
-                    member.datatype != counterpart.datatype):
-                return False
-        
-        # Having reached this point, they must be identical.
-        return True
+        return (self.is_restriction(other_CDT) and
+                other_CDT.is_restriction(self))
 
  
 class CodeResource(models.Model):
@@ -1172,8 +1162,8 @@ def cable_trivial_h(cable, cable_wires):
     trivial (i.e. mapping corresponding pin to corresponding pin
     without changing names or anything).
     
-    PRE: cable is clean; cable_wires is a QuerySet containing cable's
-    custom wires.
+    PRE: cable is clean (and therefore so are its wires); cable_wires
+    is a QuerySet containing cable's custom wires.
     """
     if cable.is_raw():
         return True
@@ -1229,6 +1219,14 @@ class PipelineStepInputCable(models.Model):
     custom_wires = generic.GenericRelation("CustomCableWire")
 
     execrecords = generic.GenericRelation("ExecRecord")
+
+    # October 15, 2013: allow the data coming out of a PSIC to be
+    # saved.  Note that this is only relevant if the PSIC is not
+    # trivial, and is false by default.
+    keep_output = models.BooleanField(
+        "Whether or not to retain the output of this PSIC",
+        help_text="Keep or delete output",
+        default=False)
 
     # step_providing_input must be PRIOR to this step (Time moves forward)
 
@@ -1530,7 +1528,9 @@ class PipelineStepInputCable(models.Model):
 
         # Having reached this point, we know that the wiring matches.
         return True
-    
+
+    # NOTE October 15, 2013: is this actually that useful?  I think
+    # we're going to need is_compatible_given_input more.
     def is_compatible(self, other_cable, source_CDT):
         """
         Checks if a cable is compatible wrt specified CDT.
@@ -1552,10 +1552,30 @@ class PipelineStepInputCable(models.Model):
                     other_cable.provider_output.get_cdt())):
             return False
         
-        if self.transf_input != other_outcable.transf_input:
+        # After this point, all of the checks are the same as for
+        # is_compatible_given_input.
+        return self.is_compatible_given_input(other_cable)
+
+    def is_compatible_given_input(self, other_cable):
+        """
+9        Check compatibility of two cables having the same input.
+
+        Given that both had the same input, they are compatible if:
+         - both feed the same TransformationInput
+         - both are trivial, or the wiring matches
+        
+        For two cables' wires to match, any wire connecting column
+        indices (source_idx, dest_idx) must appear in both cables.
+
+        PRE: self, other_cable are clean, and both can be fed the
+        same input SymbolicDataset.
+        """
+        # Both cables can be fed by source_CDT if source_CDT is
+        # a restriction of their provider_outputs' CDTs.
+        if self.transf_input != other_cable.transf_input:
             return False
 
-        if self.is_trivial() and other_outcable.is_trivial():
+        if self.is_trivial() and other_cable.is_trivial():
             return True
 
         # We know they aren't trivial at this point, so check wiring.
@@ -1646,11 +1666,19 @@ class CustomCableWire(models.Model):
 
         # Check that the datatypes on either side of this wire are
         # either the same, or restriction-compatible
-        if (self.source_pin.datatype != self.dest_pin.datatype and
-                (not self.dest_pin.datatype.is_restricted_by(self.source_pin.datatype))):
+        if not self.source_pin.datatype.is_restriction(self.dest_pin.datatype):
             raise ValidationError(
                 "The datatype of the source pin \"{}\" is incompatible with the datatype of the destination pin \"{}\"".
                 format(self.source_pin, self.dest_pin))
+
+    def is_casting(self):
+        """
+        Tells whether the cable performs a casting on Datatypes.
+
+        PRE: the wire must be clean (and therefore the source DT must
+        at least be a restriction of the destination DT).
+        """
+        return self.source_pin.datatype != self.dest_pin.datatype
         
 class PipelineOutputCable(models.Model):
     """
@@ -1770,9 +1798,8 @@ class PipelineOutputCable(models.Model):
 
         # The cable has a nonraw source (and output_cdt is specified)
         else:
-            if (not self.output_cdt.is_restriction(
-                    self.provider_output.get_cdt()) and
-                    not outwires.exists()):
+            if not self.provider_output.get_cdt().is_restriction(
+                    self.output_cdt) and not outwires.exists():
                 raise ValidationError(
                     "Cable \"{}\" has a source CDT that is not a restriction of its target CDT, but no wires exist".
                     format(self))
@@ -1781,6 +1808,12 @@ class PipelineOutputCable(models.Model):
             for outwire in outwires:
                 outwire.clean()
                 outwire.validate_unique()
+                # It isn't enough that the outwires are clean: they
+                # should do no casting.
+                if outwire.is_casting():
+                    raise ValidationError(
+                        "Custom wire \"{}\" of PipelineOutputCable \"{}\" casts the Datatype of its source".
+                        format(outwire, self))
 
     def complete_clean(self):
         """Checks completeness and coherence of this POC.
@@ -1864,7 +1897,7 @@ class PipelineOutputCable(models.Model):
 
     def is_compatible(self, other_outcable):
         """
-        Checks if an outcable is compatible.
+        Checks if an outcable is compatible with this one.
         
         The specified cable and this one are compatible if:
          - both are fed by the same TransformationOutput
@@ -2269,7 +2302,7 @@ class RunOutputCable(models.Model):
            to the corresponding ERO
          - if this ROC's output was not marked for deletion, the corresponding
            ERO should have existent data associated
-         - if this ROC's output was not marked for deletion, the ROC is not trivial,
+         - if the POC's output was not marked for deletion, the POC is not trivial,
            and this ROC did not reuse an ER, then this ROC should have existent
            data associated
         """
@@ -2318,12 +2351,17 @@ class RunOutputCable(models.Model):
         # self.execrecord is set, so complete_clean it.
         self.execrecord.complete_clean()
 
-        # The ER must point to the same cable that this RunOutputCable points to
-        # FIXME: or, it points to a compatible cable!
-        if self.pipelineoutputcable != self.execrecord.general_transf:
+        # The ER must point to a cable that is compatible with the one
+        # this RunOutputCable points to.
+        if type(self.execrecord.general_transf) != PipelineOutputCable:
             raise ValidationError(
-                "RunOutputCable points to cable \"{}\" but corresponding ER does not".
-                format(self.pipelineoutputcable))
+                "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
+                format(self))
+        
+        elif not self.pipelineoutputcable.is_compatible(self.execrecord.general_transf):
+            raise ValidationError(
+                "POC of RunOutputCable \"{}\" is incompatible with that of its ExecRecord".
+                format(self))
 
         is_deleted = False
         if self.run.parent_runstep != None:
@@ -2343,8 +2381,8 @@ class RunOutputCable(models.Model):
             corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
             if not corresp_ero.has_data():
                 raise ValidationError(
-                    "ExecRecordOut \"{}\" should reference existent data".
-                    format(corresp_ero))
+                    "RunOutputCable \"{}\" was not deleted; ExecRecordOut \"{}\" should reference existent data".
+                    format(self, corresp_ero))
 
             # If the step was not reused and the cable was not
             # trivial, there should be data associated to this ROC.
@@ -2360,8 +2398,8 @@ class RunOutputCable(models.Model):
                 if not self.execrecord.execrecordouts.filter(
                         symbolicdataset=self.output.all()[0].symbolicdataset).exists():
                     raise ValidationError(
-                        "Dataset \"{}\" is not in an ERO of ExecRecord \"{}\"".
-                        format(self.output.all()[0], self.execrecord))
+                        "Dataset \"{}\" was produced by RunOutputCable \"{}\" but is not in an ERO of ExecRecord \"{}\"".
+                        format(self.output.all()[0], self, self.execrecord))
 
             
 
@@ -2615,6 +2653,8 @@ class RunSIC(models.Model):
     PSIC = models.ForeignKey(
         PipelineStepInputCable,
         related_name="psic_instances")
+    
+    output = generic.GenericRelation("Dataset")
 
     class Meta:
         # Uniqueness constraint ensures that no POC is multiply-represented
@@ -2627,24 +2667,62 @@ class RunSIC(models.Model):
 
         In sequence, the checks we perform:
          - PSIC belongs to runstep.pipelinestep
-         - if reused is None (no decision on reusing has been made), execrecord
-           should not be set
-         - if there is an execrecord defined:
-           - it must be complete and clean
-           - PSIC is the same as (or compatible to) self.execrecord.general_transf
+         - if reused is None (no decision on reusing has been made), no data
+           should be associated, and execrecord should not be set
+         - else if reused is True, no data should be associated.
+         - else if reused is False:
+           - if the cable is trivial, there should be no associated Dataset
+           - otherwise, make sure there is at most one Dataset, and clean it
+             if it exists
+        (from here on execrecord is assumed to be set)
+         - it must be complete and clean
+         - PSIC is the same as (or compatible to) self.execrecord.general_transf
+         - if this RunSIC does not keep its output, there should be no existent
+           data associated.
+         - else if this RunSIC keeps its output:
+           - the corresponding ERO should have existent data associated
+           - if the PSIC is not trivial and this RunSIC does not reuse an ER,
+             then there should be existent data associated and it should also
+             be associated to the corresponding ERO.
         """
-        # The ER must point to the same cable that this RunOutputCable points to
-        # FIXME: or, a compatible one!
         if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
             raise ValidationError(
                 "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
                 format(self.PSIC, self.runstep.pipelinestep))
 
-        if self.reused == None and self.execrecord != None:
-            raise ValidationError(
-                "ExecRecord of RunSIC \"{}\" should not be set yet".
-                format(self))
+        if self.reused == None:
+            if self.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
+                    format(self))
+            if self.execrecord != None:
+                raise ValidationError(
+                    "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
+                    format(self))
+
+        elif self.reused:
+            if self.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" reused an ExecRecord and should not have generated any Datasets".
+                    format(self))
+
+        else:
+            # If this cable is trivial, there should be no data
+            # associated.
+            if self.PSIC.is_trivial() and self.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" is trivial and should not have generated any Datasets".
+                    format(self))
+
+            # Otherwise, check that there is at most one Dataset
+            # attached, and clean it.
+            elif self.has_data():
+                if self.output.count() > 1:
+                    raise ValidationError(
+                        "RunSIC \"{}\" should generate at most one Dataset".
+                        format(self))
+                self.output.all()[0].clean()
         
         # If there is no execrecord defined, then exit.
         if self.execrecord == None:
@@ -2654,10 +2732,48 @@ class RunSIC(models.Model):
         # clean and complete.
         self.execrecord.complete_clean()
 
-        if self.PSIC != self.execrecord.general_transf:
+        # Check that PSIC and execrecord.general_transf are compatible
+        # given that the SymbolicDataset represented in the ERI is the
+        # input to both.  (This must be true because our Pipeline was
+        # well-defined.)
+        if type(self.execrecord.general_transf) != PipelineStepInputCable:
             raise ValidationError(
-                "RunSIC points to cable \"{}\" but corresponding ER does not".
+                "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
                 format(self.PSIC))
+        
+        elif not self.PSIC.is_compatible_given_input(self.execrecord.general_transf):
+            raise ValidationError(
+                "PSIC of RunSIC \"{}\" is incompatible with that of its ExecRecord".
+                format(self.PSIC))
+
+        # If the output of this PSIC is not marked to keep, there should be
+        # no data associated.
+        if not self.PSIC.keep_output:
+            if self.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" does not keep its output; no data should be produced".
+                    format(self))
+        else:
+            # The corresponding ERO should have existent data.
+            corresp_ero = self.execrecord.execrecordouts.all()[0]
+            if not corresp_ero.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" keeps its output; ExecRecordOut \"{}\" should reference existent data".
+                    format(self, corresp_ero))
+
+            # If reused == False and the cable is not trivial,
+            # there should be associated data, and it should match that
+            # of corresp_ero.
+            if not self.reused and not self.PSIC.is_trivial():
+                if not self.has_data():
+                    raise ValidationError(
+                        "RunSIC \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                        format(self))
+
+                if corresp_ero.symbolicdataset.dataset != self.output.all()[0]:
+                    raise ValidationError(
+                        "Dataset \"{}\" was produced by RunSIC \"{}\" but is not in an ERO of ExecRecord \"{}\"".
+                        format(self.output.all()[0], self, self.execrecord))
 
     def is_complete(self):
         """True if RunSIC is complete; false otherwise."""
@@ -2669,6 +2785,10 @@ class RunSIC(models.Model):
         if not self.is_complete():
             raise ValidationError(
                 "RunSIC \"{}\" has no ExecRecord".format(self))
+
+    def has_data(self):
+        """True if associated output exists; False if not."""
+        return self.output.all().exists()
 
 class Dataset(models.Model):
     """
@@ -2696,10 +2816,12 @@ class Dataset(models.Model):
     # Case 1: uploaded
     # Case 2: from the transformation of a RunStep
     # Case 3: from the execution of a POC (i.e. from a ROC)
+    # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
     content_type = models.ForeignKey(
         ContentType,
         limit_choices_to = {
-            "model__in": ("PipelineStep", "PipelineOutputCable")
+            "model__in": ("PipelineStep", "PipelineOutputCable",
+                          "PipelineStepInputCable")
         },
         null=True,
         blank=True)
@@ -2751,32 +2873,34 @@ class Dataset(models.Model):
             
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
+        md5gen = hashlib.md5()
         try:
-            md5gen = hashlib.md5()
             self.dataset_file.open()
             md5gen.update(self.dataset_file.read())
-            md5 = md5gen.hexdigest()
-            return md5
-
-        except ValueError as e:
-            print(e)
-            return ""
+        finally:
+            self.dataset_file.close()
+            
+        md5 = md5gen.hexdigest()
+        return md5
 
     def set_md5(self):
-        """Computes the MD5 checksum of the Dataset and stores it to the associated SymbolicDataset."""
+        """
+        Computes the MD5 checksum of the Dataset and stores it.
+
+        The value is stored to the associated SymbolicDataset.
+        """
         self.symbolicdataset.MD5_checksum = self.compute_md5()
             
     def check_md5(self):
         """
-        Checks that the MD5 checksum of the Dataset equals that in the associated SymbolicDataset.
-        This will be used when regenerating data that once existed, as a coherence check.
-        """
+        Checks the MD5 checksum of the Dataset against its stored value.
 
+        The stored value is in the Dataset's associated
+        SymbolicDataset.  This will be used when regenerating data
+        that once existed, as a coherence check.
+        """
         # Recompute the MD5, see if it equals what is already stored
-        md5gen = hashlib.md5()
-        self.dataset_file.open()
-        md5gen.update(self.dataset_file.read())
-        return self.symbolicdataset.MD5_checksum == md5gen.hexdigest()
+        return self.symbolicdataset.MD5_checksum == self.compute_md5()
 
     def is_raw(self):
         """True if this Dataset is raw, i.e. not a CSV file."""
@@ -2814,8 +2938,18 @@ class DatasetStructure(models.Model):
                 
         FIXME: will have to unit test each data field when doing execute.
         """
-        data_csv = csv.DictReader(self.dataset.dataset_file)
-        header = data_csv.fieldnames
+        # October 16, 2013: proper handling of self.dataset.dataset_file
+        # is needed.
+        header = None
+        try:
+            self.dataset.dataset_file.open()
+            data_csv = csv.DictReader(self.dataset.dataset_file)
+            header = data_csv.fieldnames
+        # We want to propagate the error up if it happens, so we
+        # just use this finally block to close the file.
+        finally:
+            self.dataset.dataset_file.close()
+            
         cdt_members = self.compounddatatype.members.all()
 
         # The number of CSV columns must match the number of CDT members
@@ -2838,10 +2972,15 @@ class DatasetStructure(models.Model):
         # be checked when calling clean().
 
         # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-        return (sum(1 for line in self.dataset.dataset_file) - 1);
-
-        # FIXME: do we need to close and reopen self.dataset_file at the end of this
-        # script?  Find out by running twice consecutively.
+        try:
+            self.dataset.dataset_file.open()
+            row_count = sum(1 for line in self.dataset.dataset_file) - 1
+        # If there is an exception from opening/reading the file, it
+        # should be propagated, but we still want to close the file.
+        finally:
+            self.dataset.dataset_file.close()
+        
+        return row_count
 
 class SymbolicDataset(models.Model):
     """
@@ -2965,9 +3104,9 @@ class ExecRecord(models.Model):
                         source_idx = wire.source_pin.column_idx
                         dest_idx = wire.dest_pin.column_idx
                         
-                        dest_dt = dest_CDT.members.get(column_idx=dest_idx)
+                        dest_dt = dest_CDT.members.get(column_idx=dest_idx).datatype
                         source_dt = source_CDT.members.get(
-                            column_idx=source_idx)
+                            column_idx=source_idx).datatype
 
                         if source_dt != dest_dt:
                             raise ValidationError(
@@ -3076,7 +3215,7 @@ class ExecRecordIn(models.Model):
           that this ERI represents.
           
         Also, if symbolicdataset refers to existent data, check that it
-        is compatible with the input requested.
+        is compatible with the input represented.
         """
         parent_transf = self.execrecord.general_transf
 
@@ -3279,31 +3418,49 @@ class ExecRecordOut(models.Model):
             if not self.symbolicdataset.dataset.is_raw():
                 actual_data = self.symbolicdataset.dataset
 
-                # If this execrecord refers to a Method/Pipeline,
-                # Dataset CDT must match generic_output's CDT.
-                if type(self.execrecord.general_transf) in (Method, Pipeline):
+                # If this execrecord refers to a Method, Dataset CDT
+                # must *exactly* be generic_output's CDT since it was
+                # generated by this Method.
+                if type(self.execrecord.general_transf) == Method:
+                    if (actual_data.structure.compounddatatype !=
+                            self.generic_output.get_cdt()):
+                        raise ValidationError(
+                            "CDT of Dataset \"{}\" is not the CDT of the TransformationOutput \"{}\" of the generating Method".
+                            format(actual_data, self.generic_output))
+
+                # If it refers to a POC, then Dataset CDT must be
+                # identical to generic_output's CDT, because it was
+                # generated either by this POC or by a compatible one,
+                # and compatible ones must have a CDT identical to
+                # this one.  This therefore is also the same for
+                # Pipeline.
+                elif (type(self.execrecord.general_transf) in
+                          (Pipeline, PipelineOutputCable)):
                     if not actual_data.structure.compounddatatype.is_identical(
                             self.generic_output.get_cdt()):
                         raise ValidationError(
-                            "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
+                            "CDT of Dataset \"{}\" is not identical to the CDT of the TransformationOutput \"{}\" of the generating Pipeline".
                             format(actual_data, self.generic_output))
                     
-                # If it refers to a cable, then Dataset CDT must be
-                # a restriction of generic_output's CDT.
-                elif type(self.execrecord.general_transf) == PipelineStepInputCable:
+                # If it refers to a PSIC, then Dataset CDT must be a
+                # restriction of generic_output's CDT.
+                    
+                # NOTE: we could do a more stringent test here and say
+                # that a non-trivial PSIC should not have data
+                # attached to its ERO, but we envision that at some
+                # point in the future we might like to occasionally
+                # keep the data coming out of a PSIC (for example, if
+                # it's really slow to reprocess).  Putting this less
+                # stringent test is future-proofing for that case.
+                else:
                     if not actual_data.structure.compounddatatype.is_restriction(
                             self.generic_output.get_cdt()):
                         raise ValidationError(
                             "CDT of Dataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
                             format(actual_data, self.generic_output))
-                else:
-                    if not actual_data.structure.compounddatatype.is_restriction(
-                            self.generic_output.get_cdt()):
-                        raise ValidationError(
-                            "CDT of Dataset \"{}\" does not match the CDT of the generating TransformationOutput \"{}\"".
-                            format(actual_data, self.generic_output))
 
-                if self.generic_output.get_min_row() != None and actual_data.num_rows() < self.generic_output.get_min_row():
+                if (self.generic_output.get_min_row() != None and
+                        actual_data.num_rows() < self.generic_output.get_min_row()):
                     if type(self.execrecord.general_transf) == PipelineStepInputCable:
                         raise ValidationError(
                             "Dataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".

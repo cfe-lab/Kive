@@ -2,6 +2,7 @@
 Unit tests for Shipyard (Copperfish)
 """
 
+import os
 from django.test import TestCase;
 from copperfish.models import *;
 from django.core.files import File;
@@ -14,9 +15,35 @@ class CopperfishExecRecordTests_setup(TestCase):
     def setUp(self):
 
         # Datatypes and CDTs
+        self.string_dt = Datatype(name="string", description="string desc",
+                                  Python_type="str");
         with open(os.path.join(samplecode_path, "stringUT.py"), "rb") as f:
-            self.string_dt = Datatype(name="string",description="string desc",verification_script=File(f),Python_type="str");
-            self.string_dt.save()
+            self.string_dt.verification_script.save(
+                "stringUT.py", File(f))
+        self.string_dt.save()
+
+        # October 11, 2013: more Datatypes.
+        self.DNA_dt = Datatype(
+            name="DNANucSeq",
+            description="DNA nucleotide sequence",
+            Python_type="str");
+        with open(os.path.join(samplecode_path, "DNANucSeqUT.py"), "rb") as f:
+            self.DNA_dt.verification_script.save(
+                "DNANucSeqUT.py", File(f))
+        self.DNA_dt.save()
+        self.DNA_dt.restricts.add(self.string_dt);
+        self.DNA_dt.save()
+            
+        self.RNA_dt = Datatype(
+            name="RNANucSeq",
+            description="RNA nucleotide sequence",
+            Python_type="str");
+        with open(os.path.join(samplecode_path, "RNANucSeqUT.py"), "rb") as f:
+            self.RNA_dt.verification_script.save(
+                "RNANucSeqUT.py", File(f))
+        self.RNA_dt.save()
+        self.RNA_dt.restricts.add(self.string_dt);
+            
         self.singlet_cdt = CompoundDatatype()
         self.singlet_cdt.save()
         self.singlet_cdt.members.create(datatype=self.string_dt,column_name="k",column_idx=1)
@@ -30,30 +57,36 @@ class CopperfishExecRecordTests_setup(TestCase):
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="b",column_idx=2)
         self.triplet_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
 
-        # October 11, 2013: more Datatypes.
-        with open(os.path.join(samplecode_path, "DNANucSeqUT.py"), "rb") as f:
-            self.DNA_dt = Datatype(
-                name="DNANucSeq",
-                description="DNA nucleotide sequence",
-                verification_script=File(f), Python_type="str");
-            self.DNA_dt.save()
-            self.DNA_dt.restricts.add(self.string_dt);
-            
-        with open(os.path.join(samplecode_path, "RNANucSeqUT.py"), "rb") as f:
-            self.RNA_dt = Datatype(
-                name="RNANucSeq",
-                description="RNA nucleotide sequence",
-                verification_script=File(f), Python_type="str");
-            self.RNA_dt.save()
-            self.RNA_dt.restricts.add(self.string_dt);
+        # October 15: more CDTs.
+        self.DNA_triplet_cdt = CompoundDatatype()
+        self.DNA_triplet_cdt.save()
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="a", column_idx=1)
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="b", column_idx=2)
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="c", column_idx=3)
+
+        self.DNA_doublet_cdt = CompoundDatatype()
+        self.DNA_doublet_cdt.save()
+        self.DNA_doublet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="x", column_idx=1)
+        self.DNA_doublet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="y", column_idx=2)
 
         # CRs and CRRs
-        self.generic_cr = CodeResource(name="genericCR",description="Just a CR",filename="complement.py")
+        self.generic_cr = CodeResource(
+            name="genericCR", description="Just a CR",
+            filename="complement.py")
         self.generic_cr.save()
+        self.generic_crRev = CodeResourceRevision(
+            coderesource=self.generic_cr, revision_name="v1",
+            revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.generic_crRev = CodeResourceRevision(coderesource=self.generic_cr,revision_name="v1",revision_desc="desc",content_file=File(f))
-            self.generic_crRev.save()
-
+            self.generic_crRev.content_file.save("generic_script.py",
+                                                 File(f))
+        self.generic_crRev.save()
+        
         # Method family, methods, and their input/outputs
         self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
         self.mA = Method(revision_name="mA_name",revision_desc="A_desc",family = self.mf,driver = self.generic_crRev); self.mA.save()
@@ -120,36 +153,43 @@ class CopperfishExecRecordTests_setup(TestCase):
         # Define a user
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
-
+        
+            
         # Define singlet, doublet, triplet, and raw uploaded datasets
         self.triplet_symDS = SymbolicDataset()
         self.triplet_symDS.save()
-        self.triplet_DS = None
+        self.triplet_DS = Dataset(
+            user=self.myUser, name="triplet", description="lol",
+            symbolicdataset=self.triplet_symDS)
         with open(os.path.join(samplecode_path, "step_0_triplet.csv"), "rb") as f:
-            self.triplet_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),symbolicdataset=self.triplet_symDS)
-            self.triplet_DS.save()
+            self.triplet_DS.dataset_file.save("step_0_triplet.csv", File(f))
+        self.triplet_DS.save()
         self.triplet_DS_structure = DatasetStructure(dataset=self.triplet_DS,compounddatatype=self.triplet_cdt)
         self.triplet_DS_structure.save()
         self.triplet_DS.clean()
 
         self.doublet_symDS = SymbolicDataset()
         self.doublet_symDS.save()
-        self.doublet_DS = None
+        self.doublet_DS = Dataset(
+            user=self.myUser, name="doublet", description="lol",
+            symbolicdataset=self.doublet_symDS)
         with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.doublet_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_symDS)
-            self.doublet_DS.save()
+            self.doublet_DS.dataset_file.save("doublet_cdt.csv", File(f))
+        self.doublet_DS.save()
         self.doublet_DS_structure = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.doublet_cdt)
         self.doublet_DS_structure.save()
         self.doublet_DS.clean()
 
         self.singlet_symDS = SymbolicDataset()
         self.singlet_symDS.save()
-        self.singlet_DS = None
+        self.singlet_DS = Dataset(
+            user=self.myUser, name="singlet", description="lol",
+            symbolicdataset=self.singlet_symDS)
         # Changed October 1, 2013: input E2_in requires something with >= 10 rows.
         #with open(os.path.join(samplecode_path, "step_0_singlet.csv"), "rb") as f:
         with open(os.path.join(samplecode_path, "singlet_cdt_large.csv"), "rb") as f:
-            self.singlet_DS = Dataset(user=self.myUser,name="singlet",description="lol",dataset_file=File(f),symbolicdataset=self.singlet_symDS)
-            self.singlet_DS.save()
+            self.singlet_DS.dataset_file.save("singlet_cdt_large.csv", File(f))
+        self.singlet_DS.save()
         self.singlet_DS_structure = DatasetStructure(dataset=self.singlet_DS,compounddatatype=self.singlet_cdt)
         self.singlet_DS_structure.save()
         self.singlet_DS.clean()
@@ -157,20 +197,25 @@ class CopperfishExecRecordTests_setup(TestCase):
         # October 1, 2013: this is the same as the old singlet_symDS.
         self.singlet_3rows_symDS = SymbolicDataset()
         self.singlet_3rows_symDS.save()
-        self.singlet_3rows_DS = None
+        self.singlet_3rows_DS = Dataset(
+            user=self.myUser, name="singlet", description="lol",
+            symbolicdataset=self.singlet_3rows_symDS)
         with open(os.path.join(samplecode_path, "step_0_singlet.csv"), "rb") as f:
-            self.singlet_3rows_DS = Dataset(user=self.myUser,name="singlet",description="lol",dataset_file=File(f),symbolicdataset=self.singlet_3rows_symDS)
-            self.singlet_3rows_DS.save()
+            self.singlet_3rows_DS.dataset_file.save("step_0_singlet.csv",
+                                                    File(f))
+        self.singlet_3rows_DS.save()
         self.singlet_3rows_DS_structure = DatasetStructure(dataset=self.singlet_3rows_DS,compounddatatype=self.singlet_cdt)
         self.singlet_3rows_DS_structure.save()
         self.singlet_3rows_DS.clean()
 
         self.raw_symDS = SymbolicDataset()
         self.raw_symDS.save()
-        self.raw_DS = None
+        self.raw_DS = Dataset(
+            user=self.myUser, name="raw", description="lol",
+            symbolicdataset=self.raw_symDS)
         with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
-            self.raw_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.raw_symDS)
-            self.raw_DS.save()
+            self.raw_DS.dataset_file.save("step_0_raw.fasta", File(f))
+        self.raw_DS.save()        
         self.raw_DS.clean()
 
         # Added September 30, 2013: symbolic dataset that results from E01_21.
@@ -184,10 +229,13 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         self.C1_in_symDS = SymbolicDataset()
         self.C1_in_symDS.save()
-        self.C1_in_DS = None
+        self.C1_in_DS = Dataset(
+            user=self.myUser, name="C1_in_triplet",
+            description="triplet 3 rows",
+            symbolicdataset=self.C1_in_symDS)
         with open(os.path.join(samplecode_path, "C1_in_triplet.csv"), "rb") as f:
-            self.C1_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C1_in_symDS)
-            self.C1_in_DS.save()
+            self.C1_in_DS.dataset_file.save("C1_in_triplet.csv", File(f))
+        self.C1_in_DS.save()
         self.C1_in_DS.clean()
         self.C1_in_DS_structure = DatasetStructure(dataset=self.C1_in_DS,compounddatatype=self.triplet_cdt)
         self.C1_in_DS_structure.save()
@@ -195,22 +243,33 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         self.C2_in_symDS = SymbolicDataset()
         self.C2_in_symDS.save()
-        # October 9, 2013: C2_in_symDS should be empty!
-        # self.C2_in_DS = None
-        # with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-        #     self.C2_in_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_in_symDS)
-        #     self.C2_in_DS.save()
-        # self.C2_in_DS.clean()
-        # self.C2_in_DS_structure = DatasetStructure(dataset=self.C2_in_DS,compounddatatype=self.doublet_cdt)
-        # self.C2_in_DS_structure.save()
-        # self.C2_in_DS.clean()
+
+        # October 16: an alternative to C2_in_symDS, which has existent data.
+        self.E11_32_output_symDS = SymbolicDataset()
+        self.E11_32_output_symDS.save()
+        self.E11_32_output_DS = Dataset(
+            user=self.myUser, name="E11_32 output doublet",
+            description="result of E11_32 fed by doublet_cdt.csv",
+            symbolicdataset=self.E11_32_output_symDS)
+        with open(os.path.join(samplecode_path, "E11_32_output.csv"), "rb") as f:
+            self.E11_32_output_DS.dataset_file.save(
+                "E11_32_output.csv", File(f))
+        self.E11_32_output_DS.save()
+        self.E11_32_output_DS.clean()
+        self.E11_32_output_DS_structure = DatasetStructure(
+            dataset=self.E11_32_output_DS,
+            compounddatatype=self.doublet_cdt)
+        self.E11_32_output_DS_structure.save()
+        self.E11_32_output_DS.clean()
 
         self.C1_out_symDS = SymbolicDataset()
         self.C1_out_symDS.save()
-        self.C1_out_DS = None
+        self.C1_out_DS = Dataset(
+            user=self.myUser, name="raw", description="lol",
+            symbolicdataset=self.C1_out_symDS)
         with open(os.path.join(samplecode_path, "step_0_singlet.csv"), "rb") as f:
-            self.C1_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C1_out_symDS)
-            self.C1_out_DS.save()
+            self.C1_out_DS.dataset_file.save("step_0_singlet.csv", File(f))
+        self.C1_out_DS.save()
         self.C1_out_DS.clean()
         self.C1_out_DS_structure = DatasetStructure(dataset=self.C1_out_DS,compounddatatype=self.singlet_cdt)
         self.C1_out_DS_structure.save()
@@ -218,26 +277,33 @@ class CopperfishExecRecordTests_setup(TestCase):
 
         self.C2_out_symDS = SymbolicDataset()
         self.C2_out_symDS.save()
-        self.C2_out_DS = None
+        self.C2_out_DS = Dataset(
+            user=self.myUser, name="raw", description="lol",
+            symbolicdataset=self.C2_out_symDS)
         with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
-            self.C2_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C2_out_symDS)
-            self.C2_out_DS.save()
+            self.C2_out_DS.dataset_file.save("step_0_raw.fasta", File(f))
+        self.C2_out_DS.save()
         self.C2_out_DS.clean()
 
         self.C3_out_symDS = SymbolicDataset()
         self.C3_out_symDS.save()
-        self.C3_out_DS = None
+        self.C3_out_DS = Dataset(
+            user=self.myUser, name="raw", description="lol",
+            symbolicdataset=self.C3_out_symDS)
         with open(os.path.join(samplecode_path, "step_0_raw.fasta"), "rb") as f:
-            self.C3_out_DS = Dataset(user=self.myUser,name="raw",description="lol",dataset_file=File(f),symbolicdataset=self.C3_out_symDS)
-            self.C3_out_DS.save()
+            self.C3_out_DS.dataset_file.save("step_0_raw.fasta", File(f))
+        self.C3_out_DS.save()
         self.C3_out_DS.clean()
 
         self.triplet_3_rows_symDS = SymbolicDataset()
         self.triplet_3_rows_symDS.save()
-        self.triplet_3_rows_DS = None
+        self.triplet_3_rows_DS = Dataset(
+            user=self.myUser, name="triplet", description="lol",
+            symbolicdataset=self.triplet_3_rows_symDS)
         with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
-            self.triplet_3_rows_DS = Dataset(user=self.myUser,name="triplet",description="lol",dataset_file=File(f),symbolicdataset=self.triplet_3_rows_symDS)
-            self.triplet_3_rows_DS.save()
+            self.triplet_3_rows_DS.dataset_file.save(
+                "step_0_triplet_3_rows.csv", File(f))
+        self.triplet_3_rows_DS.save()
         self.triplet_3_rows_DS_structure = DatasetStructure(dataset=self.triplet_3_rows_DS,compounddatatype=self.triplet_cdt)
         self.triplet_3_rows_DS_structure.save()
         self.triplet_3_rows_DS.clean()
@@ -245,17 +311,69 @@ class CopperfishExecRecordTests_setup(TestCase):
         # October 9, 2013: added as the result of cable E21_41.
         self.E1_out_symDS = SymbolicDataset()
         self.E1_out_symDS.save()
-        self.E1_out_DS = None
+        self.E1_out_DS = Dataset(
+            user=self.myUser, name="E1_out",
+            description="doublet remuxed from triplet",
+            symbolicdataset=self.E1_out_symDS)
         with open(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"), "rb") as f:
-            self.E1_out_DS = Dataset(
-                user=self.myUser, name="E1_out",
-                description="doublet remuxed from triplet", dataset_file=File(f),
-                symbolicdataset=self.E1_out_symDS)
-            self.E1_out_DS.save()
+            self.E1_out_DS.dataset_file.save(
+                "doublet_remuxed_from_t3r.csv", File(f))
+        self.E1_out_DS.save()
         self.E1_out_DS_structure = DatasetStructure(
             dataset=self.E1_out_DS, compounddatatype=self.doublet_cdt)
         self.E1_out_DS_structure.save()
         self.E1_out_DS.clean()
+
+        # October 15, 2013: SymbolicDatasets that go into and come out
+        # of cable E01_21 and E21_41.
+        self.DNA_triplet_symDS = SymbolicDataset()
+        self.DNA_triplet_symDS.save()
+        self.DNA_triplet_DS = Dataset(
+            user=self.myUser, name="DNA_triplet",
+            description="DNA triplet data",
+            symbolicdataset=self.DNA_triplet_symDS)
+        with open(os.path.join(samplecode_path, "DNA_triplet.csv"), "rb") as f:
+            self.DNA_triplet_DS.dataset_file.save(
+                "DNA_triplet.csv", File(f))
+        self.DNA_triplet_DS.save()
+        self.DNA_triplet_DS_structure = DatasetStructure(
+            dataset=self.DNA_triplet_DS,
+            compounddatatype=self.DNA_triplet_cdt)
+        self.DNA_triplet_DS_structure.save()
+        self.DNA_triplet_DS.clean()
+
+        self.E01_21_DNA_doublet_symDS = SymbolicDataset()
+        self.E01_21_DNA_doublet_symDS.save()
+        self.E01_21_DNA_doublet_DS = Dataset(
+            user=self.myUser, name="E01_21_DNA_doublet",
+            description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
+            symbolicdataset=self.E01_21_DNA_doublet_symDS)
+        with open(os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), "rb") as f:
+            self.E01_21_DNA_doublet_DS.dataset_file.save(
+                "E01_21_DNA_doublet.csv", File(f))
+        self.E01_21_DNA_doublet_DS.save()
+        self.E01_21_DNA_doublet_DS_structure = DatasetStructure(
+            dataset=self.E01_21_DNA_doublet_DS,
+            compounddatatype=self.DNA_doublet_cdt)
+        self.E01_21_DNA_doublet_DS_structure.save()
+        self.E01_21_DNA_doublet_DS.clean()
+
+        self.E21_41_DNA_doublet_symDS = SymbolicDataset()
+        self.E21_41_DNA_doublet_symDS.save()
+        self.E21_41_DNA_doublet_DS = Dataset(
+            user=self.myUser, name="E21_41_DNA_doublet",
+            description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
+            symbolicdataset=self.E21_41_DNA_doublet_symDS)
+        with open(os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), "rb") as f:
+            self.E21_41_DNA_doublet_DS.dataset_file.save(
+                "E21_41_DNA_doublet.csv", File(f))
+        self.E21_41_DNA_doublet_DS.save()
+        self.E21_41_DNA_doublet_DS_structure = DatasetStructure(
+            dataset=self.E21_41_DNA_doublet_DS,
+            compounddatatype=self.DNA_doublet_cdt)
+        self.E21_41_DNA_doublet_DS_structure.save()
+        self.E21_41_DNA_doublet_DS.clean()
+        
 
     def tearDown(self):
         """Clear CodeResources, Datasets, and VerificationScripts folders."""
@@ -1405,12 +1523,13 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
         # A dataset of correct triplet CDT.
         self.triplet_large_symDS = SymbolicDataset()
         self.triplet_large_symDS.save()
-        self.triplet_large_DS = None
+        self.triplet_large_DS = Dataset(
+            user=self.myUser, name="triplet", description="lol",
+            symbolicdataset=self.triplet_large_symDS)
         with open(os.path.join(samplecode_path, "triplet_cdt_large.csv"), "rb") as f:
-            self.triplet_large_DS = Dataset(
-                user=self.myUser, name="triplet", description="lol",
-                dataset_file=File(f), symbolicdataset=self.triplet_large_symDS)
-            self.triplet_large_DS.save()
+            self.triplet_large_DS.dataset_file.save(
+                "triplet_cdt_large.csv", File(f))
+        self.triplet_large_DS.save()
         self.triplet_large_DS_structure = DatasetStructure(
             dataset=self.triplet_large_DS,
             compounddatatype=self.triplet_cdt)
@@ -1420,12 +1539,13 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
         # Define dataset of correct CDT (singlet) with > 10 rows
         self.singlet_large_symDS = SymbolicDataset()
         self.singlet_large_symDS.save()
-        self.singlet_large_DS = None
+        self.singlet_large_DS = Dataset(
+            user=self.myUser, name="singlet", description="lol",
+            symbolicdataset=self.singlet_large_symDS)
         with open(os.path.join(samplecode_path, "singlet_cdt_large.csv"), "rb") as f:
-            self.singlet_large_DS = Dataset(
-                user=self.myUser, name="singlet", description="lol",
-                dataset_file=File(f), symbolicdataset=self.singlet_large_symDS)
-            self.singlet_large_DS.save()
+            self.singlet_large_DS.dataset_file.save(
+                "singlet_cdt_large.csv", File(f))
+        self.singlet_large_DS.save()
         self.singlet_large_DS_structure = DatasetStructure(
             dataset=self.singlet_large_DS,
             compounddatatype=self.singlet_cdt)
@@ -1454,20 +1574,6 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
-
-        # Define dataset with correct CDT (doublet)
-        self.doublet_symDS = SymbolicDataset()
-        self.doublet_symDS.save()
-        self.doublet_DS = None
-        with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-            self.doublet_DS = Dataset(
-                user=self.myUser, name="doublet", description="lol",
-                dataset_file=File(f), symbolicdataset=self.doublet_symDS)
-            self.doublet_DS.save()
-        self.doublet_DS_structure = DatasetStructure(
-            dataset=self.doublet_DS, compounddatatype=self.doublet_cdt)
-        self.doublet_DS_structure.save()
-        self.doublet_DS.clean()
 
         myERI_right_CDT = myER.execrecordins.create(
             symbolicdataset=self.doublet_symDS, generic_input=self.C2_in)
@@ -1559,17 +1665,319 @@ class ExecRecordTests(CopperfishExecRecordTests_setup):
             myERO_too_many_rows.clean)
         myERO_too_many_rows.delete()
 
-    # def test_ERI_associated_Dataset_must_be_restriction_of_input_CDT(self):
-    #     """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
-    #     mC_ER = self.mC.execrecords.create()
-    #     mC_ER_in_1 = mC_ER.execrecordins.create(
-    #         generic_input=self.C1_in,
-    #         symbolicdataset=self.C1_in_symDS)
+    def test_ERI_associated_Dataset_must_be_restriction_of_input_CDT(self):
+        """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
+        mC_ER = self.mC.execrecords.create()
+        mC_ER_in_1 = mC_ER.execrecordins.create(
+            generic_input=self.C1_in,
+            symbolicdataset=self.C1_in_symDS)
+
+        # Good case: input Dataset has the CDT of generic_input.
+        self.assertEquals(mC_ER_in_1.clean(), None)
+
+        # Good case: input Dataset has an identical CDT of generic_input.
+        other_CDT = CompoundDatatype()
+        other_CDT.save()
+
+        col1 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="a", column_idx=1)
+        col2 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="b", column_idx=2)
+        col3 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="c", column_idx=3)
+
+        self.C1_in_DS.structure.compounddatatype = other_CDT
+        self.assertEquals(mC_ER_in_1.clean(), None)
+
+        # Good case: proper restriction.
+        col1.datatype = self.DNA_dt
+        col2.datatype = self.RNA_dt
+        self.assertEquals(mC_ER_in_1.clean(), None)
+
+        # Bad case: a type that is not a restriction at all.
+        self.C1_in_DS.structure.compounddatatype = self.doublet_cdt
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not a restriction of the required CDT",
+            mC_ER_in_1.clean)
+        
+    def test_ERO_CDT_restrictions_Method(self):
+        """ERO CDT restriction tests for the ER of a Method."""
+        ####
+        mA_ER = self.mA.execrecords.create()
+        mA_ERO = mA_ER.execrecordouts.create(
+            generic_output=self.A1_out,
+            symbolicdataset=self.doublet_symDS)
+
+        # Good case: output Dataset has the CDT of generic_output.
+        self.assertEquals(mA_ERO.clean(), None)
+
+        # Bad case: output Dataset has an identical CDT.
+        other_CDT = CompoundDatatype()
+        other_CDT.save()
+        col1 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="x", column_idx=1)
+        col2 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="y", column_idx=2)
+        
+        self.doublet_DS.structure.compounddatatype = other_CDT
+        self.doublet_DS.structure.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not the CDT of the TransformationOutput .* of the generating Method",
+            mA_ERO.clean)
+
+        # Bad case: output Dataset has another CDT altogether.
+        mA_ERO.symbolicdataset=self.triplet_symDS
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not the CDT of the TransformationOutput .* of the generating Method",
+            mA_ERO.clean)
+        
+    def test_ERO_CDT_restrictions_Pipeline(self):
+        """ERO CDT restriction tests for the ER of a Pipeline."""
+        ####
+        pD_ER = self.pD.execrecords.create()
+        pD_ERO = pD_ER.execrecordouts.create(
+            generic_output=self.D1_out,
+            symbolicdataset=self.C1_in_symDS)
+
+        # Good case: output Dataset has the CDT of generic_output.
+        self.assertEquals(pD_ERO.clean(), None)
+
+        # Good case: output Dataset has an identical CDT.
+        other_CDT = CompoundDatatype()
+        other_CDT.save()
+        col1 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="a", column_idx=1)
+        col2 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="b", column_idx=2)
+        col3 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="c", column_idx=3)
+        
+        self.C1_in_DS.structure.compounddatatype = other_CDT
+        self.C1_in_DS.structure.save()
+        self.assertEquals(pD_ERO.clean(), None)
+
+        # Bad case: output Dataset has a CDT that is a restriction of
+        # generic_output.
+        col1.datatype = self.DNA_dt
+        col1.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            pD_ERO.clean)
+
+        # Bad case: output Dataset has another CDT altogether.
+        pD_ERO.symbolicdataset = self.doublet_symDS
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            pD_ERO.clean)
+        
+    def test_ERO_CDT_restrictions_POC(self):
+        """ERO CDT restriction tests for the ER of a POC."""
+        ####
+        outcable_ER = self.E21_41.execrecords.create()
+        outcable_ERO = outcable_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+
+        # Good case: output Dataset has the CDT of generic_output.
+        self.assertEquals(outcable_ERO.clean(), None)
+
+        # Good case: output Dataset has an identical CDT.
+        other_CDT = CompoundDatatype()
+        other_CDT.save()
+        col1 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="x", column_idx=1)
+        col2 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="y", column_idx=2)
+        
+        self.E1_out_DS.structure.compounddatatype = other_CDT
+        self.E1_out_DS.structure.save()
+        self.assertEquals(outcable_ERO.clean(), None)
+
+        # Bad case: output Dataset has a CDT that is a restriction of
+        # generic_output.
+        col1.datatype = self.DNA_dt
+        col1.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            outcable_ERO.clean)
+
+        # Bad case: output Dataset has another CDT altogether.
+        outcable_ERO.symbolicdataset = self.singlet_symDS
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            outcable_ERO.clean)
+
+    def test_ERO_CDT_restrictions_PSIC(self):
+        """ERO CDT restriction tests for the ER of a PSIC."""
+        ####
+        cable_ER = self.E11_32.execrecords.create()
+        cable_ERO = cable_ER.execrecordouts.create(
+            generic_output=self.C2_in,
+            symbolicdataset=self.doublet_symDS)
+
+        # Good case: output Dataset has the CDT of generic_output.
+        self.assertEquals(cable_ERO.clean(), None)
+
+        # Good case: output Dataset has an identical CDT.
+        other_CDT = CompoundDatatype()
+        other_CDT.save()
+        col1 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="x", column_idx=1)
+        col2 = other_CDT.members.create(datatype=self.string_dt,
+                                        column_name="y", column_idx=2)
+        
+        self.doublet_DS.structure.compounddatatype = other_CDT
+        self.doublet_DS.structure.save()
+        self.assertEquals(cable_ERO.clean(), None)
+
+        # Good case: output Dataset has a CDT that is a restriction of
+        # generic_output.
+        col1.datatype = self.DNA_dt
+        col1.save()
+        self.assertEquals(cable_ERO.clean(), None)
+
+        # Bad case: output Dataset has another CDT altogether.
+        cable_ERO.symbolicdataset = self.singlet_symDS
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "CDT of Dataset .* is not a restriction of the CDT of the fed TransformationInput .*",
+            cable_ERO.clean)
+
+    def test_ER_trivial_PSICs_have_same_SD_on_both_sides(self):
+        """ERs representing trivial PSICs must have the same SymbolicDataset on both sides."""
+        cable_ER = self.E02_22.execrecords.create()
+        cable_ERI = cable_ER.execrecordins.create(
+            generic_input=self.E2_in,
+            symbolicdataset = self.singlet_symDS)
+        cable_ERO = cable_ER.execrecordouts.create(
+            generic_output=self.D2_in,
+            symbolicdataset = self.singlet_symDS)
+
+        # Good case: SDs on either side of this trivial cable match.
+        self.assertEquals(cable_ER.clean(), None)
+
+        # Bad case: SDs don't match.
+        cable_ERO.symbolicdataset = self.C1_out_symDS
+        cable_ERO.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ER .* represents a trivial cable but its input and output do not match",
+            cable_ER.clean)
+
+    def test_ER_trivial_POCs_have_same_SD_on_both_sides(self):
+        """ERs representing trivial POCs must have the same SymbolicDataset on both sides."""
+        outcable_ER = self.E31_42.execrecords.create()
+        outcable_ERI = outcable_ER.execrecordins.create(
+            generic_input=self.C1_out,
+            symbolicdataset = self.C1_out_symDS)
+        outcable_ERO = outcable_ER.execrecordouts.create(
+            generic_output=self.E2_out,
+            symbolicdataset = self.C1_out_symDS)
+
+        # Good case: SDs on either side of this trivial POC match.
+        self.assertEquals(outcable_ER.clean(), None)
+
+        # Bad case: SDs don't match.
+        outcable_ERO.symbolicdataset = self.singlet_symDS
+        outcable_ERO.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ER .* represents a trivial cable but its input and output do not match",
+            outcable_ER.clean)
+        
+
+    def test_ER_Datasets_passing_through_non_trivial_POCs(self):
+        """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
+        outcable_ER = self.E21_41.execrecords.create()
+        outcable_ERI = outcable_ER.execrecordins.create(
+            generic_input=self.D1_out,
+            symbolicdataset=self.C1_in_symDS)
+        outcable_ERO = outcable_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+
+        # Good case: the Datatypes are exactly those needed.
+        self.assertEquals(outcable_ER.clean(), None)
+
+        # Good case: same as above, but with CDTs that are restrictions.
+        D1_out_structure = self.D1_out.structure.all()[0]
+        E1_out_structure = self.E1_out.structure.all()[0]
+        D1_out_structure.compounddatatype = self.DNA_triplet_cdt
+        D1_out_structure.save()
+        E1_out_structure.compounddatatype = self.DNA_doublet_cdt
+        E1_out_structure.save()
+        
+        outcable_ERI.symbolicdataset = self.DNA_triplet_symDS
+        outcable_ERI.save()
+        outcable_ERO.symbolicdataset = self.E21_41_DNA_doublet_symDS
+        outcable_ERO.save()
+        self.assertEquals(outcable_ER.clean(), None)
+
+        # Bad case: cable does some casting.
+        output_col1 = (self.E21_41_DNA_doublet_DS.structure.compounddatatype.
+                       members.get(column_idx=1))
+        output_col1.datatype = self.string_dt
+        output_col1.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecord .* represents a cable but Datatype of destination Dataset column .* does not match its source",
+            outcable_ER.clean)
+        
+    def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
+        """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
+        cable_ER = self.E01_21.execrecords.create()
+        cable_ERI = cable_ER.execrecordins.create(
+            generic_input=self.E1_in,
+            symbolicdataset=self.triplet_symDS)
+        cable_ERO = cable_ER.execrecordouts.create(
+            generic_output=self.D1_in,
+            symbolicdataset=self.D1_in_symDS)
+
+        # Good case: the Datatypes are exactly those needed.
+        self.assertEquals(cable_ER.clean(), None)
+
+        # Good case: same as above, but with CDTs that are restrictions.
+        in_structure = self.E1_in.structure.all()[0]
+        out_structure = self.D1_in.structure.all()[0]
+        in_structure.compounddatatype = self.DNA_triplet_cdt
+        in_structure.save()
+        out_structure.compounddatatype = self.DNA_doublet_cdt
+        out_structure.save()
+        
+        cable_ERI.symbolicdataset = self.DNA_triplet_symDS
+        cable_ERI.save()
+        cable_ERO.symbolicdataset = self.E01_21_DNA_doublet_symDS
+        cable_ERO.save()
+        self.assertEquals(cable_ER.clean(), None)
+
+        # Bad case: cable does some casting.
+        output_col1 = (self.E01_21_DNA_doublet_DS.structure.compounddatatype.
+                       members.get(column_idx=1))
+        output_col1.datatype = self.string_dt
+        output_col1.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecord .* represents a cable but Datatype of destination Dataset column .* does not match its source",
+            cable_ER.clean)
 
 class RunSICTests(CopperfishExecRecordTests_setup):
 
-    def test_RSIC_clean(self):
-        """Checks coherence of a RunSIC at all stages of its creation."""
+    def test_RSIC_clean_early(self):
+        """Checks coherence of a RunSIC up to the point at which reused is set."""
         # Define some infrastructure.
         pE_run = self.pE.pipeline_instances.create(user=self.myUser)
         step_E3_RS = self.step_E3.pipelinestep_instances.create(
@@ -1587,6 +1995,17 @@ class RunSICTests(CopperfishExecRecordTests_setup):
         E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
         self.assertEquals(E11_32_RSIC.clean(), None)
 
+        # Bad case: reused is unset but there is data associated.
+        self.doublet_DS.created_by = E11_32_RSIC
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* has not decided whether or not to reuse an ExecRecord; no Datasets should be associated",
+            E11_32_RSIC.clean)
+        # Reset....
+        self.doublet_DS.created_by = None
+        self.doublet_DS.save()
+
         # Bad case: ER is set before reused.
         E11_32_ER = self.E11_32.execrecords.create()
         source = E11_32_ER.execrecordins.create(
@@ -1598,10 +2017,136 @@ class RunSICTests(CopperfishExecRecordTests_setup):
         E11_32_RSIC.execrecord = E11_32_ER
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecord of RunSIC .* should not be set yet",
+            "RunSIC .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet",
             E11_32_RSIC.clean)
-        # Set up to proceed....
+        # Reset....
+        E11_32_RSIC.execrecord = None
+
+    def test_RSIC_clean_reused(self):
+        """Checks coherence of a RunSIC reusing an ER after reused is set."""
+        # Define some infrastructure.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(
+            run=pE_run)
+        E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
+        E11_32_RSIC.reused = True
+
+        E11_32_ER = self.E11_32.execrecords.create()
+        source = E11_32_ER.execrecordins.create(
+            generic_input=self.mA.outputs.get(dataset_name="A1_out"),
+            symbolicdataset=self.doublet_symDS)
+        dest = E11_32_ER.execrecordouts.create(
+            generic_output=self.C2_in,
+            symbolicdataset=self.C2_in_symDS)
+    
+        # Bad case: Dataset is associated.
+        self.doublet_DS.created_by = E11_32_RSIC
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* reused an ExecRecord and should not have generated any Datasets",
+            E11_32_RSIC.clean)
+        # Reset....
+        self.doublet_DS.created_by = None
+        self.doublet_DS.save()
+        
+        # Propagation test: ER is set and broken.
+        E11_32_RSIC.execrecord = E11_32_ER
+        dest.generic_output = self.C1_in
+        dest.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Input .* is not the one fed by the PSIC of ExecRecord .*",
+            E11_32_RSIC.clean)
+        # Reset to proceed....
+        dest.generic_output = self.C2_in
+        dest.save()
+
+        # Bad case: execrecord points to a PSIC that is incompatible.
+        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER.execrecordins.create(
+            generic_input=self.E2_in,
+            symbolicdataset=self.singlet_symDS)
+        E02_22_ER.execrecordouts.create(
+            generic_output=self.D2_in,
+            symbolicdataset=self.singlet_symDS)
+        E11_32_RSIC.execrecord = E02_22_ER
+        self.assertRaisesRegexp(
+            ValidationError,
+            "PSIC of RunSIC .* is incompatible with that of its ExecRecord",
+            E11_32_RSIC.clean)
+
+        # Bad case: execrecord doesn't point to a PSIC.
+        # We make a complete and clean ER for something else.
+        mA_ER = self.mA.execrecords.create()
+        mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                   generic_input=self.A1_rawin)
+        mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
+                                    generic_output=self.A1_out)
+        E11_32_RSIC.execrecord = mA_ER
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecord of RunSIC .* does not represent a PSIC",
+            E11_32_RSIC.clean)
+
+        # Check of propagation:
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecord of RunSIC .* does not represent a PSIC",
+            E11_32_RSIC.complete_clean)
+        
+        # Reset....
+        E11_32_RSIC.execrecord = E11_32_ER
+
+        # The bad case where PSIC does not keep its output (default)
+        # but data is associated cannot happen because we already said
+        # that we're reusing an ER.  We move on to....
+
+        # Bad case: PSIC keeps its output, ERO does not have existent data.
+        self.E11_32.keep_output = True
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* keeps its output; ExecRecordOut .* should reference existent data",
+            E11_32_RSIC.clean)
+
+        # Proceed....
+        dest.symbolicdataset = self.E11_32_output_symDS
+        dest.save()
+
+        # Good case: ERO does have existent data.
+        self.assertEquals(E11_32_RSIC.clean(), None)
+
+        # Good case: RSIC is complete.
+        self.assertEquals(E11_32_RSIC.is_complete(), True)
+        self.assertEquals(E11_32_RSIC.complete_clean(), None)
+
+        # Bad case: RSIC is incomplete.
+        E11_32_RSIC.execrecord = None
+        self.assertEquals(E11_32_RSIC.is_complete(), False)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* has no ExecRecord",
+            E11_32_RSIC.complete_clean)
+        
+
+    # October 16, 2013: modified to test parts involving Datasets being
+    # attached.
+    def test_RSIC_clean_not_reused(self):
+        """Checks coherence of a RunSIC at all stages of its creation."""
+        # Define some infrastructure.
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(
+            run=pE_run)
+        E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
         E11_32_RSIC.reused = False
+
+        E11_32_ER = self.E11_32.execrecords.create()
+        source = E11_32_ER.execrecordins.create(
+            generic_input=self.mA.outputs.get(dataset_name="A1_out"),
+            symbolicdataset=self.doublet_symDS)
+        dest = E11_32_ER.execrecordouts.create(
+            generic_output=self.C2_in,
+            symbolicdataset=self.C2_in_symDS)
 
         # Good case: no ER is set.
         E11_32_RSIC.execrecord = None
@@ -1619,7 +2164,21 @@ class RunSICTests(CopperfishExecRecordTests_setup):
         dest.generic_output = self.C2_in
         dest.save()
 
-        # Bad case: PSIC and execrecord are inconsistent.
+        # Bad case: execrecord points to a PSIC that is incompatible.
+        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER.execrecordins.create(
+            generic_input=self.E2_in,
+            symbolicdataset=self.singlet_symDS)
+        E02_22_ER.execrecordouts.create(
+            generic_output=self.D2_in,
+            symbolicdataset=self.singlet_symDS)
+        E11_32_RSIC.execrecord = E02_22_ER
+        self.assertRaisesRegexp(
+            ValidationError,
+            "PSIC of RunSIC .* is incompatible with that of its ExecRecord",
+            E11_32_RSIC.clean)
+
+        # Bad case: execrecord doesn't point to a PSIC.
         # We make a complete and clean ER for something else.
         mA_ER = self.mA.execrecords.create()
         mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
@@ -1629,17 +2188,63 @@ class RunSICTests(CopperfishExecRecordTests_setup):
         E11_32_RSIC.execrecord = mA_ER
         self.assertRaisesRegexp(
             ValidationError,
-            "RunSIC points to cable .* but corresponding ER does not",
+            "ExecRecord of RunSIC .* does not represent a PSIC",
             E11_32_RSIC.clean)
 
         # Check of propagation:
         self.assertRaisesRegexp(
             ValidationError,
-            "RunSIC points to cable .* but corresponding ER does not",
+            "ExecRecord of RunSIC .* does not represent a PSIC",
             E11_32_RSIC.complete_clean)
         
         # Reset....
         E11_32_RSIC.execrecord = E11_32_ER
+
+        # Good case: PSIC does not keep its output, no data is associated.
+        self.assertEquals(E11_32_RSIC.clean(), None)
+
+        # Bad case: PSIC does not keep its output but data is associated.
+        self.E11_32_output_DS.created_by = E11_32_RSIC
+        self.E11_32_output_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* does not keep its output; no data should be produced",
+            E11_32_RSIC.clean)
+        # Reset....
+        self.E11_32_output_DS.created_by = None
+        self.E11_32_output_DS.save()
+
+        # Bad case: PSIC keeps its output, ERO has no existent data.
+        self.E11_32.keep_output = True
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* keeps its output; ExecRecordOut .* should reference existent data",
+            E11_32_RSIC.clean)
+
+        # Bad case: PSIC keeps its output, ERO has existent data,
+        # and cable is not trivial, but there is no associated data.
+        dest.symbolicdataset = self.E11_32_output_symDS
+        dest.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* was not reused, trivial, or deleted; it should have produced data",
+            E11_32_RSIC.clean)
+
+        # Bad case: as above, but Dataset associated is wrong.
+        self.doublet_DS.created_by = E11_32_RSIC
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Dataset .* was produced by RunSIC .* but is not in an ERO of ExecRecord .*",
+            E11_32_RSIC.clean)
+        # Reset....
+        self.doublet_DS.created_by = None
+        self.doublet_DS.save()
+        
+        # Good case: as above, with correct Dataset.
+        self.E11_32_output_DS.created_by = E11_32_RSIC
+        self.E11_32_output_DS.save()
+        self.assertEquals(E11_32_RSIC.clean(), None)
 
         # Good case: RSIC is complete.
         self.assertEquals(E11_32_RSIC.is_complete(), True)
@@ -1800,13 +2405,16 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         # Bad case 1: the ROC points to an ER linked to the wrong
         # thing (another POC).
         E31_42_ROC.execrecord = E21_41_ER
-        error_msg = "RunOutputCable points to cable .* but corresponding ER does not"
+        error_msg = "POC of RunOutputCable .* is incompatible with that of its ExecRecord"
         self.assertRaisesRegexp(ValidationError, error_msg, E31_42_ROC.clean)
 
         # Bad case 2: the ROC points to an ER linked to another wrong
         # thing (not a POC).
         E31_42_ROC.execrecord = mA_ER
-        self.assertRaisesRegexp(ValidationError, error_msg, E31_42_ROC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "ExecRecord of RunOutputCable .* does not represent a POC",
+            E31_42_ROC.clean)
         
         # Good case: ROC and ER are consistent.  This lets us proceed.
         E31_42_ROC.execrecord = E31_42_ER
@@ -1904,14 +2512,14 @@ class RunOutputCableTests(CopperfishExecRecordTests_setup):
         other_triplet_3_rows_symDS = SymbolicDataset()
         other_triplet_3_rows_symDS.save()
 
-        other_triplet_3_rows_DS = None
+        other_triplet_3_rows_DS = other_triplet_3_rows_DS = Dataset(
+            user=self.myUser, name="triplet", description="lol",
+            symbolicdataset=other_triplet_3_rows_symDS,
+            created_by = D11_21_ROC)
         with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
-            other_triplet_3_rows_DS = Dataset(
-                user=self.myUser, name="triplet", description="lol",
-                dataset_file=File(f),
-                symbolicdataset=other_triplet_3_rows_symDS,
-                created_by = D11_21_ROC)
-            other_triplet_3_rows_DS.save()
+            other_triplet_3_rows_DS.dataset_file.save(
+                "step_0_triplet_3_rows.csv", File(f))
+        other_triplet_3_rows_DS.save()
         other_triplet_3_rows_DS_structure = DatasetStructure(
             dataset=other_triplet_3_rows_DS,
             compounddatatype=self.triplet_cdt)
