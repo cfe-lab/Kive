@@ -1,8 +1,9 @@
 """
 copperfish.models
 
-Data model for the Shipyard (Copperfish) project - open source software
-that performs revision control on datasets and bioinformatic pipelines.
+Data model for the Shipyard (Copperfish) project - open source
+software that performs revision control on datasets and bioinformatic
+pipelines.
 """
 
 from django.db import models
@@ -29,6 +30,10 @@ import os
 import sys
 import csv
 import glob
+import subprocess
+import stat
+import StringIO
+import file_access_utils
 
 class Datatype(models.Model):
     """
@@ -741,9 +746,10 @@ class CodeResourceRevision(models.Model):
         with open(os.path.join(install_path, base_name), "wb") as f:
             f.write(curr_code)
 
-            # FIXME continue from here! (October 22, 2013)
-            # TO DO: set the permission to executable after writing.
-            # Then, continue writing Method.execute().
+        # Make sure this is written with read, write, and execute
+        # permission.
+        os.chmod(os.path.join(install_path, base_name),
+                 stat.S_IRUSR | stat.S_IXUSR)
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This should never
@@ -1074,18 +1080,48 @@ class Method(Transformation):
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
 
-    def execute(self, run_path, input_paths, output_paths):
+    def run_code(self, run_path, input_paths, output_paths,
+                 output_handle, error_handle):
         """
-        Execute the method using the given run path and input/outputs.
-
+        Run the method using the given run path and input/outputs.
+        
+        This differs from 'execute' in that this is only responsible
+        for running code; it does not handle any of the bookkeeping
+        of creating ExecRecords and the like.
+        
         run_path is the directory in which the code will be run;
         input_paths is a list of input files as expected by the code;
         output_paths is where the code will write the results.
+        output_handle and error_handle are writable file handles that
+        will capture the stdout and stderr of the code.  More
+        specifically, the write mode string must start with "w".
+
+        Returns a subprocess.Popen object which represents the running 
+        process.
+
+        Note: how this should work is that whatever calls this creates
+        output_handle and error_handle, and monitors those alongside
+        the returned subprocess.Popen object.  After the process is
+        finished, the caller is responsible for whatever cleanup is
+        required.
 
         PRE: the CRR of this Method is properly Shipyard-formatted, i.e.
         it has the right command-line interface:
         [script name] [input 1] ... [input n] [output 1] ... [output n]
         """
+        # If there aren't the right number of inputs or outputs
+        # specified, raise a ValueError.
+        if (len(input_paths) != self.inputs.count() or 
+                len(output_paths) != self.outputs.count()):
+            raise ValueError(
+                "Method \"{}\" expects {} inputs and {} outputs".
+                format(self, self.inputs.count(), self.outputs.count()))
+
+        if (not output_handle.mode.startswith("w") or 
+              not error_handle.mode.startswith("w")):
+            raise ValueError(
+                "output_handle and error_handle must be writable")
+        
         # First, check whether run_path exists and is
         # readable/writable/executable by us.
         try:
@@ -1111,56 +1147,39 @@ class Method(Transformation):
         # Now we know that run_path is a valid directory in which to work.
 
         # Check that all of the inputs exist and are readable by us.
+        # We do this by attempting to open the file; we propagate any
+        # errors back up.
         for input_path in input_paths:
-            if (not os.access(input_path, os.F_OK) or 
-                    not os.access(input_path, os.R_OK)):
-                raise ValueError(
-                    "input path \"{}\" does not exist or cannot be read".
-                    format(input_path))
+            f = open(input_path, "rb")
+            f.close()
 
         # Check that all of the outputs do *not* exist and we can
         # create them, i.e. we have write permission on their parent
         # directories.
         for output_path in output_paths:
-            if os.access(output_path, os.F_OK):
-                raise ValueError(
-                    "output path \"{}\" already exists".
-                    format(output_path))
+            can_create, reason = file_access_utils.can_create_file(
+                output_path)
 
-            else:
-                # The path did not exist; see if we can create it.
-                output_dir = os.path.dirname(output_path)
-
-                # If output_dir is the empty string, i.e. output_path
-                # is just in the same directory as we are executing Python,
-                # then we don't have to make a directory.  If it *isn't*
-                # empty, then we either have to create the directory or
-                # see if we can write to it if it already exists.
-                try:
-                    os.makedirs(output_dir)
-                except error:
-                    # Did it fail to create?
-                    if not os.access(output_dir, os.F_OK):
-                        raise ValueError(
-                            "output directory \"{}\" could not be created".
-                            format(output_dir))
-
-                    # If we reach here, the directory must already
-                    # have existed, and the outputs can be written to it -
-                    # but only if there are sufficient permissions
-                    if not os.access(output_dir, os.W_OK or os.X_OK):
-                        raise ValueError(
-                            "insufficient permissions on run path \"{}\"".
-                            format(run_path))
+            if not can_create:
+                raise ValueError(reason)
 
         # Populate run_path with the CodeResourceRevision.
         driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
         # written into place.  It remains to execute the code.
-        
+        # The code to be executed sits in 
+        # [run_path]/[driver.coderesource.name],
+        # and is executable.
+        code_to_run = os.path.join(
+            run_path, driver.coderesource.filename)
+        code_popen = subprocess.Popen(
+            [code_to_run].append(input_paths).append(output_paths), 
+            shell=False,
+            stdout=output_handle,
+            stderr=error_handle)
 
-
+        return code_popen
             
 
 class Pipeline(Transformation):
@@ -1509,6 +1528,56 @@ def cable_trivial_h(cable, cable_wires):
 
     # All the wiring was trivial, so....
     return True
+
+
+# Helper that will be called by both PSIC and POC.
+def run_cable_h(wires, input_path, output_path):
+    """
+    Perform the cable-specified transformation on the input.
+
+    wire_qs is the QuerySet containing the custom wires defined
+    for this cable.
+    """
+    # Trivial case: just make a link to the file.
+    # FIXME for Windows we may have to actually copy the file.
+    if self.is_trivial():
+        os.link(input_path, output_path)
+        return
+    
+    # Having reached here, we know the cable is not trivial.  Make
+    # a dictionary that encapsulates the mapping required: keyed
+    # by the output column name, with value being the input column
+    # name.
+    source_of = {}
+    column_names_by_idx = {}
+    for wire in wires:
+        source_of[wire.dest_pin.column_name] = (
+            wire.source_pin.column_name)
+        column_names_by_idx[wire.dest_pin.column_idx] = (
+            wire.dest_pin.column_name)
+        
+    # Construct a list with the column names in the appropriate order.
+    output_fields = [column_names_by_idx[i] 
+                     for i in sorted(column_names_by_idx)]
+    
+    with (open(input_path, "rb"), open(output_path, "wb") as 
+          infile, outfile):
+        input_csv = csv.DictReader(infile)
+        output_csv = csv.DictWriter(outfile,
+                                    fieldnames=output_fields)
+        output_csv.writeheader()
+        
+        for source_row in input_csv:
+            # row looks like {col1name: col1val, col2name:
+            # col2val, ...}.
+            dest_row = {}
+
+            # source_of looks like:
+            # {outcol1: sourcecol5, outcol2: sourcecol1, ...}
+            for out_col_name in source_of:
+                dest_row[out_col_name] = source_row[source_of[out_col_name]]
+                
+            output_csv.writerow(dest_row)
 
 class PipelineStepInputCable(models.Model):
     """
@@ -1923,6 +1992,90 @@ class PipelineStepInputCable(models.Model):
         # the wiring matches, we can....
         return True
 
+    def run_cable(self, input_path, output_path):
+        """
+        Perform the cable-specified transformation on the input.
+
+        This uses run_cable_h.
+        """
+        run_cable_h(self.custom_wires.all(), input_path, output_path)
+
+    def execute(self, runstep, input_SD, output_path,
+                curr_session_data):
+        """
+        Execute this cable on the input.
+
+         - input_SD is the SymbolicDataset fed into this cable.
+         - output_path is where the output file should be written.
+         
+         - curr_session_data is an accumulator that remembers all of the
+        "time bomb" data that we have either generated so far during a
+        run but have not saved anywhere, or have written to the filesystem
+        from something saved in the database.  It is a dict keyed by
+        PKs of SymbolicDatasets with values being the actual filesystem
+        paths of corresponding data.
+
+        Returns an RSIC that describes this cable's 
+        running; if real data was provided, then the re-multiplexed
+        real data has been written to output_path.
+
+        FIXME this will be easier to write once we actually figure out
+        the algorithm; come back and fill this in.
+
+        PRE: whether or not input_SD has real data associated,
+        it has an appropriate CDT for feeding this cable.
+        PRE: if input_SD has data, and input_path refers to a real file,
+        they are the same.
+        """
+        # Create a RSIC for this.
+        curr_RSIC = self.psic_instances.create()
+
+        # First: we look for an ExecRecord that we can reuse.
+        # We first search for ERIs of PSICs that take input_SD
+        # as an input.
+        PSIC_contenttype = ContentType.objects.get_for_model(
+            PipelineStepInputCable)
+        candidate_ERIs = ExecRecordIn.objects.filter(
+            symbolicdataset=input_SD,
+            execrecord__content_type=PSIC_contenttype)
+
+        # FIXME can we speed this up using a prefetch?
+        # Next, we go through each one and see if it's 
+        # compatible to this one.
+        for candidate_ERI in candidate_ERIs:
+            candidate_psic = candidate_ERI.execrecord.general_transf
+
+            if self.is_compatible(candidate_psic):
+                # If we found one, we finish the RSIC and return.
+                curr_RSIC.reused = True
+                curr_RSIC.execrecord = candidate_ERI.execrecord
+                curr_RSIC.complete_clean()
+                curr_RSIC.save()
+                return curr_RSIC
+
+        # At this point, we know we cannot reuse an ER, so we
+        # will have to run the cable.
+        curr_RSIC.reused = False
+
+        # There are four cases:
+        # - input_SD has real data and is not in curr_session_data:
+        #   then we will use input_SD.dataset.
+        #
+        # - input_SD has real data and is in curr_session_data: then
+        #   we use the file pointed to in curr_session_data (and it
+        #   had better equal that of input_SD.dataset).
+        #
+        # - input_SD does not have real data but it is in
+        #   curr_session_data: use the file pointed to in
+        #   curr_session_data (i.e. this is a "time bomb").
+        #
+        # - input_SD does not have real data and is not in
+        #   curr_session_data: then we have to backtrack!
+
+        # FIXME continue from here!  (October 23, 2013)
+        
+        
+
 class CustomCableWire(models.Model):
     """
     Defines a customized connection within a pipeline.
@@ -2260,6 +2413,14 @@ class PipelineOutputCable(models.Model):
         # that we have checked all the wires.  Having made sure all of
         # the wiring matches, we can....
         return True
+        
+    def run_cable(self, input_path, output_path):
+        """
+        Perform the cable-specified transformation on the input.
+
+        This uses run_cable_h.
+        """
+        run_cable_h(self.custom_outwires.all(), input_path, output_path)
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
