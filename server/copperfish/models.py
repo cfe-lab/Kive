@@ -1531,23 +1531,39 @@ def cable_trivial_h(cable, cable_wires):
 
 
 # Helper that will be called by both PSIC and POC.
-def run_cable_h(wires, input_path, output_path):
+def run_cable_h(wires, source, output_path):
     """
     Perform the cable-specified transformation on the input.
 
     wire_qs is the QuerySet containing the custom wires defined
     for this cable.
     """
-    # Trivial case: just make a link to the file.
-    # FIXME for Windows we may have to actually copy the file.
-    if self.is_trivial():
-        os.link(input_path, output_path)
-        return
+
+    # Read/write binary files in chunks of 8 megabytes
+    chunkSize = 1024*8
     
-    # Having reached here, we know the cable is not trivial.  Make
-    # a dictionary that encapsulates the mapping required: keyed
-    # by the output column name, with value being the input column
-    # name.
+    if type(source) == str and self.is_trivial():
+        # If trivial, make a link from source to output_path.
+        # FIXME: for Windows we may not be able to use sym links
+        os.link(source, output_path)
+        return
+
+    if type(source) == Dataset and self.is_trivial():
+        # Write the dataset contents into the file output_path.
+        try:
+            source.dataset_file.open()
+            with (open(output_path,"wb") as outfile):
+                chunk = source.dataset_file.read(chunkSize)
+                while chunk != "":
+                    outfile.write(chunk)
+                    chunk = source.dataset_file.read(chunkSize)
+        finally:
+            source.dataset_file.close()
+        return
+        
+    # The cable is not trivial.  Make a dict that encapsulates the
+    # mapping required: keyed by the output column name, with value
+    # being the input column name.
     source_of = {}
     column_names_by_idx = {}
     for wire in wires:
@@ -1559,25 +1575,36 @@ def run_cable_h(wires, input_path, output_path):
     # Construct a list with the column names in the appropriate order.
     output_fields = [column_names_by_idx[i] 
                      for i in sorted(column_names_by_idx)]
-    
-    with (open(input_path, "rb"), open(output_path, "wb") as 
-          infile, outfile):
-        input_csv = csv.DictReader(infile)
-        output_csv = csv.DictWriter(outfile,
-                                    fieldnames=output_fields)
-        output_csv.writeheader()
-        
-        for source_row in input_csv:
-            # row looks like {col1name: col1val, col2name:
-            # col2val, ...}.
-            dest_row = {}
 
-            # source_of looks like:
-            # {outcol1: sourcecol5, outcol2: sourcecol1, ...}
-            for out_col_name in source_of:
-                dest_row[out_col_name] = source_row[source_of[out_col_name]]
+    try:
+        infile = None
+        if type(source) == Dataset:
+            infile = source.dataset_file
+            infile.open()
+        else:
+            infile = open(source, "rb")
+            
+        input_csv = csv.DictReader(infile)
+
+        with open(output_path, "wb") as outfile:
+            output_csv = csv.DictWriter(outfile,
+                                        fieldnames=output_fields)
+            output_csv.writeheader()
+            
+            for source_row in input_csv:
+                # row looks like {col1name: col1val, col2name:
+                # col2val, ...}.
+                dest_row = {}
                 
-            output_csv.writerow(dest_row)
+                # source_of looks like:
+                # {outcol1: sourcecol5, outcol2: sourcecol1, ...}
+                for out_col_name in source_of:
+                    dest_row[out_col_name] = source_row[source_of[out_col_name]]
+                    output_csv.writerow(dest_row)
+
+    finally:
+        infile.close()
+        
 
 class PipelineStepInputCable(models.Model):
     """
@@ -1992,28 +2019,44 @@ class PipelineStepInputCable(models.Model):
         # the wiring matches, we can....
         return True
 
-    def run_cable(self, input_path, output_path):
+    def run_cable(self, source, output_path):
         """
         Perform the cable-specified transformation on the input.
 
         This uses run_cable_h.
+
+        source can either be a Dataset or a path to a file.
         """
-        run_cable_h(self.custom_wires.all(), input_path, output_path)
+        run_cable_h(self.custom_wires.all(), source, output_path)
 
     def execute(self, runstep, input_SD, output_path,
-                curr_session_data):
+                sd_fs_map, method_map, cable_map,
+                user):
         """
         Execute this cable on the input.
 
          - input_SD is the SymbolicDataset fed into this cable.
          - output_path is where the output file should be written.
-         
-         - curr_session_data is an accumulator that remembers all of the
-        "time bomb" data that we have either generated so far during a
-        run but have not saved anywhere, or have written to the filesystem
-        from something saved in the database.  It is a dict keyed by
-        PKs of SymbolicDatasets with values being the actual filesystem
-        paths of corresponding data.
+
+         - sd_fs_map is a dict mapping symDS to the file system
+
+           The mapped value is (path, generator|"DATABASE") or
+           ("","DATABASE")
+
+           (path, generator) tells you what should have
+           generated this data file and where it SHOULD go;
+
+           For cases where generator="DATABASE", if the path is
+           specified, then data MUST be at that location. If it is not
+           specified, then the data file is available in the database
+           but has not been written to the filesystem yet.
+
+        - method_map maps methods to (path, ER): the path tells you
+        where the code SHOULD go (But may not be due to recycling):
+        the ER tells you what inputs are needed (Which in turn will
+        lead back to an sd_fs_map lookup)
+        
+        - cable_map maps cables to ER
 
         Returns an RSIC that describes this cable's 
         running; if real data was provided, then the re-multiplexed
@@ -2026,10 +2069,14 @@ class PipelineStepInputCable(models.Model):
         it has an appropriate CDT for feeding this cable.
         PRE: if input_SD has data, and input_path refers to a real file,
         they are the same.
+
+        PRE: input_SD is in sd_fs_map (It was already uploaded or generated)
         """
+        
         # Create a RSIC for this.
         curr_RSIC = self.psic_instances.create()
-
+        curr_ER = None
+        
         # First: we look for an ExecRecord that we can reuse.
         # We first search for ERIs of PSICs that take input_SD
         # as an input.
@@ -2039,42 +2086,140 @@ class PipelineStepInputCable(models.Model):
             symbolicdataset=input_SD,
             execrecord__content_type=PSIC_contenttype)
 
+        curr_RSIC.reused = False
+        
         # FIXME can we speed this up using a prefetch?
-        # Next, we go through each one and see if it's 
-        # compatible to this one.
+        # Search for an execrecord that we can reuse OR fill in.
         for candidate_ERI in candidate_ERIs:
             candidate_psic = candidate_ERI.execrecord.general_transf
 
             if self.is_compatible(candidate_psic):
-                # If we found one, we finish the RSIC and return.
-                curr_RSIC.reused = True
-                curr_RSIC.execrecord = candidate_ERI.execrecord
-                curr_RSIC.complete_clean()
-                curr_RSIC.save()
-                return curr_RSIC
+                # If the cable is marked to keep its output, the ERO
+                # must have real data associated with it.
+                if (self.keep_output):
 
+                    # If the ERO has data, we use it.
+                    if (candidate_ERI.execrecord.execrecordouts.all()[0].
+                            symbolicdataset.has_data()):
+                        curr_RSIC.reused = True
+                        curr_RSIC.execrecord = candidate_ERI.execrecord
+                        curr_RSIC.complete_clean()
+                        curr_RSIC.save()
+                        return curr_RSIC
+
+                    # FIXMEFIXMEFIXME: We aren't returning the maps! Also,
+                    # We need to DETERMINE the maps.
+
+                    # FIXME continue from here (October 24, 2013):
+                    # - address the above FIXME3
+                    # - finish this below (we haven't sorted out the return value yet)
+                    # - change DatasetStructure to point to SymbolicDataset
+                    #   instead of Dataset
+                    
+                    # The ER is correct, but the ERO is empty, so we
+                    # compute the output and fill in the ERO.
+                    else:
+                        curr_ER = candidate_ERI.execrecord
+                        break
+
+                # We do not want to keep output, so whether or not
+                # there is real data, for now this ER will do
+                else:
+                    curr_RSIC.reused = True
+                    curr_RSIC.execrecord = candidate_ERI.execrecord
+                    curr_RSIC.complete_clean()
+                    curr_RSIC.save()
+                    return curr_RSIC
+
+                
         # At this point, we know we cannot reuse an ER, so we
         # will have to run the cable.
-        curr_RSIC.reused = False
+        output_SD = None
+        if curr_ER == None:
+            # No ER was found; create a new one.
+            curr_ER = self.execrecords.create()
+            curr_ER.execrecordins.create(
+                generic_input=self.provider_output,
+                symbolicdataset=input_SD)
+            output_SD = SymbolicDataset()
+            output_SD.save()
+            curr_ER.execrecordouts.create(
+                generic_output=self.transf_input,
+                symbolicdataset=output_SD)
+        else:
+            output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
 
+        if not self.is_raw():
+                
+            # Determine the compounddatatype
+            source_CDT = input_SD.structure.compounddatatype
+            wires = self.custom_wires.all()
+            
+            # This is the new CDT
+            output_SD_CDT = CompoundDatatype()
+            output_SD_CDT.save()
+            
+            # Look at each wire, take the DT from source_pin, assign the name and index of dest_pin
+            for wire in wires:
+                output_SD_CDT.members.create(
+                    datatype=wire.source_pin.datatype,
+                    column_name=wire.dest_pin.column_name,
+                    column_idx=wire.dest_pin.column_idx)
+
+            # Add this structure to the symbolic dataset
+            output_SD_CDT.clean()
+            output_SD.structure.create(output_SD_CDT)
+            
         # There are four cases:
-        # - input_SD has real data and is not in curr_session_data:
-        #   then we will use input_SD.dataset.
-        #
-        # - input_SD has real data and is in curr_session_data: then
-        #   we use the file pointed to in curr_session_data (and it
-        #   had better equal that of input_SD.dataset).
-        #
-        # - input_SD does not have real data but it is in
-        #   curr_session_data: use the file pointed to in
-        #   curr_session_data (i.e. this is a "time bomb").
-        #
-        # - input_SD does not have real data and is not in
-        #   curr_session_data: then we have to backtrack!
+        
+        # 1) input_SD has real data and does not contain written data on the filesystem
+        # --> The data was uploaded OR derived from a previous reused step
+        # --> We will use input_SD.dataset for the computation
+        if (input_SD.has_data() and not os.access(sd_fs_map[input_SD.pk]['PATH'], os.R_OK)):
+            self.run_cable(input_SD.dataset, output_path)
+        
+        # 2) input_SD has real data and there is data on the filesystem:
+        # --> The data was calculated from a previous step
+        # --> We use the data on the filesystem
+        #     (PRE: It must be equal to input_SD.dataset)
+        
+        # 3) input_SD does not have real data but there is data on the
+        # filesystem: The data was calculated but is transient (time
+        # bomb) --> We use the data on the filesystem
 
-        # FIXME continue from here!  (October 23, 2013)
+        elif os.access(sd_fs_map[input_SD.pk]['PATH']), os.R_OK):
+            self.run_cable(sd_fs_map[input_SD.pk]['PATH'], output_path)
+
+        # 4) input_SD does not have real data and is not on the filesystem
+        # (And there's nothing to reuse)
+        # --> We have to backtrack: input_SD.fill_in()
+        else:
+            # Backtrack to add input_SD to curr_session_data
+            sd_fs_map, method_map, cable_map = input_SD.recover(sd_fs_map, method_map, cable_map)
+
+            # And now we have what we need to run this cable
+            self.run_cable(sd_fs_map[input_SD.pk]['PATH'], output_path)
+
+        # Annotate sd_fs_map with the output created by run_cable
+        sd_fs_map[output_SD.pk] = {'PATH': output_path, 'GENERATOR': self}
+        cable_map[self] = curr_ER
         
-        
+        # If we are retaining this data, we create a dataset
+        if self.keep_output:
+
+            new_dataset = Dataset(
+                user=user,
+                name="{} {}".format(runstep.run.name, curr_RSIC.pk),
+                symbolicdataset=output_SD)
+            with open(output_path, "rb") as f:
+                new_dataset.dataset_file = File(f)
+            new_dataset.set_md5()
+            new_dataset.save()
+
+        # Return sd_fs_map and cable_map
+
+                
+            
 
 class CustomCableWire(models.Model):
     """
@@ -2563,6 +2708,9 @@ class Run(models.Model):
         related_name="pipeline_instances",
         help_text="Pipeline used in this run")
 
+    name = models.CharField("Run name", max_length=256)
+    description = models.TextField("Run description", blank=True)
+    
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
     parent_runstep = models.OneToOneField(
@@ -3095,6 +3243,8 @@ class RunStep(models.Model):
                 # If this RunStep did not reuse an ER and did not have
                 # a child run, then there should be a corresponding
                 # real Dataset.
+
+                # FIXME: Some datasets could have come from a prior run
                 if (not self.reused and not hasattr(self, "child_run") and
                         not self.outputs.filter(
                             symbolicdataset=corresp_ero.symbolicdataset).exists()):
