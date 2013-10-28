@@ -40,11 +40,6 @@ class Datatype(models.Model):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`copperfish.CompoundDatatype`
     """
-
-    # Implicitly defined
-    #   restricted_by (self/ManyToMany)
-    #   compoundDatatypeMember_set (ForeignKey)
-
     name = models.CharField(
         "Datatype name",
         max_length=64,
@@ -72,12 +67,13 @@ class Datatype(models.Model):
         (STR, 'str'),
         (FLOAT, 'float'),
         (BOOL, 'bool'),
-        (DATETIME, 'datetime'))
+        (DATETIME, 'datetime')
+    )
 
     Python_type = models.CharField(
         'Python variable type',
         max_length=64,
-        default = STRING,
+        default = STR,
         choices=PYTHON_TYPE_CHOICES,
         help_text="Python type (int|str|float|bool|datetime)");
 
@@ -200,11 +196,9 @@ class BasicConstraint(models.Model):
     CONSTRAINT_TYPES = (
         (MIN_LENGTH, "minimum string length"),
         (MAX_LENGTH, "maximum string length"),
-        (MIN_VAL = "minimum numeric value"),
-        (MAX_VAL = "maximum numeric value"),
-        # (MIN_PREC = "minimum float precision"),
-        # (MAX_PREC = "maximum float precision"),
-        (REGEXP = "Perl regular expression")
+        (MIN_VAL, "minimum numeric value"),
+        (MAX_VAL, "maximum numeric value"),
+        (REGEXP, "Perl regular expression")
     )
 
     ruletype = models.CharField(
@@ -301,7 +295,7 @@ class CustomConstraint(models.Model):
         related_name="custom_constraints")
 
     verification_method = models.ForeignKey(
-        Method,
+        "Method",
         related_name="verification_methods")
 
     # Clean: Methods which function as CustomConstraints
@@ -1124,25 +1118,7 @@ class Method(Transformation):
         
         # First, check whether run_path exists and is
         # readable/writable/executable by us.
-        try:
-            os.makedirs(run_path)
-        except os.error:
-            # Check if the directory does not exist.
-            if not os.access(run_path, os.F_OK):
-                raise ValueError("run path \"{}\" could not be created".
-                                 format(run_path))
-
-            # Otherwise, the directory already existed.  Check that we
-            # have sufficient permissions on it, and that it is empty.
-            if not os.access(run_path, os.W_OK or os.X_OK):
-                raise ValueError(
-                    "insufficient permissions on run path \"{}\"".
-                    format(run_path))
-
-            if len(glob.glob(run_path + "/*") + glob.glob(run_path + "/.*")) > 0:
-                raise ValueError(
-                    "run path \"{}\" is not empty".
-                    format(run_path))
+        file_access_utils.set_up_directory(run_path)
 
         # Now we know that run_path is a valid directory in which to work.
 
@@ -1552,7 +1528,7 @@ def run_cable_h(wires, source, output_path):
         # Write the dataset contents into the file output_path.
         try:
             source.dataset_file.open()
-            with (open(output_path,"wb") as outfile):
+            with open(output_path,"wb") as outfile:
                 chunk = source.dataset_file.read(chunkSize)
                 while chunk != "":
                     outfile.write(chunk)
@@ -2029,198 +2005,6 @@ class PipelineStepInputCable(models.Model):
         """
         run_cable_h(self.custom_wires.all(), source, output_path)
 
-    def execute(self, runstep, input_SD, output_path,
-                sd_fs_map, method_map, cable_map,
-                user):
-        """
-        Execute this cable on the input.
-
-         - input_SD is the SymbolicDataset fed into this cable.
-         - output_path is where the output file should be written.
-
-         - sd_fs_map is a dict mapping symDS to the file system
-
-           The mapped value is (path, generator|"DATABASE") or
-           ("","DATABASE")
-
-           (path, generator) tells you what should have
-           generated this data file and where it SHOULD go;
-
-           For cases where generator="DATABASE", if the path is
-           specified, then data MUST be at that location. If it is not
-           specified, then the data file is available in the database
-           but has not been written to the filesystem yet.
-
-        - method_map maps methods to (path, ER): the path tells you
-        where the code SHOULD go (But may not be due to recycling):
-        the ER tells you what inputs are needed (Which in turn will
-        lead back to an sd_fs_map lookup)
-        
-        - cable_map maps cables to ER
-
-        Returns an RSIC that describes this cable's 
-        running; if real data was provided, then the re-multiplexed
-        real data has been written to output_path.
-
-        FIXME this will be easier to write once we actually figure out
-        the algorithm; come back and fill this in.
-
-        PRE: whether or not input_SD has real data associated,
-        it has an appropriate CDT for feeding this cable.
-        PRE: if input_SD has data, and input_path refers to a real file,
-        they are the same.
-
-        PRE: input_SD is in sd_fs_map (It was already uploaded or generated)
-        """
-        
-        # Create a RSIC for this.
-        curr_RSIC = self.psic_instances.create()
-        curr_ER = None
-        
-        # First: we look for an ExecRecord that we can reuse.
-        # We first search for ERIs of PSICs that take input_SD
-        # as an input.
-        PSIC_contenttype = ContentType.objects.get_for_model(
-            PipelineStepInputCable)
-        candidate_ERIs = ExecRecordIn.objects.filter(
-            symbolicdataset=input_SD,
-            execrecord__content_type=PSIC_contenttype)
-
-        curr_RSIC.reused = False
-        
-        # FIXME can we speed this up using a prefetch?
-        # Search for an execrecord that we can reuse OR fill in.
-        for candidate_ERI in candidate_ERIs:
-            candidate_psic = candidate_ERI.execrecord.general_transf
-
-            if self.is_compatible(candidate_psic):
-                # If the cable is marked to keep its output, the ERO
-                # must have real data associated with it.
-                if (self.keep_output):
-
-                    # If the ERO has data, we use it.
-                    if (candidate_ERI.execrecord.execrecordouts.all()[0].
-                            symbolicdataset.has_data()):
-                        curr_RSIC.reused = True
-                        curr_RSIC.execrecord = candidate_ERI.execrecord
-                        curr_RSIC.complete_clean()
-                        curr_RSIC.save()
-                        return curr_RSIC
-
-                    # FIXMEFIXMEFIXME: We aren't returning the maps! Also,
-                    # We need to DETERMINE the maps.
-
-                    # FIXME continue from here (October 24, 2013):
-                    # - address the above FIXME3
-                    # - finish this below (we haven't sorted out the return value yet)
-                    # - change DatasetStructure to point to SymbolicDataset
-                    #   instead of Dataset
-                    
-                    # The ER is correct, but the ERO is empty, so we
-                    # compute the output and fill in the ERO.
-                    else:
-                        curr_ER = candidate_ERI.execrecord
-                        break
-
-                # We do not want to keep output, so whether or not
-                # there is real data, for now this ER will do
-                else:
-                    curr_RSIC.reused = True
-                    curr_RSIC.execrecord = candidate_ERI.execrecord
-                    curr_RSIC.complete_clean()
-                    curr_RSIC.save()
-                    return curr_RSIC
-
-                
-        # At this point, we know we cannot reuse an ER, so we
-        # will have to run the cable.
-        output_SD = None
-        if curr_ER == None:
-            # No ER was found; create a new one.
-            curr_ER = self.execrecords.create()
-            curr_ER.execrecordins.create(
-                generic_input=self.provider_output,
-                symbolicdataset=input_SD)
-            output_SD = SymbolicDataset()
-            output_SD.save()
-            curr_ER.execrecordouts.create(
-                generic_output=self.transf_input,
-                symbolicdataset=output_SD)
-        else:
-            output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
-
-        if not self.is_raw():
-                
-            # Determine the compounddatatype
-            source_CDT = input_SD.structure.compounddatatype
-            wires = self.custom_wires.all()
-            
-            # This is the new CDT
-            output_SD_CDT = CompoundDatatype()
-            output_SD_CDT.save()
-            
-            # Look at each wire, take the DT from source_pin, assign the name and index of dest_pin
-            for wire in wires:
-                output_SD_CDT.members.create(
-                    datatype=wire.source_pin.datatype,
-                    column_name=wire.dest_pin.column_name,
-                    column_idx=wire.dest_pin.column_idx)
-
-            # Add this structure to the symbolic dataset
-            output_SD_CDT.clean()
-            output_SD.structure.create(output_SD_CDT)
-            
-        # There are four cases:
-        
-        # 1) input_SD has real data and does not contain written data on the filesystem
-        # --> The data was uploaded OR derived from a previous reused step
-        # --> We will use input_SD.dataset for the computation
-        if (input_SD.has_data() and not os.access(sd_fs_map[input_SD.pk]['PATH'], os.R_OK)):
-            self.run_cable(input_SD.dataset, output_path)
-        
-        # 2) input_SD has real data and there is data on the filesystem:
-        # --> The data was calculated from a previous step
-        # --> We use the data on the filesystem
-        #     (PRE: It must be equal to input_SD.dataset)
-        
-        # 3) input_SD does not have real data but there is data on the
-        # filesystem: The data was calculated but is transient (time
-        # bomb) --> We use the data on the filesystem
-
-        elif os.access(sd_fs_map[input_SD.pk]['PATH']), os.R_OK):
-            self.run_cable(sd_fs_map[input_SD.pk]['PATH'], output_path)
-
-        # 4) input_SD does not have real data and is not on the filesystem
-        # (And there's nothing to reuse)
-        # --> We have to backtrack: input_SD.fill_in()
-        else:
-            # Backtrack to add input_SD to curr_session_data
-            sd_fs_map, method_map, cable_map = input_SD.recover(sd_fs_map, method_map, cable_map)
-
-            # And now we have what we need to run this cable
-            self.run_cable(sd_fs_map[input_SD.pk]['PATH'], output_path)
-
-        # Annotate sd_fs_map with the output created by run_cable
-        sd_fs_map[output_SD.pk] = {'PATH': output_path, 'GENERATOR': self}
-        cable_map[self] = curr_ER
-        
-        # If we are retaining this data, we create a dataset
-        if self.keep_output:
-
-            new_dataset = Dataset(
-                user=user,
-                name="{} {}".format(runstep.run.name, curr_RSIC.pk),
-                symbolicdataset=output_SD)
-            with open(output_path, "rb") as f:
-                new_dataset.dataset_file = File(f)
-            new_dataset.set_md5()
-            new_dataset.save()
-
-        # Return sd_fs_map and cable_map
-
-                
-            
-
 class CustomCableWire(models.Model):
     """
     Defines a customized connection within a pipeline.
@@ -2559,13 +2343,13 @@ class PipelineOutputCable(models.Model):
         # the wiring matches, we can....
         return True
         
-    def run_cable(self, input_path, output_path):
+    def run_cable(self, source, output_path):
         """
         Perform the cable-specified transformation on the input.
 
         This uses run_cable_h.
         """
-        run_cable_h(self.custom_outwires.all(), input_path, output_path)
+        run_cable_h(self.custom_outwires.all(), source, output_path)
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -3501,8 +3285,8 @@ class Dataset(models.Model):
         If this is a structured data type (IE, a CSV) clean the CSV.
         """
         # If there is an associated DatasetStructure, clean the structure
-        if not self.is_raw():
-            self.structure.clean()
+        if not self.symbolicdataset.is_raw():
+            self.symbolicdataset.structure.clean()
 
         if (self.symbolicdataset.MD5_checksum == ""):
             self.set_md5()
@@ -3542,32 +3326,21 @@ class Dataset(models.Model):
         """
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
-
-    def is_raw(self):
-        """True if this Dataset is raw, i.e. not a CSV file."""
-        return not hasattr(self, "structure")
-            
-    def num_rows(self):
-        """
-        Returns number of rows in CSV file if Dataset is a CSV file; None otherwise.
-        """
-        if not self.is_raw():
-            return self.structure.num_rows()
-        return None
-
+    
 class DatasetStructure(models.Model):
     """
     Data with a Shipyard-compliant structure: a CSV file with a header.
     Encodes the CDT, and the transformation output generating this data.
 
-    Related to :model:`copperfish.Dataset`
+    Related to :model:`copperfish.SymbolicDataset`
     Related to :model:`copperfish.CompoundDatatype`
     """
     # Note: previously we were tracking the exact TransformationOutput
     # this came from (both for its Run and its RunStep) but this is
     # now done more cleanly using ExecRecord.
 
-    dataset = models.OneToOneField(Dataset, related_name="structure")
+    symbolicdataset = models.OneToOneField(
+        "SymbolicDataset", related_name="structure")
 
     compounddatatype = models.ForeignKey(
         CompoundDatatype,
@@ -3576,20 +3349,26 @@ class DatasetStructure(models.Model):
     def clean(self):
         """
         Checks the CSV header conforms to CDT definition.
-                
+
+        This is trivial if the parent SymbolicDataset has no data.
+
         FIXME: will have to unit test each data field when doing execute.
         """
         # October 16, 2013: proper handling of self.dataset.dataset_file
         # is needed.
+        if not self.symbolicdataset.has_data():
+            return None
+
         header = None
         try:
-            self.dataset.dataset_file.open()
-            data_csv = csv.DictReader(self.dataset.dataset_file)
+            self.symbolicdataset.dataset.dataset_file.open()
+            data_csv = csv.DictReader(
+                self.symbolicdataset.dataset.dataset_file)
             header = data_csv.fieldnames
         # We want to propagate the error up if it happens, so we
         # just use this finally block to close the file.
         finally:
-            self.dataset.dataset_file.close()
+            self.symbolicdataset.dataset.dataset_file.close()
             
         cdt_members = self.compounddatatype.members.all()
 
@@ -3597,7 +3376,7 @@ class DatasetStructure(models.Model):
         if len(header) != cdt_members.count():
             raise ValidationError(
                 "Dataset \"{}\" does not have the same number of columns as its CDT".
-                format(self.dataset))
+                format(self.symbolicdataset.dataset))
 
         # CDT definition must be coherent with the CSV header: ith cdt member must
         # have the same name as the ith CSV header
@@ -3605,21 +3384,29 @@ class DatasetStructure(models.Model):
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 raise ValidationError(
                     "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
-                    format(cdtm.column_idx, self.dataset, header[cdtm.column_idx-1], cdtm.column_name))
+                    format(cdtm.column_idx, self.symbolicdataset.dataset,
+                           header[cdtm.column_idx-1], cdtm.column_name))
 
     def num_rows(self):
-        """Reports the number of rows belonging to the CSV file (excluding header)."""
+        """
+        Reports the number of rows belonging to the CSV file (excluding header).
+
+        Returns None if no real data exists.
+        """
+        if not self.symbolicdataset.has_data():
+            return None
+        
         # Note: we don't check for the integrity of self.dataset_file as that will
         # be checked when calling clean().
-
+        
         # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
         try:
-            self.dataset.dataset_file.open()
+            self.symbolicdataset.dataset.dataset_file.open()
             row_count = sum(1 for line in self.dataset.dataset_file) - 1
         # If there is an exception from opening/reading the file, it
         # should be propagated, but we still want to close the file.
         finally:
-            self.dataset.dataset_file.close()
+            self.symbolicdataset.dataset.dataset_file.close()
         
         return row_count
 
@@ -3634,20 +3421,33 @@ class SymbolicDataset(models.Model):
         """
         Unicode representation of a SymbolicDataset.
 
-        If the dataset has been deleted, this will be S[primary key]*;
-        if not, S[primary key].
+        If no Dataset is associated, this will be S[primary key];
+        if not, S[primary key]d.
         """
         unicode_rep = u"S{}".format(self.pk)
 
-        if hasattr(self, 'dataset') == False:
-            unicode_rep += u"*"
+        if self.has_data():
+            unicode_rep += u"d"
         return unicode_rep
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
         return hasattr(self, "dataset")
-
     
+    def is_raw(self):
+        """True if this SymbolicDataset is raw, i.e. not a CSV file."""
+        return not hasattr(self, "structure")
+            
+    def num_rows(self):
+        """
+        Returns number of rows in the associated Dataset.
+
+        This returns None if there is no data, or if the Dataset is raw.
+        """
+        if self.is_raw() or not self.has_data():
+            return None
+        
+        return self.structure.num_rows()
 
 class ExecRecord(models.Model):
     """
@@ -4130,9 +3930,13 @@ class ExecRecordOut(models.Model):
 # and for prototypes.  These must be loaded into the database right
 # after the tables have been created, e.g. after calling
 # "./manage.py syncdb"
-STR_DT = Datatype.objects.get(pk=1)
-BOOL_DT = Datatype.objects.get(pk=2)
+    
+# These are added using a fixture after this file is loaded; as such,
+# we can't define these variables here.
+    
+# STR_DT = Datatype.objects.get(pk=1)
+# BOOL_DT = Datatype.objects.get(pk=2)
 
-VERIF_IN = CompoundDatatype.objects.get(pk=1)
-VERIF_OUT = CompoundDatatype.objects.get(pk=2)
-PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=3)
+# VERIF_IN = CompoundDatatype.objects.get(pk=1)
+# VERIF_OUT = CompoundDatatype.objects.get(pk=2)
+# PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=3)

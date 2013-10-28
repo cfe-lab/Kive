@@ -48,7 +48,35 @@ def can_create_new_file(file_to_create):
         # be written to it - but only if there are sufficient
         # permissions.
         if not os.access(output_dir, os.W_OK or os.X_OK):
-            reason = "insufficient permissions on run path \"{}\"".format(run_path))
+            reason = "insufficient permissions on run path \"{}\"".format(run_path)
             is_okay = False
 
     return (is_okay, reason)
+
+def set_up_directory(directory_to_use):
+    """
+    Checks whether the specified directory can be used.
+
+    That is, either we create it with appropriate permissions,
+    or it exists already and is writable/executable/empty.
+    """
+    try:
+        os.makedirs(directory_to_use)
+    except os.error:
+        # Check if the directory does not exist.
+        if not os.access(directory_to_use, os.F_OK):
+            raise ValueError("directory \"{}\" could not be created".
+                             format(directory_to_use))
+
+        # Otherwise, the directory already existed.  Check that we
+        # have sufficient permissions on it, and that it is empty.
+        if not os.access(directory_to_use, os.W_OK or os.X_OK):
+            raise ValueError(
+                "insufficient permissions on directory \"{}\"".
+                format(directory_to_use))
+
+        if (len(glob.glob(directory_to_use + "/*") +
+                glob.glob(directory_to_use + "/.*")) > 0):
+            raise ValueError(
+                "directory \"{}\" is not empty".
+                format(directory_to_use))
