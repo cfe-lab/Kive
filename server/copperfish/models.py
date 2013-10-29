@@ -777,8 +777,8 @@ class CodeResourceDependency(models.Model):
     requirement = models.ForeignKey(CodeResourceRevision,
                                     related_name="needed_by");
 
-    # Where to place it during runtime relative to the CodeResource that relies on this CodeResourceDependency
-    # FIXME: specifies the subdirectory, and OPTIONALLY, the file name to adopt during execution
+    # Where to place it during runtime relative to the CodeResource
+    # that relies on this CodeResourceDependency.
     depPath = models.CharField(
         "Dependency path",
         max_length=255,
@@ -3299,13 +3299,13 @@ class Dataset(models.Model):
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
         md5gen = hashlib.md5()
+        md5 = None
         try:
             self.dataset_file.open()
-            md5gen.update(self.dataset_file.read())
+            md5 = file_access_utils.compute_md5(self.dataset_file.file)
         finally:
             self.dataset_file.close()
-            
-        md5 = md5gen.hexdigest()
+        
         return md5
 
     def set_md5(self):
@@ -3415,7 +3415,9 @@ class SymbolicDataset(models.Model):
     Symbolic representation of a Dataset (that may or may not have been deleted/restored).
     """
     # For validation of Datasets when being reused, or when being regenerated.
-    MD5_checksum = models.CharField(max_length=64,help_text="Validates file integrity")
+    MD5_checksum = models.CharField(
+        max_length=64,
+        help_text="Validates file integrity")
 
     def __unicode__(self):
         """
@@ -3429,6 +3431,18 @@ class SymbolicDataset(models.Model):
         if self.has_data():
             unicode_rep += u"d"
         return unicode_rep
+
+    # FIXME fill this in!
+    def clean(self):
+        """
+        Checks coherence of this SymbolicDataset.
+
+        First, it checks that the MD5 checksum is a 32-character hex
+        string.  If there is an associated DatasetStructure, clean
+        that.  Then, if it has data (i.e. an associated Dataset), it
+        cleans that Dataset.
+        """
+        pass
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
@@ -3463,6 +3477,20 @@ class ExecRecord(models.Model):
         })
     object_id = models.PositiveIntegerField()
     general_transf = generic.GenericForeignKey("content_type", "object_id")
+
+    # Output and error logs, i.e. the stdout and stderr produced by running
+    # the code at this step.
+    output_log = models.FileField(
+        "output log", 
+        null=True,
+        help_text="Terminal output of this ExecRecord, i.e. stdout.")
+    
+    error_log = models.FileField(
+        "error log", 
+        null=True,
+        help_text="Terminal error output of this ExecRecord, i.e. stderr.")
+
+    # FIXME modify clean() to handle this.
 
     # Has this record been called into question by a subsequent execution?
     tainted = models.BooleanField(default=False,help_text="Denotes whether this record's veracity is questionable")

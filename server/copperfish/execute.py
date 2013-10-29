@@ -4,6 +4,8 @@
 import models
 import file_access_utils
 import os.path
+import sys
+import time
 
 class Sandbox:
     """
@@ -174,29 +176,9 @@ class Sandbox:
                 
         # At this point, we know we cannot reuse an ER, so we
         # will have to run the cable.
-        output_SD = None
-        if curr_ER == None:
-            # No ER was found; create a new one.
-            curr_ER = cable.execrecords.create()
-            curr_ER.execrecordins.create(
-                generic_input=cable.provider_output,
-                symbolicdataset=input_SD)
-            output_SD = SymbolicDataset()
-            output_SD.save()
 
-            ero_xput = None
-            if type(cable) == PipelineStepInputCable:
-                ero_xput = cable.transf_input
-            else:
-                ero_xput = cable.pipeline.outputs.get(
-                    dataset_name=cable.output_name)
-            
-            curr_ER.execrecordouts.create(
-                generic_output=ero_xput,
-                symbolicdataset=output_SD)
-        else:
-            output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
-
+        # What comes out of the cable will have the following CDT:
+        output_SD_CDT = None
         if not cable.is_raw():
                 
             # Determine the compounddatatype
@@ -217,10 +199,8 @@ class Sandbox:
                     datatype=wire.source_pin.datatype,
                     column_name=wire.dest_pin.column_name,
                     column_idx=wire.dest_pin.column_idx)
-
-            # Add this structure to the symbolic dataset
+                
             output_SD_CDT.clean()
-            output_SD.structure.create(output_SD_CDT)
             
         # There are four cases:
         
@@ -253,8 +233,70 @@ class Sandbox:
             # And now we have what we need to run this cable
             cable.run_cable(self.sd_fs_map[input_SD]['PATH'], output_path)
 
-        # Annotate sd_fs_map with the output created by run_cable
-        self.sd_fs_map[output_SD] = {'PATH': output_path, 'GENERATOR': cable}
+        # Make an ER to represent the execution above.
+        output_SD = None
+        output_md5 = None
+        with open(output_path, "rb") as f:
+            output_md5 = file_access_utils.compute_md5(f)
+            
+        if curr_ER == None:
+            # No ER was found; create a new one.
+            
+            curr_ER = cable.execrecords.create()
+            curr_ER.execrecordins.create(
+                generic_input=cable.provider_output,
+                symbolicdataset=input_SD)
+
+            if cable.is_trivial():
+                output_SD = input_SD
+
+                # Since this cable was trivial, either the resulting
+                # file sitting at output_path is simply linked to
+                # something else that's already on the filesystem, or
+                # it was copied from the database.
+                if output_md5 != output_SD.MD5_checksum:
+                    raise ValueError(
+                        "Output of cable \"{}\" failed MD5 integrity check".
+                        format(cable))
+                
+            else:
+                output_SD = SymbolicDataset(
+                    MD5_checksum=output_md5)
+                output_SD.save()
+
+                # Add this structure to the symbolic dataset
+                if output_SD_CDT != None:
+                    output_SD.structure.create(output_SD_CDT)
+
+                ero_xput = None
+                if type(cable) == PipelineStepInputCable:
+                    ero_xput = cable.transf_input
+                else:
+                    ero_xput = cable.pipeline.outputs.get(
+                        dataset_name=cable.output_name)
+
+                # Add output_SD to sd_fs_map.
+                self.sd_fs_map[output_SD] = {
+                    'PATH': output_path, 'GENERATOR': cable
+                }
+            
+            curr_ER.execrecordouts.create(
+                generic_output=ero_xput,
+                symbolicdataset=output_SD)
+            
+        else:
+            # In this case, we did find an ER, so we can check the MD5
+            # checksum against the stored value.
+            output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
+            if output_md5 != output_SD.MD5_checksum:
+                raise ValueError(
+                    "Output of cable \"{}\" failed MD5 integrity check".
+                    format(cable))
+            
+            self.sd_fs_map[output_SD] = {
+                'PATH': output_path, 'GENERATOR': cable
+            }
+            
         self.cable_map[cable] = curr_ER
         
         # If we are retaining this data, we create a dataset
@@ -268,12 +310,12 @@ class Sandbox:
                 created_by=cable)
             with open(output_path, "rb") as f:
                 new_dataset.dataset_file = File(f)
-            new_dataset.set_md5()
             new_dataset.clean()
             new_dataset.save()
 
         # Complete the ER and record, then return the record.
         curr_ER.complete_clean()
+        curr_record.execrecord = curr_ER
         curr_record.complete_clean()
         curr_record.save()
         return curr_record
@@ -288,12 +330,15 @@ class Sandbox:
         is [sandbox path]/step[stepnum].
 
         Outputs get written to
-        [step sandbox]/output_data/step[step number]_[output name].
+        [step sandbox]/output_data/step[step number]_[output name]
 
         Inputs get written to 
-        [step sandbox]/input_data/step[step number]_[input name].
+        [step sandbox]/input_data/step[step number]_[input name]
         (Note that this may simply be a link to data that was already
         in the sandbox elsewhere.)
+
+        Logs get written to
+        [step sandbox]/logs/step[step number]_std(out|err).txt
         """
         curr_RS = pipelinestep.pipelinestep_instances.create()
         
@@ -303,11 +348,13 @@ class Sandbox:
                 "step{}".format(pipelinestep.step_num))
 
         file_access_utils.set_up_directory(step_sandbox)
-        # Set up an inputs and an outputs directory.
+        # Set up inputs, outputs, and logs directories.
         in_dir = os.path.join(step_sandbox, "input_data")
         out_dir = os.path.join(step_sandbox, "output_data")
+        log_dir = os.path.join(step_sandbox, "logs")
         file_access_utils.set_up_directory(in_dir)
         file_access_utils.set_up_directory(out_dir)
+        file_access_utils.set_up_directory(log_dir)
 
         output_paths = []
         for curr_output in pipelinestep.transformation.outputs.all():
@@ -362,18 +409,201 @@ class Sandbox:
         # If it found an ER, check that the ER provides all of the
         # output that we need.
         if curr_ER != None:
+            has_required_outputs = True
             for step_output in pipelinestep.transformation.outputs.all():
                 # Check whether this output is deleted.
                 if pipelinestep.outputs_to_delete.filter(step_output).exists():
                     continue
 
-                # FIXME continue from here.
-                #corresp_ero = curr_ER.
+                corresp_ero = curr_ER.execrecordouts.get(
+                    generic_output=step_output)
+
+                if not corresp_ero.has_data():
+                    has_required_outputs = False
+                    break
+
+            if has_required_outputs:
+                # The ER found has what we need, so we can reuse it.
+                curr_RS.reused = True
+                curr_RS.execrecord = curr_ER
+                curr_RS.complete_clean()
+                curr_RS.save()
+
+                return curr_RS
+
+        # Having reached this point, we know we can't reuse an ER.
+        # We will have to actually run code.
+
+        # First, make sure all the input files have been written to
+        # the sandbox.  Note that by this point, any inputs that we
+        # need should have non-blank PATH entries in sd_fs_map.
+        for curr_in_SD in inputs_after_cables:
+            curr_path = sd_fs_map[curr_in_SD]['PATH']
+            if not os.access(curr_path, "F_OK"):
+                self.recover(curr_in_SD)
 
         # If it's a method, run the code; if not, call execute on the
         # pipeline.
         if type(pipelinestep.transformation) == Method:
+            #
+            # We need to then register the output paths with the
+            # appropriate SDs, creating Datasets as necessary.
+            stdout_path = os.path.join(log_dir, "step{}_stdout.txt".
+                                       format(pipelinestep.step_num))
+            stderr_path = os.path.join(log_dir, "step{}_stderr.txt".
+                                       format(pipelinestep.step_num))
+
+            method_popen = None
+            with (open(stdout_path, "wb", 1), 
+                  open(stderr_path, "wb", 0) as (outwrite, errwrite):
+                method_popen = pipelinestep.transformation.run_code(
+                    step_sandbox,
+                    [sd_fs_map[x]['PATH'] for x in inputs_after_cables],
+                    output_paths, outwrite, errwrite)
+
+                # While it's running, print the captured stdout and
+                # stderr to the console.
+                with (open(stdout_path, "rb", 1), 
+                      open(stderr_path, "rb", 0)) as (outread, errread):
+                    while method_open.poll() != None:
+                        sys.stdout.write(outread.read())
+                        sys.stderr.write(errread.read())
+                        time.sleep(1)
+                        
+                    # One last write....
+                    outwrite.flush()
+                    errwrite.flush()
+                    sys.stdout.write(outread.read())
+                    sys.stderr.write(errread.read())
+
+            # The method has finished running.  Make sure all output
+            # has been flushed.
+            sys.stdout.flush()
+            sys.stderr.flush()
+
+            # If the return code was not 0, we bail.
+            if method_popen.returncode != 0:
+                raise ValueError(
+                    "Step {} of run {} returned with exit code {}".
+                    format(pipelinestep.step_num,
+                           self.run, method_popen.returncode))
+
+            # Now, we need to confirm that all of the outputs are present.
+            # If they are all present, then:
+            # 1) if they can be confirmed against past data, do it
+            # 2) Create a Dataset and clean it; that will ensure that
+            #    it conforms to its specification.
+            #    FIXME which we still need to fill in
+
+            # This is keyed by the position index of the generating
+            # output and stores the computed MD5s of the corresponding
+            # output files.
+            output_MD5s = {}
+            for i, output_path in enumerate(output_paths):
+                # i is 0-based; dataset_idx is 1-based.
+                output_idx = i + 1
             
+                if not os.access(output_path, "F_OK"):
+                    raise ValueError(
+                        "Step {} of run {} did not create output file {}".
+                        format(pipelinestep.step_num, self.run,
+                               output_path))
+
+                # Compute the MD5 checksum.
+                with open(output_path, "rb") as f:
+                    output_MD5s[output_idx] = file_access_utils.compute_MD5(f)
+
+                # If an ER was found but insufficient, there will be
+                # SymbolicDatasets representing the outputs; this
+                # allows us to check the MD5 checksum.
+                if curr_ER != None:
+                    corresp_output = pipelinestep.transformation.outputs.get(
+                        dataset_idx=output_idx)
+                    corresp_ERO = curr_ER.execrecordouts.get(
+                        content_type=ContentType.objects.get_for_model(
+                            TransformationOutput),
+                        object_id=corresp_output.pk)
+                    if (output_MD5s[output_idx] != 
+                            corresp_ERO.symbolicdataset.MD5_checksum):
+                        raise ValueError(
+                            "Output \"{}\" of Method \"{}\" failed integrity check".
+                            format(output_path, pipelinestep.transformation))
+            
+            # Create a fresh ER if none was found.
+            if curr_ER == None:
+                curr_ER = pipelinestep.transformation.execrecords.create()
+
+                for curr_input in pipelinestep.transformation.inputs.all():
+                    corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
+                    curr_ER.execrecordins.create(
+                        generic_input=curr_input,
+                        symbolicdataset=corresp_input_SD)
+
+                for curr_output in pipelinestep.transformation.outputs.all():
+                    # Make new outputs.
+                    corresp_output_SD = SymbolicDataset(
+                        MD5_checksum=output_MD5s[curr_output.dataset_idx])
+                    corresp_output_SD.save()
+
+                    # If the output was not raw, create a structure as well.
+                    if not curr_output.is_raw():
+                        corresp_output_SD.structure.create(
+                            compounddatatype=curr_output.get_cdt())
+
+                    corresp_output_SD.clean()
+
+                    curr_ER.execrecordouts.create(
+                        generic_output=curr_output,
+                        symbolicdataset=corresp_output_SD)
+
+            # Go through the outputs: if an output is not marked for
+            # deletion, *and* there was no data in the corresponding
+            # ERO, create a Dataset.
+            for curr_output in pipelinestep.transformation.outputs.all():
+                corresp_ERO = curr_ER.execrecordouts.get(
+                    content_type=ContentType.objects.get_for_model(
+                        TransformationOutput),
+                    object_id=curr_output.pk)
+                if (not pipelinestep.outputs_to_delete.filter(
+                        pk=curr_output.pk).exists() and 
+                        not corresp_ERO.has_data()):
+                    desc = """run: {}
+user: {}
+step: {}
+method: {}
+output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
+                     pipelinestep.transformation, curr_output.dataset_name)
+                    new_DT = Dataset(
+                        user=self.user,
+                        name="run:{}__step:{}__method:{}__output:{}".format(
+                            self.run.name, pipelinestep.step_num,
+                            pipelinestep.transformation,
+                            curr_output.dataset_name),
+                        description=desc,
+                        symbolicdataset=corresp_ERO.symbolicdataset,
+                        created_by=curr_RS)
+
+                    # Recall that dataset_idx is 1-based, and
+                    # output_paths is 0-based.
+                    with open(output_paths[curr_output.dataset_idx-1], "rb") as f:
+                        new_DT.dataset_file.save(
+                            os.path.basename(output_path),
+                            File(f))
+                    new_DT.clean()
+                    new_DT.save()
+
+            # Make sure the ER is clean and complete.
+            curr_ER.complete_clean()
+            # Finish curr_RS.
+            curr_RS.execrecord = curr_ER
+            curr_RS.complete_clean()
+            curr_RS.save()
+                        
         else:
             # FIXME fill this in when we figure out what to do here.
-            self.execute_pipeline()
+            self.execute_pipeline(pipeline=pipelinestep.transformation,
+                                  inputs=inputs_after_cables,
+                                  parent_runstep=curr_RS)
+
+
+        return curr_RS

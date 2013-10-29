@@ -2,6 +2,7 @@
 Basic file-checking functionality used by Shipyard.
 """
 import os
+import hashlib
 
 def can_create_new_file(file_to_create):
     """
@@ -80,3 +81,16 @@ def set_up_directory(directory_to_use):
             raise ValueError(
                 "directory \"{}\" is not empty".
                 format(directory_to_use))
+
+def compute_md5(file_to_checksum):
+    """
+    Computes MD5 checksum of specified file.
+
+    file_to_checksum should be an open, readable, file handle, with
+    its position at the beginning, i.e. so that .read() gets the
+    entire contents of the file.
+    """
+    md5gen = hashlib.md5()
+    md5gen.update(file_to_checksum.read())
+    return md5gen.hexdigest()
+
