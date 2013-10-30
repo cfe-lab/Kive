@@ -2,7 +2,7 @@
 from django.http import HttpResponse
 from copperfish import models
 from django.template import loader, Context
-from copperfish.forms import DatatypeForm
+from copperfish.forms import DatatypeForm, BasicConstraintForm
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
 
@@ -21,15 +21,21 @@ def datatypes(request):
     """
 
     if request.method == 'POST':
-        form = DatatypeForm(request.POST)
-        if form.is_valid():
-            new_datatype = form.save()
+        dform = DatatypeForm(request.POST)
+        if dform.is_valid():
+            new_datatype = dform.save()
+        cform = BasicConstraintForm(request.POST)
+        if cform.is_valid():
+            new_constraint = cform.save()
     else:
-        form = DatatypeForm() # unbound
+        dform = DatatypeForm() # unbound
+        cform = BasicConstraintForm()
 
     datatypes = models.Datatype.objects.all()
     t = loader.get_template('datatypes.html')
-    c = Context({'datatypes': datatypes, 'form': form})
+    c = Context({'datatypes': datatypes, 
+                'datatype_form': dform,
+                'constraint_form': cform})
     c.update(csrf(request))
 
     return HttpResponse(t.render(c))

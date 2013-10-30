@@ -1,0 +1,40 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "base.html" %}
+{% block title %}Datatypes{% endblock %}
+
+{% block content %}
+<h2>Datatypes</h2>
+
+<table style="frame:hsides" border=0 cellpadding=6>
+<thead>
+	<tr>
+	<th>Name</th>
+	<th>Description</th>
+<!-- 	<th>Restricts</th> -->
+	<th>Python type</th>
+	<th>Date created</th>
+	</tr>
+</thead>
+{% for datatype in datatypes %}
+<tr>
+	<td>{{ datatype.name }}</td>
+	<td>{{ datatype.description }}</td>
+<!-- 	<td>{{ datatype.restricts.name }}</td> -->
+    <td>{{ datatype.Python_type }}</td>
+    <td>{{ datatype.date_created }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<hr>
+
+<!-- Form for inserting new Datatypes -->
+<form action="" method="post">{% csrf_token %}
+{{ datatype_form.as_p }}
+{{ constraint_form.as_table }}
+<input type="submit" value="Submit" />
+</form>
+
+{% endblock %}
