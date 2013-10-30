@@ -3003,6 +3003,10 @@ class RunStep(models.Model):
 
         # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(TransformationOutput)
+
+        # Track whether there are any outputs not deleted.
+        any_outputs_kept = False
+        
         for to in self.pipelinestep.transformation.outputs.all():
             if self.pipelinestep.outputs_to_delete.filter(
                     dataset_name=to.dataset_name).exists():
@@ -3015,8 +3019,10 @@ class RunStep(models.Model):
                         "Output \"{}\" of RunStep \"{}\" is deleted; no data should be associated".
                         format(to, self))
             else:
-                # The output is not deleted.  The corresponding ERO should have
-                # existent data.
+                # The output is not deleted.
+                any_outputs_kept = True
+
+                # The corresponding ERO should have existent data.
                 corresp_ero = step_er.execrecordouts.get(
                     content_type=to_type, object_id=to.id)
                 if not corresp_ero.symbolicdataset.has_data():
@@ -3024,21 +3030,21 @@ class RunStep(models.Model):
                         "ExecRecordOut \"{}\" of RunStep \"{}\" should reference existent data".
                         format(corresp_ero, self))
 
-                # If this RunStep did not reuse an ER and did not have
-                # a child run, then there should be a corresponding
-                # real Dataset.
-
-                # FIXME: Some datasets could have come from a prior run
-                if (not self.reused and not hasattr(self, "child_run") and
-                        not self.outputs.filter(
-                            symbolicdataset=corresp_ero.symbolicdataset).exists()):
-                    raise ValidationError(
-                        "RunStep \"{}\" did not reuse an ExecRecord, had no child run, and output \"{}\" was not deleted; a corresponding Dataset should be associated".
-                        format(self, to))
+        # If there are any outputs not deleted, this RunStep did not
+        # reuse an ER, and did not have a child run, then there should
+        # be at least one corresponding real Dataset.
+        associated_datasets = self.outputs.all():
+        if (any_outputs_kept and not self.reused and
+                not hasattr(self, "child_run") and
+                not associated_datasets.exists()):
+            raise ValidationError(
+                "RunStep \"{}\" did not reuse an ExecRecord, had no child run, and did not delete all of its outputs; a corresponding Dataset should be associated".
+                format(self, to))
 
         # Check that any associated data belongs to an ERO of this ER
-        for out_data in self.outputs.all():
-            if not step_er.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
+        for out_data in associated_datasets:
+            if not step_er.execrecordouts.filter(
+                    symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError(
                     "RunStep \"{}\" generated Dataset \"{}\" but it is not in its ExecRecord".
                     format(self, out_data))
@@ -3280,21 +3286,18 @@ class Dataset(models.Model):
         return "{} (created by {} on {})".format(self.name,unicode(self.user),self.date_created)
 
 
+    # NEW FOR ERIC: this, along with SymbolicDataset.clean(), has been
+    # modified.  Also, we need to fill in DatasetStructure.clean()
+    # when the execution code has been finished.
     def clean(self):
         """
-        If this is a structured data type (IE, a CSV) clean the CSV.
+        Check file integrity of this Dataset.
         """
-        # If there is an associated DatasetStructure, clean the structure
-        if not self.symbolicdataset.is_raw():
-            self.symbolicdataset.structure.clean()
-
-        if (self.symbolicdataset.MD5_checksum == ""):
-            self.set_md5()
-        else:
-            if not self.check_md5():
-                raise ValidationError(
-                    "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".
-                    format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
+        if not self.check_md5():
+            raise ValidationError(
+                "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".
+                format(self, self.compute_md5(),
+                       self.symbolicdataset.MD5_checksum))
             
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
@@ -3308,13 +3311,15 @@ class Dataset(models.Model):
         
         return md5
 
-    def set_md5(self):
-        """
-        Computes the MD5 checksum of the Dataset and stores it.
+    # NEW FOR ERIC:
+    # this isn't necessary at all anymore.
+    # def set_md5(self):
+    #     """
+    #     Computes the MD5 checksum of the Dataset and stores it.
 
-        The value is stored to the associated SymbolicDataset.
-        """
-        self.symbolicdataset.MD5_checksum = self.compute_md5()
+    #     The value is stored to the associated SymbolicDataset.
+    #     """
+    #     self.symbolicdataset.MD5_checksum = self.compute_md5()
             
     def check_md5(self):
         """
@@ -3432,17 +3437,29 @@ class SymbolicDataset(models.Model):
             unicode_rep += u"d"
         return unicode_rep
 
-    # FIXME fill this in!
+    # NEW FOR ERIC:
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
 
         First, it checks that the MD5 checksum is a 32-character hex
-        string.  If there is an associated DatasetStructure, clean
-        that.  Then, if it has data (i.e. an associated Dataset), it
-        cleans that Dataset.
+        string.  Then, if it has data (i.e. an associated Dataset), it
+        cleans that Dataset.  Then, if there is an associated
+        DatasetStructure, clean that.
         """
-        pass
+        MD5_re = re.compile("^[1234567890abcdef]{32}$")
+
+        if not MD5_re.match(MD5_checksum):
+            raise ValidationError(
+                "MD5 checksum of SymbolicDataset \"{}\" is not 32 hex characters".
+                format(self))
+
+        if self.has_data():
+            self.dataset.clean()
+        
+        # If there is an associated DatasetStructure, clean the structure
+        if not self.is_raw():
+            self.structure.clean()
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
@@ -3478,19 +3495,20 @@ class ExecRecord(models.Model):
     object_id = models.PositiveIntegerField()
     general_transf = generic.GenericForeignKey("content_type", "object_id")
 
-    # Output and error logs, i.e. the stdout and stderr produced by running
-    # the code at this step.
+    # Output and error logs, i.e. the stdout and stderr produced by
+    # running the code at this step.  These must be set if the ER
+    # represents a Method, and are otherwise null.
     output_log = models.FileField(
         "output log", 
         null=True,
+        blank=True,
         help_text="Terminal output of this ExecRecord, i.e. stdout.")
     
     error_log = models.FileField(
         "error log", 
         null=True,
+        blank=True,
         help_text="Terminal error output of this ExecRecord, i.e. stderr.")
-
-    # FIXME modify clean() to handle this.
 
     # Has this record been called into question by a subsequent execution?
     tainted = models.BooleanField(default=False,help_text="Denotes whether this record's veracity is questionable")
@@ -3516,11 +3534,15 @@ class ExecRecord(models.Model):
         """
         Checks coherence of the ExecRecord.
 
-        Calls clean on all of the in/outputs.  (Multiple quenching is checked
-        via a uniqueness condition and does not need to be coded here.)
+        Calls clean on all of the in/outputs.  (Multiple quenching is
+        checked via a uniqueness condition and does not need to be
+        coded here.)
 
-        If this ER represents a trivial cable, then the single ERI and ERO should
-        have the same SymbolicDataset.
+        If this ER represents a trivial cable, then the single ERI and
+        ERO should have the same SymbolicDataset.
+
+        output_log and error_log are null if this ER does not
+        represent a Method.
         """
         eris = self.execrecordins.all()
         eros = self.execrecordouts.all()
@@ -3529,6 +3551,17 @@ class ExecRecord(models.Model):
             eri.clean()
         for ero in eros:
             ero.clean()
+
+        if type(self.general_transf) != Method:
+            if self.output_log != None:
+                raise ValidationError(
+                    "ExecRecord \"{}\" does not represent a Method; no output log should exist".
+                    format(self))
+
+            if self.error_log != None:
+                raise ValidationError(
+                    "ExecRecord \"{}\" does not represent a Method; no error log should exist".
+                    format(self))
 
         if type(self.general_transf) not in (Method, Pipeline):
             # If the cable is quenched:
@@ -3589,8 +3622,22 @@ class ExecRecord(models.Model):
 
         Calls clean, and then checks that all in/outputs of the
         Method/Pipeline/POC/PSIC are quenched.
+        
+        output_log and error_log are *not* null if this ER
+        represents a Method.
         """
         self.clean()
+
+        if type(self.general_transf) == Method:
+            if self.output_log == None:
+                raise ValidationError(
+                    "ExecRecord \"{}\" represents a Method but no output log exists".
+                    format(self))
+            
+            if self.error_log == None:
+                raise ValidationError(
+                    "ExecRecord \"{}\" represents a Method but no error log exists".
+                    format(self))
 
         # Because we know that each ERI is clean (and therefore each
         # one maps to a valid input of our Method/Pipeline/POC/PSIC), and

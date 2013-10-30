@@ -592,18 +592,37 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                     new_DT.clean()
                     new_DT.save()
 
+            # NEW FOR ERIC:
+            # Add the output log and error log with the ER (if it already
+            # had logs, replace them).
+            if curr_ER.output_log != None:
+                curr_ER.output_log.delete()
+            with open(stdout_path, "rb") as out:
+                curr_ER.output_log.save(os.path.basename(stdout_path),
+                                        File(out))
+                                        
+            if curr_ER.error_log != None:
+                curr_ER.error_log.delete()
+            with open(stderr_path, "rb") as err:
+                curr_ER.error_log.save(os.path.basename(stderr_path),
+                                       File(err))
+
+            # NEW FOR ERIC
             # Make sure the ER is clean and complete.
             curr_ER.complete_clean()
-            # Finish curr_RS.
             curr_RS.execrecord = curr_ER
-            curr_RS.complete_clean()
-            curr_RS.save()
                         
         else:
+            # NEW FOR ERIC
             # FIXME fill this in when we figure out what to do here.
-            self.execute_pipeline(pipeline=pipelinestep.transformation,
-                                  inputs=inputs_after_cables,
-                                  parent_runstep=curr_RS)
+            child_run = self.execute_pipeline(
+                pipeline=pipelinestep.transformation,
+                inputs=inputs_after_cables,
+                parent_runstep=curr_RS)
 
+            curr_RS.child_run = child_run
 
+        # Finish curr_RS.
+        curr_RS.complete_clean()
+        curr_RS.save()
         return curr_RS
