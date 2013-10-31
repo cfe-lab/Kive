@@ -114,6 +114,9 @@ class Sandbox:
         else:
             curr_record = cable.poc_instances.create()
         curr_ER = None
+
+        ####
+        # LOOK FOR REUSABLE ER
         
         # First: we look for an ExecRecord that we can reuse.
         # We first search for ERIs of cables that take input_SD
@@ -172,8 +175,13 @@ class Sandbox:
                 else:
                     curr_ER = candidate_ERI.execrecord
                     break
-
                 
+        # FINISHED LOOKING FOR REUSABLE ER
+        ####
+
+        ####
+        # RUN CABLE
+        
         # At this point, we know we cannot reuse an ER, so we
         # will have to run the cable.
 
@@ -233,11 +241,23 @@ class Sandbox:
             # And now we have what we need to run this cable
             cable.run_cable(self.sd_fs_map[input_SD]['PATH'], output_path)
 
+        # FINISHED RUNNING CABLE
+        ####
+
+        ####
+        # CHECK OUTPUT
+
         # Make an ER to represent the execution above.
         output_SD = None
         output_md5 = None
+        
         with open(output_path, "rb") as f:
             output_md5 = file_access_utils.compute_md5(f)
+
+        # FIXME fill this in when we write validate_CSV
+        with open(output_path, "rb") as f:
+            validation_results = self.validate_CSV(f, output_SD_CDT)
+            # FIXME do something with the results!
             
         if curr_ER == None:
             # No ER was found; create a new one.
@@ -268,6 +288,9 @@ class Sandbox:
                 if output_SD_CDT != None:
                     output_SD.structure.create(output_SD_CDT)
 
+                # FIXME we need the number of rows here as well!  We'll
+                # get this from the above call to validate_CSV.
+
                 ero_xput = None
                 if type(cable) == PipelineStepInputCable:
                     ero_xput = cable.transf_input
@@ -296,7 +319,13 @@ class Sandbox:
             self.sd_fs_map[output_SD] = {
                 'PATH': output_path, 'GENERATOR': cable
             }
-            
+
+        # FINISHED CHECKING OUTPUT
+        ####
+
+        ####
+        # PERFORM BOOKKEEPING
+        
         self.cable_map[cable] = curr_ER
         
         # If we are retaining this data, we create a dataset
@@ -315,6 +344,10 @@ class Sandbox:
 
         # Complete the ER and record, then return the record.
         curr_ER.complete_clean()
+
+        # FINISHED BOOKKEEPING
+        ####
+        
         curr_record.execrecord = curr_ER
         curr_record.complete_clean()
         curr_record.save()
@@ -341,6 +374,9 @@ class Sandbox:
         [step sandbox]/logs/step[step number]_std(out|err).txt
         """
         curr_RS = pipelinestep.pipelinestep_instances.create()
+
+        ####
+        # SET UP SANDBOX AND PATHS
         
         if step_sandbox == None:
             step_sandbox = os.path.join(
@@ -361,6 +397,12 @@ class Sandbox:
             output_paths.append(os.path.join(
                 step_sandbox, "step{}_{}".format(
                     pipelinestep.step_num, curr_output.dataset_name)))
+
+        # FINISHED SETTING UP SANDBOX AND PATHS
+        ####
+
+        ####
+        # RUN CABLES
 
         # Run all PSICs.  This list stores the SDs that come out of the
         # cables (and get fed directly into the transformation).
@@ -385,6 +427,12 @@ class Sandbox:
             
         # Sanity check
         curr_RS.clean()
+
+        # FINISHED RUNNING CABLES
+        ####
+
+        ####
+        # CHECK WHETHER WE CAN REUSE AN ER
 
         # Look for an ER that we can reuse.  It must represent the same
         # transformation, and take the same input SDs.
@@ -431,6 +479,12 @@ class Sandbox:
 
                 return curr_RS
 
+        # FINISHED LOOKING FOR REUSABLE ER
+        ####
+
+        ####
+        # ACTUALLY RUN CODE
+        
         # Having reached this point, we know we can't reuse an ER.
         # We will have to actually run code.
 
@@ -445,6 +499,8 @@ class Sandbox:
         # If it's a method, run the code; if not, call execute on the
         # pipeline.
         if type(pipelinestep.transformation) == Method:
+            ####
+            # RUN CODE: METHOD
             #
             # We need to then register the output paths with the
             # appropriate SDs, creating Datasets as necessary.
@@ -488,6 +544,12 @@ class Sandbox:
                     format(pipelinestep.step_num,
                            self.run, method_popen.returncode))
 
+            # FINISHED RUNNING METHOD
+            ####
+
+            ####
+            # CHECK OUTPUTS
+            
             # Now, we need to confirm that all of the outputs are present.
             # If they are all present, then:
             # 1) if they can be confirmed against past data, do it
@@ -502,7 +564,9 @@ class Sandbox:
             for i, output_path in enumerate(output_paths):
                 # i is 0-based; dataset_idx is 1-based.
                 output_idx = i + 1
-            
+                corresp_output = pipelinestep.transformation.outputs.get(
+                    dataset_idx=output_idx)
+                
                 if not os.access(output_path, "F_OK"):
                     raise ValueError(
                         "Step {} of run {} did not create output file {}".
@@ -513,12 +577,16 @@ class Sandbox:
                 with open(output_path, "rb") as f:
                     output_MD5s[output_idx] = file_access_utils.compute_MD5(f)
 
+                # FIXME fill this in when we write validate_CSV
+                with open(output_path, "rb") as f:
+                    validation_results = self.validate_CSV(
+                        f, corresp_output.get_cdt())
+                    # FIXME do something with the results!
+
                 # If an ER was found but insufficient, there will be
                 # SymbolicDatasets representing the outputs; this
                 # allows us to check the MD5 checksum.
                 if curr_ER != None:
-                    corresp_output = pipelinestep.transformation.outputs.get(
-                        dataset_idx=output_idx)
                     corresp_ERO = curr_ER.execrecordouts.get(
                         content_type=ContentType.objects.get_for_model(
                             TransformationOutput),
@@ -528,6 +596,12 @@ class Sandbox:
                         raise ValueError(
                             "Output \"{}\" of Method \"{}\" failed integrity check".
                             format(output_path, pipelinestep.transformation))
+
+            # FINISHED CHECKING OUTPUTS
+            #### 
+            
+            ####
+            # CREATE EXECRECORD AND REGISTER DATASETS (bookkeeping)
             
             # Create a fresh ER if none was found.
             if curr_ER == None:
@@ -549,6 +623,10 @@ class Sandbox:
                     if not curr_output.is_raw():
                         corresp_output_SD.structure.create(
                             compounddatatype=curr_output.get_cdt())
+                            
+                    # FIXME we also need to give this SD a number of rows!
+                    # We'll get this from the results of the calls to validate_CSV
+                    # above.
 
                     corresp_output_SD.clean()
 
@@ -592,7 +670,6 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                     new_DT.clean()
                     new_DT.save()
 
-            # NEW FOR ERIC:
             # Add the output log and error log with the ER (if it already
             # had logs, replace them).
             if curr_ER.output_log != None:
@@ -607,21 +684,32 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                 curr_ER.error_log.save(os.path.basename(stderr_path),
                                        File(err))
 
-            # NEW FOR ERIC
             # Make sure the ER is clean and complete.
             curr_ER.complete_clean()
             curr_RS.execrecord = curr_ER
+
+            # FINISHED BOOKKEEPING
+            ####
                         
         else:
-            # NEW FOR ERIC
+            ####
+            # RUN PIPELINE
+            
             # FIXME fill this in when we figure out what to do here.
             child_run = self.execute_pipeline(
                 pipeline=pipelinestep.transformation,
                 inputs=inputs_after_cables,
                 parent_runstep=curr_RS)
 
-            curr_RS.child_run = child_run
+            # This is implicit from the above.
+            # curr_RS.child_run = child_run
 
+            # FINISHED RUNNING PIPELINE
+            ####
+
+        # FINISHED RUNNING CODE
+        ####
+            
         # Finish curr_RS.
         curr_RS.complete_clean()
         curr_RS.save()

@@ -34,6 +34,7 @@ import subprocess
 import stat
 import StringIO
 import file_access_utils
+import datetime
 
 class Datatype(models.Model):
     """
@@ -60,14 +61,12 @@ class Datatype(models.Model):
     STR = "str"
     FLOAT = "float"
     BOOL = "bool"
-    DATETIME = "datetime"
 
     PYTHON_TYPE_CHOICES = (
         (INT, 'int'),
         (STR, 'str'),
         (FLOAT, 'float'),
-        (BOOL, 'bool'),
-        (DATETIME, 'datetime')
+        (BOOL, 'bool')
     )
 
     Python_type = models.CharField(
@@ -132,17 +131,6 @@ class Datatype(models.Model):
         """
         return (self == possible_restrictor_datatype or
                 possible_restrictor_datatype.is_restricted_by(self))
-    
-
-    # FIXME: when we start with execute, we'll use this to test
-    # whether a specified column in a CSV file conforms to this
-    # Datatype.
-    #def check_CSV_column(csv_file, col_num):
-    #    pass
-    # We could also do it with the following:
-    def check_conforming(csv_entry):
-        pass
-
 
     # Clean: If prototype is specified, it must have a CDT with
     # 2 columns: column 1 is a string "example" field,
@@ -171,6 +159,98 @@ class Datatype(models.Model):
         """Describe Datatype by name"""
         return self.name
 
+    def has_custom_constraint(self):
+        """Tells whether this Datatype has a CustomConstraint."""
+        return hasattr(self, "custom_constraint")
+
+    def check_basic_constraints(self, string_to_check):
+        """
+        Check the specified string against basic constraints.
+
+        This includes both whether or not the string can be 
+        interpreted as the appropriate Python type, but also
+        whether it then checks out against all BasicConstraints.
+
+        If it fails against even the simplest casting test (i.e.  the
+        string could not be cast to the appropriate Python type),
+        return a list containing a describing string.  If not, return
+        a list of BasicConstraints that it failed (hopefully it's
+        empty!).
+
+        PRE: this Datatype and by extension all of its BasicConstraints
+        are clean.  That means that only the appropriate BasicConstraints
+        for this Datatype's Python_type are applied.
+        """
+        ####
+        # CHECK PYTHON TYPE
+        
+        # First, try to cast it to the appropriate Python type.
+        if self.Python_type == Datatype.STR:
+            # string_to_check is, by definition, a string.
+            pass
+        elif self.Python_type == Datatype.INT:
+            try:
+                int(string_to_check)
+            except ValueError:
+                return ["Was not integer"]
+        elif self.Python_type == Datatype.FLOAT:
+            try:
+                float(string_to_check)
+            except ValueError:
+                return ["Was not float"]
+        elif self.Python_type == Datatype.BOOL:
+            bool_RE = re.compile("^(True)|(False)|(true)|(false)|(TRUE)|(FALSE)|T|F|t|f|0|1$")
+            if not bool_RE.match(string_to_check):
+                return ["Was not boolean"]
+
+        # FINISHED CHECKING PYTHON TYPE
+        ####
+
+        ####
+        # CHECK BASIC CONSTRAINTS
+        constraints_failed = []
+        
+        # Go through the BasicConstraints and check them all in turn.
+        for basic_constraint in self.basic_constraints.all():
+            if (basic_constraint.ruletype == BasicConstraint.MIN_LENGTH and
+                    len(string_to_check) < int(basic_constraint.rule)):
+                constraints_failed.append(basic_constraint)
+
+            elif (basic_constraint.ruletype == BasicConstraint.MAX_LENGTH and
+                    len(string_to_check) > int(basic_constraint.rule)):
+                constraints_failed.append(basic_constraint)
+
+            elif (basic_constraint.ruletype == BasicConstraint.MIN_VAL and
+                    float(string_to_check) < float(basic_constraint.rule)):
+                constraints_failed.append(basic_constraint)
+
+            elif (basic_constraint.ruletype == BasicConstraint.MAX_VAL and
+                    float(string_to_check) > float(basic_constraint.rule)):
+                constraints_failed.append(basic_constraint)
+
+            elif basic_constraint.ruletype == BasicConstraint.REGEXP:
+                constraint_re = re.compile(basic_constraint.rule)
+                if not constraint_re.match(string_to_check):
+                    constraints_failed.append(basic_constraint)
+
+            elif basic_constraint.ruletype == BasicConstraint.DATETIMEFORMAT:
+                # Attempt to make a datetime object using this format
+                # string.
+                try:
+                    datetime.datetime.strptime(string_to_check,
+                                               basic_constraint.rule)
+                except:
+                    constraints_failed.append(basic_constraint)
+
+        # FINISHED CHECKING BASIC CONSTRAINTS
+        ####
+                    
+        return constraints_failed
+
+    # Note that checking the CustomConstraint requires a place to run.
+    # As such, it's debatable whether to put it here or as a Sandbox
+    # method.  We'll probably put it here.
+
 class BasicConstraint(models.Model):
     """
     Basic (level 1) constraint on a Datatype.
@@ -180,6 +260,7 @@ class BasicConstraint(models.Model):
      - (min|max)val (numeric)
      - (min|max)prec (float)
      - regexp (this will work on anything)
+     - datetimeformat (string -- this is a special case)
     """
     datatype = models.ForeignKey(
         Datatype,
@@ -193,12 +274,15 @@ class BasicConstraint(models.Model):
     # MIN_PREC = "minprec"
     # MAX_PREC = "maxprec"
     REGEXP = "regexp"
+    DATETIMEFORMAT = "datetimeformat"
+    
     CONSTRAINT_TYPES = (
         (MIN_LENGTH, "minimum string length"),
         (MAX_LENGTH, "maximum string length"),
         (MIN_VAL, "minimum numeric value"),
         (MAX_VAL, "maximum numeric value"),
-        (REGEXP, "Perl regular expression")
+        (REGEXP, "Perl regular expression"),
+        (DATETIMEFORMAT, "date format string (1989 C standard)")
     )
 
     ruletype = models.CharField(
@@ -223,6 +307,9 @@ class BasicConstraint(models.Model):
          - (MIN|MAX)_VAL: rule must be castable to a float; parent DT
            must have Python type 'float' or 'int'
          - REGEXP: rule must be a valid Perl-style RE
+         - DATETIMEFORMAT: rule can be anything (note that it's up to you
+           to define something *useful* here); parent DT must have Python 
+           type 'str'
         """
         error_msg = ""
         is_error = False
@@ -279,6 +366,12 @@ class BasicConstraint(models.Model):
                              format(self, self.rule))
                 is_error = True
 
+        elif self.ruletype == BasicConstraint.DATETIMEFORMAT:
+            if self.datatype.Python_type != Datatype.STR:
+                error_msg = ("Rule \"{}\" specifies a date/time format but its parent Datatype \"{}\" is not a Python string".
+                             format(self, self.datatype))
+                is_error = True
+
         if is_error:
             raise ValidationError(error_msg)
 
@@ -290,9 +383,9 @@ class CustomConstraint(models.Model):
     take a CSV of strings (which is the parent of all
     Datatypes) and return T/F for 
     """
-    datatype = models.ForeignKey(
+    datatype = models.OneToOneField(
         Datatype,
-        related_name="custom_constraints")
+        related_name="custom_constraint")
 
     verification_method = models.ForeignKey(
         "Method",
@@ -303,8 +396,7 @@ class CustomConstraint(models.Model):
     # a column of bools named "is_valid".  We thus need to hard-code
     # in at least two Datatypes and two CDTs (string, bool, and
     # a CDT for each).  We'll probably need more later anyway.
-    # Such CDTs will be pre-loaded into the database, and are
-    # accessible as VERIF_IN and VERIF_OUT.
+    # Such CDTs will be pre-loaded into the database.
     def clean(self):
         """
         Checks coherence of this CustomConstraint.
@@ -313,6 +405,10 @@ class CustomConstraint(models.Model):
         a CDT looking like (string to_test); it must return
         as output a CDT looking like (bool is_valid).
         """
+        # Pre-defined CDTs that the verification method must use.
+        VERIF_IN = CompoundDatatype.objects.get(pk=1)
+        VERIF_OUT = CompoundDatatype.objects.get(pk=2)
+        
         verif_method_in = self.verification_method.inputs.all()
         verif_method_out = self.verification_method.outputs.all()
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
@@ -3286,9 +3382,6 @@ class Dataset(models.Model):
         return "{} (created by {} on {})".format(self.name,unicode(self.user),self.date_created)
 
 
-    # NEW FOR ERIC: this, along with SymbolicDataset.clean(), has been
-    # modified.  Also, we need to fill in DatasetStructure.clean()
-    # when the execution code has been finished.
     def clean(self):
         """
         Check file integrity of this Dataset.
@@ -3310,16 +3403,6 @@ class Dataset(models.Model):
             self.dataset_file.close()
         
         return md5
-
-    # NEW FOR ERIC:
-    # this isn't necessary at all anymore.
-    # def set_md5(self):
-    #     """
-    #     Computes the MD5 checksum of the Dataset and stores it.
-
-    #     The value is stored to the associated SymbolicDataset.
-    #     """
-    #     self.symbolicdataset.MD5_checksum = self.compute_md5()
             
     def check_md5(self):
         """
@@ -3331,6 +3414,66 @@ class Dataset(models.Model):
         """
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
+
+class SymbolicDataset(models.Model):
+    """
+    Symbolic representation of a Dataset (that may or may not have been deleted/restored).
+    """
+    # For validation of Datasets when being reused, or when being regenerated.
+    MD5_checksum = models.CharField(
+        max_length=64,
+        validators=[RegexValidator(
+            regex=re.compile("^[1234567890AaBbCcDdEeFf]{32}$"),
+            message="MD5 checksum is not 32 hex characters")],
+        help_text="Validates file integrity")
+
+    def __unicode__(self):
+        """
+        Unicode representation of a SymbolicDataset.
+
+        If no Dataset is associated, this will be S[primary key];
+        if not, S[primary key]d.
+        """
+        unicode_rep = u"S{}".format(self.pk)
+
+        if self.has_data():
+            unicode_rep += u"d"
+        return unicode_rep
+
+    def clean(self):
+        """
+        Checks coherence of this SymbolicDataset.
+
+        If it has data (i.e. an associated Dataset), it cleans that
+        Dataset.  Then, if there is an associated DatasetStructure,
+        clean that.
+
+        Note that the MD5 checksum is already checked via a validator.
+        """
+        if self.has_data():
+            self.dataset.clean()
+        
+        # If there is an associated DatasetStructure, clean the structure
+        if not self.is_raw():
+            self.structure.clean()
+
+    def has_data(self):
+        """True if associated Dataset exists; False otherwise."""
+        return hasattr(self, "dataset")
+    
+    def is_raw(self):
+        """True if this SymbolicDataset is raw, i.e. not a CSV file."""
+        return not hasattr(self, "structure")
+            
+    def num_rows(self):
+        """
+        Returns number of rows in the associated Dataset.
+
+        This returns None if the Dataset is raw.
+        """
+        if self.is_raw():
+            return None
+        return self.structure.num_rows()
     
 class DatasetStructure(models.Model):
     """
@@ -3345,11 +3488,14 @@ class DatasetStructure(models.Model):
     # now done more cleanly using ExecRecord.
 
     symbolicdataset = models.OneToOneField(
-        "SymbolicDataset", related_name="structure")
+        SymbolicDataset, related_name="structure")
 
     compounddatatype = models.ForeignKey(
         CompoundDatatype,
         related_name="conforming_datasets")
+    num_rows = models.IntegerField(
+        "number of rows",
+        validators=[MinValueValidator(0)])
 
     def clean(self):
         """
@@ -3364,6 +3510,9 @@ class DatasetStructure(models.Model):
         if not self.symbolicdataset.has_data():
             return None
 
+        ####
+        # FIXME is this necessary?  We are going to already check the contents
+        # when it's created/uploaded.
         header = None
         try:
             self.symbolicdataset.dataset.dataset_file.open()
@@ -3393,93 +3542,9 @@ class DatasetStructure(models.Model):
                            header[cdtm.column_idx-1], cdtm.column_name))
 
     def num_rows(self):
-        """
-        Reports the number of rows belonging to the CSV file (excluding header).
-
-        Returns None if no real data exists.
-        """
-        if not self.symbolicdataset.has_data():
-            return None
-        
-        # Note: we don't check for the integrity of self.dataset_file as that will
-        # be checked when calling clean().
-        
-        # From http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-        try:
-            self.symbolicdataset.dataset.dataset_file.open()
-            row_count = sum(1 for line in self.dataset.dataset_file) - 1
-        # If there is an exception from opening/reading the file, it
-        # should be propagated, but we still want to close the file.
-        finally:
-            self.symbolicdataset.dataset.dataset_file.close()
-        
-        return row_count
-
-class SymbolicDataset(models.Model):
-    """
-    Symbolic representation of a Dataset (that may or may not have been deleted/restored).
-    """
-    # For validation of Datasets when being reused, or when being regenerated.
-    MD5_checksum = models.CharField(
-        max_length=64,
-        help_text="Validates file integrity")
-
-    def __unicode__(self):
-        """
-        Unicode representation of a SymbolicDataset.
-
-        If no Dataset is associated, this will be S[primary key];
-        if not, S[primary key]d.
-        """
-        unicode_rep = u"S{}".format(self.pk)
-
-        if self.has_data():
-            unicode_rep += u"d"
-        return unicode_rep
-
-    # NEW FOR ERIC:
-    def clean(self):
-        """
-        Checks coherence of this SymbolicDataset.
-
-        First, it checks that the MD5 checksum is a 32-character hex
-        string.  Then, if it has data (i.e. an associated Dataset), it
-        cleans that Dataset.  Then, if there is an associated
-        DatasetStructure, clean that.
-        """
-        MD5_re = re.compile("^[1234567890abcdef]{32}$")
-
-        if not MD5_re.match(MD5_checksum):
-            raise ValidationError(
-                "MD5 checksum of SymbolicDataset \"{}\" is not 32 hex characters".
-                format(self))
-
-        if self.has_data():
-            self.dataset.clean()
-        
-        # If there is an associated DatasetStructure, clean the structure
-        if not self.is_raw():
-            self.structure.clean()
-
-    def has_data(self):
-        """True if associated Dataset exists; False otherwise."""
-        return hasattr(self, "dataset")
+        """The number of rows in the CSV file (excluding header)."""
+        return self.num_rows
     
-    def is_raw(self):
-        """True if this SymbolicDataset is raw, i.e. not a CSV file."""
-        return not hasattr(self, "structure")
-            
-    def num_rows(self):
-        """
-        Returns number of rows in the associated Dataset.
-
-        This returns None if there is no data, or if the Dataset is raw.
-        """
-        if self.is_raw() or not self.has_data():
-            return None
-        
-        return self.structure.num_rows()
-
 class ExecRecord(models.Model):
     """
     Record of a previous execution of a Method/Pipeline/PipelineOutputCable/PSIC.
@@ -3763,46 +3828,45 @@ class ExecRecordIn(models.Model):
                     format(self.generic_input, self.execrecord))
 
 
-        # If the ERI has a dataset, then it's raw/unraw state must match the
+        # The ERI's SymbolicDataset raw/unraw state must match the
         # raw/unraw state of the generic_input that it feeds it (if ER is a cable)
         # or that it is fed into (if ER is a Method/Pipeline).
-        if self.symbolicdataset.has_data():
-            if self.generic_input.is_raw() != self.symbolicdataset.dataset.is_raw():
+        if self.generic_input.is_raw() != self.symbolicdataset.is_raw():
+            raise ValidationError(
+                "SymbolicDataset \"{}\" cannot feed source \"{}\"".
+                format(self.symbolicdataset, self.generic_input))
+
+        if not self.symbolicdataset.is_raw():
+            transf_xput_used = self.generic_input
+            cdt_needed = self.generic_input.get_cdt()
+            input_SD = self.symbolicdataset
+
+            # CDT of input_SD must be a restriction of cdt_needed,
+            # i.e. we can feed it into cdt_needed.
+            if not input_SD.structure.compounddatatype.is_restriction(
+                    cdt_needed):
                 raise ValidationError(
-                    "Dataset \"{}\" cannot feed source \"{}\"".
-                    format(self.symbolicdataset.dataset, self.generic_input))
+                    "CDT of SymbolicDataset \"{}\" is not a restriction of the required CDT".
+                    format(input_SD))
 
-            if not self.symbolicdataset.dataset.is_raw():
-                transf_xput_used = self.generic_input
-                cdt_needed = self.generic_input.get_cdt()
-                actual_data = self.symbolicdataset.dataset
-
-                # CDT of Dataset must be a restriction of cdt_needed,
-                # i.e. we can feed the Dataset into cdt_needed.
-                if not actual_data.structure.compounddatatype.is_restriction(
-                        cdt_needed):
-                    raise ValidationError(
-                        "CDT of Dataset \"{}\" is not a restriction of the required CDT".
-                        format(actual_data))
-
-                # Check row constraints.
-                if (transf_xput_used.get_min_row() != None and
-                        actual_data.num_rows() < transf_xput_used.get_min_row()):
-                    error_str = ""
-                    if type(self.generic_input) == TransformationOutput:
-                        error_str = "Dataset \"{}\" has too few rows to have come from TransformationOutput \"{}\""
-                    else:
-                        error_str = "Dataset \"{}\" has too few rows for TransformationInput \"{}\""
-                    raise ValidationError(error_str.format(actual_data, transf_xput_used))
+            # Check row constraints.
+            if (transf_xput_used.get_min_row() != None and
+                    input_SD.num_rows() < transf_xput_used.get_min_row()):
+                error_str = ""
+                if type(self.generic_input) == TransformationOutput:
+                    error_str = "SymbolicDataset \"{}\" has too few rows to have come from TransformationOutput \"{}\""
+                else:
+                    error_str = "SymbolicDataset \"{}\" has too few rows for TransformationInput \"{}\""
+                raise ValidationError(error_str.format(input_SD, transf_xput_used))
                     
-                if (transf_xput_used.get_max_row() != None and
-                        actual_data.num_rows() > transf_xput_used.get_max_row()):
-                    error_str = ""
-                    if type(self.generic_input) == TransformationOutput:
-                        error_str = "Dataset \"{}\" has too many rows to have come from TransformationOutput \"{}\""
-                    else:
-                        error_str = "Dataset \"{}\" has too many rows for TransformationInput \"{}\""
-                    raise ValidationError(error_str.format(actual_data, transf_xput_used))
+            if (transf_xput_used.get_max_row() != None and
+                input_SD.num_rows() > transf_xput_used.get_max_row()):
+                error_str = ""
+                if type(self.generic_input) == TransformationOutput:
+                    error_str = "SymbolicDataset \"{}\" has too many rows to have come from TransformationOutput \"{}\""
+                else:
+                    error_str = "SymbolicDataset \"{}\" has too many rows for TransformationInput \"{}\""
+                raise ValidationError(error_str.format(input_SD, transf_xput_used))
 
 class ExecRecordOut(models.Model):
     """
@@ -3869,8 +3933,7 @@ class ExecRecordOut(models.Model):
         If execrecord is not a cable, then check that output belongs to 
         execrecord.general_transf.
 
-        If SymbolicDataset points to existent data, then this existent
-        data is compatible with the producing TransformationOutput.
+        The SymbolicDataset is compatible with generic_output).
         """
 
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
@@ -3915,86 +3978,78 @@ class ExecRecordOut(models.Model):
                     "Output \"{}\" does not belong to Method/Pipeline of ExecRecord \"{}\"".
                     format(self.generic_output, self.execrecord))
 
-        # If the Dataset is undeleted, it must be coherent with generic_output.
-        if self.symbolicdataset.has_data():
+        # Check that the SD is compatible with generic_output.
 
-            # If the data is raw, the ERO output TO must also be raw
-            if self.symbolicdataset.dataset.is_raw() != self.generic_output.is_raw():
-                if type(self.generic_output) == PipelineStepInputCable:
+        # If SD is raw, the ERO output TO must also be raw
+        if self.symbolicdataset.is_raw() != self.generic_output.is_raw():
+            if type(self.generic_output) == PipelineStepInputCable:
+                raise ValidationError(
+                    "SymbolicDataset \"{}\" cannot feed input \"{}\"".
+                    format(self.symbolicdataset, self.generic_output))
+            else:
+                raise ValidationError(
+                    "SymbolicDataset \"{}\" cannot have come from output \"{}\"".
+                    format(self.symbolicdataset, self.generic_output))
+
+        # The SD must satisfy the CDT / row constraints of the producing TO
+        # (in the Method/Pipeline/POC case) or of the TI fed (in the PSIC case).
+        if not self.symbolicdataset.is_raw():
+            input_SD = self.symbolicdataset
+
+            # If this execrecord refers to a Method, the SD CDT
+            # must *exactly* be generic_output's CDT since it was
+            # generated by this Method.
+            if type(self.execrecord.general_transf) == Method:
+                if (input_SD.structure.compounddatatype !=
+                        self.generic_output.get_cdt()):
                     raise ValidationError(
-                        "Dataset \"{}\" cannot feed input \"{}\"".
-                        format(self.symbolicdataset.dataset, self.generic_output))
+                        "CDT of SymbolicDataset \"{}\" is not the CDT of the TransformationOutput \"{}\" of the generating Method".
+                        format(input_SD, self.generic_output))
+
+            # If it refers to a POC, then SD CDT must be
+            # identical to generic_output's CDT, because it was
+            # generated either by this POC or by a compatible one,
+            # and compatible ones must have a CDT identical to
+            # this one.  This therefore is also the same for
+            # Pipeline.
+            elif (type(self.execrecord.general_transf) in
+                      (Pipeline, PipelineOutputCable)):
+                if not input_SD.structure.compounddatatype.is_identical(
+                        self.generic_output.get_cdt()):
+                    raise ValidationError(
+                        "CDT of SymbolicDataset \"{}\" is not identical to the CDT of the TransformationOutput \"{}\" of the generating Pipeline".
+                        format(input_SD, self.generic_output))
+                    
+            # If it refers to a PSIC, then SD CDT must be a
+            # restriction of generic_output's CDT.
+            else:
+                if not input_SD.structure.compounddatatype.is_restriction(
+                        self.generic_output.get_cdt()):
+                    raise ValidationError(
+                        "CDT of SymbolicDataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
+                        format(input_SD, self.generic_output))
+
+            if (self.generic_output.get_min_row() != None and
+                    input_SD.num_rows() < self.generic_output.get_min_row()):
+                if type(self.execrecord.general_transf) == PipelineStepInputCable:
+                    raise ValidationError(
+                        "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
+                        format(input_SD, self.generic_output))
                 else:
                     raise ValidationError(
-                        "Dataset \"{}\" cannot have come from output \"{}\"".
-                        format(self.symbolicdataset.dataset, self.generic_output))
+                        "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
+                        format(input_SD, self.generic_output))
 
-            # The dataset must satisfy the CDT / row constraints of the producing TO
-            # (in the Method/Pipeline/POC case) or of the TI fed (in the PSIC case).
-            if not self.symbolicdataset.dataset.is_raw():
-                actual_data = self.symbolicdataset.dataset
-
-                # If this execrecord refers to a Method, Dataset CDT
-                # must *exactly* be generic_output's CDT since it was
-                # generated by this Method.
-                if type(self.execrecord.general_transf) == Method:
-                    if (actual_data.structure.compounddatatype !=
-                            self.generic_output.get_cdt()):
-                        raise ValidationError(
-                            "CDT of Dataset \"{}\" is not the CDT of the TransformationOutput \"{}\" of the generating Method".
-                            format(actual_data, self.generic_output))
-
-                # If it refers to a POC, then Dataset CDT must be
-                # identical to generic_output's CDT, because it was
-                # generated either by this POC or by a compatible one,
-                # and compatible ones must have a CDT identical to
-                # this one.  This therefore is also the same for
-                # Pipeline.
-                elif (type(self.execrecord.general_transf) in
-                          (Pipeline, PipelineOutputCable)):
-                    if not actual_data.structure.compounddatatype.is_identical(
-                            self.generic_output.get_cdt()):
-                        raise ValidationError(
-                            "CDT of Dataset \"{}\" is not identical to the CDT of the TransformationOutput \"{}\" of the generating Pipeline".
-                            format(actual_data, self.generic_output))
-                    
-                # If it refers to a PSIC, then Dataset CDT must be a
-                # restriction of generic_output's CDT.
-                    
-                # NOTE: we could do a more stringent test here and say
-                # that a non-trivial PSIC should not have data
-                # attached to its ERO, but we envision that at some
-                # point in the future we might like to occasionally
-                # keep the data coming out of a PSIC (for example, if
-                # it's really slow to reprocess).  Putting this less
-                # stringent test is future-proofing for that case.
+            if (self.generic_output.get_max_row() != None and 
+                    input_SD.num_rows() > self.generic_output.get_max_row()):
+                if type(self.execrecord.general_transf) == PipelineStepInputCable:
+                    raise ValidationError(
+                        "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
+                        format(input_SD, self.generic_output))
                 else:
-                    if not actual_data.structure.compounddatatype.is_restriction(
-                            self.generic_output.get_cdt()):
-                        raise ValidationError(
-                            "CDT of Dataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
-                            format(actual_data, self.generic_output))
-
-                if (self.generic_output.get_min_row() != None and
-                        actual_data.num_rows() < self.generic_output.get_min_row()):
-                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
-                        raise ValidationError(
-                            "Dataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
-                            format(actual_data, self.generic_output))
-                    else:
-                        raise ValidationError(
-                            "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
-                            format(actual_data, self.generic_output))
-
-                if self.generic_output.get_max_row() != None and actual_data.num_rows() > self.generic_output.get_max_row():
-                    if type(self.execrecord.general_transf) == PipelineStepInputCable:
-                        raise ValidationError(
-                            "Dataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
-                            format(actual_data, self.generic_output))
-                    else:
-                        raise ValidationError(
-                            "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
-                            format(actual_data, self.generic_output))
+                    raise ValidationError(
+                        "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
+                        format(input_SD, self.generic_output))
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
