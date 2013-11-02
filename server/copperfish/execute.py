@@ -15,28 +15,26 @@ class Sandbox:
     as where stuff is within the sandbox.
     """
 
-    # sd_fs_map is a dict mapping symDS to the file system
-    #
-    # The mapped value is (path, generator|"DATABASE") or
-    # ("","DATABASE")
-    #
-    # (path, generator) tells you what should have
-    # generated this data file and where it SHOULD go;
-    #
-    # For cases where generator="DATABASE", if the path is
-    # specified, then data MUST be at that location. If it is not
-    # specified, then the data file is available in the database
-    # but has not been written to the filesystem yet.
+    # sd_fs_map is a dict mapping SymDSs to paths.  The path
+    # represents where a data file *should be* (whether or not it 
+    # is there).  If the path is None, that means that the SD
+    # is available on the database.
 
-    # method_map maps methods to (path, ER): the path tells you
-    # where the code SHOULD go (But may not be due to recycling):
-    # the ER tells you what inputs are needed (Which in turn will
-    # lead back to an sd_fs_map lookup)
+    # socket_map is a dict mapping (generator, socket) to SDs.
+    # generator is whatever generated this SD (e.g. cable,
+    # PipelineStep) and socket is the specific TI/TO.  If generator is
+    # None then this means that the socket in question is a Pipeline
+    # input.  This will be used to look up inputs when running a
+    # pipeline.
+    
+    # ps_map maps pipelinestep to (path, ER of method): the path tells you
+    # the directory that the PS would have been run in (whether or not
+    # it was): the ER tells you what inputs are needed (Which in turn
+    # will lead back to an sd_fs_map lookup)
         
     # cable_map maps cables to ER
     
-    def __init__(self, user, pipeline, inputs, sandbox_path=None,
-                 parent_sandbox=None):
+    def __init__(self, user, pipeline, inputs, sandbox_path=None):
         """
         Sets up a sandboxed environment to run the specified Pipeline.
 
@@ -53,25 +51,25 @@ class Sandbox:
         self.user = user
         self.pipeline = pipeline
         self.parent_sandbox = parent_sandbox
+        self.inputs = inputs
 
         # Set up our maps.
         self.sd_fs_map = {}
+        self.socket_map = {}
         self.cable_map = {}
         self.method_map = {}
-        if parent_sandbox != None:
-            # Initialize with the values from the parent sandbox.
-            self.sd_fs_map = parent_sandbox.sd_fs_map
-            self.cable_map = parent_sandbox.cable_map
-            self.method_map = parent_sandbox.method_map
 
-        else:
-            # This is a top-level sandbox, so we initialize the
-            # maps ourselves.
-            for input in inputs:
-                self.sd_fs_map[input] = {
-                    'PATH'=None,
-                    'GENERATOR'="DATABASE"
-                }
+        # NEW FOR ERIC
+        # Initialize the maps ourselves.
+        for i, pipeline_input in enumerate(inputs):
+            # Get the corresponding pipeline input, compensating for
+            # 0-basedness.
+            corresp_pipeline_input = pipeline.inputs.get(
+                dataset_idx=i+1)
+
+            self.socket_map[(None, corresp_pipeline_input)] = pipeline_input
+            
+            self.sd_fs_map[pipeline_input] = None
 
         # Determine a sandbox path.
         self.sandbox_path = sandbox_path
@@ -161,12 +159,17 @@ class Sandbox:
                     curr_record.complete_clean()
                     curr_record.save()
                     
-                    # Add the ERO's SD to sd_fs_map; add this
-                    # cable to cable_map.
-                    self.sd_fs_map[cable_out_SD] = {
-                        'PATH': output_path,
-                        'GENERATOR': cable
-                    }
+                    # Add the ERO's SD to sd_fs_map if this SD was not
+                    # already in sd_fs_map; if it was but had never
+                    # been written to the FS, update it with the path.
+                    if (cable_out_SD not in self.sd_fs_map or
+                            self.sd_fs_map[cable_out_SD] == None:
+                        self.sd_fs_map[cable_out_SD] = output_path
+
+                    # Add (cable, destination socket) to socket_map.
+                    socket_map[(cable, cable.generic_output)] = cable_out_SD
+                    
+                    # Add this cable to cable_map.
                     self.cable_map[cable] = candidate_ERI.execrecord
                     return curr_record
                     
@@ -216,7 +219,7 @@ class Sandbox:
         # --> The data was uploaded OR derived from a previous reused step
         # --> We will use input_SD.dataset for the computation
         if (input_SD.has_data() and
-                not os.access(self.sd_fs_map[input_SD]['PATH'], os.R_OK)):
+                not os.access(self.sd_fs_map[input_SD], os.R_OK)):
             cable.run_cable(input_SD.dataset, output_path)
         
         # 2) input_SD has real data and there is data on the filesystem:
@@ -228,8 +231,8 @@ class Sandbox:
         # filesystem: The data was calculated but is transient (time
         # bomb) --> We use the data on the filesystem
 
-        elif os.access(self.sd_fs_map[input_SD]['PATH']), os.R_OK):
-            cable.run_cable(self.sd_fs_map[input_SD]['PATH'], output_path)
+        elif os.access(self.sd_fs_map[input_SD]), os.R_OK):
+            cable.run_cable(self.sd_fs_map[input_SD], output_path)
 
         # 4) input_SD does not have real data and is not on the filesystem
         # (And there's nothing to reuse)
@@ -239,8 +242,8 @@ class Sandbox:
             self.recover(input_SD)
 
             # And now we have what we need to run this cable
-            cable.run_cable(self.sd_fs_map[input_SD]['PATH'], output_path)
-
+            cable.run_cable(self.sd_fs_map[input_SD], output_path)
+            
         # FINISHED RUNNING CABLE
         ####
 
@@ -254,10 +257,28 @@ class Sandbox:
         with open(output_path, "rb") as f:
             output_md5 = file_access_utils.compute_md5(f)
 
-        # FIXME fill this in when we write validate_CSV
-        with open(output_path, "rb") as f:
-            validation_results = self.validate_CSV(f, output_SD_CDT)
-            # FIXME do something with the results!
+        output_summary = None
+        if not cable.is_raw():
+            # A run path for summarize_CSV.
+            val_dir = "{}_validation".format(output_path)
+            with open(output_path, "rb") as f:
+                output_summary = file_access_utils.summarize_CSV(
+                    f, output_SD_CDT, val_dir)
+            
+            if output_summary.has_key("bad_num_cols"):
+                raise ValueError(
+                    "Output of cable \"{}\" had the wrong number of columns".
+                    format(cable))
+
+            if output_summary.has_key("bad_col_indices"):
+                raise ValueError(
+                    "Output of cable \"{}\" had a malformed header".
+                    format(cable))
+
+            if output_summary.has_key("failing_cells"):
+                raise ValueError(
+                    "Output of cable \"{}\" had malformed entries".
+                    format(cable))
             
         if curr_ER == None:
             # No ER was found; create a new one.
@@ -286,10 +307,9 @@ class Sandbox:
 
                 # Add this structure to the symbolic dataset
                 if output_SD_CDT != None:
-                    output_SD.structure.create(output_SD_CDT)
-
-                # FIXME we need the number of rows here as well!  We'll
-                # get this from the above call to validate_CSV.
+                    output_SD.structure.create(
+                        compounddatatype=output_SD_CDT,
+                        num_rows=output_summary["num_rows"])
 
                 ero_xput = None
                 if type(cable) == PipelineStepInputCable:
@@ -297,11 +317,6 @@ class Sandbox:
                 else:
                     ero_xput = cable.pipeline.outputs.get(
                         dataset_name=cable.output_name)
-
-                # Add output_SD to sd_fs_map.
-                self.sd_fs_map[output_SD] = {
-                    'PATH': output_path, 'GENERATOR': cable
-                }
             
             curr_ER.execrecordouts.create(
                 generic_output=ero_xput,
@@ -315,16 +330,19 @@ class Sandbox:
                 raise ValueError(
                     "Output of cable \"{}\" failed MD5 integrity check".
                     format(cable))
-            
-            self.sd_fs_map[output_SD] = {
-                'PATH': output_path, 'GENERATOR': cable
-            }
 
         # FINISHED CHECKING OUTPUT
         ####
 
         ####
         # PERFORM BOOKKEEPING
+
+        # Update maps as in the reused == True case (see above).
+        if (cable_out_SD not in self.sd_fs_map or
+                self.sd_fs_map[cable_out_SD] == None:
+            self.sd_fs_map[cable_out_SD] = output_path
+
+        socket_map[(cable, cable.generic_output)] = cable_out_SD
         
         self.cable_map[cable] = curr_ER
         
@@ -353,52 +371,51 @@ class Sandbox:
         curr_record.save()
         return curr_record
 
-    def execute_step(self, pipelinestep, inputs, step_sandbox=None):
+    def execute_step(self, pipelinestep, inputs, step_run_dir=None):
         """
         Execute the specified PipelineStep with the given inputs.
 
         If code is actually run, the outputs go to the paths
         specified in output_paths.  The requisite code is placed
-        in step_sandbox; if step_sandbox is None, then the default
+        in step_run_dir; if step_run_dir is None, then the default
         is [sandbox path]/step[stepnum].
 
         Outputs get written to
-        [step sandbox]/output_data/step[step number]_[output name]
+        [step run dir]/output_data/step[step number]_[output name]
 
         Inputs get written to 
-        [step sandbox]/input_data/step[step number]_[input name]
+        [step run dir]/input_data/step[step number]_[input name]
         (Note that this may simply be a link to data that was already
         in the sandbox elsewhere.)
 
         Logs get written to
-        [step sandbox]/logs/step[step number]_std(out|err).txt
+        [step run dir]/logs/step[step number]_std(out|err).txt
         """
         curr_RS = pipelinestep.pipelinestep_instances.create()
 
         ####
-        # SET UP SANDBOX AND PATHS
-        
-        if step_sandbox == None:
-            step_sandbox = os.path.join(
-                self.sandbox_path,
-                "step{}".format(pipelinestep.step_num))
+        # SET UP DIRECTORY FOR RUNNING THIS STEP AND PATHS
+        step_run_dir = step_run_dir or os.path.join(
+            self.sandbox_path, "step{}".format(pipelinestep.step_num))
 
-        file_access_utils.set_up_directory(step_sandbox)
+        file_access_utils.set_up_directory(step_run_dir)
         # Set up inputs, outputs, and logs directories.
-        in_dir = os.path.join(step_sandbox, "input_data")
-        out_dir = os.path.join(step_sandbox, "output_data")
-        log_dir = os.path.join(step_sandbox, "logs")
+        in_dir = os.path.join(step_run_dir, "input_data")
+        out_dir = os.path.join(step_run_dir, "output_data")
         file_access_utils.set_up_directory(in_dir)
         file_access_utils.set_up_directory(out_dir)
-        file_access_utils.set_up_directory(log_dir)
 
         output_paths = []
-        for curr_output in pipelinestep.transformation.outputs.all():
+        for (curr_output in pipelinestep.transformation.outputs.all().
+             order_by("dataset_idx")):
+            file_suffix = "raw" if curr_output.is_raw() else "csv"
+                
             output_paths.append(os.path.join(
-                step_sandbox, "step{}_{}".format(
-                    pipelinestep.step_num, curr_output.dataset_name)))
+                out_dir, "step{}_{}.{}".format(
+                    pipelinestep.step_num, curr_output.dataset_name,
+                    file_suffix)))
 
-        # FINISHED SETTING UP SANDBOX AND PATHS
+        # FINISHED SETTING UP DIRECTORY AND PATHS
         ####
 
         ####
@@ -432,52 +449,63 @@ class Sandbox:
         ####
 
         ####
-        # CHECK WHETHER WE CAN REUSE AN ER
+        # CHECK WHETHER WE CAN REUSE AN ER FOR A METHOD
 
         # Look for an ER that we can reuse.  It must represent the same
         # transformation, and take the same input SDs.
-        possible_ERs = pipelinestep.transformation.execrecords.all()
-
-        curr_ER = None
-        for candidate_ER in possible_ERs:
-            ER_matches = True
-            for ERI in candidate_ER.execrecordins.all():
-                # Get the input index of this ERI.
-                input_idx = ERI.generic_input.dataset_idx
-                if ERI.symbolicdataset != inputs_after_cable[input_idx-1]:
-                    ER_matches = False
-                    break
-                
-            # At this point all the ERIs have matched the inputs.  So,
-            # we would break.
-            if ER_matches:
-                curr_ER = candidate_ER
-                break
-
+        curr_ER = find_compatible_ER(pipelinestep.transformation,
+                                     inputs_after_cable)
+        
         # If it found an ER, check that the ER provides all of the
         # output that we need.
         if curr_ER != None:
-            has_required_outputs = True
-            for step_output in pipelinestep.transformation.outputs.all():
-                # Check whether this output is deleted.
-                if pipelinestep.outputs_to_delete.filter(step_output).exists():
-                    continue
-
-                corresp_ero = curr_ER.execrecordouts.get(
-                    generic_output=step_output)
-
-                if not corresp_ero.has_data():
-                    has_required_outputs = False
-                    break
-
-            if has_required_outputs:
+            outputs_needed = ps_outputs_to_retain(pipelinestep)
+            if transf_ER_provides_outputs(curr_ER, outputs_needed):
+                ####
+                # REUSE AN ER
+                
                 # The ER found has what we need, so we can reuse it.
                 curr_RS.reused = True
                 curr_RS.execrecord = curr_ER
+
+                # Update the maps.
+
+                # Since this is the reused = True case, step_run_dir
+                # represents where the code *should be* -- later you
+                # might actually fill it in.
+                self.ps_map[pipelinestep] = (step_run_dir, curr_ER)
+
+                # Add every output of this transformation to
+                # sd_fs_map.
+                for step_output in pipelinestep.transformation.outputs.all():
+                    corresp_ero = curr_ER.execrecordouts.get(
+                        content_type=ContentType.objects.get_for_model(
+                            type(step_output)),
+                        object_id=step_output.pk)
+
+                    corresp_SD = corresp_ero.symbolicdataset
+
+                    # Compensate for 0-basedness.
+                    
+                    corresp_path = output_paths[step_output.dataset_idx-1]
+
+                    # Update sd_fs_map and socket_map.
+                    if corresp_SD not in self.sd_fs_map:
+                        # If this is the first time this file would have
+                        # appeared on the filesystem, this is where it
+                        # *should* go -- later it might actually be filled
+                        # in here during a "recover" operation.
+                        self.sd_fs_map[corresp_SD] = corresp_path
+
+                    self.socket_map[(pipelinestep, step_output)] = corresp_SD
+                
                 curr_RS.complete_clean()
                 curr_RS.save()
 
                 return curr_RS
+                
+                # FINISHED REUSING AN ER
+                ####
 
         # FINISHED LOOKING FOR REUSABLE ER
         ####
@@ -504,6 +532,11 @@ class Sandbox:
             #
             # We need to then register the output paths with the
             # appropriate SDs, creating Datasets as necessary.
+
+            # Set up a log directory.
+            log_dir = os.path.join(step_run_dir, "logs")
+            file_access_utils.set_up_directory(log_dir)
+            
             stdout_path = os.path.join(log_dir, "step{}_stdout.txt".
                                        format(pipelinestep.step_num))
             stderr_path = os.path.join(log_dir, "step{}_stderr.txt".
@@ -513,7 +546,7 @@ class Sandbox:
             with (open(stdout_path, "wb", 1), 
                   open(stderr_path, "wb", 0) as (outwrite, errwrite):
                 method_popen = pipelinestep.transformation.run_code(
-                    step_sandbox,
+                    step_run_dir,
                     [sd_fs_map[x]['PATH'] for x in inputs_after_cables],
                     output_paths, outwrite, errwrite)
 
@@ -553,14 +586,13 @@ class Sandbox:
             # Now, we need to confirm that all of the outputs are present.
             # If they are all present, then:
             # 1) if they can be confirmed against past data, do it
-            # 2) Create a Dataset and clean it; that will ensure that
-            #    it conforms to its specification.
-            #    FIXME which we still need to fill in
+            # 2) check the contents of the CSV.
 
             # This is keyed by the position index of the generating
             # output and stores the computed MD5s of the corresponding
             # output files.
             output_MD5s = {}
+            output_nums_rows = {}
             for i, output_path in enumerate(output_paths):
                 # i is 0-based; dataset_idx is 1-based.
                 output_idx = i + 1
@@ -577,12 +609,33 @@ class Sandbox:
                 with open(output_path, "rb") as f:
                     output_MD5s[output_idx] = file_access_utils.compute_MD5(f)
 
-                # FIXME fill this in when we write validate_CSV
-                with open(output_path, "rb") as f:
-                    validation_results = self.validate_CSV(
-                        f, corresp_output.get_cdt())
-                    # FIXME do something with the results!
+                if not corresp_output.is_raw():
+                    output_summary = None
+                    # A place to validate this output.
+                    val_dir = "{}_validation".format(output_path)
+                    
+                    with open(output_path, "rb") as f:
+                        output_summary = file_access_utils.summarize_CSV(
+                            f, corresp_output.get_cdt(), val_dir)
 
+                    if output_summary.has_key("bad_num_cols"):
+                        raise ValueError(
+                            "Output of Method \"{}\" had the wrong number of columns".
+                            format(pipelinestep.transformation))
+
+                    if output_summary.has_key("bad_col_indices"):
+                        raise ValueError(
+                            "Output of Method \"{}\" had a malformed header".
+                            format(pipelinestep.transformation))
+
+                    if output_summary.has_key("failing_cells"):
+                        raise ValueError(
+                            "Output of Method \"{}\" had malformed entries".
+                            format(pipelinestep.transformation))
+
+                    output_nums_rows[output_idx] = output_summary["num_rows"]
+
+                        
                 # If an ER was found but insufficient, there will be
                 # SymbolicDatasets representing the outputs; this
                 # allows us to check the MD5 checksum.
@@ -622,11 +675,8 @@ class Sandbox:
                     # If the output was not raw, create a structure as well.
                     if not curr_output.is_raw():
                         corresp_output_SD.structure.create(
-                            compounddatatype=curr_output.get_cdt())
-                            
-                    # FIXME we also need to give this SD a number of rows!
-                    # We'll get this from the results of the calls to validate_CSV
-                    # above.
+                            compounddatatype=curr_output.get_cdt(),
+                            num_rows=output_nums_rows[curr_output.dataset_idx])
 
                     corresp_output_SD.clean()
 
@@ -687,6 +737,32 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
             # Make sure the ER is clean and complete.
             curr_ER.complete_clean()
             curr_RS.execrecord = curr_ER
+            
+            # Update the maps as we did in the reused case.
+            # Since this is the reused=False case, step_run_dir
+            # represents where the step *actually is*.
+            self.ps_map[pipelinestep] = (step_run_dir, curr_ER)
+
+            for step_output in pipelinestep.transformation.outputs.all():
+                corresp_ero = curr_ER.execrecordouts.get(
+                    content_type=ContentType.objects.get_for_model(
+                        type(step_output)),
+                    object_id=step_output.pk)
+
+                corresp_SD = corresp_ero.symbolicdataset
+
+                # Compensate for 0-basedness.
+                corresp_path = output_paths[step_output.dataset_idx-1]
+
+                
+                # Update sd_fs_map and socket_map as in the reused =
+                # True case.
+                # If this is the first time the data has ever been
+                # written to the filesystem, then this represents
+                # where the data *actually is*.
+                if corresp_SD not in self.sd_fs_map:
+                    self.sd_fs_map[corresp_SD] = corresp_path
+                self.socket_map[(pipelinestep, step_output)] = corresp_SD
 
             # FINISHED BOOKKEEPING
             ####
@@ -714,3 +790,253 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
         curr_RS.complete_clean()
         curr_RS.save()
         return curr_RS
+
+    def execute_pipeline(self, pipeline=None, input_SDs=None, 
+                         sandbox_path=None, parent_runstep=None):
+        """
+        Execute the specified Pipeline with the given inputs.
+
+        If any of pipeline, input_SDs, sandbox_path, parent_runstep 
+        are None, then *all* of them have to be None; in this case,
+        we are running the Sandbox's top-level Pipeline with the
+        top-level inputs in the Sandbox's specified path.
+
+        Outputs get written to
+        [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
+
+        At the end of this function, the outputs of the pipeline
+        will be added to sd_fs_map, so you can determine where
+        to find your output.
+        """
+        # Check whether all of the inputs are none or not.
+        is_set = (
+            pipeline != None, input_SDs != None, sandbox_path != None,
+            parent_runstep != None
+        )
+        if any(is_set) and not all(is_set):
+            raise ValueError(
+                "Either none or all of the parameters must be None")
+        
+        # Initialize the defaults: this is adapted from:
+        # http://stackoverflow.com/questions/8131942/python-how-to-pass-default-argument-to-instance-method-with-an-instance-variab
+        pipeline = pipeline or self.pipeline
+        input_SDs = input_SDs or self.inputs
+        sandbox_path = sandbox_path or self.sandbox_path
+
+        curr_run = self.run
+        if parent_runstep != None:
+            curr_run = pipeline.pipeline_instances.create(
+                user=self.user, parent_runstep=parent_runstep)
+
+        ####
+        # SET UP SANDBOX AND PATHS
+
+        # Set up an output directory (or make sure it's usable).
+        out_dir = os.path.join(sandbox_path, "output_data")
+        file_access_utils.set_up_directory(out_dir)
+
+        # FINISHED SETTING UP SANDBOX AND PATHS
+        ####
+
+
+        ####
+        # LOOK FOR ER TO REUSE
+
+        curr_er = find_compatible_ER(pipeline, input_SDs)
+
+        if curr_er != None:
+            # An appropriate ER was found.  Does it have all the
+            # inputs we need?
+            outputs_needed = pipeline.outputs.all()
+            if parent_runstep != None:
+                outputs_needed = ps_outputs_to_retain(
+                    parent_runstep)
+
+            if transf_ER_provides_outputs(curr_er, outputs_needed):
+                ####
+                # REUSE AN ER
+
+                # The ER found has what we need, so we can reuse it.
+                curr_run.reused = True
+                curr_run.execrecord = curr_ER
+
+                # Register the outputs with sd_fs_map -- and
+                # socket_map if this is not a top-level run.
+                for p_out in pipeline.outputs.all():
+                    corresp_ero = curr_ER.execrecordouts.get(
+                        content_type=ContentType.objects.get_for_model(
+                            type(p_out)),
+                        object_id=p_out.pk)
+
+                    corresp_SD = corresp_ero.symbolicdataset
+
+                    # Compensate for 0-basedness.
+                    file_suffix = "raw" if p_out.is_raw() else "csv"
+                    output_path = os.path.join(
+                        out_dir,
+                        "run{}_{}.{}".format(curr_run.pk, p_out.dataset_name,
+                                             file_suffix))
+
+
+                    # Add it to sd_fs_map if it isn't already in there.
+                    if corresp_SD not in self.sd_fs_map:
+                        self.sd_fs_map[corresp_SD] = output_path
+
+                    # Update socket_map if necessary.
+                    if parent_runstep != None:
+                        socket_map[(parent_runstep, p_out)] = corresp_SD
+
+                # Update ps_map if this is not a top-level run.
+                if parent_runstep != None:
+                    self.ps_map[parent_runstep] = (sandbox_path, curr_ER)
+
+                curr_run.complete_clean()
+                curr_run.save()
+
+                return curr_run
+
+                # FINISH REUSING AN ER
+                ####
+
+        # FINISHED LOOKING FOR ER TO REUSE
+        ####
+        
+        ####
+        # RUN STEPS
+
+        for step in pipeline.steps.all().order_by("step_num"):
+            # Look at the cables for this step and identify 
+            # what inputs we need.
+
+            step_inputs = []
+            for cable in step.cables_in.all().order_by(
+                    transf_input__dataset_idx):
+                # Find the SD that feeds this cable.  First, identify
+                # the generating step.  If it was a Pipeline input,
+                # leave generator == None.
+                generator = None
+                if cable.step_providing_input != 0:
+                    generator = pipeline.steps.get(
+                        step_num=cable.step_providing_input)
+                
+                step_inputs.append(
+                    socket_map[(generator, cable.provider_output)])
+        
+            curr_RS = self.execute_step(
+                step, step_inputs,
+                step_run_dir=os.path.join(
+                    sandbox_path,
+                    "step{}".format(step.step_num)))
+
+        # FINISH RUNNING STEPS
+        ####
+
+        ####
+        # RUN OUTPUT CABLES
+
+        for outcable in pipeline.outcables.all():
+            # Identify the SD that feeds this outcable.
+            generator = pipeline.steps.get(
+                step_num=outcable.step_providing_output)
+
+            source_SD = socket_map[(generator, outcable.provider_output)]
+
+            file_suffix = "raw" if outcable.is_raw() else "csv"
+
+            output_path = os.path.join(
+                out_dir,
+                "run{}_{}.{}".format(curr_run.pk, outcable.output_name,
+                                     file_suffix))
+
+            curr_ROC = self.execute_cable(outcable, source_SD,
+                                          output_path, curr_run)
+
+        # FINISH RUNNING OUTPUT CABLES
+        ####
+
+        ####
+        # LAST BIT OF BOOKKEEPING
+
+        # At this point, we either need to create an ER or had an ER
+        # that has now been filled in by running the POCs.  If we need
+        # to create an ER, we can use socket_map to fill it in.
+
+        if curr_ER == None:
+            curr_ER = pipeline.execrecords.create()
+            
+            for curr_input in pipeline.inputs.all():
+                corresp_input_SD = self.socket_map[(None, curr_input)]
+                curr_ER.execrecordins.create(
+                    generic_input=curr_input,
+                    symbolicdataset=corresp_input_SD)
+
+            for outcable in pipeline.outcables.all():
+                corresp_output = pipeline.outputs.get(
+                    dataset_name=outcable.output_name)
+                corresp_output_SD = self.socket_map[(outcable, corresp_output)]
+                curr_ER.execrecordouts.create(
+                    generic_output=corresp_output,
+                    symbolicdataset=corresp_output_SD)
+
+        curr_ER.complete_clean()
+        curr_run.execrecord = curr_ER
+        curr_run.complete_clean()
+        curr_run.save()
+        
+        # FINISH LAST BIT OF BOOKKEEPING
+        ####
+
+        return curr_run
+
+# FIXME these helpers should probably be in models, associated to
+# appropriate classes.
+# CONTINUE FROM HERE!  Fix this and write recover().
+def find_compatible_ER(transformation, input_SDs):
+    """
+    Helper that finds an ER that we can reuse.
+
+    transformation must be a Method or Pipeline; input_SDs is a list
+    of inputs to transformation in the proper order.
+    """
+    for candidate_ER in transformation.execrecords.all():
+        ER_matches = True
+        for ERI in candidate_ER.execrecordins.all():
+            # Get the input index of this ERI.
+            input_idx = ERI.generic_input.dataset_idx
+            if ERI.symbolicdataset != input_SDs[input_idx-1]:
+                ER_matches = False
+                break
+                
+        # At this point all the ERIs have matched the inputs.  So,
+        # we have found our candidate.
+        if ER_matches:
+            return candidate_ER
+
+    # We didn't find anything.
+    return None
+
+def ps_outputs_to_retain(pipelinestep):
+    """Returns a list of TOs this PS doesn't delete."""
+    outputs_needed = []
+    
+    for step_output in pipelinestep.transformation.outputs.all():
+        if not pipelinestep.outputs_to_delete.filter(
+                step_output).exists():
+            outputs_needed.append(step_output)
+            
+    return outputs_needed
+
+def transf_ER_provides_outputs(ER, outputs):
+    """
+    Determines whether the ER has existent data for these outputs.
+    
+    outputs is an iterable of TOs that we want the ER to have real
+    data for.
+    """    
+    for curr_output in outputs:
+        corresp_ero = ER.execrecordouts.get(generic_output=curr_output)
+
+        if not corresp_ero.has_data():
+            return False
+
+    return True
