@@ -8,17 +8,17 @@ from copperfish.models import Datatype, BasicConstraint
 from datetime import datetime
 
 class DatatypeForm (forms.ModelForm):
-    restricts = forms.ModelChoiceField(queryset = Datatype.objects.all())
+    restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(), required=False)
     Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES)
     date_created = datetime.now()
-    
+    """
     # constraints
     reg_exp = forms.CharField()
     min_len = forms.IntegerField()
     max_len = forms.IntegerField()
     min_val = forms.IntegerField()
     max_val = forms.IntegerField()
-    
+    """
     class Meta:
         model = Datatype
         fields = ('name', 'description',)

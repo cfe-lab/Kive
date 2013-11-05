@@ -2,7 +2,12 @@
 <!-- Display contents of Datatypes as a HTML table -->
 
 {% extends "base.html" %}
+
 {% block title %}Datatypes{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript" src="static/datatypes.js"></script>
+{% endblock %}
 
 {% block content %}
 <h2>Datatypes</h2>
@@ -31,10 +36,18 @@
 <hr>
 
 <!-- Form for inserting new Datatypes -->
+<h3>New datatype</h3>
 <form action="" method="post">{% csrf_token %}
 {{ datatype_form.as_p }}
-{{ constraint_form.as_table }}
+<hr>
+<h3>Basic constraints</h3>
+<input type="button" id="addConstraint" value="+"/>
+<input type="button" id="removeConstraint" value="-"/></br>
+{{ constraint_form.as_table }}</br>
+<div id="additionalConstraints"></div>
+<hr>
 <input type="submit" value="Submit" />
 </form>
+
 
 {% endblock %}
