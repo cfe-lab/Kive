@@ -57,6 +57,8 @@ class Sandbox:
         self.sd_fs_map = {}
         self.socket_map = {}
         self.cable_map = {}
+
+        # FIXME: Change to self.PS_map
         self.method_map = {}
 
         # NEW FOR ERIC
@@ -163,10 +165,11 @@ class Sandbox:
                     # already in sd_fs_map; if it was but had never
                     # been written to the FS, update it with the path.
                     if (cable_out_SD not in self.sd_fs_map or
-                            self.sd_fs_map[cable_out_SD] == None:
+                            self.sd_fs_map[cable_out_SD] == None):
                         self.sd_fs_map[cable_out_SD] = output_path
 
                     # Add (cable, destination socket) to socket_map.
+                    # FIXME: the socket for this cable is determined by looking at the schematic?
                     socket_map[(cable, cable.generic_output)] = cable_out_SD
                     
                     # Add this cable to cable_map.
@@ -212,38 +215,31 @@ class Sandbox:
                     column_idx=wire.dest_pin.column_idx)
                 
             output_SD_CDT.clean()
-            
-        # There are four cases:
-        
-        # 1) input_SD has real data and does not contain written data on the filesystem
-        # --> The data was uploaded OR derived from a previous reused step
-        # --> We will use input_SD.dataset for the computation
-        if (input_SD.has_data() and
-                not os.access(self.sd_fs_map[input_SD], os.R_OK)):
-            cable.run_cable(input_SD.dataset, output_path)
-        
-        # 2) input_SD has real data and there is data on the filesystem:
-        # --> The data was calculated from a previous step
-        # --> We use the data on the filesystem
-        #     (PRE: It must be equal to input_SD.dataset)
-        
-        # 3) input_SD does not have real data but there is data on the
-        # filesystem: The data was calculated but is transient (time
-        # bomb) --> We use the data on the filesystem
 
-        elif os.access(self.sd_fs_map[input_SD]), os.R_OK):
-            cable.run_cable(self.sd_fs_map[input_SD], output_path)
 
-        # 4) input_SD does not have real data and is not on the filesystem
-        # (And there's nothing to reuse)
-        # --> We have to backtrack.
+        # The input contents are not on the file system, and:
+        if (self.sd_fs_map[input_SD] == None or 
+                not os.access(self.sd_fs_map[input_SD], os.R_OK):
+
+            # 1A) input_SD has data (Data uploaded or from reused step)
+            # --> Use input_SD.dataset for computation
+            if input_SD.has_data():
+                cable.run_cable(input_SD.dataset, output_path)
+
+            # 1B) input_SD doesn't have data (It was symbolically-reused)
+            # --> We backtrack to this point, then run the cable
+            else:
+                self.recover(input_SD)
+                cable.run_cable(self.sd_fs_map[input_SD], output_path)
+
+        # 2) Input contents are on the file system due, so whether
+        # or not input_SD has data (IE, was transient), we can use it
+        # --> Use the existing data on the filesystem for computation
+        # Pre: file system copy must match the database version if it exists
         else:
-            # Backtrack to 'fill in' our maps appropriately.
-            self.recover(input_SD)
+            if os.access(self.sd_fs_map[input_SD]), os.R_OK):
+                cable.run_cable(self.sd_fs_map[input_SD], output_path)
 
-            # And now we have what we need to run this cable
-            cable.run_cable(self.sd_fs_map[input_SD], output_path)
-            
         # FINISHED RUNNING CABLE
         ####
 
@@ -486,7 +482,6 @@ class Sandbox:
                     corresp_SD = corresp_ero.symbolicdataset
 
                     # Compensate for 0-basedness.
-                    
                     corresp_path = output_paths[step_output.dataset_idx-1]
 
                     # Update sd_fs_map and socket_map.
