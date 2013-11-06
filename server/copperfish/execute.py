@@ -696,7 +696,7 @@ step: {}
 method: {}
 output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                      pipelinestep.transformation, curr_output.dataset_name)
-                    new_DT = Dataset(
+                    new_DS = Dataset(
                         user=self.user,
                         name="run:{}__step:{}__method:{}__output:{}".format(
                             self.run.name, pipelinestep.step_num,
@@ -709,11 +709,11 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                     # Recall that dataset_idx is 1-based, and
                     # output_paths is 0-based.
                     with open(output_paths[curr_output.dataset_idx-1], "rb") as f:
-                        new_DT.dataset_file.save(
+                        new_DS.dataset_file.save(
                             os.path.basename(output_path),
                             File(f))
-                    new_DT.clean()
-                    new_DT.save()
+                    new_DS.clean()
+                    new_DS.save()
 
             # Add the output log and error log with the ER (if it already
             # had logs, replace them).
@@ -914,6 +914,8 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                     generator = pipeline.steps.get(
                         step_num=cable.step_providing_input)
                 
+                # Look up the symDS that is associated with this socket
+                # (The generator PS must already have been executed)
                 step_inputs.append(
                     socket_map[(generator, cable.provider_output)])
         
