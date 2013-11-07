@@ -108,6 +108,93 @@ class MetadataTestSetup(TestCase):
         self.RNAoutput_cdt.full_clean();
         self.RNAoutput_cdt.save();
 
+        ####
+        # Everything above this point is used in metadata.tests.
+        # This next bit is used in method.tests.
+        
+        # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
+        self.tuple_cdt = CompoundDatatype()
+        self.tuple_cdt.save()
+        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="x",column_idx=1)
+        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="y",column_idx=2)
+        
+        # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
+        self.singlet_cdt = CompoundDatatype()
+        self.singlet_cdt.save()
+        self.singlet_cdt.members.create(
+            datatype=self.string_dt, column_name="k", column_idx=1)
+
+        self.triplet_cdt = CompoundDatatype()
+        self.triplet_cdt.save()
+        self.triplet_cdt.members.create(
+            datatype=self.string_dt, column_name="a", column_idx=1)
+        self.triplet_cdt.members.create(
+            datatype=self.string_dt,column_name="b",column_idx=2)
+        self.triplet_cdt.members.create(
+            datatype=self.string_dt,column_name="c",column_idx=3)
+
+        ####
+        # This next bit is used for pipeline.tests.
+
+        # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
+        self.triplet_squares_cdt = CompoundDatatype()
+        self.triplet_squares_cdt.save()
+        self.triplet_squares_cdt.members.create(
+            datatype=self.string_dt, column_name="a^2",
+            column_idx=1)
+        self.triplet_squares_cdt.members.create(
+            datatype=self.string_dt, column_name="b^2",
+            column_idx=2)
+        self.triplet_squares_cdt.members.create(
+            datatype=self.string_dt, column_name="c^2",
+            column_idx=3)
+
+        # A CDT with mixed Datatypes
+        self.mix_triplet_cdt = CompoundDatatype()
+        self.mix_triplet_cdt.save()
+        self.mix_triplet_cdt.members.create(
+            datatype=self.string_dt, column_name="StrCol1",
+            column_idx=1)
+        self.mix_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="DNACol2",
+            column_idx=2)
+        self.mix_triplet_cdt.members.create(
+            datatype=self.string_dt, column_name="StrCol3",
+            column_idx=3)
+
+        # Define CDT "doublet_cdt" with 2 members for use as an input/output
+        self.doublet_cdt = CompoundDatatype()
+        self.doublet_cdt.save();
+        self.doublet_cdt.members.create(
+            datatype=self.string_dt, column_name="x",
+            column_idx=1)
+        self.doublet_cdt.members.create(
+            datatype=self.string_dt, column_name="y",
+            column_idx=2)
+
+        #### 
+        # Stuff from this point on is used in librarian and archive
+        # testing.
+        
+        # October 15: more CDTs.
+        self.DNA_triplet_cdt = CompoundDatatype()
+        self.DNA_triplet_cdt.save()
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="a", column_idx=1)
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="b", column_idx=2)
+        self.DNA_triplet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="c", column_idx=3)
+
+        self.DNA_doublet_cdt = CompoundDatatype()
+        self.DNA_doublet_cdt.save()
+        self.DNA_doublet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="x", column_idx=1)
+        self.DNA_doublet_cdt.members.create(
+            datatype=self.DNA_dt, column_name="y", column_idx=2)
+
+
+
     def tearDown(self):
         """Delete any files that have been put into the database."""
         for crr in CodeResourceRevision.objects.all():

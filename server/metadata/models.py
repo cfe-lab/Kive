@@ -414,8 +414,8 @@ class CustomConstraint(models.Model):
 class CompoundDatatypeMember(models.Model):
     """
     A data type member of a particular CompoundDatatype.
-    Related to :model:`copperfish.Dataset`
-    Related to :model:`copperfish.CompoundDatatype`
+    Related to :model:`archive.models.Dataset`
+    Related to :model:`metadata.models.CompoundDatatype`
     """
 
     compounddatatype = models.ForeignKey(

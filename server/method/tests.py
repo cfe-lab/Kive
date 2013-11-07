@@ -215,12 +215,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_1_method.full_clean();
         self.script_1_method.save()
 
-        # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
-        self.tuple_cdt = CompoundDatatype()
-        self.tuple_cdt.save()
-        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="x",column_idx=1)
-        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="y",column_idx=2)
-
         # Assign tuple as both an input and an output to script_1_method
         self.script_1_method.create_input(compounddatatype = self.tuple_cdt,
                                            dataset_name = "input_tuple",
@@ -256,21 +250,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_2_method.full_clean();
         self.script_2_method.save()
 
-        # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
-        self.singlet_cdt = CompoundDatatype()
-        self.singlet_cdt.save()
-        self.singlet_cdt.members.create(
-            datatype=self.string_dt, column_name="a", column_idx=1)
-
-        self.triplet_cdt = CompoundDatatype()
-        self.triplet_cdt.save()
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="a", column_idx=1)
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt,column_name="b",column_idx=2)
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt,column_name="c",column_idx=3)
-
         # Assign triplet as input and output,
         self.script_2_method.create_input(
             compounddatatype = self.triplet_cdt,
@@ -285,7 +264,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             dataset_name = "a_b_c_mean",
             dataset_idx = 2)
         self.script_2_method.save()
-
 
         # script_3_product
         # INPUT-1: Single column (k)
@@ -329,6 +307,81 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                                            dataset_name = "kr",
                                            dataset_idx = 1)
         self.script_3_method.save()
+
+        ####
+        # This next bit was originally in pipeline.tests.
+        
+        # DNArecomp_mf is a MethodFamily called DNArecomplement
+        self.DNArecomp_mf = MethodFamily(
+            name="DNArecomplement",
+            description="Re-complement DNA nucleotide sequences.")
+        self.DNArecomp_mf.full_clean()
+        self.DNArecomp_mf.save()
+
+        # Add to MethodFamily DNArecomp_mf a method revision DNArecomp_m
+        self.DNArecomp_m = self.DNArecomp_mf.members.create(
+            revision_name="v1",
+            revision_desc="First version",
+            driver=self.compv2_crRev)
+
+        # To this method revision, add inputs with CDT DNAoutput_cdt
+        self.DNArecomp_m.create_input(
+            compounddatatype = self.DNAoutput_cdt,
+            dataset_name = "complemented_seqs",
+            dataset_idx = 1)
+
+        # To this method revision, add outputs with CDT DNAinput_cdt
+        self.DNArecomp_m.create_output(
+            compounddatatype = self.DNAinput_cdt,
+            dataset_name = "recomplemented_seqs",
+            dataset_idx = 1)
+
+        # Setup used in the "2nd-wave" tests (this was originally in
+        # Copperfish_Raw_Setup).
+        
+        # Define CR "script_4_raw_in_CSV_out.py"
+        # input: raw [but contains (a,b,c) triplet]
+        # output: CSV [3 CDT members of the form (a^2, b^2, c^2)]
+
+        # Define CR in order to define CRR
+        self.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
+            filename="script_4_raw_in_CSV_out.py",
+            description="Given (a,b,c), outputs (a^2,b^2,c^2)")
+        self.script_4_CR.save()
+
+        # Define CRR for this CR in order to define method
+        with open(os.path.join(samplecode_path, "script_4_raw_in_CSV_out.py"), "rb") as f:
+            self.script_4_1_CRR = CodeResourceRevision(
+                coderesource=self.script_4_CR,
+                revision_name="v1",
+                revision_desc="v1",
+                content_file=File(f))
+            self.script_4_1_CRR.save()
+
+        # Define MF in order to define method
+        self.test_MF = MethodFamily(
+            name="test method family",
+            description="method family placeholder");
+        self.test_MF.full_clean()
+        self.test_MF.save()
+
+        # Establish CRR as a method within a given method family
+        self.script_4_1_M = Method(
+            revision_name="s4",
+            revision_desc="s4",
+            family = self.test_MF,
+            driver = self.script_4_1_CRR)
+        self.script_4_1_M.full_clean()
+        self.script_4_1_M.save()
+
+        # A shorter alias
+        self.testmethod = self.script_4_1_M;
+
+        ####
+        # Stuff from this point on is used in testing librarian and
+        # archive.
+
+        
 
 class CodeResourceTests(MethodTestSetup):
      
