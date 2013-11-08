@@ -381,8 +381,7 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
-    method = models.BooleanField(help_text="Is the output of this method nondeterministic")
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
+    random = models.BooleanField(help_text="Is the output of this method nondeterministic?")
 
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""

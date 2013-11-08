@@ -435,8 +435,7 @@ class PipelineTests(PipelineTestSetup):
             foo.clean);
         
     def test_pipeline_oneStep_cabling_minrow_constraints_may_breach_each_other_clean (self):
-        """Unverifiable cabling: step requests input with possibly too few rows
-        (input min_row specified)."""
+        """Unverifiable cabling: step requests input with possibly too few rows (input min_row specified)."""
         
         # Define method curr_method
         curr_method = Method(family=self.DNAcomp_mf,
@@ -2928,85 +2927,6 @@ class RawInputCableTests(PipelineTestSetup):
         # These raw cables were both cabled from the pipeline input and are valid
         self.assertEquals(rawcable1.clean(), None)
         self.assertEquals(rawcable2.clean(), None)
-        
-    def test_PSIC_raw_cable_comes_from_pipeline_input_step_num_not_zero_bad(self):
-        """
-        Cable is fed from a pipeline input but the step number is not 0.
-        """
-
-        # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
-        self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
-        self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
-        self.script_4_1_M.clean()
-
-        # Define pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-
-        # Define 2 identical steps within the pipeline
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1);
-        step2 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2);
-
-        # Cable the pipeline input into step1's transformation's only raw input hole,
-        # but provide the wrong step number.
-        rawcable1 = step1.cables_in.create(
-            dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
-            source_step=2,
-            source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"));
-
-        rawcable2 = step2.cables_in.create(
-            dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
-            source_step=1,
-            source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"));
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Cable \"Pipeline test pipeline family v1 step 1:a_b_c\(raw\)\" must have step 0 for a source",
-            rawcable1.clean)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Cable \"Pipeline test pipeline family v1 step 2:a_b_c\(raw\)\" must have step 0 for a source",
-            rawcable2.clean)
-
-    def test_PSIC_raw_cable_comes_from_internal_step_bad(self):
-        """
-        source comes from within the pipeline, not from a pipeline RawInput
-        """
-        # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
-        self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
-        self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
-        self.script_4_1_M.clean()
-
-        # Define pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
-        self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-
-        # Define 2 identical steps within the pipeline
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1);
-        step2 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2);
-
-        # Cable the pipeline input into step1's transformation's only raw input hole
-        rawcable1 = step1.create_raw_cable(
-            dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
-            source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"));
-
-        # Invalidly raw cable from step 1 to step 2
-        rawcable2 = step2.cables_in.create(
-            dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
-            source_step=0,
-            source=self.script_4_1_M.inputs.get(dataset_name="a_b_c"));
-
-        # Second method is invalidly raw cabled from the input of the first method
-        self.assertEquals(rawcable1.clean(), None)
-
-        error_msg = "Step 2 requests raw input not coming from parent pipeline"
-        self.assertRaisesRegexp(ValidationError, error_msg, rawcable2.clean) 
-        self.assertRaisesRegexp(ValidationError, error_msg, step2.clean)
-        self.assertRaisesRegexp(ValidationError, error_msg, step2.complete_clean) 
-        self.assertRaisesRegexp(ValidationError, error_msg, self.pipeline_1.clean)
-        self.assertRaisesRegexp(ValidationError, error_msg, self.pipeline_1.complete_clean)
 
     def test_PSIC_raw_cable_leads_to_foreign_pipeline_bad(self):
         """
@@ -3028,16 +2948,21 @@ class RawInputCableTests(PipelineTestSetup):
         self.pipeline_2.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_pipeline_2 = self.pipeline_2.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        # Define a raw cable into Pipeline2step1 from Pipeline1's raw inputs (Cross-pipeline contamination!)
+        # Define a raw cable into Pipeline2step1 from Pipeline1's raw
+        # inputs (Cross-pipeline contamination!)
         rawcable1 = step1_pipeline_2.cables_in.create(
             dest=step1_pipeline_2.transformation.inputs.get(dataset_name="a_b_c"),
             source_step=0,
             source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"))
 
-        self.assertRaisesRegexp(ValidationError,"Step 1",rawcable1.clean) 
-        self.assertRaisesRegexp(ValidationError,"Step 1",step1_pipeline_2.clean)
-        self.assertRaisesRegexp(ValidationError,"Step 1",step1_pipeline_2.complete_clean) 
-        self.assertRaisesRegexp(ValidationError,"Step 1",self.pipeline_2.clean)
+        error_msg = "Pipeline does not have input .*"
+        self.assertRaisesRegexp(ValidationError, error_msg, rawcable1.clean)
+        self.assertRaisesRegexp(ValidationError, error_msg,
+                                step1_pipeline_2.clean)
+        self.assertRaisesRegexp(ValidationError, error_msg,
+                                step1_pipeline_2.complete_clean)
+        self.assertRaisesRegexp(ValidationError, error_msg,
+                                self.pipeline_2.clean)
 
     def test_PSIC_raw_cable_does_not_map_to_raw_input_of_this_step_bad(self):
         """
@@ -3064,7 +2989,7 @@ class RawInputCableTests(PipelineTestSetup):
             source_step=0,
             source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"))
 
-        error_msg = "Transformation at step 1 does not have raw input \"\[Method test method family s4\]:raw1 a_b_c_method\"";
+        error_msg = "Transformation at step 1 does not have input \"\[Method test method family s4\]:raw1 a_b_c_method\"";
         self.assertRaisesRegexp(ValidationError,error_msg,rawcable1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,step1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,step1.complete_clean)
@@ -3960,7 +3885,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
             source_pin=self.doublet_cdt.members.all()[0],
             dest_pin=self.triplet_cdt.members.all()[0])
 
-        errorMessage = "Source pin \"1: <string> \[StrCol1\]\" does not come from compounddatatype \"\(1: <string> \[a\], 2: <string> \[b\], 3: <string> \[c\]\)\""
+        errorMessage = "Source pin \"1: <string> \[x\]\" does not come from compounddatatype \"\(1: <string> \[a\], 2: <string> \[b\], 3: <string> \[c\]\)\""
 
         self.assertRaisesRegexp(
             ValidationError,

@@ -707,3 +707,115 @@ class CompoundDatatypeTests(MetadataTestSetup):
             ValidationError,
             "Column indices are not consecutive starting from 1",
             bad_cdt.clean);
+
+    # The following tests were previously tests on
+    # DatasetStructure.clean(), but now they must be adapted as
+    # tests on summarize_CSV.
+
+    # def test_clean_must_be_coherent_with_structure_if_applicable(self):
+    #     # Valid dataset - raw (No structure defined)
+    #     self.doublet_symDS = SymbolicDataset()
+    #     self.doublet_symDS.save()
+    #     self.doublet_DS = None
+    #     with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
+    #         self.doublet_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_symDS)
+    #         self.doublet_DS.save()
+    #     self.assertEqual(self.doublet_DS.clean(), None)
+
+    #     # Valid dataset - doublet
+    #     self.doublet_DS_structure_valid = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.doublet_cdt)
+    #     self.doublet_DS_structure_valid.save()
+    #     self.assertEqual(self.doublet_DS.clean(), None)
+    #     self.assertEqual(self.doublet_DS_structure_valid.clean(), None)
+    #     self.doublet_DS_structure_valid.delete()
+
+    #     # Invalid: Wrong number of columns
+    #     self.doublet_DS_structure = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.triplet_cdt)
+    #     self.doublet_DS_structure.save()
+    #     errorMessage = "Dataset \".*\" does not have the same number of columns as its CDT"
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_DS.clean)
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_DS_structure.clean)
+        
+    #     # Invalid: Incorrect column header
+    #     self.doublet_wrong_header_symDS = SymbolicDataset()
+    #     self.doublet_wrong_header_symDS.save()
+    #     self.doublet_wrong_header_DS = None
+    #     with open(os.path.join(samplecode_path, "doublet_cdt_incorrect_header.csv"), "rb") as f:
+    #         self.doublet_wrong_header_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_wrong_header_symDS)
+    #         self.doublet_wrong_header_DS.save()
+    #     self.doublet_wrong_header_DS_structure = DatasetStructure(dataset=self.doublet_wrong_header_DS,compounddatatype=self.doublet_cdt)
+    #     errorMessage = "Column .* of Dataset \".*\" is named .*, not .* as specified by its CDT"
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_wrong_header_DS.clean)
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_wrong_header_DS_structure.clean)
+    
+    # def test_clean_check_CSV(self):
+
+    #     # triplet_DS has CSV format conforming to it's CDT
+    #     self.triplet_symDS.structure.clean()
+
+    #     # Define a dataset, but with the wrong number of headers
+    #     symDS = SymbolicDataset()
+    #     symDS.save()
+    #     DS1 = None
+    #     with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
+    #         DS1 = Dataset(user=self.myUser,name="DS1",description="DS1 desc",dataset_file=File(f),symbolicdataset=symDS)
+    #         DS1.save()
+    #     structure = DatasetStructure(dataset=DS1,compounddatatype=self.doublet_cdt)
+
+    #     errorMessage = "Dataset \".*\" does not have the same number of columns as its CDT"
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, structure.clean)
+
+    #     # Define a dataset with the right number of header columns, but the wrong column names
+    #     symDS2 = SymbolicDataset()
+    #     symDS2.save()
+    #     DS2 = None
+    #     with open(os.path.join(samplecode_path, "three_random_columns.csv"), "rb") as f:
+    #         DS2 = Dataset(user=self.myUser,name="DS2",description="DS2 desc",dataset_file=File(f),symbolicdataset=symDS2)
+    #         DS2.save()
+    #     structure2 = DatasetStructure(dataset=DS2,compounddatatype=self.triplet_cdt)
+
+    #     errorMessage = "Column 1 of Dataset \".*\" is named .*, not .* as specified by its CDT"
+    #     self.assertRaisesRegexp(ValidationError,errorMessage, structure2.clean)
+
+
+
+    # def test_dataset_clean_incorrect_number_of_CSV_header_fields_bad(self):
+
+    #     uploaded_sd = SymbolicDataset.create_SD(
+    #         os.path.join(samplecode_path, "script_2_output_2.csv"),
+    #         self.triplet_cdt,
+    #         make_dataset=False)
+            
+    #     new_structure = uploaded_sd.structure
+
+    #     # Attach a file with the wrong number of columns.
+    #     uploaded_dataset = Dataset(
+    #         user=self.myUser,name="uploaded_dataset",
+    #         description="hehe",
+    #         symbolicdataset=uploaded_sd)
+    #     with open(os.path.join(samplecode_path, "script_2_output_2.csv"), "rb") as f:
+    #         uploaded_dataset.dataset_file.save("script_2_output_2.csv", File(f))
+    #         uploaded_dataset.save()
+
+    #     errorMessage = "Dataset .* does not have the same number of columns as its CDT"
+    #     self.assertRaisesRegexp(
+    #         ValidationError, errorMessage,
+    #         new_structure.clean)
+
+    # def test_dataset_clean_correct_number_of_CSV_header_fields_but_incorrect_contents_bad(self):
+
+    #     uploaded_sd = SymbolicDataset()
+    #     uploaded_sd.save()
+    #     uploaded_dataset = None
+    #     with open(os.path.join(samplecode_path, "three_random_columns.csv"), "rb") as f:
+    #         uploaded_dataset = Dataset(
+    #             user=self.myUser,name="uploaded_raw_dataset",
+    #             description="hehe",dataset_file=File(f),
+    #             symbolicdataset=uploaded_sd)
+    #         uploaded_dataset.save()
+    #     new_structure = DatasetStructure(dataset=uploaded_dataset,
+    #                                      compounddatatype=self.triplet_cdt)
+    #     new_structure.save()
+
+    #     errorMessage = "Column .* of Dataset .* is named .*, not .* as specified by its CDT"
+    #     self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)

@@ -52,8 +52,6 @@ class Pipeline(transformation.models.Transformation):
             null=True,
             blank=True)
 
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
-
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
 
@@ -348,7 +346,17 @@ class PipelineStep(models.Model):
         Mark a TO for deletion.
         """
         self.outputs_to_delete.add(dataset_to_delete)
-
+        
+    def outputs_to_retain(self):
+        """Returns a list of TOs this PipelineStep doesn't delete."""
+        outputs_needed = []
+        
+        for step_output in self.transformation.outputs.all():
+            if not self.outputs_to_delete.filter(
+                    step_output).exists():
+                outputs_needed.append(step_output)
+                
+        return outputs_needed
 
 
 # A helper function that will be called both by PSICs and
@@ -531,29 +539,67 @@ class PipelineStepInputCable(models.Model):
         """Check coherence of the cable.
 
         Check in all cases:
-        - Are the input and output either both raw or both non-raw?
+        - Are the source and destination either both raw or both
+          non-raw?
+        - Does the source come from a prior step or from the Pipeline?
+        - Does the cable map to an (existent) input of this step's transformation?
+        - Does the requested source exist?
 
         If the cable is raw:
-        - Does the input come from the Pipeline?
         - Are there any wires defined?  (There shouldn't be!)
 
         If the cable is not raw:
-        - Does the input come from a prior step?
-        - Does the cable map to an (existent) input of this step's transformation?
-        - Does the requested output exist?
-        - Do the input and output 'work together' (compatible min/max)?
+        - Do the source and destination 'work together' (compatible min/max)?
 
         Whether the input and output have compatible CDTs or have valid custom
         wiring is checked via clean_and_completely_wired.
         """
-        input_requested = self.source;
-        feed_to_input = self.dest;
-
-        if input_requested.is_raw() != feed_to_input.is_raw():
+        if self.source.is_raw() != self.dest.is_raw():
             raise ValidationError(
                 "Cable \"{}\" has mismatched source (\"{}\") and destination (\"{}\")".
-                format(self, input_requested, feed_to_input))
+                format(self, self.source, self.dest))
 
+        # input_requested = self.source;
+        # requested_from = self.source_step;
+        # feed_to_input = self.dest;
+        # step_trans = self.pipelinestep.transformation
+
+        # Does the source come from a step prior to this one?
+        if self.source_step >= self.pipelinestep.step_num:
+            raise ValidationError(
+                "Step {} requests input from a later step".
+                format(self.pipelinestep.step_num));
+
+        # Does the specified input defined for this transformation exist?
+        if not self.pipelinestep.transformation.inputs.filter(
+                pk=self.dest.pk).exists():
+            raise ValidationError(
+                "Transformation at step {} does not have input \"{}\"".
+                format(self.pipelinestep.step_num, unicode(self.dest)));
+
+        # Check that the source is available.
+        if self.source_step == 0:
+            # Look for the desired input among the Pipeline inputs.
+            pipeline_inputs = self.pipelinestep.pipeline.inputs.all();
+            if self.source not in pipeline_inputs:
+                raise ValidationError(
+                    "Pipeline does not have input \"{}\"".
+                    format(unicode(self.source)));
+
+        # If not from step 0, input derives from the output of a pipeline step
+        else:
+            # Look for the desired input among this PS' inputs.
+            source_ps = self.pipelinestep.pipeline.steps.get(
+                step_num=self.source_step)
+
+            source_ps_outputs = source_ps.transformation.outputs.all()
+            if self.source not in source_ps_outputs:
+                raise ValidationError(
+                    "Transformation at step {} does not produce output \"{}\"".
+                    format(self.source_step,
+                           unicode(self.source)))
+        
+        # Propagate to more specific clean functions.
         if self.is_raw():
             self.raw_clean()
         else:
@@ -563,35 +609,11 @@ class PipelineStepInputCable(models.Model):
         """
         Helper function called by clean() to deal with raw cables.
         
-        PRE: the pipeline step's transformation is not the parent pipeline (this should
-        never happen anyway).
-        PRE: cable is raw (i.e. the source and destination are both raw); this is enforced
-        by clean().
+        PRE: the pipeline step's transformation is not the parent
+        pipeline (this should never happen anyway).
+        PRE: cable is raw (i.e. the source and destination are both
+        raw); this is enforced by clean().
         """
-        input_requested = self.source
-        feed_to_input = self.dest
-        step_trans = self.pipelinestep.transformation
-
-        # If this cable is raw, does source_step == 0?
-        if self.is_raw() and self.source_step != 0:
-            raise ValidationError(
-                "Cable \"{}\" must have step 0 for a source".
-                format(self))
-
-        # Does this input cable come from a raw input of the parent pipeline?
-        # Note: this depends on the pipeline step's transformation not equalling
-        # the parent pipeline (which shouldn't ever happen).
-        if not self.pipelinestep.pipeline.inputs.filter(pk=input_requested.pk).exists():
-            raise ValidationError(
-                "Step {} requests raw input not coming from parent pipeline".
-                format(self.pipelinestep.step_num))
-
-        # Does the specified input defined for this transformation exist?
-        if not step_trans.inputs.filter(pk=feed_to_input.pk).exists():
-            raise ValidationError(
-                "Transformation at step {} does not have raw input \"{}\"".
-                format(self.pipelinestep.step_num, unicode(feed_to_input)))
-
         # Are there any wires defined?
         if self.custom_wires.all().exists():
             raise ValidationError(
@@ -600,96 +622,43 @@ class PipelineStepInputCable(models.Model):
 
     def non_raw_clean(self):
         """Helper function called by clean() to deal with non-raw cables."""
-        input_requested = self.source;
-        requested_from = self.source_step;
-        feed_to_input = self.dest;
-        step_trans = self.pipelinestep.transformation
-
-        # Does this input cable come from a step prior to this one?
-        if requested_from >= self.pipelinestep.step_num:
-            raise ValidationError(
-                "Step {} requests input from a later step".
-                format(self.pipelinestep.step_num));
-
-        # Does the specified input defined for this transformation exist?
-        if not step_trans.inputs.filter(pk=feed_to_input.pk).exists():
-            raise ValidationError ("Transformation at step {} does not have input \"{}\"".
-                                   format(self.pipelinestep.step_num, unicode(feed_to_input)));
-
-        # Do the source and destination work together?
-        # This checks:
-        # - the source produces the requested data
-        # - the source doesn't delete the requested data
-        # - they have compatible min_row and max_row
-
-        if requested_from == 0:
-            # Get pipeline inputs of the cable's parent Pipeline,
-            # and look for pipeline inputs that match the desired input.
-            
-            pipeline_inputs = self.pipelinestep.pipeline.inputs.all();
-            if input_requested not in pipeline_inputs:
-                raise ValidationError(
-                    "Pipeline does not have input \"{}\"".
-                    format(unicode(input_requested)));
-
-        # If not from step 0, input derives from the output of a pipeline step
-        else:
-            # Look at the pipeline step referenced by the wiring parameter
-            providing_step = self.pipelinestep.pipeline.steps.get(step_num=requested_from)
-
-            # Does the source pipeline step produce the output requested?
-            source_step_outputs = providing_step.transformation.outputs.all()
-            if input_requested not in source_step_outputs:
-                raise ValidationError(
-                    "Transformation at step {} does not produce output \"{}\"".
-                    format(requested_from, unicode(input_requested)))
-
         # Check that the input and output connected by the
         # cable are compatible re: number of rows.  Don't check for
         # ValidationError because this was checked in the
         # clean() of PipelineStep.
 
-        provided_min_row = 0
-        required_min_row = 0
-
-        # Source output row constraint
-        if input_requested.get_min_row() != None:
-            provided_min_row = input_requested.get_min_row()
-
-        # Destination input row constraint
-        if feed_to_input.get_min_row() != None:
-            required_min_row = feed_to_input.get_min_row()
+        # These are source and destination row constraints.
+        source_min_row = (0 if self.source.get_min_row() == None
+                          else self.source.get_min_row())
+        dest_min_row = (0 if self.dest.get_min_row() == None
+                        else self.dest.get_min_row())
 
         # Check for contradictory min row constraints
-        if (provided_min_row < required_min_row):
+        if (source_min_row < dest_min_row):
             raise ValidationError(
                 "Data fed to input \"{}\" of step {} may have too few rows".
-                format(feed_to_input.dataset_name, self.pipelinestep.step_num))
+                format(self.dest.dataset_name, self.pipelinestep.step_num))
 
-        provided_max_row = float("inf")
-        required_max_row = float("inf")
-
-        if input_requested.get_max_row() != None:
-            provided_max_row = input_requested.get_max_row()
-
-        if feed_to_input.get_max_row() != None:
-            required_max_row = feed_to_input.get_max_row()
+        # Similarly, these are max-row constraints.
+        source_max_row = (float("inf") if self.source.get_max_row() == None
+                          else self.source.get_max_row())
+        dest_max_row = (float("inf") if self.dest.get_max_row() == None
+                        else self.dest.get_max_row())
 
         # Check for contradictory max row constraints
-        if (provided_max_row > required_max_row):
+        if (source_max_row > dest_max_row):
             raise ValidationError(
                 "Data fed to input \"{}\" of step {} may have too many rows".
-                format(feed_to_input.dataset_name, self.pipelinestep.step_num))
+                format(self.dest.dataset_name, self.pipelinestep.step_num))
 
         # Validate whatever wires there already are
         if self.custom_wires.all().exists():
             for wire in self.custom_wires.all():
                 wire.clean()
-
         
     def clean_and_completely_wired(self):
         """
-        Check coherence of the cable, and check that it is correctly wired (if it is non-raw).
+        Check coherence and wiring of this cable (if it is non-raw).
 
         This will call clean() as well as checking whether the input
         and output 'work together'.  That is, either both are raw, or
@@ -698,18 +667,15 @@ class PipelineStepInputCable(models.Model):
          - there is good wiring defined.
         """
         # Check coherence of this cable otherwise.
-        self.clean();
+        self.clean()
 
         # There are no checks to be done on wiring if this is a raw cable.
         if self.is_raw():
             return
         
-        input_requested = self.source;
-        feed_to_input = self.dest;
-        
         # If source CDT cannot feed (i.e. is not a restriction of)
         # destination CDT, check presence of custom wiring
-        if not input_requested.get_cdt().is_restriction(feed_to_input.get_cdt()):
+        if not self.source.get_cdt().is_restriction(self.dest.get_cdt()):
             if not self.custom_wires.all().exists():
                 raise ValidationError(
                     "Custom wiring required for cable \"{}\"".
@@ -719,12 +685,12 @@ class PipelineStepInputCable(models.Model):
         if self.custom_wires.all().exists():
             # Each destination CDT member of must be wired to exactly once.
 
-            # Get the CDT members of dest
+            # Get the CDT members of dest.
             dest_members = self.dest.get_cdt().members.all()
 
             # For each CDT member, check that there is exactly 1
-            # custom_wire leading to it (IE, number of occurences of
-            # CDT member = dest_pin)
+            # custom_wire leading to it (i.e. number of occurrences of
+            # CDT member = dest_pin).
             for dest_member in dest_members:
                 numwires = self.custom_wires.filter(dest_pin=dest_member).count()
 
@@ -1045,21 +1011,18 @@ class PipelineOutputCable(models.Model):
         should be no custom wiring.  If the cable is not raw and there
         are custom wires, they should be clean.
         """
-        output_requested = self.source;
-        requested_from = self.source_step;
-
         # Step number must be valid for this pipeline
-        if requested_from > self.pipeline.steps.all().count():
+        if self.source_step > self.pipeline.steps.all().count():
             raise ValidationError(
                 "Output requested from a non-existent step");
         
-        providing_step = self.pipeline.steps.get(step_num=requested_from);
+        source_ps = self.pipeline.steps.get(step_num=self.source_step);
 
         # Try to find a matching output hole
-        if not providing_step.transformation.outputs.filter(pk=output_requested.pk).exists():
+        if not source_ps.transformation.outputs.filter(pk=self.source.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not produce output \"{}\"".
-                format(requested_from, output_requested));
+                format(self.source_step, self.source));
 
         outwires = self.custom_outwires.all()
 
@@ -1073,17 +1036,16 @@ class PipelineOutputCable(models.Model):
                 "Cable \"{}\" has a non-null output_cdt but its source is raw" .
                 format(self))
 
-
-        # The cable has a raw source (and output_cdt is None)
+        # The cable has a raw source (and output_cdt is None).
         if self.is_raw():
 
-            # Wires cannot exist
+            # Wires cannot exist.
             if outwires.exists():
                 raise ValidationError(
                     "Cable \"{}\" is raw and should not have wires defined" .
                     format(self))
 
-        # The cable has a nonraw source (and output_cdt is specified)
+        # The cable has a nonraw source (and output_cdt is specified).
         else:
             if not self.source.get_cdt().is_restriction(
                     self.output_cdt) and not outwires.exists():
@@ -1091,7 +1053,7 @@ class PipelineOutputCable(models.Model):
                     "Cable \"{}\" has a source CDT that is not a restriction of its target CDT, but no wires exist".
                     format(self))
 
-            # Clean all wires
+            # Clean all wires.
             for outwire in outwires:
                 outwire.clean()
                 outwire.validate_unique()
@@ -1108,6 +1070,8 @@ class PipelineOutputCable(models.Model):
         Calls clean, and then checks that if this POC is not raw and there
         are any custom wires defined, then they must quench the output CDT.
         """
+        self.clean()
+
         if not self.is_raw() and self.custom_outwires.all().exists():
             # Check that each CDT member has a wire leading to it
             for dest_member in self.output_cdt.members.all():

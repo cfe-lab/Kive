@@ -449,14 +449,14 @@ class Sandbox:
 
         # Look for an ER that we can reuse.  It must represent the same
         # transformation, and take the same input SDs.
-        curr_ER = find_compatible_ER(pipelinestep.transformation,
-                                     inputs_after_cable)
+        curr_ER = pipelinestep.transformation.find_compatible_ER(
+            inputs_after_cable)
         
         # If it found an ER, check that the ER provides all of the
         # output that we need.
         if curr_ER != None:
-            outputs_needed = ps_outputs_to_retain(pipelinestep)
-            if transf_ER_provides_outputs(curr_ER, outputs_needed):
+            outputs_needed = pipelinestep.outputs_to_retain()
+            if curr_ER.provides_outputs(outputs_needed):
                 ####
                 # REUSE AN ER
                 
@@ -837,17 +837,16 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
         ####
         # LOOK FOR ER TO REUSE
 
-        curr_er = find_compatible_ER(pipeline, input_SDs)
+        curr_er = pipeline.find_compatible_ER(input_SDs)
 
         if curr_er != None:
             # An appropriate ER was found.  Does it have all the
             # inputs we need?
             outputs_needed = pipeline.outputs.all()
             if parent_runstep != None:
-                outputs_needed = ps_outputs_to_retain(
-                    parent_runstep)
+                outputs_needed = parent_runstep.outputs_to_retain()
 
-            if transf_ER_provides_outputs(curr_er, outputs_needed):
+            if curr_er.provides_outputs(outputs_needed):
                 ####
                 # REUSE AN ER
 
@@ -985,55 +984,4 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
 
         return curr_run
 
-# FIXME these helpers should probably be in models, associated to
-# appropriate classes.
-# CONTINUE FROM HERE!  Fix this and write recover().
-def find_compatible_ER(transformation, input_SDs):
-    """
-    Helper that finds an ER that we can reuse.
-
-    transformation must be a Method or Pipeline; input_SDs is a list
-    of inputs to transformation in the proper order.
-    """
-    for candidate_ER in transformation.execrecords.all():
-        ER_matches = True
-        for ERI in candidate_ER.execrecordins.all():
-            # Get the input index of this ERI.
-            input_idx = ERI.generic_input.dataset_idx
-            if ERI.symbolicdataset != input_SDs[input_idx-1]:
-                ER_matches = False
-                break
-                
-        # At this point all the ERIs have matched the inputs.  So,
-        # we have found our candidate.
-        if ER_matches:
-            return candidate_ER
-
-    # We didn't find anything.
-    return None
-
-def ps_outputs_to_retain(pipelinestep):
-    """Returns a list of TOs this PS doesn't delete."""
-    outputs_needed = []
-    
-    for step_output in pipelinestep.transformation.outputs.all():
-        if not pipelinestep.outputs_to_delete.filter(
-                step_output).exists():
-            outputs_needed.append(step_output)
-            
-    return outputs_needed
-
-def transf_ER_provides_outputs(ER, outputs):
-    """
-    Determines whether the ER has existent data for these outputs.
-    
-    outputs is an iterable of TOs that we want the ER to have real
-    data for.
-    """    
-    for curr_output in outputs:
-        corresp_ero = ER.execrecordouts.get(generic_output=curr_output)
-
-        if not corresp_ero.has_data():
-            return False
-
-    return True
+# CONTINUE FROM HERE!  Write recover().

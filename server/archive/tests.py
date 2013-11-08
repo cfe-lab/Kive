@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 
 import os
 
+from librarian.models import *
 from archive.models import *
 import librarian.tests
 
@@ -221,7 +222,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
             step_E1_RS.clean)
 
         # Good propagation case for E1: reused = False, associated data is clean.
-        self.doublet_DS.set_md5()
+        self.doublet_symDS.MD5_checksum = self.doublet_DS.compute_md5()
         self.doublet_DS.save()
         self.doublet_symDS.save()
         self.assertEquals(step_E1_RS.clean(), None)
@@ -1377,9 +1378,9 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
             "File integrity of .* lost.  Current checksum .* does not equal expected checksum .*",
             E21_41_ROC.clean)
         # Reset....
-        self.doublet_DS.set_md5()
+        self.doublet_symDS.MD5_checksum = self.doublet_DS.compute_md5()
         self.doublet_DS.created_by = None
-        self.doublet_DS.symbolicdataset.save()
+        self.doublet_symDS.save()
 
         # Now set an ER.  Propagation bad case: ER is not complete and clean.
         E31_42_ROC.execrecord = E31_42_ER
