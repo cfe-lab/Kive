@@ -905,16 +905,12 @@ class MethodLog(models.Model):
     output_log = models.FileField(
         "output log",
         upload_to="Logs",
-        null=True,
-        blank=True,
-        help_text="Terminal output of this ExecRecord, i.e. stdout.")
+        help_text="Terminal output of the RunStep Method, i.e. stdout.")
     
     error_log = models.FileField(
         "error log",
         upload_to="Logs",
-        null=True,
-        blank=True,
-        help_text="Terminal error output of this ExecRecord, i.e. stderr.")
+        help_text="Terminal error output of the RunStep Method, i.e. stderr.")
 
     def clean(self):
         """Checks that the RunStep is for a Method."""
