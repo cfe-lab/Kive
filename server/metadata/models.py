@@ -376,7 +376,7 @@ class CustomConstraint(models.Model):
 
     # Clean: Methods which function as CustomConstraints must take in
     # a column of strings named "to_test" and returns a column of
-    # positive integers named "rownum".  We thus need to
+    # positive integers named "failed_row".  We thus need to
     # hard-code in at least two Datatypes and two CDTs (string,
     # PositiveInteger (and probably int) so that PositiveInteger can
     # restrict it), and a CDT for each).  We'll probably need more
@@ -761,7 +761,7 @@ class CompoundDatatype(models.Model):
             # Now: open the resulting file, which is at output_path, and
             # make sure it's OK.  We're going to have to call
             # summarize_CSV on this resulting file, but that's OK because
-            # it must have a CDT (NaturalNumber invalid_rownum), and we
+            # it must have a CDT (NaturalNumber failed_row), and we
             # will define NaturalNumber to have no CustomConstraint, so
             # that no deeper recursion will happen.
             output_summary = None
@@ -813,20 +813,3 @@ class CompoundDatatype(models.Model):
             summary["failing_cells"] = failing_cells
     
         return summary
-
- 
-# Some stuff that was pre-loaded into the database, e.g. atomic
-# Datatypes such as str, bool.  Also, CDTs for verification methods
-# and for prototypes.  These must be loaded into the database right
-# after the tables have been created, e.g. after calling
-# "./manage.py syncdb"
-    
-# These are added using a fixture after this file is loaded; as such,
-# we can't define these variables here.
-    
-# STR_DT = Datatype.objects.get(pk=1)
-# BOOL_DT = Datatype.objects.get(pk=2)
-
-# VERIF_IN = CompoundDatatype.objects.get(pk=1)
-# VERIF_OUT = CompoundDatatype.objects.get(pk=2)
-# PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=3)
