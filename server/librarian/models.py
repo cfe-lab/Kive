@@ -39,6 +39,9 @@ class SymbolicDataset(models.Model):
     file_access_utils.summarize_CSV()).
     """
     # For validation of Datasets when being reused, or when being regenerated.
+    # FIXME November 13, 2013: we need to allow this to be blank now
+    # in order to keep track of cases where code didn't write an output
+    # that it was supposed to!
     MD5_checksum = models.CharField(
         max_length=64,
         validators=[RegexValidator(
@@ -93,6 +96,7 @@ class SymbolicDataset(models.Model):
         return self.structure.num_rows
 
     @classmethod
+    # FIXME what does it do for num_rows when file_path is unset?
     def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
                   name=None, description=None):
         """
@@ -153,6 +157,10 @@ class DatasetStructure(models.Model):
     compounddatatype = models.ForeignKey(
         "metadata.CompoundDatatype",
         related_name="conforming_datasets")
+
+    # FIXME November 13, 2013: this needs to be nullable in the case
+    # where the data file that was supposed to be produced was in fact
+    # not produced!
     num_rows = models.IntegerField(
         "number of rows",
         validators=[MinValueValidator(0)])

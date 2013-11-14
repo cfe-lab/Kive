@@ -217,6 +217,9 @@ class Sandbox:
             output_SD_CDT.clean()
 
 
+        # FIXME here is where you create an ExecLog -- start_time is now
+        # Do this within a transaction
+
         # The input contents are not on the file system, and:
         if (self.sd_fs_map[input_SD] == None or 
                 not os.access(self.sd_fs_map[input_SD], os.R_OK):
@@ -224,13 +227,18 @@ class Sandbox:
             # 1A) input_SD has data (Data uploaded or from reused step)
             # --> Use input_SD.dataset for computation
             if input_SD.has_data():
+                # Start ExecLog
                 cable.run_cable(input_SD.dataset, output_path)
+                # Finish ExecLog
 
             # 1B) input_SD doesn't have data (It was symbolically-reused)
             # --> We backtrack to this point, then run the cable
             else:
                 self.recover(input_SD)
+
+                # Create ExecLog here
                 cable.run_cable(self.sd_fs_map[input_SD], output_path)
+                # Finish ExecLog here
 
         # 2) Input contents are on the file system due, so whether
         # or not input_SD has data (IE, was transient), we can use it
@@ -238,18 +246,28 @@ class Sandbox:
         # Pre: file system copy must match the database version if it exists
         else:
             if os.access(self.sd_fs_map[input_SD]), os.R_OK):
+                # Start ExecLog
                 cable.run_cable(self.sd_fs_map[input_SD], output_path)
+                # Finish ExecLog
 
+        # FIXME here is where you finish the ExecLog -- end_time is now
+        # (end the transaction)
+        
         # FINISHED RUNNING CABLE
         ####
 
-        ####
-        # CHECK OUTPUT
 
-        # Make an ER to represent the execution above.
-        output_SD = None
-        output_md5 = None
+        ####
+        # CREATE EXECRECORD
+
+        # FIXME we need to check that this file exists.
+        # What do we do if it doesn't?  We need 
+        # DatasetStructure's num_rows to be nullable,
+        # and we need SymbolicDataset's MD5_checksum to be
+        # blankable as well.
         
+        # Extract the MD5 and some summary data on the output file.
+        output_md5 = None
         with open(output_path, "rb") as f:
             output_md5 = file_access_utils.compute_md5(f)
 
@@ -260,76 +278,91 @@ class Sandbox:
             with open(output_path, "rb") as f:
                 output_summary = file_access_utils.summarize_CSV(
                     f, output_SD_CDT, val_dir)
-            
-            if output_summary.has_key("bad_num_cols"):
-                raise ValueError(
-                    "Output of cable \"{}\" had the wrong number of columns".
-                    format(cable))
 
-            if output_summary.has_key("bad_col_indices"):
-                raise ValueError(
-                    "Output of cable \"{}\" had a malformed header".
-                    format(cable))
-
-            if output_summary.has_key("failing_cells"):
-                raise ValueError(
-                    "Output of cable \"{}\" had malformed entries".
-                    format(cable))
-            
+        had_ER_at_beginning = curr_ER != None
         if curr_ER == None:
             # No ER was found; create a new one.
-            
+
+            # FIXME point the ER to the above-created ExecLog
             curr_ER = cable.execrecords.create()
             curr_ER.execrecordins.create(
-                generic_input=cable.provider_output,
+                generic_input=cable.source,
                 symbolicdataset=input_SD)
+            
+            output_SD = SymbolicDataset(
+                MD5_checksum=output_md5)
+            output_SD.save()
 
-            if cable.is_trivial():
-                output_SD = input_SD
+            # Add this structure to the symbolic dataset
+            if output_SD_CDT != None:
+                output_SD.structure.create(
+                    compounddatatype=output_SD_CDT,
+                    num_rows=output_summary["num_rows"])
 
-                # Since this cable was trivial, either the resulting
-                # file sitting at output_path is simply linked to
-                # something else that's already on the filesystem, or
-                # it was copied from the database.
-                if output_md5 != output_SD.MD5_checksum:
-                    raise ValueError(
-                        "Output of cable \"{}\" failed MD5 integrity check".
-                        format(cable))
-                
+            ero_xput = None
+            if type(cable) == PipelineStepInputCable:
+                ero_xput = cable.dest
             else:
-                output_SD = SymbolicDataset(
-                    MD5_checksum=output_md5)
-                output_SD.save()
-
-                # Add this structure to the symbolic dataset
-                if output_SD_CDT != None:
-                    output_SD.structure.create(
-                        compounddatatype=output_SD_CDT,
-                        num_rows=output_summary["num_rows"])
-
-                ero_xput = None
-                if type(cable) == PipelineStepInputCable:
-                    ero_xput = cable.transf_input
-                else:
-                    ero_xput = cable.pipeline.outputs.get(
-                        dataset_name=cable.output_name)
+                ero_xput = cable.pipeline.outputs.get(
+                    dataset_name=cable.output_name)
             
             curr_ER.execrecordouts.create(
                 generic_output=ero_xput,
                 symbolicdataset=output_SD)
-            
-        else:
-            # In this case, we did find an ER, so we can check the MD5
-            # checksum against the stored value.
-            output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
-            if output_md5 != output_SD.MD5_checksum:
-                raise ValueError(
-                    "Output of cable \"{}\" failed MD5 integrity check".
-                    format(cable))
 
-        # FINISHED CHECKING OUTPUT
+            curr_ER.complete_clean()
+
+        # FINISHED CREATING EXECRECORD
         ####
 
+        ####
+        # CHECK OUTPUT
+
+        output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
+
+        # This part should create an IntegrityCheckLog
+        # and if appropriate, a ChecksumConflict.
+        # FIXME create IntegrityCheckLog and associate it with the
+        # above ExecLog.
+
+        # Case 1: we are recreating data that already had an SD;
+        # check integrity.
+        if output_md5 != output_SD.MD5_checksum:
+            # FIXME note it as a failure by creating a
+            # ChecksumConflict.  This also requires creating a new SD
+            # for this "evil twin" data file.
+            pass
+
+        # Case 2: we are creating data that had never existed before.
+        # Check contents.
+        elif not had_ER_at_beginning:
+            # FIXME do the contents check here.  This code below here
+            # is old and should be adapted.
+
+            # First do a check to see if the file is there or not.
+            
+            if not cable.is_raw():
+                if output_summary.has_key("bad_num_cols"):
+                    raise ValueError(
+                        "Output of cable \"{}\" had the wrong number of columns".
+                        format(cable))
+
+                if output_summary.has_key("bad_col_indices"):
+                    raise ValueError(
+                        "Output of cable \"{}\" had a malformed header".
+                        format(cable))
+
+                if output_summary.has_key("failing_cells"):
+                    raise ValueError(
+                        "Output of cable \"{}\" had malformed entries".
+                        format(cable))
+
+            # FIXME here is where you finish the ContentCheckLog
+            # (ending the transaction)
+            
+        # FINISHED CHECKING OUTPUT
+        ####
+            
         ####
         # PERFORM BOOKKEEPING
 
@@ -356,8 +389,7 @@ class Sandbox:
             new_dataset.clean()
             new_dataset.save()
 
-        # Complete the ER and record, then return the record.
-        curr_ER.complete_clean()
+        output_SD.clean()
 
         # FINISHED BOOKKEEPING
         ####
