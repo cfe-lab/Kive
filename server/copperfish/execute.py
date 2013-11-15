@@ -106,6 +106,8 @@ class Sandbox:
         they are the same.
         PRE: input_SD is in sd_fs_map
         PRE: more generally, all the _maps are "up to date" for this step
+        PRE: input_SD is currently considered valid (i.e. has not failed
+        any integrity or contents checks at this time).
         """
         # Create a record for this.
         curr_record = None
@@ -117,6 +119,10 @@ class Sandbox:
 
         ####
         # LOOK FOR REUSABLE ER
+
+        # FIXME now we have to redefine what "reusability" means: an
+        # ER should only be considered for reuse if all of its inputs
+        # and outputs are still considered valid *at this time*.
         
         # First: we look for an ExecRecord that we can reuse.
         # We first search for ERIs of cables that take input_SD
@@ -260,26 +266,12 @@ class Sandbox:
         ####
         # CREATE EXECRECORD
 
-        # FIXME we need to check that this file exists.
-        # What do we do if it doesn't?  We need 
-        # DatasetStructure's num_rows to be nullable,
-        # and we need SymbolicDataset's MD5_checksum to be
-        # blankable as well.
-        
-        # Extract the MD5 and some summary data on the output file.
-        output_md5 = None
-        with open(output_path, "rb") as f:
-            output_md5 = file_access_utils.compute_md5(f)
-
-        output_summary = None
-        if not cable.is_raw():
-            # A run path for summarize_CSV.
-            val_dir = "{}_validation".format(output_path)
-            with open(output_path, "rb") as f:
-                output_summary = file_access_utils.summarize_CSV(
-                    f, output_SD_CDT, val_dir)
-
+        # Since we attempted to run code, regardless of the outcome,
+        # we create an ExecRecord.  Then we will fill in details on
+        # anything that went wrong.  For now, fill in the MD5_checksum
+        # and num_rows with default values of "" and -1.
         had_ER_at_beginning = curr_ER != None
+        output_SD = None
         if curr_ER == None:
             # No ER was found; create a new one.
 
@@ -289,15 +281,13 @@ class Sandbox:
                 generic_input=cable.source,
                 symbolicdataset=input_SD)
             
-            output_SD = SymbolicDataset(
-                MD5_checksum=output_md5)
+            output_SD = SymbolicDataset(MD5_checksum="")
             output_SD.save()
 
-            # Add this structure to the symbolic dataset
+            # Add this structure to the symbolic dataset.
             if output_SD_CDT != None:
-                output_SD.structure.create(
-                    compounddatatype=output_SD_CDT,
-                    num_rows=output_summary["num_rows"])
+                output_SD.structure.create(compounddatatype=output_SD_CDT,
+                                           num_rows=-1)
 
             ero_xput = None
             if type(cable) == PipelineStepInputCable:
@@ -316,32 +306,78 @@ class Sandbox:
         ####
 
         ####
+        # CHECK IF FILE EXISTS
+        
+        if os.access(output_path, os.R_OK):
+            # FIXME create a ContentCheckLog denoting this as missing;
+            # we leave num_rows = -1 and MD5_checksum = "".  Then
+            # return.
+            pass
+
+        # FINISHED CHECKING REAL DATA
+        ####
+
+        ####
+        # REGISTER REAL DATA (if applicable)
+        
+        # If we are retaining this data, we create a dataset
+        if cable_keeps_output:
+            new_dataset = Dataset(
+                user=user,
+                name="{} {} {}".format(self.run.name,
+                                       type(cable).__name__,
+                                       curr_record.pk),
+                symbolicdataset=output_SD,
+                created_by=cable)
+            with open(output_path, "rb") as f:
+                new_dataset.dataset_file = File(f)
+            new_dataset.save()
+
+        # FINISHED REGISTERING REAL DATA
+        ####
+
+        ####
         # CHECK OUTPUT
+        
 
-        output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
+        # Probably this involves a transaction.
 
-        # This part should create an IntegrityCheckLog
-        # and if appropriate, a ChecksumConflict.
-        # FIXME create IntegrityCheckLog and associate it with the
-        # above ExecLog.
+        
+        # Extract the MD5 and some summary data on the output file.
+        output_md5 = None
+        with open(output_path, "rb") as f:
+            output_md5 = file_access_utils.compute_md5(f)
 
         # Case 1: we are recreating data that already had an SD;
         # check integrity.
-        if output_md5 != output_SD.MD5_checksum:
-            # FIXME note it as a failure by creating a
-            # ChecksumConflict.  This also requires creating a new SD
-            # for this "evil twin" data file.
-            pass
+        if had_ER_at_beginning:
+            if output_md5 == output_SD.MD5_checksum:
+                # FIXME note this as a passed integrity check.
+                pass
+            else:
+                # FIXME note this as a failed integrity check by
+                # creating an MD5Conflict.  This also requires
+                # creating a new SD for this "evil twin" data file.
+                pass
 
         # Case 2: we are creating data that had never existed before.
-        # Check contents.
+        # Set the MD5 checksum and check contents.
         elif not had_ER_at_beginning:
-            # FIXME do the contents check here.  This code below here
-            # is old and should be adapted.
-
-            # First do a check to see if the file is there or not.
+            output_SD.MD5_checksum = output_md5
+            output_SD.save()
             
+            # FIXME do the contents check here.  This code below here
+            # is old and should be adapted.  Make sure to set num_rows
+            # here.
+            
+            output_summary = None
             if not cable.is_raw():
+                # A run path for summarize_CSV.
+                val_dir = "{}_validation".format(output_path)
+                with open(output_path, "rb") as f:
+                    output_summary = file_access_utils.summarize_CSV(
+                        f, output_SD_CDT, val_dir)
+
                 if output_summary.has_key("bad_num_cols"):
                     raise ValueError(
                         "Output of cable \"{}\" had the wrong number of columns".
@@ -374,22 +410,6 @@ class Sandbox:
         socket_map[(cable, cable.generic_output)] = cable_out_SD
         
         self.cable_map[cable] = curr_ER
-        
-        # If we are retaining this data, we create a dataset
-        if cable_keeps_output:
-            new_dataset = Dataset(
-                user=user,
-                name="{} {} {}".format(self.run.name,
-                                       type(cable).__name__,
-                                       curr_record.pk),
-                symbolicdataset=output_SD,
-                created_by=cable)
-            with open(output_path, "rb") as f:
-                new_dataset.dataset_file = File(f)
-            new_dataset.clean()
-            new_dataset.save()
-
-        output_SD.clean()
 
         # FINISHED BOOKKEEPING
         ####

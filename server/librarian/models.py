@@ -38,15 +38,16 @@ class SymbolicDataset(models.Model):
     it still exists or not) is/was coherent (e.g. checked using
     file_access_utils.summarize_CSV()).
     """
-    # For validation of Datasets when being reused, or when being regenerated.
-    # FIXME November 13, 2013: we need to allow this to be blank now
-    # in order to keep track of cases where code didn't write an output
-    # that it was supposed to!
+    # For validation of Datasets when being reused, or when being
+    # regenerated.  A blank MD5_checksum means that the file was
+    # missing (not created when it was supposed to be created).
     MD5_checksum = models.CharField(
         max_length=64,
         validators=[RegexValidator(
-            regex=re.compile("^[1234567890AaBbCcDdEeFf]{32}$"),
-            message="MD5 checksum is not 32 hex characters")],
+            regex=re.compile("(^[1234567890AaBbCcDdEeFf]{32}$)|(^$))"),
+            message="MD5 checksum is not either 32 hex characters or blank")],
+        blank=True,
+        default="",
         help_text="Validates file integrity")
 
     def __unicode__(self):
@@ -158,12 +159,13 @@ class DatasetStructure(models.Model):
         "metadata.CompoundDatatype",
         related_name="conforming_datasets")
 
-    # FIXME November 13, 2013: this needs to be nullable in the case
-    # where the data file that was supposed to be produced was in fact
-    # not produced!
+    # A value of -1 means that the file is missing or the number of
+    # rows has never been counted (e.g. if we never did a ContentCheck
+    # on it).
     num_rows = models.IntegerField(
         "number of rows",
-        validators=[MinValueValidator(0)])
+        validators=[MinValueValidator(-1)],
+        default=-1)
 
     # October 31, 2013: we now think that it's too onerous to have 
     # a clean() function here that opens up the CSV file and checks it.
