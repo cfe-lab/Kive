@@ -58,8 +58,7 @@ class Sandbox:
         self.socket_map = {}
         self.cable_map = {}
 
-        # FIXME: Change to self.PS_map
-        self.method_map = {}
+        self.ps_map = {}
 
         # NEW FOR ERIC
         # Initialize the maps ourselves.
