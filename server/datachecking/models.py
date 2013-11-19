@@ -22,7 +22,9 @@ class ContentCheckLog(models.Model):
         related_name="content_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey("archive.ExecLog", null=True)
+    execlog = models.ForeignKey(
+        "archive.ExecLog", null=True,
+        related_name="content_checks")
 
     check_time = models.DateTimeField("time of check", auto_now_add=True)
 
@@ -176,7 +178,8 @@ class IntegrityCheckLog(models.Model):
         related_name="integrity_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey("archive.ExecLog", null=True)
+    execlog = models.ForeignKey("archive.ExecLog", null=True,
+                                related_name="integrity_checks")
 
     check_time = models.DateTimeField("time of check", auto_now_add=True)
 

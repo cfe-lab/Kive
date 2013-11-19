@@ -96,6 +96,14 @@ class SymbolicDataset(models.Model):
             return None
         return self.structure.num_rows
 
+    def get_cdt(self):
+        """
+        Retrieve the CDT of this SymbolicDataset (none if it is raw).
+        """
+        cdt = None if self.is_raw() else self.structure.compounddatatype
+        return cdt
+        
+
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,

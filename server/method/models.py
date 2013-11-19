@@ -32,15 +32,15 @@ class CodeResource(models.Model):
     #   revisions (codeResourceRevision/ForeignKey)
 
     name = models.CharField(
-            "Resource name",
-            max_length=255,
-            help_text="The name for this resource");
+        "Resource name",
+        max_length=255,
+        help_text="The name for this resource");
 
     filename = models.CharField(
-            "Resource file name",
-            max_length=255,
-            help_text="The filename for this resource",
-            blank=True);
+        "Resource file name",
+        max_length=255,
+        help_text="The filename for this resource",
+        blank=True);
 
     description = models.TextField("Resource description");
 
@@ -381,7 +381,12 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
-    random = models.BooleanField(help_text="Is the output of this method nondeterministic?")
+    random = models.BooleanField(
+        help_text="Is the output of this method nondeterministic?)
+
+    tainted = models.BooleanField(
+        default=False,
+        help_text="Is this Method broken?")
 
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""

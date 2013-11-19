@@ -12,10 +12,13 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
 
+from datetime import datetime
+
 import metadata.models
 import transformation.models
 import librarian.models
 import method.models
+import archive.models
 
 class PipelineFamily(transformation.models.TransformationFamily):
     """
@@ -43,14 +46,14 @@ class Pipeline(transformation.models.Transformation):
     """
 
     family = models.ForeignKey(
-            PipelineFamily,
-            related_name="members")
+        PipelineFamily,
+        related_name="members")
 
     revision_parent = models.ForeignKey(
-            "self",
-            related_name = "descendants",
-            null=True,
-            blank=True)
+        "self",
+        related_name = "descendants",
+        null=True,
+        blank=True)
 
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
@@ -836,15 +839,26 @@ class PipelineStepInputCable(models.Model):
         # the wiring matches, we can....
         return True
 
-    def run_cable(self, source, output_path):
+    def run_cable(self, source, output_path, cable_record):
         """
         Perform the cable-specified transformation on the input.
 
-        This uses run_cable_h.
+        This uses run_cable_h and creates an ExecLog, associating it
+        to cable_record.
 
         source can either be a Dataset or a path to a file.
         """
+        # Create an ExecLog.
+        curr_log = archive.models.ExecLog(
+            record=cable_record,
+            start_time=datetime.now())
         run_cable_h(self.custom_wires.all(), source, output_path)
+        curr_log.end_time = datetime.now()
+        curr_log.complete_clean()
+        curr_log.save()
+        cable_record.log = curr_log
+        cable_record.save()
+        return curr_log
 
 class CustomCableWire(models.Model):
     """
@@ -1182,10 +1196,21 @@ class PipelineOutputCable(models.Model):
         # the wiring matches, we can....
         return True
         
-    def run_cable(self, source, output_path):
+    def run_cable(self, source, output_path, cable_record):
         """
         Perform the cable-specified transformation on the input.
 
-        This uses run_cable_h.
+        This uses run_cable_h and creates an ExecLog, associating it
+        to cable_record.
         """
+        # Create an ExecLog.
+        curr_log = archive.models.ExecLog(
+            record=cable_record,
+            start_time=datetime.now())
         run_cable_h(self.custom_outwires.all(), source, output_path)
+        curr_log.end_time = datetime.now()
+        curr_log.complete_clean()
+        curr_log.save()
+        cable_record.log = curr_log
+        cable_record.save()
+        return curr_log

@@ -221,7 +221,7 @@ class Datatype(models.Model):
                 # string.
                 try:
                     datetime.strptime(string_to_check,
-                                               basic_constraint.rule)
+                                      basic_constraint.rule)
                 except:
                     constraints_failed.append(basic_constraint)
 
@@ -640,7 +640,7 @@ class CompoundDatatype(models.Model):
         # CustomConstraints.
     
         try:
-            # Keyed by column name, maps to (path to file, file handle)
+            # Keyed by column index, maps to (path to file, file handle)
             cols_with_cc = {}
             for cdtm in cdt_members:
                 if cdtm.datatype.has_custom_constraint():
@@ -799,7 +799,7 @@ class CompoundDatatype(models.Model):
                 for row in test_out_csv:
                     if (row["rownum"], col) in failing_cells:
                         failing_cells[(row["rownum"], col)].append(
-                            "CustomConstraint")
+                            corresp_DT.custom_constraint)
                     else:
                         failing_cells[(row["rownum"], col)] = [
                             corresp_DT.custom_constraint

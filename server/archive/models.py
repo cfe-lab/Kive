@@ -221,7 +221,6 @@ class RunStep(models.Model):
 
            - if there is no ExecLog or if it isn't complete, there
              should be no Datasets associated and ER should not be set
-             ADD
 
            (from here on ExecLog is assumed to be complete and clean)
 
@@ -235,8 +234,10 @@ class RunStep(models.Model):
 
          - check that it is complete and clean
          - check that it's coherent with pipelinestep
-         - if an output is marked for deletion, there should be no
-           associated Dataset
+         
+         - if an output is marked for deletion or missing, there
+           should be no associated Dataset
+
          - else:
            - the corresponding ERO should have an associated Dataset.
 
@@ -343,6 +344,11 @@ class RunStep(models.Model):
                     raise ValidationError(
                         "RunStep \"{}\" does not have a complete log so should not have generated any Datasets".
                         format(self))
+                
+                if self.execrecord != None:
+                    raise ValidationError(
+                        "RunStep \"{}\" does not have a complete log; execrecord should not be set".
+                        format(self))
                 return
 
             # From here on, ExecLog is assumed to be complete and clean.
@@ -369,21 +375,34 @@ class RunStep(models.Model):
                 "RunStep \"{}\" points to transformation \"{}\" but corresponding ER does not".
                 format(self, self.pipelinestep))
 
+        # November 18, 2013: get the missing outputs.
+        outputs_missing = self.log.all()[0].missing_outputs()
+
         # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(
             transformation.models.TransformationOutput)
         
         for to in self.pipelinestep.transformation.outputs.all():
+            # Get the associated ERO.
+            corresp_ero = step_er.execrecordouts.get(
+                content_type=to_type, object_id=to.id)
+            
             if self.pipelinestep.outputs_to_delete.filter(
                     dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
-                # Get the associated ERO.
-                corresp_ero = step_er.execrecordouts.get(
-                    content_type=to_type, object_id=to.id)
                 if self.outputs.filter(symbolicdataset=corresp_ero.symbolicdataset).exists():
                     raise ValidationError(
                         "Output \"{}\" of RunStep \"{}\" is deleted; no data should be associated".
                         format(to, self))
+
+            elif to in outputs_missing:
+                # This output is missing; there should be no associated Dataset.
+                if self.outputs.filter(
+                        symbolicdataset=corresp_ero.symbolicdataset).exists():
+                    raise ValidationError(
+                        "Output \"{}\" of RunStep \"{}\" is missing; no data should be associated".
+                        format(to, self))
+                
             else:
                 # The corresponding ERO should have existent data.
                 corresp_ero = step_er.execrecordouts.get(
@@ -403,9 +422,10 @@ class RunStep(models.Model):
 
     def is_complete(self):
         """True if RunStep is complete; false otherwise."""
-        step_er = self.execrecord
+        # Sub-Pipeline case:
         if hasattr(self, "child_run"):
-            step_er = self.child_run.execrecord
+            return self.child_run.is_complete()
+        # Method case:
         return step_er != None
     
     def complete_clean(self):
@@ -485,10 +505,13 @@ class RunSIC(models.Model):
         (from here on execrecord is assumed to be set)
          - it must be complete and clean
          - PSIC is the same as (or compatible to) self.execrecord.general_transf()
-         - if this RunSIC does not keep its output, there should be no existent
-           data associated.
-         - else if this RunSIC keeps its output:
+         
+         - if this RunSIC does not keep its output or its output is
+           missing, there should be no existent data associated.
+           
+         - else:
            - the corresponding ERO should have existent data associated
+
            - if the PSIC is not trivial and this RunSIC does not reuse an ER,
              then there should be existent data associated and it should also
              be associated to the corresponding ERO.
@@ -573,6 +596,9 @@ class RunSIC(models.Model):
                 "PSIC of RunSIC \"{}\" is incompatible with that of its ExecRecord".
                 format(self.PSIC))
 
+        # Check whether this has a missing output.
+        missing_output = len(self.log.missing_outputs()) != 0
+
         # If the output of this PSIC is not marked to keep, there should be
         # no data associated.
         if not self.PSIC.keep_output:
@@ -580,6 +606,15 @@ class RunSIC(models.Model):
                 raise ValidationError(
                     "RunSIC \"{}\" does not keep its output; no data should be produced".
                     format(self))
+
+
+        # Similar if the ExecLog shows missing output.
+        elif missing_output:
+            if self.has_data():
+                raise ValidationError(
+                    "RunSIC \"{}\" had a missing output; no data should be produced".
+                    format(self))
+            
         else:
             # The corresponding ERO should have existent data.
             corresp_ero = self.execrecord.execrecordouts.all()[0]
@@ -654,32 +689,47 @@ class RunOutputCable(models.Model):
         unique_together = ("run", "pipelineoutputcable")
 
 
-    # FIXME continue from here!  Make the appropriate changes to clean
-    # similar to what was done for RSIC.
-    # -- RL November 15, 2013
     def clean(self):
         """
         Check coherence of this RunOutputCable.
 
         In sequence, the checks we perform are:
          - pipelineoutputcable belongs to run.pipeline
-         - if it has been decided not to reuse an ER:
-           - if this cable is trivial, there should be no associated dataset
-           - otherwise, clean any associated dataset
+
+         - if an ExecLog is attached, complete_clean it
+
+         - if no decision has been made on reuse, check that no log is
+           associated, no data has been associated, and that ER is
+           unset
+
          - else if it has been decided to reuse an ER, check that there
            are no associated datasets
-         - else if no decision has been made, check that no data has
-           been associated, and that ER is unset
+         
+         - else if it has been decided not to reuse an ER:
+         
+           - if this cable is trivial, there should be no associated
+             dataset
+
+           - if no ExecLog is attached yet or it is incomplete, there
+             should be no associated dataset yet
+
+           (from here on, ExecLog is known to be attached and complete)
+
+           - otherwise, clean any associated dataset
+
         (after this point it is assumed that ER is set)
          - check that it is complete and clean
          - check that it's coherent with pipelineoutputcable
-         - if this ROC was not reused, any associated dataset should belong
-           to the corresponding ERO
-         - if this ROC's output was not marked for deletion, the corresponding
-           ERO should have existent data associated
-         - if the POC's output was not marked for deletion, the POC is not trivial,
-           and this ROC did not reuse an ER, then this ROC should have existent
-           data associated
+
+         - if this ROC's output was marked for deletion or
+           missing output, then no data should be associated
+
+         - else the corresponding ERO should have existent data
+           associated
+
+           - if this ROC did not reuse an ER and the cable is not
+             trivial, then this ROC should have existent data
+             associated and it should belong to the corresponding ERO
         """
         if (not self.run.pipeline.outcables.
                 filter(pk=self.pipelineoutputcable.pk).exists()):
@@ -687,7 +737,15 @@ class RunOutputCable(models.Model):
                 "POC \"{}\" does not belong to Pipeline \"{}\"".
                 format(self.pipelineoutputcable, self.run.pipeline))
 
+        if self.log.all().exists():
+            self.log.all()[0].complete_clean()
+
         if self.reused == None:
+            if self.log.all().exists():
+                raise ValidationError(
+                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no ExecLog should be associated".
+                    format(self))
+            
             if self.has_data():
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
@@ -711,8 +769,20 @@ class RunOutputCable(models.Model):
                         "RunOutputCable \"{}\" is trivial and should not have generated any Datasets".
                         format(self))
 
-            # Otherwise, check that there is at most one Dataset attached, and
-            # clean it.
+            if (not self.log.all().exists() or
+                    not self.log.all()[0].is_complete()):
+                if self.has_data():
+                    raise ValidationError(
+                        "RunOutputCable \"{}\" does not have a complete log so should not have generated any Datasets".
+                        format(self))
+
+                return
+
+            # From here on, ExecLog is known to be appropriately
+            # attached and complete.
+
+            # Otherwise, check that there is at most one Dataset
+            # attached, and clean it.
             elif self.has_data():
                 if self.output.count() > 1:
                     raise ValidationError(
@@ -743,6 +813,10 @@ class RunOutputCable(models.Model):
             is_deleted = self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
                 dataset_name=self.pipelineoutputcable.output_name).exists()
 
+        # November 18, 2013: check if there was missing output
+        # (i.e. some kind of messed up execution) in the ExecLog.
+        missing_output = len(self.log.missing_outputs()) != 0
+            
         # If the output of this ROC is marked for deletion, there should be no data
         # associated.
         if is_deleted:
@@ -750,13 +824,22 @@ class RunOutputCable(models.Model):
                 raise ValidationError(
                     "RunOutputCable \"{}\" is marked for deletion; no data should be produced".
                     format(self))
-        # If it isn't marked for deletion:
+
+        # If the output of this ROC was missing on execution, there
+        # should be no data associated.
+        elif missing_output:
+            if self.has_data():
+                raise ValidationError(
+                    "RunOutputCable \"{}\" had a missing output; no data should be produced".
+                    format(self))
+            
+        # If it isn't marked for deletion and the output isn't missing....
         else:
             # The corresponding ERO should have existent data.
             corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
             if not corresp_ero.has_data():
                 raise ValidationError(
-                    "RunOutputCable \"{}\" was not deleted; ExecRecordOut \"{}\" should reference existent data".
+                    "RunOutputCable \"{}\" was not deleted and did not have missing output; ExecRecordOut \"{}\" should reference existent data".
                     format(self, corresp_ero))
 
             # If the step was not reused and the cable was not
@@ -770,8 +853,9 @@ class RunOutputCable(models.Model):
                 # The associated data should belong to the ERO of
                 # self.execrecord (which has already been checked for
                 # completeness and cleanliness).
-                if not self.execrecord.execrecordouts.filter(
-                        symbolicdataset=self.output.all()[0].symbolicdataset).exists():
+                if (not self.execrecord.execrecordouts.filter(
+                        symbolicdataset=self.output.all()[0].symbolicdataset).
+                        exists()):
                     raise ValidationError(
                         "Dataset \"{}\" was produced by RunOutputCable \"{}\" but is not in an ERO of ExecRecord \"{}\"".
                         format(self.output.all()[0], self, self.execrecord))
@@ -959,6 +1043,15 @@ class ExecLog(models.Model):
             raise ValidationError(
                 "ExecLog \"{}\" represents a Method but has no associated MethodOutput".
                 format(self))
+
+    def missing_outputs(self):
+        """Returns the output SDs missing output from this execution."""
+        missing = []
+        for ccl in content_checks:
+            if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
+                missing.append(ccl.symbolicdataset)
+
+        return missing
 
 class MethodOutput(models.Model):
     """
