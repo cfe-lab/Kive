@@ -565,7 +565,7 @@ class CompoundDatatype(models.Model):
                 other_CDT.is_restriction(self))
 
     
-    def summarize_CSV(self, file_to_check, testing_path):
+    def summarize_CSV(self, file_to_check, summary_path):
         """
         Give metadata on the CSV: its number of rows, and any defects.
     
@@ -645,10 +645,10 @@ class CompoundDatatype(models.Model):
             for cdtm in cdt_members:
                 if cdtm.datatype.has_custom_constraint():
                     # This column is going to require running a verification
-                    # method, so we set up a place within testing_path to do
+                    # method, so we set up a place within summary_path to do
                     # so.
                     column_test_path = os.path.join(
-                        testing_path, "col{}".format(cdtm.column_idx))
+                        summary_path, "col{}".format(cdtm.column_idx))
     
                     # Set up the paths
                     # [testing path]/col[colnum]/
@@ -769,7 +769,7 @@ class CompoundDatatype(models.Model):
             with open(output_path, "rb") as test_out:
                 output_summary = summarize_CSV(
                     test_out, VERIF_OUT,
-                    os.path.join(testing_path, "SHOULDNEVERBEWRITTENTO"))
+                    os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
     
             if output_summary.has_key("bad_num_cols"):
                 raise ValueError(
@@ -788,7 +788,7 @@ class CompoundDatatype(models.Model):
     
             # This should really never happen.
             if os.path.exists(os.path.join(
-                    testing_path, "SHOULDNEVERBEWRITTENTO")):
+                    summary_path, "SHOULDNEVERBEWRITTENTO")):
                 raise ValueError(
                     "Verification output CDT \"{}\" has been corrupted".
                     format(VERIF_OUT))

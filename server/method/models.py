@@ -388,6 +388,8 @@ class Method(transformation.models.Transformation):
         default=False,
         help_text="Is this Method broken?")
 
+    pipelinesteps = generic.GenericRelation("pipeline.PipelineStep")
+
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""
         string_rep = u"Method {} {}".format("{}", self.revision_name)
@@ -438,6 +440,42 @@ class Method(transformation.models.Transformation):
                         compounddatatype = parent_output.get_cdt(),
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
+
+    def find_compatible_ER(self, input_SDs):
+        """
+        Helper that finds an ER that we can reuse given these inputs.
+    
+        input_SDs is a list of inputs to this Method in the proper
+        order.
+        """
+        # Look through all PipelineSteps that use this Method; then
+        # look at all the RunSteps corresponding to it and their ERs.
+        for possible_PS in self.pipelinesteps.all():
+            for possible_RS in possible_PS.pipelinestep_instances.filter(
+                    reused=False):
+                candidate_ER = possible_RS.execrecord
+
+                # Check if its outputs are OK; if not, move on.
+                if not candidate_ER.outputs_OK():
+                    continue
+
+                # From here on we know the outputs are OK.  Check if
+                # the inputs match.
+                ER_matches = True
+                for ERI in candidate_ER.execrecordins.all():
+                    # Get the input index of this ERI.
+                    input_idx = ERI.generic_input.dataset_idx
+                    if ERI.symbolicdataset != input_SDs[input_idx-1]:
+                        ER_matches = False
+                        break
+                        
+                # At this point all the ERIs have matched the inputs.  So,
+                # we have found our candidate.
+                if ER_matches:
+                    return candidate_ER
+    
+        # We didn't find anything.
+        return None
 
     def run_code(self, run_path, input_paths, output_paths,
                  output_handle, error_handle):

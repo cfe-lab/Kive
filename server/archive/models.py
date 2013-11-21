@@ -435,16 +435,28 @@ class RunStep(models.Model):
             raise ValidationError(
                 "RunStep \"{}\" is not complete".format(self))
 
-    # FIXME fill this in!
-    def failed_execution(self):
+    def successful_execution(self):
         """
-        True if RunStep is failed; false otherwise.
+        True if RunStep is successful; False otherwise.
         
-        The RunStep is failed if any of its cables fail, or if the ER
-        was tainted at the time of the RunStep's completion.
-        """
-        pass
+        The RunStep is failed if any of its cables fail, if the
+        ExecLog has a non-0 return code, or if there are any
+        associated failed content/integrity checks.
 
+        PRE: this RS is clean and complete.
+        """
+        for cable in self.RSICs.all():
+            if not cable.successful_execution():
+                return False
+
+        log_qs = self.log.all()
+        if not log_qs.exists():
+            return True
+
+        # From this point on it is known that there is an ExecLog.
+        return log_qs[0].is_successful()
+            
+        
 class RunSIC(models.Model):
     """
     Annotates the action of a PipelineStepInputCable within a RunStep.
@@ -651,10 +663,22 @@ class RunSIC(models.Model):
     def has_data(self):
         """True if associated output exists; False if not."""
         return self.output.all().exists()
+    
+    def successful_execution(self):
+        """
+        True if RunSIC is successful; False otherwise.
+        
+        The RunStep is failed if there are any associated failed
+        content/integrity checks.
 
-    # FIXME fill this in!
-    def failed_execution(self):
-        pass
+        PRE: this RunSIC is clean and complete.
+        """
+        log_qs = self.log.all()
+        if not log_qs.exists():
+            return True
+
+        # From this point on it is known that there is an ExecLog.
+        return log_qs[0].is_successful()
 
 class RunOutputCable(models.Model):
     """
@@ -877,6 +901,23 @@ class RunOutputCable(models.Model):
         """True if associated output exists; False if not."""
         return self.output.all().exists()
 
+    def successful_execution(self):
+        """
+        True if this RunOutputCable is successful; False otherwise.
+        
+        The ROC is failed if there are any associated failed
+        content/integrity checks.
+
+        This is basically exactly the same as for an RSIC.
+
+        PRE: this ROC is clean and complete.
+        """
+        log_qs = self.log.all()
+        if not log_qs.exists():
+            return True
+
+        # From this point on it is known that there is an ExecLog.
+        return log_qs[0].is_successful()
 
 
 class Dataset(models.Model):
@@ -1052,6 +1093,25 @@ class ExecLog(models.Model):
                 missing.append(ccl.symbolicdataset)
 
         return missing
+
+    def is_successful(self):
+        """True if this execution was successful; False otherwise."""
+        # If this ExecLog has a MethodOutput, check its return code.
+        if (hasattr(self, "methodoutput") and
+                self.methodoutput.return_code != 0):
+            return False
+
+        for icl in self.integrity_checks.all():
+            if icl.is_fail():
+                return False
+
+        for ccl in self.content_checks.all():
+            if ccl.is_fail():
+                return False
+
+        # Having reached here, we are comfortable with the execution.
+        return True
+        
 
 class MethodOutput(models.Model):
     """

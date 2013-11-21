@@ -171,31 +171,6 @@ class Transformation(models.Model):
 
         return new_output
 
-    def find_compatible_ER(self, input_SDs):
-        """
-        Helper that finds an ER that we can reuse given these inputs.
-    
-        input_SDs is a list of inputs to transformation in the proper
-        order.
-        """
-        for candidate_ER in self.execrecords.all():
-            ER_matches = True
-            for ERI in candidate_ER.execrecordins.all():
-                # Get the input index of this ERI.
-                input_idx = ERI.generic_input.dataset_idx
-                if ERI.symbolicdataset != input_SDs[input_idx-1]:
-                    ER_matches = False
-                    break
-                    
-            # At this point all the ERIs have matched the inputs.  So,
-            # we have found our candidate.
-            if ER_matches:
-                return candidate_ER
-    
-        # We didn't find anything.
-        return None
-    
-
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
 class TransformationXput(models.Model):

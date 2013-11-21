@@ -35,8 +35,12 @@ class ContentCheckLog(models.Model):
         Basically all this does is call clean on any BadData
         associated to it.
         """
-        if hasattr(self, "baddata"):
+        if self.is_fail():
             self.baddata.clean()
+
+    def is_fail(self):
+        """True if this content check is a failure."""
+        return hasattr(self, "baddata")
 
 class BadData(models.Model):
     """
@@ -189,8 +193,12 @@ class IntegrityCheckLog(models.Model):
 
         Calls clean on its child MD5Conflict, if it exists.
         """
-        if hasattr(self, "usurper"):
+        if self.is_fail():
             self.usurper.clean()
+
+    def is_fail(self):
+        """True if this integrity check is a failure."""
+        return hasattr(self, "usurper")
 
 class MD5Conflict(models.Model):
     """

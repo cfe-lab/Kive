@@ -7,6 +7,13 @@ import os.path
 import sys
 import time
 
+from datetime import datetime
+
+import transformation.models
+import pipeline.models
+import method.models
+import metadata.models
+
 class Sandbox:
     """
     Represents the state of a run.
@@ -99,8 +106,9 @@ class Sandbox:
            is a recovery operation (i.e. re-running something that was
            reused in order to recover some non-persistent output).
 
-           If recover == True, then output_path and parent_record are
-           ignored.
+        If recover == True, then input_SD, output_path, and
+        parent_record are ignored; output_path is recovered using the
+        maps.
 
         Returns an RSIC/ROC that describes this cable's running.
         Also, sd_fs_map and cable_map will have been updated.
@@ -236,8 +244,11 @@ class Sandbox:
             curr_record = self.cable_map[cable]
             curr_ER = curr_record.execrecord
 
+            input_SD = curr_ER.execrecordins.all()[0].symbolicdataset
+
             output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
             output_SD_CDT = output_SD.get_cdt()
+            output_path = self.sd_fs_map[output_SD]
 
         # FINISHED CREATING/RETRIEVING RECORD
         ####
@@ -266,7 +277,12 @@ class Sandbox:
             # 1B) input_SD doesn't have data (It was symbolically-reused)
             # --> We backtrack to this point, then run the cable
             else:
-                self.recover(input_SD)
+                successful_recovery = self.recover(input_SD)
+
+                if not successful_recovery:
+                    # We return the incomplete curr_record (missing an
+                    # ExecLog).
+                    return curr_record
 
                 curr_log = cable.run_cable(self.sd_fs_map[input_SD],
                                            output_path, curr_record)
@@ -348,8 +364,6 @@ class Sandbox:
             # we leave num_rows = -1 and MD5_checksum = "".
             ccl = output_SD.content_checks.create(execlog=curr_log)
             ccl.baddata.create(missing_output=True)
-
-            
             
         else:
             # Extract the MD5.
@@ -382,58 +396,27 @@ class Sandbox:
                 # FINISHED REGISTERING REAL DATA
                 ####
 
-                if not had_ER_at_beginning and not cable.is_raw():
+                if not had_ER_at_beginning:
                     ####
                     # PERFORM CONTENT CHECK ON FIRST TIME OF CREATION
                     
-                    csv_summary = None
                     # A path to perform the CSV check if necessary.
                     summary_path = "{}_summary".format(output_path)
-                    with open(output_path, "rb") as f:
-                        csv_summary = output_SD_CDT.summarize_CSV(
-                            f, summary_path)
-                    
-                    ccl = output_SD.content_checks.create(execlog=curr_log)
-                    
-                    # Check for a malformed header (and thus a
-                    # malformed file).
-                    if ("bad_num_cols" in csv_summary or
-                            "bad_col_indices" in csv_summary):
-                        ccl.baddata.create(bad_header=True)
 
-                    else:
-                        # The header was OK, so we have the number of
-                        # rows.
-                        csv_baddata = None
-                        output_SD.structure.num_rows = csv_summary["num_rows"]
-                        if (csv_summary["num_rows"] > cable.dest.get_max_row()
-                                or (csv_summary["num_rows"] <
-                                    cable.dest.get_min_row())):
-                            csv_baddata = ccl.baddata.create(bad_num_rows=True)
+                    cable_min_row = None
+                    cable_max_row = None
+                    # Set these if this cable is not raw.
+                    if not cable.is_raw():
+                        if type(cable) == pipeline.models.PipelineStepInputCable:
+                            cable_min_row = cable.dest.get_min_row()
+                            cable_max_row = cable.dest.get_max_row()
+                        else:
+                            cable_min_row = cable.source.get_min_row()
+                            cable_max_row = cable.source.get_max_row()
 
-                        if "failing_cells" in csv_summary:
-                            # Create a BadData object if it doesn't
-                            # already exist.
-                            if csv_baddata == None:
-                                csv_baddata = ccl.baddata.create(
-                                    bad_num_rows=True)
-
-                            # row, col are indices.
-                            for row, col in csv_summary["failing_cells"]:
-                                fails = csv_summary["failing_cells"][(row,col)]
-                                for failed_constr in fails:
-                                    new_ce = csv_baddata.cell_errors.create(
-                                        row_num=row,
-                                        column=output_SD_CDT.get(
-                                            column_idx=col))
-
-                                    # If the failure is a string (e.g.
-                                    # "Was not integer"), then leave
-                                    # constraint_failed as null.
-                                    if type(failed_constr) != str:
-                                        new_ce.constraint_failed = failed_constr
-
-                                    new_ce.save()
+                    ccl = output_SD.check_file_contents(
+                        output_path, summary_path, cable_min_row,
+                        cable_max_row, curr_log)
                                     
                     # FINISHED CONTENT CHECK ON FIRST TIME OF CREATION
                     ####
@@ -443,18 +426,10 @@ class Sandbox:
             elif recover or had_ER_at_beginning:
                 ####
                 # PERFORM INTEGRITY CHECK
-                
-                icl = output_SD.integrity_checks.create(
-                    execlog=curr_log)
-                
-                if output_md5 != output_SD.MD5_checksum:
-                    evil_twin = SymbolicDataset.create_SD(
-                        output_path, cdt=output_SD_CDT,
-                        user=self.user,
-                        name="{}eviltwin".format(output_SD),
-                        description="MD5 conflictor of {}".format(output_SD))
 
-                    icl.usurper.create(conflicting_SD=evil_twin)
+                icl = output_SD.check_integrity(output_path, curr_log,
+                                                output_md5)
+                
                 # FINISHED INTEGRITY CHECK
                 ####
                             
@@ -484,8 +459,8 @@ class Sandbox:
         ####
         return curr_record
 
-    # FIXME continue from here tomorrow
-    def execute_step(self, pipelinestep, inputs, step_run_dir=None):
+    def execute_step(self, pipelinestep, inputs, step_run_dir=None,
+                     recover=False):
         """
         Execute the specified PipelineStep with the given inputs.
 
@@ -493,6 +468,12 @@ class Sandbox:
         specified in output_paths.  The requisite code is placed
         in step_run_dir; if step_run_dir is None, then the default
         is [sandbox path]/step[stepnum].
+
+        If recover == True, then we perform this in recovery mode,
+        where we don't create a new RS or ER, but we fill in an old RS
+        with a new ExecLog and we confirm the output in the ER.  In
+        this case, the parameter value of step_run_dir is ignored and
+        retrieved using the maps.
 
         Outputs get written to
         [step run dir]/output_data/step[step number]_[output name]
@@ -505,128 +486,163 @@ class Sandbox:
         Logs get written to
         [step run dir]/logs/step[step number]_std(out|err).txt
         """
-        curr_RS = pipelinestep.pipelinestep_instances.create()
-
-        ####
-        # SET UP DIRECTORY FOR RUNNING THIS STEP AND PATHS
-        step_run_dir = step_run_dir or os.path.join(
-            self.sandbox_path, "step{}".format(pipelinestep.step_num))
-
-        file_access_utils.set_up_directory(step_run_dir)
-        # Set up inputs, outputs, and logs directories.
-        in_dir = os.path.join(step_run_dir, "input_data")
-        out_dir = os.path.join(step_run_dir, "output_data")
-        file_access_utils.set_up_directory(in_dir)
-        file_access_utils.set_up_directory(out_dir)
-
+        # Some preamble.
+        curr_RS = None
+        curr_ER = None
         output_paths = []
-        for (curr_output in pipelinestep.transformation.outputs.all().
-             order_by("dataset_idx")):
-            file_suffix = "raw" if curr_output.is_raw() else "csv"
-                
-            output_paths.append(os.path.join(
-                out_dir, "step{}_{}.{}".format(
-                    pipelinestep.step_num, curr_output.dataset_name,
-                    file_suffix)))
-
-        # FINISHED SETTING UP DIRECTORY AND PATHS
-        ####
-
-        ####
-        # RUN CABLES
-
-        # Run all PSICs.  This list stores the SDs that come out of the
-        # cables (and get fed directly into the transformation).
         inputs_after_cable = []
-        for (curr_input in pipelinestep.transformation.inputs.all().
-             order_by("dataset_idx")):
-            corresp_cable = pipelinestep.cables_in.get(
-                transf_input=curr_input)
-            
-            curr_RSIC = self.execute_cable(
-                corresp_cable, inputs[curr_input.dataset_idx-1],
-                os.path.join(
-                    in_dir,
-                    "step{}_{}".format(
-                        pipelinestep.step_num,
-                        curr_input.dataset_name)),
-                curr_RS)
-
-            inputs_after_cable.append(
-                curr_RSIC.execrecord.execrecordouts.
-                all()[0].symbolicdataset)
-            
-        # Sanity check
-        curr_RS.clean()
-
-        # FINISHED RUNNING CABLES
-        ####
+        in_dir = ""
+        out_dir = ""
+        log_dir = ""
+        had_ER_at_beginning = False
 
         ####
-        # CHECK WHETHER WE CAN REUSE AN ER FOR A METHOD
+        # SET UP RUNSTEP, OUTPUT PATHS, INPUTS, ER....
 
-        # Look for an ER that we can reuse.  It must represent the same
-        # transformation, and take the same input SDs.
-        curr_ER = pipelinestep.transformation.find_compatible_ER(
-            inputs_after_cable)
-        
-        # If it found an ER, check that the ER provides all of the
-        # output that we need.
-        if curr_ER != None:
-            outputs_needed = pipelinestep.outputs_to_retain()
-            if curr_ER.provides_outputs(outputs_needed):
-                ####
-                # REUSE AN ER
+        ####
+        # NON-RECOVERY CASE
+        if not recover:
+            curr_RS = pipelinestep.pipelinestep_instances.create()
+            step_run_dir = step_run_dir or os.path.join(
+                self.sandbox_path, "step{}".format(pipelinestep.step_num))
+
+            # Set up run directory.
+            file_access_utils.set_up_directory(step_run_dir)
+            # Set up inputs, outputs, and logs directories.
+            in_dir = os.path.join(step_run_dir, "input_data")
+            file_access_utils.set_up_directory(in_dir)
+            out_dir = os.path.join(step_run_dir, "output_data")
+            file_access_utils.set_up_directory(out_dir)
+            log_dir = os.path.join(step_run_dir, "logs")
+            file_access_utils.set_up_directory(log_dir)
+
+            # Set up output paths.
+            for (curr_output in pipelinestep.transformation.outputs.all().
+                 order_by("dataset_idx")):
+                file_suffix = "raw" if curr_output.is_raw() else "csv"
+                    
+                output_paths.append(os.path.join(
+                    out_dir, "step{}_{}.{}".format(
+                        pipelinestep.step_num, curr_output.dataset_name,
+                        file_suffix)))
+
+    
+            # Run all PSICs.  This list stores the SDs that come out of the
+            # cables (and get fed directly into the transformation).
+            for (curr_input in pipelinestep.transformation.inputs.all().
+                 order_by("dataset_idx")):
+                corresp_cable = pipelinestep.cables_in.get(
+                    transf_input=curr_input)
                 
-                # The ER found has what we need, so we can reuse it.
-                curr_RS.reused = True
-                curr_RS.execrecord = curr_ER
-                curr_RS.complete_clean()
-                curr_RS.save()
-
-                # Update the maps.
-
-                # Since this is the reused = True case, step_run_dir
-                # represents where the code *should be* -- later you
-                # might actually fill it in.
-                self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
-
-                # Add every output of this transformation to
-                # sd_fs_map.
-                for step_output in pipelinestep.transformation.outputs.all():
-                    corresp_ero = curr_ER.execrecordouts.get(
-                        content_type=ContentType.objects.get_for_model(
-                            type(step_output)),
-                        object_id=step_output.pk)
-
-                    corresp_SD = corresp_ero.symbolicdataset
-
-                    # Compensate for 0-basedness.
-                    corresp_path = output_paths[step_output.dataset_idx-1]
-
-                    # Update sd_fs_map and socket_map.
-                    if corresp_SD not in self.sd_fs_map:
-                        # If this is the first time this file would have
-                        # appeared on the filesystem, this is where it
-                        # *should* go -- later it might actually be filled
-                        # in here during a "recover" operation.
-                        self.sd_fs_map[corresp_SD] = corresp_path
-
-                    self.socket_map[(pipelinestep, step_output)] = corresp_SD
-
-                return curr_RS
+                curr_RSIC = self.execute_cable(
+                    corresp_cable, inputs[curr_input.dataset_idx-1],
+                    os.path.join(
+                        in_dir,
+                        "step{}_{}".format(
+                            pipelinestep.step_num,
+                            curr_input.dataset_name)),
+                    curr_RS)
+    
+                inputs_after_cable.append(
+                    curr_RSIC.execrecord.execrecordouts.
+                    all()[0].symbolicdataset)
                 
-                # FINISHED REUSING AN ER
-                ####
-
-        # FINISHED LOOKING FOR REUSABLE ER
+            # Sanity check
+            curr_RS.clean()
+    
+            # Look for an ER that we can reuse.  It must represent the same
+            # transformation, and take the same input SDs.
+            curr_ER = pipelinestep.transformation.find_compatible_ER(
+                inputs_after_cable)
+            
+            # If it found an ER, check that the ER provides all of the
+            # output that we need.
+            if curr_ER != None:
+                had_ER_at_beginning = True
+                outputs_needed = pipelinestep.outputs_to_retain()
+                if curr_ER.provides_outputs(outputs_needed):
+                    ####
+                    # REUSE AN ER
+                    
+                    # The ER found has what we need, so we can reuse it.
+                    curr_RS.reused = True
+                    curr_RS.execrecord = curr_ER
+                    curr_RS.complete_clean()
+                    curr_RS.save()
+    
+                    # Update the maps.
+    
+                    # Since this is the reused = True case, step_run_dir
+                    # represents where the code *should be* -- later you
+                    # might actually fill it in.
+                    self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
+    
+                    # Add every output of this transformation to
+                    # sd_fs_map.
+                    for step_output in pipelinestep.transformation.outputs.all():
+                        corresp_ero = curr_ER.execrecordouts.get(
+                            content_type=ContentType.objects.get_for_model(
+                                type(step_output)),
+                            object_id=step_output.pk)
+    
+                        corresp_SD = corresp_ero.symbolicdataset
+    
+                        # Compensate for 0-basedness.
+                        corresp_path = output_paths[step_output.dataset_idx-1]
+    
+                        # Update sd_fs_map and socket_map.
+                        if corresp_SD not in self.sd_fs_map:
+                            # If this is the first time this file would have
+                            # appeared on the filesystem, this is where it
+                            # *should* go -- later it might actually be filled
+                            # in here during a "recover" operation.
+                            self.sd_fs_map[corresp_SD] = corresp_path
+    
+                        self.socket_map[(pipelinestep, step_output)] = corresp_SD
+    
+                    return curr_RS
+                    
+                    # FINISHED REUSING AN ER
+                    ####
+                
         ####
+        # RECOVERY CASE
+        else:
+            step_run_dir, curr_RS = self.ps_map(pipelinestep)
 
+            # We will use these:
+            in_dir = os.path.join(step_run_dir, "input_data")
+            out_dir = os.path.join(step_run_dir, "output_data")
+            log_dir = os.path.join(step_run_dir, "logs")
+
+            for (curr_output in pipelinestep.transformation.outputs.all().
+                 order_by("dataset_idx")):
+                # Get the SymbolicDataset that comes from this output
+                # using socket_map; then use sd_fs_map to get its
+                # path.
+                corresp_SD = self.socket_map(pipelinestep, curr_output)
+                output_paths.append(self.sd_fs_map[corresp_SD])
+
+            # Retrieve the input SDs from the ER.
+            for (curr_input in pipelinestep.transformation.inputs.all().
+                 order_by("dataset_idx")):
+                corresp_ERI = curr_ER.execrecordins.get(
+                    content_type=ContentType.objects.get_for_model(
+                        transformation.models.TransformationInput),
+                    object_id=curr_input.pk)
+                inputs_after_cable.append(corresp_ERI.symbolicdataset)
+
+            curr_ER = curr_RS.execrecord
+            had_ER_at_beginning = True
+
+        # FINISHED SETTING UP RUNSTEP, OUTPUT PATHS, INPUTS, ER....
         ####
-        # ACTUALLY RUN CODE
         
         # Having reached this point, we know we can't reuse an ER.
         # We will have to actually run code.
+
+        ####
+        # PUT ALL DATASETS INTO PLACE
 
         # First, make sure all the input files have been written to
         # the sandbox.  Note that by this point, any inputs that we
@@ -634,220 +650,258 @@ class Sandbox:
         for curr_in_SD in inputs_after_cables:
             curr_path = sd_fs_map[curr_in_SD]['PATH']
             if not os.access(curr_path, "F_OK"):
-                self.recover(curr_in_SD)
+                successful_recovery = self.recover(curr_in_SD)
 
-        # If it's a method, run the code; if not, call execute on the
-        # pipeline.
-        if type(pipelinestep.transformation) == Method:
-            ####
-            # RUN CODE: METHOD
-            #
-            # We need to then register the output paths with the
-            # appropriate SDs, creating Datasets as necessary.
+                if not successful_recovery:
+                    # We return the incomplete curr_record (missing an
+                    # ExecLog).
+                    return curr_record
 
-            # Set up a log directory.
-            log_dir = os.path.join(step_run_dir, "logs")
-            file_access_utils.set_up_directory(log_dir)
+        # FINISHED PUTTING ALL DATASETS INTO PLACE
+        ####
             
-            stdout_path = os.path.join(log_dir, "step{}_stdout.txt".
-                                       format(pipelinestep.step_num))
-            stderr_path = os.path.join(log_dir, "step{}_stderr.txt".
-                                       format(pipelinestep.step_num))
 
-            method_popen = None
-            with (open(stdout_path, "wb", 1), 
-                  open(stderr_path, "wb", 0) as (outwrite, errwrite):
-                method_popen = pipelinestep.transformation.run_code(
-                    step_run_dir,
-                    [sd_fs_map[x]['PATH'] for x in inputs_after_cables],
-                    output_paths, outwrite, errwrite)
+        ####
+        # ACTUALLY RUN CODE
 
-                # While it's running, print the captured stdout and
-                # stderr to the console.
-                with (open(stdout_path, "rb", 1), 
-                      open(stderr_path, "rb", 0)) as (outread, errread):
-                    while method_open.poll() != None:
-                        sys.stdout.write(outread.read())
-                        sys.stderr.write(errread.read())
-                        time.sleep(1)
-                        
-                    # One last write....
-                    outwrite.flush()
-                    errwrite.flush()
+        # First, the easy case when this step is a sub-Pipeline.  Note
+        # that this case never occurs when we are recovering.
+        if type(pipelinestep.transformation) == pipeline.models.Pipeline:
+            ####
+            # RUN PIPELINE
+            
+            child_run = self.execute_pipeline(
+                pipeline=pipelinestep.transformation,
+                inputs=inputs_after_cables,
+                parent_runstep=curr_RS)
+
+            # This is implicit from the above.
+            # curr_RS.child_run = child_run
+
+            return curr_RS
+
+            # FINISHED RUNNING PIPELINE
+            ####
+
+        # From this point on we know that this step was a Method.
+        
+        ####
+        # RUN CODE: METHOD
+        #
+        # Log paths.
+            
+        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".
+                                   format(pipelinestep.step_num))
+        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".
+                                   format(pipelinestep.step_num))
+
+        method_popen = None
+
+        # Create an ExecLog; this sets its start_time.
+        curr_log = archive.models.ExecLog(record=curr_RS)
+        
+        with (open(stdout_path, "wb", 1), 
+              open(stderr_path, "wb", 0) as (outwrite, errwrite):
+            method_popen = pipelinestep.transformation.run_code(
+                step_run_dir,
+                [sd_fs_map[x]['PATH'] for x in inputs_after_cables],
+                output_paths, outwrite, errwrite)
+
+            # While it's running, print the captured stdout and
+            # stderr to the console.
+            with (open(stdout_path, "rb", 1), 
+                  open(stderr_path, "rb", 0)) as (outread, errread):
+                while method_open.poll() != None:
                     sys.stdout.write(outread.read())
                     sys.stderr.write(errread.read())
-
-            # The method has finished running.  Make sure all output
-            # has been flushed.
-            sys.stdout.flush()
-            sys.stderr.flush()
-
-            # If the return code was not 0, we bail.
-            if method_popen.returncode != 0:
-                raise ValueError(
-                    "Step {} of run {} returned with exit code {}".
-                    format(pipelinestep.step_num,
-                           self.run, method_popen.returncode))
-
-            # FINISHED RUNNING METHOD
-            ####
-
-            ####
-            # CHECK OUTPUTS
-            
-            # Now, we need to confirm that all of the outputs are present.
-            # If they are all present, then:
-            # 1) if they can be confirmed against past data, do it
-            # 2) check the contents of the CSV.
-
-            # This is keyed by the position index of the generating
-            # output and stores the computed MD5s of the corresponding
-            # output files.
-            output_MD5s = {}
-            output_nums_rows = {}
-            for i, output_path in enumerate(output_paths):
-                # i is 0-based; dataset_idx is 1-based.
-                output_idx = i + 1
-                corresp_output = pipelinestep.transformation.outputs.get(
-                    dataset_idx=output_idx)
+                    time.sleep(1)
                 
-                if not os.access(output_path, "F_OK"):
-                    raise ValueError(
-                        "Step {} of run {} did not create output file {}".
-                        format(pipelinestep.step_num, self.run,
-                               output_path))
+                # One last write....
+                outwrite.flush()
+                errwrite.flush()
+                sys.stdout.write(outread.read())
+                sys.stderr.write(errread.read())
 
-                # Compute the MD5 checksum.
-                with open(output_path, "rb") as f:
-                    output_MD5s[output_idx] = file_access_utils.compute_MD5(f)
+        # The method has finished running.  Make sure all output
+        # has been flushed.
+        sys.stdout.flush()
+        sys.stderr.flush()
 
-                if not corresp_output.is_raw():
-                    output_summary = None
-                    # A place to validate this output.
-                    val_dir = "{}_validation".format(output_path)
-                    
-                    with open(output_path, "rb") as f:
-                        output_summary = file_access_utils.summarize_CSV(
-                            f, corresp_output.get_cdt(), val_dir)
+        # Mark the end time in the ExecLog and save; then
+        # create a MethodOutput object with all of the output.
+        curr_log.end_time = datetime.now()
+        curr_log.clean()
+        curr_log.save()
 
-                    if output_summary.has_key("bad_num_cols"):
-                        raise ValueError(
-                            "Output of Method \"{}\" had the wrong number of columns".
-                            format(pipelinestep.transformation))
+        curr_mo = MethodOutput(
+            execlog=curr_log,
+            return_code = method_popen.returncode)
+        with (open(stdout_path, "rb"), 
+              open(stderr_path, "rb")) as (outread, errread):
+            curr_mo.output_log.save(stdout_path, File(outread))
+            curr_mo.error_log.save(stderr_path, File(errread))
+        curr_mo.clean()
+        curr_mo.save()
 
-                    if output_summary.has_key("bad_col_indices"):
-                        raise ValueError(
-                            "Output of Method \"{}\" had a malformed header".
-                            format(pipelinestep.transformation))
+        # Sanity check.
+        curr_log.complete_clean()
 
-                    if output_summary.has_key("failing_cells"):
-                        raise ValueError(
-                            "Output of Method \"{}\" had malformed entries".
-                            format(pipelinestep.transformation))
+        # FINISHED RUNNING METHOD
+        ####
 
-                    output_nums_rows[output_idx] = output_summary["num_rows"]
+        
+        ####
+        # CREATE EXECRECORD IF NECESSARY
+        
+        # Create a fresh ER if none was found.
+        if curr_ER == None:
+            curr_ER = pipelinestep.transformation.execrecords.create()
 
-                        
-                # If an ER was found but insufficient, there will be
-                # SymbolicDatasets representing the outputs; this
-                # allows us to check the MD5 checksum.
-                if curr_ER != None:
-                    corresp_ERO = curr_ER.execrecordouts.get(
-                        content_type=ContentType.objects.get_for_model(
-                            TransformationOutput),
-                        object_id=corresp_output.pk)
-                    if (output_MD5s[output_idx] != 
-                            corresp_ERO.symbolicdataset.MD5_checksum):
-                        raise ValueError(
-                            "Output \"{}\" of Method \"{}\" failed integrity check".
-                            format(output_path, pipelinestep.transformation))
+            for curr_input in pipelinestep.transformation.inputs.all():
+                corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
+                curr_ER.execrecordins.create(
+                    generic_input=curr_input,
+                    symbolicdataset=corresp_input_SD)
 
-            # FINISHED CHECKING OUTPUTS
-            #### 
-            
-            ####
-            # CREATE EXECRECORD AND REGISTER DATASETS (bookkeeping)
-            
-            # Create a fresh ER if none was found.
-            if curr_ER == None:
-                curr_ER = pipelinestep.transformation.execrecords.create()
-
-                for curr_input in pipelinestep.transformation.inputs.all():
-                    corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
-                    curr_ER.execrecordins.create(
-                        generic_input=curr_input,
-                        symbolicdataset=corresp_input_SD)
-
-                for curr_output in pipelinestep.transformation.outputs.all():
-                    # Make new outputs.
-                    corresp_output_SD = SymbolicDataset(
-                        MD5_checksum=output_MD5s[curr_output.dataset_idx])
-                    corresp_output_SD.save()
-
-                    # If the output was not raw, create a structure as well.
-                    if not curr_output.is_raw():
-                        corresp_output_SD.structure.create(
-                            compounddatatype=curr_output.get_cdt(),
-                            num_rows=output_nums_rows[curr_output.dataset_idx])
-
-                    corresp_output_SD.clean()
-
-                    curr_ER.execrecordouts.create(
-                        generic_output=curr_output,
-                        symbolicdataset=corresp_output_SD)
-
-            # Go through the outputs: if an output is not marked for
-            # deletion, *and* there was no data in the corresponding
-            # ERO, create a Dataset.
             for curr_output in pipelinestep.transformation.outputs.all():
-                corresp_ERO = curr_ER.execrecordouts.get(
-                    content_type=ContentType.objects.get_for_model(
-                        TransformationOutput),
-                    object_id=curr_output.pk)
-                if (not pipelinestep.outputs_to_delete.filter(
-                        pk=curr_output.pk).exists() and 
-                        not corresp_ERO.has_data()):
-                    desc = """run: {}
-user: {}
-step: {}
-method: {}
-output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
-                     pipelinestep.transformation, curr_output.dataset_name)
-                    new_DS = Dataset(
-                        user=self.user,
-                        name="run:{}__step:{}__method:{}__output:{}".format(
-                            self.run.name, pipelinestep.step_num,
-                            pipelinestep.transformation,
-                            curr_output.dataset_name),
-                        description=desc,
-                        symbolicdataset=corresp_ERO.symbolicdataset,
-                        created_by=curr_RS)
+                # Make new outputs with blank MD5s and num_rows = -1
+                # for now (we'll fill them in later).
+                corresp_output_SD = SymbolicDataset(MD5_checksum="")
+                corresp_output_SD.save()
 
-                    # Recall that dataset_idx is 1-based, and
-                    # output_paths is 0-based.
-                    with open(output_paths[curr_output.dataset_idx-1], "rb") as f:
-                        new_DS.dataset_file.save(
-                            os.path.basename(output_path),
-                            File(f))
-                    new_DS.clean()
-                    new_DS.save()
+                # If the output was not raw, create a structure as well.
+                if not curr_output.is_raw():
+                    corresp_output_SD.structure.create(
+                        compounddatatype=curr_output.get_cdt(),
+                        num_rows=-1)
 
-            # Add the output log and error log with the ER (if it already
-            # had logs, replace them).
-            if curr_ER.output_log != None:
-                curr_ER.output_log.delete()
-            with open(stdout_path, "rb") as out:
-                curr_ER.output_log.save(os.path.basename(stdout_path),
-                                        File(out))
-                                        
-            if curr_ER.error_log != None:
-                curr_ER.error_log.delete()
-            with open(stderr_path, "rb") as err:
-                curr_ER.error_log.save(os.path.basename(stderr_path),
-                                       File(err))
+                corresp_output_SD.clean()
 
-            # Make sure the ER is clean and complete.
+                curr_ER.execrecordouts.create(
+                    generic_output=curr_output,
+                    symbolicdataset=corresp_output_SD)
+
+            # Sanity check
             curr_ER.complete_clean()
+
+        # FINISHED CREATING ER
+        ####
+
+        # From here on, curr_ER is appropriately set.
+
+        ####
+        # CHECK OUTPUTS
+
+        # Flag that indicates whether we have detected any problems
+        # with the output.  If so, we then exit without checking the
+        # rest of the data.
+        bad_output_found = False
+        for curr_output in pipelinestep.transformation.outputs.all():
+            output_path = output_paths[curr_output.dataset_idx-1]
+            output_ERO = curr_ER.execrecordouts.get(
+                content_type=ContentType.objects.get_for_model(
+                    transformation.models.TransformationOutput),
+                object_id=curr_output.pk)
+            output_SD = output_ERO.symbolicdataset
+        
+            # Check that the file exists, as we did for cables.
+            if not os.access(output_path, os.R_OK):
+                ccl = output_SD.content_checks.create(execlog=curr_log)
+                ccl.baddata.create(missing_output=True)
+
+                bad_output_found = True
+                continue
+
+            # Compute the MD5 checksum of this file.
+            output_md5 = ""
+            with open(output_path, "rb") as f:
+                output_md5 = file_access_utils.compute_MD5(f)
+
+            # If this is the first time we've ever seen this file,
+            # save its MD5 checksum.
+            if not had_ER_at_beginning:
+                output_SD.MD5_checksum = curr_MD5
+            
+            # Create a Dataset for this file if we are retaining this
+            # output and if the corresponding ERO didn't already have
+            # a Dataset associated.  Note: this would never happen
+            # when in recovery mode.
+            if (not pipelinestep.outputs_to_delete.filter(
+                    pk=curr_output.pk).exists() and 
+                    not output_ERO.has_data()):
+                desc = "run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}"
+                desc = desc.format(
+                    self.run.name, self.user, pipelinestep.step_num,
+                    pipelinestep.transformation, curr_output.dataset_name)
+                new_DS = Dataset(
+                    user=self.user,
+                    name=("run:{}__user:{}__step:{}__method:{}__output:{}".
+                          format(self.run.name, pipelinestep.step_num,
+                                 pipelinestep.transformation,
+                                 curr_output.dataset_name)),
+                    description=desc,
+                    symbolicdataset=output_SD,
+                    created_by=curr_RS)
+
+                # Recall that dataset_idx is 1-based, and
+                # output_paths is 0-based.
+                with open(output_path, "rb") as f:
+                    new_DS.dataset_file.save(os.path.basename(output_path),
+                                             File(f))
+                new_DS.clean()
+                new_DS.save()
+
+            # Don't bother with any more checks if we've already found
+            # bad data (i.e. we've already bailed out and are just
+            # tidying up).
+            if bad_output_found:
+                continue
+
+            ####
+            # CONTENT CHECK OF NEW FILE
+
+            # Note that if we are in recovery mode, we wouldn't do
+            # this, and had_ER_at_beginning is True.
+            if not had_ER_at_beginning:
+                # A place to validate this output.
+                summary_path = "{}_summary".format(output_path)
+
+                # Note that get_min_row() and get_max_row() return
+                # None if the output is raw.
+                ccl = output_SD.check_file_contents(
+                    output_path, summary_path, curr_output.get_min_row(),
+                    curr_output.get_max_row())
+
+                if ccl.is_fail():
+                    bad_output_found = True
+
+            # FINISHED CONTENT CHECK OF NEW CSV
+            ####
+
+            ####
+            # INTEGRITY CHECK OF RECREATED DATA
+            
+            # Second case: this file already had an existing SD
+            # representing it.  In this case, check its integrity.
+            elif had_ER_at_beginning:
+                icl = output_SD.check_integrity(output_path, curr_log,
+                                                output_md5)
+
+                if icl.is_fail():
+                    bad_output_found = True
+                    
+            # FINISHED INTEGRITY CHECK
+            ####
+
+        # FINISHED CHECKING OUTPUTS
+        ####
+                
+        # Make sure the ER is clean and complete.
+        curr_ER.complete_clean()
+
+        ####
+        # FINISH BOOKKEEPING (NON-RECOVERY CASE)
+        if not recover:
             curr_RS.execrecord = curr_ER
             
             # Finish curr_RS.
@@ -858,18 +912,18 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
             # Since this is the reused=False case, step_run_dir
             # represents where the step *actually is*.
             self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
-
+    
             for step_output in pipelinestep.transformation.outputs.all():
                 corresp_ero = curr_ER.execrecordouts.get(
                     content_type=ContentType.objects.get_for_model(
                         type(step_output)),
                     object_id=step_output.pk)
-
+    
                 corresp_SD = corresp_ero.symbolicdataset
-
+    
                 # Compensate for 0-basedness.
                 corresp_path = output_paths[step_output.dataset_idx-1]
-
+    
                 
                 # Update sd_fs_map and socket_map as in the reused =
                 # True case.
@@ -880,27 +934,9 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
                     self.sd_fs_map[corresp_SD] = corresp_path
                 self.socket_map[(pipelinestep, step_output)] = corresp_SD
 
-            # FINISHED BOOKKEEPING
-            ####
-                        
-        else:
-            ####
-            # RUN PIPELINE
-            
-            # FIXME fill this in when we figure out what to do here.
-            child_run = self.execute_pipeline(
-                pipeline=pipelinestep.transformation,
-                inputs=inputs_after_cables,
-                parent_runstep=curr_RS)
-
-            # This is implicit from the above.
-            # curr_RS.child_run = child_run
-
-            # FINISHED RUNNING PIPELINE
-            ####
-
-        # FINISHED RUNNING CODE
+        # FINISHED BOOKKEEPING (NON-RECOVERY CASE)
         ####
+        
         return curr_RS
 
     def execute_pipeline(self, pipeline=None, input_SDs=None, 
@@ -949,68 +985,6 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
 
         # FINISHED SETTING UP SANDBOX AND PATHS
         ####
-
-
-        ####
-        # LOOK FOR ER TO REUSE
-
-        curr_er = pipeline.find_compatible_ER(input_SDs)
-
-        if curr_er != None:
-            # An appropriate ER was found.  Does it have all the
-            # inputs we need?
-            outputs_needed = pipeline.outputs.all()
-            if parent_runstep != None:
-                outputs_needed = parent_runstep.outputs_to_retain()
-
-            if curr_er.provides_outputs(outputs_needed):
-                ####
-                # REUSE AN ER
-
-                # The ER found has what we need, so we can reuse it.
-                curr_run.reused = True
-                curr_run.execrecord = curr_ER
-
-                # Register the outputs with sd_fs_map -- and
-                # socket_map if this is not a top-level run.
-                for p_out in pipeline.outputs.all():
-                    corresp_ero = curr_ER.execrecordouts.get(
-                        content_type=ContentType.objects.get_for_model(
-                            type(p_out)),
-                        object_id=p_out.pk)
-
-                    corresp_SD = corresp_ero.symbolicdataset
-
-                    # Compensate for 0-basedness.
-                    file_suffix = "raw" if p_out.is_raw() else "csv"
-                    output_path = os.path.join(
-                        out_dir,
-                        "run{}_{}.{}".format(curr_run.pk, p_out.dataset_name,
-                                             file_suffix))
-
-
-                    # Add it to sd_fs_map if it isn't already in there.
-                    if corresp_SD not in self.sd_fs_map:
-                        self.sd_fs_map[corresp_SD] = output_path
-
-                    # Update socket_map if necessary.
-                    if parent_runstep != None:
-                        socket_map[(parent_runstep, p_out)] = corresp_SD
-
-                # Update ps_map if this is not a top-level run.
-                if parent_runstep != None:
-                    self.ps_map[parent_runstep] = (sandbox_path, curr_ER)
-
-                curr_run.complete_clean()
-                curr_run.save()
-
-                return curr_run
-
-                # FINISH REUSING AN ER
-                ####
-
-        # FINISHED LOOKING FOR ER TO REUSE
-        ####
         
         ####
         # RUN STEPS
@@ -1020,26 +994,30 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
             # what inputs we need.
 
             step_inputs = []
-            for cable in step.cables_in.all().order_by(
-                    transf_input__dataset_idx):
+            for cable in step.cables_in.all().order_by(dest__dataset_idx):
                 # Find the SD that feeds this cable.  First, identify
                 # the generating step.  If it was a Pipeline input,
                 # leave generator == None.
                 generator = None
-                if cable.step_providing_input != 0:
+                if cable.source_step != 0:
                     generator = pipeline.steps.get(
-                        step_num=cable.step_providing_input)
+                        step_num=cable.source_step)
                 
                 # Look up the symDS that is associated with this socket
                 # (The generator PS must already have been executed)
-                step_inputs.append(
-                    socket_map[(generator, cable.provider_output)])
+                step_inputs.append(socket_map[(generator, cable.source)])
         
             curr_RS = self.execute_step(
                 step, step_inputs,
-                step_run_dir=os.path.join(
-                    sandbox_path,
-                    "step{}".format(step.step_num)))
+                step_run_dir=os.path.join(sandbox_path,
+                                          "step{}".format(step.step_num)))
+
+            # If this RS returns without completing or if the step
+            # failed (i.e. the Method returned with an error code or
+            # any of the outputs didn't check out), we bail.
+            if not curr_RS.is_complete() or not curr_RS.successful_execution():
+                curr_run.clean()
+                return curr_run
 
         # FINISH RUNNING STEPS
         ####
@@ -1050,9 +1028,9 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
         for outcable in pipeline.outcables.all():
             # Identify the SD that feeds this outcable.
             generator = pipeline.steps.get(
-                step_num=outcable.step_providing_output)
+                step_num=outcable.source_step)
 
-            source_SD = socket_map[(generator, outcable.provider_output)]
+            source_SD = socket_map[(generator, outcable.source)]
 
             file_suffix = "raw" if outcable.is_raw() else "csv"
 
@@ -1064,35 +1042,14 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
             curr_ROC = self.execute_cable(outcable, source_SD,
                                           output_path, curr_run)
 
+            # As above, bail if this returned without completing or
+            # failed.
+            if not curr_ROC.is_complete() or not curr_RS.successful_execution():
+                curr_run.clean()
+                return curr_run
+
         # FINISH RUNNING OUTPUT CABLES
         ####
-
-        ####
-        # LAST BIT OF BOOKKEEPING
-
-        # At this point, we either need to create an ER or had an ER
-        # that has now been filled in by running the POCs.  If we need
-        # to create an ER, we can use socket_map to fill it in.
-
-        if curr_ER == None:
-            curr_ER = pipeline.execrecords.create()
-            
-            for curr_input in pipeline.inputs.all():
-                corresp_input_SD = self.socket_map[(None, curr_input)]
-                curr_ER.execrecordins.create(
-                    generic_input=curr_input,
-                    symbolicdataset=corresp_input_SD)
-
-            for outcable in pipeline.outcables.all():
-                corresp_output = pipeline.outputs.get(
-                    dataset_name=outcable.output_name)
-                corresp_output_SD = self.socket_map[(outcable, corresp_output)]
-                curr_ER.execrecordouts.create(
-                    generic_output=corresp_output,
-                    symbolicdataset=corresp_output_SD)
-
-        curr_ER.complete_clean()
-        curr_run.execrecord = curr_ER
         curr_run.complete_clean()
         curr_run.save()
         
@@ -1101,4 +1058,50 @@ output: {}""".format(self.run.name, self.user, pipelinestep.step_num,
 
         return curr_run
 
-# CONTINUE FROM HERE!  Write recover().
+    def recover(self, SD_to_recover):
+        """
+        Fills in SD_to_recover onto the file system.
+
+        Returns True if it succeeds; False otherwise.
+
+        PRE: SD_to_recover is in the maps but no corresopnding file is
+        on the file system.
+        """
+        # Base case: there is an appropriate Dataset in the database.
+        # Simply write it to the correct location.
+        if SD_to_recover.has_data():
+            # Read/write binary files in chunks of 8 megabytes
+            chunk_size = 1024*8
+            location = self.sd_fs_map[SD_to_recover]
+            saved_data = SD_to_recover.dataset
+            try:
+                saved_data.dataset_file.open()
+                with open(location,"wb") as outfile:
+                    chunk = saved_data.dataset_file.read(chunk_size)
+                    while chunk != "":
+                        outfile.write(chunk)
+                        chunk = saved_data.dataset_file.read(chunk_size)
+            except:
+                return False
+            finally:
+                saved_data.dataset_file.close()
+            return True
+
+        # Recursive case: look up how to generate SD_to_recover,
+        # and then do that.
+        generator = None
+        socket = None
+        for generator, socket in socket_map:
+            if socket_map[(generator, socket)] == SD_to_recover:
+                break
+
+        curr_record = None
+        if type(generator) == pipeline.models.PipelineStep:
+            curr_record = self.execute_step(generator, None, recover=True)
+
+        else:
+            curr_record = self.execute_cable(
+                generator, None, None, None, recover=True)
+
+        return curr_record.is_complete() and curr_record.successful_execution()
+        

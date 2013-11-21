@@ -148,6 +148,124 @@ class SymbolicDataset(models.Model):
         return symDS
 
     
+    def check_file_contents(self, file_path_to_check, summary_path,
+                            min_row, max_row, execlog):
+        """
+        Does a content check of a file that this SD represents.
+
+        If this SD is raw, then it just creates a clean CCL.
+
+        This calls [CDT].summarize_CSV on the file and creates a
+        ContentCheckLog.
+        
+        Returns the completed ContentCheckLog, and associates it with
+        execlog.  If the file does not have a badly-formed header, it
+        also sets this SD's num_rows.
+
+        FIXME this should probably be invoked within a transaction!
+        """
+        if self.is_raw():
+            ccl = self.content_checks.create(execlog=execlog)
+            ccl.clean()
+            return ccl
+
+        # From here on we know that this SD is not raw.
+        
+        csv_summary = None
+        my_CDT = self.get_cdt()
+        with open(file_path_to_check, "rb") as f:
+            csv_summary = my_CDT.summarize_CSV(f, summary_path)
+        
+        ccl = self.content_checks.create(execlog=execlog)
+        
+        # Check for a malformed header (and thus a malformed file).
+        if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
+            ccl.baddata.create(bad_header=True)
+            ccl.clean()
+            return ccl
+
+        # From here on we know that the header is OK.
+        
+        # Set and check the number of rows.
+        csv_baddata = None
+        self.structure.num_rows = csv_summary["num_rows"]
+        if (csv_summary["num_rows"] > max_row
+                or csv_summary["num_rows"] < min_row):
+            csv_baddata = ccl.baddata.create(bad_num_rows=True)
+
+        if "failing_cells" in csv_summary:
+            # Create a BadData object if it doesn't already exist.
+            if csv_baddata == None:
+                csv_baddata = ccl.baddata.create()
+
+            # row, col are indices.
+            for row, col in csv_summary["failing_cells"]:
+                fails = csv_summary["failing_cells"][(row,col)]
+                for failed_constr in fails:
+                    new_cell_error = csv_baddata.cell_errors.create(
+                        row_num=row,
+                        column=my_CDT.get(column_idx=col))
+
+                    # If the failure is a string (e.g.  "Was not
+                    # integer"), then leave constraint_failed as null.
+                    if type(failed_constr) != str:
+                        new_cell_error.constraint_failed = failed_constr
+
+                    new_cell_error.clean()
+                    new_cell_error.save()
+
+        # Our CCL should now be complete.
+        ccl.clean()
+        return ccl
+
+    def check_integrity(self, new_file_path, execlog,
+                        newly_computed_MD5=None):
+        """
+        Checks integrity of this SD against the specified new file.
+
+        If newly_computed_MD5 is not None, use it; otherwise, compute
+        it from new_file.
+
+        Return the newly-created IntegrityCheckLog object (which is
+        linked to execlog).
+        """
+        if newly_computed_MD5 == None:
+            with open(new_file_path, "rb") as f:
+                newly_computed_MD5 = file_access_utils.compute_md5(f)
+        
+        icl = self.integrity_checks.create(execlog=execlog)
+                
+        if output_md5 != self.MD5_checksum:
+            evil_twin = SymbolicDataset.create_SD(
+                new_file_path, cdt=self.get_cdt(), user=self.user,
+                name="{}eviltwin".format(self),
+                description="MD5 conflictor of {}".format(self))
+
+            icl.usurper.create(conflicting_SD=evil_twin)
+
+        icl.clean()
+        return icl
+    
+    def is_OK(self):
+        """
+        Check that this SD has been checked for integrity and contents,
+        and that they have never failed either such test.
+        """
+        icls = self.integrity_checks.all()
+        ccls = self.content_checks.all()
+        if not icls.exists() or not ccls.exists():
+            return False
+
+        for icl in icls:
+            if icl.is_fail():
+                return False
+        for ccl in ccls:
+            if ccl.is_fail():
+                return False
+
+        # At this point, we are comfortable with this SD.
+        return True
+    
 class DatasetStructure(models.Model):
     """
     Data with a Shipyard-compliant structure: a CSV file with a header.
@@ -195,19 +313,6 @@ class ExecRecord(models.Model):
     This record is specific to using given inputs.
     """
     generator = models.ForeignKey("archive.ExecLog")
-
-    def general_transf(self):
-        """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        desired_transf = None
-        generating_record = self.generator.record
-        if type(generating_record) == archive.models.RunStep:
-            desired_transf = generating_record.pipelinestep.transformation
-        elif type(generating_record) == archive.models.RunSIC:
-            desired_transf = generating_record.PSIC
-        elif type(generating_record) == archive.models.RunOutputCable:
-            desired_transf = generating_record.pipelineoutputcable
-
-        return desired_transf
 
     def __unicode__(self):
         """Unicode representation of this ExecRecord."""
@@ -310,7 +415,10 @@ class ExecRecord(models.Model):
         # because there is no multiple quenching (due to a uniqueness
         # constraint), all we have to do is check the number of ERIs
         # to make sure everything is quenched.
-        if type(self.general_transf()) in (pipeline.models.PipelineOutputCable, pipeline.models.PipelineStepInputCable):
+        if type(self.general_transf()) in (
+                pipeline.models.PipelineOutputCable,
+                pipeline.models.PipelineStepInputCable
+                ):
             # In this case we check that there is an input and an output.
             if not self.execrecordins.all().exists():
                 raise ValidationError(
@@ -322,12 +430,25 @@ class ExecRecord(models.Model):
         else:
             if self.execrecordins.count() != self.general_transf().inputs.count():
                 raise ValidationError(
-                    "Input(s) to ExecRecord \"{}\" are not quenched".format(self));
+                    "Input(s) to ExecRecord \"{}\" are not quenched".format(self))
         
             # Similar for EROs.
             if self.execrecordouts.count() != self.general_transf().outputs.count():
                 raise ValidationError(
-                    "Output(s) of ExecRecord \"{}\" are not quenched".format(self));
+                    "Output(s) of ExecRecord \"{}\" are not quenched".format(self))
+
+    def general_transf(self):
+        """Returns the Method/POC/PSIC represented by this ExecRecord."""
+        desired_transf = None
+        generating_record = self.generator.record
+        if type(generating_record) == archive.models.RunStep:
+            desired_transf = generating_record.pipelinestep.transformation
+        elif type(generating_record) == archive.models.RunSIC:
+            desired_transf = generating_record.PSIC
+        elif type(generating_record) == archive.models.RunOutputCable:
+            desired_transf = generating_record.pipelineoutputcable
+
+        return desired_transf
 
     def provides_outputs(self, outputs):
         """
@@ -339,6 +460,15 @@ class ExecRecord(models.Model):
         for curr_output in outputs:
             corresp_ero = self.execrecordouts.get(generic_output=curr_output)
             if not corresp_ero.has_data():
+                return False
+        return True
+
+    def outputs_OK(self):
+        """
+        Checks whether all of the EROs of this ER are OK.
+        """
+        for ero in self.execrecordouts.all():
+            if not ero.is_OK():
                 return False
         return True
         
@@ -483,6 +613,10 @@ class ExecRecordIn(models.Model):
                 else:
                     error_str = "SymbolicDataset \"{}\" has too many rows for TransformationInput \"{}\""
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
+
+    def is_OK(self):
+        """Checks if the associated SymbolicDataset is OK."""
+        return self.symbolicdataset.is_OK()
 
 class ExecRecordOut(models.Model):
     """
@@ -676,4 +810,8 @@ class ExecRecordOut(models.Model):
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
         return self.symbolicdataset.has_data()
+
+    def is_OK(self):
+        """Checks if the associated SymbolicDataset is OK."""
+        return self.symbolicdataset.is_OK()
 

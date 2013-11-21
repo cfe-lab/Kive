@@ -402,7 +402,7 @@ def run_cable_h(wires, source, output_path):
     """
 
     # Read/write binary files in chunks of 8 megabytes
-    chunkSize = 1024*8
+    chunk_size = 1024*8
     
     if type(source) == str and self.is_trivial():
         # If trivial, make a link from source to output_path.
@@ -415,10 +415,10 @@ def run_cable_h(wires, source, output_path):
         try:
             source.dataset_file.open()
             with open(output_path,"wb") as outfile:
-                chunk = source.dataset_file.read(chunkSize)
+                chunk = source.dataset_file.read(chunk_size)
                 while chunk != "":
                     outfile.write(chunk)
-                    chunk = source.dataset_file.read(chunkSize)
+                    chunk = source.dataset_file.read(chunk_size)
         finally:
             source.dataset_file.close()
         return
@@ -539,7 +539,8 @@ class PipelineStepInputCable(models.Model):
 
     
     def clean(self):
-        """Check coherence of the cable.
+        """
+        Check coherence of the cable.
 
         Check in all cases:
         - Are the source and destination either both raw or both
