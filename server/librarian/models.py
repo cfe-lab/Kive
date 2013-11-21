@@ -44,7 +44,7 @@ class SymbolicDataset(models.Model):
     MD5_checksum = models.CharField(
         max_length=64,
         validators=[RegexValidator(
-            regex=re.compile("(^[1234567890AaBbCcDdEeFf]{32}$)|(^$))"),
+            regex=re.compile("(^[1234567890AaBbCcDdEeFf]{32}$)|(^$)"),
             message="MD5 checksum is not either 32 hex characters or blank")],
         blank=True,
         default="",
@@ -707,7 +707,7 @@ class ExecRecordOut(models.Model):
 
         # Second case: parent ER represents a PSIC.
         elif (type (self.execrecord.general_transf()) ==
-              pipeline.models.PipelineStepInputCable:
+              pipeline.models.PipelineStepInputCable):
             parent_er_psic = self.execrecord.general_transf()
 
             # This ERO must point to a TI.

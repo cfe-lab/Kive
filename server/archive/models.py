@@ -142,11 +142,6 @@ class Run(models.Model):
             raise ValidationError(
                 "Run \"{}\" is not complete".format(self))
 
-        
-    # FIXME fill this in!
-    def failed_execution(self):
-        pass
-
 
 class RunStep(models.Model):
     """
@@ -1057,7 +1052,7 @@ class ExecLog(models.Model):
         """
         if ((type(self.record) == RunStep) and 
                 (type(self.record.pipelinestep.transformation) !=
-                 method.models.Method):
+                 method.models.Method)):
             raise ValidationError(
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))

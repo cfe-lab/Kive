@@ -105,15 +105,15 @@ class Datatype(models.Model):
         # Return False if Case 1 is never encountered
         return is_restricted
 
-    def is_restriction(self, possible_restrictor_datatype):
+    def is_restriction(self, possible_restricted_datatype):
         """
         True if this Datatype restricts the parameter, directly or indirectly.
 
         This induces a partial ordering A <= B if A is a restriction of B.
         For example, a DNA sequence is a restriction of a string.
         """
-        return (self == possible_restrictor_datatype or
-                possible_restrictor_datatype.is_restricted_by(self))
+        return (self == possible_restricted_datatype or
+                possible_restricted_datatype.is_restricted_by(self))
 
     # Clean: If prototype is specified, it must have a CDT with
     # 2 columns: column 1 is a string "example" field,

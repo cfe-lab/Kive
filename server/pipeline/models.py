@@ -344,11 +344,11 @@ class PipelineStep(models.Model):
 
     # Same for deletes.
     @transaction.commit_on_success
-    def add_deletion(self, dataset_to_delete):
+    def add_deletion(self, output_to_delete):
         """
         Mark a TO for deletion.
         """
-        self.outputs_to_delete.add(dataset_to_delete)
+        self.outputs_to_delete.add(output_to_delete)
         
     def outputs_to_retain(self):
         """Returns a list of TOs this PipelineStep doesn't delete."""
@@ -505,8 +505,6 @@ class PipelineStepInputCable(models.Model):
     source = generic.GenericForeignKey("content_type", "object_id");
 
     custom_wires = generic.GenericRelation("CustomCableWire")
-
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
 
     # October 15, 2013: allow the data coming out of a PSIC to be
     # saved.  Note that this is only relevant if the PSIC is not
@@ -805,7 +803,7 @@ class PipelineStepInputCable(models.Model):
 
     def is_compatible_given_input(self, other_cable):
         """
-9        Check compatibility of two cables having the same input.
+        Check compatibility of two cables having the same input.
 
         Given that both had the same input, they are compatible if:
          - both feed the same TransformationInput
@@ -995,7 +993,6 @@ class PipelineOutputCable(models.Model):
         help_text="Source output hole")
 
     custom_outwires = generic.GenericRelation("CustomCableWire")
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw

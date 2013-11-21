@@ -6,6 +6,10 @@ SymbolicDataset, etc.
 """
 
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes import generic
+from django.core.exceptions import ValidationError
+
 import librarian.models
 
 class ContentCheckLog(models.Model):
@@ -204,7 +208,7 @@ class MD5Conflict(models.Model):
     """
     Denotes an MD5 conflict found during an integrity check.
     """
-    integritychecklog = OneToOneField(
+    integritychecklog = models.OneToOneField(
         IntegrityCheckLog,
         related_name="usurper")
     

@@ -696,7 +696,7 @@ class PipelineTests(PipelineTestSetup):
         # Mark DNAcompv2_m output as deletable.
         # August 24, 2013: this is now OK.
         step1.add_deletion(
-            dataset_to_delete=self.DNAcompv2_m.outputs.get(dataset_name="output"));
+            self.DNAcompv2_m.outputs.get(dataset_name="output"));
 
         # Now try to map it to the pipeline output.
         outcable = foo.create_outcable(
@@ -861,7 +861,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Mark the output of step2 as deleted
         step2.add_deletion(
-            dataset_to_delete=step2.transformation.outputs.get(
+            step2.transformation.outputs.get(
                 dataset_name="recomplemented_seqs"));
 
         self.assertEquals(foo.clean(), None);
@@ -1351,7 +1351,7 @@ class PipelineTests(PipelineTestSetup):
             source_step=2,
             source=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"));
         step3.add_deletion(
-            dataset_to_delete=step3.transformation.outputs.get(dataset_name="output"));
+            step3.transformation.outputs.get(dataset_name="output"));
 
         outcable1 = foo.create_outcable(
             output_name="outputone", output_idx=1,
@@ -1755,7 +1755,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete irrelevant output
         step1.add_deletion(
-            dataset_to_delete = step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
         
         step2 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=2);
@@ -1808,7 +1808,7 @@ class PipelineTests(PipelineTestSetup):
         # This output required for subsequent steps
         # August 24, 2013: this is now allowed, so no error should be raised.
         step1.add_deletion(
-            dataset_to_delete = step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
         
         step2 = foo.steps.create(transformation=self.script_3_method,
                                  step_num=2);
@@ -1860,7 +1860,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 1st output (Which is deleted)
         # August 24, 2013: this is now OK
@@ -1911,7 +1911,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outcable for 1st output (Which is not deleted)
         outcable = foo.create_outcable(
@@ -1990,7 +1990,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outcable for 2nd output (Which is deleted)
         # August 24, 2013: this is now OK.
@@ -2032,7 +2032,7 @@ class PipelineTests(PipelineTestSetup):
         
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 2nd output (Which is not deleted)
         outcable = foo.create_outcable(
@@ -2149,7 +2149,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_squared"))
 
         # Add outcable for 1st output (Which is deleted)
         # August 24, 2013: this is now allowed, so no error should be raised later.
@@ -2199,7 +2199,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Delete data in step 1
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
+            step1.transformation.outputs.get(dataset_name="a_b_c_mean"))
 
         # Add outcable for 1st output (Which is not deleted)
         outcable1 = foo.create_outcable(
@@ -2485,7 +2485,7 @@ class PipelineStepTests(PipelineTestSetup):
         # Mark step 1 "output" as deletable
         # step 1 "output" is defined by DNAcompv2_m
         step1.add_deletion(
-            dataset_to_delete=step1.transformation.outputs.get(dataset_name="output"));
+            step1.transformation.outputs.get(dataset_name="output"));
 
         self.assertEquals(step1.clean(), None);
 
@@ -2516,7 +2516,7 @@ class PipelineStepTests(PipelineTestSetup):
         # Reference TransformationOutput not belonging to this step's
         # transformation.
         step1.add_deletion(
-            dataset_to_delete=self.script_2_method.outputs.all()[0]);
+            self.script_2_method.outputs.all()[0]);
         self.assertRaisesRegexp(
                 ValidationError,
                 "Transformation at step 1 does not have output \"\[Method Test method family script2\]:1 \(1: <string> \[a\], 2: <string> \[b\], 3: <string> \[c\]\) a_b_c_squared\"",
@@ -2627,8 +2627,8 @@ class PipelineStepTests(PipelineTestSetup):
                        revision_desc="Foo version");
         foo.save();
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1);
+                         dataset_name="oneinput",
+                         dataset_idx=1);
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1);
         step1.cables_in.create(
@@ -2705,7 +2705,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        step1.add_deletion(dataset_to_delete=raw_output)
+        step1.add_deletion(raw_output)
 
         self.assertEquals(step1.clean(), None)
         self.assertEquals(pipeline_1.clean(), None)
@@ -2719,7 +2719,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version");
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        step1.add_deletion(dataset_to_delete=raw_output)
+        step1.add_deletion(raw_output)
 
         self.assertEquals(step1.clean(), None)
 
@@ -2737,7 +2737,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in an unrelated method
-        step1.add_deletion(dataset_to_delete=raw_output_unrelated)
+        step1.add_deletion(raw_output_unrelated)
 
         errorMessage = "Transformation at step 1 does not have output \"\[Method test method family s42\]:raw1 a_b_c_squared_raw\""
 
@@ -2772,7 +2772,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         step1_unrelated = pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2)
-        step1.add_deletion(dataset_to_delete=unrelated_raw_output)
+        step1.add_deletion(unrelated_raw_output)
 
         error_msg = "Transformation at step 1 does not have output \"\[Method test method family s42\]:raw1 unrelated_raw_output\""
 
@@ -2830,7 +2830,7 @@ class RawOutputCableTests(PipelineTestSetup):
         self.assertEquals(outcable1.clean(), None)
 
         # Mark raw output of step1 as deleted
-        step1.add_deletion(dataset_to_delete=raw_output)
+        step1.add_deletion(raw_output)
 
         # Now it's deleted.
         # NOTE August 23, 2013: this doesn't break anymore.

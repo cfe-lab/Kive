@@ -137,7 +137,8 @@ INSTALLED_APPS = (
     'librarian',
     'method',
     'pipeline',
-    'transformation'
+    'transformation',
+    'datachecking'
 )
 
 # A sample logging configuration. The only tangible logging
