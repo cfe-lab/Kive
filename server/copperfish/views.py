@@ -2,6 +2,7 @@
 from django.http import HttpResponse
 from copperfish import models
 from django.template import loader, Context
+from copperfish.models import BasicConstraint
 from copperfish.forms import DatatypeForm, BasicConstraintForm
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
@@ -34,28 +35,24 @@ def datatypes(request):
             for i in range(numberOfFields):
                 ruletype = query['ruletype' + (str(i-1) if i > 0 else '')]
                 rule = query['rule' + (str(i-1) if i > 0 else '')]
-                cform = BasicConstraintForm({'datatype': new_datatype,
-                                            'ruletype': ruletype,
-                                            'rule': rule})
+                new_constraint = BasicConstraint(datatype = new_datatype,
+                                            ruletype = ruletype,
+                                            rule = rule)
                 
+                new_constraint.full_clean()
+                new_constraint.save()
                 
-                #if cform.is_valid():
-                #    print 'ok'
-                new_constraint = cform.save(commit = False)
-                """
-                new_constraint.datatype = new_datatype
-                if new_constraint.is_valid():
-                    new_constraint.save()
-                """
+            # re-check Datatype object
+            new_datatype.full_clean()
+            
+            # additional fields will disappear on submit, but let's
+            # at least set the original field to the submitted values
+            cform = BasicConstraintForm({'ruletype': query['ruletype'],
+                                        'rule': query['rule']})
         
-        #cform = BasicConstraintForm(request.POST)
-        #if cform.is_valid():
-        #    new_constraint = cform.save()
-        #    pass
     else:
         dform = DatatypeForm() # unbound
-    
-    cform = BasicConstraintForm()
+        cform = BasicConstraintForm()
 
     datatypes = models.Datatype.objects.all()
     t = loader.get_template('datatypes.html')
@@ -66,3 +63,33 @@ def datatypes(request):
 
     return HttpResponse(t.render(c))
     #return render_to_response('datatypes.html', {'form': form})
+
+
+
+def datatype_detail(request, id):
+    # retrieve the Datatype object from database by PK
+    this_datatype = models.Datatype.objects.get(pk=id)
+    
+    if request.method == 'POST':
+        query = request.POST.dict()
+        # modify Datatype / spawn new version of immutable Datatype
+        
+            
+        return HttpResponseRedirect('/datatypes/')
+    
+    form = DatatypeForm(instance = this_datatype)
+    
+    # how many basic constraints are associated with current Datatype?
+    cforms = []
+    for i, bc in enumerate(this_datatype.basic_constraints.all()):
+        cforms.append(BasicConstraintForm(instance = bc))
+    
+    t = loader.get_template('datatype_detail.html')
+    c = Context({'datatype': this_datatype, 
+                'form': form,
+                'constraint_forms': cforms})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+

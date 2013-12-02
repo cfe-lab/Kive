@@ -16,4 +16,5 @@ urlpatterns = patterns('',
     # url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'copperfish.views.home', name='home'),
     url(r'^datatypes$', 'copperfish.views.datatypes', name='datatypes'),
+    url(r'^datatypes/(?P<id>\d+)/$', 'copperfish.views.datatype_detail', name='datatype_detail'),
 )

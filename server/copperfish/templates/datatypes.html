@@ -24,7 +24,7 @@
 </thead>
 {% for datatype in datatypes %}
 <tr>
-	<td>{{ datatype.name }}</td>
+	<td><a href="{{ datatype.get_absolute_url }}">{{ datatype.name }}</a></td>
 	<td>{{ datatype.description }}</td>
 <!-- 	<td>{{ datatype.restricts.name }}</td> -->
     <td>{{ datatype.Python_type }}</td>

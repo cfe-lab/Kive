@@ -16,6 +16,8 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator
 from django.db import transaction
 
+from django.core.urlresolvers import reverse
+
 # Python math functions
 import operator
 # To calculate MD5 hash
@@ -166,6 +168,11 @@ class Datatype(models.Model):
             raise ValidationError(
                 "Datatype \"{}\" has a circular restriction".
                 format(self))
+    
+    def get_absolute_url(self):
+        return '/datatypes/%i' % self.id
+        #return ('datatype_detail', (), {'name': self.name, 'id': self.id})
+        #return reverse('datatype_detail', kwargs={'name': self.name, 'id': self.id})
 
     def __unicode__(self):
         """Describe Datatype by name"""
