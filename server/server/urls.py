@@ -1,4 +1,7 @@
 from django.conf.urls import patterns, include, url
+from django import forms
+from copperfish.forms import *
+#from copperfish.preview import *
 
 # Uncomment the next two lines to enable the admin:
 #from django.contrib import admin
@@ -17,4 +20,10 @@ urlpatterns = patterns('',
     url(r'^$', 'copperfish.views.home', name='home'),
     url(r'^datatypes$', 'copperfish.views.datatypes', name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', 'copperfish.views.datatype_detail', name='datatype_detail'),
+    url(r'datatype_add$', 'copperfish.views.datatype_add', name='datatype_add'),
+    #url(r'datatype_add$', DatatypeFormPreview(DatatypeForm)),
+    #url(r'^datatype_add/(?P<id>\d+)_str$', StringBasicConstraintFormPreview(StringBasicConstraintForm)),
+    #url(r'^datatype_add/(?P<id>\d+)_int$', IntegerBasicConstraintFormPreview(IntegerBasicConstraintForm)),
+    #url(r'^datatype_finish/(?P<id>\d+)_(?P<Python_type>\w+)$', 'copperfish.views.datatype_add', name='datatype_add'),
+    
 )

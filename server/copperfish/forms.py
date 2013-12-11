@@ -12,7 +12,7 @@ class DatatypeForm (forms.ModelForm):
         super(DatatypeForm, self).__init__(*args, **kwargs)
         
     restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(), required=False)
-    Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES)
+    Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, widget=forms.Select(attrs={'onchange': 'switchConstraintForm(this.value)'}))
     date_created = datetime.now()
     
     class Meta:
@@ -31,3 +31,12 @@ class BasicConstraintForm (forms.ModelForm):
     class Meta:
         model = BasicConstraint
         exclude = ('datatype', )
+
+class IntegerConstraintForm (forms.Form):
+    minval = forms.IntegerField(required=False)
+    maxval = forms.IntegerField(required=False)
+
+class StringConstraintForm (forms.Form):
+    minlen = forms.IntegerField(required=False)
+    maxlen = forms.IntegerField(required=False)
+    regexp = forms.CharField(required=False)
