@@ -1,0 +1,59 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "base.html" %}
+
+{% block title %}Datatypes{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript" src="/static/datatypes.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<h2>Detailed view - <tt>{{ datatype.name }}</tt></h2>
+<a href="/datatypes">Return to summary view</a>
+
+
+<h3>Details</h3>
+<table style="frame:hsides" border=0 cellpadding=6>
+<tr>
+    <td>Name</td>
+    <td>{{ datatype.name }}</td>
+</tr>
+<tr>
+    <td>Date created</td>
+    <td>{{ datatype.date_created }}</td>
+</tr>
+<tr>
+    <td>Description</td>
+    <td>{{ datatype.description }}</td>
+</tr>
+<tr>
+    <td>Python type</td>
+    <td>{{ datatype.Python_type }}</td>
+</tr>
+{% for r in datatype.restricts.all %}
+<tr>
+    <td>Restricts</td>
+    <td>{{ r }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<h3>Basic constraints</h3>
+
+<table style="frame:hsides" border=0 cellpadding=6>
+<thead>
+    <th>Rule type</th>
+    <th>Specification</th>
+</thead>
+{% for bc in constraints %}
+<tr>
+    <td>{{ bc.ruletype }}</td>
+    <td>{{ bc.rule }}</td>
+</tr>
+{% endfor %}
+</table>
+
+{% endblock %}
