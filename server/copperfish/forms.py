@@ -27,14 +27,15 @@ class DatatypeForm (forms.ModelForm):
 
 
 class BasicConstraintForm (forms.ModelForm):
-    ruletype = forms.ChoiceField(BasicConstraint.CONSTRAINT_TYPES)
+    #ruletype = forms.ChoiceField(BasicConstraint.CONSTRAINT_TYPES)
     class Meta:
         model = BasicConstraint
-        exclude = ('datatype', )
+        #exclude = ('datatype', )
 
 class IntegerConstraintForm (forms.Form):
-    minval = forms.IntegerField(required=False)
-    maxval = forms.IntegerField(required=False)
+    minval = forms.FloatField(required=False)
+    maxval = forms.FloatField(required=False)
+
 
 class StringConstraintForm (forms.Form):
     minlen = forms.IntegerField(required=False)

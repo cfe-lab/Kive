@@ -41,23 +41,49 @@ def datatype_add(request):
             try:            
                 if new_datatype.Python_type == 'str':
                     # manually create and validate BasicConstraint objects    
-                    minlen = BasicConstraint(datatype = new_datatype, ruletype='minlen', rule=query['minlen'])
-                    minlen.full_clean()
-                    minlen.save()
-                    maxlen = BasicConstraint(datatype = new_datatype, ruletype='maxlen', rule=query['maxlen'])
-                    maxlen.full_clean()
-                    maxlen.save()
-                    regexp = BasicConstraint(datatype = new_datatype, ruletype='regexp', rule=query['regexp'])
-                    regexp.full_clean()
-                    regexp.save()
+                    minlen = BasicConstraintForm(initial={'datatype': new_datatype,
+                                                    'ruletype': 'minlen', 
+                                                    'rule': query['minlen']})
+                    if minlen.is_valid():
+                        minlen.save(commit=False)
+                    else:
+                        raise ValidationError
+                    
+                    maxlen = BasicConstraintForm(initial={'datatype': new_datatype,
+                                                    'ruletype': 'maxlen', 
+                                                    'rule': query['maxlen']})
+                    if maxlen.is_valid():
+                        minlen.save(commit=False)
+                    else:
+                        raise ValidationError
+                    
+                    regexp = BasicConstraintForm(initial={'datatype': new_datatype,
+                                                    'ruletype': 'regexp', 
+                                                    'rule': query['regexp']})
+                    if regexp.is_valid():
+                        regexp.save(commit=False)
+                    else:
+                        raise ValidationError
                 
                 elif new_datatype.Python_type in ['int', 'float']:
-                    minval = BasicConstraint(datatype = new_datatype, ruletype='minval', rule=query['minval'])
-                    minval.full_clean()
-                    minval.save()
-                    maxval = BasicConstraint(datatype = new_datatype, ruletype='maxval', rule=query['maxval'])
-                    maxval.full_clean()
-                    maxval.save()
+                    minval = BasicConstraintForm(initial={'datatype': new_datatype,
+                                                    'ruletype': 'minval', 
+                                                    'rule': query['minval']})
+                    print 'call is_valid'
+                    if minval.is_valid():
+                        minval.save(commit=False)
+                    else:
+                        print 'minval validation error', minval.errors
+                        raise ValidationError
+                    
+                    maxval = BasicConstraintForm(initial={'datatype': new_datatype,
+                                                    'ruletype': 'maxval', 
+                                                    'rule': query['maxval']})
+                    if maxval.is_valid():
+                        maxval.save(commit=False)
+                    else:
+                        print 'maxval validation error', maxval.errors
+                        raise ValidationError
                 
                 # re-check Datatype object
                 new_datatype.full_clean()
@@ -67,9 +93,9 @@ def datatype_add(request):
             except:
                 pass # through
                 
-        icform = IntegerConstraintForm(initial={'minval': query.get('minval', None), 
+        icform = IntegerConstraintForm({'minval': query.get('minval', None), 
             'maxval': query.get('maxval', None)})
-        scform = StringConstraintForm(initial={'minlen': query.get('minlen', None), 
+        scform = StringConstraintForm({'minlen': query.get('minlen', None), 
             'maxlen': query.get('maxlen', None),
             'regexp': query.get('regexp', None)})
     else:
