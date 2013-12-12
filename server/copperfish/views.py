@@ -6,6 +6,8 @@ from copperfish.models import BasicConstraint
 from copperfish.forms import *
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
+from django.core.exceptions import ValidationError
+from django.forms.util import ErrorList
 
 def home(request):
     """
@@ -32,72 +34,77 @@ def datatype_add(request):
     """
     Render form for creating a new Datatype
     """
+    exceptions = []
+    
     if request.method == 'POST':
         dform = DatatypeForm(request.POST)
         query = request.POST.dict()
-        
+        print query
         if dform.is_valid():
-            new_datatype = dform.save(commit=False)
-            try:            
-                if new_datatype.Python_type == 'str':
-                    # manually create and validate BasicConstraint objects    
-                    minlen = BasicConstraintForm(initial={'datatype': new_datatype,
-                                                    'ruletype': 'minlen', 
-                                                    'rule': query['minlen']})
-                    if minlen.is_valid():
-                        minlen.save(commit=False)
-                    else:
-                        raise ValidationError
-                    
-                    maxlen = BasicConstraintForm(initial={'datatype': new_datatype,
-                                                    'ruletype': 'maxlen', 
-                                                    'rule': query['maxlen']})
-                    if maxlen.is_valid():
-                        minlen.save(commit=False)
-                    else:
-                        raise ValidationError
-                    
-                    regexp = BasicConstraintForm(initial={'datatype': new_datatype,
-                                                    'ruletype': 'regexp', 
-                                                    'rule': query['regexp']})
-                    if regexp.is_valid():
-                        regexp.save(commit=False)
-                    else:
-                        raise ValidationError
+            new_datatype = dform.save() # this has to be saved to database to be passed to BasicConstraint()
+            if new_datatype.Python_type == 'str':
+                # manually create and validate BasicConstraint objects    
+                if query['minlen']:
+                    minlen = BasicConstraint(datatype=new_datatype, ruletype='minlen', rule=query['minlen'])
+                    try:
+                        minlen.full_clean()
+                    except ValidationError as e:
+                        exceptions.extend(e.messages)
+                        pass
                 
-                elif new_datatype.Python_type in ['int', 'float']:
-                    minval = BasicConstraintForm(initial={'datatype': new_datatype,
-                                                    'ruletype': 'minval', 
-                                                    'rule': query['minval']})
-                    print 'call is_valid'
-                    if minval.is_valid():
-                        minval.save(commit=False)
-                    else:
-                        print 'minval validation error', minval.errors
-                        raise ValidationError
-                    
-                    maxval = BasicConstraintForm(initial={'datatype': new_datatype,
-                                                    'ruletype': 'maxval', 
-                                                    'rule': query['maxval']})
-                    if maxval.is_valid():
-                        maxval.save(commit=False)
-                    else:
-                        print 'maxval validation error', maxval.errors
-                        raise ValidationError
+                if query['maxlen']:
+                    maxlen = BasicConstraint(datatype=new_datatype, ruletype='maxlen', rule=query['maxlen'])
+                    try:
+                        maxlen.full_clean()
+                    except ValidationError as e:
+                        exceptions.extend(e.messages)
+                        pass
                 
+                if query['regexp']:
+                    regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=query['regexp'])
+                    try:
+                        regexp.full_clean()
+                    except ValidationError as e:
+                        exceptions.extend(e.messages)
+                        pass
+            
+            elif new_datatype.Python_type in ['int', 'float']:
+                if query['minval']:
+                    minval = BasicConstraint(datatype=new_datatype, ruletype='minval', rule=query['minval'])
+                    try:
+                        minval.full_clean()
+                    except ValidationError as e:
+                        exceptions.extend(e.messages)
+                        pass
+                
+                if query['maxval']:
+                    maxval = BasicConstraint(datatype=new_datatype, ruletype='maxval', rule=query['maxval'])
+                    try:
+                        maxval.full_clean()
+                    except ValidationError as e:
+                        exceptions.extend(e.messages)
+                        pass
+            
+            if exceptions:
+                print exceptions
+                new_datatype.delete() # delete object from database
+            else:
                 # re-check Datatype object
                 new_datatype.full_clean()
-                new_datatype.save()
+                new_datatype.save()    
                 return HttpResponseRedirect('/datatypes')
                 
-            except:
-                pass # through
-                
+        
+        # populate forms for display (one or more invalid forms)
         icform = IntegerConstraintForm({'minval': query.get('minval', None), 
             'maxval': query.get('maxval', None)})
+        if exceptions:
+            icform.errors['Basic Constraint Errors'] = ErrorList(exceptions)
+        
         scform = StringConstraintForm({'minlen': query.get('minlen', None), 
             'maxlen': query.get('maxlen', None),
             'regexp': query.get('regexp', None)})
+            
     else:
         dform = DatatypeForm() # unbound
         #cform = BasicConstraintForm()

@@ -236,46 +236,46 @@ class BasicConstraint(models.Model):
         if self.ruletype == BasicConstraint.MIN_LENGTH:
             if self.datatype.Python_type != Datatype.STR:
                 error_msg = ("Rule \"{}\" specifies a minimum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 min_length = int(self.rule)
                 if min_length < 0:
                     error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" is negative".
-                                 format(self, self.rule))
+                                 format(self.ruletype, self.rule))
                     is_error = True
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         elif self.ruletype == BasicConstraint.MAX_LENGTH:
             if self.datatype.Python_type != Datatype.STR:
                 error_msg = ("Rule \"{}\" specifies a maximum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 max_length = int(self.rule)
                 if max_length < 1:
                     error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" is non-positive".
-                                 format(self, self.rule))
+                                 format(self.ruletype, self.rule))
                     is_error = True
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, 
                                BasicConstraint.MIN_VAL):
             if self.datatype.Python_type not in (Datatype.INT, Datatype.FLOAT):
                 error_msg = ("Rule \"{}\" specifies a bound on a numeric value but its parent Datatype \"{}\" is not a number".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 val_bound = float(self.rule)
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a bound on a numeric value but \"{}\" does not specify a numeric value".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
         
         elif self.ruletype == BasicConstraint.REGEXP:
@@ -283,7 +283,7 @@ class BasicConstraint(models.Model):
                 re.compile(self.rule)
             except re.error:
                 error_msg = ("Rule \"{}\" specifies an invalid regular expression \"{}\"".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         if is_error:
