@@ -17,6 +17,13 @@ def home(request):
     c = Context()
     return HttpResponse(t.render(c))
 
+def dev(request):
+    """
+    Default homepage
+    """
+    t = loader.get_template('dev.html')
+    c = Context()
+    return HttpResponse(t.render(c))
 
 def datatypes(request):
     """

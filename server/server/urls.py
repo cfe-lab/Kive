@@ -18,6 +18,7 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'copperfish.views.home', name='home'),
+    url(r'^dev$', 'copperfish.views.dev', name='dev'),
     url(r'^datatypes$', 'copperfish.views.datatypes', name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', 'copperfish.views.datatype_detail', name='datatype_detail'),
     url(r'datatype_add$', 'copperfish.views.datatype_add', name='datatype_add'),
