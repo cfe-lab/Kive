@@ -46,9 +46,11 @@ def datatype_add(request):
     if request.method == 'POST':
         dform = DatatypeForm(request.POST)
         query = request.POST.dict()
-        print query
+        
         if dform.is_valid():
             new_datatype = dform.save() # this has to be saved to database to be passed to BasicConstraint()
+            minlen, maxlen, regexp, minval, maxval = None, None, None, None, None
+            
             if new_datatype.Python_type == 'str':
                 # manually create and validate BasicConstraint objects    
                 if query['minlen']:
@@ -93,9 +95,15 @@ def datatype_add(request):
                         pass
             
             if exceptions:
-                print exceptions
                 new_datatype.delete() # delete object from database
             else:
+                # save basic constraint objects if they are defined
+                if minlen: minlen.save()
+                if maxlen: maxlen.save()
+                if regexp: regexp.save()
+                if minval: minval.save()
+                if maxval: maxval.save()
+                
                 # re-check Datatype object
                 new_datatype.full_clean()
                 new_datatype.save()    

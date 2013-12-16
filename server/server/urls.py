@@ -26,5 +26,5 @@ urlpatterns = patterns('',
     #url(r'^datatype_add/(?P<id>\d+)_str$', StringBasicConstraintFormPreview(StringBasicConstraintForm)),
     #url(r'^datatype_add/(?P<id>\d+)_int$', IntegerBasicConstraintFormPreview(IntegerBasicConstraintForm)),
     #url(r'^datatype_finish/(?P<id>\d+)_(?P<Python_type>\w+)$', 'copperfish.views.datatype_add', name='datatype_add'),
-    
+    url(r'resources$', 'copperfish.views.resources', name='resources'),
 )
