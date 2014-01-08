@@ -16,9 +16,6 @@ import hashlib
 import file_access_utils
 
 import method.models
-import pipeline.models
-import archive.models
-import librarian.models
 import transformation.models
 
 class Run(models.Model):
@@ -33,7 +30,7 @@ class Run(models.Model):
     start_time = models.DateTimeField("start time", auto_now_add=True,
                                       help_text="Time at start of run")
     pipeline = models.ForeignKey(
-        pipeline.models.Pipeline,
+        "pipeline.Pipeline",
         related_name="pipeline_instances",
         help_text="Pipeline used in this run")
 
@@ -156,14 +153,14 @@ class RunStep(models.Model):
     # If this RunStep has a child_run, then this execrecord should be
     # null.
     execrecord = models.ForeignKey(
-        librarian.models.ExecRecord,
+        "librarian.ExecRecord",
         null=True, blank=True,
         related_name="runsteps")
     reused = models.NullBooleanField(
         default=None,
         help_text="Denotes whether this run step reuses a previous execution")
     pipelinestep = models.ForeignKey(
-        pipeline.models.PipelineStep,
+        "pipeline.PipelineStep",
         related_name="pipelinestep_instances")
 
     start_time = models.DateTimeField("start time", auto_now_add=True,
@@ -256,8 +253,7 @@ class RunStep(models.Model):
                 "PipelineStep of RunStep \"{}\" is not a Pipeline but a child run exists".
                 format(self))
 
-        elif (type(self.pipelinestep.transformation) ==
-              pipeline.models.Pipeline):
+        elif (type(self.pipelinestep.transformation).__name__ == "Pipeline"):
             if self.log.all().exists():
                 raise ValidationError(
                     "RunStep \"{}\" represents a sub-pipeline so no log should be associated".
@@ -289,7 +285,7 @@ class RunStep(models.Model):
                 raise ValidationError(
                     "RunStep \"{}\" inputs not quenched; reused and execrecord should not be set".
                     format(self))
-            if (type(self.pipelinestep.transformation) == pipeline.models.Pipeline and
+            if (type(self.pipelinestep.transformation).__name__ == "Pipeline" and
                     hasattr(self, "child_run")):
                 raise ValidationError(
                     "RunStep \"{}\" inputs not quenched; child_run should not be set".
@@ -351,7 +347,7 @@ class RunStep(models.Model):
             for out_data in self.outputs.all():
                 out_data.clean()
     
-        elif type(self.pipelinestep.transformation) == pipeline.models.Pipeline:
+        elif type(self.pipelinestep.transformation).__name__ == "Pipeline":
             if hasattr(self, "child_run"):
                 self.child_run.clean()
             return
@@ -462,7 +458,7 @@ class RunSIC(models.Model):
     """
     runstep = models.ForeignKey(RunStep, related_name="RSICs")
     execrecord = models.ForeignKey(
-        librarian.models.ExecRecord,
+        "librarian.ExecRecord",
         null=True,
         blank=True,
         related_name="RSICs")
@@ -470,7 +466,7 @@ class RunSIC(models.Model):
         help_text="Denotes whether this run reused the action of an output cable",
         default=None)
     PSIC = models.ForeignKey(
-        pipeline.models.PipelineStepInputCable,
+        "pipeline.PipelineStepInputCable",
         related_name="psic_instances")
 
     start_time = models.DateTimeField(
@@ -592,7 +588,7 @@ class RunSIC(models.Model):
         # input to both.  (This must be true because our Pipeline was
         # well-defined.)
         if (type(self.execrecord.general_transf()) !=
-                pipeline.models.PipelineStepInputCable):
+                "pipeline.PipelineStepInputCable"):
             raise ValidationError(
                 "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
                 format(self.PSIC))
@@ -685,14 +681,14 @@ class RunOutputCable(models.Model):
     """
     run = models.ForeignKey(Run, related_name="runoutputcables")
     execrecord = models.ForeignKey(
-        librarian.models.ExecRecord,
+        "librarian.ExecRecord",
         null=True, blank=True,
         related_name="runoutputcables")
     reused = models.NullBooleanField(
         help_text="Denotes whether this run reused the action of an output cable",
         default=None)
     pipelineoutputcable = models.ForeignKey(
-        pipeline.models.PipelineOutputCable,
+        "pipeline.PipelineOutputCable",
         related_name="poc_instances")
     
     start_time = models.DateTimeField(
@@ -817,7 +813,7 @@ class RunOutputCable(models.Model):
 
         # The ER must point to a cable that is compatible with the one
         # this RunOutputCable points to.
-        if type(self.execrecord.general_transf()) != pipeline.models.PipelineOutputCable:
+        if type(self.execrecord.general_transf()) != "pipeline.PipelineOutputCable":
             raise ValidationError(
                 "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
                 format(self))
@@ -970,7 +966,7 @@ class Dataset(models.Model):
 
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField(
-        librarian.models.SymbolicDataset,
+        "librarian.SymbolicDataset",
         related_name="dataset")
 
     def __unicode__(self):
