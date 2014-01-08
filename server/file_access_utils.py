@@ -1,9 +1,7 @@
 """
 Basic file-checking functionality used by Shipyard.
 """
-import os
-import hashlib
-import csv
+import hashlib, glob, os
 
 def can_create_new_file(file_to_create):
     """

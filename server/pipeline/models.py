@@ -393,15 +393,16 @@ def cable_trivial_h(cable, cable_wires):
 
 
 # Helper that will be called by both PSIC and POC.
-def run_cable_h(wires, source, output_path):
+def run_cable_h(cable, source, output_path):
     """
-    Perform the cable-specified transformation on the input.
+    Perform cable transformation on the input.
 
-    wire_qs is the QuerySet containing the custom wires defined
-    for this cable.
+    wires is the QuerySet containing wires for this cable.
     """
 
-    # Read/write binary files in chunks of 8 megabytes
+    wires = cable.custom_wires.all()
+
+    # Read/write binary files in chunks
     chunk_size = 1024*8
     
     if type(source) == str and self.is_trivial():
@@ -410,7 +411,7 @@ def run_cable_h(wires, source, output_path):
         os.link(source, output_path)
         return
 
-    if type(source) == Dataset and self.is_trivial():
+    if type(source) == archive.models.Dataset and cable.is_trivial():
         # Write the dataset contents into the file output_path.
         try:
             source.dataset_file.open()
@@ -840,18 +841,23 @@ class PipelineStepInputCable(models.Model):
 
     def run_cable(self, source, output_path, cable_record):
         """
-        Perform the cable-specified transformation on the input.
+        Perform cable transformation on the input.
+        Creates an ExecLog, associating it to cable_record.
+        Source can either be a Dataset or a path to a file.
 
-        This uses run_cable_h and creates an ExecLog, associating it
-        to cable_record.
+        INPUTS
+        source
+        output_path
+        cable_record    RSIC/ROC for this step.
 
-        source can either be a Dataset or a path to a file.
+        OUTPUT
+        curr_log        The exec log created while executing.
         """
-        # Create an ExecLog.
-        curr_log = archive.models.ExecLog(
-            record=cable_record,
-            start_time=datetime.now())
-        run_cable_h(self.custom_wires.all(), source, output_path)
+
+        curr_log = archive.models.ExecLog(record=cable_record,start_time=datetime.now())
+
+        # Problem: run_cable_h doesnt know what cable this is
+        run_cable_h(self, source, output_path)
         curr_log.end_time = datetime.now()
         curr_log.complete_clean()
         curr_log.save()
@@ -1205,7 +1211,7 @@ class PipelineOutputCable(models.Model):
         curr_log = archive.models.ExecLog(
             record=cable_record,
             start_time=datetime.now())
-        run_cable_h(self.custom_outwires.all(), source, output_path)
+        run_cable_h(self, source, output_path)
         curr_log.end_time = datetime.now()
         curr_log.complete_clean()
         curr_log.save()

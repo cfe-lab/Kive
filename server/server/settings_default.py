@@ -138,7 +138,8 @@ INSTALLED_APPS = (
     'method',
     'pipeline',
     'transformation',
-    'datachecking'
+    'datachecking',
+	'sandbox'
 )
 
 # A sample logging configuration. The only tangible logging
