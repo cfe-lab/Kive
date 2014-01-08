@@ -1,3 +1,10 @@
 body {
 	font-family: 'Lato', sans-serif;
 }
+table {
+    style: "frame:hsides";
+    border: 0;
+    padding: 0px;
+    border-spacing: 12px 12px;
+    border-bottom: 1pt solid black;
+}

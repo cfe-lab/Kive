@@ -4,7 +4,7 @@ Generate an HTML form to create a new Datatype object
 
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django import forms
-from copperfish.models import Datatype, BasicConstraint
+from copperfish.models import Datatype, BasicConstraint, CodeResourceRevision
 from datetime import datetime
 
 class DatatypeForm (forms.ModelForm):
@@ -41,3 +41,10 @@ class StringConstraintForm (forms.Form):
     minlen = forms.IntegerField(required=False, help_text='Minimum string length (must be non-negative integer)')
     maxlen = forms.IntegerField(required=False, help_text='Maximum string length (must be non-negative integer)')
     regexp = forms.CharField(required=False, help_text='A regular expression that can be recognized by the Python re module (Perl-like syntax).')
+
+
+
+class CodeResourceRevisionForm (forms.ModelForm):
+    class Meta:
+        model = CodeResourceRevision
+        exclude = ('coderesource', 'MD5_checksum', 'revision_DateTime', )

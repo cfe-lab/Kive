@@ -19,7 +19,7 @@ def home(request):
 
 def dev(request):
     """
-    Default homepage
+    Developer portal
     """
     t = loader.get_template('dev.html')
     c = Context()
@@ -148,3 +148,37 @@ def datatype_detail(request, id):
 
 
 
+def resources(request):
+    """
+    Display a list of all code resources (parents) in database
+    """
+    resources = models.CodeResource.objects.filter()
+    t = loader.get_template('resources.html')
+    c = Context({'resources': resources})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+def resource_add(request):
+    """
+    Add a new code resource.
+    """
+    if request.method == 'POST':
+        pass
+    else:
+        form = CodeResourceRevisionForm()
+    
+    t = loader.get_template('resource_add.html')
+    c = Context({'resource_form': form})
+    c.update(csrf(request))
+    
+    return HttpResponse(t.render(c))
+
+
+def usr(request):
+    """
+    User portal
+    """
+    t = loader.get_template('usr.html')
+    c = Context()
+    return HttpResponse(t.render(c))
