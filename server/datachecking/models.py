@@ -54,7 +54,7 @@ class BadData(models.Model):
                                            related_name="baddata")
 
     # In decreasing order of severity....
-    missing_output = models.BooleanField()
+    missing_output = models.BooleanField(default=False)
     bad_header = models.NullBooleanField()
     bad_num_rows = models.NullBooleanField()
 

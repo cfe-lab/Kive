@@ -16,9 +16,6 @@ import re
 import csv
 from datetime import datetime
 
-import method.models
-import archive.models
-
 class Datatype(models.Model):
     """
     Abstract definition of a semantically atomic type of data.
