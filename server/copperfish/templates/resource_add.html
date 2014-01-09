@@ -1,0 +1,25 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "base.html" %}
+
+{% block title %}Upload code resource{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript" src="static/datatypes.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<a href="/dev/resources">return to Code Resource summary</a>
+
+<h2>Upload a code resource</h2>
+
+<!-- Form for inserting new Datatypes -->
+<form action="" method="post">{% csrf_token %}
+    {{ resource_form.as_p }}
+    <input type="submit" value="Submit" />
+</form>
+
+
+{% endblock %}
