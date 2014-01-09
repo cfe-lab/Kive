@@ -44,7 +44,17 @@ class StringConstraintForm (forms.Form):
 
 
 
-class CodeResourceRevisionForm (forms.ModelForm):
+class CodeResourceForm (forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(CodeResourceForm, self).__init__(*args, **kwargs)
+        self.fields['revision_name'].help_text = 'Name for this new code resource'
+        self.fields['revision_desc'].help_text = 'A detailed description of this new code resource'
+        self.fields['content_file'].help_text = 'File containing this new code resource'
     class Meta:
         model = CodeResourceRevision
-        exclude = ('coderesource', 'MD5_checksum', 'revision_DateTime', )
+        fields = ('revision_name', 'revision_desc', 'content_file', )
+
+class CodeResourceRevisionForm (forms.ModelForm):
+   class Meta:
+        model = CodeResourceRevision
+        fields = ('revision_name', 'revision_desc', 'content_file', )

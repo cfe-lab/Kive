@@ -44,7 +44,7 @@ def datatype_add(request):
     exceptions = []
     
     if request.method == 'POST':
-        dform = DatatypeForm(request.POST)
+        dform = DatatypeForm(request.POST) # create form bound to POST data
         query = request.POST.dict()
         
         if dform.is_valid():
@@ -164,9 +164,16 @@ def resource_add(request):
     Add a new code resource.
     """
     if request.method == 'POST':
-        pass
+        form = CodeResourceForm(request.POST, request.FILES) # create form bound to POST data
+        query = request.POST.dict()
+        # crform.revision_parent will be stored as NULL
+        if form.is_valid():
+            print query
+        # create a new CodeResource
+        #CodeResource()
+        
     else:
-        form = CodeResourceRevisionForm()
+        form = CodeResourceForm()
     
     t = loader.get_template('resource_add.html')
     c = Context({'resource_form': form})
