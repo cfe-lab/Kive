@@ -7,6 +7,7 @@ from librarian.models import ExecRecordIn
 import file_access_utils, logging_utils
 import os.path
 import logging, sys, time
+import tempfile
 
 from datetime import datetime
 
@@ -76,7 +77,7 @@ class Sandbox:
         self.run = pipeline.pipeline_instances.create(user=self.user)
 
         if sandbox_path == None:
-            self.sandbox_path = os.path.join("/tmp", "user{}_run{}".format(self.user, self.run.pk))
+            self.sandbox_path = tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
 
         # Make the sandbox directory.
         logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
@@ -510,14 +511,17 @@ class Sandbox:
                 logging.debug("file_access_utils.set_up_directory('{}')".format(path))
                 file_access_utils.set_up_directory(path)
 
+            # We will use these:
+            out_dir = os.path.join(step_run_dir, "output_data")
+            in_dir = os.path.join(step_run_dir, "input_data")
+            log_dir = os.path.join(step_run_dir, "logs")
+
             # Set up output paths.
             for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
                 file_suffix = "raw" if curr_output.is_raw() else "csv"
                 file_name = "step{}_{}.{}".format(pipelinestep.step_num, curr_output.dataset_name,file_suffix)
                 output_path = os.path.join(out_dir,file_name)
                 output_paths.append(output_path)
-
-            in_dir = os.path.join(step_run_dir, "input_data")
 
             # Run all PSICs.  This list stores the SDs that come out of the
             # cables (and get fed directly into the transformation).
@@ -593,11 +597,6 @@ class Sandbox:
         # RECOVERY CASE
         else:
             step_run_dir, curr_RS = self.ps_map(pipelinestep)
-
-            # We will use these:
-            in_dir = os.path.join(step_run_dir, "input_data")
-            out_dir = os.path.join(step_run_dir, "output_data")
-            log_dir = os.path.join(step_run_dir, "logs")
 
             for curr_output in (
                 pipelinestep.transformation.outputs.all().order_by("dataset_idx")):
