@@ -52,7 +52,7 @@ class CodeResourceForm (forms.ModelForm):
         self.fields['content_file'].help_text = 'File containing this new code resource'
     class Meta:
         model = CodeResourceRevision
-        fields = ('revision_name', 'revision_desc', 'content_file', )
+        fields = ('revision_name', 'revision_desc', 'content_file')
 
 class CodeResourceRevisionForm (forms.ModelForm):
    class Meta:

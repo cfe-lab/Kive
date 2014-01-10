@@ -2,7 +2,7 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from copperfish import models
 from django.template import loader, Context
-from copperfish.models import BasicConstraint
+from copperfish.models import BasicConstraint, CodeResource
 from copperfish.forms import *
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
@@ -159,6 +159,7 @@ def resources(request):
     return HttpResponse(t.render(c))
 
 
+
 def resource_add(request):
     """
     Add a new code resource.
@@ -166,9 +167,13 @@ def resource_add(request):
     if request.method == 'POST':
         form = CodeResourceForm(request.POST, request.FILES) # create form bound to POST data
         query = request.POST.dict()
+
+        form.coderesource = CodeResource(name='', filename='')
+
         # crform.revision_parent will be stored as NULL
         if form.is_valid():
             print query
+            return HttpResponseRedirect('/dev/resources')
         # create a new CodeResource
         #CodeResource()
         
