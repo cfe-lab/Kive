@@ -1015,29 +1015,25 @@ class Dataset(models.Model):
 class ExecLog(models.Model):
     """
     Logs of Method/PSIC/POC execution.
+    Records the start/end times of execution.
+    Records *attempts* to run a computation, whether or not it succeeded.
 
-    Records the start and end times of execution; if the log is for
-    a Method, links to a MethodOutput.
-
-    This is meant to capture an *attempt* to run an atomic operation,
-    whether or not it was successful.
+    ELs for methods will also link to a MethodOutput.
     """
     content_type = models.ForeignKey(
         ContentType,
-        limit_choices_to = {
-            "model__in": ("RunStep", "RunOutputCable",
-                          "RunSIC")
-        })
+        limit_choices_to = { "model__in":
+                            ("RunStep", "RunOutputCable","RunSIC")})
     object_id = models.PositiveIntegerField()
     record = generic.GenericForeignKey("content_type", "object_id")
 
-    start_time = models.DateTimeField(
-        "start time", auto_now_add=True,
-        help_text="Time at start of execution")
 
-    end_time = models.DateTimeField(
-        "end time",
-        help_text="Time at end of execution")
+    start_time = models.DateTimeField("start time",
+                                      auto_now_add=True,
+                                      help_text="Time at start of execution")
+
+    end_time = models.DateTimeField("end time",
+                                    help_text="Time at end of execution")
 
     def clean(self):
         """
@@ -1054,12 +1050,11 @@ class ExecLog(models.Model):
                 format(self))
 
     def is_complete(self):
-        """True if ExecLog is complete; False otherwise."""
-        if (type(self.record == RunStep) and
-                type(self.record.pipelinestep.transformation) ==
-                method.models.Method):
+        """If this is a RunStep, specifically a method, it must have a methodoutput to be complete"""
+        if type(self.record) == RunStep and type(self.record.pipelinestep.transformation) == method.models.Method:
             if not hasattr(self, "methodoutput"):
                 return False
+
         return True
 
     def complete_clean(self):

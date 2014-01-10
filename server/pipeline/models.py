@@ -14,6 +14,7 @@ from django.db import transaction
 
 from datetime import datetime
 
+import logging, logging_utils
 import metadata.models
 import transformation.models
 import librarian.models
@@ -400,19 +401,25 @@ def run_cable_h(cable, source, output_path):
     wires is the QuerySet containing wires for this cable.
     """
 
+    import csv, logging
+    logger = logging.getLogger()
+    logging_utils.set_logging_function_name("pipeline.run_cable_h")
+
     wires = cable.custom_wires.all()
 
     # Read/write binary files in chunks
     chunk_size = 1024*8
     
-    if type(source) == str and self.is_trivial():
-        # If trivial, make a link from source to output_path.
-        # FIXME: for Windows we may not be able to use sym links
+    if type(source) == str and cable.is_trivial():
+        logger.debug("Cable source is a file path")
+        logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
         os.link(source, output_path)
         return
 
     if type(source) == archive.models.Dataset and cable.is_trivial():
-        # Write the dataset contents into the file output_path.
+        logger.debug("Cable source is a dataset object")
+        logger.debug("Trivial cable: writing dataset to the file system")
+
         try:
             source.dataset_file.open()
             with open(output_path,"wb") as outfile:
@@ -424,50 +431,50 @@ def run_cable_h(cable, source, output_path):
             source.dataset_file.close()
         return
         
-    # The cable is not trivial.  Make a dict that encapsulates the
-    # mapping required: keyed by the output column name, with value
+    # Make a dict encapsulating the mapping required: keyed by the output column name, with value
     # being the input column name.
     source_of = {}
     column_names_by_idx = {}
+
+    mappings = ""
     for wire in wires:
-        source_of[wire.dest_pin.column_name] = (
-            wire.source_pin.column_name)
-        column_names_by_idx[wire.dest_pin.column_idx] = (
-            wire.dest_pin.column_name)
-        
+        mappings += "{} wires to {}   ".format(wire.source_pin, wire.dest_pin)
+        source_of[wire.dest_pin.column_name] = wire.source_pin.column_name
+        column_names_by_idx[wire.dest_pin.column_idx] = wire.dest_pin.column_name
+
+    logger.debug("Nontrivial cable. {}".format(mappings))
+
     # Construct a list with the column names in the appropriate order.
-    output_fields = [column_names_by_idx[i] 
-                     for i in sorted(column_names_by_idx)]
+    output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
     try:
         infile = None
-        if type(source) == Dataset:
+
+        if type(source) == archive.models.Dataset:
             infile = source.dataset_file
             infile.open()
         else:
             infile = open(source, "rb")
-            
+
         input_csv = csv.DictReader(infile)
 
         with open(output_path, "wb") as outfile:
-            output_csv = csv.DictWriter(outfile,
-                                        fieldnames=output_fields)
+            output_csv = csv.DictWriter(outfile,fieldnames=output_fields)
             output_csv.writeheader()
             
             for source_row in input_csv:
-                # row looks like {col1name: col1val, col2name:
-                # col2val, ...}.
+                # row = {col1name: col1val, col2name: col2val, ...}
                 dest_row = {}
                 
-                # source_of looks like:
-                # {outcol1: sourcecol5, outcol2: sourcecol1, ...}
+                # source_of = {outcol1: sourcecol5, outcol2: sourcecol1, ...}
                 for out_col_name in source_of:
                     dest_row[out_col_name] = source_row[source_of[out_col_name]]
-                    output_csv.writerow(dest_row)
+
+                output_csv.writerow(dest_row)
 
     finally:
         infile.close()
-        
+
 
 class PipelineStepInputCable(models.Model):
     """
@@ -853,16 +860,18 @@ class PipelineStepInputCable(models.Model):
         OUTPUT
         curr_log        The exec log created while executing.
         """
-
-        curr_log = archive.models.ExecLog(record=cable_record,start_time=datetime.now())
-
-        # Problem: run_cable_h doesnt know what cable this is
+        logging_utils.set_logging_function_name("pipeline.PSIC.run_cable")
+        import datetime
+        from django.utils.timezone import utc
+        now = datetime.datetime.utcnow().replace(tzinfo=utc)
+        curr_log = archive.models.ExecLog(record=cable_record,start_time=now)
+        logging.debug("run_cable_h({},{},{})".format(self,source,output_path))
         run_cable_h(self, source, output_path)
-        curr_log.end_time = datetime.now()
+        logging_utils.set_logging_function_name("pipeline.PSIC.run_cable")
+        curr_log.end_time = datetime.datetime.utcnow().replace(tzinfo=utc)
         curr_log.complete_clean()
+        logging.debug("Creating/returning exec log".format(curr_log))
         curr_log.save()
-        cable_record.log = curr_log
-        cable_record.save()
         return curr_log
 
 class CustomCableWire(models.Model):
