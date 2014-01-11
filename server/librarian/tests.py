@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.utils import timezone
 
 import file_access_utils
 
@@ -110,10 +111,16 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_wire1 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[1],dest_pin=self.doublet_cdt.members.all()[1])
         self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
         self.pE.clean()
-        
+
         # Define a user
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
+
+        # Runs for the pipelines.
+        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        self.pD_run.save()
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.pE_run.save()
 
         # November 7, 2013: use a helper function (defined in
         # librarian.models) to define our SymDSs and DSs.
@@ -264,12 +271,34 @@ class DatasetStructureTests(LibrarianTestSetup):
 
 class ExecRecordTests(LibrarianTestSetup):
 
+    def ER_from_record(self, record):
+        """
+        Helper function to create an ExecRecord from an Run, RunStep, or 
+        RunOutputCable (record), by creating a throwaway ExecLog.
+        """
+        myEL = ExecLog(record=record, end_time=timezone.now())
+        myEL.save()
+        myER = ExecRecord(generator=myEL)
+        myER.save()
+        return(myER)
+
+    def ER_from_PSIC(self, run, PS, PSIC):
+        """
+        Helper function to create an ExecRecord associated to a
+        PipelineStepInputCable, for a particular run and pipeline step.
+        """
+        myRS = run.runsteps.create(pipelinestep=PS)
+        myRSIC = PSIC.psic_instances.create(runstep=myRS)
+        return ER_from_record(myRSIC)
+
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
-        myER = self.E21_41.execrecords.create(tainted=False)
+        myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
+        myER = self.ER_from_record(myROC)
+        myERI_bad = myER.execrecordins.create(
+            symbolicdataset = self.singlet_symDS,
+            generic_input = self.C1_out)
 
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
-                                              generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
             "ExecRecordIn \".*\" does not denote the TO that feeds the parent ExecRecord POC",
@@ -277,8 +306,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_links_PSIC_so_ERI_must_link_TX_that_PSIC_is_fed_by(self):
         # ER links PSIC: ERI must link to the TO/TI that the PSIC is fed by
-        myER = self.E11_32.execrecords.create(tainted=False)
-
+        myER = self.ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
@@ -286,8 +314,7 @@ class ExecRecordTests(LibrarianTestSetup):
             "ExecRecordIn \".*\" does not denote the TO/TI that feeds the parent ExecRecord PSIC",
             myERI_bad.clean)
         
-        yourER = self.E02_22.execrecords.create(tainted=False)
-
+        yourER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         yourERI_bad = yourER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                                   generic_input=self.D2_in)
         self.assertRaisesRegexp(
@@ -296,48 +323,49 @@ class ExecRecordTests(LibrarianTestSetup):
             yourERI_bad.clean)
 
     def test_ER_doesnt_link_cable_so_ERI_mustnt_link_TO(self):
-        # ER doesn't refer to a cable (So, method/pipeline): ERI must refer to a TI
-        myER = self.mA.execrecords.create(tainted=False)
+        # ER's EL doesn't refer to a RSIC or ROC (So, RunStep): ERI must refer to a TI
+        myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
+        myER = self.ER_from_record(myRS)
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecordIn \".*\" must refer to a TI of the Method/Pipeline of the parent ExecRecord",
+            "ExecRecordIn \".*\" must refer to a TI of the Method of the parent ExecRecord",
             myERI_bad.clean)
 
-    def test_ER_links_toplevel_pipeline_so_TI_of_ERI_must_be_member_of_pipeline(self):
-        # ERI links TI: TI must be a member of the ER's method/pipeline
-        myER = self.pE.execrecords.create(tainted=False)
-        myERI_good = myER.execrecordins.create(
-            symbolicdataset=self.triplet_symDS,
-            generic_input=self.pE.inputs.get(dataset_name="E1_in"))
-        self.assertEqual(myERI_good.clean(), None)
-        
-        myERI_bad = myER.execrecordins.create(
-            symbolicdataset=self.singlet_symDS,
-            generic_input=self.pD.inputs.get(dataset_name="D2_in"))
-        self.assertRaisesRegexp(ValidationError,"Input \".*\" does not belong to Method/Pipeline of ExecRecord \".*\"",myERI_bad.clean)
+    def test_general_transf_returns_correct_method(self):
+        """
+        Test if ExecRecord.general_transf() returns the method of the PipelineStep
+        it was defined with.
+        """
+        myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
+        myER = self.ER_from_record(myRS)
+        self.assertEqual(myER.general_transf(), self.step_D1.transformation)
 
     def test_ER_links_sub_pipelinemethod_so_ERI_must_link_TI_belonging_to_transformation(self):
-        # ER is a sub-pipeline/method - ERI must refer to TI of that transformation
-        myER = self.pD.execrecords.create(tainted=False)
+        # ER is a method - ERI must refer to TI of that transformation
+        # The transformation of step_D1 is method mB, which has input B1_in.
+        myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
+        myER = self.ER_from_record(myRS)
         myERI_good = myER.execrecordins.create(
             symbolicdataset=self.D1_in_symDS,
-            generic_input=self.D1_in)
+            generic_input=self.B1_in)
+
         self.assertEqual(myERI_good.clean(), None)
         
         myERI_bad = myER.execrecordins.create(
             symbolicdataset=self.triplet_symDS,
-            generic_input=self.pD.outputs.all()[0])
+            generic_input=self.mB.outputs.all()[0])
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecordIn \".*\" must refer to a TI of the Method/Pipeline of the parent ExecRecord",
+            "ExecRecordIn \".*\" must refer to a TI of the Method of the parent ExecRecord",
             myERI_bad.clean)
 
     def test_ERI_dataset_must_match_rawunraw_state_of_generic_input_it_was_fed_into(self):
         # ERI has a dataset: it's raw/unraw state must match the raw/unraw state of the generic_input it was fed into
-
-        myER_C = self.mC.execrecords.create(tainted=False)
+        # Method mC is step step_E3 of pipeline pE, and method mA is step step_E1 of pipeline pE.
+        myRS_C = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
+        myER_C = self.ER_from_record(myRS_C)
 
         myERI_unraw_unraw = myER_C.execrecordins.create(
             symbolicdataset=self.triplet_symDS,
@@ -350,7 +378,8 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_raw_unraw_BAD.clean)
         myERI_raw_unraw_BAD.delete()
 
-        myER_A = self.mA.execrecords.create(tainted=False)
+        myRS_A = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
+        myER_A = self.ER_from_record(myRS_A)
         myERI_unraw_raw_BAD = myER_A.execrecordins.create(
             symbolicdataset=self.triplet_symDS,
             generic_input=self.A1_rawin)
@@ -367,7 +396,8 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_links_POC_ERI_links_TO_which_constrains_input_dataset_CDT(self):
         # ERI links with a TO (For a POC leading from source TO), the input dataset CDT is constrained by the source TO
-        myER = self.E21_41.execrecords.create(tainted=False)
+        myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
+        myER = self.ER_from_record(myROC)
 
         # We annotate that triplet was fed from D1_out into E21_41
         myERI_wrong_CDT = myER.execrecordins.create(
@@ -388,54 +418,11 @@ class ExecRecordTests(LibrarianTestSetup):
             "SymbolicDataset \".*\" has too many rows to have come from TransformationOutput \".*\"",
             myERI_too_many_rows.clean)
 
-    def test_ER_links_pipeline_ERI_links_TI_which_constrains_input_dataset_CDT(self):
-        # ERI links with a TI (for pipeline inputs) - the dataset is constrained by the pipeline TI CDT
-
-        myER = self.pE.execrecords.create(tainted=False)
-        myERI_wrong_CDT = myER.execrecordins.create(
-            symbolicdataset=self.singlet_symDS,
-            generic_input=self.E1_in)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "CDT of SymbolicDataset .* is not a restriction of the required CDT",
-            myERI_wrong_CDT.clean)
-        myERI_wrong_CDT.delete()
-
-        myERI_too_few_rows = myER.execrecordins.create(
-            symbolicdataset=self.singlet_3rows_symDS,
-            generic_input=self.E2_in)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "SymbolicDataset \".*\" has too few rows for TransformationInput \".*\"",
-            myERI_too_few_rows.clean)
-        myERI_too_few_rows.delete()
-
-        # A dataset of correct triplet CDT.
-        self.triplet_large_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "triplet_cdt_large.csv"),
-            self.triplet_cdt,
-            user=self.myUser, name="triplet", description="lol")
-        
-        # Define dataset of correct CDT (singlet) with > 10 rows
-        self.singlet_large_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "singlet_cdt_large.csv"),
-            self.singlet_cdt,
-            user=self.myUser, name="singlet", description="lol")
-
-        myERI_right_E1 = myER.execrecordins.create(
-            symbolicdataset=self.triplet_large_symDS,
-            generic_input=self.E1_in)
-        self.assertEqual(myERI_right_E1.clean(), None)
-
-        myERI_right_E2 = myER.execrecordins.create(
-            symbolicdataset=self.singlet_large_symDS,
-            generic_input=self.E2_in)
-        self.assertEqual(myERI_right_E2.clean(), None)
-
     def test_ER_links_pipelinestep_ERI_links_TI_which_constrains_input_CDT(self):
         # The transformation input of its PipelineStep constrains the dataset when the ER links with a method
-        
-        myER = self.mC.execrecords.create(tainted=False)
+        # Method mC is step step_E3 of pipeline pE.
+        myROC = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
+        myER = self.ER_from_record(myROC)
         myERI_wrong_CDT = myER.execrecordins.create(
             symbolicdataset=self.singlet_symDS,
             generic_input=self.C2_in)
@@ -453,7 +440,8 @@ class ExecRecordTests(LibrarianTestSetup):
         # If the parent ER is linked with a POC, the ERO TO must belong to that pipeline
 
         # E31_42 belongs to pipeline E
-        myER = self.E31_42.execrecords.create(tainted=False)
+        myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
+        myER = self.ER_from_record(myROC)
 
         # This ERO has a TO that belongs to this pipeline
         myERO_good = myER.execrecordouts.create(
@@ -475,7 +463,8 @@ class ExecRecordTests(LibrarianTestSetup):
         # The TO must have the same name as the POC which supposedly created it
 
         # Make ER for POC E21_41 which defines pipeline E's TO "E1_out"
-        myER = self.E21_41.execrecords.create(tainted=False)
+        myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
+        myER = self.ER_from_record(myROC)
 
         # Define ERO with a TO that is part of pipeline E but with the wrong name from the POC
         myERO_bad = myER.execrecordouts.create(
@@ -488,7 +477,9 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_if_dataset_is_undeleted_it_must_be_coherent_with_output(self):
         # 1) If the data is raw, the ERO output TO must also be raw
-        myER = self.mC.execrecords.create(tainted=False)
+        # Method mC is step step_E3 of pipeline pE.
+        myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
+        myER = self.ER_from_record(myRS)
 
         myERO_rawDS_rawTO = myER.execrecordouts.create(
             symbolicdataset=self.raw_symDS, generic_output=self.C3_rawout)
@@ -526,7 +517,9 @@ class ExecRecordTests(LibrarianTestSetup):
         myERO_invalid_CDT.delete()
 
         # Dataset must have num rows within the row constraints of the producing TO
-        myER_2 = self.mB.execrecords.create(tainted=False)
+        # Method mB is step step_D1 of pipeline pD.
+        myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
+        myER_2 = self.ER_from_record(myRS)
         myERO_too_many_rows = myER_2.execrecordouts.create(
             symbolicdataset=self.triplet_symDS, generic_output=self.B1_out)
         self.assertRaisesRegexp(
@@ -537,7 +530,9 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ERI_associated_Dataset_must_be_restriction_of_input_CDT(self):
         """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
-        mC_ER = self.mC.execrecords.create()
+        # Method mC is step step_E3 of pipeline pE.
+        mC_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
+        mC_ER = self.ER_from_record(mC_RS)
         mC_ER_in_1 = mC_ER.execrecordins.create(
             generic_input=self.C1_in,
             symbolicdataset=self.C1_in_symDS)
