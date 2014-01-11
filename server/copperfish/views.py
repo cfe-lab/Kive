@@ -93,7 +93,7 @@ def datatype_add(request):
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
-            
+
             if exceptions:
                 new_datatype.delete() # delete object from database
             else:
@@ -167,13 +167,20 @@ def resource_add(request):
     if request.method == 'POST':
         form = CodeResourceForm(request.POST, request.FILES) # create form bound to POST data
         query = request.POST.dict()
+        files = request.FILES.dict()
+        content_file = files['content_file']
 
-        form.coderesource = CodeResource(name='', filename='')
+        cr = CodeResource(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
+        cr.full_clean()
+        cr.save()
+        form.coderesource = cr
+        print form.coderesource.filename
 
-        # crform.revision_parent will be stored as NULL
+
+        # revision_parent will be stored as NULL
         if form.is_valid():
             print query
-            return HttpResponseRedirect('/dev/resources')
+            return HttpResponseRedirect('/resources')
         # create a new CodeResource
         #CodeResource()
         

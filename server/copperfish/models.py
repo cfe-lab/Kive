@@ -545,7 +545,6 @@ class CodeResource(models.Model):
         must not end in space, and be composed of letters,
         numbers, dash, underscore, paranthesis, and space.
         """
-        
         if self.isValidFileName():
             pass
         else:
