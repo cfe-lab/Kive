@@ -526,9 +526,14 @@ class RunSIC(models.Model):
                 format(self.PSIC, self.runstep.pipelinestep))
 
         if self.log.all().exists():
-            self.log.complete_clean()
+            if self.log.count() == 1:
+                self.log.first().complete_clean()
+            else:
+                raise ValidationError(
+                    "RunSIC \"{}\" has {} ExecLogs but should have only one".
+                    format(self, self.log.count()))
 
-        if self.reused == None:
+        if self.reused is None:
             if self.log.all().exists():
                 raise ValidationError(
                     "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; no log should have been generated".
@@ -642,7 +647,7 @@ class RunSIC(models.Model):
 
     def is_complete(self):
         """True if RunSIC is complete; false otherwise."""
-        return self.execrecord != None
+        return self.execrecord is not None
 
     def complete_clean(self):
         """Check completeness and coherence of this RunSIC."""
