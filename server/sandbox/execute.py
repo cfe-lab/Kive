@@ -51,7 +51,8 @@ class Sandbox:
         PRE: the inputs are all appropriate for pipeline.
         """
         logging_utils.setup_logging()
-        logging_utils.set_logging_function_name("sandbox.__init__()")
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         logger = logging.getLogger()
 
         self.user = user
@@ -64,7 +65,7 @@ class Sandbox:
 
         # Initialize the maps ourselves.
 
-        logger.debug("initializing maps")
+        logger.debug("{}: initializing maps".format(fn))
         for i, pipeline_input in enumerate(inputs):
             # Get the corresponding pipeline input, compensating for
             # 0-basedness.
@@ -80,7 +81,7 @@ class Sandbox:
             self.sandbox_path = tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
 
         # Make the sandbox directory.
-        logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
+        logger.debug("{}: file_access_utils.set_up_directory({})".format(fn, self.sandbox_path))
         file_access_utils.set_up_directory(self.sandbox_path)
 
     def execute_cable(self, cable, input_SD, output_path, parent_record,
@@ -110,7 +111,8 @@ class Sandbox:
         5) input_SD is clean
         """
 
-        logging_utils.set_logging_function_name("sandbox.execute_cable")
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         ####
         # CREATE/RETRIEVE RECORD
@@ -124,14 +126,14 @@ class Sandbox:
 
         # If not recovering, we create a new record.
         if not recover:
-            logging.debug("Not recovering cable")
+            logging.debug("{}: Not recovering cable".format(fn))
 
             if type(cable) == pipeline.models.PipelineStepInputCable:
-                logging.debug("Creating RSIC")
+                logging.debug("{}: Creating RSIC".format(fn))
                 curr_record = cable.psic_instances.create(runstep=parent_record)
                 required_record_type = archive.models.RunSIC
             else:
-                logging.debug("Creating ROC")
+                logging.debug("{}: Creating ROC".format(fn))
                 curr_record = cable.poc_instances.create()
                 required_record_type = archive.models.RunOutputCable
 
@@ -149,7 +151,7 @@ class Sandbox:
                     cable_keeps_output = not (
                         parent_record.parent_runstep.pipelinestep.
                         outputs_to_delete.filter(dataset_name=cable.output_name).exists())
-            logging.debug("Cable keeps output? {}".format(cable_keeps_output))
+            logging.debug("{}: Cable keeps output? {}".format(fn, cable_keeps_output))
 
             # FIXME now we have to redefine what "reusability" means: an
             # ER should only be considered for reuse if all of its inputs
@@ -160,7 +162,7 @@ class Sandbox:
 
             # A) Get the content type (RSIC or ROC?) of the ExecRecord's ExecLog
             record_contenttype = ContentType.objects.get_for_model(required_record_type)
-            logging.debug("Searching for reusable cable ER - (linked to an '{}' ExecLog)".format(record_contenttype))
+            logging.debug("{}: Searching for reusable cable ER - (linked to an '{}' ExecLog)".format(fn, record_contenttype))
 
             # B) Look at ERIs linked to the same cable type, with matching input SD
             candidate_ERIs = ExecRecordIn.objects.filter(execrecord__generator__content_type=record_contenttype, symbolicdataset=input_SD)
@@ -171,7 +173,7 @@ class Sandbox:
             # FIXME can we speed this up using a prefetch?
             # Search for an execrecord that we can reuse OR fill in.
             for candidate_ERI in candidate_ERIs:
-                logging.debug("Considering ERI {}".format(candidate_ERI))
+                logging.debug("{}: Considering ERI {}".format(fn, candidate_ERI))
                 candidate_cable = candidate_ERI.execrecord.general_transf
     
                 if cable.is_compatible(candidate_cable):
@@ -237,42 +239,40 @@ class Sandbox:
         ####
         # RUN CABLE
         
-        logging.debug("No ER to reuse - committed to executing cable")
+        logging.debug("{}: No ER to reuse - committed to executing cable".format(fn))
         curr_log = None
 
         # The input contents are not on the file system, and:
         if (self.sd_fs_map[input_SD] == None) or not os.access(self.sd_fs_map[input_SD], os.R_OK):
-            logging.debug("Dataset unavailable on file system")
+            logging.debug("{}: Dataset unavailable on file system".format(fn))
 
             if input_SD.has_data():
-                logging.debug("Dataset has real data: using it for cable execution")
-                logging.debug("PSIC.run_cable('{}','{}','{}')".format(input_SD.dataset, output_path, curr_record))
+                logging.debug("{}: Dataset has real data: using it for cable execution".format(fn))
+                logging.debug("{}: PSIC.run_cable('{}','{}','{}')".format(fn, input_SD.dataset, output_path, curr_record))
                 curr_log = cable.run_cable(input_SD.dataset,output_path,curr_record)
-                logging_utils.set_logging_function_name("sandbox.execute_cable")
-                
+
             else:
-                logging.debug("Dataset is symbolic: need to recover it")
-                logging.debug("recover({})".format(input_SD))
+                logging.debug("{}: Dataset is symbolic: need to recover it".format(fn))
+                logging.debug("{}: recover({})".format(fn, input_SD))
                 successful_recovery = self.recover(input_SD)
 
                 if not successful_recovery:
-                    logging.warn("Recovery failed: returning incomplete RSIC/ROC (IE, missing ExecLog)")
+                    logging.warn("{}: Recovery failed, returning incomplete RSIC/ROC (IE, missing ExecLog)".format(fn))
                     return curr_record
 
-                logging.debug("PSIC.run_cable('{}','{}','{}')".format(self.sd_fs_map[input_SD], output_path, curr_record))
+                logging.debug("{}: PSIC.run_cable('{}','{}','{}')".format(fn, self.sd_fs_map[input_SD], output_path, curr_record))
                 curr_log = cable.run_cable(self.sd_fs_map[input_SD],output_path, curr_record)
-                logging_utils.set_logging_function_name("sandbox.execute_cable")
 
 
         else:
-            logging.debug("Dataset contents found on file system: using it for cable execution")
+            logging.debug("{}: Dataset contents found on file system: using it for cable execution".format(fn))
             dataset_path = self.sd_fs_map[input_SD]
 
             if os.access(dataset_path, os.R_OK):
-                logging.debug("cable.run_cable('{}','{}','{}')".format(dataset_path,output_path,curr_record))
+                logging.debug("{}: cable.run_cable('{}','{}','{}')".format(fn, dataset_path,output_path,curr_record))
                 curr_log = cable.run_cable(dataset_path,output_path,curr_record)
             else:
-                logging.error("Can't access dataset on file system anymore! Returning incomplete RSIC/ROC")
+                logging.error("{}: Can't access dataset on file system anymore! Returning incomplete RSIC/ROC".format(fn))
                 return curr_record
 
         # FINISHED RUNNING CABLE
@@ -286,7 +286,7 @@ class Sandbox:
         had_ER_at_beginning = curr_ER != None
         
         if not recover and curr_ER == None:
-            logging.debug("No ER already in use - creating fresh cable ER + ERI")
+            logging.debug("{}: No ER already in use - creating fresh cable ER + ERI".format(fn))
 
             # Create a new ER, generated by the above ExecLog.
             curr_ER = curr_log.execrecords.create()
@@ -311,7 +311,7 @@ class Sandbox:
                 # source_pin, assign the name and index of
                 # dest_pin.
                 for wire in wires:
-                    logging.debug("Adding CDTM: {} {}".format(wire.dest_pin.column_name, wire.dest_pin.column_idx))
+                    logging.debug("{}: Adding CDTM: {} {}".format(fn, wire.dest_pin.column_name, wire.dest_pin.column_idx))
                     output_SD_CDT.members.create(datatype=wire.source_pin.datatype,
                                                  column_name=wire.dest_pin.column_name,
                                                  column_idx=wire.dest_pin.column_idx)
@@ -322,16 +322,16 @@ class Sandbox:
 
                 # Add this structure to the symbolic dataset.
                 if output_SD_CDT != None:
-                    logging.debug("Registering output SD's CDT structure")
+                    logging.debug("{}: Registering output SD's CDT structure".format(fn))
 
                     # You need to work with this 1-to-1 properly
                     output_SD_structure = librarian.models.DatasetStructure(symbolicdataset=output_SD,
                                                                      compounddatatype=output_SD_CDT,
                                                                      num_rows=-1)
                     output_SD_structure.save()
-                    logging.debug("output_SD is raw? {}".format(output_SD.is_raw()))
+                    logging.debug("{}: output_SD is raw? {}".format(fn, output_SD.is_raw()))
                 else:
-                    logging.debug("Output SD is raw")
+                    logging.debug("{}: Output SD is raw".format(fn))
 
             ero_xput = None
             if type(cable) == pipeline.models.PipelineStepInputCable:
@@ -486,7 +486,8 @@ class Sandbox:
         [step run dir]/logs/step[step number]_std(out|err).txt
         """
 
-        logging_utils.set_logging_function_name("sandbox.execute_step")
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         curr_ER = None
         output_paths = []
@@ -500,7 +501,7 @@ class Sandbox:
         # NON-RECOVERY CASE
         if not recover:
 
-            logging.debug("Not recovering step")
+            logging.debug("{}: Not recovering step".format(fn))
 
             # FIXME: Trying to make a runstep without a run
             curr_RS = pipelinestep.pipelinestep_instances.create(run=curr_run)
@@ -508,7 +509,7 @@ class Sandbox:
 
             for extension in ["", "input_data", "output_data", "logs"]:
                 path = os.path.join(step_run_dir, extension) if extension != "" else step_run_dir
-                logging.debug("file_access_utils.set_up_directory('{}')".format(path))
+                logging.debug("{}: file_access_utils.set_up_directory('{}')".format(fn, path))
                 file_access_utils.set_up_directory(path)
 
             # We will use these:
@@ -529,13 +530,12 @@ class Sandbox:
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_dir = os.path.join(in_dir,"step{}_{}".format(pipelinestep.step_num,curr_input.dataset_name))
 
-                logging.debug("execute_cable('{}','{}','{}','{}')".format(corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
+                logging.debug("{}: execute_cable('{}','{}','{}','{}')".format(fn, corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
                 curr_RSIC = self.execute_cable(corresp_cable, inputs[curr_input.dataset_idx-1],cable_dir,curr_RS)
-                logging_utils.set_logging_function_name("sandbox.execute_step")
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.all()[0].symbolicdataset)
                 
             # Sanity check
-            logging.debug("Running clean on curr_RS {}".format(curr_RS))
+            logging.debug("{}: Running clean on curr_RS {}".format(fn, curr_RS))
             curr_RS.clean()
     
             # Look for an ER that we can reuse.  It must represent the same
@@ -937,7 +937,8 @@ class Sandbox:
         to find your output.
         """
 
-        logging_utils.set_logging_function_name("sandbox.execute_pipeline")
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         logger = logging.getLogger()
         is_set = (
@@ -945,15 +946,14 @@ class Sandbox:
             sandbox_path != None, parent_runstep != None
         )
         if any(is_set) and not all(is_set):
-            raise ValueError(
-                "Either none or all of the parameters must be None")
+            raise ValueError("Either none or all parameters must be None")
         
         pipeline = pipeline or self.pipeline
         sandbox_path = sandbox_path or self.sandbox_path
 
         curr_run = self.run
         if parent_runstep != None:
-            logger.debug("parent_runstep is not none")
+            logger.debug("{}: parent_runstep is not none".format(fn))
             curr_run = pipeline.pipeline_instances.create(user=self.user,
                                                           parent_runstep=parent_runstep)
 
@@ -973,10 +973,10 @@ class Sandbox:
         # RUN STEPS
 
         for step in pipeline.steps.all().order_by("step_num"):
-            logger.debug("Looking at cables for step '{}'".format(step))
+            logger.debug("{}: Looking at cables for step '{}'".format(fn, step))
             step_inputs = []
             for cable in step.cables_in.all().order_by("dest__dataset_idx"):
-                logger.debug("Finding SD that feeds cable '{}'".format(cable))
+                logger.debug("{}: Finding SD that feeds cable '{}'".format(fn, cable))
 
                 # Find the SD that feeds this cable.  First, identify
                 # the generating step.  If it was a Pipeline input,
@@ -992,14 +992,14 @@ class Sandbox:
             run_dir = os.path.join(sandbox_path,"step{}".format(step.step_num))
 
             # FIXME: execute_step needs to know what run was created
-            logger.debug("execute_step('{}', '{}', '{}', '{}')".format(
-                curr_run, step, step_inputs, run_dir))
+            logger.debug("{}: execute_step('{}', '{}', '{}', '{}')".format(
+                fn, curr_run, step, step_inputs, run_dir))
 
             curr_RS = self.execute_step(curr_run, step, step_inputs,step_run_dir=run_dir)
             logging_utils.set_logging_function_name("sandbox.execute_pipeline")
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
-                logger.debug("Step failed to execute: returning the run")
+                logger.debug("{}: Step failed to execute: returning the run".format(fn))
                 curr_run.clean()
                 return curr_run
 

@@ -16,7 +16,11 @@ class ExecuteTests(TestCase):
 
     def setUp(self):
         import shutil
-        shutil.rmtree('/tmp/userjohn_run1')     # Clear the file system
+
+        try:
+            shutil.rmtree('/tmp/userjohn_run1')     # Clear the file system
+        except:
+            pass
 
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
@@ -31,6 +35,11 @@ class ExecuteTests(TestCase):
         self.tri_cdtm_1 = self.tri_cdt.members.create(datatype=self.int_dt,column_name="a",column_idx=1)
         self.tri_cdtm_2 = self.tri_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
         self.tri_cdtm_3 = self.tri_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
+
+        self.di_cdt = CompoundDatatype()
+        self.di_cdt.save()
+        self.di_cdtm_1 = self.di_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=1)
+        self.di_cdtm_2 = self.di_cdt.members.create(datatype=self.int_dt,column_name="e",column_idx=2)
 
     def tearTown(selfself):
         import shutil
@@ -48,7 +57,7 @@ class ExecuteTests(TestCase):
         self.mA_crr.save()
         self.mf = MethodFamily(name="self.mf",description="self.mf desc"); self.mf.save()
         self.mA = Method(revision_name="mA",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr); self.mA.save()
-        self.A1_in = self.mA.create_input(compounddatatype=self.tri_cdt,dataset_name="mA1_in", dataset_idx=1)
+        self.A1_in = self.mA.create_input(compounddatatype=self.di_cdt,dataset_name="mA1_in", dataset_idx=1)
 
         self.pf = PipelineFamily(name="self.pf", description="self.pf desc"); self.pf.save()
         self.pX = Pipeline(family=self.pf, revision_name="pX_name",revision_desc="X"); self.pX.save()
@@ -57,8 +66,9 @@ class ExecuteTests(TestCase):
         self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.A1_in,source_step=0,source=self.X1_in)
 
         # Custom wires drop the first member and swaps the second and third member
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_2,dest_pin=self.tri_cdtm_3)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.tri_cdtm_2)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_2,dest_pin=self.di_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.di_cdtm_1)
+
 
         # Simulate the upload of a dataset
         self.symDS = SymbolicDataset.create_SD(

@@ -9,12 +9,3 @@ def setup_logging():
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     return logger
-
-def set_logging_function_name(function_name):
-    logger = logging.getLogger()
-    for h in logger.handlers:
-        logger.removeHandler(h)
-    formatter = logging.Formatter('%(asctime)s - {} - %(message)s'.format(function_name))
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)

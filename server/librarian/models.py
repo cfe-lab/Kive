@@ -20,7 +20,7 @@ import method.models
 import pipeline.models
 import archive.models
 
-import file_access_utils
+import file_access_utils, logging_utils
 
 class SymbolicDataset(models.Model):
     """
@@ -153,7 +153,7 @@ class SymbolicDataset(models.Model):
         """
         Does a content check of a file that this SD represents.
 
-        If this SD is raw, then it just creates a clean CCL.
+        If this SD is raw, it just creates a clean CCL.
 
         This calls [CDT].summarize_CSV on the file and creates a
         ContentCheckLog.
@@ -164,24 +164,28 @@ class SymbolicDataset(models.Model):
 
         FIXME this should probably be invoked within a transaction!
         """
+        import datachecking.models, inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
         if self.is_raw():
+            logging.debug("{}: SD is raw, creating clean CCL".format(fn))
             ccl = self.content_checks.create(execlog=execlog)
             ccl.clean()
             return ccl
 
-        # From here on we know that this SD is not raw.
-        
+
+        logging.debug("{}: SD is not raw, checking CSV".format(fn))
         csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path)
-        
         ccl = self.content_checks.create(execlog=execlog)
         
         # Check for a malformed header (and thus a malformed file).
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
-            ccl.baddata.create(bad_header=True)
-            ccl.clean()
+            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_header=True)
+            bad_data.save()
+            logging.debug("{}: malformed header".format(fn))
             return ccl
 
         # From here on we know that the header is OK.
@@ -189,14 +193,16 @@ class SymbolicDataset(models.Model):
         # Set and check the number of rows.
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
-        if (csv_summary["num_rows"] > max_row
-                or csv_summary["num_rows"] < min_row):
-            csv_baddata = ccl.baddata.create(bad_num_rows=True)
+        if (csv_summary["num_rows"] > max_row or csv_summary["num_rows"] < min_row):
+            logging.debug("{}: bad number of rows".format(fn))
+            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_num_rows=True)
+            bad_data.save()
 
         if "failing_cells" in csv_summary:
             # Create a BadData object if it doesn't already exist.
             if csv_baddata == None:
-                csv_baddata = ccl.baddata.create()
+                csv_baddata = datachecking.models.BadData(contentchecklog = ccl)
+                csv_baddata.save()
 
             # row, col are indices.
             for row, col in csv_summary["failing_cells"]:
@@ -279,7 +285,8 @@ class DatasetStructure(models.Model):
     # now done more cleanly using ExecRecord.
 
     symbolicdataset = models.OneToOneField(
-        SymbolicDataset, related_name="structure")
+        SymbolicDataset,
+        related_name="structure")
 
     compounddatatype = models.ForeignKey(
         "metadata.CompoundDatatype",
@@ -312,7 +319,7 @@ class ExecRecord(models.Model):
 
     This record is specific to using given inputs.
     """
-    generator = models.ForeignKey("archive.ExecLog")
+    generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
 
     def __unicode__(self):
         """Unicode representation of this ExecRecord."""
@@ -674,19 +681,15 @@ class ExecRecordOut(models.Model):
 
     def clean(self):
         """
-        Checks coherence of this ExecRecordOut.
-
-        If execrecord represents a POC, then check that output is the one defined
-        by the POC.
-
-        If execrecord represents a PSIC, then check that the output is the TI the
-        cable feeds.
-        
-        If execrecord is not a cable, then check that output belongs to 
-        the execrecord's Method.
-
-        The SymbolicDataset is compatible with generic_output.
+        If ER represents a POC, check output defined by the POC.
+        If ER represents a PSIC, check output is the TI the cable feeds.
+        If ER is not a cable, check output belongs to ER's Method.
+        The SD is compatible with generic_output. (??)
         """
+
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+        import logging
 
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if (type(self.execrecord.general_transf()) ==
@@ -735,6 +738,9 @@ class ExecRecordOut(models.Model):
 
         # Check that the SD is compatible with generic_output.
 
+        logging.debug("{}: ERO SD is raw? {}".format(fn, self.symbolicdataset.is_raw()))
+        logging.debug("{}: ERO generic_output is raw? {}".format(fn, self.generic_output.is_raw()))
+
         # If SD is raw, the ERO output TO must also be raw
         if self.symbolicdataset.is_raw() != self.generic_output.is_raw():
             if type(self.generic_output) == pipeline.models.PipelineStepInputCable:
@@ -745,6 +751,8 @@ class ExecRecordOut(models.Model):
                 raise ValidationError(
                     "SymbolicDataset \"{}\" cannot have come from output \"{}\"".
                     format(self.symbolicdataset, self.generic_output))
+
+
 
         # The SD must satisfy the CDT / row constraints of the producing TO
         # (in the Method/Pipeline/POC case) or of the TI fed (in the PSIC case).
