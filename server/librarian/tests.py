@@ -289,7 +289,7 @@ class ExecRecordTests(LibrarianTestSetup):
         """
         myRS = run.runsteps.create(pipelinestep=PS)
         myRSIC = PSIC.psic_instances.create(runstep=myRS)
-        return ER_from_record(myRSIC)
+        return self.ER_from_record(myRSIC)
 
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
@@ -570,8 +570,9 @@ class ExecRecordTests(LibrarianTestSetup):
         
     def test_ERO_CDT_restrictions_Method(self):
         """ERO CDT restriction tests for the ER of a Method."""
-        ####
-        mA_ER = self.mA.execrecords.create()
+        # Method mA is step step_E1 of pipeline pE.
+        mA_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
+        mA_ER = self.ER_from_record(mA_RS)
         mA_ERO = mA_ER.execrecordouts.create(
             generic_output=self.A1_out,
             symbolicdataset=self.doublet_symDS)
@@ -603,53 +604,12 @@ class ExecRecordTests(LibrarianTestSetup):
             ValidationError,
             "CDT of SymbolicDataset .* is not the CDT of the TransformationOutput .* of the generating Method",
             mA_ERO.clean)
-        
-    def test_ERO_CDT_restrictions_Pipeline(self):
-        """ERO CDT restriction tests for the ER of a Pipeline."""
-        ####
-        pD_ER = self.pD.execrecords.create()
-        pD_ERO = pD_ER.execrecordouts.create(
-            generic_output=self.D1_out,
-            symbolicdataset=self.C1_in_symDS)
 
-        # Good case: output Dataset has the CDT of generic_output.
-        self.assertEquals(pD_ERO.clean(), None)
-
-        # Good case: output Dataset has an identical CDT.
-        other_CDT = CompoundDatatype()
-        other_CDT.save()
-        col1 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="a", column_idx=1)
-        col2 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="b", column_idx=2)
-        col3 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="c", column_idx=3)
-        
-        self.C1_in_symDS.structure.compounddatatype = other_CDT
-        self.C1_in_symDS.structure.save()
-        self.assertEquals(pD_ERO.clean(), None)
-
-        # Bad case: output SymbolicDataset has a CDT that is a
-        # restriction of generic_output.
-        col1.datatype = self.DNA_dt
-        col1.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "CDT of SymbolicDataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
-            pD_ERO.clean)
-
-        # Bad case: output Dataset has another CDT altogether.
-        pD_ERO.symbolicdataset = self.doublet_symDS
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "CDT of SymbolicDataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
-            pD_ERO.clean)
-        
     def test_ERO_CDT_restrictions_POC(self):
         """ERO CDT restriction tests for the ER of a POC."""
         ####
-        outcable_ER = self.E21_41.execrecords.create()
+        outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
+        outcable_ER = self.ER_from_record(outcable_ROC)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E1_out,
             symbolicdataset=self.E1_out_symDS)
@@ -689,7 +649,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ERO_CDT_restrictions_PSIC(self):
         """ERO CDT restriction tests for the ER of a PSIC."""
         ####
-        cable_ER = self.E11_32.execrecords.create()
+        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.C2_in,
             symbolicdataset=self.doublet_symDS)
@@ -725,7 +685,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_trivial_PSICs_have_same_SD_on_both_sides(self):
         """ERs representing trivial PSICs must have the same SymbolicDataset on both sides."""
-        cable_ER = self.E02_22.execrecords.create()
+        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         cable_ERI = cable_ER.execrecordins.create(
             generic_input=self.E2_in,
             symbolicdataset = self.singlet_symDS)
@@ -746,7 +706,9 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_trivial_POCs_have_same_SD_on_both_sides(self):
         """ERs representing trivial POCs must have the same SymbolicDataset on both sides."""
-        outcable_ER = self.E31_42.execrecords.create()
+        # E31_42 belongs to pipeline E
+        outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
+        outcable_ER = self.ER_from_record(outcable_ROC)
         outcable_ERI = outcable_ER.execrecordins.create(
             generic_input=self.C1_out,
             symbolicdataset = self.C1_out_symDS)
@@ -768,7 +730,8 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_Datasets_passing_through_non_trivial_POCs(self):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
-        outcable_ER = self.E21_41.execrecords.create()
+        outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
+        outcable_ER = self.ER_from_record(outcable_ROC)
         outcable_ERI = outcable_ER.execrecordins.create(
             generic_input=self.D1_out,
             symbolicdataset=self.C1_in_symDS)
@@ -806,7 +769,7 @@ class ExecRecordTests(LibrarianTestSetup):
         
     def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
         """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
-        cable_ER = self.E01_21.execrecords.create()
+        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
         cable_ERI = cable_ER.execrecordins.create(
             generic_input=self.E1_in,
             symbolicdataset=self.triplet_symDS)
