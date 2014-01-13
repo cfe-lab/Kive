@@ -60,6 +60,7 @@ def set_up_directory(directory_to_use):
     That is, either we create it with appropriate permissions,
     or it exists already and is writable/executable/empty.
     """
+
     try:
         os.makedirs(directory_to_use)
     except os.error:

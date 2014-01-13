@@ -564,26 +564,27 @@ class CompoundDatatype(models.Model):
     
     def summarize_CSV(self, file_to_check, summary_path):
         """
-        Give metadata on the CSV: its number of rows, and any defects.
-    
-        By defects we mean deviations from the CDT.
-    
-        file_to_check is an open, readable, file object that
-        is set to the beginning.
+        Give metadata on the CSV: number of rows, and any deviations
+        from the CDT (defects).
+
+        file_to_check: open file object set to the beginning.
         
-        Returns a dict containing metadata about the file:
-        - bad_num_cols: set if the header has the wrong number of columns;
-          if so, returns the number of columns in the header.
+
+        OUTPUT: a dict containing metadata about the CSV
+
+        - bad_num_cols: set if header has wrong number of columns;
+          if so, returns number of columns in the header.
     
-        - bad_col_indices: set if there are improperly named columns 
-          in the header; if so, returns a list of indices of bad columns
+        - bad_col_indices: set if header has improperly named columns;
+          if so, returns list of indices of bad columns
     
         - num_rows: number of rows
         
-        - failing_cells: dict of non-conforming cells in the file.  Each
-          entry is keyed by (rownum, colnum) and contains a list of tests
-          failed.
+        - failing_cells: dict of non-conforming cells in the file.
+          Entries keyed by (rownum, colnum) contain list of tests failed.
         """
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         summary = {}
         
         # A CSV reader which we will use to check individual 
@@ -593,38 +594,33 @@ class CompoundDatatype(models.Model):
     
         # Counter for the number of rows.
         num_rows = 0
-        
+
+
+
         ####
         # CHECK HEADER
-        
-        # First, check that the header is OK.
         header = data_csv.fieldnames
-                
         cdt_members = self.members.all()
-    
-        # The number of CSV columns must match the number of CDT members.
         if len(header) != cdt_members.count():
             summary["bad_num_cols"] = len(header)
+            logging.debug("{}: number of CSV columns must match number of CDT members")
             return summary
     
-        # CDT definition must be coherent with the CSV header: ith cdt
-        # member must have the same name as the ith CSV header.
+        # The ith cdt member must have the same name as the ith CSV header.
         bad_col_indices = []
         for cdtm in cdt_members:
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 bad_col_indices.append(cdtm.column_idx)
-                # raise ValidationError(
-                #     "Column {} of Dataset \"{}\" is named {}, not {} as specified by its CDT".
-                #         format(cdtm.column_idx, self.symbolicdataset.dataset,
-                #                header[cdtm.column_idx-1], cdtm.column_name))
-    
+                logging.debug("{}: Incorrect header for column {}".format(fn, cdtm.column_idx))
+
         if len(bad_col_indices) != 0:
             summary["bad_col_indices"] = bad_col_indices
             return summary
-    
         # FINISH CHECKING HEADER
         ####
-        
+
+
+
         ####
         # CHECK CONSTRAINTS
     
@@ -657,13 +653,13 @@ class CompoundDatatype(models.Model):
                     # the input file will go into the second; the output
                     # will go into the third; output and error logs go
                     # into the fourth.
-                    
-                    set_up_directory(os.path.join(column_test_path,
-                                                  "input_data"))
-                    set_up_directory(os.path.join(column_test_path,
-                                                  "output_data"))
-                    set_up_directory(os.path.join(column_test_path,
-                                                  "logs"))
+
+                    input_data = os.path.join(column_test_path, "input_data")
+                    set_up_directory(input_data)
+                    output_data = os.path.join(column_test_path, "output_data")
+                    set_up_directory(output_data)
+                    logs = os.path.join(column_test_path, "logs")
+                    set_up_directory(logs)
     
                     input_file_path = os.path.join(column_test_path,
                                                    "input_data",
