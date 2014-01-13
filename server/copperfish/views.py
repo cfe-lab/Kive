@@ -8,6 +8,7 @@ from copperfish.forms import *
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.forms.util import ErrorList
+from datetime import datetime
 
 def home(request):
     """
@@ -152,7 +153,7 @@ def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = models.CodeResource.objects.filter()
+    resources = models.CodeResourceRevision.objects.filter()
     t = loader.get_template('resources.html')
     c = Context({'resources': resources})
     c.update(csrf(request))
@@ -162,31 +163,40 @@ def resources(request):
 
 def resource_add(request):
     """
-    Add a new code resource.
+    Add a new code resource with a prototype (no revisions).  The FILENAME of the prototype will
+    be used as the symbolic filename for all subsequent revisions of this code resource.
+    The actual filename will be suffixed with date and time when saved to the filesystem.
+    On execution, Shipyard will refer to a revision's CodeResource to get the original filename and
+    copy the revision file over to the sandbox.
+    NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
+
     if request.method == 'POST':
-        form = CodeResourceForm(request.POST, request.FILES) # create form bound to POST data
         query = request.POST.dict()
-        files = request.FILES.dict()
-        content_file = files['content_file']
+        #files = request.FILES.dict()
 
-        cr = CodeResource(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
-        cr.full_clean()
-        cr.save()
-        form.coderesource = cr
-        print form.coderesource.filename
+        content_file = request.FILES['content_file']
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        with open('CodeResources/%s_%s' % (content_file.name, timestamp), 'wb+') as destination:
+            for chunk in content_file.chunks:
+                destination.write(chunk)
 
+        cr = CodeResource.objects.create(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
+        #cr = CodeResource(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
+        #cr.full_clean()
+        #cr.save()
 
-        # revision_parent will be stored as NULL
+        form = CodeResourcePrototypeForm(request.POST) # create form bound to POST data
         if form.is_valid():
-            print query
+            prototype = form.save(commit=False)
+            prototype.coderesource = cr
+            prototype.save()
+
             return HttpResponseRedirect('/resources')
-        # create a new CodeResource
-        #CodeResource()
-        
+
     else:
-        form = CodeResourceForm()
-    
+        form = CodeResourcePrototypeForm()
+
     t = loader.get_template('resource_add.html')
     c = Context({'resource_form': form})
     c.update(csrf(request))

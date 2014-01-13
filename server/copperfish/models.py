@@ -711,17 +711,22 @@ class CodeResourceRevision(models.Model):
             raise ValidationError("Self-referential dependency"); 
 
         # Check if dependencies conflict with each other
-        listOfDependencyPaths = self.list_all_filepaths()
-        if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-            raise ValidationError("Conflicting dependencies");
+        try:
+            listOfDependencyPaths = self.list_all_filepaths()
+            if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
+                raise ValidationError("Conflicting dependencies");
 
-        # If content file exists, it must have a file name
-        if self.content_file and self.coderesource.filename == "":
-            raise ValidationError("If content file exists, it must have a file name")
+            # If content file exists, it must have a file name
+            if self.content_file and self.coderesource.filename == "":
+               raise ValidationError("If content file exists, it must have a file name")
 
-        # If no content file exists, it must not have a file name
-        if not self.content_file and self.coderesource.filename != "":
-            raise ValidationError("Cannot have a filename specified in the absence of a content file")
+            # If no content file exists, it must not have a file name
+            if not self.content_file and self.coderesource.filename != "":
+               raise ValidationError("Cannot have a filename specified in the absence of a content file")
+        except:
+            pass
+
+
 
     def install(self, install_path):
         """
