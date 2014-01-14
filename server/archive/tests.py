@@ -5,6 +5,7 @@ Shipyard archive application unit tests.
 from django.test import TestCase
 from django.core.files import File
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 import os
 from librarian.models import *
@@ -13,106 +14,219 @@ import librarian.tests
 
 # Note that these tests use the exact same setup as librarian.
 
-class RunStepTests(librarian.tests.LibrarianTestSetup):
+class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
-    def test_RunStep_clean(self):
-        """Check coherence tests for RunStep at all stages of its creation."""
-        # Create some infrastructure for our RunSteps.
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+    def setUp(self):
+        super(ArchiveTestSetup, self).setUp()
 
-        # Bad case: RS has a PS that does not belong to the pipeline.
-        step_D1_RS = self.step_D1.pipelinestep_instances.create(run=pE_run)
+        # RunSteps for PipelineSteps.
+        self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+
+class RunStepTests(ArchiveTestSetup):
+
+    def test_RunStep_has_PipelineStep_not_in_pipeline(self):
+        """
+        When creating a RunStep, the PipelineStep and Pipeline must match.
+        """
+        # Try to create a RunStep from step_D1, of pipeline pD, referencing
+        # a run from pipeline pE.
+        step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pE_run)
         self.assertRaisesRegexp(
             ValidationError,
             "PipelineStep .* of RunStep .* does not belong to Pipeline .*",
             step_D1_RS.clean)
 
+<<<<<<< HEAD
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
 
         # Bad case: step E1 should not have a child_run defined.
         pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         pD_run.parent_runstep = step_E1_RS
         pD_run.save()
+=======
+    def test_RunStep_is_not_pipeline_but_child_run_exists(self):
+        """
+        A RunStep which is not for a sub-Pipeline should not have a child run.
+        """
+        pD_run = self.pD_run
+        pD_run.parent_runstep = self.step_E1_RS
+>>>>>>> 7cfb21a15245632f7daae7072e3ba6d14cf8dd65
         self.assertRaisesRegexp(
             ValidationError,
             "PipelineStep of RunStep .* is not a Pipeline but a child run exists",
-            step_E1_RS.clean)
+            self.step_E1_RS.clean)
 
-        # Moving on....
-        pD_run.parent_runstep = None
-        pD_run.save()
+    def test_RunStep_has_no_RunSICs(self):
+        """
+        A RunStep is allowed to have no RunStepInputCables.
+        """
+        self.assertEquals(self.step_E1_RS.clean(), None)
 
-        # Good case: no RSICs.
-        self.assertEquals(step_E1_RS.clean(), None)
+    def test_RunStep_has_incomplete_RunSIC(self):
+        """
+        A RunSIC must be complete before it is attached to a RunStep.
+        """
+        # Create a RSIC with no ExecRecord.
+        E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
 
-        # Bad case (propagation): define an RSIC that is not complete.
-        E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS)
-        E03_11_ER = self.E03_11.execrecords.create()
+        # Incomplete RSIC should cascade to the RS.
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* has no ExecRecord",
+            self.step_E1_RS.clean)
+
+    def test_RunStep_has_complete_RSIC(self):
+        """
+        A complete RunSIC (ie. one with an ExecRecord) may be attached to a RunStep.
+        """
+        # Create a RSIC and ExecRecord from it.
+        E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS, reused=False)
+        E03_11_ER = self.ER_from_record(E03_11_RSIC)
         E03_11_ER.execrecordins.create(generic_input=self.E3_rawin,
                                        symbolicdataset=self.raw_symDS)
         E03_11_ER.execrecordouts.create(generic_output=self.A1_rawin,
                                         symbolicdataset=self.raw_symDS)
-
-        E03_11_RSIC.reused = False
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunSIC .* has no ExecRecord",
-            step_E1_RS.clean)
-
-        # Good propagation case: RSIC is complete.
+        # Link the ExecRecord to the RSIC.
         E03_11_RSIC.execrecord = E03_11_ER
         E03_11_RSIC.save()
-        self.assertEquals(step_E1_RS.clean(), None)
+        self.assertEquals(self.step_E1_RS.clean(), None)
 
-        # Bad case: cables not quenched, but there is an associated dataset.
-        E03_11_RSIC.delete()
-        self.doublet_DS.created_by = step_E1_RS
+    def test_RunStep_cables_not_quenched_but_dataset_exists(self):
+        """
+        A complete RunSIC must exist for every PipelineSIC of a PipelineStep 
+        before a dataset can be generated for the associated RunStep.
+        """
+        # Create a dataset for a RunStep for step_E1, without 
+        # creating any RSIC's for the inputs to step_E1.
+        self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* inputs not quenched; no data should have been generated",
-            step_E1_RS.clean)
+            self.step_E1_RS.clean)
         # Reset....
         self.doublet_DS.created_by = None
         self.doublet_DS.save()
 
-        # Bad case: cables not quenched, but reused is set.
-        step_E1_RS.reused = False
+    def _test_RunStep_cables_not_quenched_but_reused_is_set(self, reused):
+        """
+        RunSteps may only decide whether to reuse existing ExecRecords after
+        all inputs have been processed.
+        """
+        self.step_E1_RS.reused = reused
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* inputs not quenched; reused and execrecord should not be set",
-            step_E1_RS.clean)
+            self.step_E1_RS.clean)
 
-        # Bad case: cables not quenched, but execrecord is set
-        step_E1_RS.reused = None
-        # Define ER for mA
-        mA_ER = self.mA.execrecords.create()
+    def test_RunStep_cables_not_quenched_but_reused_is_false(self):
+        """
+        RunSteps may only decide not to reuse an existing ExecRecord after all
+        inputs have been processed.
+        """
+        return self._test_RunStep_cables_not_quenched_but_reused_is_set(False)
+
+    def test_RunStep_cables_not_quenched_but_reused_is_true(self):
+        """
+        RunSteps may only decide to reuse an existing ExecRecord after all
+        inputs have been processed.
+        """
+        return self._test_RunStep_cables_not_quenched_but_reused_is_set(True)
+
+    def _test_RunStep_execrecord_is_set_RSIC_failure(self, fail):
+        """
+        RunSteps can only generate an ExecRecord, or have selected one to 
+        reuse, after all inputs have been processed.
+        """
+        step_E1_RS = self.step_E1_RS
+        step_E1_RS.reused = False
+
+        # Run step_E1 the first time, which creates an ExecLog for step_E1 (which 
+        # calls method mA). Note that a RunStep for step_E1 has already been created.
+        mA_EL = step_E1_RS.log.create(end_time = timezone.now())
+
+        # Since step_E1 is a Method, its stdout, stderr, and return code are also kept
+        # in a MethodOutput, which is linked to the ExecLog.
+        mA_output = MethodOutput(execlog = mA_EL, return_code = 0)
+        mA_output.save()
+        mA_EL.methodoutput = mA_output
+
+        # At this point, the RunStep should have the same number of linked RunSIC's
+        # as the PipelineStep (here, step_E1) has inputs. In the failing case,
+        # for whatever reason, these do not get created.
+
+        if not fail:
+            # Create a RunSIC for step_E1's inputs.
+            E03_11_RSIC = step_E1_RS.RSICs.create(
+                PSIC=self.E03_11,
+                reused=False)
+            # An ExecRecord is created for the RunSIC, with corresponding ERI's and ERO's.
+            E03_11_ER = self.ER_from_record(E03_11_RSIC)
+            E03_11_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
+                                           generic_input=self.E3_rawin)
+            E03_11_ER.execrecordouts.create(symbolicdataset=self.raw_symDS,
+                                            generic_output=self.A1_rawin)
+            E03_11_RSIC.execrecord = E03_11_ER
+            E03_11_RSIC.save()
+
+        # step_E1 ran succesfully. Since it has never been run before, a new
+        # ExecRecord gets populated, along with ExecRecordIn's and ExecRecordOut's.
+        mA_ER = mA_EL.execrecords.create()
+
         mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                               generic_input=self.A1_rawin)
         mA_ER_out = mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
                                                 generic_output=self.A1_out)
+
+        # Link the ExecRecord to the RunStep.
         step_E1_RS.execrecord = mA_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; reused and execrecord should not be set",
-            step_E1_RS.clean)
+        step_E1_RS.save()
 
-        # Reset....
-        step_E1_RS.execrecord = None
+        if fail:
+            # We shouldn't have been able to populate an ExecRecord without having complete
+            # records of the inputs to the PipelineStep for this run, in the form of RunSIC's.
+            self.assertRaisesRegexp(
+                ValidationError,
+                "RunStep .* inputs not quenched; reused and execrecord should not be set",
+                step_E1_RS.clean)
+        else:
+            # Everything went well.
+            self.assertEquals(step_E1_RS.clean(), None)
 
-        # Bad case: PS is a Pipeline, PS has child_run set, but cables are not
-        # quenched.
-        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
-        pD_run.parent_runstep = step_E2_RS
+    def test_RunStep_complete_and_cables_quenched(self):
+        """
+        A RunStep may be marked complete (by having a linked ExecRecord) 
+        after all its inputs are processed.
+        """
+        return self._test_RunStep_execrecord_is_set_RSIC_failure(False)
+
+    def test_RunStep_complete_but_cables_not_quenched(self):
+        """
+        A RunStep without all the necessary RSIC's may not have an ExecRecord yet.
+        """
+        return self._test_RunStep_execrecord_is_set_RSIC_failure(True)
+
+    def test_RunStep_complete_for_sub_pipeline_but_cables_not_quenched(self):
+        """
+        If a RunStep represents a sub-pipeline, child_run should only be set
+        once the all inputs of the sub-pipeline have been processed.
+        """
+        # pD is a sub-pipeline of pipeline pE. We have run pD and linked it to
+        # step_E2 of pipeline pE, but for some reason, we have no record of
+        # running the input cables to pD.
+        pD_run = self.pD_run
+        pD_run.parent_runstep = self.step_E2_RS
         pD_run.save()
+
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* inputs not quenched; child_run should not be set",
-            step_E2_RS.clean)
+            self.step_E2_RS.clean)
 
-        # Reset....
-        pD_run.parent_runstep = None
-        pD_run.save()
+
+    def test_RunStep_clean(self):
+
         E03_11_RSIC = self.E03_11.psic_instances.create(
             runstep=step_E1_RS,
             reused=False,
@@ -474,6 +588,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
             ValidationError,
             "RunStep .* has no ExecRecord",
             step_E2_RS.complete_clean)
+        
 
 
 class RunTests(librarian.tests.LibrarianTestSetup):
@@ -1275,8 +1390,66 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
             ValidationError,
             "RunSIC .* has no ExecRecord",
             E11_32_RSIC.complete_clean)
+
+    def _test_decided_reused_RunSIC_has_at_most_one_ExecLog(self, reused):
+        """
+        A RunSIC which has decided whether or not to reuse an ExecRecord
+        should have either zero or one ExecLogs.
+        """
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(
+            run=self.pE_run)
+        E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
+        E11_32_RSIC.reused = reused
+
+        # No ExecLogs yet.
+        self.assertEquals(E11_32_RSIC.clean(), None)
+
+        # One ExecLog.
+        now = timezone.now()
+        log1 = E11_32_RSIC.log.create(end_time = now)
+        self.assertEquals(E11_32_RSIC.clean(), None)
+
+        # Two ExecLogs.
+        log2 = E11_32_RSIC.log.create(end_time = now.replace(hour=now.hour + 1))
         
-        
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* has .* ExecLogs but should have only one",
+            E11_32_RSIC.clean)
+
+    def test_reused_RunSIC_has_at_most_one_ExecLog(self):
+        """
+        A RunSIC which is reusing an ExecRecord should have either
+        zero or one ExecLogs.
+        """
+        return self._test_decided_reused_RunSIC_has_at_most_one_ExecLog(True)
+
+    def test_non_reused_RunSIC_has_at_most_one_ExecLog(self):
+        """
+        A RunSIC which is not reusing an ExecRecord should have either
+        zero or one ExecLogs.
+        """
+        return self._test_decided_reused_RunSIC_has_at_most_one_ExecLog(False)
+
+    def test_undecided_reused_RunSIC_has_no_ExecLog(self):
+        """
+        A RunSIC which has not decided whether or not to reuse an ExecRecord
+        should have no ExecLogs.
+        """
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(
+            run=self.pE_run)
+        E01_21_RSIC = self.E01_21.psic_instances.create(runstep=step_E2_RS)
+
+        # No ExecLogs yet.
+        self.assertEquals(E01_21_RSIC.clean(), None)
+
+        # One ExecLog.
+        log1 = E01_21_RSIC.log.create(end_time = timezone.now())
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunSIC .* has not decided whether or not to reuse an ExecRecord; no log should have been generated",
+            E01_21_RSIC.clean)
+
 class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
 
     def test_ROC_clean(self):

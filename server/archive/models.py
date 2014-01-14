@@ -12,8 +12,24 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
 import hashlib
+
 import file_access_utils
-import method.models, transformation.models
+
+import method.models
+import transformation.models
+
+def clean_execlogs(runx):
+    """
+    Helper function to ensure a RunStep, RunSIC, or RunOutputCable has at most one
+    ExecLog, and to clean it if it exists.
+    """
+    if runx.log.all().exists():
+       if runx.log.count() == 1:
+           runx.log.first().complete_clean()
+       else:
+           raise ValidationError(
+               "{} \"{}\" has {} ExecLogs but should have only one".
+               format(runx.__class__.__name__, runx, runx.log.count()))
 
 class Run(models.Model):
     """
@@ -271,8 +287,7 @@ class RunStep(models.Model):
                     "RunStep \"{}\" represents a sub-pipeline so execrecord should not be set".
                     format(self))
 
-        if self.log.all().exists():
-            self.log.clean()
+        clean_execlogs(self)
         
         for rsic in self.RSICs.all():
             rsic.complete_clean()
@@ -525,13 +540,7 @@ class RunSIC(models.Model):
                 "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
                 format(self.PSIC, self.runstep.pipelinestep))
 
-        if self.log.all().exists():
-            if self.log.count() == 1:
-                self.log.first().complete_clean()
-            else:
-                raise ValidationError(
-                    "RunSIC \"{}\" has {} ExecLogs but should have only one".
-                    format(self, self.log.count()))
+        clean_execlogs(self)
 
         if self.reused is None:
             if self.log.all().exists():
@@ -615,6 +624,7 @@ class RunSIC(models.Model):
                 raise ValidationError(
                     "RunSIC \"{}\" does not keep its output; no data should be produced".
                     format(self))
+
 
         # Similar if the ExecLog shows missing output.
         elif missing_output:
