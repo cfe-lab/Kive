@@ -222,13 +222,15 @@ def resource_add(request):
 
 
 def resource_add_revision(request, id):
+    this_code_resource = models.CodeResource.objects.get(pk=id)
+
     if request.method == 'POST':
         pass
     else:
         form = CodeResourceRevisionForm()
 
     t = loader.get_template('resource_add_revision.html')
-    c = Context({'resource_form': form})
+    c = Context({'resource_form': form, 'coderesource': this_code_resource})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 

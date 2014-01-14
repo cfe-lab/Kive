@@ -13,7 +13,15 @@
 
 <a href="/resources">return to Code Resource summary</a>
 
-<h2>Add a new code resource</h2>
+<h2>Add a code resource revision</h2>
+
+<table>
+<tr><td>Name</td><td>{{ coderesource.name }}</td></tr>
+<tr><td>Filename</td><td>{{ coderesource.filename }}</td></tr>
+<tr><td>Description</td><td>{{ coderesource.description }}</td></tr>
+<tr><td># revisions</td><td>{{ coderesource.num_revisions }}</td></tr>
+<tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
+</table>
 
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
