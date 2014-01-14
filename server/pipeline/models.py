@@ -15,11 +15,7 @@ from django.db import transaction
 from datetime import datetime
 
 import logging, logging_utils
-import metadata.models
-import transformation.models
-import librarian.models
-import method.models
-import archive.models
+import archive.models, librarian.models, metadata.models, method.models, transformation.models
 
 class PipelineFamily(transformation.models.TransformationFamily):
     """
@@ -401,9 +397,8 @@ def run_cable_h(cable, source, output_path):
     wires is the QuerySet containing wires for this cable.
     """
 
-    import inspect
+    import csv, inspect, logging
     fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
-    import csv, logging
     logger = logging.getLogger()
 
     wires = cable.custom_wires.all()

@@ -53,12 +53,14 @@ def can_create_new_file(file_to_create):
 
     return (is_okay, reason)
 
-def set_up_directory(directory_to_use):
+def set_up_directory(directory_to_use, tolerate=False):
     """
     Checks whether the specified directory can be used.
 
     That is, either we create it with appropriate permissions,
     or it exists already and is writable/executable/empty.
+
+    If tolerate is true, we ignore the directories input_data, logs, and output_data
     """
 
     try:
@@ -76,11 +78,16 @@ def set_up_directory(directory_to_use):
                 "insufficient permissions on directory \"{}\"".
                 format(directory_to_use))
 
-        if (len(glob.glob(directory_to_use + "/*") +
-                glob.glob(directory_to_use + "/.*")) > 0):
-            raise ValueError(
-                "directory \"{}\" is not empty".
-                format(directory_to_use))
+        paths = glob.glob(directory_to_use + "/*")
+        paths += glob.glob(directory_to_use + "/.*")
+
+        if tolerate:
+            for path in paths:
+                if (path == os.path.join(directory_to_use, "input_data") or
+                            path == os.path.join(directory_to_use, "logs") or
+                            path == os.path.join(directory_to_use, "output_data")):
+                    continue
+                raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
 def compute_md5(file_to_checksum):
     """

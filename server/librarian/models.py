@@ -13,13 +13,7 @@ from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 
 import re
-
-import metadata.models
-import transformation.models
-import method.models
-import pipeline.models
-import archive.models
-
+import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import file_access_utils, logging_utils
 
 class SymbolicDataset(models.Model):
@@ -474,6 +468,7 @@ class ExecRecord(models.Model):
         """
         Checks whether all of the EROs of this ER are OK.
         """
+
         for ero in self.execrecordouts.all():
             if not ero.is_OK():
                 return False
