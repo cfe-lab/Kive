@@ -27,7 +27,6 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
             "PipelineStep .* of RunStep .* does not belong to Pipeline .*",
             step_D1_RS.clean)
 
-        # Moving on....
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
 
         # Bad case: step E1 should not have a child_run defined.

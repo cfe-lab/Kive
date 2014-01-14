@@ -495,17 +495,11 @@ class Sandbox:
         inputs_after_cable = []
         had_ER_at_beginning = False
 
-        ####
-        # SET UP RUNSTEP, OUTPUT PATHS, INPUTS, ER....
-
-        ####
-        # NON-RECOVERY CASE
         if not recover:
-
-            # FIXME: Trying to make a runstep without a run
-            logging.debug("{}: Not recovering step".format(fn))
+            logging.debug("{}: NON-RECOVERY CASE".format(fn))
             curr_RS = pipelinestep.pipelinestep_instances.create(run=curr_run)
 
+            logging.debug("{}: Preparing file system for sandbox".format(fn))
             step_run_dir = step_run_dir or os.path.join(self.sandbox_path, "step{}".format(pipelinestep.step_num))
             out_dir = os.path.join(step_run_dir, "output_data")
             in_dir = os.path.join(step_run_dir, "input_data")
@@ -515,15 +509,13 @@ class Sandbox:
             file_access_utils.set_up_directory(out_dir)
             file_access_utils.set_up_directory(log_dir)
 
-            # Set up output paths.
             for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
                 file_suffix = "raw" if curr_output.is_raw() else "csv"
                 file_name = "step{}_{}.{}".format(pipelinestep.step_num, curr_output.dataset_name,file_suffix)
                 output_path = os.path.join(out_dir,file_name)
                 output_paths.append(output_path)
 
-            # Run all PSICs.  This list stores the SDs that come out of the
-            # cables (and get fed directly into the transformation).
+            logging.debug("{}: Running input cables (PSICs)".format(fn))
             for curr_input in pipelinestep.transformation.inputs.all().order_by("dataset_idx"):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_dir = os.path.join(in_dir,"step{}_{}".format(pipelinestep.step_num,curr_input.dataset_name))
@@ -531,47 +523,42 @@ class Sandbox:
                 curr_RSIC = self.execute_cable(corresp_cable, inputs[curr_input.dataset_idx-1],cable_dir,curr_RS)
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.all()[0].symbolicdataset)
                 
-            logging.debug("{}: Running clean on curr_RS {}".format(fn, curr_RS))
             curr_RS.clean()
-    
             logging.debug("{}: Looking for ER with same transformation + input SDs".format(fn))
             curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
-            
+
             if curr_ER != None:
-                logger.debug("{}: Found ER, checking that ER provides all outputs needed".format(fn))
+                logging.debug("{}: Found ER, checking it provides outputs needed".format(fn))
                 had_ER_at_beginning = True
                 outputs_needed = pipelinestep.outputs_to_retain()
                 if curr_ER.provides_outputs(outputs_needed):
 
-                    logger.debug("{}: Reusing ER {}".format(fn, curr_ER))
+                    logging.debug("{}: Completely reusing ER {}".format(fn, curr_ER))
 
                     curr_RS.reused = True
                     curr_RS.execrecord = curr_ER
                     curr_RS.complete_clean()
                     curr_RS.save()
     
-                    logger.debug("{}: Updating maps for where code *should be* (May have to fill in later)")
+                    logging.debug("{}: Updating maps for where code *should be* (May have to fill in later)")
 
                     self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
     
                     # Add every output of this transformation to sd_fs_map.
                     for step_output in pipelinestep.transformation.outputs.all():
-                        corresp_ero = curr_ER.execrecordouts.get(
-                            content_type=ContentType.objects.get_for_model(
-                                type(step_output)),
-                            object_id=step_output.pk)
+                        corresp_ero = curr_ER.execrecordouts.get(content_type=ContentType.objects.get_for_model(type(step_output)),
+                                                                 object_id=step_output.pk)
     
                         corresp_SD = corresp_ero.symbolicdataset
-    
-                        # Compensate for 0-basedness.
                         corresp_path = output_paths[step_output.dataset_idx-1]
-    
+
                         logger.debug("{}: Updating sd_fs and socket maps".format(fn))
                         if corresp_SD not in self.sd_fs_map:
                             self.sd_fs_map[corresp_SD] = corresp_path
                         self.socket_map[(pipelinestep, step_output)] = corresp_SD
-                    logger.debug("{}: Finished reusing ER".format(fn))
+                    logging.debug("{}: Finished completely reusing ER".format(fn))
                     return curr_RS
+
 
         else:
             logger.debug("{}: Recovering step".format(fn))
@@ -596,44 +583,34 @@ class Sandbox:
 
             curr_ER = curr_RS.execrecord
             had_ER_at_beginning = True
+        logging.debug("{}: Finished setting up runstep, output paths, inputs, ER ... (???)".format(fn))
 
-        # FINISHED SETTING UP RUNSTEP, OUTPUT PATHS, INPUTS, ER....
-        ####
-        
-        # Having reached this point, we know we can't reuse an ER.
-        # We will have to actually run code.
 
-        ####
-        # PUT ALL DATASETS INTO PLACE
 
-        # First, make sure all the input files have been written to
-        # the sandbox.  Note that by this point, any inputs that we
-        # need should have non-blank PATH entries in sd_fs_map.
+
+        logging.debug("{}: Writing required datasets to the FS for running code".format(fn))
         for curr_in_SD in inputs_after_cable:
             curr_path = self.sd_fs_map[curr_in_SD]
             if not os.access(curr_path, os.F_OK):
+                logging.debug("{}: File {} not on FS: recovering".format(fn, curr_path))
                 successful_recovery = self.recover(curr_in_SD)
 
                 if not successful_recovery:
-                    # We return the incomplete curr_record (missing an
-                    # ExecLog).
+                    logging.debug("{}: Failed to recover: quitting without creating ER".format(fn))
                     return curr_record
+        logging.debug("{}: Finished putting datasets into place".format(fn))
 
-        # FINISHED PUTTING ALL DATASETS INTO PLACE
-        ####
-            
 
-        ####
-        # ACTUALLY RUN CODE
+        # First, the case when this step is a sub-Pipeline.
+        # This case never occurs when recovering.
+        logging.debug("{}: Running code for this step!".format(fn))
 
-        # First, the easy case when this step is a sub-Pipeline.  Note
-        # that this case never occurs when we are recovering.
         if type(pipelinestep.transformation) == pipeline.models.Pipeline:
+            logging.debug("")
             ####
             # RUN PIPELINE
             
-            child_run = self.execute_pipeline(
-                pipeline=pipelinestep.transformation,
+            child_run = self.execute_pipeline(pipeline=pipelinestep.transformation,
                 inputs=inputs_after_cables,
                 parent_runstep=curr_RS)
 
