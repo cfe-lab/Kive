@@ -176,26 +176,15 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
-        #files = request.FILES.dict()
         file_in_memory = request.FILES['content_file']
-        content_file = ContentFile(file_in_memory.read())
 
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        path = default_storage.save('CodeResources/%s_%s' % (file_in_memory.name, timestamp), content_file)
-
-        """
-        with open('CodeResources/%s_%s' % (content_file.name, timestamp), 'wb+') as destination:
-            for chunk in content_file.chunks:
-                destination.write(chunk)
-        """
+        # create new CodeResource
         new_code_resource = CodeResource.objects.create(name=query['revision_name'],
                                                         description=query['revision_desc'],
                                                         filename=file_in_memory.name)
-        #cr = CodeResource(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
-        #cr.full_clean()
-        #cr.save()
 
-        #form = CodeResourcePrototypeForm(request.POST, request.FILES) # create form bound to POST data
+        # modify actual filename prior to saving revision object
+        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
         prototype = CodeResourceRevision(revision_name=query['revision_name'],
                                          revision_desc=query['revision_desc'],
@@ -223,11 +212,33 @@ def resource_add(request):
 
 def resource_add_revision(request, id):
     this_code_resource = models.CodeResource.objects.get(pk=id)
+    all_revisions = models.CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
+    last_revision = all_revisions[0]
 
     if request.method == 'POST':
-        pass
+        query = request.POST.dict()
+        file_in_memory = request.FILES['content_file']
+
+        # modify actual filename prior to saving revision object
+        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+        revision = CodeResourceRevision(revision_name=query['revision_name'],
+                                         revision_desc=query['revision_desc'],
+                                         coderesource=this_code_resource,
+                                         content_file=file_in_memory)
+        try:
+            revision.full_clean()
+            revision.save()
+            return HttpResponseRedirect('/resources')
+        except:
+            raise
+
+        form = CodeResourceRevisionForm(request.POST, request.FILES)
     else:
-        form = CodeResourceRevisionForm()
+        if last_revision:
+            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc})
+        else:
+            form = CodeResourceRevisionForm()
 
     t = loader.get_template('resource_add_revision.html')
     c = Context({'resource_form': form, 'coderesource': this_code_resource})

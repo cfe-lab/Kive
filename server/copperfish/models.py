@@ -726,6 +726,7 @@ class CodeResourceRevision(models.Model):
             md5gen = hashlib.md5();
             md5gen.update(self.content_file.read());
             self.MD5_checksum = md5gen.hexdigest();
+            print 'md5', self.MD5_checksum
 
         except ValueError as e:
             self.MD5_checksum = "";
