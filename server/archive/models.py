@@ -18,6 +18,19 @@ import file_access_utils
 import method.models
 import transformation.models
 
+def clean_execlogs(runx):
+    """
+    Helper function to ensure a RunStep, RunSIC, or RunOutputCable has at most one
+    ExecLog, and to clean it if it exists.
+    """
+    if runx.log.all().exists():
+       if runx.log.count() == 1:
+           runx.log.first().complete_clean()
+       else:
+           raise ValidationError(
+               "{} \"{}\" has {} ExecLogs but should have only one".
+               format(runx.__class__.__name__, runx, runx.log.count()))
+
 class Run(models.Model):
     """
     Stores data associated with an execution of a pipeline.
@@ -274,8 +287,7 @@ class RunStep(models.Model):
                     "RunStep \"{}\" represents a sub-pipeline so execrecord should not be set".
                     format(self))
 
-        if self.log.all().exists():
-            self.log.clean()
+        clean_execlogs(self)
         
         for rsic in self.RSICs.all():
             rsic.complete_clean()
@@ -525,13 +537,7 @@ class RunSIC(models.Model):
                 "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
                 format(self.PSIC, self.runstep.pipelinestep))
 
-        if self.log.all().exists():
-            if self.log.count() == 1:
-                self.log.first().complete_clean()
-            else:
-                raise ValidationError(
-                    "RunSIC \"{}\" has {} ExecLogs but should have only one".
-                    format(self, self.log.count()))
+        clean_execlogs(self)
 
         if self.reused is None:
             if self.log.all().exists():
@@ -592,8 +598,8 @@ class RunSIC(models.Model):
         # given that the SymbolicDataset represented in the ERI is the
         # input to both.  (This must be true because our Pipeline was
         # well-defined.)
-        if (type(self.execrecord.general_transf()) !=
-                "pipeline.PipelineStepInputCable"):
+        if (type(self.execrecord.general_transf()).__name__ !=
+                "PipelineStepInputCable"):
             raise ValidationError(
                 "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
                 format(self.PSIC))
@@ -605,7 +611,7 @@ class RunSIC(models.Model):
                 format(self.PSIC))
 
         # Check whether this has a missing output.
-        missing_output = len(self.log.missing_outputs()) != 0
+        missing_output = (len(self.log.first().missing_outputs()) != 0)
 
         # If the output of this PSIC is not marked to keep, there should be
         # no data associated.
@@ -1079,7 +1085,7 @@ class ExecLog(models.Model):
     def missing_outputs(self):
         """Returns the output SDs missing output from this execution."""
         missing = []
-        for ccl in content_checks:
+        for ccl in self.content_checks.all():
             if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
                 missing.append(ccl.symbolicdataset)
 
