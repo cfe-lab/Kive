@@ -537,6 +537,30 @@ class CodeResource(models.Model):
 
         return True
 
+    def count_revisions(self):
+        """
+        Number of revisions associated with this CodeResource.
+        """
+        return CodeResourceRevision.objects.filter(coderesource=self).count()
+
+    num_revisions = property(count_revisions)
+
+    def get_last_revision_date(self):
+        """
+        Date of most recent revision to this CodeResource.
+        """
+        revisions = CodeResourceRevision.objects.filter(coderesource=self)
+        if len(revisions) == 0:
+            return 'n/a'
+        revision_dates = [revision.revision_DateTime for revision in revisions]
+        revision_dates.sort() # ascending order
+        return revision_dates[0]
+
+    last_revision_date = property(get_last_revision_date)
+
+    def get_absolute_url(self):
+        return '/resources/%i' % self.id
+
     def clean(self):
         """
         CodeResource name must be valid.
@@ -711,20 +735,19 @@ class CodeResourceRevision(models.Model):
             raise ValidationError("Self-referential dependency"); 
 
         # Check if dependencies conflict with each other
-        try:
-            listOfDependencyPaths = self.list_all_filepaths()
-            if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-                raise ValidationError("Conflicting dependencies");
+        listOfDependencyPaths = self.list_all_filepaths()
+        if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
+            raise ValidationError("Conflicting dependencies");
 
-            # If content file exists, it must have a file name
-            if self.content_file and self.coderesource.filename == "":
-               raise ValidationError("If content file exists, it must have a file name")
+        # If content file exists, it must have a file name
+        if self.content_file and self.coderesource.filename == "":
+           raise ValidationError("If content file exists, it must have a file name")
 
-            # If no content file exists, it must not have a file name
-            if not self.content_file and self.coderesource.filename != "":
-               raise ValidationError("Cannot have a filename specified in the absence of a content file")
-        except:
-            pass
+        # If no content file exists, it must not have a file name
+        if not self.content_file and self.coderesource.filename != "":
+            print 'foo', self.content_file
+            raise ValidationError("Cannot have a filename specified in the absence of a content file")
+
 
 
 

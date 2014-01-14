@@ -9,6 +9,8 @@ from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.forms.util import ErrorList
 from datetime import datetime
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 def home(request):
     """
@@ -153,7 +155,8 @@ def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = models.CodeResourceRevision.objects.filter()
+    resources = models.CodeResource.objects.filter()
+
     t = loader.get_template('resources.html')
     c = Context({'resources': resources})
     c.update(csrf(request))
@@ -174,25 +177,39 @@ def resource_add(request):
     if request.method == 'POST':
         query = request.POST.dict()
         #files = request.FILES.dict()
+        file_in_memory = request.FILES['content_file']
+        content_file = ContentFile(file_in_memory.read())
 
-        content_file = request.FILES['content_file']
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        path = default_storage.save('CodeResources/%s_%s' % (file_in_memory.name, timestamp), content_file)
+
+        """
         with open('CodeResources/%s_%s' % (content_file.name, timestamp), 'wb+') as destination:
             for chunk in content_file.chunks:
                 destination.write(chunk)
-
-        cr = CodeResource.objects.create(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
+        """
+        new_code_resource = CodeResource.objects.create(name=query['revision_name'],
+                                                        description=query['revision_desc'],
+                                                        filename=file_in_memory.name)
         #cr = CodeResource(name=query['revision_name'], description=query['revision_desc'], filename=content_file.name)
         #cr.full_clean()
         #cr.save()
 
-        form = CodeResourcePrototypeForm(request.POST) # create form bound to POST data
-        if form.is_valid():
-            prototype = form.save(commit=False)
-            prototype.coderesource = cr
-            prototype.save()
+        #form = CodeResourcePrototypeForm(request.POST, request.FILES) # create form bound to POST data
 
+        prototype = CodeResourceRevision(revision_name=query['revision_name'],
+                                         revision_desc=query['revision_desc'],
+                                         coderesource=new_code_resource,
+                                         content_file=file_in_memory)
+        try:
+            prototype.full_clean()
+            prototype.save()
             return HttpResponseRedirect('/resources')
+        except:
+            new_code_resource.delete()
+            raise
+
+        form = CodeResourcePrototypeForm(request.POST, request.FILES)
 
     else:
         form = CodeResourcePrototypeForm()
@@ -202,6 +219,19 @@ def resource_add(request):
     c.update(csrf(request))
     
     return HttpResponse(t.render(c))
+
+
+def resource_add_revision(request, id):
+    if request.method == 'POST':
+        pass
+    else:
+        form = CodeResourceRevisionForm()
+
+    t = loader.get_template('resource_add_revision.html')
+    c = Context({'resource_form': form})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
 
 
 def usr(request):

@@ -29,6 +29,7 @@ in the following table.
 <thead>
 	<tr>
 	<th>Name</th>
+    <th>Filename</th>
 	<th>Description</th>
 	<th>Number of revisions</th>
 	<th>Last revision date</th>
@@ -36,8 +37,11 @@ in the following table.
 </thead>
 {% for resource in resources %}
 <tr>
-	<td>{{ resource.revision_name }}</td>
-	<td>{{ resource.revision_description }}</td>
+	<td><a href="{{ resource.get_absolute_url }}">{{ resource.name }}</a></td>
+    <td>{{ resource.filename }}</td>
+	<td>{{ resource.description }}</td>
+    <td>{{ resource.num_revisions }}</td>
+    <td>{{ resource.last_revision_date }}</td>
 </tr>
 {% endfor %}
 </table>
