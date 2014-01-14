@@ -10,26 +10,14 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
-
-import hashlib
-import re
-import string
-import os.path
-import os
-import subprocess
-import stat
-
-import file_access_utils
-import transformation.models
+import hashlib, os, re, string, stat, subprocess
+import file_access_utils, transformation.models
 
 class CodeResource(models.Model):
     """
     A CodeResource is any file tracked by ShipYard.
     Related to :model:`method.CodeResourceRevision`
     """
-
-    # Implicitly defined
-    #   revisions (codeResourceRevision/ForeignKey)
 
     name = models.CharField(
         "Resource name",
@@ -262,7 +250,7 @@ class CodeResourceRevision(models.Model):
         PRE: install_path exists and has all the sufficient permissions for us
         to write our files into.
         """
-        self.install_h(install_path, coderesource.filename)
+        self.install_h(install_path, self.coderesource.filename)
         
     def install_h(self, install_path, base_name):
         """Helper for install."""
@@ -443,38 +431,35 @@ class Method(transformation.models.Transformation):
 
     def find_compatible_ER(self, input_SDs):
         """
-        Helper that finds an ER that we can reuse given these inputs.
-    
-        input_SDs is a list of inputs to this Method in the proper
-        order.
+        Given a set of input SDs, find an ER that can be reused given these inputs.
+        A compatible ER may have to be filled in.
         """
-        # Look through all PipelineSteps that use this Method; then
-        # look at all the RunSteps corresponding to it and their ERs.
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
+        # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
-            for possible_RS in possible_PS.pipelinestep_instances.filter(
-                    reused=False):
+
+            # For linked runsteps which did not *completely* reuse an ER
+            for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
                 candidate_ER = possible_RS.execrecord
 
-                # Check if its outputs are OK; if not, move on.
                 if not candidate_ER.outputs_OK():
                     continue
+                logging.debug("{}: Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match".format(fn))
 
-                # From here on we know the outputs are OK.  Check if
-                # the inputs match.
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
-                    # Get the input index of this ERI.
                     input_idx = ERI.generic_input.dataset_idx
                     if ERI.symbolicdataset != input_SDs[input_idx-1]:
                         ER_matches = False
                         break
                         
-                # At this point all the ERIs have matched the inputs.  So,
-                # we have found our candidate.
                 if ER_matches:
+                    logging.debug("{}: All ERIs match input SDs - commiting to candidate ER {}".format(candidate_ER))
                     return candidate_ER
     
-        # We didn't find anything.
+        logging.debug("{}: No compatible ERs found".format(fn))
         return None
 
     def run_code(self, run_path, input_paths, output_paths,
@@ -521,7 +506,9 @@ class Method(transformation.models.Transformation):
         
         # First, check whether run_path exists and is
         # readable/writable/executable by us.
-        file_access_utils.set_up_directory(run_path)
+
+        # FIXME: Wasn't this already setup for cables? (Have switch to tolerate input_data, logs, and output_data)
+        file_access_utils.set_up_directory(run_path, tolerate=True)
 
         # Now we know that run_path is a valid directory in which to work.
 
@@ -543,7 +530,7 @@ class Method(transformation.models.Transformation):
                 raise ValueError(reason)
 
         # Populate run_path with the CodeResourceRevision.
-        driver.install(run_path)
+        self.driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
         # written into place.  It remains to execute the code.
@@ -551,9 +538,11 @@ class Method(transformation.models.Transformation):
         # [run_path]/[driver.coderesource.name],
         # and is executable.
         code_to_run = os.path.join(
-            run_path, driver.coderesource.filename)
+            run_path,
+            self.driver.coderesource.filename)
+
         code_popen = subprocess.Popen(
-            [code_to_run].append(input_paths).append(output_paths), 
+            [code_to_run] + input_paths + output_paths,
             shell=False,
             stdout=output_handle,
             stderr=error_handle)

@@ -531,6 +531,9 @@ class RunSIC(models.Model):
              then there should be existent data associated and it should also
              be associated to the corresponding ERO.
         """
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
         if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
             raise ValidationError(
@@ -598,8 +601,8 @@ class RunSIC(models.Model):
         # given that the SymbolicDataset represented in the ERI is the
         # input to both.  (This must be true because our Pipeline was
         # well-defined.)
-        if (type(self.execrecord.general_transf()).__name__ !=
-                "PipelineStepInputCable"):
+
+        if (type(self.execrecord.general_transf()).__name__ != "PipelineStepInputCable"):
             raise ValidationError(
                 "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
                 format(self.PSIC))
@@ -611,7 +614,8 @@ class RunSIC(models.Model):
                 format(self.PSIC))
 
         # Check whether this has a missing output.
-        missing_output = (len(self.log.first().missing_outputs()) != 0)
+        logging.debug("{}: Checking RunSIC's log".format(fn))
+        missing_output = len(self.log.first().missing_outputs()) != 0
 
         # If the output of this PSIC is not marked to keep, there should be
         # no data associated.
@@ -1084,11 +1088,15 @@ class ExecLog(models.Model):
 
     def missing_outputs(self):
         """Returns the output SDs missing output from this execution."""
+        import csv, inspect, logging
+        fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
+
         missing = []
         for ccl in self.content_checks.all():
             if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
                 missing.append(ccl.symbolicdataset)
 
+        logging.debug("{}: returning missing outputs '{}'".format(fn,missing))
         return missing
 
     def is_successful(self):

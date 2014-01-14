@@ -17,10 +17,10 @@ class ExecuteTests(TestCase):
     def setUp(self):
         import shutil
 
-        try:
-            shutil.rmtree('/tmp/userjohn_run1')     # Clear the file system
-        except:
-            pass
+        #try:
+        #    shutil.rmtree('/tmp/userjohn_run1')     # Clear the file system
+        #except:
+        #    pass
 
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
@@ -40,10 +40,6 @@ class ExecuteTests(TestCase):
         self.di_cdt.save()
         self.di_cdtm_1 = self.di_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=1)
         self.di_cdtm_2 = self.di_cdt.members.create(datatype=self.int_dt,column_name="e",column_idx=2)
-
-    def tearTown(selfself):
-        import shutil
-        shutil.rmtree('/tmp/userjohn_run1')     # Clear the file system
 
     def test_cable(self):
         """Test the cable execution of a simple one-step pipeline."""

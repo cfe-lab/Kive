@@ -1,5 +1,6 @@
 """Code that is responsible for the execution of Pipelines."""
 
+from django.core.files import File
 from django.contrib.contenttypes.models import ContentType
 from librarian.models import ExecRecordIn
 
@@ -177,13 +178,13 @@ class Sandbox:
                 candidate_cable = candidate_ERI.execrecord.general_transf
     
                 if cable.is_compatible(candidate_cable):
-                    cable_out_SD = (candidate_ERI.execrecord.execrecordouts.
+                    output_SD = (candidate_ERI.execrecord.execrecordouts.
                                     all()[0].symbolicdataset)
                     
                     # If you're not keeping the output, or you are and
                     # there is existent data, you can successfully reuse
                     # the ER.
-                    if not cable_keeps_output or cable_out_SD.has_data():
+                    if not cable_keeps_output or output_SD.has_data():
                         curr_record.reused = True
                         curr_record.execrecord = candidate_ERI.execrecord
                         curr_record.complete_clean()
@@ -192,13 +193,13 @@ class Sandbox:
                         # Add the ERO's SD to sd_fs_map if this SD was not
                         # already in sd_fs_map; if it was but had never
                         # been written to the FS, update it with the path.
-                        if (cable_out_SD not in self.sd_fs_map or
-                                self.sd_fs_map[cable_out_SD] == None):
-                            self.sd_fs_map[cable_out_SD] = output_path
+                        if (output_SD not in self.sd_fs_map or
+                                self.sd_fs_map[output_SD] == None):
+                            self.sd_fs_map[output_SD] = output_path
     
                         # Add (cable, destination socket) to socket_map.
                         # FIXME: the socket for this cable is determined by looking at the schematic?
-                        socket_map[(cable, cable.generic_output)] = cable_out_SD
+                        socket_map[(cable, cable.generic_output)] = output_SD
                         
                         # Add this cable to cable_map.
                         self.cable_map[cable] = curr_record
@@ -446,12 +447,12 @@ class Sandbox:
 
         # Update maps as in the reused == True case (see above) if we
         # are not recovering.
+
         if not recover:
-            if (cable_out_SD not in self.sd_fs_map or self.sd_fs_map[cable_out_SD] == None):
-                self.sd_fs_map[cable_out_SD] = output_path
-            
-            socket_map[(cable, cable.generic_output)] = cable_out_SD
-            
+            if (output_SD not in self.sd_fs_map or self.sd_fs_map[output_SD] == None):
+                self.sd_fs_map[output_SD] = output_path
+
+            self.socket_map[(cable, cable.dest)] = output_SD
             self.cable_map[cable] = curr_record
 
         # FINISHED BOOKKEEPING
@@ -501,21 +502,18 @@ class Sandbox:
         # NON-RECOVERY CASE
         if not recover:
 
-            logging.debug("{}: Not recovering step".format(fn))
-
             # FIXME: Trying to make a runstep without a run
+            logging.debug("{}: Not recovering step".format(fn))
             curr_RS = pipelinestep.pipelinestep_instances.create(run=curr_run)
+
             step_run_dir = step_run_dir or os.path.join(self.sandbox_path, "step{}".format(pipelinestep.step_num))
-
-            for extension in ["", "input_data", "output_data", "logs"]:
-                path = os.path.join(step_run_dir, extension) if extension != "" else step_run_dir
-                logging.debug("{}: file_access_utils.set_up_directory('{}')".format(fn, path))
-                file_access_utils.set_up_directory(path)
-
-            # We will use these:
             out_dir = os.path.join(step_run_dir, "output_data")
             in_dir = os.path.join(step_run_dir, "input_data")
             log_dir = os.path.join(step_run_dir, "logs")
+            file_access_utils.set_up_directory(step_run_dir)
+            file_access_utils.set_up_directory(in_dir)
+            file_access_utils.set_up_directory(out_dir)
+            file_access_utils.set_up_directory(log_dir)
 
             # Set up output paths.
             for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
@@ -529,44 +527,34 @@ class Sandbox:
             for curr_input in pipelinestep.transformation.inputs.all().order_by("dataset_idx"):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_dir = os.path.join(in_dir,"step{}_{}".format(pipelinestep.step_num,curr_input.dataset_name))
-
                 logging.debug("{}: execute_cable('{}','{}','{}','{}')".format(fn, corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
                 curr_RSIC = self.execute_cable(corresp_cable, inputs[curr_input.dataset_idx-1],cable_dir,curr_RS)
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.all()[0].symbolicdataset)
                 
-            # Sanity check
             logging.debug("{}: Running clean on curr_RS {}".format(fn, curr_RS))
             curr_RS.clean()
     
-            # Look for an ER that we can reuse.  It must represent the same
-            # transformation, and take the same input SDs.
-            curr_ER = pipelinestep.transformation.find_compatible_ER(
-                inputs_after_cable)
+            logging.debug("{}: Looking for ER with same transformation + input SDs".format(fn))
+            curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
             
-            # If it found an ER, check that the ER provides all of the
-            # output that we need.
             if curr_ER != None:
+                logger.debug("{}: Found ER, checking that ER provides all outputs needed".format(fn))
                 had_ER_at_beginning = True
                 outputs_needed = pipelinestep.outputs_to_retain()
                 if curr_ER.provides_outputs(outputs_needed):
-                    ####
-                    # REUSE AN ER
-                    
-                    # The ER found has what we need, so we can reuse it.
+
+                    logger.debug("{}: Reusing ER {}".format(fn, curr_ER))
+
                     curr_RS.reused = True
                     curr_RS.execrecord = curr_ER
                     curr_RS.complete_clean()
                     curr_RS.save()
     
-                    # Update the maps.
-    
-                    # Since this is the reused = True case, step_run_dir
-                    # represents where the code *should be* -- later you
-                    # might actually fill it in.
+                    logger.debug("{}: Updating maps for where code *should be* (May have to fill in later)")
+
                     self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
     
-                    # Add every output of this transformation to
-                    # sd_fs_map.
+                    # Add every output of this transformation to sd_fs_map.
                     for step_output in pipelinestep.transformation.outputs.all():
                         corresp_ero = curr_ER.execrecordouts.get(
                             content_type=ContentType.objects.get_for_model(
@@ -578,24 +566,15 @@ class Sandbox:
                         # Compensate for 0-basedness.
                         corresp_path = output_paths[step_output.dataset_idx-1]
     
-                        # Update sd_fs_map and socket_map.
+                        logger.debug("{}: Updating sd_fs and socket maps".format(fn))
                         if corresp_SD not in self.sd_fs_map:
-                            # If this is the first time this file would have
-                            # appeared on the filesystem, this is where it
-                            # *should* go -- later it might actually be filled
-                            # in here during a "recover" operation.
                             self.sd_fs_map[corresp_SD] = corresp_path
-    
                         self.socket_map[(pipelinestep, step_output)] = corresp_SD
-    
+                    logger.debug("{}: Finished reusing ER".format(fn))
                     return curr_RS
-                    
-                    # FINISHED REUSING AN ER
-                    ####
-                
-        ####
-        # RECOVERY CASE
+
         else:
+            logger.debug("{}: Recovering step".format(fn))
             step_run_dir, curr_RS = self.ps_map(pipelinestep)
 
             for curr_output in (
@@ -630,9 +609,9 @@ class Sandbox:
         # First, make sure all the input files have been written to
         # the sandbox.  Note that by this point, any inputs that we
         # need should have non-blank PATH entries in sd_fs_map.
-        for curr_in_SD in inputs_after_cables:
-            curr_path = sd_fs_map[curr_in_SD]['PATH']
-            if not os.access(curr_path, "F_OK"):
+        for curr_in_SD in inputs_after_cable:
+            curr_path = self.sd_fs_map[curr_in_SD]
+            if not os.access(curr_path, os.F_OK):
                 successful_recovery = self.recover(curr_in_SD)
 
                 if not successful_recovery:
@@ -671,41 +650,36 @@ class Sandbox:
         ####
         # RUN CODE: METHOD
         #
-        # Log paths.
-            
-        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".
-                                   format(pipelinestep.step_num))
-        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".
-                                   format(pipelinestep.step_num))
 
-        method_popen = None
-
-        # Create an ExecLog; this sets its start_time.
+        # Create ExecLog to set start_time.
         curr_log = archive.models.ExecLog(record=curr_RS)
-        
-        with open(stdout_path, "wb", 1), open(stderr_path, "wb", 0) as (outwrite, errwrite):
+        method_popen = None
+        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
+        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+        with open(stdout_path, "wb", 1) as outwrite:
+            errwrite = open(stderr_path, "wb", 0)
             method_popen = pipelinestep.transformation.run_code(
                 step_run_dir,
-                [sd_fs_map[x]['PATH'] for x in inputs_after_cables],
-                output_paths, outwrite, errwrite)
+                [self.sd_fs_map[x] for x in inputs_after_cable],
+                output_paths,
+                outwrite,
+                errwrite)
 
-            # While it's running, print the captured stdout and
-            # stderr to the console.
-            with (open(stdout_path, "rb", 1), 
-                  open(stderr_path, "rb", 0)) as (outread, errread):
-                while method_open.poll() != None:
+            # While running, print stdout/stderr to console
+            with open(stdout_path, "rb", 1) as outread:
+                errread = open(stderr_path, "rb", 0)
+                while method_popen.poll() != None:
                     sys.stdout.write(outread.read())
                     sys.stderr.write(errread.read())
                     time.sleep(1)
-                
-                # One last write....
                 outwrite.flush()
                 errwrite.flush()
                 sys.stdout.write(outread.read())
                 sys.stderr.write(errread.read())
+                errread.close()
+            errwrite.close()
 
-        # The method has finished running.  Make sure all output
-        # has been flushed.
+        # Method has finished running: flush output
         sys.stdout.flush()
         sys.stderr.flush()
 
@@ -715,13 +689,15 @@ class Sandbox:
         curr_log.clean()
         curr_log.save()
 
-        curr_mo = MethodOutput(
-            execlog=curr_log,
-            return_code = method_popen.returncode)
-        with (open(stdout_path, "rb"), 
-              open(stderr_path, "rb")) as (outread, errread):
+        curr_mo = archive.models.MethodOutput(execlog=curr_log,
+                                              return_code = method_popen.returncode)
+
+
+        with open(stdout_path, "rb") as outread:
+            errread = open(stderr_path, "rb")
             curr_mo.output_log.save(stdout_path, File(outread))
             curr_mo.error_log.save(stderr_path, File(errread))
+            errread.close()
         curr_mo.clean()
         curr_mo.save()
 
@@ -992,11 +968,9 @@ class Sandbox:
             run_dir = os.path.join(sandbox_path,"step{}".format(step.step_num))
 
             # FIXME: execute_step needs to know what run was created
-            logger.debug("{}: execute_step('{}', '{}', '{}', '{}')".format(
-                fn, curr_run, step, step_inputs, run_dir))
-
+            logger.debug("{}: execute_step('{}', '{}', '{}', '{}')".format(fn, curr_run, step, step_inputs, run_dir))
             curr_RS = self.execute_step(curr_run, step, step_inputs,step_run_dir=run_dir)
-            logging_utils.set_logging_function_name("sandbox.execute_pipeline")
+            logger.debug("{}: DONE EXECUTING STEP".format(fn))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
                 logger.debug("{}: Step failed to execute: returning the run".format(fn))
