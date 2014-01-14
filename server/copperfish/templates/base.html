@@ -1,19 +1,25 @@
-<!-- Django template -->
+<!DOCTYPE html><!-- Django template -->
 <html>
-
 <head>
+<meta charset="utf-8">
 <title>{% block title %}{% endblock %}</title>
 {% block javascript %}{% endblock %}
 <!-- custom font from Google -->
+<!--
+At some point we may want to download the font file into the application directory. That way we're not dependent on an HTTP connection. —JN
+-->
 <link href='http://fonts.googleapis.com/css?family=Lato:400,700' rel='stylesheet' type='text/css'>
 {% load staticfiles %}
-<link rel="stylesheet" href="/static/style.css" type="text/css" media="screen">
-</head>
+<link rel="stylesheet" href="/static/style.css" media="screen">
 
+</head>
 <body>
+
+<div data-role="wrapper">
 <h1>Shipyard</h1>
 {% block content %}
 {% endblock %}
-</body>
+</div>
 
+</body>
 </html>

@@ -4,15 +4,19 @@
 {% block title %}Shipyard home{% endblock %}
 
 {% block content %}
-<table>
-<tr>
-    <td><a href="/dev.html">Developer portal</a></td>
-    <td>Add and/or modify database objects, including Datatypes and Methods.</td>
-</tr>
-<tr>
-    <td><a href="/usr.html">Users portal</a></td>
-    <td>Upload data sets and process data using pipelines.</td>
-</tr>
+<nav><ul>
+    <li>
+        <a href="/dev.html">
+        <h4 class="menu-item">Developer portal</h4>
+        <p class="menu-description">Add and/or modify database objects, including Datatypes and Methods.</p>
+        </a>
+    </li>
+    <li>
+        <a href="/usr.html">
+        <h4 class="menu-item">Users portal</h4>
+        <p class="menu-description">Upload data sets and process data using pipelines.</p>
+        </a>
+    </li>
+</ul></nav>
 
-</table>
 {% endblock %}
