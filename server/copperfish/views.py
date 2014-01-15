@@ -223,16 +223,16 @@ def resource_add_revision(request, id):
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
         revision = CodeResourceRevision(revision_name=query['revision_name'],
-                                         revision_desc=query['revision_desc'],
-                                         coderesource=this_code_resource,
-                                         content_file=file_in_memory)
+                                        revision_desc=query['revision_desc'],
+                                        coderesource=this_code_resource,
+                                        content_file=file_in_memory)
         try:
             revision.full_clean()
             revision.save()
             return HttpResponseRedirect('/resources')
         except:
             raise
-
+        # otherwise return form with user entries
         form = CodeResourceRevisionForm(request.POST, request.FILES)
     else:
         if last_revision:
