@@ -43,6 +43,7 @@ class StringConstraintForm (forms.Form):
     regexp = forms.CharField(required=False, help_text='A regular expression that can be recognized by the Python re module (Perl-like syntax).')
 
 
+# code resource forms
 class CodeResourceForm (forms.ModelForm):
     class Meta:
         model = CodeResource
@@ -58,8 +59,12 @@ class CodeResourcePrototypeForm (forms.ModelForm):
         #fields = ('revision_name', 'revision_desc', 'content_file')
         exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
 
-
 class CodeResourceRevisionForm (forms.ModelForm):
    class Meta:
         model = CodeResourceRevision
         fields = ('revision_name', 'revision_desc', 'content_file', )
+
+
+class TransformationForm (forms.ModelForm):
+    class Meta:
+        model = Transformation
