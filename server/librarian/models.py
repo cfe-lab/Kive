@@ -123,8 +123,9 @@ class SymbolicDataset(models.Model):
                                          compounddatatype=cdt)
             
             with open(file_path, "rb") as f:
-                structure.num_rows = cdt.summarize_CSV(
-                    f, "/tmp/SD{}".format(symDS.pk))["num_rows"]
+                CSV_summary = cdt.summarize_CSV(f, "/tmp/SD{}".format(symDS.pk))
+                print CSV_summary
+                structure.num_rows = CSV_summary["num_rows"]
             structure.save()
     
         dataset = None

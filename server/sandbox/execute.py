@@ -487,7 +487,8 @@ class Sandbox:
         [step run dir]/logs/step[step number]_std(out|err).txt
         """
 
-        import inspect
+        import inspect, logging
+        import django.utils.timezone
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         curr_ER = None
@@ -586,9 +587,7 @@ class Sandbox:
         logging.debug("{}: Finished setting up runstep, output paths, inputs, ER ... (???)".format(fn))
 
 
-
-
-        logging.debug("{}: Writing required datasets to the FS for running code".format(fn))
+        logging.debug("{}: checking required datasets are on the FS for running code".format(fn))
         for curr_in_SD in inputs_after_cable:
             curr_path = self.sd_fs_map[curr_in_SD]
             if not os.access(curr_path, os.F_OK):
@@ -598,43 +597,34 @@ class Sandbox:
                 if not successful_recovery:
                     logging.debug("{}: Failed to recover: quitting without creating ER".format(fn))
                     return curr_record
-        logging.debug("{}: Finished putting datasets into place".format(fn))
+        logging.debug("{}: Finished putting datasets into place: proceeding to run code for this step".format(fn))
 
-
-        # First, the case when this step is a sub-Pipeline.
-        # This case never occurs when recovering.
-        logging.debug("{}: Running code for this step!".format(fn))
 
         if type(pipelinestep.transformation) == pipeline.models.Pipeline:
-            logging.debug("")
-            ####
-            # RUN PIPELINE
-            
-            child_run = self.execute_pipeline(pipeline=pipelinestep.transformation,
+            logging.debug("{}: Executing sub-pipeline".format(fn))
+
+            child_run = self.execute_pipeline(
+                pipeline=pipelinestep.transformation,
                 inputs=inputs_after_cables,
                 parent_runstep=curr_RS)
 
-            # This is implicit from the above.
-            # curr_RS.child_run = child_run
-
+            logging.debug("{}: Finished executing sub-pipeline".format(fn))
             return curr_RS
 
-            # FINISHED RUNNING PIPELINE
-            ####
 
-        # From this point on we know that this step was a Method.
-        
-        ####
-        # RUN CODE: METHOD
-        #
 
-        # Create ExecLog to set start_time.
+        logging.debug("{}: Creating EL for method execution".format(fn))
         curr_log = archive.models.ExecLog(record=curr_RS)
         method_popen = None
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+
+        logging.debug("{}: Running code".format(fn))
         with open(stdout_path, "wb", 1) as outwrite:
             errwrite = open(stderr_path, "wb", 0)
+
+            # FIXME: output_paths is empty?
+            print "--- {} ---".format(output_paths)
             method_popen = pipelinestep.transformation.run_code(
                 step_run_dir,
                 [self.sd_fs_map[x] for x in inputs_after_cable],
@@ -642,6 +632,7 @@ class Sandbox:
                 outwrite,
                 errwrite)
 
+            logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
             # While running, print stdout/stderr to console
             with open(stdout_path, "rb", 1) as outread:
                 errread = open(stderr_path, "rb", 0)
@@ -656,20 +647,17 @@ class Sandbox:
                 errread.close()
             errwrite.close()
 
-        # Method has finished running: flush output
         sys.stdout.flush()
         sys.stderr.flush()
 
-        # Mark the end time in the ExecLog and save; then
-        # create a MethodOutput object with all of the output.
-        curr_log.end_time = datetime.now()
+        curr_date_time = django.utils.timezone.now()
+        logging.debug("{}: Execution of method complete, saving end time {} in ExecLog".format(fn, curr_date_time))
+        curr_log.end_time = curr_date_time
         curr_log.clean()
         curr_log.save()
 
-        curr_mo = archive.models.MethodOutput(execlog=curr_log,
-                                              return_code = method_popen.returncode)
-
-
+        logging.debug("{}: Storing stdout/stderr in fresh MethodOutput".format(fn))
+        curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=method_popen.returncode)
         with open(stdout_path, "rb") as outread:
             errread = open(stderr_path, "rb")
             curr_mo.output_log.save(stdout_path, File(outread))
@@ -677,34 +665,26 @@ class Sandbox:
             errread.close()
         curr_mo.clean()
         curr_mo.save()
-
-        # Sanity check.
         curr_log.complete_clean()
 
-        # FINISHED RUNNING METHOD
-        ####
 
-        
-        ####
-        # CREATE EXECRECORD IF NECESSARY
-        
-        # Create a fresh ER if none was found.
+
         if curr_ER == None:
+            logging.debug("{}: Creating fresh ER".format(fn))
             curr_ER = pipelinestep.transformation.execrecords.create()
 
+            logging.debug("{}: Annotating ERIs")
             for curr_input in pipelinestep.transformation.inputs.all():
                 corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
                 curr_ER.execrecordins.create(
                     generic_input=curr_input,
                     symbolicdataset=corresp_input_SD)
 
+            logging.debug("{}: Creating new SDs + EROs")
             for curr_output in pipelinestep.transformation.outputs.all():
-                # Make new outputs with blank MD5s and num_rows = -1
-                # for now (we'll fill them in later).
                 corresp_output_SD = SymbolicDataset(MD5_checksum="")
                 corresp_output_SD.save()
 
-                # If the output was not raw, create a structure as well.
                 if not curr_output.is_raw():
                     corresp_output_SD.structure.create(
                         compounddatatype=curr_output.get_cdt(),
@@ -716,11 +696,9 @@ class Sandbox:
                     generic_output=curr_output,
                     symbolicdataset=corresp_output_SD)
 
-            # Sanity check
             curr_ER.complete_clean()
+        logging.debug("Finished creating fresh ER")
 
-        # FINISHED CREATING ER
-        ####
 
         # From here on, curr_ER is appropriately set.
 
