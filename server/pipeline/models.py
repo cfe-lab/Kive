@@ -397,11 +397,15 @@ def run_cable_h(cable, source, output_path):
     wires is the QuerySet containing wires for this cable.
     """
 
-    import csv, inspect, logging
+    import csv, inspect, logging, os
     fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
     logger = logging.getLogger()
 
-    wires = cable.custom_wires.all()
+    wires = ""
+    if (type(cable).__name__ == "PipelineOutputCable"):
+        wires = cable.custom_outwires.all()
+    else:
+        wires = cable.custom_wires.all()
 
     # Read/write binary files in chunks
     chunk_size = 1024*8
@@ -1214,14 +1218,18 @@ class PipelineOutputCable(models.Model):
         This uses run_cable_h and creates an ExecLog, associating it
         to cable_record.
         """
-        # Create an ExecLog.
+        import django.utils.timezone
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
+        logging.debug("{}: Creating ExecLog for {}".format(fn,cable_record))
         curr_log = archive.models.ExecLog(
             record=cable_record,
-            start_time=datetime.now())
+            start_time=django.utils.timezone.now())
+
         run_cable_h(self, source, output_path)
-        curr_log.end_time = datetime.now()
+        curr_log.end_time = django.utils.timezone.now()
         curr_log.complete_clean()
         curr_log.save()
-        cable_record.log = curr_log
-        cable_record.save()
+
         return curr_log

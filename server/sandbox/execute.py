@@ -9,9 +9,6 @@ import file_access_utils, logging_utils
 import os.path
 import logging, sys, time
 import tempfile
-
-from datetime import datetime
-
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
 
 class Sandbox:
@@ -135,7 +132,7 @@ class Sandbox:
                 required_record_type = archive.models.RunSIC
             else:
                 logging.debug("{}: Creating ROC".format(fn))
-                curr_record = cable.poc_instances.create()
+                curr_record = cable.poc_instances.create(run=parent_record)
                 required_record_type = archive.models.RunOutputCable
 
             ####
@@ -452,7 +449,17 @@ class Sandbox:
             if (output_SD not in self.sd_fs_map or self.sd_fs_map[output_SD] == None):
                 self.sd_fs_map[output_SD] = output_path
 
-            self.socket_map[(cable, cable.dest)] = output_SD
+            # FIXME: If this is a POC, cable.dest doesn't exist
+            # Normally, cable.dest points to the TI/TO
+            # But in the case of a POC, we must get the TO from this pipeline that has the output_idx and output_name
+            cable_dest = ""
+            if type(cable).__name__ == "PipelineOutputCable":
+                cable_dest = self.pipeline.outputs.filter(dataset_name=cable.output_name, dataset_idx=cable.output_idx)
+            else:
+                cable_dest = cable.dest
+
+            #self.socket_map[(cable, cable.dest)] = output_SD
+            self.socket_map[(cable, cable_dest)] = output_SD
             self.cable_map[cable] = curr_record
 
         # FINISHED BOOKKEEPING
@@ -489,6 +496,7 @@ class Sandbox:
 
         import inspect, logging
         import django.utils.timezone
+
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         curr_ER = None
@@ -559,6 +567,11 @@ class Sandbox:
                         self.socket_map[(pipelinestep, step_output)] = corresp_SD
                     logging.debug("{}: Finished completely reusing ER".format(fn))
                     return curr_RS
+                curr_RS.reused = False
+            else:
+                curr_RS.reused = False
+
+
 
 
         else:
@@ -612,9 +625,8 @@ class Sandbox:
             return curr_RS
 
 
-
-        logging.debug("{}: Creating EL for method execution".format(fn))
         curr_log = archive.models.ExecLog(record=curr_RS)
+        logging.debug("{}: Created EL for method execution at {}".format(fn, curr_log))
         method_popen = None
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
@@ -622,9 +634,6 @@ class Sandbox:
         logging.debug("{}: Running code".format(fn))
         with open(stdout_path, "wb", 1) as outwrite:
             errwrite = open(stderr_path, "wb", 0)
-
-            # FIXME: output_paths is empty?
-            print "--- {} ---".format(output_paths)
             method_popen = pipelinestep.transformation.run_code(
                 step_run_dir,
                 [self.sd_fs_map[x] for x in inputs_after_cable],
@@ -636,10 +645,11 @@ class Sandbox:
             # While running, print stdout/stderr to console
             with open(stdout_path, "rb", 1) as outread:
                 errread = open(stderr_path, "rb", 0)
-                while method_popen.poll() != None:
+                while method_popen.poll() is None:
+                    logging.debug("{}: Waiting for execution to finish...".format(fn))
                     sys.stdout.write(outread.read())
                     sys.stderr.write(errread.read())
-                    time.sleep(1)
+                    time.sleep(2)
                 outwrite.flush()
                 errwrite.flush()
                 sys.stdout.write(outread.read())
@@ -651,12 +661,13 @@ class Sandbox:
         sys.stderr.flush()
 
         curr_date_time = django.utils.timezone.now()
-        logging.debug("{}: Execution of method complete, saving end time {} in ExecLog".format(fn, curr_date_time))
         curr_log.end_time = curr_date_time
         curr_log.clean()
         curr_log.save()
+        logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".format(
+                fn, curr_log.start_time, curr_log.end_time))
 
-        logging.debug("{}: Storing stdout/stderr in fresh MethodOutput".format(fn))
+        logging.debug("{}: Storing stdout/stderr in MethodOutput".format(fn))
         curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=method_popen.returncode)
         with open(stdout_path, "rb") as outread:
             errread = open(stderr_path, "rb")
@@ -671,24 +682,32 @@ class Sandbox:
 
         if curr_ER == None:
             logging.debug("{}: Creating fresh ER".format(fn))
-            curr_ER = pipelinestep.transformation.execrecords.create()
 
-            logging.debug("{}: Annotating ERIs")
+            # FIXME: Have Richard review this
+            curr_ER = librarian.models.ExecRecord(generator=curr_log)
+            curr_ER.save()
+            curr_RS.execrecord = curr_ER
+            curr_RS.save()
+
+            logging.debug("{}: Annotating ERIs for ER '{}'".format(fn, curr_ER))
             for curr_input in pipelinestep.transformation.inputs.all():
                 corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
                 curr_ER.execrecordins.create(
                     generic_input=curr_input,
                     symbolicdataset=corresp_input_SD)
 
-            logging.debug("{}: Creating new SDs + EROs")
+            logging.debug("{}: Creating new SDs + EROs".format(fn))
             for curr_output in pipelinestep.transformation.outputs.all():
-                corresp_output_SD = SymbolicDataset(MD5_checksum="")
+                corresp_output_SD = librarian.models.SymbolicDataset(MD5_checksum="")
                 corresp_output_SD.save()
 
                 if not curr_output.is_raw():
-                    corresp_output_SD.structure.create(
-                        compounddatatype=curr_output.get_cdt(),
-                        num_rows=-1)
+                    # FIXME: Have Richard review this
+                    curr_structure = librarian.models.DatasetStructure(symbolicdataset = corresp_output_SD,
+                                                                       compounddatatype=curr_output.get_cdt(),
+                                                                       num_rows=-1)
+                    curr_structure.save()
+                    #corresp_output_SD.structure.create(compounddatatype=curr_output.get_cdt(),num_rows=-1)
 
                 corresp_output_SD.clean()
 
@@ -697,17 +716,9 @@ class Sandbox:
                     symbolicdataset=corresp_output_SD)
 
             curr_ER.complete_clean()
-        logging.debug("Finished creating fresh ER")
+        logging.debug("{}: Finished creating fresh ER, proceeding to check outputs".format(fn))
 
-
-        # From here on, curr_ER is appropriately set.
-
-        ####
-        # CHECK OUTPUTS
-
-        # Flag that indicates whether we have detected any problems
-        # with the output.  If so, we then exit without checking the
-        # rest of the data.
+        # had_output_found indicates we have detected problems with the output.
         bad_output_found = False
         for curr_output in pipelinestep.transformation.outputs.all():
             output_path = output_paths[curr_output.dataset_idx-1]
@@ -725,131 +736,98 @@ class Sandbox:
                 bad_output_found = True
                 continue
 
-            # Compute the MD5 checksum of this file.
             output_md5 = ""
             with open(output_path, "rb") as f:
-                output_md5 = file_access_utils.compute_MD5(f)
+                output_md5 = file_access_utils.compute_md5(f)
 
-            # If this is the first time we've ever seen this file,
-            # save its MD5 checksum.
             if not had_ER_at_beginning:
-                output_SD.MD5_checksum = curr_MD5
-            
-            # Create a Dataset for this file if we are retaining this
-            # output and if the corresponding ERO didn't already have
-            # a Dataset associated.  Note: this would never happen
-            # when in recovery mode.
+                output_SD.MD5_checksum = output_md5
+                output_SD.save()
+                logging.debug("{}: First time seeing file: saving md5 {}".format(fn, output_md5))
+
+
             if (not pipelinestep.outputs_to_delete.filter(
                     pk=curr_output.pk).exists() and 
                     not output_ERO.has_data()):
-                desc = "run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}"
-                desc = desc.format(
-                    self.run.name, self.user, pipelinestep.step_num,
-                    pipelinestep.transformation, curr_output.dataset_name)
-                new_DS = Dataset(
+
+                logging.debug("{}: Retaining output: creating Dataset".format(fn))
+
+                desc = "run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}".format(
+                    self.run.name,
+                    self.user,
+                    pipelinestep.step_num,
+                    pipelinestep.transformation,
+                    curr_output.dataset_name)
+
+                new_DS = archive.models.Dataset(
                     user=self.user,
-                    name=("run:{}__user:{}__step:{}__method:{}__output:{}".
-                          format(self.run.name, pipelinestep.step_num,
-                                 pipelinestep.transformation,
+                    name=("run:{}__step:{}__output:{}".
+                          format(self.run.name,
+                                 pipelinestep.step_num,
                                  curr_output.dataset_name)),
                     description=desc,
                     symbolicdataset=output_SD,
                     created_by=curr_RS)
 
-                # Recall that dataset_idx is 1-based, and
-                # output_paths is 0-based.
+                # dataset_idx is 1-based, and output_paths is 0-based.
                 with open(output_path, "rb") as f:
                     new_DS.dataset_file.save(os.path.basename(output_path),
                                              File(f))
                 new_DS.clean()
                 new_DS.save()
 
-            # Don't bother with any more checks if we've already found
-            # bad data (i.e. we've already bailed out and are just
-            # tidying up).
             if bad_output_found:
+                logging.debug("{}: Already found bad data, not proceeding with anymore checks".format(fn))
                 continue
 
-            ####
-            # CONTENT CHECK OF NEW FILE
 
-            # Note that if we are in recovery mode, we wouldn't do
-            # this, and had_ER_at_beginning is True.
             if not had_ER_at_beginning:
-                # A place to validate this output.
+                logging.debug("{}: New data - performing content check".format(fn))
                 summary_path = "{}_summary".format(output_path)
 
-                # Note that get_min_row() and get_max_row() return
-                # None if the output is raw.
                 ccl = output_SD.check_file_contents(
-                    output_path, summary_path, curr_output.get_min_row(),
-                    curr_output.get_max_row())
+                        output_path, summary_path,
+                        curr_output.get_min_row(), curr_output.get_max_row(),
+                        curr_log)
 
                 if ccl.is_fail():
+                    logging.debug("{}: content check FAILED for {}".format(fn, output_path))
                     bad_output_found = True
+                else:
+                    logging.debug("{}: content check passed for {}".format(fn, output_path))
 
-            # FINISHED CONTENT CHECK OF NEW CSV
-            ####
-
-            ####
-            # INTEGRITY CHECK OF RECREATED DATA
-            
-            # Second case: this file already had an existing SD
-            # representing it.  In this case, check its integrity.
             elif had_ER_at_beginning:
-                icl = output_SD.check_integrity(output_path, curr_log,
-                                                output_md5)
+                logging.debug("{}: SD has been computed before, checking integrity of {}".format(fn, output_SD))
+                icl = output_SD.check_integrity(output_path,curr_log,output_md5)
 
                 if icl.is_fail():
                     bad_output_found = True
                     
-            # FINISHED INTEGRITY CHECK
-            ####
-
-        # FINISHED CHECKING OUTPUTS
-        ####
-                
-        # Make sure the ER is clean and complete.
+        logging.debug("{}: Finished checking outputs".format(fn))
         curr_ER.complete_clean()
 
-        ####
-        # FINISH BOOKKEEPING (NON-RECOVERY CASE)
         if not recover:
+            logging.debug("{}: Not recovering: finishing bookkeeping".format(fn))
             curr_RS.execrecord = curr_ER
-            
-            # Finish curr_RS.
             curr_RS.complete_clean()
             curr_RS.save()
-            
-            # Update the maps as we did in the reused case.
-            # Since this is the reused=False case, step_run_dir
-            # represents where the step *actually is*.
+
+            # Since reused=False, step_run_dir represents where the step *actually is*
+            logging.debug("Updating maps")
             self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
     
             for step_output in pipelinestep.transformation.outputs.all():
                 corresp_ero = curr_ER.execrecordouts.get(
-                    content_type=ContentType.objects.get_for_model(
-                        type(step_output)),
+                    content_type=ContentType.objects.get_for_model(type(step_output)),
                     object_id=step_output.pk)
     
                 corresp_SD = corresp_ero.symbolicdataset
-    
-                # Compensate for 0-basedness.
                 corresp_path = output_paths[step_output.dataset_idx-1]
     
-                
-                # Update sd_fs_map and socket_map as in the reused =
-                # True case.
-                # If this is the first time the data has ever been
-                # written to the filesystem, then this represents
-                # where the data *actually is*.
                 if corresp_SD not in self.sd_fs_map:
                     self.sd_fs_map[corresp_SD] = corresp_path
                 self.socket_map[(pipelinestep, step_output)] = corresp_SD
 
-        # FINISHED BOOKKEEPING (NON-RECOVERY CASE)
-        ####
-        
         return curr_RS
 
     def execute_pipeline(self, pipeline=None, input_SDs=None, 
@@ -932,37 +910,23 @@ class Sandbox:
                 curr_run.clean()
                 return curr_run
 
-        # FINISH RUNNING STEPS
-        ####
-
-        ####
-        # RUN OUTPUT CABLES
+        logging.debug("{}: Finished executing steps, proceeding to run output cables".format(fn))
 
         for outcable in pipeline.outcables.all():
             # Identify the SD that feeds this outcable.
-            generator = pipeline.steps.get(
-                step_num=outcable.source_step)
-
-            source_SD = socket_map[(generator, outcable.source)]
-
+            generator = pipeline.steps.get(step_num=outcable.source_step)
+            source_SD = self.socket_map[(generator, outcable.source)]
             file_suffix = "raw" if outcable.is_raw() else "csv"
+            out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name,file_suffix)
+            output_path = os.path.join(out_dir,out_file_name)
+            curr_ROC = self.execute_cable(outcable, source_SD,output_path, curr_run)
 
-            output_path = os.path.join(
-                out_dir,
-                "run{}_{}.{}".format(curr_run.pk, outcable.output_name,
-                                     file_suffix))
-
-            curr_ROC = self.execute_cable(outcable, source_SD,
-                                          output_path, curr_run)
-
-            # As above, bail if this returned without completing or
-            # failed.
             if not curr_ROC.is_complete() or not curr_RS.successful_execution():
                 curr_run.clean()
+                logger.debug("Execution failed")
                 return curr_run
 
-        # FINISH RUNNING OUTPUT CABLES
-        ####
+        logging.debug("{}: Finished executing output cables".format(fn))
         curr_run.complete_clean()
         curr_run.save()
         

@@ -168,7 +168,6 @@ class SymbolicDataset(models.Model):
             ccl.clean()
             return ccl
 
-
         logging.debug("{}: SD is not raw, checking CSV".format(fn))
         csv_summary = None
         my_CDT = self.get_cdt()
@@ -183,13 +182,15 @@ class SymbolicDataset(models.Model):
             logging.debug("{}: malformed header".format(fn))
             return ccl
 
-        # From here on we know that the header is OK.
-        
-        # Set and check the number of rows.
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
-        if (csv_summary["num_rows"] > max_row or csv_summary["num_rows"] < min_row):
-            logging.debug("{}: bad number of rows".format(fn))
+        if max_row is not None and csv_summary["num_rows"] > max_row:
+            logging.debug("{}: too many rows".format(fn))
+            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_num_rows=True)
+            bad_data.save()
+
+        if min_row is not None and csv_summary["num_rows"] < min_row:
+            logging.debug("{}: too few rows".format(fn))
             bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_num_rows=True)
             bad_data.save()
 

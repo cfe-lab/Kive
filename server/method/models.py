@@ -254,8 +254,10 @@ class CodeResourceRevision(models.Model):
         
     def install_h(self, install_path, base_name):
         """Helper for install."""
-        # Write content_file to [install_path]/base_name.  First we
-        # get the file contents.
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
+        logging.debug("{}: Writing code to {}".format(fn, install_path))
         curr_code = None
         try:
             self.content_file.open()
@@ -465,71 +467,55 @@ class Method(transformation.models.Transformation):
     def run_code(self, run_path, input_paths, output_paths,
                  output_handle, error_handle):
         """
-        Run the method using the given run path and input/outputs.
-        
-        This differs from 'execute' in that this is only responsible
-        for running code; it does not handle any of the bookkeeping
-        of creating ExecRecords and the like.
-        
-        run_path is the directory in which the code will be run;
-        input_paths is a list of input files as expected by the code;
-        output_paths is where the code will write the results.
-        output_handle and error_handle are writable file handles that
-        will capture the stdout and stderr of the code.  More
-        specifically, the write mode string must start with "w".
+        SYNOPSIS
+        Runs a method using the run path and input/outputs.
+        Leaves responsibility of DB annotation up to execute()
 
-        Returns a subprocess.Popen object which represents the running 
-        process.
+        INPUTS
+        run_path        Directory where code will be run
+        input_paths     List of input files expected by the code
+        output_paths    List of where code will write results
+        output_handle   File handle storing stdout
+        error_handle    File handle storing stderr
 
-        Note: how this should work is that whatever calls this creates
-        output_handle and error_handle, and monitors those alongside
-        the returned subprocess.Popen object.  After the process is
-        finished, the caller is responsible for whatever cleanup is
-        required.
+        OUTPUTS
+        A running subprocess.Popen object which is asynchronous
 
-        PRE: the CRR of this Method is properly Shipyard-formatted, i.e.
-        it has the right command-line interface:
-        [script name] [input 1] ... [input n] [output 1] ... [output n]
+        ASSUMPTIONS
+        1) The CRR of this Method can interface with Shipyard.
+        Ie, it has positional inputs and outputs at command line:
+        script_name.py [input 1] ... [input n] [output 1] ... [output n]
+
+        2) The caller is responsible for cleaning up the stdout/err
+        file handles after the Popen has finished processing.
         """
-        # If there aren't the right number of inputs or outputs
-        # specified, raise a ValueError.
-        if (len(input_paths) != self.inputs.count() or 
-                len(output_paths) != self.outputs.count()):
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
+        if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
             raise ValueError(
                 "Method \"{}\" expects {} inputs and {} outputs".
                 format(self, self.inputs.count(), self.outputs.count()))
 
-        if (not output_handle.mode.startswith("w") or 
-              not error_handle.mode.startswith("w")):
-            raise ValueError(
-                "output_handle and error_handle must be writable")
+        if (not output_handle.mode.startswith("w") or not error_handle.mode.startswith("w")):
+            raise ValueError("output_handle and error_handle must be writable")
         
-        # First, check whether run_path exists and is
-        # readable/writable/executable by us.
-
-        # FIXME: Wasn't this already setup for cables? (Have switch to tolerate input_data, logs, and output_data)
+        logging.debug("{}: Checking run_path exists: {}".format(fn, run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
 
-        # Now we know that run_path is a valid directory in which to work.
-
-        # Check that all of the inputs exist and are readable by us.
-        # We do this by attempting to open the file; we propagate any
-        # errors back up.
         for input_path in input_paths:
+            logging.debug("{}: Confirming input file exists + readable: {}".format(fn, input_path))
             f = open(input_path, "rb")
             f.close()
 
-        # Check that all of the outputs do *not* exist and we can
-        # create them, i.e. we have write permission on their parent
-        # directories.
         for output_path in output_paths:
-            can_create, reason = file_access_utils.can_create_file(
-                output_path)
+            logging.debug("{}: Confirming output path doesn't exist: {}".format(fn,output_path))
+            can_create, reason = file_access_utils.can_create_new_file(output_path)
 
             if not can_create:
                 raise ValueError(reason)
 
-        # Populate run_path with the CodeResourceRevision.
+        logging.debug("{}: Installing CRR driver to FS: {}".format(fn, self.driver))
         self.driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
@@ -541,8 +527,10 @@ class Method(transformation.models.Transformation):
             run_path,
             self.driver.coderesource.filename)
 
+        command = [code_to_run] + input_paths + output_paths
+        logging.debug("{}: subprocess.Popen({})".format(fn, command))
         code_popen = subprocess.Popen(
-            [code_to_run] + input_paths + output_paths,
+            command,
             shell=False,
             stdout=output_handle,
             stderr=error_handle)

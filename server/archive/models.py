@@ -199,18 +199,16 @@ class RunStep(models.Model):
 
         The checks we perform, in sequence:
          - pipelinestep is consistent with run
-         - if pipelinestep is for a method, there should be no
-           child_run
+         - if pipelinestep is a method, there should be no child_run
 
-         - if pipelinestep is for a pipeline, there should be no
+         - if pipelinestep is a pipeline, there should be no
            ExecLog or Datasets associated, reused = None, and
            execrecord = None
 
-         - if an ExecLog is associated, check that it is clean
-
-         - if any RSICs exist, check they are clean and complete.
+         - If ELs is associated, check it is clean
+         - If RSICs exist, check they are clean and complete
          
-         - if all RSICs are not quenched, reused, child_run, and
+         - If all RSICs are not quenched, reused, child_run, and
            execrecord should not be set, no ExecLog should be
            associated and no Datasets should be associated
 
@@ -418,6 +416,7 @@ class RunStep(models.Model):
                         format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
+        # Supposed to be the datasets attached to this runstep (Produced by this runstep)
         for out_data in self.outputs.all():
             if not step_er.execrecordouts.filter(
                     symbolicdataset=out_data.symbolicdataset).exists():
@@ -783,7 +782,7 @@ class RunOutputCable(models.Model):
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
                     format(self))
 
-            if self.execrecord is not None:
+            if self.execrecord != None:
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
                     format(self))
@@ -822,15 +821,14 @@ class RunOutputCable(models.Model):
                         format(self))
                 self.output.all()[0].clean()
 
-        if self.execrecord is None:
+        if self.execrecord == None:
             return
 
         # self.execrecord is set, so complete_clean it.
         self.execrecord.complete_clean()
 
-        # The ER must point to a cable that is compatible with the one
-        # this RunOutputCable points to.
-        if self.execrecord.general_transf().__class__.__name__ != "PipelineOutputCable":
+        # ER must point to a cable compatible with the one this RunOutputCable points to.
+        if type(self.execrecord.general_transf()).__name__ != "PipelineOutputCable":
             raise ValidationError(
                 "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
                 format(self))

@@ -4,6 +4,7 @@ from django.core.files import File
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from archive.models import MethodOutput
 from librarian.models import SymbolicDataset
 from metadata.models import Datatype, CompoundDatatype
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -52,6 +53,17 @@ class ExecuteTests(TestCase):
         self.output_cdt.save()
         self.output_cdtm_1 = self.output_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
         self.output_cdtm_2 = self.output_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
+
+    def tearDown(self):
+        for crr in CodeResourceRevision.objects.all():
+            crr.content_file.close()
+            crr.content_file.delete()
+
+        for method_out in MethodOutput.objects.all():
+            method_out.output_log.close()
+            #method_out.output_log.delete()
+            method_out.error_log.close()
+            #method_out.error_log.delete()
 
 
     def test_pipeline_execute(self):
