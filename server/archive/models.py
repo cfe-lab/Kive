@@ -194,18 +194,16 @@ class RunStep(models.Model):
 
         The checks we perform, in sequence:
          - pipelinestep is consistent with run
-         - if pipelinestep is for a method, there should be no
-           child_run
+         - if pipelinestep is a method, there should be no child_run
 
-         - if pipelinestep is for a pipeline, there should be no
+         - if pipelinestep is a pipeline, there should be no
            ExecLog or Datasets associated, reused = None, and
            execrecord = None
 
-         - if an ExecLog is associated, check that it is clean
-
-         - if any RSICs exist, check they are clean and complete.
+         - If ELs is associated, check it is clean
+         - If RSICs exist, check they are clean and complete
          
-         - if all RSICs are not quenched, reused, child_run, and
+         - If all RSICs are not quenched, reused, child_run, and
            execrecord should not be set, no ExecLog should be
            associated and no Datasets should be associated
 
@@ -416,7 +414,8 @@ class RunStep(models.Model):
                         format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
-        for out_data in associated_datasets:
+        # Supposed to be the datasets attached to this runstep (Produced by this runstep)
+        for out_data in self.outputs.all():
             if not step_er.execrecordouts.filter(
                     symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError(
@@ -425,11 +424,12 @@ class RunStep(models.Model):
 
     def is_complete(self):
         """True if RunStep is complete; false otherwise."""
+
         # Sub-Pipeline case:
         if hasattr(self, "child_run"):
             return self.child_run.is_complete()
         # Method case:
-        return step_er != None
+        return self.execrecord != None
     
     def complete_clean(self):
         """Checks coherence and completeness of this RunStep."""
@@ -826,9 +826,8 @@ class RunOutputCable(models.Model):
         # self.execrecord is set, so complete_clean it.
         self.execrecord.complete_clean()
 
-        # The ER must point to a cable that is compatible with the one
-        # this RunOutputCable points to.
-        if type(self.execrecord.general_transf()) != "pipeline.PipelineOutputCable":
+        # ER must point to a cable compatible with the one this RunOutputCable points to.
+        if type(self.execrecord.general_transf()).__name__ != "PipelineOutputCable":
             raise ValidationError(
                 "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
                 format(self))
@@ -845,7 +844,7 @@ class RunOutputCable(models.Model):
 
         # November 18, 2013: check if there was missing output
         # (i.e. some kind of messed up execution) in the ExecLog.
-        missing_output = len(self.log.missing_outputs()) != 0
+        missing_output = len(self.log.first().missing_outputs()) != 0
             
         # If the output of this ROC is marked for deletion, there should be no data
         # associated.
