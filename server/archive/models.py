@@ -137,7 +137,12 @@ class Run(models.Model):
     
     def is_complete(self):
         """True if this run is complete; false otherwise."""
-        # A run is complete if all of its outcables are complete.
+        # A run is complete if all of its component RunSteps and RunOutputCables
+        # are complete.
+        for step in self.pipeline.steps.all():
+            corresp_rs = self.runsteps.filter(pipelinestep=step)
+            if not corresp_rs.exists() or not corresp_rs[0].is_complete():
+                return False
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
             if not corresp_roc.exists() or not corresp_roc[0].is_complete():
@@ -293,7 +298,7 @@ class RunStep(models.Model):
             rsic.complete_clean()
 
         if (self.pipelinestep.cables_in.count() != self.RSICs.count()):
-            if (self.reused != None or self.execrecord != None):
+            if (self.reused is not None or self.execrecord is not None):
                 raise ValidationError(
                     "RunStep \"{}\" inputs not quenched; reused and execrecord should not be set".
                     format(self))
@@ -406,17 +411,14 @@ class RunStep(models.Model):
                         "Output \"{}\" of RunStep \"{}\" is missing; no data should be associated".
                         format(to, self))
                 
-            else:
-                # The corresponding ERO should have existent data.
-                corresp_ero = step_er.execrecordouts.get(
-                    content_type=to_type, object_id=to.id)
-                if not corresp_ero.symbolicdataset.has_data():
+            # The corresponding ERO should have existent data.
+            elif not corresp_ero.symbolicdataset.has_data():
                     raise ValidationError(
                         "ExecRecordOut \"{}\" of RunStep \"{}\" should reference existent data".
                         format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
-        for out_data in associated_datasets:
+        for out_data in self.outputs.all():
             if not step_er.execrecordouts.filter(
                     symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError(
@@ -429,7 +431,7 @@ class RunStep(models.Model):
         if hasattr(self, "child_run"):
             return self.child_run.is_complete()
         # Method case:
-        return step_er != None
+        return self.execrecord is not None
     
     def complete_clean(self):
         """Checks coherence and completeness of this RunStep."""
@@ -781,7 +783,7 @@ class RunOutputCable(models.Model):
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
                     format(self))
 
-            if self.execrecord != None:
+            if self.execrecord is not None:
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
                     format(self))
@@ -820,7 +822,7 @@ class RunOutputCable(models.Model):
                         format(self))
                 self.output.all()[0].clean()
 
-        if self.execrecord == None:
+        if self.execrecord is None:
             return
 
         # self.execrecord is set, so complete_clean it.
@@ -828,7 +830,7 @@ class RunOutputCable(models.Model):
 
         # The ER must point to a cable that is compatible with the one
         # this RunOutputCable points to.
-        if type(self.execrecord.general_transf()) != "pipeline.PipelineOutputCable":
+        if self.execrecord.general_transf().__class__.__name__ != "PipelineOutputCable":
             raise ValidationError(
                 "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
                 format(self))
@@ -845,7 +847,7 @@ class RunOutputCable(models.Model):
 
         # November 18, 2013: check if there was missing output
         # (i.e. some kind of messed up execution) in the ExecLog.
-        missing_output = len(self.log.missing_outputs()) != 0
+        missing_output = len(self.log.first().missing_outputs()) != 0
             
         # If the output of this ROC is marked for deletion, there should be no data
         # associated.

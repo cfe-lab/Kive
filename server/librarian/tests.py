@@ -257,6 +257,31 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
             dataset.dataset_file.close()
             dataset.dataset_file.delete()
 
+    def ER_from_record(self, record):
+        """
+        Helper function to create an ExecRecord from an Run, RunStep, or 
+        RunOutputCable (record), by creating a throwaway ExecLog.
+        """
+        myEL = ExecLog(record=record, end_time=timezone.now())
+        myEL.save()
+        if record.__class__.__name__ == "RunStep":
+            output = MethodOutput(execlog=myEL, return_code = 0)
+            output.save()
+            myEL.methodoutput = output
+            myEL.save()
+        myER = ExecRecord(generator=myEL)
+        myER.save()
+        return(myER)
+
+    def ER_from_PSIC(self, run, PS, PSIC):
+        """
+        Helper function to create an ExecRecord associated to a
+        PipelineStepInputCable, for a particular run and pipeline step.
+        """
+        myRS = run.runsteps.create(pipelinestep=PS)
+        myRSIC = PSIC.psic_instances.create(runstep=myRS)
+        return self.ER_from_record(myRSIC)
+
 class SymbolicDatasetTests(LibrarianTestSetup):
     
     def test_is_raw(self):
@@ -270,26 +295,6 @@ class DatasetStructureTests(LibrarianTestSetup):
         self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
 
 class ExecRecordTests(LibrarianTestSetup):
-
-    def ER_from_record(self, record):
-        """
-        Helper function to create an ExecRecord from an Run, RunStep, or 
-        RunOutputCable (record), by creating a throwaway ExecLog.
-        """
-        myEL = ExecLog(record=record, end_time=timezone.now())
-        myEL.save()
-        myER = ExecRecord(generator=myEL)
-        myER.save()
-        return(myER)
-
-    def ER_from_PSIC(self, run, PS, PSIC):
-        """
-        Helper function to create an ExecRecord associated to a
-        PipelineStepInputCable, for a particular run and pipeline step.
-        """
-        myRS = run.runsteps.create(pipelinestep=PS)
-        myRSIC = PSIC.psic_instances.create(runstep=myRS)
-        return self.ER_from_record(myRSIC)
 
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
