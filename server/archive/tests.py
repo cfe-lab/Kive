@@ -608,100 +608,10 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         #pE_run.save()
         #pE_ER.delete()
 
-
-    def test_Run_clean_reused(self):
-        """Check coherence of a Run after it has decided to reuse an ExecRecord."""
-        # Create a top-level run.
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        pE_run.reused = True
-
-        # Good case: no RS or ROC associated, no ER yet.
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: RS associated.
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* reuses an ER, so there should be no associated RunSteps",
-            pE_run.clean)
-        # Reset....
-        step_E1_RS.delete()
-
-        # Bad case: ROC associated.
-        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* reuses an ER, so there should be no associated RunOutputCables",
-            pE_run.clean)
-        # Reset....
-        E33_43_ROC.delete()
-
-        # Set an ER.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-
-        # Bad propagation case: execrecord is not complete.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            pE_run.clean)
-
-        # Proceed:
-        pE_ER_in1 = pE_ER.execrecordins.create(
-            generic_input=self.E1_in,
-            symbolicdataset=self.triplet_symDS)
-        pE_ER_in2 = pE_ER.execrecordins.create(
-            generic_input=self.E2_in,
-            symbolicdataset=self.singlet_symDS)
-        pE_ER_in3 = pE_ER.execrecordins.create(
-            generic_input=self.E3_rawin,
-            symbolicdataset=self.raw_symDS)
-        
-        pE_ER_out1 = pE_ER.execrecordouts.create(
-            generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
-        pE_ER_out2 = pE_ER.execrecordouts.create(
-            generic_output=self.E2_out,
-            symbolicdataset=self.C1_out_symDS)
-        pE_ER_out3 = pE_ER.execrecordouts.create(
-            generic_output=self.E3_rawout,
-            symbolicdataset=self.C3_out_symDS)
-
-        # Bad case: ER and pipeline are not consistent.
-        pE_run.pipeline = self.pD
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.clean)
-
-        # Now test is_complete, complete_clean.
-        self.assertEquals(pE_run.is_complete(), True)
-        # Propagation bad case: clean fails.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.complete_clean)
-        
-        # Good case: the run is complete and clean.
-        pE_run.pipeline = self.pE
-        pE_run.save()
-        self.assertEquals(pE_run.is_complete(), True)
-        self.assertEquals(pE_run.complete_clean(), None)
-
-        # Bad case: the run is incomplete but clean.
-        pE_run.execrecord = None
-        self.assertEquals(pE_run.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has no ExecRecord",
-            pE_run.complete_clean)
-
-
-        
     def test_Run_clean_not_reused(self):
         """Check coherence of a Run after it has decided not to reuse an ExecRecord."""
+        # Jan 15: Much of this is no longer relevant, since Runs can't have ExecRecords
+        # anymore. I've tried to fix up what I can. -Rosemary
         # Create a top-level run.
         pE_run = self.pE.pipeline_instances.create(user=self.myUser)
         pE_run.reused = False
@@ -926,7 +836,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         # Bad propagation case: bad ROC associated.
         E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run)
         E21_41_ER = self.ER_from_record(E21_41_ROC)
-        E21_41_ROC_old_log = E21_41_ROC.log
+        E21_41_ROC_old_log = E21_41_ROC.log.first()
         E21_41_ROC.log = E21_41_ROC.log.none()
         E21_41_ER.execrecordins.create(
             generic_input=self.D1_out,
@@ -940,6 +850,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         # Complete other good ROC
         E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
         E33_43_ER = self.ER_from_record(E33_43_ROC)
+        E33_43_ROC_old_log = E33_43_ROC.log.first()
         E33_43_ROC.log = E33_43_ROC.log.none()
         E33_43_ER.execrecordins.create(
             generic_input=self.D1_out,
@@ -958,45 +869,19 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         # Proceed....
         E21_41_ROC.reused = False
+        E33_43_ROC.reused = False
         self.E1_out_DS.created_by = E21_41_ROC
         self.E1_out_DS.save()
+        E33_43_ROC.log.add(E33_43_ROC_old_log)
+        E21_41_ROC.log.add(E21_41_ROC_old_log)
+        E33_43_ROC.save()
         E21_41_ROC.save()
         # Good propagation case: one good ROC associated.
         self.assertEquals(pE_run.clean(), None)
 
-        # Bad case: ER is set, only one output cable is set and done.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-
-        # Good case: one output cable is done, the other two are clean
-        # but incomplete.
-        E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
-        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: only one output cable is done, but all 3 are set,
-        # but ER is set.
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-
         # Good case: all 3 output cables are done, ER not set.
         E31_42_ROC.reused = False
-        E31_42_ER = self.E31_42.execrecords.create()
+        E31_42_ER = self.ER_from_record(E31_42_ROC)
         E31_42_ER.execrecordins.create(
             generic_input=self.C1_out, symbolicdataset=self.C1_out_symDS)
         E31_42_ER.execrecordouts.create(
@@ -1006,7 +891,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E31_42_ROC.save()
         
         E33_43_ROC.reused = False
-        E33_43_ER = self.E33_43.execrecords.create()
+        E33_43_ER = self.ER_from_record(E33_43_ER)
         E33_43_ER.execrecordins.create(
             generic_input=self.C3_rawout, symbolicdataset=self.C3_out_symDS)
         E33_43_ER.execrecordouts.create(
@@ -1015,77 +900,8 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E33_43_ROC.execrecord = E33_43_ER
         E33_43_ROC.save()
         self.assertEquals(pE_run.clean(), None)
-
-        # Propagation bad case: ER set but not complete.
-        pE_run.execrecord = pE_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            pE_run.clean)
-
-        # Propagation good case: ER is complete.
-        pE_ER_in1 = pE_ER.execrecordins.create(
-            generic_input=self.E1_in,
-            symbolicdataset=self.triplet_symDS)
-        pE_ER_in2 = pE_ER.execrecordins.create(
-            generic_input=self.E2_in,
-            symbolicdataset=self.singlet_symDS)
-        pE_ER_in3 = pE_ER.execrecordins.create(
-            generic_input=self.E3_rawin,
-            symbolicdataset=self.raw_symDS)
-        
-        pE_ER_out1 = pE_ER.execrecordouts.create(
-            generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
-        pE_ER_out2 = pE_ER.execrecordouts.create(
-            generic_output=self.E2_out,
-            symbolicdataset=self.C1_out_symDS)
-        pE_ER_out3 = pE_ER.execrecordouts.create(
-            generic_output=self.E3_rawout,
-            symbolicdataset=self.C3_out_symDS)
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: ER and pipeline are not consistent.
-        pE_run.execrecord = mA_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-
-        # Bad case: ERO has a symbolic dataset different from that
-        # of the corresponding ROC.
-        pE_ER_out2.symbolicdataset = self.singlet_3rows_symDS
-        pE_ER_out2.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
-            pE_run.clean)
-
-        # Before we reset, check is_complete and complete_clean.
-        self.assertEquals(pE_run.is_complete(), True)
-        # Propagation bad case: pE_run is not clean.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
-            pE_run.complete_clean)
-        
-        # Reset....
-        pE_ER_out2.symbolicdataset = self.C1_out_symDS
-        pE_ER_out2.save()
         self.assertEquals(pE_run.is_complete(), True)
         self.assertEquals(pE_run.complete_clean(), None)
-
-        pE_run.execrecord = None
-        pE_run.save()
-        self.assertEquals(pE_run.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has no ExecRecord",
-            pE_run.complete_clean)
 
 class RunSICTests(librarian.tests.LibrarianTestSetup):
 
