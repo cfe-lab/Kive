@@ -202,9 +202,10 @@ def resource_add(request):
 
     else:
         form = CodeResourcePrototypeForm()
+        dep_form = CodeResourceDependencyForm()
 
     t = loader.get_template('resource_add.html')
-    c = Context({'resource_form': form})
+    c = Context({'resource_form': form, 'dependency_form': dep_form})
     c.update(csrf(request))
     
     return HttpResponse(t.render(c))

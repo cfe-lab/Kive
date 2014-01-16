@@ -4,7 +4,7 @@ Generate an HTML form to create a new Datatype object
 
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django import forms
-from copperfish.models import Datatype, BasicConstraint, CodeResource, CodeResourceRevision
+from copperfish.models import Datatype, BasicConstraint, CodeResource, CodeResourceRevision, CodeResourceDependency
 from datetime import datetime
 
 class DatatypeForm (forms.ModelForm):
@@ -64,7 +64,9 @@ class CodeResourceRevisionForm (forms.ModelForm):
         model = CodeResourceRevision
         fields = ('revision_name', 'revision_desc', 'content_file', )
 
-
-class TransformationForm (forms.ModelForm):
+class CodeResourceDependencyForm (forms.ModelForm):
+    coderesource = forms.ChoiceField([(x, x.name) for x in CodeResource.objects.all()])
     class Meta:
-        model = Transformation
+        model = CodeResourceDependency
+        exclude = ('coderesourcerevision', 'requirement')
+
