@@ -65,7 +65,8 @@ class CodeResourceRevisionForm (forms.ModelForm):
         fields = ('revision_name', 'revision_desc', 'content_file', )
 
 class CodeResourceDependencyForm (forms.ModelForm):
-    coderesource = forms.ChoiceField([(x, x.name) for x in CodeResource.objects.all()])
+    coderesource = forms.ChoiceField([('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
     class Meta:
         model = CodeResourceDependency
         exclude = ('coderesourcerevision', 'requirement')

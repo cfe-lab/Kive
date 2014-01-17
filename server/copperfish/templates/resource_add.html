@@ -6,7 +6,51 @@
 {% block title %}Add a new code resource{% endblock %}
 
 {% block javascript %}
-<script src="static/resources.js"></script>
+<script src="static/jquery-2.0.3.min.js"></script>
+<script>
+$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+    var options = document.getElementById("id_coderesource").options;
+    var numberOfForms = 0;
+    $("#addDependencyForm").click(  // query button by id selector
+        function () {   // anonymous function
+            numberOfForms += 1;
+            renderForms(numberOfForms);
+        }
+    )
+    $("#removeDependencyForm").click(
+        function() {
+            if (numberOfForms > 0) {
+                numberOfForms -= 1;
+                renderForms(numberOfForms);
+            }
+        }
+    )
+    // render forms in div
+    var renderForms = function($nForms) {
+        var htmlStr = "";
+        for (var i = 0; i < $nForms; i++) {
+            htmlStr += "<select id=\"id_coderesource_" + i + "\" name=\"id_coderesource_" + i + "\">";
+            for (var j = 0; j < options.length; j++) {
+                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
+            }
+            htmlStr += "</select>";
+            htmlStr += "<select id=\"id_revisions_" + i + "\" name=\"id_revisions_" + i + "\">";
+            htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select><br/>";
+        }
+        $("#extraDependencyForms").html(htmlStr);
+    };
+
+    // trigger ajax on CR drop-down to populate revision select
+    $("select[id|='id_coderesource_']").change(
+        function() {
+            $.ajax({
+                type: "POST",
+                url: "get_revisions/"
+            })
+        }
+    )
+});
+</script>
 {% endblock %}
 
 {% block content %}
@@ -18,13 +62,14 @@
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     {{ resource_form.as_p }}
+    <h3>Dependencies</h3>
+    <p>
+    <input type="button" id="addDependencyForm" value="+"/>
+    <input type="button" id="removeDependencyForm" value="-"/><br/>
+    {{ dependency_form.coderesource }} {{ dependency_form.revisions }}<br/>
+    <div id="extraDependencyForms"></div>
+    </p>
 
-    {{ dependency_form.as_p }}
-    <h3>Basic constraints</h3>
- <input type="button" id="addConstraint" value="+"/>
- <input type="button" id="removeConstraint" value="-"/></br>
- {{ constraint_form.as_table }}</br>
- <div id="additionalConstraints"></div>
     <input type="submit" value="Upload" />
 </form>
 
