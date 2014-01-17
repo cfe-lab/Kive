@@ -708,6 +708,16 @@ class CompoundDatatypeTests(MetadataTestSetup):
             "Column indices are not consecutive starting from 1",
             bad_cdt.clean);
 
+    def test_clean_members_no_column_names(self):
+        """
+        Datatype members must have column names.
+        """
+        cdt = CompoundDatatype(); cdt.save()
+        cdt.members.create(datatype=self.RNA_dt, column_idx=1)
+        self.assertRaisesRegexp(ValidationError,
+            "{'column_name': \[u'This field cannot be blank.'\]}",
+            cdt.clean)
+
     # The following tests were previously tests on
     # DatasetStructure.clean(), but now they must be adapted as
     # tests on summarize_CSV.

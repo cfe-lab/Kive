@@ -7,11 +7,16 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 
 import os.path
+import logging
+import shutil
+import tempfile
 
 from method.models import *
 from metadata.models import *
 import metadata.tests
+from messages import error_messages
 
+logging.getLogger().setLevel(10) # Debug messages
 samplecode_path = "../samplecode"
 
 class MethodTestSetup(metadata.tests.MetadataTestSetup):
@@ -212,7 +217,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="script1",
             revision_desc="script1",
             family = self.test_mf,driver = self.script_1_crRev)
-        self.script_1_method.full_clean();
         self.script_1_method.save()
 
         # Assign tuple as both an input and an output to script_1_method
@@ -222,6 +226,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_1_method.create_output(compounddatatype = self.tuple_cdt,
                                            dataset_name = "input_tuple",
                                            dataset_idx = 1)
+        self.script_1_method.full_clean()
         self.script_1_method.save()
 
         # script_2_square_and_means
@@ -247,7 +252,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="script2",
             revision_desc="script2",
             family = self.test_mf, driver = self.script_2_crRev)
-        self.script_2_method.full_clean();
         self.script_2_method.save()
 
         # Assign triplet as input and output,
@@ -263,6 +267,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             compounddatatype = self.singlet_cdt,
             dataset_name = "a_b_c_mean",
             dataset_idx = 2)
+        self.script_2_method.full_clean()
         self.script_2_method.save()
 
         # script_3_product
@@ -289,7 +294,6 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_desc="script3",
             family = self.test_mf,
             driver = self.script_3_crRev)
-        self.script_3_method.full_clean();
         self.script_3_method.save()
 
         # Assign singlet as input and output
@@ -306,6 +310,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_3_method.create_output(compounddatatype = self.singlet_cdt,
                                            dataset_name = "kr",
                                            dataset_idx = 1)
+        self.script_3_method.full_clean()
         self.script_3_method.save()
 
         ####
@@ -371,11 +376,53 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_desc="s4",
             family = self.test_MF,
             driver = self.script_4_1_CRR)
-        self.script_4_1_M.full_clean()
         self.script_4_1_M.save()
+
+        self.script_4_1_M.create_input(compounddatatype=self.triplet_cdt, 
+            dataset_name="s4 input", dataset_idx = 1)
+        self.script_4_1_M.full_clean()
 
         # A shorter alias
         self.testmethod = self.script_4_1_M
+
+        # Some code for a no-op method.
+        resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write("#!/bin/bash\ncat $1")
+            self.noop_data_file = f.name
+            revision = CodeResourceRevision(coderesource = resource,
+                content_file = File(f))
+            revision.clean()
+            revision.save()
+        
+        string_dt = Datatype(name="string", description="string", Python_type=Datatype.STR)
+        string_dt.save()
+        string_cdt = CompoundDatatype()
+        string_cdt.save()
+        string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
+        string_cdt.full_clean()
+        
+        mfamily = MethodFamily(name="noop"); mfamily.save()
+        self.noop_method = Method(family=mfamily, driver=revision,
+            revision_name = "1", revision_desc = "first version")
+        self.noop_method.save()
+        self.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
+        self.noop_method.clean()
+        self.noop_method.full_clean()
+
+        # Some data.
+        self.scratch_dir = tempfile.mkdtemp()
+        fd, self.noop_infile = tempfile.mkstemp(dir=self.scratch_dir)
+        self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)[1]
+        self.noop_indata = "word\nhello\nworld"
+
+        handle = os.fdopen(fd, "w")
+        handle.write(self.noop_indata)
+        handle.close()
+
+    def tearDown(self):
+        shutil.rmtree(self.scratch_dir)
+
 
 class CodeResourceTests(MethodTestSetup):
      
@@ -1513,7 +1560,7 @@ class MethodTests(MethodTestSetup):
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
+        foo.save()
 
         # check_input_indices() should not raise a ValidationError
         self.assertEquals(foo.check_input_indices(), None);
@@ -1613,7 +1660,7 @@ class MethodTests(MethodTestSetup):
         """Test input index check, badly-indexed multi-input case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
+        foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=2);
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1633,8 +1680,10 @@ class MethodTests(MethodTestSetup):
     def test_no_outputs_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
+                     revision_desc="Foo version", driver=self.compv1_crRev)
+        foo.save()
+        foo.create_input(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="oneinput", dataset_idx=1)
 
         self.assertEquals(foo.check_output_indices(), None);
         self.assertEquals(foo.clean(), None);
@@ -1642,18 +1691,22 @@ class MethodTests(MethodTestSetup):
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
+                     revision_desc="Foo version", driver=self.compv1_crRev)
+        foo.save()
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=1);
-        self.assertEquals(foo.check_output_indices(), None);
-        self.assertEquals(foo.clean(), None);
+                           dataset_name="oneoutput", dataset_idx=1)
+        foo.create_input(compounddatatype=self.DNAinput_cdt,
+                          dataset_name="oneinput", dataset_idx=1)
+        self.assertEquals(foo.check_output_indices(), None)
+        self.assertEquals(foo.clean(), None)
 
     def test_many_valid_outputs_scrambled_checkOutputIndices_good (self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", driver=self.compv1_crRev);
         foo.save();
+        foo.create_input(compounddatatype=self.DNAinput_cdt,
+                         dataset_name="oneinput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
                            dataset_name="oneoutput", dataset_idx=3);
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
@@ -1666,10 +1719,12 @@ class MethodTests(MethodTestSetup):
     def test_one_invalid_output_checkOutputIndices_bad (self):
         """Test output index check, one badly-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev);
-        foo.save();
+                     revision_desc="Foo version", driver=self.compv1_crRev)
+        foo.save()
+        foo.create_input(compounddatatype=self.DNAinput_cdt,
+                         dataset_name="oneinput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=4);
+                          dataset_name="oneoutput", dataset_idx=4)
         self.assertRaisesRegexp(
                 ValidationError,
                 "Outputs are not consecutively numbered starting from 1",
@@ -1686,6 +1741,8 @@ class MethodTests(MethodTestSetup):
                      revision_desc="Foo version", driver=self.compv1_crRev);
         foo.save();
         
+        foo.create_input(compounddatatype=self.DNAinput_cdt,
+                         dataset_name="oneinput", dataset_idx=1);
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
                           dataset_name="oneoutput", dataset_idx=2);
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
@@ -1921,6 +1978,44 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_out_2.dataset_idx, 2);
         self.assertEqual(curr_out_2.get_min_row(), None);
         self.assertEqual(curr_out_2.get_max_row(), None);
+
+    def test_driver_is_metapackage(self):
+        """
+        A metapackage cannot be a driver for a Method.
+        """
+        # Create a CodeResourceRevision with no content file (ie. a Metapackage).
+        res = CodeResource(); res.save()
+        rev = CodeResourceRevision(coderesource=res, content_file=None); rev.clean(); rev.save()
+        f = MethodFamily(); f.save()
+        m = Method(family=f, driver=rev)
+        m.save()
+        m.create_input(compounddatatype = self.singlet_cdt,
+            dataset_name = "input",
+            dataset_idx = 1);
+        self.assertRaisesRegexp(ValidationError,
+            error_messages["driver_metapackage"].format(".*", ".*"),
+            m.clean)
+
+    def test_run_code_nooutput(self):
+        """
+        Run a no-output method (which just prints to stdout).
+        """
+        empty_dir = tempfile.mkdtemp()
+        outfile = tempfile.NamedTemporaryFile(delete=False)
+        errfile = tempfile.NamedTemporaryFile(delete=False)
+
+        proc = self.noop_method.run_code(empty_dir, [self.noop_infile], [], outfile, errfile)
+        proc.communicate()
+        outfile.close(); errfile.close()
+
+        proc_out = open(outfile.name).read()
+        proc_err = open(errfile.name).read()
+
+        self.assertEqual(proc_out, self.noop_indata)
+
+        os.remove(outfile.name)
+        os.remove(errfile.name)
+        shutil.rmtree(empty_dir)
 
 class MethodFamilyTests(MethodTestSetup):
 

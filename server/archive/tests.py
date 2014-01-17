@@ -7,14 +7,16 @@ from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-import os
-import tempfile
+import os, sys
+import tempfile, shutil
 import random
+import logging
 
 from librarian.models import *
 from archive.models import *
 from method.models import *
 from metadata.models import *
+from pipeline.models import *
 from method.tests import samplecode_path
 import librarian.tests
 from messages import error_messages
@@ -1572,3 +1574,67 @@ class DatasetTests(librarian.tests.LibrarianTestSetup):
         self.raw_DS.dataset_file.close()
         errorMessage = "File integrity of \".*\" lost.  Current checksum \".*\" does not equal expected checksum \".*\""
         self.assertRaisesRegexp(ValidationError,errorMessage, self.raw_DS.clean)
+
+class ExecLogTests(TestCase):
+
+    def setUp(self):
+        logging.getLogger().setLevel(10) # Debug messages
+
+        # Some code.
+        resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write("#!/bin/bash\ncat $1")
+            self.noop_data_file = f.name
+            revision = CodeResourceRevision(coderesource = resource,
+                content_file = File(f))
+            revision.clean()
+            revision.save()
+        
+        string_dt = Datatype(name="string", description="string", Python_type=Datatype.STR)
+        string_dt.save()
+        string_cdt = CompoundDatatype()
+        string_cdt.save()
+        string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
+        string_cdt.full_clean()
+        
+        mfamily = MethodFamily(name="noop"); mfamily.save()
+        self.noop_method = Method(family=mfamily, driver=revision,
+            revision_name = "1", revision_desc = "first version")
+        self.noop_method.save()
+        self.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
+        self.noop_method.clean()
+        self.noop_method.full_clean()
+
+        # Some data.
+        self.scratch_dir = tempfile.mkdtemp()
+        fd, self.noop_infile = tempfile.mkstemp(dir=self.scratch_dir)
+        self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)[1]
+        self.noop_indata = "word\nhello\nworld"
+
+        handle = os.fdopen(fd, "w")
+        handle.write(self.noop_indata)
+        handle.close()
+
+    def tearDown(self):
+        shutil.rmtree(self.scratch_dir)
+
+    def test_run_code_nooutput(self):
+        """
+        Run a no-output method (which just prints to stdout).
+        """
+        empty_dir = tempfile.mkdtemp()
+        outfile = tempfile.NamedTemporaryFile(delete=False)
+        errfile = tempfile.NamedTemporaryFile(delete=False)
+
+        proc = self.noop_method.run_code(empty_dir, [self.noop_infile], [], outfile, errfile)
+        proc.communicate()
+        outfile.close(); errfile.close()
+
+        proc_out = open(outfile.name).read()
+        proc_err = open(errfile.name).read()
+
+        self.assertEqual(proc_out, self.noop_indata)
+
+        os.remove(outfile.name)
+        os.remove(errfile.name)
+        shutil.rmtree(empty_dir)

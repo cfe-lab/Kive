@@ -426,6 +426,7 @@ class CompoundDatatypeMember(models.Model):
 
     column_name = models.CharField(
         "Column name",
+        blank=False,
         max_length=128,
         help_text="Gives datatype a 'column name' as an alternative to column index");
 
@@ -507,7 +508,8 @@ class CompoundDatatype(models.Model):
 
         # += is shorthand for extend() - concatenate a list with another list
         for member in self.members.all():
-            column_indices += [member.column_idx];
+            member.full_clean()
+            column_indices += [member.column_idx]
 
         # Check if the sorted list is exactly a sequence from 1 to n
         if sorted(column_indices) != range(1, self.members.count()+1):

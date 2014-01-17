@@ -13,7 +13,7 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 
 import metadata.models
-import metadata.models
+from messages import error_messages
 
 class TransformationFamily(models.Model):
     """
@@ -77,14 +77,14 @@ class Transformation(models.Model):
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
         # Append each input index (hole number) to a list
-        input_nums = [];
+        input_nums = []
         for curr_input in self.inputs.all():
-            input_nums += [curr_input.dataset_idx];
+            input_nums += [curr_input.dataset_idx]
 
         # Indices must be consecutively numbered from 1 to n
-        if sorted(input_nums) != range(1, self.inputs.count()+1):
+        if sorted(input_nums) != list(range(1, self.inputs.count()+1)):
             raise ValidationError(
-                "Inputs are not consecutively numbered starting from 1");
+                "Inputs are not consecutively numbered starting from 1")
         
     def check_output_indices(self):
         """Check that output indices are numbered consecutively from 1."""
