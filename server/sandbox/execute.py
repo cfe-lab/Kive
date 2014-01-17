@@ -94,7 +94,7 @@ class Sandbox:
         recover         True if recovering + ignore input_SD/output_path/parent_record
 
         OUTPUTS
-        RSIC/ROC that describes this execution.
+        curr_record     RSIC/ROC that describes this execution.
 
         NOTES
         Recovering is to re-compute something reused to recover the data
@@ -112,17 +112,12 @@ class Sandbox:
         import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
-        ####
-        # CREATE/RETRIEVE RECORD
-        
-        # The record that we create/update.
-        curr_record = None
+        curr_record = None      # RSIC/ROC that we create, reuse, or update
         curr_ER = None
         output_SD = None
-        # What comes out of the cable will have the following CDT:
-        output_SD_CDT = None
+        output_SD_CDT = None    # CDT of what comes out of the cable
 
-        # If not recovering, we create a new record.
+        # If not recovering, create new record
         if not recover:
             logging.debug("{}: Not recovering cable".format(fn))
 
@@ -135,10 +130,7 @@ class Sandbox:
                 curr_record = cable.poc_instances.create(run=parent_record)
                 required_record_type = archive.models.RunOutputCable
 
-            ####
             # LOOK FOR REUSABLE ER
-
-            # Check if this cable keeps its output.
             cable_keeps_output = None
             if type(cable) == pipeline.models.PipelineStepInputCable:
                 cable_keeps_output = cable.keep_output
@@ -151,9 +143,8 @@ class Sandbox:
                         outputs_to_delete.filter(dataset_name=cable.output_name).exists())
             logging.debug("{}: Cable keeps output? {}".format(fn, cable_keeps_output))
 
-            # FIXME now we have to redefine what "reusability" means: an
-            # ER should only be considered for reuse if all of its inputs
-            # and outputs are still considered valid *at this time*.
+            # FIXME: will redefine what "reusability" means - ERs should only be
+            # considered for reuse if its inputs/outputs are valid *at this time*.
             
             # To find cable ER to reuse, load cable ERIs of the same cable
             # type taking inputSD as input
@@ -165,45 +156,48 @@ class Sandbox:
             # B) Look at ERIs linked to the same cable type, with matching input SD
             candidate_ERIs = ExecRecordIn.objects.filter(execrecord__generator__content_type=record_contenttype, symbolicdataset=input_SD)
 
-
             curr_record.reused = False
-            
-            # FIXME can we speed this up using a prefetch?
-            # Search for an execrecord that we can reuse OR fill in.
+
+            # Search for an ER we can completely reuse OR update
             for candidate_ERI in candidate_ERIs:
-                logging.debug("{}: Considering ERI {}".format(fn, candidate_ERI))
-                candidate_cable = candidate_ERI.execrecord.general_transf
-    
-                if cable.is_compatible(candidate_cable):
-                    output_SD = (candidate_ERI.execrecord.execrecordouts.
-                                    all()[0].symbolicdataset)
-                    
-                    # If you're not keeping the output, or you are and
-                    # there is existent data, you can successfully reuse
-                    # the ER.
+                logging.debug("{}: Considering ERI {} for ER reuse/update".format(fn, candidate_ERI))
+                candidate_cable = candidate_ERI.execrecord.general_transf()
+
+                compaitibility = False
+                if type(cable).__name__ == "PipelineOutputCable":
+                    compaitibility = cable.is_compatible(candidate_cable)
+                else:
+                    compaitibility = cable.is_compatible(candidate_cable, input_SD.structure.compounddatatype)
+
+                if compaitibility:
+                    output_SD = candidate_ERI.execrecord.execrecordouts.all()[0].symbolicdataset
+
+                    # If not keeping output, or you are but there is already data, reuse the ER
                     if not cable_keeps_output or output_SD.has_data():
+                        logging.debug("{}: reusing ER {}".format(fn, candidate_ERI.execrecord))
+
                         curr_record.reused = True
                         curr_record.execrecord = candidate_ERI.execrecord
-                        curr_record.complete_clean()
+
+                        curr_record.clean()
                         curr_record.save()
                         
-                        # Add the ERO's SD to sd_fs_map if this SD was not
-                        # already in sd_fs_map; if it was but had never
-                        # been written to the FS, update it with the path.
+                        # Add ERO's SD to sd_fs_map if SD wasn't in sd_fs_map
+                        # If it was but never written to the FS, update it
                         if (output_SD not in self.sd_fs_map or
                                 self.sd_fs_map[output_SD] == None):
                             self.sd_fs_map[output_SD] = output_path
     
                         # Add (cable, destination socket) to socket_map.
-                        # FIXME: the socket for this cable is determined by looking at the schematic?
-                        socket_map[(cable, cable.generic_output)] = output_SD
+                        self.socket_map[(cable, cable.dest)] = output_SD
                         
                         # Add this cable to cable_map.
                         self.cable_map[cable] = curr_record
                         return curr_record
                         
-                    # Otherwise (i.e. you are keeping output but the ERO
-                    # doesn't have any), we proceed, filling in this ER.
+                    # Otherwise (if keeping output but the ERO doesn't have any)
+                    # Proceed and fill in this ER.
+
                     else:
                         curr_ER = candidate_ERI.execrecord
                 
@@ -224,9 +218,7 @@ class Sandbox:
         else:
             curr_record = self.cable_map[cable]
             curr_ER = curr_record.execrecord
-
             input_SD = curr_ER.execrecordins.all()[0].symbolicdataset
-
             output_SD = curr_ER.execrecordouts.all()[0].symbolicdataset
             output_SD_CDT = output_SD.get_cdt()
             output_path = self.sd_fs_map[output_SD]
@@ -436,8 +428,12 @@ class Sandbox:
             
         ####
         # PERFORM BOOKKEEPING
-        
-        curr_record.execrecord = curr_ER
+
+
+        # If we had not recovered...
+        if not recover:
+            curr_record.execrecord = curr_ER
+
         curr_record.complete_clean()
         curr_record.save()
 
@@ -499,6 +495,8 @@ class Sandbox:
 
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        logging.debug("{}: STARTING EXECUTION OF STEP".format(fn))
+
         curr_ER = None
         output_paths = []
         inputs_after_cable = []
@@ -534,6 +532,8 @@ class Sandbox:
                 
             curr_RS.clean()
             logging.debug("{}: Looking for ER with same transformation + input SDs".format(fn))
+
+            # FIXME: SD generated from the previous step wasn't checked and so cannot be used
             curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
 
             if curr_ER != None:
@@ -561,7 +561,7 @@ class Sandbox:
                         corresp_SD = corresp_ero.symbolicdataset
                         corresp_path = output_paths[step_output.dataset_idx-1]
 
-                        logger.debug("{}: Updating sd_fs and socket maps".format(fn))
+                        logging.debug("{}: Updating sd_fs and socket maps".format(fn))
                         if corresp_SD not in self.sd_fs_map:
                             self.sd_fs_map[corresp_SD] = corresp_path
                         self.socket_map[(pipelinestep, step_output)] = corresp_SD
@@ -785,6 +785,7 @@ class Sandbox:
                 logging.debug("{}: New data - performing content check".format(fn))
                 summary_path = "{}_summary".format(output_path)
 
+                # CCL is generated
                 ccl = output_SD.check_file_contents(
                         output_path, summary_path,
                         curr_output.get_min_row(), curr_output.get_max_row(),

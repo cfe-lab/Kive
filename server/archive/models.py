@@ -376,8 +376,12 @@ class RunStep(models.Model):
                 "RunStep \"{}\" points to transformation \"{}\" but corresponding ER does not".
                 format(self, self.pipelinestep))
 
-        # November 18, 2013: get the missing outputs.
-        outputs_missing = self.log.all()[0].missing_outputs()
+
+        # If there is no exec log there is no notion of missing outputs
+        outputs_missing = []
+        if self.log.all().exists():
+            outputs_missing = self.log.all().first().missing_outputs()
+
 
         # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(
@@ -534,6 +538,8 @@ class RunSIC(models.Model):
         import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        logging.debug("{}: Initiating".format(fn))
+
         if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
             raise ValidationError(
@@ -614,46 +620,66 @@ class RunSIC(models.Model):
                 format(self.PSIC))
 
         # Check whether this has a missing output.
-        logging.debug("{}: Checking RunSIC's log".format(fn))
-        missing_output = len(self.log.first().missing_outputs()) != 0
+        logging.debug("{}: Checking RunSIC's ExecLog".format(fn))
 
-        # If the output of this PSIC is not marked to keep, there should be
-        # no data associated.
-        if not self.PSIC.keep_output:
-            if self.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" does not keep its output; no data should be produced".
-                    format(self))
+        if self.log.exists():
+            missing_output = len(self.log.first().missing_outputs()) != 0
 
-
-        # Similar if the ExecLog shows missing output.
-        elif missing_output:
-            if self.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" had a missing output; no data should be produced".
-                    format(self))
-            
-        else:
-            # The corresponding ERO should have existent data.
-            corresp_ero = self.execrecord.execrecordouts.all()[0]
-            if not corresp_ero.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" keeps its output; ExecRecordOut \"{}\" should reference existent data".
-                    format(self, corresp_ero))
-
-            # If reused == False and the cable is not trivial,
-            # there should be associated data, and it should match that
-            # of corresp_ero.
-            if not self.reused and not self.PSIC.is_trivial():
-                if not self.has_data():
+            # If output of PSIC not marked as kept, there shouldn't be a dataset
+            if not self.PSIC.keep_output:
+                if self.has_data():
                     raise ValidationError(
-                        "RunSIC \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                        "RunSIC \"{}\" doesn't keep its output but a dataset was registered".
                         format(self))
 
-                if corresp_ero.symbolicdataset.dataset != self.output.all()[0]:
+            # If EL shows missing output
+            elif missing_output:
+                if self.has_data():
                     raise ValidationError(
-                        "Dataset \"{}\" was produced by RunSIC \"{}\" but is not in an ERO of ExecRecord \"{}\"".
-                        format(self.output.all()[0], self, self.execrecord))
+                        "RunSIC \"{}\" had missing output but a dataset was registered".
+                        format(self))
+
+            else:
+                # The corresponding ERO should have existent data.
+                corresp_ero = self.execrecord.execrecordouts.all()[0]
+                if not corresp_ero.has_data():
+                    raise ValidationError(
+                        "RunSIC \"{}\" keeps its output; ExecRecordOut \"{}\" should reference existent data".
+                        format(self, corresp_ero))
+
+                # If reused == False and the cable is not trivial,
+                # there should be associated data, and it should match that
+                # of corresp_ero.
+                if not self.reused and not self.PSIC.is_trivial():
+                    if not self.has_data():
+                        raise ValidationError(
+                            "RunSIC \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                            format(self))
+
+                    if corresp_ero.symbolicdataset.dataset != self.output.all()[0]:
+                        raise ValidationError(
+                            "Dataset \"{}\" was produced by RunSIC \"{}\" but is not in an ERO of ExecRecord \"{}\"".
+                            format(self.output.all()[0], self, self.execrecord))
+
+        # Case: RSIC has no log
+        else:
+
+            # Case 1: Completely recycled ER (reused = true): it should not have an RSIC.output (No registered dataset)
+            if self.reused and self.output.exists():
+                raise ValidationError("RunSIC '{}' was reused but has a registered dataset")
+
+            # Case 2: Still executing (reused = false): there should be no RSIC.output and no ER
+            if not self.reused:
+                if self.output.all().exists():
+                    raise ValidationError("RunSIC '{}' not reused and has no log, but has a dataset output")
+                if self.execrecord.all().exists():
+                    raise ValidationError("RunSIC '{}' not reused and has no log, but has an ER")
+
+
+
+
+
+
 
     def is_complete(self):
         """True if RunSIC is complete; false otherwise."""
@@ -1086,7 +1112,7 @@ class ExecLog(models.Model):
                 format(self))
 
     def missing_outputs(self):
-        """Returns the output SDs missing output from this execution."""
+        """Returns output SDs missing output from this execution."""
         import csv, inspect, logging
         fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
 

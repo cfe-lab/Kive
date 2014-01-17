@@ -153,28 +153,30 @@ class SymbolicDataset(models.Model):
         This calls [CDT].summarize_CSV on the file and creates a
         ContentCheckLog.
         
-        Returns the completed ContentCheckLog, and associates it with
-        execlog.  If the file does not have a badly-formed header, it
+        Returns completed CCL and associates it with the EL
+
+        If file does not have a badly-formed header, it
         also sets this SD's num_rows.
 
-        FIXME this should probably be invoked within a transaction!
+        FIXME: use a transaction!
         """
         import datachecking.models, inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        logging.debug("{}: Creating clean CCL and linking to EL".format(fn))
+        ccl = self.content_checks.create(execlog=execlog)
+
         if self.is_raw():
-            logging.debug("{}: SD is raw, creating clean CCL".format(fn))
-            ccl = self.content_checks.create(execlog=execlog)
+            logging.debug("{}: SD is raw - returning clean CCL".format(fn))
             ccl.clean()
             return ccl
 
-        logging.debug("{}: SD is not raw, checking CSV".format(fn))
+        logging.debug("{}: SD not raw, checking CSV".format(fn))
         csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path)
-        ccl = self.content_checks.create(execlog=execlog)
-        
+
         # Check for a malformed header (and thus a malformed file).
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_header=True)
@@ -253,16 +255,24 @@ class SymbolicDataset(models.Model):
         Check that this SD has been checked for integrity and contents,
         and that they have never failed either such test.
         """
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
         icls = self.integrity_checks.all()
         ccls = self.content_checks.all()
-        if not icls.exists() or not ccls.exists():
+
+        # Neither an integrity check nor a content check has been performed
+        if not icls.exists() and not ccls.exists():
+            logging.debug("{}: SD '{}' may not be OK - Neither integrity nor content check performed".format(fn, self))
             return False
 
         for icl in icls:
             if icl.is_fail():
+                logging.debug("{}: SD '{}' failed integrity check".format(fn, self))
                 return False
         for ccl in ccls:
             if ccl.is_fail():
+                logging.debug("{}: SD '{}' failed content check".format(fn, self))
                 return False
 
         # At this point, we are comfortable with this SD.
@@ -456,14 +466,23 @@ class ExecRecord(models.Model):
     def provides_outputs(self, outputs):
         """
         Checks whether this ER has existent data for these outputs.
-        
-        outputs is an iterable of TOs that we want the ER to have real
-        data for.
-        """    
+        outputs: an iterable of TOs we want the ER to have real data for.
+        """
+
+        import inspect, logging
+        fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
+
+        # Load each TO in outputs
         for curr_output in outputs:
-            corresp_ero = self.execrecordouts.get(generic_output=curr_output)
-            if not corresp_ero.has_data():
+
+            type = ContentType.objects.get_for_model(curr_output)
+            corresp_ero = self.execrecordouts.filter(content_type=type, object_id=curr_output.id)
+
+            if not corresp_ero.first().has_data():
+                logging.debug("{}: corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested".format(fn))
                 return False
+
+        logging.debug("{}: all outputs needed have corresponding EROs with data".format(fn))
         return True
 
     def outputs_OK(self):
@@ -735,8 +754,8 @@ class ExecRecordOut(models.Model):
 
         # Check that the SD is compatible with generic_output.
 
-        logging.debug("{}: ERO SD is raw? {}".format(fn, self.symbolicdataset.is_raw()))
-        logging.debug("{}: ERO generic_output is raw? {}".format(fn, self.generic_output.is_raw()))
+        logging.debug("{}: ERO SD '{}' is raw? {}".format(fn, self.symbolicdataset, self.symbolicdataset.is_raw()))
+        logging.debug("{}: ERO generic_output '{}' is raw? {}".format(fn, self.generic_output, self.generic_output.is_raw()))
 
         # If SD is raw, the ERO output TO must also be raw
         if self.symbolicdataset.is_raw() != self.generic_output.is_raw():

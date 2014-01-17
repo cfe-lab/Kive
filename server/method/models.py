@@ -439,15 +439,23 @@ class Method(transformation.models.Transformation):
         import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        logging.debug("{}: Considering all pipeline steps featuring this method...".format(fn))
+
         # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
+            logging.debug("{}: Considering pipeline step '{}'".format(fn, possible_PS))
 
             # For linked runsteps which did not *completely* reuse an ER
             for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
+                logging.debug("{}: Considering non-reused runstep '{}'".format(fn,possible_RS))
+
                 candidate_ER = possible_RS.execrecord
 
                 if not candidate_ER.outputs_OK():
+                    logging.debug("{}: Rejecting runstep, outputs not OK".format(fn))
                     continue
+
+
                 logging.debug("{}: Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match".format(fn))
 
                 ER_matches = True
@@ -458,7 +466,7 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    logging.debug("{}: All ERIs match input SDs - commiting to candidate ER {}".format(candidate_ER))
+                    logging.debug("{}: All ERIs match input SDs - comitting to candidate ER {}".format(fn, candidate_ER))
                     return candidate_ER
     
         logging.debug("{}: No compatible ERs found".format(fn))
