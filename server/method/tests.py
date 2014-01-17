@@ -375,13 +375,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_4_1_M.save()
 
         # A shorter alias
-        self.testmethod = self.script_4_1_M;
-
-        ####
-        # Stuff from this point on is used in testing librarian and
-        # archive.
-
-        
+        self.testmethod = self.script_4_1_M
 
 class CodeResourceTests(MethodTestSetup):
      

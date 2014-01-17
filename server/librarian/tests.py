@@ -8,7 +8,12 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 
+import random
+import tempfile
+import os.path
+
 import file_access_utils
+from messages import error_messages
 
 from archive.models import *
 from pipeline.models import *
@@ -283,10 +288,164 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         return self.ER_from_record(myRSIC)
 
 class SymbolicDatasetTests(LibrarianTestSetup):
+
+    def setUp(self):
+        super(SymbolicDatasetTests, self).setUp()
+
+        rows = 10
+        seqlen = 10
+
+        self.data = ""
+        for i in range(rows):
+            seq = "".join([random.choice("ATCG") for j in range(seqlen)])
+            self.data += "patient{},{}\n".format(i, seq)
+        self.header = "header,sequence"
+
+        self.datatype_dna = Datatype(name="DNA", 
+            description="sequences of ATCG", Python_type=Datatype.STR)
+        self.datatype_dna.clean()
+        self.datatype_dna.save()
+        self.datatype_str = Datatype(name="string", 
+            description="sequences of ASCII characters", 
+            Python_type=Datatype.STR)
+        self.datatype_str.clean()
+        self.datatype_str.save()
+        self.cdt_record = CompoundDatatype()
+        self.cdt_record.save()
+        self.cdt_record.members.create(datatype=self.datatype_str, 
+            column_name="header", column_idx=1)
+        self.cdt_record.members.create(datatype=self.datatype_dna,
+            column_name="sequence", column_idx=2)
+        self.cdt_record.clean()
+
+        self.data_file = tempfile.NamedTemporaryFile(delete=False)
+        self.data_file.write(self.header + "\n" + self.data)
+        self.file_path = self.data_file.name
+        self.data_file.close()
+
+        self.dsname = "good data"
+        self.dsdesc = "some headers and sequences"
+        self.sym_dataset = SymbolicDataset.create_SD(file_path = self.file_path,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = self.dsname, description = self.dsdesc)
     
     def test_is_raw(self):
         self.assertEqual(self.triplet_symDS.is_raw(), False)
         self.assertEqual(self.raw_symDS.is_raw(), True)
+
+    def test_forgot_header(self):
+        """
+        Symbolic dataset creation with a CDT fails when the header is left off
+        the data file.
+        """
+        # Write the data with no header.
+        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file.write(self.data)
+        data_file.close()
+
+        # Try to create a symbolic dataset.
+        self.assertRaisesRegexp(ValueError,
+            error_messages["header_mismatch"].format(".*", ".*", ".*"),
+            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = "lab data", description = "patient sequences"))
+
+        os.remove(data_file.name)
+
+    def test_empty_file(self):
+        """
+        SymbolicDataset creation fails if the file passed is empty.
+        """
+        data_file = tempfile.NamedTemporaryFile(delete=False)
+        file_path = data_file.name
+        data_file.close()
+
+        self.assertRaisesRegexp(ValueError,
+            error_messages["empty_file"].format(".*"),
+            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = "missing data", description = "oops!"))
+
+    def test_no_data(self):
+        """
+        Symbolic dataset creation fails if the file has a header but no data.
+        """
+        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file.write("header,sequence")
+        file_path = data_file.name
+        data_file.close()
+
+        self.assertRaisesRegexp(ValueError,
+            error_messages["no_data"].format(".*"),
+            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = "missing data", description = "oops!"))
+
+    def test_too_many_columns(self):
+        """
+        Symbolic dataset creation fails if the data file has too many
+        columns.
+        """
+        data_file = tempfile.NamedTemporaryFile(delete=False)
+        header = "header,sequence,extra"
+        data = "foo,bar,baz"
+        data_file.write(header + "\n" + data)
+        file_path = data_file.name
+        data_file.close()
+
+        self.assertRaisesRegexp(ValueError,
+            error_messages["header_mismatch"].format(".*", self.header, header),
+            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = "bad data", description = "too many columns"))
+
+    def test_dataset_created(self):
+        """
+        Test coherence of the Dataset created alongsite a SymbolicDataset.
+        """
+        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file.write(self.header + "\n" + self.data)
+        file_path = data_file.name
+        data_file.close()
+
+        dsname = "good data"
+        dsdesc = "some headers and sequences"
+        sym_dataset = SymbolicDataset.create_SD(file_path = data_file.name,
+                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
+                name = dsname, description = dsdesc)
+        dataset = sym_dataset.dataset
+        self.assertEqual(dataset.clean(), None)
+        self.assertEqual(dataset.user, self.myUser)
+        self.assertEqual(dataset.name, dsname)
+        self.assertEqual(dataset.description, dsdesc)
+        self.assertEqual(dataset.date_created.date(), timezone.now().date())
+        self.assertEqual(dataset.date_created < timezone.now(), True)
+        self.assertEqual(dataset.symbolicdataset, sym_dataset)
+        self.assertEqual(dataset.created_by, None)
+        self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_path))
+
+    def test_dataset_created(self):
+        """
+        Test coherence of the Dataset created alongsite a SymbolicDataset.
+        """
+        dataset = self.sym_dataset.dataset
+        self.assertEqual(dataset.clean(), None)
+        self.assertEqual(dataset.user, self.myUser)
+        self.assertEqual(dataset.name, self.dsname)
+        self.assertEqual(dataset.description, self.dsdesc)
+        self.assertEqual(dataset.date_created.date(), timezone.now().date())
+        self.assertEqual(dataset.date_created < timezone.now(), True)
+        self.assertEqual(dataset.symbolicdataset, self.sym_dataset)
+        self.assertEqual(dataset.created_by, None)
+        self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(self.file_path))
+
+    def test_symds_creation(self):
+        """
+        Test coherence of newly created SymbolicDataset.
+        """
+        self.assertEqual(self.sym_dataset.clean(), None)
+        self.assertEqual(self.sym_dataset.has_data(), True)
+        self.assertEqual(self.sym_dataset.is_raw(), False)
 
 class DatasetStructureTests(LibrarianTestSetup):
 
@@ -544,7 +703,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
         # Good case: input SymbolicDataset has the CDT of
         # generic_input.
-        self.assertEquals(mC_ER_in_1.clean(), None)
+        self.assertEqual(mC_ER_in_1.clean(), None)
 
         # Good case: input SymbolicDataset has an identical CDT of
         # generic_input.
@@ -559,12 +718,12 @@ class ExecRecordTests(LibrarianTestSetup):
                                         column_name="c", column_idx=3)
 
         self.C1_in_symDS.structure.compounddatatype = other_CDT
-        self.assertEquals(mC_ER_in_1.clean(), None)
+        self.assertEqual(mC_ER_in_1.clean(), None)
 
         # Good case: proper restriction.
         col1.datatype = self.DNA_dt
         col2.datatype = self.RNA_dt
-        self.assertEquals(mC_ER_in_1.clean(), None)
+        self.assertEqual(mC_ER_in_1.clean(), None)
 
         # Bad case: a type that is not a restriction at all.
         self.C1_in_symDS.structure.compounddatatype = self.doublet_cdt
@@ -584,7 +743,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
         # Good case: output SymbolicDataset has the CDT of
         # generic_output.
-        self.assertEquals(mA_ERO.clean(), None)
+        self.assertEqual(mA_ERO.clean(), None)
 
         # Bad case: output SymbolicDataset has an identical CDT.
         other_CDT = CompoundDatatype()
@@ -620,7 +779,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset=self.E1_out_symDS)
 
         # Good case: output SymbolicDataset has the CDT of generic_output.
-        self.assertEquals(outcable_ERO.clean(), None)
+        self.assertEqual(outcable_ERO.clean(), None)
 
         # Good case: output SymbolicDataset has an identical CDT.
         other_CDT = CompoundDatatype()
@@ -632,7 +791,7 @@ class ExecRecordTests(LibrarianTestSetup):
         
         self.E1_out_symDS.structure.compounddatatype = other_CDT
         self.E1_out_symDS.structure.save()
-        self.assertEquals(outcable_ERO.clean(), None)
+        self.assertEqual(outcable_ERO.clean(), None)
 
         # Bad case: output SymbolicDataset has a CDT that is a restriction of
         # generic_output.
@@ -660,7 +819,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset=self.doublet_symDS)
 
         # Good case: output Dataset has the CDT of generic_output.
-        self.assertEquals(cable_ERO.clean(), None)
+        self.assertEqual(cable_ERO.clean(), None)
 
         # Good case: output Dataset has an identical CDT.
         other_CDT = CompoundDatatype()
@@ -672,13 +831,13 @@ class ExecRecordTests(LibrarianTestSetup):
         
         self.doublet_symDS.structure.compounddatatype = other_CDT
         self.doublet_symDS.structure.save()
-        self.assertEquals(cable_ERO.clean(), None)
+        self.assertEqual(cable_ERO.clean(), None)
 
         # Good case: output Dataset has a CDT that is a restriction of
         # generic_output.
         col1.datatype = self.DNA_dt
         col1.save()
-        self.assertEquals(cable_ERO.clean(), None)
+        self.assertEqual(cable_ERO.clean(), None)
 
         # Bad case: output Dataset has another CDT altogether.
         cable_ERO.symbolicdataset = self.singlet_symDS
@@ -699,7 +858,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset = self.singlet_symDS)
 
         # Good case: SDs on either side of this trivial cable match.
-        self.assertEquals(cable_ER.clean(), None)
+        self.assertEqual(cable_ER.clean(), None)
 
         # Bad case: SDs don't match.
         cable_ERO.symbolicdataset = self.C1_out_symDS
@@ -722,7 +881,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset = self.C1_out_symDS)
 
         # Good case: SDs on either side of this trivial POC match.
-        self.assertEquals(outcable_ER.clean(), None)
+        self.assertEqual(outcable_ER.clean(), None)
 
         # Bad case: SDs don't match.
         outcable_ERO.symbolicdataset = self.singlet_symDS
@@ -745,7 +904,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset=self.E1_out_symDS)
 
         # Good case: the Datatypes are exactly those needed.
-        self.assertEquals(outcable_ER.clean(), None)
+        self.assertEqual(outcable_ER.clean(), None)
 
         # Good case: same as above, but with CDTs that are restrictions.
         D1_out_structure = self.D1_out.structure.all()[0]
@@ -759,7 +918,7 @@ class ExecRecordTests(LibrarianTestSetup):
         outcable_ERI.save()
         outcable_ERO.symbolicdataset = self.E21_41_DNA_doublet_symDS
         outcable_ERO.save()
-        self.assertEquals(outcable_ER.clean(), None)
+        self.assertEqual(outcable_ER.clean(), None)
 
         # Bad case: cable does some casting.
         output_col1 = (self.E21_41_DNA_doublet_symDS.structure.compounddatatype.
@@ -783,7 +942,7 @@ class ExecRecordTests(LibrarianTestSetup):
             symbolicdataset=self.D1_in_symDS)
 
         # Good case: the Datatypes are exactly those needed.
-        self.assertEquals(cable_ER.clean(), None)
+        self.assertEqual(cable_ER.clean(), None)
 
         # Good case: same as above, but with CDTs that are restrictions.
         in_structure = self.E1_in.structure.all()[0]
@@ -797,7 +956,7 @@ class ExecRecordTests(LibrarianTestSetup):
         cable_ERI.save()
         cable_ERO.symbolicdataset = self.E01_21_DNA_doublet_symDS
         cable_ERO.save()
-        self.assertEquals(cable_ER.clean(), None)
+        self.assertEqual(cable_ER.clean(), None)
 
         # Bad case: cable does some casting.
         output_col1 = (self.E01_21_DNA_doublet_symDS.structure.

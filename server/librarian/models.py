@@ -15,6 +15,7 @@ from django.core.files import File
 import re
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import file_access_utils, logging_utils
+from messages import error_messages
 
 class SymbolicDataset(models.Model):
     """
@@ -96,11 +97,26 @@ class SymbolicDataset(models.Model):
         """
         cdt = None if self.is_raw() else self.structure.compounddatatype
         return cdt
+
+    @classmethod
+    def _validate_csv_summary(self, file_path, cdt, summary):
+        """
+        Check the output of summarize_CSV for errors.
+        """
+        if len(summary) == 0:
+            raise ValueError(error_messages["empty_file"].format(file_path))
+        if "bad_col_indices" in summary or "bad_num_cols" in summary:
+            expected_header = ",".join([m.column_name for m in cdt.members.all()])
+            raise ValueError(
+                error_messages["header_mismatch"].format(file_path, 
+                  expected_header, ",".join(summary["header"])))
+        if summary["num_rows"] == 0:
+            raise ValueError(error_messages["no_data"].format(file_path))
         
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
+    def create_SD(self, file_path, cdt=None, make_dataset=True, user=None,
                   name=None, description=None):
         """
         Helper function to make defining SDs and Datasets faster.
@@ -118,13 +134,13 @@ class SymbolicDataset(models.Model):
         symDS.save()
     
         structure = None
-        if cdt != None:
+        if cdt is not None:
             structure = DatasetStructure(symbolicdataset=symDS,
                                          compounddatatype=cdt)
             
             with open(file_path, "rb") as f:
                 CSV_summary = cdt.summarize_CSV(f, "/tmp/SD{}".format(symDS.pk))
-                #print CSV_summary
+                self._validate_csv_summary(file_path, cdt, CSV_summary)
                 structure.num_rows = CSV_summary["num_rows"]
             structure.save()
     
