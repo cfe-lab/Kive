@@ -350,10 +350,12 @@ class PipelineStep(models.Model):
     def outputs_to_retain(self):
         """Returns a list of TOs this PipelineStep doesn't delete."""
         outputs_needed = []
-        
+
+        # Checking each TO of this PS and maintain TOs marked to be deleted
         for step_output in self.transformation.outputs.all():
-            if not self.outputs_to_delete.filter(
-                    step_output).exists():
+
+            # Check if for this pipeline step we want to delete TO step_output
+            if not self.outputs_to_delete.filter(pk=step_output.pk).exists():
                 outputs_needed.append(step_output)
                 
         return outputs_needed
@@ -782,31 +784,27 @@ class PipelineStepInputCable(models.Model):
         # Having reached this point, we know that the wiring matches.
         return True
 
-    # NOTE October 15, 2013: is this actually that useful?  I think
-    # we're going to need is_compatible_given_input more.
     def is_compatible(self, other_cable, source_CDT):
         """
         Checks if a cable is compatible wrt specified CDT.
         
-        The specified cable and this one are compatible if:
-         - both can be fed by source_CDT
-         - both feed the same TransformationInput
-         - both are trivial, or the wiring matches
+        Cables are compatible if:
+         - Both can be fed by source_CDT
+         - Both feed the same TransformationInput
+         - Both are trivial, or the wiring matches
         
         For two cables' wires to match, any wire connecting column
         indices (source_idx, dest_idx) must appear in both cables.
 
         PRE: self, other_cable are clean.
         """
-        # Both cables can be fed by source_CDT if source_CDT is
-        # a restriction of their sources' CDTs.
-        if (not source_CDT.is_restriction(self.source.get_cdt()) or
-                not source_CDT.is_restriction(
-                    other_cable.source.get_cdt())):
+        # Both cables can be fed by source_CDT if source_CDT is a restriction of their CDTs
+        other_CDT = other_cable.source.get_cdt()
+
+        if not source_CDT.is_restriction(source_CDT) or not source_CDT.is_restriction(other_CDT):
             return False
         
-        # After this point, all of the checks are the same as for
-        # is_compatible_given_input.
+        # After this point, all checks are the same as for is_compatible_given_input
         return self.is_compatible_given_input(other_cable)
 
     def is_compatible_given_input(self, other_cable):
@@ -1193,17 +1191,25 @@ class PipelineOutputCable(models.Model):
 
         if self.is_trivial() and other_outcable.is_trivial():
             return True
+        elif self.is_trivial() != other_outcable.is_trivial():
+            return False
+
 
         # We know they are fed by the same TransformationOutput
         # and are non-trivial.  As such, we have to check that
         # their wiring matches.
+
+
+        # FIXME: THIS MAY NEED SOME WORK
+
         for wire in self.custom_outwires.all():
             # Get the corresponding wire in other_outcable.
-            corresp_wire = other_outcable.custom_outwires.get(
-                dest_pin=wire.dest_pin)
+            corresp_wires = other_outcable.custom_outwires.filter(source_pin=wire.source_pin)
 
-            if (wire.source_pin.column_idx !=
-                    corresp_wire.source_pin.column_idx):
+
+
+            # FIXME: Do they map to the same name?
+            if wire.source_pin.column_idx != corresp_wire.source_pin.column_idx:
                 return False
 
         # By the fact that self and other_outcable are clean, we know
