@@ -65,9 +65,7 @@ class CodeResource(models.Model):
         numbers, dash, underscore, paranthesis, and space.
         """
         
-        if self.isValidFileName():
-            pass
-        else:
+        if not self.isValidFileName():
             raise ValidationError("Invalid code resource filename");
 
 

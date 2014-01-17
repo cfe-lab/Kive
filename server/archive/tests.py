@@ -5,11 +5,19 @@ Shipyard archive application unit tests.
 from django.test import TestCase
 from django.core.files import File
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 import os
+import tempfile
+import random
+
 from librarian.models import *
 from archive.models import *
+from method.models import *
+from metadata.models import *
+from method.tests import samplecode_path
 import librarian.tests
+from messages import error_messages
 
 # Note that these tests use the exact same setup as librarian.
 
@@ -47,13 +55,17 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
 
         # Bad case (propagation): define an RSIC that is not complete.
         E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS)
-        E03_11_ER = self.E03_11.execrecords.create()
+        E03_11_EL = E03_11_RSIC.log.create(end_time=timezone.now())
+        E03_11_EL.save()
+        E03_11_ER = ExecRecord(generator=E03_11_EL)
+        E03_11_ER.save()
         E03_11_ER.execrecordins.create(generic_input=self.E3_rawin,
                                        symbolicdataset=self.raw_symDS)
         E03_11_ER.execrecordouts.create(generic_output=self.A1_rawin,
                                         symbolicdataset=self.raw_symDS)
 
         E03_11_RSIC.reused = False
+        E03_11_RSIC.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunSIC .* has no ExecRecord",
@@ -86,7 +98,8 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         # Bad case: cables not quenched, but execrecord is set
         step_E1_RS.reused = None
         # Define ER for mA
-        mA_ER = self.mA.execrecords.create()
+        mA_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
+        mA_ER = self.ER_from_record(mA_RS)
         mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                               generic_input=self.A1_rawin)
         mA_ER_out = mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
@@ -122,7 +135,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         # Quench cables for step E2 as well.
         E01_21_RSIC = self.E01_21.psic_instances.create(
             runstep = step_E2_RS, reused=False)
-        E01_21_ER = self.E01_21.execrecords.create()
+        E01_21_ER = self.ER_from_record(E01_21_RSIC)
         E01_21_ER.execrecordins.create(generic_input=self.E1_in,
                                        symbolicdataset=self.triplet_symDS)
         E01_21_ER.execrecordouts.create(generic_output=self.D1_in,
@@ -132,7 +145,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
 
         E02_22_RSIC = self.E02_22.psic_instances.create(
             runstep=step_E2_RS, reused=False)
-        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER = self.ER_from_record(E02_22_RSIC)
         E02_22_ER.execrecordins.create(generic_input=self.E2_in,
                                        symbolicdataset=self.singlet_symDS)
         E02_22_ER.execrecordouts.create(generic_output=self.D2_in,
@@ -159,26 +172,32 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
             ValidationError,
             "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
             step_E1_RS.clean)
-        pD_ER = self.pD.execrecords.create()
-        step_E2_RS.execrecord = pD_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
-            step_E2_RS.clean)
-        # Proceeding....
+
+        # Jan 14: not necessary anymore, since ExecRecords can no longer point to pipelines. -Rosemary
+        pD_ER = self.ER_from_record(step_D1_RS)
+        #step_E2_RS.execrecord = pD_ER
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
+        #    step_E2_RS.clean)
+        ## Proceeding....
         step_E1_RS.execrecord = None
         step_E2_RS.execrecord = None
+        step_E2_RS.reused = None
 
+        # Jan 14: this exception doesn't appear in the code anymore. Is this no longer
+        # a restriction? -Rosemary
         # Bad case: PS is a Pipeline, reused is not set, child_run is set.
-        pD_run.parent_runstep = step_E2_RS
-        pD_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; child_run should not be set",
-            step_E2_RS.clean)
-        # Proceeding....
-        pD_run.parent_runstep = None
-        pD_run.save()
+        #pD_run.parent_runstep = step_E2_RS
+        #pD_run.save()
+        #step_E2_RS.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* has not decided whether or not to reuse an ExecRecord; child_run should not be set",
+        #    step_E2_RS.clean)
+        ## Proceeding....
+        #pD_run.parent_runstep = None
+        #pD_run.save()
 
         # Bad case: reused = True, there is data associated to this RS.
         step_E1_RS.reused = True
@@ -186,19 +205,26 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.doublet_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* reused an ExecRecord and should not have generated any data",
+            "RunStep .* reused an ExecRecord and should not have generated any Datasets",
             step_E1_RS.clean)
 
+        # Jan 14: This exception doesn't appear in the code anymore. Replaced with a test for
+        # being a sub-pipeline and being reused (which can't happen?).
         # Bad case: reused = True and child_run is set.
         step_E2_RS.reused = True
-        pD_run.parent_runstep = step_E2_RS
-        pD_run.save()
+        #pD_run.parent_runstep = step_E2_RS
+        #pD_run.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* reused an ExecRecord and should not have a child run",
+        #    step_E2_RS.clean)
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* reused an ExecRecord and should not have a child run",
+            "RunStep .* represents a sub-pipeline so reused should not be set",
             step_E2_RS.clean)
 
         # Reset....
+        step_E2_RS.reused = None
         self.doublet_DS.created_by = None
         self.doublet_DS.save()
         pD_run.parent_runstep = None
@@ -207,6 +233,16 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         # Good case: reused = True and ER is not.
         self.assertEquals(step_E1_RS.clean(), None)
         self.assertEquals(step_E2_RS.clean(), None)
+
+        # Create ExecLogs with associated MethodOutputs for RunSteps.
+        step_E1_EL = step_E1_RS.log.create(end_time = timezone.now())
+        step_E2_EL = step_E2_RS.log.create(end_time = timezone.now())
+        step_E1_MO = MethodOutput(execlog=step_E1_EL, return_code = 0)
+        step_E2_MO = MethodOutput(execlog=step_E2_EL, return_code = 0)
+        step_E1_MO.save()
+        step_E2_MO.save()
+        step_E1_EL.methodoutput = step_E1_MO
+        step_E2_EL.methodoutput = step_E2_MO
         
         # Bad propagation case: reused = False and associated data is not clean.
         step_E1_RS.reused = False
@@ -225,8 +261,29 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.doublet_symDS.save()
         self.assertEquals(step_E1_RS.clean(), None)
 
+        # Jan 15: This scenario is no longer good, since ExecLogs are now only 
+        # associated with atomic transformations, but step_E2 is a sub-pipeline.
+        # Replaced with a test that sub-pipelines can't have ExecLogs, nor can
+        # they set reused (why the second one?). -Rosemary
         # Good propagation case for E2: reused = False and no child run is set.
         step_E2_RS.reused = False
+        #self.assertEquals(step_E2_RS.clean(), None)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* represents a sub-pipeline so no log should be associated",
+            step_E2_RS.clean)
+
+        # Remove the log, should still fail because reused is set.
+        step_E2_RS.log = step_E2_RS.log.none()
+        step_E2_RS.save()
+        self.assertRaisesRegexp(
+            ValidationError,
+            "RunStep .* represents a sub-pipeline so reused should not be set",
+            step_E2_RS.clean)
+
+        # Good case: sub-pipeline with no log and unset reused.
+        step_E2_RS.reused = None
+        step_E2_RS.save()
         self.assertEquals(step_E2_RS.clean(), None)
 
         # Good case: child run is set and clean.
@@ -234,16 +291,17 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         pD_run.save()
         self.assertEquals(step_E2_RS.clean(), None)
 
+        # Jan 15: No longer relevant, since Runs can't have ExecRecords anymore. -Rosemary
         # Bad propagation case: child run is set but not clean.
-        pD_run.execrecord = pD_ER
-        pD_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
-            step_E2_RS.clean)
-        # Reset....
-        pD_run.execrecord = None
-        pD_run.save()
+        #pD_run.execrecord = pD_ER
+        #pD_run.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
+        #    step_E2_RS.clean)
+        ## Reset....
+        #pD_run.execrecord = None
+        #pD_run.save()
 
         # Bad case: child run is set and clean, but there is data
         # associated with the RunStep.
@@ -251,7 +309,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.C1_in_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* has a child run so should not have generated any data",
+            "RunStep .* represents a sub-pipeline and should not have generated any data",
             step_E2_RS.clean)
         # Reset....
         self.C1_in_DS.created_by = None
@@ -263,7 +321,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         step_E2_RS.execrecord = pD_ER
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* has a child run so execrecord should not be set",
+            "RunStep .* represents a sub-pipeline so execrecord should not be set",
             step_E2_RS.clean)
 
         # Reset....
@@ -278,20 +336,19 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
             "Input\(s\) to ExecRecord .* are not quenched",
             step_E1_RS.clean)
 
-        pD_run.reused = True
-        pD_run.execrecord = pD_ER
-        pD_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            step_E2_RS.clean)
+        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
+        # an ExecRecord. -Rosemary
+        #pD_run.reused = True
+        #pD_run.execrecord = pD_ER
+        #pD_run.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "Input\(s\) to ExecRecord .* are not quenched",
+        #    step_E2_RS.clean)
 
         # Reset....
-        pD_run.parent_runstep = None
-        pD_run.save()
-        step_E2_RS.reused = True
-        step_E2_RS.execrecord = pD_ER
-        step_E2_RS.save()
+        #pD_run.parent_runstep = None
+        #pD_run.save()
         
         # Good propagation cases: ERs are complete, outputs are not deleted, all
         # associated data belongs to an ERO of this ER (i.e. this case proceeds
@@ -309,21 +366,27 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.assertEquals(step_E2_RS.clean(), None)
         
         # Bad case: ER points to the wrong transformation.
-        step_E1_RS.execrecord = pD_ER
-        step_E2_RS.execrecord = mA_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* points to transformation .* but corresponding ER does not",
-            step_E1_RS.clean)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* points to transformation .* but corresponding ER does not",
-            step_E2_RS.clean)
+        # Jan 15: TODO The data types are checked first, making this exception hard to reach.
+        # To test this, I have to make two methods with the same inputs and outputs.
+        #step_E1_RS.execrecord = pD_ER
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* points to transformation .* but corresponding ER does not",
+        #    step_E1_RS.clean)
+
+        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
+        # an ExecRecord. -Rosemary
+        #step_E2_RS.execrecord = mA_ER
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* points to transformation .* but corresponding ER does not",
+        #    step_E2_RS.clean)
+        #step_E2_RS.execrecord = pD_ER
+        #step_E2_RS.save()
+
         # Reset....
-        step_E1_RS.execrecord = mA_ER
-        step_E1_RS.save()
-        step_E2_RS.execrecord = pD_ER
-        step_E2_RS.save()
+        #step_E1_RS.execrecord = mA_ER
+        #step_E1_RS.save()
 
         # Bad case: step E1's output is marked for deletion, and step
         # is not reused, but there is an associated Dataset.
@@ -337,10 +400,15 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         # Bad case: output not deleted, but ERO has no existent data.
         self.step_E1.outputs_to_delete.remove(
             self.mA.outputs.get(dataset_name="A1_out"))
+        self.step_E1.save()
         empty_symDS = SymbolicDataset()
         empty_symDS.save()
+        structure = DatasetStructure(symbolicdataset=empty_symDS, compounddatatype=self.doublet_cdt)
+        structure.save()
+        empty_symDS.structure = structure
         mA_ER_out.symbolicdataset = empty_symDS
         mA_ER_out.save()
+
         self.assertRaisesRegexp(
             ValidationError,
             "ExecRecordOut .* of RunStep .* should reference existent data",
@@ -349,26 +417,29 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         mA_ER_out.symbolicdataset = self.doublet_symDS
         mA_ER_out.save()
 
-        pD_ER_out.symbolicdataset = empty_symDS
-        pD_ER_out.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of RunStep .* should reference existent data",
-            step_E2_RS.clean)
+        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
+        # an ExecRecord. -Rosemary
+        #pD_ER_out.symbolicdataset = empty_symDS
+        #pD_ER_out.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "ExecRecordOut .* of RunStep .* should reference existent data",
+        #    step_E2_RS.clean)
         # Reset....
-        pD_ER_out.symbolicdataset = self.C1_in_symDS
-        pD_ER_out.save()
+        #pD_ER_out.symbolicdataset = self.C1_in_symDS
+        #pD_ER_out.save()
 
         # Bad case: ER is not reused, output was not deleted, but no Dataset is associated.
-        self.doublet_DS.created_by = None
-        self.doublet_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* did not reuse an ExecRecord, had no child run, and output .* was not deleted; a corresponding Dataset should be associated",
-            step_E1_RS.clean)
-        # Reset....
-        self.doublet_DS.created_by = step_E1_RS
-        self.doublet_DS.save()
+        # Jan 15: This exception doesn't seem to be in the code anymore. -Rosemary
+        #self.doublet_DS.created_by = None
+        #self.doublet_DS.save()
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* did not reuse an ExecRecord, had no child run, and output .* was not deleted; a corresponding Dataset should be associated",
+        #    step_E1_RS.clean)
+        ## Reset....
+        #self.doublet_DS.created_by = step_E1_RS
+        #self.doublet_DS.save()
 
         # Bad case: there is an associated dataset that does not belong to any ERO
         # of this ER.
@@ -384,9 +455,8 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         
         # Let's check some of the above cases for step E2 when it's *not* reused.
         # Sadly this means we have to define a whole sub-run for pD.
-        step_E2_RS.reused = False
-        step_E2_RS.execrecord = None
-
+        # Jan 15: Actually E2 can never be reused, because it is a sub-pipeline.
+        # But we still need the sub-run for some of the below tests.
         pD_run.parent_runstep = step_E2_RS
         pD_run.reused = False
         
@@ -394,7 +464,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         step_D1_RS.reused = False
         D01_11_RSIC = self.D01_11.psic_instances.create(runstep=step_D1_RS,
                                                         reused=False)
-        D01_11_ER = self.D01_11.execrecords.create()
+        D01_11_ER = self.ER_from_record(D01_11_RSIC)
         D01_11_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
                                        generic_input=self.D1_in)
         D01_11_ER.execrecordouts.create(symbolicdataset=self.D1_in_symDS,
@@ -404,7 +474,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         
         D02_12_RSIC = self.D02_12.psic_instances.create(runstep=step_D1_RS,
                                                         reused=False)
-        D02_12_ER = self.D02_12.execrecords.create()
+        D02_12_ER = self.ER_from_record(D02_12_RSIC)
         D02_12_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                        generic_input=self.D2_in)
         D02_12_ER.execrecordouts.create(symbolicdataset=self.singlet_symDS,
@@ -412,7 +482,9 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         D02_12_RSIC.execrecord = D02_12_ER
         D02_12_RSIC.save()
 
-        mB_ER = self.mB.execrecords.create()
+        # Method mB is step step_D1 of pipeline pD.
+        step_D1_RS.log = step_D1_RS.log.none()
+        mB_ER = self.ER_from_record(step_D1_RS)
         mB_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
                                    generic_input=self.B1_in)
         mB_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
@@ -427,7 +499,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         
         D11_21_ROC = self.D11_21.poc_instances.create(run=pD_run,
                                                       reused=False)
-        D11_21_ER = self.D11_21.execrecords.create()
+        D11_21_ER = self.ER_from_record(D11_21_ROC)
         D11_21_ER.execrecordins.create(
             symbolicdataset=self.C1_in_symDS,
             generic_input=self.mB.outputs.get(dataset_name="B1_out"))
@@ -438,7 +510,7 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         D11_21_ROC.save()
 
         # pD_ER was already defined above.
-        pD_run.execrecord = pD_ER
+        pD_run.runsteps.add(step_D1_RS)
         pD_run.save()
 
         # None of the bad cases really work in this setting, because other checks
@@ -453,27 +525,34 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.assertEquals(step_E1_RS.is_complete(), False)
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* has no ExecRecord",
+            "RunStep .* is not complete",
             step_E1_RS.complete_clean)
 
         # Propagation check on complete_clean:
         step_E1_RS.reused = None
+        step_E1_ER = self.ER_from_record(step_E1_RS)
+        step_E1_RS.execrecord = step_E1_ER
+        step_E1_RS.log = step_E1_RS.log.none()
         step_E1_RS.save()
         self.assertRaisesRegexp(
             ValidationError,
             "RunStep .* has not decided whether or not to reuse an ExecRecord; no data should have been generated",
             step_E1_RS.complete_clean)
 
+        step_E2_RS.child_run = pD_run
+        step_E2_RS.save()
         self.assertEquals(step_E2_RS.is_complete(), True)
         self.assertEquals(step_E2_RS.complete_clean(), None)
 
-        pD_run.execrecord = None
-        pD_run.save()
-        self.assertEquals(step_E2_RS.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has no ExecRecord",
-            step_E2_RS.complete_clean)
+        # Jan 15: Runs can't have ExecRecords anymore, so there is no way
+        # (at least I can't think of one) to have a RunStep for a
+        # sub-pipeline be incomplete without the sub-pipeline Run being
+        # incomplete.
+        #self.assertEquals(step_E2_RS.is_complete(), False)
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "RunStep .* is not complete",
+        #    step_E2_RS.complete_clean)
 
 
 class RunTests(librarian.tests.LibrarianTestSetup):
@@ -504,128 +583,41 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         step_E2_RS.delete()
 
         # Bad case: reused == None, but there is a RS associated to the Run.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunSteps",
-            pE_run.clean)
-        # Reset....
-        step_E1_RS.delete()
+        # Jan 15: No longer relevant, Runs don't have ExecRecords and can't reuse them.
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunSteps",
+        #    pE_run.clean)
+        ## Reset....
+        #step_E1_RS.delete()
 
         # Bad case: reused == None, but there is an ROC associated.
-        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunOutputCables",
-            pE_run.clean)
-        # Reset....
-        E33_43_ROC.delete()
+        # Jan 15: No longer relevant, Runs don't have ExecRecords and can't reuse them.
+        #E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "Run .* has not decided whether or not to reuse an ER yet, so there should be no associated RunOutputCables",
+        #    pE_run.clean)
+        ## Reset....
+        #E33_43_ROC.delete()
 
         # Bad case: reused == None, but there is an execrecord associated.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-        pE_ER.delete()
+        # Jan 15: No longer relevant, Runs don't have ExecRecords and can't reuse them.
+        #pE_ER = self.pE.execrecords.create()
+        #pE_run.execrecord = pE_ER
+        #self.assertRaisesRegexp(
+        #    ValidationError,
+        #    "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
+        #    pE_run.clean)
+        ## Reset....
+        #pE_run.execrecord = None
+        #pE_run.save()
+        #pE_ER.delete()
 
-
-    def test_Run_clean_reused(self):
-        """Check coherence of a Run after it has decided to reuse an ExecRecord."""
-        # Create a top-level run.
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        pE_run.reused = True
-
-        # Good case: no RS or ROC associated, no ER yet.
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: RS associated.
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* reuses an ER, so there should be no associated RunSteps",
-            pE_run.clean)
-        # Reset....
-        step_E1_RS.delete()
-
-        # Bad case: ROC associated.
-        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* reuses an ER, so there should be no associated RunOutputCables",
-            pE_run.clean)
-        # Reset....
-        E33_43_ROC.delete()
-
-        # Set an ER.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-
-        # Bad propagation case: execrecord is not complete.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            pE_run.clean)
-
-        # Proceed:
-        pE_ER_in1 = pE_ER.execrecordins.create(
-            generic_input=self.E1_in,
-            symbolicdataset=self.triplet_symDS)
-        pE_ER_in2 = pE_ER.execrecordins.create(
-            generic_input=self.E2_in,
-            symbolicdataset=self.singlet_symDS)
-        pE_ER_in3 = pE_ER.execrecordins.create(
-            generic_input=self.E3_rawin,
-            symbolicdataset=self.raw_symDS)
-        
-        pE_ER_out1 = pE_ER.execrecordouts.create(
-            generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
-        pE_ER_out2 = pE_ER.execrecordouts.create(
-            generic_output=self.E2_out,
-            symbolicdataset=self.C1_out_symDS)
-        pE_ER_out3 = pE_ER.execrecordouts.create(
-            generic_output=self.E3_rawout,
-            symbolicdataset=self.C3_out_symDS)
-
-        # Bad case: ER and pipeline are not consistent.
-        pE_run.pipeline = self.pD
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.clean)
-
-        # Now test is_complete, complete_clean.
-        self.assertEquals(pE_run.is_complete(), True)
-        # Propagation bad case: clean fails.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.complete_clean)
-        
-        # Good case: the run is complete and clean.
-        pE_run.pipeline = self.pE
-        pE_run.save()
-        self.assertEquals(pE_run.is_complete(), True)
-        self.assertEquals(pE_run.complete_clean(), None)
-
-        # Bad case: the run is incomplete but clean.
-        pE_run.execrecord = None
-        self.assertEquals(pE_run.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has no ExecRecord",
-            pE_run.complete_clean)
-
-
-        
     def test_Run_clean_not_reused(self):
         """Check coherence of a Run after it has decided not to reuse an ExecRecord."""
+        # Jan 15: Much of this is no longer relevant, since Runs can't have ExecRecords
+        # anymore. I've tried to fix up what I can. -Rosemary
         # Create a top-level run.
         pE_run = self.pE.pipeline_instances.create(user=self.myUser)
         pE_run.reused = False
@@ -641,7 +633,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
         self.assertRaisesRegexp(
             ValidationError,
-            "RunStep .* has no ExecRecord",
+            "RunStep .* is not complete",
             pE_run.clean)
 
         # Bad case: second RS is associated, first one is not.
@@ -670,7 +662,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         step_E1_RS.reused = False
         E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS,
                                                         reused=False)
-        E03_11_ER = self.E03_11.execrecords.create()
+        E03_11_ER = self.ER_from_record(E03_11_RSIC)
         E03_11_ER.execrecordins.create(generic_input=self.E3_rawin,
                                        symbolicdataset=self.raw_symDS)
         E03_11_ER.execrecordouts.create(generic_output=self.A1_rawin,
@@ -679,7 +671,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E03_11_RSIC.save()
         self.doublet_DS.created_by = step_E1_RS
         self.doublet_DS.save()
-        mA_ER = self.mA.execrecords.create()
+        mA_ER = self.ER_from_record(step_E1_RS)
         mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                               generic_input=self.A1_rawin)
         mA_ER_out = mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
@@ -693,15 +685,11 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         self.assertEquals(pE_run.clean(), None)
 
         # Bad case: first RS is complete, second one is unclean.
-        step_E2_RS.reused = False
-        step_E2_RS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; reused and execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        step_E2_RS.reused = None
-        step_E2_RS.save()
+        # Jan 15: The fact that step_E2 is a sub-pipeline, so it can't have a 
+        # value for reused or an ExecRecord, will always be caught before the
+        # fact that its inputs are not quenched. There are already a couple of
+        # tests for subpipelines not being allowed to have reused or execrecord
+        # set. -Rosemary
 
         # Bad case: there aren't enough RSs and an ROC is associated.
         E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
@@ -712,27 +700,11 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         # Reset....
         E31_42_ROC.delete()
 
-        # Bad case: not enough RSs and an ER is associated.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunSteps, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-        # NOTE: can't delete this before setting pE_run.execrecord =
-        # None, or else it will cascade deletions and break stuff
-        # afterwards!
-        pE_ER.delete()
-        
         # Bad case: enough RSs, but last one is not complete.
         # To save time, let's just reuse the second step.
         E01_21_RSIC = self.E01_21.psic_instances.create(
             runstep=step_E2_RS, reused=True)
-        E01_21_ER = self.E01_21.execrecords.create()
+        E01_21_ER = self.ER_from_record(E01_21_RSIC)
         E01_21_ER.execrecordins.create(generic_input=self.E1_in,
                                        symbolicdataset=self.triplet_symDS)
         E01_21_ER.execrecordouts.create(generic_output=self.D1_in,
@@ -742,30 +714,75 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         E02_22_RSIC = self.E02_22.psic_instances.create(
             runstep=step_E2_RS, reused=True)
-        E02_22_ER = self.E02_22.execrecords.create()
+        E02_22_ER = self.ER_from_record(E02_22_RSIC)
         E02_22_ER.execrecordins.create(generic_input=self.E2_in,
                                        symbolicdataset=self.singlet_symDS)
         E02_22_ER.execrecordouts.create(generic_output=self.D2_in,
                                         symbolicdataset=self.singlet_symDS)
         E02_22_RSIC.execrecord = E02_22_ER
         E02_22_RSIC.save()
-        step_E2_RS.reused = True
-        pD_ER = self.pD.execrecords.create()
-        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
-                                              generic_input=self.D1_in)
-        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
-                                              generic_input=self.D2_in)
-        pD_ER_out = pD_ER.execrecordouts.create(
+
+        pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        pD_run.parent_runstep = step_E2_RS
+        pD_run.save()
+
+        step_D1_RS = self.step_D1.pipelinestep_instances.create(run=pD_run, reused=False)
+
+        D01_11_RSIC = self.D01_11.psic_instances.create(runstep=step_D1_RS,
+                                                        reused=False)
+        D01_11_ER = self.ER_from_record(D01_11_RSIC)
+        D01_11_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
+                                       generic_input=self.D1_in)
+        D01_11_ER.execrecordouts.create(symbolicdataset=self.D1_in_symDS,
+                                        generic_output=self.B1_in)
+        D01_11_RSIC.execrecord = D01_11_ER
+        D01_11_RSIC.save()
+        
+        D02_12_RSIC = self.D02_12.psic_instances.create(runstep=step_D1_RS,
+                                                        reused=False)
+        D02_12_ER = self.ER_from_record(D02_12_RSIC)
+        D02_12_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                       generic_input=self.D2_in)
+        D02_12_ER.execrecordouts.create(symbolicdataset=self.singlet_symDS,
+                                        generic_output=self.B2_in)
+        D02_12_RSIC.execrecord = D02_12_ER
+        D02_12_RSIC.save()
+
+        mB_ER = self.ER_from_record(step_D1_RS)
+        mB_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
+                                   generic_input=self.B1_in)
+        mB_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+                                   generic_input=self.B2_in)
+        mB_ER.execrecordouts.create(
+            symbolicdataset=self.C1_in_symDS,
+            generic_output=self.mB.outputs.get(dataset_name="B1_out"))
+        self.C1_in_DS.created_by = step_D1_RS
+        self.C1_in_DS.save()
+        step_D1_RS.execrecord = mB_ER
+
+        D11_21_ROC = self.D11_21.poc_instances.create(run=pD_run,
+                                                      reused=False)
+        D11_21_ER = self.ER_from_record(D11_21_ROC)
+        D11_21_ER.execrecordins.create(
+            symbolicdataset=self.C1_in_symDS,
+            generic_input=self.mB.outputs.get(dataset_name="B1_out"))
+        D11_21_ER.execrecordouts.create(
             symbolicdataset=self.C1_in_symDS,
             generic_output=self.pD.outputs.get(dataset_name="D1_out"))
-        step_E2_RS.execrecord = pD_ER
+        D11_21_ROC.execrecord = D11_21_ER
+        D11_21_ROC.save()
+
+        step_D1_RS.save()
         step_E2_RS.save()
+        pD_run.runsteps.add(step_D1_RS)
+        pD_run.save()
         
         # Good case: two complete RSs, no last one.
         self.assertEquals(pE_run.clean(), None)
 
         # Create an incomplete last RS.
-        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run)
+        # Jan 15: Since completeness of a Run now tests completeness of all
+        # RunSteps, this is no longer a good case. -Rosemary
 
         # Good case: two complete RSs, clean but incomplete last one.
         self.assertEquals(pE_run.clean(), None)
@@ -778,25 +795,26 @@ class RunTests(librarian.tests.LibrarianTestSetup):
             "Run .* has not completed all of its RunSteps, so there should be no associated RunOutputCables",
             pE_run.clean)
         # Reset....
-        E31_42_ROC.delete()
+        #E31_42_ROC.delete()
 
-        # Bad case: enough RSs but last is incomplete; ER is associated.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunSteps, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-        pE_ER.delete()
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run)
+        step_E3_ER = self.ER_from_record(step_E3_RS)
 
         # Proceed: complete the last RunStep.
+        step_E3_ER.execrecordins.create(symbolicdataset=self.C1_in_symDS,
+                                        generic_input=self.C1_in)
+        step_E3_ER.execrecordins.create(symbolicdataset=self.C2_in_symDS,
+                                        generic_input=self.C2_in)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C1_out_symDS,
+                                         generic_output=self.C1_out)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C2_out_symDS,
+                                         generic_output=self.C2_rawout)
+        step_E3_ER.execrecordouts.create(symbolicdataset=self.C3_out_symDS,
+                                         generic_output=self.C3_rawout)
+
         E21_31_RSIC = self.E21_31.psic_instances.create(
             runstep=step_E3_RS, reused=False)
-        E21_31_ER = self.E21_31.execrecords.create()
+        E21_31_ER = self.ER_from_record(E21_31_RSIC)
         E21_31_ER.execrecordins.create(
             generic_input=self.D1_out, symbolicdataset=self.C1_in_symDS)
         E21_31_ER.execrecordouts.create(
@@ -806,7 +824,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         
         E11_32_RSIC = self.E11_32.psic_instances.create(
             runstep=step_E3_RS, reused=False)
-        E11_32_ER = self.E11_32.execrecords.create()
+        E11_32_ER = self.ER_from_record(E11_32_RSIC)
         E11_32_ER.execrecordins.create(
             generic_input=self.A1_out, symbolicdataset=self.doublet_symDS)
         E11_32_ER.execrecordouts.create(
@@ -815,31 +833,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E11_32_RSIC.save()
         
         step_E3_RS.reused = False
-        
-        mC_ER = self.mC.execrecords.create()
-        mC_ER_in1 = mC_ER.execrecordins.create(
-            generic_input=self.C1_in,
-            symbolicdataset=self.C1_in_symDS)
-        mC_ER_in2 = mC_ER.execrecordins.create(
-            generic_input=self.C2_in,
-            symbolicdataset=self.C2_in_symDS)
-        mC_ER_out1 = mC_ER.execrecordouts.create(
-            generic_output=self.C1_out,
-            symbolicdataset=self.C1_out_symDS)
-        mC_ER_out2 = mC_ER.execrecordouts.create(
-            generic_output=self.C2_rawout,
-            symbolicdataset=self.C2_out_symDS)
-        mC_ER_out3 = mC_ER.execrecordouts.create(
-            generic_output=self.C3_rawout,
-            symbolicdataset=self.C3_out_symDS)
-        self.C1_out_DS.created_by = step_E3_RS
-        self.C1_out_DS.save()
-        self.C2_out_DS.created_by = step_E3_RS
-        self.C2_out_DS.save()
-        self.C3_out_DS.created_by = step_E3_RS
-        self.C3_out_DS.save()
-
-        step_E3_RS.execrecord = mC_ER
+        step_E3_RS.execrecord = step_E3_ER
         step_E3_RS.save()
 
         # Good case: all RSs complete, no outcables set.
@@ -847,7 +841,9 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         # Bad propagation case: bad ROC associated.
         E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run)
-        E21_41_ER = self.E21_41.execrecords.create()
+        E21_41_ER = self.ER_from_record(E21_41_ROC)
+        E21_41_ROC_old_log = E21_41_ROC.log.first()
+        E21_41_ROC.log = E21_41_ROC.log.none()
         E21_41_ER.execrecordins.create(
             generic_input=self.D1_out,
             symbolicdataset=self.C1_in_symDS)
@@ -856,6 +852,22 @@ class RunTests(librarian.tests.LibrarianTestSetup):
             symbolicdataset=self.E1_out_symDS)
         E21_41_ROC.execrecord = E21_41_ER
         E21_41_ROC.save()
+
+        # Complete other good ROC
+        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
+        E33_43_ER = self.ER_from_record(E33_43_ROC)
+        E33_43_ROC_old_log = E33_43_ROC.log.first()
+        E33_43_ROC.log = E33_43_ROC.log.none()
+        E33_43_ER.execrecordins.create(
+            generic_input=self.D1_out,
+            symbolicdataset=self.C1_in_symDS)
+        E33_43_ER.execrecordouts.create(
+            generic_output=self.E1_out,
+            symbolicdataset=self.E1_out_symDS)
+        E33_43_ROC.execrecord = E33_43_ER
+        E33_43_ER.save()
+        E33_43_ROC.save()
+
         self.assertRaisesRegexp(
             ValidationError,
             "RunOutputCable .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet",
@@ -863,45 +875,19 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         # Proceed....
         E21_41_ROC.reused = False
+        E33_43_ROC.reused = False
         self.E1_out_DS.created_by = E21_41_ROC
         self.E1_out_DS.save()
+        E33_43_ROC.log.add(E33_43_ROC_old_log)
+        E21_41_ROC.log.add(E21_41_ROC_old_log)
+        E33_43_ROC.save()
         E21_41_ROC.save()
         # Good propagation case: one good ROC associated.
         self.assertEquals(pE_run.clean(), None)
 
-        # Bad case: ER is set, only one output cable is set and done.
-        pE_ER = self.pE.execrecords.create()
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-
-        # Good case: one output cable is done, the other two are clean
-        # but incomplete.
-        E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
-        E33_43_ROC = self.E33_43.poc_instances.create(run=pE_run)
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: only one output cable is done, but all 3 are set,
-        # but ER is set.
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has not completed all of its RunOutputCables, so execrecord should not be set",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = None
-        pE_run.save()
-
         # Good case: all 3 output cables are done, ER not set.
         E31_42_ROC.reused = False
-        E31_42_ER = self.E31_42.execrecords.create()
+        E31_42_ER = self.ER_from_record(E31_42_ROC)
         E31_42_ER.execrecordins.create(
             generic_input=self.C1_out, symbolicdataset=self.C1_out_symDS)
         E31_42_ER.execrecordouts.create(
@@ -911,7 +897,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E31_42_ROC.save()
         
         E33_43_ROC.reused = False
-        E33_43_ER = self.E33_43.execrecords.create()
+        E33_43_ER = self.ER_from_record(E33_43_ER)
         E33_43_ER.execrecordins.create(
             generic_input=self.C3_rawout, symbolicdataset=self.C3_out_symDS)
         E33_43_ER.execrecordouts.create(
@@ -920,77 +906,8 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         E33_43_ROC.execrecord = E33_43_ER
         E33_43_ROC.save()
         self.assertEquals(pE_run.clean(), None)
-
-        # Propagation bad case: ER set but not complete.
-        pE_run.execrecord = pE_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            pE_run.clean)
-
-        # Propagation good case: ER is complete.
-        pE_ER_in1 = pE_ER.execrecordins.create(
-            generic_input=self.E1_in,
-            symbolicdataset=self.triplet_symDS)
-        pE_ER_in2 = pE_ER.execrecordins.create(
-            generic_input=self.E2_in,
-            symbolicdataset=self.singlet_symDS)
-        pE_ER_in3 = pE_ER.execrecordins.create(
-            generic_input=self.E3_rawin,
-            symbolicdataset=self.raw_symDS)
-        
-        pE_ER_out1 = pE_ER.execrecordouts.create(
-            generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
-        pE_ER_out2 = pE_ER.execrecordouts.create(
-            generic_output=self.E2_out,
-            symbolicdataset=self.C1_out_symDS)
-        pE_ER_out3 = pE_ER.execrecordouts.create(
-            generic_output=self.E3_rawout,
-            symbolicdataset=self.C3_out_symDS)
-        self.assertEquals(pE_run.clean(), None)
-
-        # Bad case: ER and pipeline are not consistent.
-        pE_run.execrecord = mA_ER
-        pE_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* points to pipeline .* but corresponding ER does not",
-            pE_run.clean)
-        # Reset....
-        pE_run.execrecord = pE_ER
-        pE_run.save()
-
-        # Bad case: ERO has a symbolic dataset different from that
-        # of the corresponding ROC.
-        pE_ER_out2.symbolicdataset = self.singlet_3rows_symDS
-        pE_ER_out2.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
-            pE_run.clean)
-
-        # Before we reset, check is_complete and complete_clean.
-        self.assertEquals(pE_run.is_complete(), True)
-        # Propagation bad case: pE_run is not clean.
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of Run .* does not match the corresponding RunOutputCable",
-            pE_run.complete_clean)
-        
-        # Reset....
-        pE_ER_out2.symbolicdataset = self.C1_out_symDS
-        pE_ER_out2.save()
         self.assertEquals(pE_run.is_complete(), True)
         self.assertEquals(pE_run.complete_clean(), None)
-
-        pE_run.execrecord = None
-        pE_run.save()
-        self.assertEquals(pE_run.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Run .* has no ExecRecord",
-            pE_run.complete_clean)
 
 class RunSICTests(librarian.tests.LibrarianTestSetup):
 
@@ -1025,7 +942,7 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         self.doublet_DS.save()
 
         # Bad case: ER is set before reused.
-        E11_32_ER = self.E11_32.execrecords.create()
+        E11_32_ER = self.ER_from_record(E11_32_RSIC)
         source = E11_32_ER.execrecordins.create(
             generic_input=self.mA.outputs.get(dataset_name="A1_out"),
             symbolicdataset=self.doublet_symDS)
@@ -1033,6 +950,7 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
             generic_output=self.C2_in,
             symbolicdataset=self.C2_in_symDS)
         E11_32_RSIC.execrecord = E11_32_ER
+        E11_32_RSIC.log = E11_32_RSIC.log.none()
         self.assertRaisesRegexp(
             ValidationError,
             "RunSIC .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet",
@@ -1044,12 +962,11 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         """Checks coherence of a RunSIC reusing an ER after reused is set."""
         # Define some infrastructure.
         pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        step_E3_RS = self.step_E3.pipelinestep_instances.create(
-            run=pE_run)
+        step_E3_RS = self.step_E3.pipelinestep_instances.create(run=pE_run)
         E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
         E11_32_RSIC.reused = True
 
-        E11_32_ER = self.E11_32.execrecords.create()
+        E11_32_ER = self.ER_from_record(E11_32_RSIC)
         source = E11_32_ER.execrecordins.create(
             generic_input=self.mA.outputs.get(dataset_name="A1_out"),
             symbolicdataset=self.doublet_symDS)
@@ -1081,7 +998,9 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         dest.save()
 
         # Bad case: execrecord points to a PSIC that is incompatible.
-        E02_22_ER = self.E02_22.execrecords.create()
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+        E02_22_RSIC = self.E02_22.psic_instances.create(runstep=step_E2_RS)
+        E02_22_ER = self.ER_from_record(E02_22_RSIC)
         E02_22_ER.execrecordins.create(
             generic_input=self.E2_in,
             symbolicdataset=self.singlet_symDS)
@@ -1096,7 +1015,9 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
 
         # Bad case: execrecord doesn't point to a PSIC.
         # We make a complete and clean ER for something else.
-        mA_ER = self.mA.execrecords.create()
+        # mA is step_E1 of pipeline pE.
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        mA_ER = self.ER_from_record(step_E1_RS)
         mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                    generic_input=self.A1_rawin)
         mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
@@ -1158,7 +1079,7 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         E11_32_RSIC = self.E11_32.psic_instances.create(runstep=step_E3_RS)
         E11_32_RSIC.reused = False
 
-        E11_32_ER = self.E11_32.execrecords.create()
+        E11_32_ER = self.ER_from_record(E11_32_RSIC)
         source = E11_32_ER.execrecordins.create(
             generic_input=self.mA.outputs.get(dataset_name="A1_out"),
             symbolicdataset=self.doublet_symDS)
@@ -1183,7 +1104,9 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         dest.save()
 
         # Bad case: execrecord points to a PSIC that is incompatible.
-        E02_22_ER = self.E02_22.execrecords.create()
+        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+        E02_22_RSIC = self.E02_22.psic_instances.create(runstep=step_E2_RS)
+        E02_22_ER = self.ER_from_record(E02_22_RSIC)
         E02_22_ER.execrecordins.create(
             generic_input=self.E2_in,
             symbolicdataset=self.singlet_symDS)
@@ -1198,7 +1121,9 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
 
         # Bad case: execrecord doesn't point to a PSIC.
         # We make a complete and clean ER for something else.
-        mA_ER = self.mA.execrecords.create()
+        # mA is step_E1 of pipeline pE.
+        mA_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        mA_ER = self.ER_from_record(mA_RS)
         mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                    generic_input=self.A1_rawin)
         mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
@@ -1313,7 +1238,10 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         self.C1_out_DS.save()
 
         # Bad case: reused is not set but execrecord is.
-        E31_42_ER = self.E31_42.execrecords.create()
+        #E31_42_ER = self.E31_42.execrecords.create()
+        E31_42_ER = self.ER_from_record(E31_42_ROC)
+        old_log = E31_42_ROC.log.first()
+        E31_42_ROC.log = E31_42_ROC.log.none()
         E31_42_ROC.execrecord = E31_42_ER
         self.assertRaisesRegexp(
             ValidationError,
@@ -1321,6 +1249,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
             E31_42_ROC.clean)
         # Reset....
         E31_42_ROC.execrecord = None
+        E31_42_ROC.log.add(old_log)
 
         # Now set reused.  First we do the reused = True case.
         E31_42_ROC.reused = True
@@ -1355,6 +1284,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         E21_41_ROC = self.E21_41.poc_instances.create(run=pE_run, reused=False)
         self.doublet_DS.created_by = E21_41_ROC
         self.doublet_DS.save()
+        E21_41_ER = self.ER_from_record(E21_41_ROC)
         self.assertEquals(E21_41_ROC.clean(), None)
 
         # Bad case: non-trivial cable, multiple datasets attached.
@@ -1400,19 +1330,29 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
             generic_output=self.pE.outputs.get(dataset_name="E2_out"))
 
         # Bad cases: we're looking at an ER for another transformation.
-        # Create ER for mA.
-        mA_ER = self.mA.execrecords.create()
+        # Create ER for mA, which is step_E1 of pipeline pE.
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        mA_ER = self.ER_from_record(step_E1_RS)
         mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
                                    generic_input=self.A1_rawin)
         mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
                                     generic_output=self.A1_out)
 
         # Create an execrecord for another of the POCs.
-        E21_41_ER = self.E21_41.execrecords.create()
+        E21_41_ER = self.ER_from_record(E21_41_ROC)
+
         empty_sd_source = SymbolicDataset()
         empty_sd_source.save()
+        structure = DatasetStructure(symbolicdataset=empty_sd_source, compounddatatype=self.triplet_cdt)
+        structure.save()
+        empty_sd_source.structure = structure
+
         empty_sd_dest = SymbolicDataset()
         empty_sd_dest.save()
+        structure = DatasetStructure(symbolicdataset=empty_sd_dest, compounddatatype=self.doublet_cdt)
+        structure.save()
+        empty_sd_dest.structure = structure
+
         E21_41_ER_in = E21_41_ER.execrecordins.create(
             symbolicdataset=empty_sd_source,
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
@@ -1449,9 +1389,12 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         pD_run.save()
         D11_21_ROC = self.D11_21.poc_instances.create(run=pD_run)
         D11_21_ROC.reused = False
-        D11_21_ER = self.D11_21.execrecords.create()
+        D11_21_ER = self.ER_from_record(D11_21_ROC)
         empty_symDS = SymbolicDataset()
         empty_symDS.save()
+        structure = DatasetStructure(symbolicdataset=empty_symDS, compounddatatype=self.triplet_cdt)
+        structure.save()
+        empty_symDS.structure = structure
         Dsource = D11_21_ER.execrecordins.create(
             generic_input=self.B1_out,
             symbolicdataset=empty_symDS)
@@ -1527,7 +1470,9 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         
         # Bad case: associated data *does* exist, but is not the same
         # as that of the corresponding ERO.
-        other_triplet_3_rows_symDS = SymbolicDataset()
+        with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
+          md5 = file_access_utils.compute_md5(f)
+        other_triplet_3_rows_symDS = SymbolicDataset(MD5_checksum=md5)
         other_triplet_3_rows_symDS.save()
 
         other_triplet_3_rows_DS = other_triplet_3_rows_DS = Dataset(
@@ -1539,7 +1484,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
                 "step_0_triplet_3_rows.csv", File(f))
         other_triplet_3_rows_DS.save()
         other_triplet_3_rows_DS_structure = DatasetStructure(
-            dataset=other_triplet_3_rows_DS,
+            symbolicdataset=other_triplet_3_rows_symDS,
             compounddatatype=self.triplet_cdt)
         other_triplet_3_rows_DS_structure.save()
         other_triplet_3_rows_DS.clean()

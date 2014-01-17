@@ -137,7 +137,12 @@ class Run(models.Model):
     
     def is_complete(self):
         """True if this run is complete; false otherwise."""
-        # A run is complete if all of its outcables are complete.
+        # A run is complete if all of its component RunSteps and RunOutputCables
+        # are complete.
+        for step in self.pipeline.steps.all():
+            corresp_rs = self.runsteps.filter(pipelinestep=step)
+            if not corresp_rs.exists() or not corresp_rs[0].is_complete():
+                return False
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
             if not corresp_roc.exists() or not corresp_roc[0].is_complete():
@@ -291,7 +296,7 @@ class RunStep(models.Model):
             rsic.complete_clean()
 
         if (self.pipelinestep.cables_in.count() != self.RSICs.count()):
-            if (self.reused != None or self.execrecord != None):
+            if (self.reused is not None or self.execrecord is not None):
                 raise ValidationError(
                     "RunStep \"{}\" inputs not quenched; reused and execrecord should not be set".
                     format(self))
@@ -408,11 +413,8 @@ class RunStep(models.Model):
                         "Output \"{}\" of RunStep \"{}\" is missing; no data should be associated".
                         format(to, self))
                 
-            else:
-                # The corresponding ERO should have existent data.
-                corresp_ero = step_er.execrecordouts.get(
-                    content_type=to_type, object_id=to.id)
-                if not corresp_ero.symbolicdataset.has_data():
+            # The corresponding ERO should have existent data.
+            elif not corresp_ero.symbolicdataset.has_data():
                     raise ValidationError(
                         "ExecRecordOut \"{}\" of RunStep \"{}\" should reference existent data".
                         format(corresp_ero, self))
@@ -428,12 +430,11 @@ class RunStep(models.Model):
 
     def is_complete(self):
         """True if RunStep is complete; false otherwise."""
-
         # Sub-Pipeline case:
         if hasattr(self, "child_run"):
             return self.child_run.is_complete()
         # Method case:
-        return self.execrecord != None
+        return self.execrecord is not None
     
     def complete_clean(self):
         """Checks coherence and completeness of this RunStep."""

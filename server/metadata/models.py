@@ -591,15 +591,17 @@ class CompoundDatatype(models.Model):
         # cells in the file, as well as creating external CSVs
         # for columns whose DT has a CustomConstraint.
         data_csv = csv.DictReader(file_to_check)
+        if data_csv.fieldnames is None:
+          logging.debug("{}: file is empty")
+          return summary
     
         # Counter for the number of rows.
         num_rows = 0
 
-
-
         ####
         # CHECK HEADER
         header = data_csv.fieldnames
+        summary["header"] = header
         cdt_members = self.members.all()
         if len(header) != cdt_members.count():
             summary["bad_num_cols"] = len(header)
