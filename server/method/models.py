@@ -12,6 +12,7 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
+from messages import error_messages
 
 class CodeResource(models.Model):
     """
@@ -389,6 +390,16 @@ class Method(transformation.models.Transformation):
             string_rep = string_rep.format("[family unset]")
 
         return string_rep
+
+    def clean(self):
+        """
+        Check coherence of this Method. The checks we perform are:
+
+        - Method does not have a Metapackage as a driver.
+        """
+        if self.driver.content_file is None:
+            raise ValidationError(error_messages["driver_metapackage"].
+                format(self, self.driver))
 
     def save(self, *args, **kwargs):
         """

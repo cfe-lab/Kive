@@ -853,7 +853,7 @@ class PipelineStepInputCable(models.Model):
         Source can either be a Dataset or a path to a file.
 
         INPUTS
-        source
+        source          Either the Dataset to run through the cable, or a file path containing the data.
         output_path
         cable_record    RSIC/ROC for this step.
 
