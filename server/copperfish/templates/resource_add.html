@@ -29,26 +29,42 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     var renderForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
-            htmlStr += "<select id=\"id_coderesource_" + i + "\" name=\"id_coderesource_" + i + "\">";
+            htmlStr += "<select class=\"coderesource\" id=\"id_coderesource-" + i + "\" name=\"id_coderesource_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
             }
             htmlStr += "</select>";
-            htmlStr += "<select id=\"id_revisions_" + i + "\" name=\"id_revisions_" + i + "\">";
+            htmlStr += "<select class=\"revisions\" id=\"id_revisions_" + i + "\" name=\"id_revisions_" + i + "\">";
             htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select><br/>";
         }
         $("#extraDependencyForms").html(htmlStr);
+
+        // repeated within this event handler for the dynamic HTML elements
+        $("select.coderesource").on('change',
+            function() {
+                console.log('drop down triggered');
+                console.log(this);
+                /*
+                $.ajax({
+                    type: "POST",
+                    url: "get_revisions/"
+                })*/
+            }
+        )
     };
 
     // trigger ajax on CR drop-down to populate revision select
-    $("select[id|='id_coderesource_']").change(
+    $("#id_coderesource").on('change',
         function() {
+            cr_id = $(this).val();
+            console.log(cr_id);
             $.ajax({
                 type: "POST",
-                url: "get_revisions/"
+                url: "get_revisions/"+cr_id+"/"
             })
         }
     )
+
 });
 </script>
 {% endblock %}

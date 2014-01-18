@@ -7,6 +7,7 @@ def populate_revision_dropdown (request):
      drop-down.  The 'change' event triggers an Ajax request that this function will handle
      and return a JSON object with the revision info.
     """
+    print 'in populate_revision_dropdown'
     from copperfish.models import CodeResourceRevision
     json = {}
     if request.is_ajax():
