@@ -301,19 +301,15 @@ class Sandbox:
             else:
                 output_SD = librarian.models.SymbolicDataset(MD5_checksum="")
                 output_SD.save()
-
                 output_SD_CDT = metadata.models.CompoundDatatype()
                 output_SD_CDT.save()
-
                 wires = None
                 if type(cable) == pipeline.models.PipelineStepInputCable:
                     wires = cable.custom_wires.all()
                 else:
                     wires = cable.custom_outwires.all()
 
-                # Look at each wire, take the DT from
-                # source_pin, assign the name and index of
-                # dest_pin.
+                # Look at each wire, take the DT from source_pin, assign the name and index of dest_pin.
                 for wire in wires:
                     logging.debug("{}: Adding CDTM: {} {}".format(fn, wire.dest_pin.column_name, wire.dest_pin.column_idx))
                     output_SD_CDT.members.create(datatype=wire.source_pin.datatype,
@@ -353,16 +349,15 @@ class Sandbox:
         ####
 
         ####
-        # CHECK OUTPUT
-
-        # FIXME Probably this will involve some transactions.
+        # CHECK OUTPUT (FIXME: This should involve transactions)
 
         ####
         # CHECK IF FILE EXISTS
 
         # At this point we know output_SD points to the output of this
         # cable.
-        
+
+        logging.debug("{}: Checking if the file created by execute_cable exists".format(fn))
         if not os.access(output_path, os.R_OK):
             # Create a ContentCheckLog denoting this as missing;
             # we leave num_rows = -1 and MD5_checksum = "".
@@ -370,7 +365,7 @@ class Sandbox:
             ccl.baddata.create(missing_output=True)
             
         else:
-            # Extract the MD5.
+            logging.debug("{}: File exists - computing MD5".format(fn))
             output_md5 = None
             with open(output_path, "rb") as f:
                 output_md5 = file_access_utils.compute_md5(f)
@@ -378,27 +373,27 @@ class Sandbox:
             if not had_ER_at_beginning:
                 output_SD.MD5_checksum = output_md5
             
-            # First, the non-recovery case.
             if not recover:
 
-                ####
-                # REGISTER REAL DATA (if applicable)
-        
-                # If we are retaining this data, we create a dataset
                 if cable_keeps_output:
+                    logging.debug("{}: Keeping data - creating dataset".format(fn))
+                    dataset_name = "{} {} {}".format(self.run.name,type(cable).__name__,curr_record.pk)
+
                     new_dataset = Dataset(
                         user=user,
-                        name="{} {} {}".format(self.run.name,
-                                               type(cable).__name__,
-                                               curr_record.pk),
+                        name=dataset_name,
                         symbolicdataset=output_SD,
                         created_by=cable)
+
                     with open(output_path, "rb") as f:
                         new_dataset.dataset_file = File(f)
+
                     new_dataset.save()
-        
-                # FINISHED REGISTERING REAL DATA
-                ####
+                else:
+                    logging.debug("{}: Not keeping data - not creating dataset".format(fn))
+
+
+                logging.debug("{}: Finished registering real data".format(fn))
 
                 if not had_ER_at_beginning:
                     ####
@@ -419,8 +414,11 @@ class Sandbox:
                             cable_max_row = cable.source.get_max_row()
 
                     ccl = output_SD.check_file_contents(
-                        output_path, summary_path, cable_min_row,
-                        cable_max_row, curr_log)
+                        output_path,
+                        summary_path,
+                        cable_min_row,
+                        cable_max_row,
+                        curr_log)
                                     
                     # FINISHED CONTENT CHECK ON FIRST TIME OF CREATION
                     ####
@@ -448,6 +446,7 @@ class Sandbox:
         if not recover:
             curr_record.execrecord = curr_ER
 
+        logging.debug("{}: Initiating complete clean on curr_record".format(curr_record))
         curr_record.complete_clean()
         curr_record.save()
 
