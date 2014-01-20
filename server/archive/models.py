@@ -788,6 +788,10 @@ class RunOutputCable(models.Model):
              trivial, then this ROC should have existent data
              associated and it should belong to the corresponding ERO
         """
+        import inspect
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+        import logging
+
         if (not self.run.pipeline.outcables.
                 filter(pk=self.pipelineoutputcable.pk).exists()):
             raise ValidationError(
@@ -873,23 +877,21 @@ class RunOutputCable(models.Model):
         # (i.e. some kind of messed up execution) in the ExecLog.
         missing_output = len(self.log.first().missing_outputs()) != 0
             
-        # If the output of this ROC is marked for deletion, there should be no data
-        # associated.
+        # If the output of this ROC is marked for deletion, there should be no data associated.
         if is_deleted:
             if self.has_data():
                 raise ValidationError(
                     "RunOutputCable \"{}\" is marked for deletion; no data should be produced".
                     format(self))
 
-        # If the output of this ROC was missing on execution, there
-        # should be no data associated.
+        # If the output of this ROC was missing on execution, there should be no data associated.
         elif missing_output:
             if self.has_data():
                 raise ValidationError(
                     "RunOutputCable \"{}\" had a missing output; no data should be produced".
                     format(self))
             
-        # If it isn't marked for deletion and the output isn't missing....
+        # Otherwise, there should be data
         else:
             # The corresponding ERO should have existent data.
             corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)

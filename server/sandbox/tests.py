@@ -121,6 +121,7 @@ class ExecuteTests(TestCase):
         self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.di_cdtm_1)
 
         # POCs: one is trivial, the second uses custom outwires
+        # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
         self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
         self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
 
@@ -130,6 +131,10 @@ class ExecuteTests(TestCase):
         self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
         self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
         self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
+
+        # Second cable is not a trivial - we assign the new CDT to it
+        self.outcable_2.output_cdt = self.pipeline_out2_cdt
+        self.outcable_2.save()
 
         # Define custom outwires to the second output (Wire twice from cdtm 2)
         self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_1 ,dest_pin=self.out2_cdtm_1)

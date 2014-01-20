@@ -365,15 +365,16 @@ class PipelineStep(models.Model):
 # POCs to tell whether they are trivial.
 def cable_trivial_h(cable, cable_wires):
     """
-    Helper called by both PSICs and POCs to check triviality.
-    
-    If a cable is raw, it is trivial.  If it is not raw, then it
-    is trivial if it either has no wiring, or if the wiring is
-    trivial (i.e. mapping corresponding pin to corresponding pin
-    without changing names or anything).
-    
-    PRE: cable is clean (and therefore so are its wires); cable_wires
-    is a QuerySet containing cable's custom wires.
+    Helper called by PSICs and POCs to check triviality.
+
+    INPUTS: cable_wires is a QuerySet containing cable's custom wires.
+
+    Definition of trivial:
+    1) All raw cables
+    2) Cables without wiring
+    3) Cables with wiring that doesn't change name/idx
+
+    PRE: cable is clean
     """
     if cable.is_raw():
         return True
@@ -381,13 +382,11 @@ def cable_trivial_h(cable, cable_wires):
     if not cable_wires.exists():
         return True
 
-    # At this point, we know there are wires.
     for wire in cable_wires:
         if (wire.source_pin.column_idx != wire.dest_pin.column_idx or
                 wire.source_pin.column_name != wire.dest_pin.column_name):
             return False
 
-    # All the wiring was trivial, so....
     return True
 
 
@@ -1175,46 +1174,53 @@ class PipelineOutputCable(models.Model):
 
     def is_compatible(self, other_outcable):
         """
-        Checks if an outcable is compatible with this one.
+        Checks if other_outcable is compatible with this POC.
         
-        The specified cable and this one are compatible if:
-         - both are fed by the same TransformationOutput
-         - both are trivial, or the wiring matches
+        Definition of compatible:
+         - Both are fed by the same TransformationOutput
+         - POCs transform the data in the same way (wires match)
         
-        For two cables' wires to match, any wire connecting column
-        indices (source_idx, dest_idx) must appear in both cables.
+        NOTES
+        Although both restricted by the source CDT, destination
+        CDTs of POCs are not necessarily the same: we cannot
+        use destination CDTMs meaningfully.
 
-        PRE: self, other_outcable are clean.
+        Furthermore, multiple wires can leave one source CDTM,
+        while only one wire can lead to a destination: it makes
+        more sense to query each wire on matching destination.
+
+        ALGORITHM
+        1) For each wire in cable 1, look at it's dest name/idx.
+        2) Find a wire in cable 2 with the same dest name/idx.
+        3A) If no such wire exists, cables are not compatible.
+        3B) If a wire exists, they must have matching source CDTM:
+        if not, cables are not compatible.
+        4) If we reach the end, cables are compatible.
+
+        PRE: Both cables are clean.
         """
+
+        # TOs must be the same
         if self.source != other_outcable.source:
             return False
 
+        # Trivial cables don't change column names or idx
         if self.is_trivial() and other_outcable.is_trivial():
             return True
         elif self.is_trivial() != other_outcable.is_trivial():
             return False
 
-
-        # We know they are fed by the same TransformationOutput
-        # and are non-trivial.  As such, we have to check that
-        # their wiring matches.
-
-
-        # FIXME: THIS MAY NEED SOME WORK
-
         for wire in self.custom_outwires.all():
-            # Get the corresponding wire in other_outcable.
-            corresp_wires = other_outcable.custom_outwires.filter(source_pin=wire.source_pin)
+            corresponding_wire = other_outcable.custom_outwires.filter(
+                    dest_pin__column_name=wire.dest_pin.column_name,
+                    dest_pin__column_idx=wire.dest_pin.column_idx)
 
+            if not corresponding_wire.exists():
+                return false
 
+            if wire.source_pin != corresponding_wire.first().source_pin:
+                return false
 
-            # FIXME: Do they map to the same name?
-            if wire.source_pin.column_idx != corresp_wire.source_pin.column_idx:
-                return False
-
-        # By the fact that self and other_outcable are clean, we know
-        # that we have checked all the wires.  Having made sure all of
-        # the wiring matches, we can....
         return True
         
     def run_cable(self, source, output_path, cable_record):
