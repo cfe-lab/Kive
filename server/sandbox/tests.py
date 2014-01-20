@@ -12,6 +12,7 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
 from method.tests import samplecode_path
+from messages import error_messages
 
 class ExecuteTests(TestCase):
 

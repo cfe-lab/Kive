@@ -2017,6 +2017,22 @@ class MethodTests(MethodTestSetup):
         os.remove(errfile.name)
         shutil.rmtree(empty_dir)
 
+    def test_run_code_dir_not_empty(self):
+        """
+        Trying to run code in a non-empty directory should fail.
+        """
+        outfile = tempfile.NamedTemporaryFile(delete=False)
+        errfile = tempfile.NamedTemporaryFile(delete=False)
+
+        self.assertRaisesRegexp(ValueError,
+            "Directory .* nonempty; contains file .*",
+            lambda : self.noop_method.run_code(self.scratch_dir, [self.noop_infile], [], outfile, errfile))
+
+        outfile.close(); errfile.close()
+
+        os.remove(outfile.name)
+        os.remove(errfile.name)
+
 class MethodFamilyTests(MethodTestSetup):
 
     def test_unicode(self):

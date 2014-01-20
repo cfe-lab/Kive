@@ -366,21 +366,6 @@ class SymbolicDatasetTests(LibrarianTestSetup):
                 cdt = self.cdt_record, make_dataset = True, user = self.myUser,
                 name = "missing data", description = "oops!"))
 
-    def test_no_data(self):
-        """
-        Symbolic dataset creation fails if the file has a header but no data.
-        """
-        data_file = tempfile.NamedTemporaryFile(delete=False)
-        data_file.write("header,sequence")
-        file_path = data_file.name
-        data_file.close()
-
-        self.assertRaisesRegexp(ValueError,
-            error_messages["no_data"].format(".*"),
-            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = "missing data", description = "oops!"))
-
     def test_too_many_columns(self):
         """
         Symbolic dataset creation fails if the data file has too many

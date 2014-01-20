@@ -397,7 +397,8 @@ class Method(transformation.models.Transformation):
 
         - Method does not have a Metapackage as a driver.
         """
-        if self.driver.content_file is None:
+        super(Method, self).clean()
+        if not self.driver.content_file:
             raise ValidationError(error_messages["driver_metapackage"].
                 format(self, self.driver))
 
@@ -511,11 +512,11 @@ class Method(transformation.models.Transformation):
 
         if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
             raise ValueError(
-                "Method \"{}\" expects {} inputs and {} outputs".
-                format(self, self.inputs.count(), self.outputs.count()))
+                error_messages["method_bad_inputcount"].
+                format(self, self.inputs.count(), self.outputs.count(), len(input_paths), len(output_paths)))
 
         if (not output_handle.mode.startswith("w") or not error_handle.mode.startswith("w")):
-            raise ValueError("output_handle and error_handle must be writable")
+            raise ValueError("output_handle and error_handle must be open for writing")
         
         logging.debug("{}: Checking run_path exists: {}".format(fn, run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
