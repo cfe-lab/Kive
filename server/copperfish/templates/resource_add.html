@@ -74,7 +74,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     var renderForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
-            htmlStr += "<select class=\"coderesource\" id=\"id_coderesource-" + i + "\" name=\"id_coderesource_" + i + "\">";
+            htmlStr += "<select class=\"coderesource\" id=\"id_coderesource_" + i + "\" name=\"id_coderesource_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
             }
@@ -87,13 +87,24 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         // repeated within this event handler for the dynamic HTML elements
         $("select.coderesource").on('change',
             function() {
-                console.log('drop down triggered');
-                console.log(this);
-                /*
-                $.ajax({
-                    type: "POST",
-                    url: "get_revisions/"
-                })*/
+                var suffix = $(this).attr('id').split('_')[2];
+                cr_id = $(this).val();
+                if (cr_id != "") {
+                    $.ajax({
+                        type: "POST",
+                        url: "get_revisions/",
+                        data: {cr_id: cr_id}, // specify data as an object
+                        datatype: "json", // type of data expected back from server
+                        success: function(result) {
+                            var options = [];
+                            var arr = JSON.parse(result)
+                            $.each(arr, function(index,value) {
+                                options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
+                            });
+                            $("#id_revisions_"+suffix).html(options.join(''));
+                        }
+                    })
+                }
             }
         )
     };
@@ -102,11 +113,23 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $("#id_coderesource").on('change',
         function() {
             cr_id = $(this).val();
-            console.log(cr_id);
-            $.ajax({
-                type: "POST",
-                url: "get_revisions/"+cr_id+"/"
-            })
+            if (cr_id != "") {
+                console.log(cr_id);
+                $.ajax({
+                    type: "POST",
+                    url: "get_revisions/",
+                    data: {cr_id: cr_id}, // specify data as an object
+                    datatype: "json", // type of data expected back from server
+                    success: function(result) {
+                        var options = [];
+                        var arr = JSON.parse(result)
+                        $.each(arr, function(index,value) {
+                            options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
+                        });
+                        $("#id_revisions").html(options.join(''));
+                    }
+                })
+            }
         }
     )
 
