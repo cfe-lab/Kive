@@ -30,7 +30,7 @@ urlpatterns = patterns('',
     url(r'resource_add$', 'copperfish.views.resource_add', name='resource_add'),
     url(r'^resources/(?P<id>\d+)/$', 'copperfish.views.resource_add_revision', name='resource_add_revision'),
 
-    url(r'get_revisions/(?P<id>\d+)/$', 'copperfish.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
+    url(r'get_revisions/(?P<id>\d+)/$', 'copperfish.views.populate_revision_dropdown', name='populate_revision_dropdown'),
 
     url(r'^usr.html$', 'copperfish.views.usr', name='usr'),
     url(r'^datasets', 'copperfish.views.datasets', name='datasets'),
