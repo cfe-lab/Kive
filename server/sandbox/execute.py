@@ -10,6 +10,7 @@ import os.path
 import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
+from messages import error_messages
 
 class Sandbox:
     """
@@ -45,8 +46,6 @@ class Sandbox:
         this Sandbox represents a 'top-level' run), or it is
         is in sd_fs_map (e.g. if this is a sub-run) and therefore
         can be recovered using the info in the maps.i
-
-        PRE: the inputs are all appropriate for pipeline.
         """
         logging_utils.setup_logging()
         import inspect
@@ -60,6 +59,8 @@ class Sandbox:
         self.socket_map = {}
         self.cable_map = {}
         self.ps_map = {}
+
+        self.check_inputs()
 
         # Initialize the maps ourselves.
 
@@ -81,6 +82,54 @@ class Sandbox:
         # Make the sandbox directory.
         logger.debug("{}: file_access_utils.set_up_directory({})".format(fn, self.sandbox_path))
         file_access_utils.set_up_directory(self.sandbox_path)
+
+    def check_inputs(self):
+        """
+        Are the supplied inputs are appropriate for the supplied pipeline?
+
+        We check if the input CDT's are restrictions of the pipeline's expected
+        input CDT's, and that the number of rows is in the range that the pipeline
+        expects. We don't rearrange inputs that are in the wrong order.
+        """
+        # First quick check that the number of inputs are the same.
+        if len(self.inputs) != self.pipeline.inputs.count():
+            raise ValueError(error_messages["pipeline_bad_inputcount"].
+                format(self.pipeline, self.pipeline.inputs.count(), len(self.inputs)))
+        
+        # Check each individual input.
+        for i, supplied_input in enumerate(self.inputs):
+            pipeline_input = self.pipeline.inputs.get(dataset_idx=i+1)
+            pipeline_raw = pipeline_input.is_raw()
+            supplied_raw = supplied_input.is_raw()
+
+            if pipeline_raw:
+                if supplied_raw:
+                    continue
+                else:
+                    raise ValueError(error_messages["pipeline_expected_raw"].
+                        format(self.pipeline, i+1, supplied_input.get_cdt()))
+
+            # Pipeline expected input is not raw.
+            elif supplied_raw:
+                raise ValueError(error_messages["pipeline_expected_nonraw"].
+                    format(self.pipeline, i+1, pipeline_input.get_cdt()))
+
+            # Neither is raw.
+            supplied_cdt = supplied_input.get_cdt()
+            pipeline_cdt = pipeline_input.get_cdt()
+
+            if not supplied_cdt.is_restriction(pipeline_cdt):
+                raise ValueError(error_messages["pipeline_cdt_mismatch"].
+                    format(self.pipeline, i+1, pipeline_cdt, supplied_cdt))
+
+            # The CDT's match. Is the number of rows okay?
+            minrows = pipeline_input.get_min_row() or 0
+            maxrows = pipeline_input.get_max_row() 
+            maxrows = maxrows if maxrows is not None else sys.maxint
+
+            if not minrows <= supplied_input.num_rows() <= maxrows:
+                raise ValueError(error_messages["pipeline_bad_numrows"].
+                    format(self.pipeline, i+1, minrows, maxrows, supplied_input.num_rows()))
 
     def execute_cable(self, cable, input_SD, output_path, parent_record,
                       recover=False):
@@ -524,10 +573,9 @@ class Sandbox:
             out_dir = os.path.join(step_run_dir, "output_data")
             in_dir = os.path.join(step_run_dir, "input_data")
             log_dir = os.path.join(step_run_dir, "logs")
-            file_access_utils.set_up_directory(step_run_dir)
-            file_access_utils.set_up_directory(in_dir)
-            file_access_utils.set_up_directory(out_dir)
-            file_access_utils.set_up_directory(log_dir)
+
+            for workdir in [step_run_dir, in_dir, out_dir, log_dir]:
+                file_access_utils.set_up_directory(workdir)
 
             for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
                 file_suffix = "raw" if curr_output.is_raw() else "csv"

@@ -12,6 +12,7 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
 from method.tests import samplecode_path
+from messages import error_messages
 
 class ExecuteTests(TestCase):
 
@@ -149,3 +150,99 @@ class ExecuteTests(TestCase):
         inputs = [self.symDS]
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
+
+class SandboxTests(ExecuteTests):
+
+    def test_sandbox_no_input(self):
+        """
+        A Sandbox cannot be created if the pipeline has inputs but none are supplied.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_bad_inputcount"].format(".*", ".*", 0),
+            lambda: Sandbox(self.myUser, p, []))
+
+    def test_sandbox_too_many_inputs(self):
+        """
+        A Sandbox cannot be created if the pipeline has fewer inputs than are supplied.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_bad_inputcount"].format(".*", 0, 1),
+            lambda: Sandbox(self.myUser, p, [self.symDS]))
+
+    def test_sandbox_correct_inputs(self):
+        """
+        We can create a Sandbox if the supplied inputs match the pipeline inputs.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+            min_row = 8, max_row = 12)
+        # Assert no ValueError raised.
+        Sandbox(self.myUser, p, [self.symDS])
+
+    def test_sandbox_raw_expected_nonraw_supplied(self):
+        """
+        Can't create a Sandbox if the pipeline expects raw input and we give it nonraw.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(dataset_name="in", dataset_idx = 1)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_expected_raw"].format(".*", 1, ".*"),
+            lambda: Sandbox(self.myUser, p, [self.symDS]))
+
+    def test_sandbox_nonraw_expected_raw_supplied(self):
+        """
+        Can't create a Sandbox if the pipeline expects non-raw input and we give it raw.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1)
+        raw_symDS = SymbolicDataset()
+        raw_symDS.save()
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_expected_nonraw"].format(".*", 1, ".*"),
+            lambda: Sandbox(self.myUser, p, [raw_symDS]))
+
+    def test_sandbox_cdt_mismatch(self):
+        """
+        Can't create a Sandbox if the pipeline expects an input with one CDT
+        and we give it the wrong one.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.di_cdt, dataset_name="in", dataset_idx = 1)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_cdt_mismatch"].format(".*", 1, ".*", ".*"),
+            lambda: Sandbox(self.myUser, p, [self.symDS]))
+
+    def test_sandbox_too_many_rows(self):
+        """
+        Can't create a Sandbox if the pipeline expects an input with one CDT
+        and we give it the wrong one.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+            min_row = 2, max_row = 4)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_bad_numrows"].format(".*", 1, 2, 4, ".*"),
+            lambda: Sandbox(self.myUser, p, [self.symDS]))
+
+    def test_sandbox_too_few_rows(self):
+        """
+        Can't create a Sandbox if the pipeline expects an input with one CDT
+        and we give it the wrong one.
+        """
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p.save()
+        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+            min_row = 20)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["pipeline_bad_numrows"].format(".*", 1, 20, ".*", ".*"),
+            lambda: Sandbox(self.myUser, p, [self.symDS]))

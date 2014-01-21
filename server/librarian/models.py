@@ -110,9 +110,6 @@ class SymbolicDataset(models.Model):
             raise ValueError(
                 error_messages["header_mismatch"].format(file_path, 
                   expected_header, ",".join(summary["header"])))
-        if summary["num_rows"] == 0:
-            raise ValueError(error_messages["no_data"].format(file_path))
-        
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
