@@ -186,8 +186,8 @@ class Sandbox:
                 cable_keeps_output = cable.keep_output
             else:
                 if parent_record.parent_runstep != None:
-                    logging.debug("{}: This is a sub-pipeline, checking if parent runstep keeps output".format(fn))
                     cable_keeps_output = not parent_record.parent_runstep.pipelinestep.outputs_to_delete.filter(dataset_name=cable.output_name).exists()
+                    logging.debug("{}: Sub-pipeline step - does the parent runstep keep output? {}".format(fn, cable_keeps_output))
                 else:
                     logging.debug("{}: Not a sub-pipeline, will keep output".format(fn))
                     cable_keeps_output = True
@@ -413,30 +413,26 @@ class Sandbox:
 
                 if not had_ER_at_beginning:
                     output_SD.MD5_checksum = output_md5
+                    output_SD.save()
             
             if not recover:
 
-                print "--------------"
-                print output_SD
-                if hasattr(output_SD, "dataset"): print output_SD.dataset
-                print "--------------"
-
                 if cable_keeps_output and not cable.is_trivial():
-                    logging.debug("{}: Keeping data - creating dataset".format(fn))
+                    logging.debug("{}: Creating dataset".format(fn))
                     dataset_name = "{} {} {}".format(self.run.name,type(cable).__name__,curr_record.pk)
-                    new_dataset = archive.models.Dataset(
-                        user=self.run.user,
-                        name=dataset_name,
-                        symbolicdataset=output_SD,
-                        created_by=cable)
 
+                    # save() needs f to be open
                     with open(output_path, "rb") as f:
-                        new_dataset.dataset_file = File(f)
+                        new_dataset = archive.models.Dataset(
+                            created_by=curr_record,
+                            dataset_file = File(f),
+                            name=dataset_name,
+                            symbolicdataset=output_SD,
+                            user=self.run.user)
                         new_dataset.save()
 
                 else:
-                    logging.debug("{}: Not keeping data - not creating dataset".format(fn))
-
+                    logging.debug("{}: Not creating dataset".format(fn))
 
                 logging.debug("{}: Finished registering real data".format(fn))
 
