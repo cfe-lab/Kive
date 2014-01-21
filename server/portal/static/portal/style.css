@@ -1,7 +1,7 @@
 body {
 	font: 14pt 'Lato', sans-serif;
 	margin: 0;
-	background: url('/static/bg_tile.png');
+	background: url('/static/portal/bg_tile.png');
 }
 a:link {
     text-decoration: none;
