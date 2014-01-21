@@ -135,6 +135,9 @@ class Datatype(models.Model):
                 "Datatype \"{}\" has a circular restriction".
                 format(self))
 
+    def get_absolute_url(self):
+        return '/datatypes/%i' % self.id
+
     def __unicode__(self):
         """Describe Datatype by name"""
         return self.name

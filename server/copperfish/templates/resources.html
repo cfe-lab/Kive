@@ -1,0 +1,51 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "base.html" %}
+
+{% block title %}Code resources{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="/dev.html">Back to developer's portal</a>
+
+<h2>Code resources</h2>
+
+<p>
+A code resource is a file that contains a set of instructions
+(implemented in a scripting language) that can be executed to 
+process data.  Some code resources depend on others; these are 
+dependencies.  Every code resource exists as a revision or an initial version.
+To create a new branch, click <a href="/resource_add">Add new code 
+resource</a> to upload the initial version.
+To upload a revision of an existing code resource branch, click on the name of
+in the following table.
+</p>
+
+<table>
+<thead>
+	<tr>
+	<th>Name</th>
+    <th>Filename</th>
+	<th>Description</th>
+	<th>Number of revisions</th>
+	<th>Last revision date</th>
+	</tr>
+</thead>
+{% for resource in resources %}
+<tr>
+	<td><a href="{{ resource.get_absolute_url }}">{{ resource.name }}</a></td>
+    <td>{{ resource.filename }}</td>
+	<td>{{ resource.description }}</td>
+    <td>{{ resource.num_revisions }}</td>
+    <td>{{ resource.last_revision_date }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="resource_add">Add new code resource</a>
+
+{% endblock %}

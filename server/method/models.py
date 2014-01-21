@@ -57,6 +57,30 @@ class CodeResource(models.Model):
 
         return True
 
+    def count_revisions(self):
+        """
+        Number of revisions associated with this CodeResource.
+        """
+        return CodeResourceRevision.objects.filter(coderesource=self).count()
+
+    num_revisions = property(count_revisions)
+
+    def get_last_revision_date(self):
+        """
+        Date of most recent revision to this CodeResource.
+        """
+        revisions = CodeResourceRevision.objects.filter(coderesource=self)
+        if len(revisions) == 0:
+            return 'n/a'
+        revision_dates = [revision.revision_DateTime for revision in revisions]
+        revision_dates.sort() # ascending order
+        return revision_dates[0]
+
+    last_revision_date = property(get_last_revision_date)
+
+    def get_absolute_url(self):
+        return '/resources/%i' % self.id
+
     def clean(self):
         """
         CodeResource name must be valid.

@@ -51,34 +51,34 @@ admin.site.register(Method, MethodAdmin);
 admin.site.register(TransformationInput);
 admin.site.register(TransformationOutput);
 
-class PipelineStepInputCableInline(admin.StackedInline):
-    model = PipelineStepInputCable;
-    extra = 0;
+# class PipelineStepInputCableInline(admin.StackedInline):
+#     model = PipelineStepInputCable;
+#     extra = 0;
 
-class PipelineStepDeleteInline(admin.StackedInline):
-    model = PipelineStepDelete;
-    extra = 0;
+# class PipelineStepDeleteInline(admin.StackedInline):
+#     model = PipelineStepDelete;
+#     extra = 0;
 
-class PipelineStepAdmin(admin.ModelAdmin):
-    inlines = [PipelineStepInputCableInline, PipelineStepDeleteInline];
+# class PipelineStepAdmin(admin.ModelAdmin):
+#     inlines = [PipelineStepInputCableInline, PipelineStepDeleteInline];
 
-class PipelineStepInline(admin.StackedInline):
-    model = PipelineStep;
-    extra = 0;
+# class PipelineStepInline(admin.StackedInline):
+#     model = PipelineStep;
+#     extra = 0;
 
-class PipelineOutputCableInline(admin.TabularInline):
-    model = PipelineOutputCable;
-    extra = 0;
+# class PipelineOutputCableInline(admin.TabularInline):
+#     model = PipelineOutputCable;
+#     extra = 0;
 
-class PipelineAdmin(admin.ModelAdmin):
-    inlines = [TransformationInputInline, PipelineStepInline,
-               PipelineOutputCableInline];
+# class PipelineAdmin(admin.ModelAdmin):
+#     inlines = [TransformationInputInline, PipelineStepInline,
+#                PipelineOutputCableInline];
 
-admin.site.register(PipelineStep, PipelineStepAdmin);
-admin.site.register(PipelineFamily);
-admin.site.register(Pipeline, PipelineAdmin);
-admin.site.register(PipelineStepInputCable);
-admin.site.register(PipelineStepDelete);
+# admin.site.register(PipelineStep, PipelineStepAdmin);
+# admin.site.register(PipelineFamily);
+# admin.site.register(Pipeline, PipelineAdmin);
+# admin.site.register(PipelineStepInputCable);
+#admin.site.register(PipelineStepDelete);
 
 class DatasetAdmin(admin.ModelAdmin):
     exclude = ["MD5_checksum"];
