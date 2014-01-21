@@ -13,11 +13,11 @@ def populate_revision_dropdown (request):
     from copperfish.models import CodeResourceRevision
     json = {}
     if request.is_ajax():
-        coderesource_id = request.POST.get('cr_id')
-        coderesource = CodeResource.objects.get(pk=coderesource_id) # pk (primary key) implies id__exact
         response = HttpResponse()
-        response.write(serializers.serialize("json", CodeResourceRevision.objects.filter(coderesource=coderesource), fields=('pk', 'revision_name')))
-        print response
+        coderesource_id = request.POST.get('cr_id')
+        if coderesource_id != '':
+            coderesource = CodeResource.objects.get(pk=coderesource_id) # pk (primary key) implies id__exact
+            response.write(serializers.serialize("json", CodeResourceRevision.objects.filter(coderesource=coderesource), fields=('pk', 'revision_name')))
         return response
     else:
         raise Http404

@@ -45,14 +45,20 @@ class StringConstraintForm (forms.Form):
 
 # code resource forms
 class CodeResourceForm (forms.ModelForm):
+    """
+    use for validating only two entries
+    """
     class Meta:
         model = CodeResource
+        exclude = ('revision_parent', 'coderesource', 'MD5_checksum', 'content_file')
 
 class CodeResourcePrototypeForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(CodeResourcePrototypeForm, self).__init__(*args, **kwargs)
-        self.fields['revision_name'].help_text = 'Name for this new code resource'
-        self.fields['revision_desc'].help_text = 'A detailed description of this new code resource'
+        self.fields['revision_name'].label = 'Name of prototype'
+        self.fields['revision_name'].help_text = 'A short name for this prototype'
+        self.fields['revision_desc'].label = 'Description'
+        self.fields['revision_desc'].help_text = 'A detailed description of this prototype'
         self.fields['content_file'].help_text = 'File containing this new code resource'
     class Meta:
         model = CodeResourceRevision

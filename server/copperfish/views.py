@@ -174,10 +174,26 @@ def resource_add(request):
     copy the revision file over to the sandbox.
     NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
+    exceptions = []
 
     if request.method == 'POST':
         query = request.POST.dict()
+
+        # validate code resource entries
+        cr_form = CodeResourceForm(request.POST)
+        if not cr_form.is_valid():
+            # create unbound form
+            form = CodeResourcePrototypeForm(initial={'revision_name': query['revision_name'],
+                                              'revision_desc': query['revision_desc']})
+            
+            dep_form = CodeResourceDependencyForm()
+            t = loader.get_template('resource_add.html')
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
         file_in_memory = request.FILES['content_file']
+
 
         # create new CodeResource
         new_code_resource = CodeResource.objects.create(name=query['revision_name'],
@@ -194,12 +210,49 @@ def resource_add(request):
         try:
             prototype.full_clean()
             prototype.save()
+
+            # now parse dependencies if any exist
+            to_save = []
+            for k in query.iterkeys():
+                if not k.startswith('revisions'):
+                    continue
+
+                # see if contents of this form result in a valid CodeResourceDependency
+                rev_id = query[k]
+                if rev_id == '':
+                    # ignore incomplete or unused dependency forms
+                    print 'ignoring incomplete CodeResourceDependencyForm'
+                    continue
+
+                suffix = ('_' + k.split('_')[-1]) if '_' in k else ''
+                on_revision = CodeResourceRevision.objects.get(pk=rev_id)
+                dependency = CodeResourceDependency(coderesourcerevision=prototype,
+                                                    requirement=on_revision,
+                                                    depPath=query['depPath'+suffix],
+                                                    depFileName=query['depFileName'+suffix])
+                try:
+                    dependency.full_clean()
+                except ValidationError as e:
+                    exceptions.extend(e.messages)
+                    break
+
+                to_save.append(dependency)
+
+            if exceptions:
+                prototype.delete()
+                raise # delete code resource
+            else:
+                for dependency in to_save:
+                    dependency.save()
+
             return HttpResponseRedirect('/resources')
         except:
             new_code_resource.delete()
             raise
 
+        # return form with last (non-valid) entries
         form = CodeResourcePrototypeForm(request.POST, request.FILES)
+        dep_form = CodeResourceDependencyForm(request.POST)
 
     else:
         form = CodeResourcePrototypeForm()
@@ -212,7 +265,12 @@ def resource_add(request):
     return HttpResponse(t.render(c))
 
 
+
 def resource_add_revision(request, id):
+    """
+    Revise a code resource.  The form will initially be populated with values of the last
+    revision to this code resource.
+    """
     this_code_resource = models.CodeResource.objects.get(pk=id)
     all_revisions = models.CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
     last_revision = all_revisions[0]
@@ -238,12 +296,15 @@ def resource_add_revision(request, id):
         form = CodeResourceRevisionForm(request.POST, request.FILES)
     else:
         if last_revision:
-            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc})
+            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
+                                                     'revision_name': last_revision.revision_name})
+            dep_form = CodeResourceDependencyForm(request.POST)
         else:
             form = CodeResourceRevisionForm()
+            dep_form = CodeResourceDependencyForm()
 
     t = loader.get_template('resource_add_revision.html')
-    c = Context({'resource_form': form, 'coderesource': this_code_resource})
+    c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dependency_form': dep_form})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
