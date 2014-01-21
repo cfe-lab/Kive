@@ -1,24 +1,35 @@
 <!-- Django template -->
 <!-- Display contents of Datatypes as a HTML table -->
 
-{% extends "base.html" %}
+{% extends "portal/base.html" %}
 
-{% block title %}Add a new code resource{% endblock %}
+{% block title %}Revise a code resource{% endblock %}
 
 {% block javascript %}
-<script src="/static/jquery-2.0.3.min.js"></script>
-<script src="/static/resources.js"></script>
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script src="/static/method/resources.js"></script>
 {% endblock %}
 
 {% block content %}
 
 <a href="/resources">return to Code Resource summary</a>
 
-<h2>Add a new code resource</h2>
+<h2>Revise a code resource</h2>
+
+<h3>Code resource information:</h3>
+<table>
+<tr><td>Name</td><td>{{ coderesource.name }}</td></tr>
+<tr><td>Filename</td><td>{{ coderesource.filename }}</td></tr>
+<tr><td>Description</td><td>{{ coderesource.description }}</td></tr>
+<tr><td># revisions</td><td>{{ coderesource.num_revisions }}</td></tr>
+<tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
+</table>
+
 
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
+        <!-- this form is pre-populated with the data of the last revision -->
     {{ resource_form.as_table }}
     </table>
     <h3>Dependencies</h3>
@@ -26,20 +37,18 @@
        Dependencies are other code resource that this code resource requires to execute.  For example, a Python module
         comprised of classes in a single file considered to be a CR dependency (e.g., "import antigravity").
     </p>
-    <p>
+
     <input type="button" id="addDependencyForm" value="+"/>
     <input type="button" id="removeDependencyForm" value="-"/><small>Add/subtract dependency form fields</small><br/>
     <table>
-    <th><td>Code resource</td><td>Revision</td><td>Path</td><td>Filename</td></th>
-    <tr>
-        <td>{{ dependency_form.coderesource }}</td>
-        <td>{{ dependency_form.revisions }}</td>
-        <td>{{ dependency_form.depPath }}</td>
-        <td>{{ dependency_form.depFileName }}</td>
-    </tr>
+        <tr>
+            <td>{{ dependency_form.coderesource }}</td>
+            <td>{{ dependency_form.revisions }}</td>
+            <td>{{ dependency_form.depPath }}</td>
+            <td>{{ dependency_form.depFileName }}</td>
+        </tr>
     <div id="extraDependencyForms"></div>
     </table>
-    </p>
 
     <input type="submit" value="Upload" />
 </form>

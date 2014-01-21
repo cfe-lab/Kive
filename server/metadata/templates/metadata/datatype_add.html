@@ -1,0 +1,41 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datatypes{% endblock %}
+
+{% block javascript %}
+<script src="static/portal/jQuery-2.0.3.min.js"></script>
+<script src="static/metadata/datatypes.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
+{% endblock %}
+
+{% block content %}
+
+<a href="/datatypes">return to Datatypes summary</a>
+
+<h2>Add a new datatype</h2>
+
+<!-- Form for inserting new Datatypes -->
+<h3>New datatype</h3>
+<form action="" method="post">{% csrf_token %}
+    <table>
+    {{ datatype_form.as_table }}
+    </table>
+
+    <h3>Basic constraints</h3>
+
+    <div id="int_constraints">
+    {{ int_con_form.errors }}
+    <table>{{ int_con_form.as_table }}</table>
+    </div>
+
+    <div id="str_constraints">
+    {{ str_con_form.errors }}
+    <table>{{ str_con_form.as_table }}</table>
+    <input type="submit" value="Submit" />
+    </div>
+</form>
+
+
+{% endblock %}
