@@ -900,13 +900,14 @@ class RunOutputCable(models.Model):
                     "RunOutputCable \"{}\" was not deleted and did not have missing output; ExecRecordOut \"{}\" should reference existent data".
                     format(self, corresp_ero))
 
-            # If the step was not reused and the cable was not
-            # trivial, there should be data associated to this ROC.
+
+
+            # If step was not reused and cable was not trivial, there should be data with the ROC
             if not self.reused and not self.pipelineoutputcable.is_trivial():
                 if not self.has_data():
                     raise ValidationError(
-                        "RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
-                        format(self))
+                        "{}: RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                        format(fn, self))
 
                 # The associated data should belong to the ERO of
                 # self.execrecord (which has already been checked for
