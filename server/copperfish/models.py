@@ -16,6 +16,8 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator
 from django.db import transaction
 
+from django.core.urlresolvers import reverse
+
 # Python math functions
 import operator
 # To calculate MD5 hash
@@ -154,6 +156,11 @@ class Datatype(models.Model):
             raise ValidationError(
                 "Datatype \"{}\" has a circular restriction".
                 format(self))
+    
+    def get_absolute_url(self):
+        return '/datatypes/%i' % self.id
+        #return ('datatype_detail', (), {'name': self.name, 'id': self.id})
+        #return reverse('datatype_detail', kwargs={'name': self.name, 'id': self.id})
 
     def __unicode__(self):
         """Describe Datatype by name"""
@@ -316,46 +323,46 @@ class BasicConstraint(models.Model):
         if self.ruletype == BasicConstraint.MIN_LENGTH:
             if self.datatype.Python_type != Datatype.STR:
                 error_msg = ("Rule \"{}\" specifies a minimum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 min_length = int(self.rule)
                 if min_length < 0:
                     error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" is negative".
-                                 format(self, self.rule))
+                                 format(self.ruletype, self.rule))
                     is_error = True
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         elif self.ruletype == BasicConstraint.MAX_LENGTH:
             if self.datatype.Python_type != Datatype.STR:
                 error_msg = ("Rule \"{}\" specifies a maximum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 max_length = int(self.rule)
                 if max_length < 1:
                     error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" is non-positive".
-                                 format(self, self.rule))
+                                 format(self.ruletype, self.rule))
                     is_error = True
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, 
                                BasicConstraint.MIN_VAL):
             if self.datatype.Python_type not in (Datatype.INT, Datatype.FLOAT):
                 error_msg = ("Rule \"{}\" specifies a bound on a numeric value but its parent Datatype \"{}\" is not a number".
-                             format(self, self.datatype))
+                             format(self.ruletype, self.datatype))
                 is_error = True
             try:
                 val_bound = float(self.rule)
             except ValueError:
                 error_msg = ("Rule \"{}\" specifies a bound on a numeric value but \"{}\" does not specify a numeric value".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
         
         elif self.ruletype == BasicConstraint.REGEXP:
@@ -363,7 +370,7 @@ class BasicConstraint(models.Model):
                 re.compile(self.rule)
             except re.error:
                 error_msg = ("Rule \"{}\" specifies an invalid regular expression \"{}\"".
-                             format(self, self.rule))
+                             format(self.ruletype, self.rule))
                 is_error = True
 
         elif self.ruletype == BasicConstraint.DATETIMEFORMAT:
@@ -627,6 +634,30 @@ class CodeResource(models.Model):
 
         return True
 
+    def count_revisions(self):
+        """
+        Number of revisions associated with this CodeResource.
+        """
+        return CodeResourceRevision.objects.filter(coderesource=self).count()
+
+    num_revisions = property(count_revisions)
+
+    def get_last_revision_date(self):
+        """
+        Date of most recent revision to this CodeResource.
+        """
+        revisions = CodeResourceRevision.objects.filter(coderesource=self)
+        if len(revisions) == 0:
+            return 'n/a'
+        revision_dates = [revision.revision_DateTime for revision in revisions]
+        revision_dates.sort() # ascending order
+        return revision_dates[0]
+
+    last_revision_date = property(get_last_revision_date)
+
+    def get_absolute_url(self):
+        return '/resources/%i' % self.id
+
     def clean(self):
         """
         CodeResource name must be valid.
@@ -635,7 +666,6 @@ class CodeResource(models.Model):
         must not end in space, and be composed of letters,
         numbers, dash, underscore, paranthesis, and space.
         """
-        
         if self.isValidFileName():
             pass
         else:
@@ -793,6 +823,7 @@ class CodeResourceRevision(models.Model):
             md5gen = hashlib.md5();
             md5gen.update(self.content_file.read());
             self.MD5_checksum = md5gen.hexdigest();
+            print 'md5', self.MD5_checksum
 
         except ValueError as e:
             self.MD5_checksum = "";
@@ -808,11 +839,15 @@ class CodeResourceRevision(models.Model):
 
         # If content file exists, it must have a file name
         if self.content_file and self.coderesource.filename == "":
-            raise ValidationError("If content file exists, it must have a file name")
+           raise ValidationError("If content file exists, it must have a file name")
 
         # If no content file exists, it must not have a file name
         if not self.content_file and self.coderesource.filename != "":
+            print 'foo', self.content_file
             raise ValidationError("Cannot have a filename specified in the absence of a content file")
+
+
+
 
     def install(self, install_path):
         """

@@ -1,0 +1,27 @@
+<!-- Django template -->
+
+{% extends "base.html" %}
+{% block title %}Shipyard developer portal{% endblock %}
+
+{% block content %}
+<h3>Developer portal</h3>
+
+<p><a href="/">Return to homepage</a></p>
+
+<nav><ul>
+    <li>
+        <a href="/datatypes">
+        <h4 class="menu-item">Datatypes</h4>
+        <p class="menu-description">Inspect and add datatypes.</p>
+        </a>
+    </li>
+    <li>
+        <a href="/resources">
+        <h4 class="menu-item">Code Resources</h4>
+        <p class="menu-description">Access and upload code resources.</p>
+        </a>
+    </li>
+</ul></nav>
+
+
+{% endblock %}
