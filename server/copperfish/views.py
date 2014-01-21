@@ -174,25 +174,34 @@ def resource_add(request):
     copy the revision file over to the sandbox.
     NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
-    exceptions = []
+
+    t = loader.get_template('resource_add.html')
 
     if request.method == 'POST':
         query = request.POST.dict()
 
-        # validate code resource entries
-        cr_form = CodeResourceForm(request.POST)
-        if not cr_form.is_valid():
+        # validate name and description entries (return error if blank)
+        min_form = CodeResourceMinimalForm(request.POST)
+        if not min_form.is_valid():
             # create unbound form
-            form = CodeResourcePrototypeForm(initial={'revision_name': query['revision_name'],
-                                              'revision_desc': query['revision_desc']})
-            
+            form = CodeResourcePrototypeForm(request.POST)
+            form._errors = min_form.errors
             dep_form = CodeResourceDependencyForm()
-            t = loader.get_template('resource_add.html')
             c = Context({'resource_form': form, 'dependency_form': dep_form})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
-        file_in_memory = request.FILES['content_file']
+        try:
+            file_in_memory = request.FILES['content_file']
+        except:
+            # no file specified
+            form = CodeResourcePrototypeForm(request.POST)
+            form._errors = min_form.errors
+            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
+            dep_form = CodeResourceDependencyForm()
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
 
 
         # create new CodeResource
@@ -213,6 +222,7 @@ def resource_add(request):
 
             # now parse dependencies if any exist
             to_save = []
+            exceptions = []
             for k in query.iterkeys():
                 if not k.startswith('revisions'):
                     continue
@@ -234,10 +244,11 @@ def resource_add(request):
                     dependency.full_clean()
                 except ValidationError as e:
                     exceptions.extend(e.messages)
-                    break
+                    pass
 
                 to_save.append(dependency)
 
+            # only save CR dependencies if they all check out
             if exceptions:
                 prototype.delete()
                 raise # delete code resource

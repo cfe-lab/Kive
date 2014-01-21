@@ -44,13 +44,12 @@ class StringConstraintForm (forms.Form):
 
 
 # code resource forms
-class CodeResourceForm (forms.ModelForm):
+class CodeResourceMinimalForm (forms.Form):
     """
     use for validating only two entries
     """
-    class Meta:
-        model = CodeResource
-        exclude = ('revision_parent', 'coderesource', 'MD5_checksum', 'content_file')
+    revision_name = forms.CharField(max_length=255)
+    revision_desc = forms.CharField(max_length=255)
 
 class CodeResourcePrototypeForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):

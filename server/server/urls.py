@@ -28,7 +28,7 @@ urlpatterns = patterns('',
     #url(r'^datatype_finish/(?P<id>\d+)_(?P<Python_type>\w+)$', 'copperfish.views.datatype_add', name='datatype_add'),
     url(r'resources$', 'copperfish.views.resources', name='resources'),
     url(r'resource_add$', 'copperfish.views.resource_add', name='resource_add'),
-    url(r'^resources/(?P<id>\d+)/$', 'copperfish.views.resource_add_revision', name='resource_add_revision'),
+    url(r'^resources/(?P<id>\d+)/$', 'copperfish.views.resource_revise', name='resource_revise'),
 
     url(r'get_revisions/$', 'copperfish.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 
