@@ -1024,9 +1024,7 @@ class Dataset(models.Model):
 
 
     def clean(self):
-        """
-        Check file integrity of this Dataset.
-        """
+        """If this Dataset has an MD5 set, verify the dataset file integrity"""
         if not self.check_md5():
             raise ValidationError(
                 "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".

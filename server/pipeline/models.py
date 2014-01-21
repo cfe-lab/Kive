@@ -11,8 +11,9 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
+from django.utils import timezone
 
-from datetime import datetime
+from messages import error_messages
 
 import logging, logging_utils
 import archive.models, librarian.models, metadata.models, method.models, transformation.models
@@ -448,13 +449,14 @@ def run_cable_h(cable, source, output_path):
     # Construct a list with the column names in the appropriate order.
     output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
-    try:
-        infile = None
+    if type(source) not in [archive.models.Dataset, str]:
+        raise ValueError(error_messages["dataset_bad_type"].format(type(source)))
 
+    try:
         if type(source) == archive.models.Dataset:
             infile = source.dataset_file
             infile.open()
-        else:
+        elif type(source) == str:
             infile = open(source, "rb")
 
         input_csv = csv.DictReader(infile)
@@ -475,7 +477,6 @@ def run_cable_h(cable, source, output_path):
 
     finally:
         infile.close()
-
 
 class PipelineStepInputCable(models.Model):
     """
@@ -861,13 +862,15 @@ class PipelineStepInputCable(models.Model):
         import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
-        import datetime
-        from django.utils.timezone import utc
-        now = datetime.datetime.utcnow().replace(tzinfo=utc)
-        curr_log = archive.models.ExecLog(record=cable_record,start_time=now)
+        # Create a new log with the current time as a placeholder for end_time.
+        curr_log = archive.models.ExecLog(record=cable_record, end_time=timezone.now())
+        curr_log.save() # save() populates start_time
+
         logging.debug("{}: run_cable_h(source='{}', output_path='{}'".format(fn, source,output_path))
         run_cable_h(self, source, output_path)
-        curr_log.end_time = datetime.datetime.utcnow().replace(tzinfo=utc)
+
+        # Set proper end time.
+        curr_log.end_time = timezone.now()
         curr_log.complete_clean()
         logging.debug("{}: Creating/returning exec log".format(fn, curr_log))
         curr_log.save()
@@ -1230,7 +1233,6 @@ class PipelineOutputCable(models.Model):
         This uses run_cable_h and creates an ExecLog, associating it
         to cable_record.
         """
-        import django.utils.timezone
         import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
@@ -1240,7 +1242,7 @@ class PipelineOutputCable(models.Model):
             start_time=django.utils.timezone.now())
 
         run_cable_h(self, source, output_path)
-        curr_log.end_time = django.utils.timezone.now()
+        curr_log.end_time = timezone.now()
         curr_log.complete_clean()
         curr_log.save()
 

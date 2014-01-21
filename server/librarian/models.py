@@ -132,9 +132,9 @@ class SymbolicDataset(models.Model):
     
         structure = None
         if cdt is not None:
-            structure = DatasetStructure(symbolicdataset=symDS,
-                                         compounddatatype=cdt)
-            
+            structure = DatasetStructure(symbolicdataset=symDS,compounddatatype=cdt)
+
+            # FIXME: Change /tmp/SD{} to the tmpdir mechanism
             with open(file_path, "rb") as f:
                 CSV_summary = cdt.summarize_CSV(f, "/tmp/SD{}".format(symDS.pk))
                 self._validate_csv_summary(file_path, cdt, CSV_summary)

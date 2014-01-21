@@ -2,15 +2,19 @@
 Shipyard unit tests pertaining to Pipeline and its relatives.
 """
 
-from django.test import TestCase;
-from django.core.files import File;
-from django.core.exceptions import ValidationError;
+from django.test import TestCase
+from django.core.files import File
+from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 
-import os.path;
+import os.path
+import tempfile
+import shutil
 
 from metadata.models import *
 from method.models import *
 from pipeline.models import *
+from librarian.models import *
 import method.tests
 
 samplecode_path = "../samplecode"
@@ -28,6 +32,9 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         """Set up default database state for Pipeline unit testing."""
         # Methods, CR/CRR/CRDs, and DTs/CDTs are set up by calling this.
         super(PipelineTestSetup, self).setUp()
+
+        self.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
+        self.user.save()
         
         # Define DNAcomp_pf
         self.DNAcomp_pf = PipelineFamily(
@@ -69,6 +76,18 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
             source=step1.transformation.outputs.get(dataset_name="output"),
             output_name="complemented_seqs",
             output_idx=1)
+
+        
+        datafile = tempfile.NamedTemporaryFile(delete=False)
+        datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
+        datafile.write("\n")
+        datafile.write("stuff,ATCG,morestuff\n")
+        datafile.close()
+
+        self.DNAinput_symDS = SymbolicDataset.create_SD(datafile.name, 
+            cdt = self.DNAinput_cdt, user=self.user, name="DNA input",
+            description = "input for DNAcomp pipeline", make_dataset=True)
+
 
         #############################
         
@@ -2389,6 +2408,24 @@ dataset_name="pipe_input_1_a_b_c",
         self.assertEquals(curr_out_new.get_min_row(), None);
         self.assertEquals(curr_out_new.get_max_row(), None);
  
+    def test_execute_cable_wrong_dataset_type(self):
+        """
+        You can't execute a cable by passing anything other than a Dataset or a string.
+
+        This doesn't really belong in PipelineTests but I didn't know where else to put it.
+        """
+        bob = User.objects.create_user('bob', 'bob@aol.com', '12345')
+        tmpdir = tempfile.mkdtemp()
+        run = self.DNAcompv1_p.pipeline_instances.create(user=bob)
+        runstep = self.DNAcompv1_p.steps.first().pipelinestep_instances.create(run=run)
+        record = self.DNAcompv1_p.steps.first().cables_in.first().psic_instances.create(runstep=runstep)
+        self.assertRaisesRegexp(ValueError,
+            error_messages["dataset_bad_type"].format(".*"),
+            lambda: self.DNAcompv1_p.steps.first().cables_in.first().run_cable(None, tmpdir, record))
+        bob.delete()
+        run.delete()
+        record.delete()
+        shutil.rmtree(tmpdir)
 
 class PipelineStepTests(PipelineTestSetup):
 
@@ -3738,8 +3775,11 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        m = Method(revision_name="s4", revision_desc="s4", family =
+            self.test_MF, driver = self.script_4_1_CRR)
+        m.save()
+        method_input = m.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="method_in", dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
         pipeline_cable = pipelineStep.cables_in.create(dest=method_input, source_step=0, source=myPipeline_input)
 
         self.assertEquals(pipeline_cable.clean(), None)
@@ -3759,8 +3799,11 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        m = Method(revision_name="s4", revision_desc="s4", family =
+            self.test_MF, driver = self.script_4_1_CRR)
+        m.save()
+        method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
         pipeline_cable = pipelineStep.cables_in.create(dest=method_input, source_step=0, source=myPipeline_input)
 
             # wire1 = string->string
@@ -3795,8 +3838,11 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        m = Method(revision_name="s4", revision_desc="s4", family =
+            self.test_MF, driver = self.script_4_1_CRR)
+        m.save()
+        method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in", dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
         pipeline_cable = pipelineStep.cables_in.create(dest=method_input, source_step=0, source=myPipeline_input)
 
         # wire1 = string->string
@@ -3825,8 +3871,11 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
-        method_input = self.testmethod.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
-        pipelineStep = myPipeline.steps.create(transformation=self.testmethod, step_num=1)
+        m = Method(revision_name="s4", revision_desc="s4", family =
+            self.test_MF, driver = self.script_4_1_CRR)
+        m.save()
+        method_input = m.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
+        pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
         pipeline_cable = pipelineStep.cables_in.create(dest=method_input, source_step=0, source=myPipeline_input)
         
         # wire1 = string->string
@@ -3849,6 +3898,64 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.complete_clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.complete_clean)
 
+    def test_execlog_created_psic_run_cable_dataset(self):
+        """
+        Check the coherence of an ExecLog created by running a cable with a Dataset.
+        """
+        import time
+
+        scratch_dir = tempfile.mkdtemp()
+        output_file = os.path.join(scratch_dir, "output")
+
+        run = self.DNAcompv1_p.pipeline_instances.create(user=self.user)
+        pipelinestep = self.DNAcompv1_p.steps.first()
+        runstep = pipelinestep.pipelinestep_instances.create(run=run)
+        psic = pipelinestep.cables_in.first()
+        rsic = psic.psic_instances.create(runstep=runstep)
+        log = psic.run_cable(self.DNAinput_symds.dataset, output_file, rsic)
+
+        self.assertEqual(log.record, rsic)
+        self.assertEqual(log.start_time.date(), timezone.now().date())
+        self.assertEqual(log.end_time.date(), timezone.now().date())
+        self.assertEqual(log.start_time < timezone.now(), True)
+        self.assertEqual(log.end_time < timezone.now(), True)
+        self.assertEqual(log.start_time <= log.end_time, True)
+        self.assertEqual(log.is_complete(), True)
+        self.assertEqual(log.complete_clean(), None)
+        self.assertEqual(len(log.missing_outputs()), 0)
+        self.assertEqual(log.is_succesful(), True)
+
+        shutil.rmtree(scratch_dir)
+
+    def test_execlog_created_psic_run_cable_file(self):
+        """
+        Check the coherence of an ExecLog created by running a cable with a file path.
+        """
+        import time
+
+        scratch_dir = tempfile.mkdtemp()
+        output_file = os.path.join(scratch_dir, "output")
+
+        run = self.pipeline_complement.pipeline_instances.create(user=self.user_alice)
+        pipelinestep = self.pipeline_complement.steps.first()
+        runstep = pipelinestep.pipelinestep_instances.create(run=run)
+        psic = pipelinestep.cables_in.first()
+        rsic = psic.psic_instances.create(runstep=runstep)
+        log = psic.run_cable(self.symds_labdata.dataset, output_file, rsic)
+
+        self.assertEqual(log.record, rsic)
+        self.assertEqual(log.start_time.date(), timezone.now().date())
+        self.assertEqual(log.end_time.date(), timezone.now().date())
+        self.assertEqual(log.start_time < timezone.now(), True)
+        self.assertEqual(log.end_time < timezone.now(), True)
+        self.assertEqual(log.start_time <= log.end_time, True)
+        self.assertEqual(log.is_complete(), True)
+        self.assertEqual(log.complete_clean(), None)
+        self.assertEqual(len(log.missing_outputs()), 0)
+        self.assertEqual(log.is_succesful(), True)
+
+        shutil.rmtree(scratch_dir)
+    
 
 # August 29, 2013: reworked to handle new design for outcables.
 class CustomOutputWiringTests(PipelineTestSetup):
