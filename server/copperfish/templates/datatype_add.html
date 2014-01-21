@@ -1,0 +1,30 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "base.html" %}
+
+{% block title %}Datatypes{% endblock %}
+
+{% block javascript %}
+<script src="static/datatypes.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
+{% endblock %}
+
+{% block content %}
+
+<a href="/datatypes">return to Datatypes summary</a>
+
+<h2>Add a new datatype</h2>
+
+<!-- Form for inserting new Datatypes -->
+<h3>New datatype</h3>
+<form action="" method="post">{% csrf_token %}
+    {{ datatype_form.as_p }}
+    {{ int_con_form.errors }}
+    {{ int_con_form.as_p }}
+    {{ str_con_form.errors }}
+    {{ str_con_form.as_p }}
+    <input type="submit" value="Submit" />
+</form>
+
+
+{% endblock %}

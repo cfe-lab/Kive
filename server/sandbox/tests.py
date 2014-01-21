@@ -138,9 +138,9 @@ class ExecuteTests(TestCase):
         self.outcable_2.save()
 
         # Define custom outwires to the second output (Wire twice from cdtm 2)
-        self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_1 ,dest_pin=self.out2_cdtm_1)
-        self.outwire2 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2 ,dest_pin=self.out2_cdtm_2)
-        self.outwire3 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2 ,dest_pin=self.out2_cdtm_3)
+        self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_1,dest_pin=self.out2_cdtm_1)
+        self.outwire2 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2,dest_pin=self.out2_cdtm_2)
+        self.outwire3 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2,dest_pin=self.out2_cdtm_3)
 
         # Have the cables define the TOs of the pipeline
         self.pX.create_outputs()

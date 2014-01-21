@@ -161,6 +161,8 @@ class Sandbox:
         import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        logging.debug("{}: STARTING EXECUTING CABLE".format(fn))
+
         curr_record = None      # RSIC/ROC that we create, reuse, or update
         curr_ER = None
         output_SD = None
@@ -179,18 +181,18 @@ class Sandbox:
                 curr_record = cable.poc_instances.create(run=parent_record)
                 required_record_type = archive.models.RunOutputCable
 
-            # LOOK FOR REUSABLE ER
             cable_keeps_output = None
             if type(cable) == pipeline.models.PipelineStepInputCable:
                 cable_keeps_output = cable.keep_output
             else:
-                # Check parent_record (which is a Run) whether or
-                # not this POC's output is to be deleted.
                 if parent_record.parent_runstep != None:
-                    cable_keeps_output = not (
-                        parent_record.parent_runstep.pipelinestep.
-                        outputs_to_delete.filter(dataset_name=cable.output_name).exists())
+                    cable_keeps_output = not parent_record.parent_runstep.pipelinestep.outputs_to_delete.filter(dataset_name=cable.output_name).exists()
+                    logging.debug("{}: Sub-pipeline step - does the parent runstep keep output? {}".format(fn, cable_keeps_output))
+                else:
+                    logging.debug("{}: Not a sub-pipeline, will keep output".format(fn))
+                    cable_keeps_output = True
             logging.debug("{}: Cable keeps output? {}".format(fn, cable_keeps_output))
+
 
             # FIXME: will redefine what "reusability" means - ERs should only be
             # considered for reuse if its inputs/outputs are valid *at this time*.
@@ -242,6 +244,7 @@ class Sandbox:
                         
                         # Add this cable to cable_map.
                         self.cable_map[cable] = curr_record
+                        logging.debug("{}: DONE EXECUTING CABLE".format(fn))
                         return curr_record
                         
                     # Otherwise (if keeping output but the ERO doesn't have any)
@@ -400,33 +403,36 @@ class Sandbox:
             ccl.baddata.create(missing_output=True)
             
         else:
-            logging.debug("{}: File exists - computing MD5".format(fn))
-            output_md5 = None
-            with open(output_path, "rb") as f:
-                output_md5 = file_access_utils.compute_md5(f)
 
-            if not had_ER_at_beginning:
-                output_SD.MD5_checksum = output_md5
+            # Don't write MD5 for trivial cables, as this would overwrite an already existing MD5
+            if not cable.is_trivial():
+                logging.debug("{}: File exists - computing MD5".format(fn))
+                output_md5 = None
+                with open(output_path, "rb") as f:
+                    output_md5 = file_access_utils.compute_md5(f)
+
+                if not had_ER_at_beginning:
+                    output_SD.MD5_checksum = output_md5
+                    output_SD.save()
             
             if not recover:
 
-                if cable_keeps_output:
-                    logging.debug("{}: Keeping data - creating dataset".format(fn))
+                if cable_keeps_output and not cable.is_trivial():
+                    logging.debug("{}: Creating dataset".format(fn))
                     dataset_name = "{} {} {}".format(self.run.name,type(cable).__name__,curr_record.pk)
 
-                    new_dataset = Dataset(
-                        user=user,
-                        name=dataset_name,
-                        symbolicdataset=output_SD,
-                        created_by=cable)
-
+                    # save() needs f to be open
                     with open(output_path, "rb") as f:
-                        new_dataset.dataset_file = File(f)
+                        new_dataset = archive.models.Dataset(
+                            created_by=curr_record,
+                            dataset_file = File(f),
+                            name=dataset_name,
+                            symbolicdataset=output_SD,
+                            user=self.run.user)
+                        new_dataset.save()
 
-                    new_dataset.save()
                 else:
-                    logging.debug("{}: Not keeping data - not creating dataset".format(fn))
-
+                    logging.debug("{}: Not creating dataset".format(fn))
 
                 logging.debug("{}: Finished registering real data".format(fn))
 
@@ -448,12 +454,14 @@ class Sandbox:
                             cable_min_row = cable.source.get_min_row()
                             cable_max_row = cable.source.get_max_row()
 
-                    ccl = output_SD.check_file_contents(
-                        output_path,
-                        summary_path,
-                        cable_min_row,
-                        cable_max_row,
-                        curr_log)
+                    # It is pointless to check the contents of a trivial cable
+                    if not cable.is_trivial():
+                        ccl = output_SD.check_file_contents(
+                            output_path,
+                            summary_path,
+                            cable_min_row,
+                            cable_max_row,
+                            curr_log)
                                     
                     # FINISHED CONTENT CHECK ON FIRST TIME OF CREATION
                     ####
@@ -508,6 +516,8 @@ class Sandbox:
 
         # FINISHED BOOKKEEPING
         ####
+
+        logging.debug("{}: DONE EXECUTING CABLE".format(fn))
         return curr_record
 
     def execute_step(self, curr_run, pipelinestep, inputs, step_run_dir=None,
@@ -782,6 +792,7 @@ class Sandbox:
 
                 bad_output_found = True
                 continue
+
 
             output_md5 = ""
             with open(output_path, "rb") as f:
