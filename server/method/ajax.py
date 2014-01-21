@@ -1,5 +1,5 @@
 from django.http import HttpResponse, Http404
-from copperfish.models import CodeResource, CodeResourceRevision
+from method.models import CodeResource, CodeResourceRevision
 from django.core import serializers
 
 def populate_revision_dropdown (request):
@@ -10,7 +10,7 @@ def populate_revision_dropdown (request):
      drop-down.  The 'change' event triggers an Ajax request that this function will handle
      and return a JSON object with the revision info.
     """
-    from copperfish.models import CodeResourceRevision
+    #from metadata.models import CodeResourceRevision
     json = {}
     if request.is_ajax():
         response = HttpResponse()
