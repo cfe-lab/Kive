@@ -277,18 +277,41 @@ def resource_add(request):
 
 
 
-def resource_add_revision(request, id):
+def resource_revise(request, id):
     """
     Revise a code resource.  The form will initially be populated with values of the last
     revision to this code resource.
     """
+    t = loader.get_template('resource_revise.html')
     this_code_resource = models.CodeResource.objects.get(pk=id)
     all_revisions = models.CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
     last_revision = all_revisions[0]
 
     if request.method == 'POST':
         query = request.POST.dict()
-        file_in_memory = request.FILES['content_file']
+
+        # validate name and description entries (return error if blank)
+        min_form = CodeResourceMinimalForm(request.POST)
+        if not min_form.is_valid():
+            # create unbound form
+            form = CodeResourceRevisionForm(request.POST)
+            form._errors = min_form.errors
+            dep_form = CodeResourceDependencyForm()
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        try:
+            file_in_memory = request.FILES['content_file']
+        except:
+            # no file specified
+            form = CodeResourceRevisionForm(request.POST)
+            form._errors = min_form.errors
+            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
+            dep_form = CodeResourceDependencyForm()
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
 
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
@@ -314,7 +337,6 @@ def resource_add_revision(request, id):
             form = CodeResourceRevisionForm()
             dep_form = CodeResourceDependencyForm()
 
-    t = loader.get_template('resource_add_revision.html')
     c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dependency_form': dep_form})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
