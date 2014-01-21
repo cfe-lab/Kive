@@ -1,0 +1,24 @@
+#!/usr/bin/expect -f
+
+spawn rm -r CodeResources
+spawn rm -r VerificationScripts
+spawn rm -r Datasets
+spawn rm [PATH TO YOUR DB]
+spawn ./manage.py syncdb --traceback
+
+expect -re "(yes/no):"
+send "yes\r"
+
+expect -re "(leave blank to use '.*'):"
+send "\r"
+
+expect -re "Email address:"
+send "[YOUR E-MAIL ADDRESS HERE]\r"
+
+expect -re "Password:"
+send "[YOUR PASSWORD]\r"
+
+expect -re "Password (again): "
+send "[YOUR PASSWORD AGAIN]\r"
+
+exit
