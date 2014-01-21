@@ -95,6 +95,41 @@ class Sandbox:
         if len(self.inputs) != self.pipeline.inputs.count():
             raise ValueError(error_messages["pipeline_bad_inputcount"].
                 format(self.pipeline, self.pipeline.inputs.count(), len(self.inputs)))
+        
+        # Check each individual input.
+        for i, supplied_input in enumerate(self.inputs):
+            pipeline_input = self.pipeline.inputs.get(dataset_idx=i+1)
+            pipeline_raw = pipeline_input.is_raw()
+            supplied_raw = supplied_input.is_raw()
+
+            if pipeline_raw:
+                if supplied_raw:
+                    continue
+                else:
+                    raise ValueError(error_messages["pipeline_expected_raw"].
+                        format(self.pipeline, i+1, supplied_input.get_cdt()))
+
+            # Pipeline expected input is not raw.
+            elif supplied_raw:
+                raise ValueError(error_messages["pipeline_expected_nonraw"].
+                    format(self.pipeline, i+1, pipeline_input.get_cdt()))
+
+            # Neither is raw.
+            supplied_cdt = supplied_input.get_cdt()
+            pipeline_cdt = pipeline_input.get_cdt()
+
+            if not supplied_cdt.is_restriction(pipeline_cdt):
+                raise ValueError(error_messages["pipeline_cdt_mismatch"].
+                    format(self.pipeline, i+1, pipeline_cdt, supplied_cdt))
+
+            # The CDT's match. Is the number of rows okay?
+            minrows = pipeline_input.get_min_row() or 0
+            maxrows = pipeline_input.get_max_row() 
+            maxrows = maxrows if maxrows is not None else sys.maxint
+
+            if not minrows <= supplied_input.num_rows() <= maxrows:
+                raise ValueError(error_messages["pipeline_bad_numrows"].
+                    format(self.pipeline, i+1, minrows, maxrows, supplied_input.num_rows()))
 
     def execute_cable(self, cable, input_SD, output_path, parent_record,
                       recover=False):
