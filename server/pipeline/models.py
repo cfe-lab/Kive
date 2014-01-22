@@ -1233,7 +1233,7 @@ class PipelineOutputCable(models.Model):
         This uses run_cable_h and creates an ExecLog, associating it
         to cable_record.
         """
-        import inspect, logging
+        import inspect, logging, django.utils.timezone
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         logging.debug("{}: Creating ExecLog for {}".format(fn,cable_record))
