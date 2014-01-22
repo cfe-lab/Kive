@@ -39,31 +39,31 @@ class ExecuteTests(TestCase):
         self.int_dt.save()
 
 		# Basic CDTs
-        self.tri_cdt = CompoundDatatype()
-        self.tri_cdt.save()
-        self.tri_cdtm_1 = self.tri_cdt.members.create(datatype=self.int_dt,column_name="a",column_idx=1)
-        self.tri_cdtm_2 = self.tri_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
-        self.tri_cdtm_3 = self.tri_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
+        self.pX_in_cdt = CompoundDatatype()
+        self.pX_in_cdt.save()
+        self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="a",column_idx=1)
+        self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
+        self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt,column_name="c",column_idx=3)
 
-        self.di_cdt = CompoundDatatype()
-        self.di_cdt.save()
-        self.di_cdtm_1 = self.di_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
-        self.di_cdtm_2 = self.di_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
+        self.mA_in_cdt = CompoundDatatype()
+        self.mA_in_cdt.save()
+        self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
+        self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
 
-        self.output_cdt = CompoundDatatype()
-        self.output_cdt.save()
-        self.output_cdtm_1 = self.output_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
-        self.output_cdtm_2 = self.output_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
+        self.mA_out_cdt = CompoundDatatype()
+        self.mA_out_cdt.save()
+        self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
+        self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
 
         # Method + input/outputs
         self.mA = Method(revision_name="mA",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr); self.mA.save()
-        self.mA_in = self.mA.create_input(compounddatatype=self.di_cdt,dataset_name="mA_in", dataset_idx=1)
-        self.mA_out = self.mA.create_output(compounddatatype=self.output_cdt,dataset_name="mA_out", dataset_idx=1)
+        self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
+        self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
 
         # Dataset for input during execution of pipeline
         self.symDS = SymbolicDataset.create_SD(
             file_path=os.path.join(samplecode_path, "triplet_cdt_for_pipeline_execute_test.csv"),
-            cdt=self.tri_cdt,
+            cdt=self.pX_in_cdt,
             make_dataset=True,
             user=self.myUser,
             name="input_dataset",
@@ -81,18 +81,18 @@ class ExecuteTests(TestCase):
             #method_out.error_log.delete()
 
 
-    def test_pipeline_execute_A(self):
+    def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
 
         # Define pipeline containing the method, and its input + outcables
         self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.tri_cdt,dataset_name="pX_in",dataset_idx=1)
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
 
         # Custom cable from pipeline input to method
         self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_2,dest_pin=self.di_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.di_cdtm_1)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
 
         # Pipeline outcables
         self.X1_outcable = self.pX.create_outcable(output_name="pX_out",output_idx=1,source_step=1,source=self.mA_out)
@@ -104,22 +104,22 @@ class ExecuteTests(TestCase):
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
 
-    def test_pipeline_execute_B(self):
-        """Two step pipeline with the second step identical to the first"""
+    def test_pipeline_execute_B_twostep_pipeline_with_recycling(self):
+        """Two step pipeline with second step identical to the first"""
 
         # Define pipeline containing two steps with the same method + pipeline input
         self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.tri_cdt,dataset_name="pX_in",dataset_idx=1)
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
         self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
 
         # Use the SAME custom cable from pipeline input to steps 1 and 2
         self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_2,dest_pin=self.di_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.di_cdtm_1)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
         self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.tri_cdtm_2,dest_pin=self.di_cdtm_2)
-        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.tri_cdtm_3,dest_pin=self.di_cdtm_1)
+        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
 
         # POCs: one is trivial, the second uses custom outwires
         # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
@@ -138,9 +138,82 @@ class ExecuteTests(TestCase):
         self.outcable_2.save()
 
         # Define custom outwires to the second output (Wire twice from cdtm 2)
-        self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_1,dest_pin=self.out2_cdtm_1)
-        self.outwire2 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2,dest_pin=self.out2_cdtm_2)
-        self.outwire3 = self.outcable_2.custom_outwires.create(source_pin=self.output_cdtm_2,dest_pin=self.out2_cdtm_3)
+        self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.out2_cdtm_1)
+        self.outwire2 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_2)
+        self.outwire3 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_3)
+
+        # Have the cables define the TOs of the pipeline
+        self.pX.create_outputs()
+
+        # Execute pipeline
+        pipeline = self.pX
+        inputs = [self.symDS]
+        mySandbox = Sandbox(self.myUser, pipeline, inputs)
+        mySandbox.execute_pipeline()
+
+    def test_pipeline_execute_C_twostep_pipeline_with_subpipeline(self):
+        """Two step pipeline with second step identical to the first"""
+
+        # Define input/output CDTs needed for inner pipeline pY
+        self.pY_in_cdt = CompoundDatatype()
+        self.pY_in_cdt.save()
+        self.pY_in_cdtm_1 = self.pY_in_cdt.members.create(column_name="pYA",column_idx=1,datatype=self.int_dt)
+        self.pY_in_cdtm_2 = self.pY_in_cdt.members.create(column_name="pYB",column_idx=2,datatype=self.string_dt)
+
+        self.pY_out_cdt = CompoundDatatype()
+        self.pY_out_cdt.save()
+        self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
+
+        # Define inner pipeline pY
+        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y")
+        self.pY.save()
+        self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
+
+        self.pY_step_1 = self.pY.steps.create(transformation=self.mA,step_num=1)
+        self.pY_cable_in = self.pY_step_1.cables_in.create(dest=self.mA_in,source_step=0,source=self.pY_in)
+        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_1,dest_pin=self.mA_in_cdtm_2)
+        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_2,dest_pin=self.mA_in_cdtm_1)
+
+        self.pY_cable_out = self.pY.create_outcable(output_name="pY_out",output_idx=1,source_step=1,source=self.mA_out)
+        self.pY_outwire1 = self.pY_cable_out.custom_outwires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.pY_out_cdt_cdtm_1)
+
+
+
+
+        # Define pipeline containing two steps with the same method + pipeline input
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
+        self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
+        self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
+
+        # Use the SAME custom cable from pipeline input to steps 1 and 2
+        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+        self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
+        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+
+        # POCs: one is trivial, the second uses custom outwires
+        # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
+        self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
+        self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
+
+        # Define CDT for the second output (first output is defined by a trivial cable)
+        self.pipeline_out2_cdt = CompoundDatatype()
+        self.pipeline_out2_cdt.save()
+        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
+        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
+        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
+
+        # Second cable is not a trivial - we assign the new CDT to it
+        self.outcable_2.output_cdt = self.pipeline_out2_cdt
+        self.outcable_2.save()
+
+        # Define custom outwires to the second output (Wire twice from cdtm 2)
+        self.outwire1 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.out2_cdtm_1)
+        self.outwire2 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_2)
+        self.outwire3 = self.outcable_2.custom_outwires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_3)
 
         # Have the cables define the TOs of the pipeline
         self.pX.create_outputs()
@@ -159,7 +232,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
             error_messages["pipeline_bad_inputcount"].format(".*", ".*", 0),
             lambda: Sandbox(self.myUser, p, []))
@@ -180,7 +253,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 8, max_row = 12)
         # Assert no ValueError raised.
         Sandbox(self.myUser, p, [self.symDS])
@@ -202,7 +275,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1)
         raw_symDS = SymbolicDataset()
         raw_symDS.save()
         self.assertRaisesRegexp(ValueError,
@@ -216,7 +289,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.di_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
             error_messages["pipeline_cdt_mismatch"].format(".*", 1, ".*", ".*"),
             lambda: Sandbox(self.myUser, p, [self.symDS]))
@@ -228,7 +301,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 2, max_row = 4)
         self.assertRaisesRegexp(ValueError,
             error_messages["pipeline_bad_numrows"].format(".*", 1, 2, 4, ".*"),
@@ -241,7 +314,7 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.tri_cdt, dataset_name="in", dataset_idx = 1,
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 20)
         self.assertRaisesRegexp(ValueError,
             error_messages["pipeline_bad_numrows"].format(".*", 1, 20, ".*", ".*"),
