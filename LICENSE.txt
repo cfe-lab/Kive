@@ -1,4 +1,4 @@
-Copyright (c) 2013, Richard Liang, Eric Martin, Rosemary McCloskey, James Nakamura, and Art Poon.
+Copyright (c) 2013, Richard Liang, Eric Martin, Rosemary McCloskey, James Nakagawa, and Art Poon.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
