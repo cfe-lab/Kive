@@ -78,13 +78,13 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
             output_idx=1)
 
         
-        datafile = tempfile.NamedTemporaryFile(delete=False)
-        datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
-        datafile.write("\n")
-        datafile.write("stuff,ATCG,morestuff\n")
-        datafile.close()
+        self.datafile = tempfile.NamedTemporaryFile(delete=False)
+        self.datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
+        self.datafile.write("\n")
+        self.datafile.write("stuff,ATCG,morestuff\n")
+        self.datafile.close()
 
-        self.DNAinput_symDS = SymbolicDataset.create_SD(datafile.name, 
+        self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, 
             cdt = self.DNAinput_cdt, user=self.user, name="DNA input",
             description = "input for DNAcomp pipeline", make_dataset=True)
 
@@ -3898,64 +3898,62 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.complete_clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,myPipeline.complete_clean)
 
-    def test_execlog_created_psic_run_cable_dataset(self):
+    def _make_log(self, pipeline, output_file, source):
+        """
+        Helper function to make an ExecLog and RSIC for a pipeline.
+        """
+        run = pipeline.pipeline_instances.create(user=self.user)
+        pipelinestep = self.DNAcompv1_p.steps.first()
+        runstep = pipelinestep.pipelinestep_instances.create(run=run)
+        psic = pipelinestep.cables_in.first()
+        rsic = psic.psic_instances.create(runstep=runstep)
+        log = psic.run_cable(source, output_file, rsic)
+        return log, rsic
+
+    def _setup_dirs(self):
+        """
+        Helper function to make a temp directory and output file.
+        """
+        scratch_dir = tempfile.mkdtemp()
+        output_file = os.path.join(scratch_dir, "output")
+        return scratch_dir, output_file
+
+    def _log_checks(self, log, rsic):
+        """
+        Helper function to check that an ExecLog made from an RSIC is coherent.
+        """
+        self.assertEqual(log.record, rsic)
+        self.assertEqual(log.start_time.date(), timezone.now().date())
+        self.assertEqual(log.end_time.date(), timezone.now().date())
+        self.assertEqual(log.start_time < timezone.now(), True)
+        self.assertEqual(log.end_time < timezone.now(), True)
+        self.assertEqual(log.start_time <= log.end_time, True)
+        self.assertEqual(log.is_complete(), True)
+        self.assertEqual(log.complete_clean(), None)
+        self.assertEqual(len(log.missing_outputs()), 0)
+        self.assertEqual(log.is_successful(), True)
+
+    def test_execlog_psic_run_cable_dataset(self):
         """
         Check the coherence of an ExecLog created by running a cable with a Dataset.
         """
         import time
 
-        scratch_dir = tempfile.mkdtemp()
-        output_file = os.path.join(scratch_dir, "output")
-
-        run = self.DNAcompv1_p.pipeline_instances.create(user=self.user)
-        pipelinestep = self.DNAcompv1_p.steps.first()
-        runstep = pipelinestep.pipelinestep_instances.create(run=run)
-        psic = pipelinestep.cables_in.first()
-        rsic = psic.psic_instances.create(runstep=runstep)
-        log = psic.run_cable(self.DNAinput_symds.dataset, output_file, rsic)
-
-        self.assertEqual(log.record, rsic)
-        self.assertEqual(log.start_time.date(), timezone.now().date())
-        self.assertEqual(log.end_time.date(), timezone.now().date())
-        self.assertEqual(log.start_time < timezone.now(), True)
-        self.assertEqual(log.end_time < timezone.now(), True)
-        self.assertEqual(log.start_time <= log.end_time, True)
-        self.assertEqual(log.is_complete(), True)
-        self.assertEqual(log.complete_clean(), None)
-        self.assertEqual(len(log.missing_outputs()), 0)
-        self.assertEqual(log.is_succesful(), True)
-
+        scratch_dir, output_file = self._setup_dirs()
+        log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.DNAinput_symDS.dataset)
+        self._log_checks(log, rsic)
         shutil.rmtree(scratch_dir)
 
-    def test_execlog_created_psic_run_cable_file(self):
+    def test_execlog_psic_run_cable_file(self):
         """
-        Check the coherence of an ExecLog created by running a cable with a file path.
+        Check the coherence of an ExecLog created by running a cable with a Dataset.
         """
         import time
 
-        scratch_dir = tempfile.mkdtemp()
-        output_file = os.path.join(scratch_dir, "output")
-
-        run = self.pipeline_complement.pipeline_instances.create(user=self.user_alice)
-        pipelinestep = self.pipeline_complement.steps.first()
-        runstep = pipelinestep.pipelinestep_instances.create(run=run)
-        psic = pipelinestep.cables_in.first()
-        rsic = psic.psic_instances.create(runstep=runstep)
-        log = psic.run_cable(self.symds_labdata.dataset, output_file, rsic)
-
-        self.assertEqual(log.record, rsic)
-        self.assertEqual(log.start_time.date(), timezone.now().date())
-        self.assertEqual(log.end_time.date(), timezone.now().date())
-        self.assertEqual(log.start_time < timezone.now(), True)
-        self.assertEqual(log.end_time < timezone.now(), True)
-        self.assertEqual(log.start_time <= log.end_time, True)
-        self.assertEqual(log.is_complete(), True)
-        self.assertEqual(log.complete_clean(), None)
-        self.assertEqual(len(log.missing_outputs()), 0)
-        self.assertEqual(log.is_succesful(), True)
-
+        scratch_dir, output_file = self._setup_dirs()
+        log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.datafile.name)
+        self._log_checks(log, rsic)
         shutil.rmtree(scratch_dir)
-    
 
 # August 29, 2013: reworked to handle new design for outcables.
 class CustomOutputWiringTests(PipelineTestSetup):

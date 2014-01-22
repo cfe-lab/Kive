@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 import hashlib
 
 import file_access_utils
+from messages import error_messages
 
 import method.models
 import transformation.models
@@ -1090,6 +1091,10 @@ class ExecLog(models.Model):
             raise ValidationError(
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))
+
+        if self.start_time > self.end_time:
+            raise ValidationError(
+                error_messages["execlog_swapped_times"].format(self))
 
     def is_complete(self):
         """If this is a RunStep, specifically a method, it must have a methodoutput to be complete"""

@@ -18,6 +18,8 @@ error_messages = {
     "pipeline_bad_numrows":
         'Pipeline "{}" expected input {} to have between {} and {} rows, but got a one with {}',
     "dataset_bad_type":
-        'Expected source to be either a Dataset or a string, got {}'
+        'Expected source to be either a Dataset or a string, got {}',
+    "execlog_swapped_times":
+        'The end time of ExecLog "{}" is before its start time.'
 
 }

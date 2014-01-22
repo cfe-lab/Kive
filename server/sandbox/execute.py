@@ -285,7 +285,7 @@ class Sandbox:
         curr_log = None
 
         # The input contents are not on the file system, and:
-        if (self.sd_fs_map[input_SD] == None) or not os.access(self.sd_fs_map[input_SD], os.R_OK):
+        if self.sd_fs_map[input_SD] is None or not os.access(self.sd_fs_map[input_SD], os.R_OK):
             logging.debug("{}: Dataset unavailable on file system".format(fn))
 
             if input_SD.has_data():
