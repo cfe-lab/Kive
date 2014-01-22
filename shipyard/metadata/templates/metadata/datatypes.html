@@ -1,0 +1,40 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datatypes{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="/dev.html">Back to developer's portal</a>
+
+<h2>Datatypes</h2>
+
+<table>
+<thead>
+	<tr>
+	<th>Name</th>
+	<th>Description</th>
+<!-- 	<th>Restricts</th> -->
+	<th>Python type</th>
+	<th>Date created</th>
+	</tr>
+</thead>
+{% for datatype in datatypes %}
+<tr>
+	<td><a href="{{ datatype.get_absolute_url }}">{{ datatype.name }}</a></td>
+	<td>{{ datatype.description }}</td>
+<!-- 	<td>{{ datatype.restricts.name }}</td> -->
+    <td>{{ datatype.Python_type }}</td>
+    <td>{{ datatype.date_created }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="/datatype_add">Create new datatype</a>
+
+{% endblock %}

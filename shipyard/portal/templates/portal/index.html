@@ -1,0 +1,22 @@
+<!-- Django template -->
+
+{% extends "portal/base.html" %}
+{% block title %}Shipyard home{% endblock %}
+
+{% block content %}
+<nav><ul>
+    <li>
+        <a href="/dev.html">
+        <h4 class="menu-item">Developer portal</h4>
+        <p class="menu-description">Add and/or modify database objects, including Datatypes and Methods.</p>
+        </a>
+    </li>
+    <li>
+        <a href="/usr.html">
+        <h4 class="menu-item">Users portal</h4>
+        <p class="menu-description">Upload data sets and process data using pipelines.</p>
+        </a>
+    </li>
+</ul></nav>
+
+{% endblock %}
