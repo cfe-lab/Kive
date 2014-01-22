@@ -110,10 +110,10 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'server.urls'
+ROOT_URLCONF = 'shipyard.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'server.wsgi.application'
+WSGI_APPLICATION = 'shipyard.wsgi.application'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
@@ -139,7 +139,7 @@ INSTALLED_APPS = (
     'pipeline',
     'transformation',
     'datachecking',
-	'sandbox',
+    'sandbox',
     'portal',
 )
 
