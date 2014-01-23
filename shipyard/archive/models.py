@@ -1076,6 +1076,8 @@ class ExecLog(models.Model):
                                       help_text="Time at start of execution")
 
     end_time = models.DateTimeField("end time",
+                                    null=True,
+                                    blank=True,
                                     help_text="Time at end of execution")
 
     def clean(self):
@@ -1092,7 +1094,7 @@ class ExecLog(models.Model):
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))
 
-        if self.start_time > self.end_time:
+        if self.end_time is not None and self.start_time > self.end_time:
             raise ValidationError(
                 error_messages["execlog_swapped_times"].format(self))
 
@@ -1112,6 +1114,9 @@ class ExecLog(models.Model):
         check for the existence of a MethodOutput.
         """
         self.clean()
+
+        if self.end_time is None:
+            raise ValidationError("ExecLog {} does not have a specified end time".format(self))
 
         if not self.is_complete():
             raise ValidationError(

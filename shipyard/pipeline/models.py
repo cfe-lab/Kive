@@ -862,17 +862,16 @@ class PipelineStepInputCable(models.Model):
         import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
-        # Create a new log with the current time as a placeholder for end_time.
-        curr_log = archive.models.ExecLog(record=cable_record, end_time=timezone.now())
-        curr_log.save() # save() populates start_time
+        # Create a new log with the current start_time and a null end_time
+        logging.debug("{}: Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(fn, source,output_path))
+        curr_log = archive.models.ExecLog(record=cable_record)
+        curr_log.save()
 
-        logging.debug("{}: run_cable_h(source='{}', output_path='{}'".format(fn, source,output_path))
         run_cable_h(self, source, output_path)
 
-        # Set proper end time.
+        # Now give it the correct end_time
         curr_log.end_time = timezone.now()
         curr_log.complete_clean()
-        logging.debug("{}: Creating/returning exec log".format(fn, curr_log))
         curr_log.save()
         return curr_log
 
@@ -1237,10 +1236,8 @@ class PipelineOutputCable(models.Model):
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         logging.debug("{}: Creating ExecLog for {}".format(fn,cable_record))
-        curr_log = archive.models.ExecLog(
-            record=cable_record,
-            start_time=django.utils.timezone.now())
-
+        curr_log = archive.models.ExecLog(record=cable_record)
+        curr_log.save()
         run_cable_h(self, source, output_path)
         curr_log.end_time = timezone.now()
         curr_log.complete_clean()

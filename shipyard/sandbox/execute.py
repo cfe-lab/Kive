@@ -619,6 +619,10 @@ class Sandbox:
 
 
         curr_log = archive.models.ExecLog(record=curr_RS)
+
+        # Give it the current start time
+        curr_log.save()
+
         logging.debug("{}: Created EL for method execution at {}".format(fn, curr_log))
         method_popen = None
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
@@ -653,12 +657,12 @@ class Sandbox:
         sys.stdout.flush()
         sys.stderr.flush()
 
-        curr_date_time = django.utils.timezone.now()
-        curr_log.end_time = curr_date_time
-        curr_log.clean()
+        # Save the completion time of this method
+        curr_log.end_time = django.utils.timezone.now()
         curr_log.save()
+
         logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".format(
-                fn, curr_log.start_time, curr_log.end_time))
+                fn,curr_log.start_time,curr_log.end_time))
 
         logging.debug("{}: Storing stdout/stderr in MethodOutput".format(fn))
         curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=method_popen.returncode)
@@ -671,12 +675,10 @@ class Sandbox:
         curr_mo.save()
         curr_log.complete_clean()
 
-
-
         if curr_ER == None:
             logging.debug("{}: Creating fresh ER".format(fn))
 
-            # FIXME: Have Richard review this
+
             curr_ER = librarian.models.ExecRecord(generator=curr_log)
             curr_ER.save()
             curr_RS.execrecord = curr_ER
@@ -887,7 +889,7 @@ class Sandbox:
                         generator = None
                 step_inputs.append(self.socket_map[(generator, socket)])
 
-            curr_RS = self.execute_step(curr_run, step, step_inputs,step_run_dir=run_dir)
+            curr_RS = self.execute_step(curr_run,step,step_inputs,step_run_dir=run_dir)
             logger.debug("{}: DONE EXECUTING STEP".format(fn))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
@@ -895,12 +897,18 @@ class Sandbox:
                 curr_run.clean()
                 return curr_run
 
-        logging.debug("{}: Finished executing steps, proceeding to run output cables".format(fn))
+        logging.debug("{}: DONE EXECUTING ALL STEPS - running POCs".format(fn))
 
         for outcable in pipeline.outcables.all():
+            logging.debug("{}: Executing POC {}".format(fn,outcable))
+
             # Identify the SD that feeds this outcable.
             generator = pipeline.steps.get(step_num=outcable.source_step)
-            source_SD = self.socket_map[(generator, outcable.source)]
+
+            # FIXME: Tried to access socket_map[(pX step 2, pY_out)] but when the subpipeline completed it wouldn't save to it's outer step...
+            source_SD = self.socket_map[(generator,outcable.source)]
+
+
             file_suffix = "raw" if outcable.is_raw() else "csv"
             out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name,file_suffix)
             output_path = os.path.join(out_dir,out_file_name)
@@ -914,9 +922,6 @@ class Sandbox:
         logging.debug("{}: Finished executing output cables".format(fn))
         curr_run.complete_clean()
         curr_run.save()
-        
-        # FINISH LAST BIT OF BOOKKEEPING
-        ####
 
         return curr_run
 
