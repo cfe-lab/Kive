@@ -33,13 +33,13 @@ The first thing you need to do is to make a copy of `/shipyard/settings_default.
 You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
 
 
-Database
---------
+Initialize database
+-------------------
 
 Next, you need to make a copy of `./nukeDB_default.expect` and call it `nukeDB.expect`.  You need to replace all text that is highlighted in square brackets, as follows:
 
-* `[PATH TO YOUR DB]` -
-* `[YOUR E-MAIL ADDRESS HERE]`
+* `[PATH TO YOUR DB]` - an absolute or relative path to your database file, if you are using sqlite3.  **WARNING:** This will overwrite an existing database at this path, so you will lose everything if you execute the `nukeDB.expect` script after having used **shipyard** for any length of time.  As a precaution, you (as system administrator) may consider changing the user permission settings on all `nukeDB.*` files.
+* `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account 
 * `[YOUR PASSWORD]`
 * `[YOUR PASSWORD AGAIN]`
 
