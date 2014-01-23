@@ -20,8 +20,11 @@ a:visited {
     background-color: #fff;
     border-left: 3px solid #06a;
     padding: 0 0 1em 0;
-    position: absolute;
+    position: static;
     top: 0; bottom: 0;
+}
+#inner_wrap {
+    margin: .5em 2em .5em 4em;
 }
 table {
     border: 0;
@@ -37,16 +40,12 @@ thead {
 }
 th, td {
     padding: .5em;
+    text-align: left;
+    vertical-align: top;
 }
-tr:hover td {
+tr:hover td,
+tr:hover th {
     background-color: #f0f0f0;
-}
-#wrapper > p,
-#wrapper > a,
-#wrapper > h2,
-#wrapper > h3,
-#wrapper > table {
-    margin: .5em 2em .5em 4em;
 }
 #wrapper > a {
     font-size: .8em;
@@ -69,6 +68,7 @@ h3 {
     font-size: 1em;
 }
 
+/* Navigation menu styles */
 nav ul {
     list-style: none;
     display: block;
@@ -103,4 +103,28 @@ nav h4 {
 }
 nav .menu-description {
     margin: .3em 0 0;
+}
+
+/* Form styles */
+form input,
+form textarea,
+form select {
+    font: inherit;
+    border: 1px solid #ccc;
+}
+
+.helptext a[rel="ctrl"] {
+    color: #888;
+    font-size: 0.8em;
+}
+.helptext .fulltext {
+    display: none;
+    position: absolute;
+    border: 1px solid #FF9; /* FF9 is superior to both 8 and 10. */
+    background-color: #ffc;
+    color: #cc3;
+    font-size: .8em;
+    font-style: italic;
+    padding: .5em;
+    max-width: 20em;
 }
