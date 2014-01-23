@@ -39,9 +39,16 @@ Initialize database
 Next, you need to make a copy of `./nukeDB_default.expect` and call it `nukeDB.expect`.  You need to replace all text that is highlighted in square brackets, as follows:
 
 * `[PATH TO YOUR DB]` - an absolute or relative path to your database file, if you are using sqlite3.  **WARNING:** This will overwrite an existing database at this path, so you will lose everything if you execute the `nukeDB.expect` script after having used **shipyard** for any length of time.  As a precaution, you (as system administrator) may consider changing the user permission settings on all `nukeDB.*` files.
-* `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account 
-* `[YOUR PASSWORD]`
-* `[YOUR PASSWORD AGAIN]`
+* `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account with the utility that is packaged with the Django distribution (`django.contrib.admin`).  Generally, it is not necessary to use this admin interface but we leave it as an open possibility.  It is okay to leave this blank, *i.e.,* as an empty string `""`.
+* `[YOUR PASSWORD]` - similarly, this is also used to initialize an admin account for the Django admin interface.  Unless you are really keen to use the admin tool, it is fine to enter an empty string here: `""`.
+* `[YOUR PASSWORD AGAIN]` - obviously, this should match the previous entry.
+
+
+Finally, execute this *expect* script using the bash script `./nukeDB.bash`.  (Note that in OS X, *expect* scripts tend to appear to hang; just give it some time and it will proceed through the rest of the automation.  We don't know why this happens.)  This is a simple wrapper that calls `nukeDB.expect` and then executes a Django function that will populate the new database with some initial data.
+
+You are now ready to run a local Django webserver - you just need to type `python manage.py runserver` and navigate to `localhost:8000` in your web browser!
+
+
 
 
 
