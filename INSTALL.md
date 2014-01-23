@@ -28,7 +28,7 @@ The root directory of **shipyard** should contain the following subdirectories:
 Settings
 --------
 
-The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, if you are using sqlite3 as your database engine, you would enter `'sqlite3'` under the key `ENGINE`, and the absolute path to the sqlite3 database file under the key `NAME`.  Note that this file does not have to exist - it will be created later.
+Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, if you are using sqlite3 as your database engine, you would enter `'sqlite3'` under the key `ENGINE`, and the absolute path to the sqlite3 database file under the key `NAME`.  Note that this file does not have to exist - it will be created later.
 
 You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
 
@@ -39,8 +39,8 @@ Initialize database
 Next, you need to make a copy of `./nukeDB_default.expect` and call it `nukeDB.expect`.  You need to replace all text that is highlighted in square brackets, as follows:
 
 * `[PATH TO YOUR DB]` - an absolute or relative path to your database file, if you are using sqlite3.  **WARNING:** This will overwrite an existing database at this path, so you will lose everything if you execute the `nukeDB.expect` script after having used **shipyard** for any length of time.  As a precaution, you (as system administrator) may consider changing the user permission settings on all `nukeDB.*` files.
-* `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account with the utility that is packaged with the Django distribution (`django.contrib.admin`).  Generally, it is not necessary to use this admin interface but we leave it as an open possibility.  It is okay to leave this blank, *i.e.,* as an empty string `""`.
-* `[YOUR PASSWORD]` - similarly, this is also used to initialize an admin account for the Django admin interface.  Unless you are really keen to use the admin tool, it is fine to enter an empty string here: `""`.
+* `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account with the utility that is packaged with the Django distribution (`django.contrib.admin`).  Generally, it is not necessary to use this admin interface but we leave it as an open possibility.  It is okay to leave this blank, *i.e.,* as an empty string followed by a carriage return `"\r"`.
+* `[YOUR PASSWORD]` - similarly, this is also used to initialize an admin account for the Django admin interface.  Unless you are really keen to use the admin tool, it is fine to enter an empty string here: `"\r"`.
 * `[YOUR PASSWORD AGAIN]` - obviously, this should match the previous entry.
 
 
