@@ -113,17 +113,21 @@ form select {
     border: 1px solid #ccc;
 }
 
+.helptext {
+    display: inline;
+}
 .helptext a[rel="ctrl"] {
     color: #888;
     font-size: 0.8em;
+    cursor: pointer;
 }
 .helptext .fulltext {
     display: none;
     position: absolute;
     border: 1px solid #FF9; /* FF9 is superior to both 8 and 10. */
     background-color: #ffc;
-    color: #cc3;
-    font-size: .8em;
+    color: #880;
+    font-size: .7em;
     font-style: italic;
     padding: .5em;
     max-width: 20em;

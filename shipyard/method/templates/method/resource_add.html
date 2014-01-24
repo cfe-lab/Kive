@@ -28,18 +28,22 @@
     </p>
     <p>
     <input type="button" id="addDependencyForm" value="+"/>
-    <input type="button" id="removeDependencyForm" value="-"/><small>Add/subtract dependency form fields</small><br/>
-    <table>
-    <th><td>Code resource</td><td>Revision</td><td>Path</td><td>Filename</td></th>
+    <input type="button" id="removeDependencyForm" value="-"/><small>Add/subtract dependency form fields</small></p>
+    
+    <table id="dependencyForms">
+    <thead>
+    <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr></thead>
+    <tbody>
     <tr>
         <td>{{ dependency_form.coderesource }}</td>
         <td>{{ dependency_form.revisions }}</td>
         <td>{{ dependency_form.depPath }}</td>
         <td>{{ dependency_form.depFileName }}</td>
     </tr>
-    <div id="extraDependencyForms"></div>
+    </tbody>
+    <tbody id="extraDependencyForms">
+    </tbody>
     </table>
-    </p>
 
     <input type="submit" value="Upload" />
 </form>
