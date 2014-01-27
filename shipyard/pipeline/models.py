@@ -1018,17 +1018,16 @@ class PipelineOutputCable(models.Model):
                            ("pipeline", "output_idx"));
 
     def __unicode__(self):
-        """ Represent with the pipeline name, output index, and output name (???) """
+        """ Represent with the pipeline name, and TO output index + name """
+
         pipeline_name = "[no pipeline set]";
         if self.pipeline != None:
             pipeline_name = unicode(self.pipeline);
 
-        is_raw_str = ""
-        if self.is_raw():
-            is_raw_str = " (raw)"
-
-        return "{}:{} ({}{})".format(pipeline_name, self.output_idx,
-                                     self.output_name, is_raw_str);
+        return "POC feeding Output_idx [{}], Output_name [{}] for pipeline [{}]".format(
+                self.output_idx,
+                self.output_name,
+                pipeline_name)
 
     def clean(self):
         """

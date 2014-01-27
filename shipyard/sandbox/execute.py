@@ -131,8 +131,7 @@ class Sandbox:
                 raise ValueError(error_messages["pipeline_bad_numrows"].
                     format(self.pipeline, i+1, minrows, maxrows, supplied_input.num_rows()))
 
-    def execute_cable(self, cable, input_SD, output_path, parent_record,
-                      recover=False):
+    def execute_cable(self,cable,input_SD,output_path,parent_record,recover=False):
         """
         Execute cable on the input.
 
@@ -457,7 +456,7 @@ class Sandbox:
             # Record the destination TI/TO of this PSIC/POC
             cable_dest = ""
             if type(cable).__name__ == "PipelineOutputCable":
-                cable_dest = self.pipeline.outputs.filter(dataset_name=cable.output_name,dataset_idx=cable.output_idx)
+                cable_dest = cable.pipeline.outputs.get(dataset_name=cable.output_name,dataset_idx=cable.output_idx)
             else:
                 cable_dest = cable.dest
 
@@ -465,7 +464,7 @@ class Sandbox:
             self.socket_map[(cable, cable_dest)] = output_SD
             self.cable_map[cable] = curr_record
 
-        logging.debug("{}: DONE EXECUTING CABLE".format(fn))
+        logging.debug("{}: DONE EXECUTING {} '{}'".format(fn, type(cable).__name__, cable))
         return curr_record
 
     def execute_step(self, curr_run, pipelinestep, inputs, step_run_dir=None,
@@ -866,42 +865,74 @@ class Sandbox:
             run_dir = os.path.join(sandbox_path,"step{}".format(step.step_num))
 
 
-            # In order to execute a step, we need to know what input SDs to execute.
-            # socket_maps tells us what SDs correspond to each logical socket in the pipeline.
+            # Before executing a step, we need to know what input SDs to feed into the step for execution
 
             # Because pipeline steps includes the cable execution prior to the transformation,
-            # The SDs we need are *upstream* of the PSIC leading to this step
+            # the SDs we need are upstream of the *PSIC* leading to this step
+
+            # For each PSIC leading to this step
             for psic in step.cables_in.all().order_by("dest__dataset_idx"):
-                logger.debug("{}: Finding SD that feeds cable '{}' using socket_map".format(fn, psic))
+
+                # The socket is upstream of that PSIC
                 socket = psic.source
 
+                # If the PSIC comes from another step, the generator is the source pipeline step
                 if psic.source_step != 0:
                     generator = pipeline.steps.get(step_num=psic.source_step)
+
+                # Otherwise, the psic comes from step 0
                 else:
+
+                    # If this step is not a subpipeline, the dataset was uploaded
+                    generator = None
+
+                    # If this step is a subpipeline...
                     if parent_runstep != None:
+
                         # Get cables in the outer pipeline step leading to this subrun
                         cables_into_subpipeline = parent_runstep.pipelinestep.cables_in
 
                         # Find the particular cable leading to this PSIC's source
                         generator = cables_into_subpipeline.get(dest=psic.source)
-                    else:
-                        generator = None
+
                 step_inputs.append(self.socket_map[(generator, socket)])
 
             curr_RS = self.execute_step(curr_run, step, step_inputs,step_run_dir=run_dir)
-            logger.debug("{}: DONE EXECUTING STEP".format(fn))
+            logger.debug("{}: DONE EXECUTING STEP {}".format(fn, step))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
                 logger.debug("{}: Step failed to execute: returning the run".format(fn))
                 curr_run.clean()
                 return curr_run
 
-        logging.debug("{}: Finished executing steps, proceeding to run output cables".format(fn))
-
+        logging.debug("{}: Finished executing steps, executing POCs".format(fn))
         for outcable in pipeline.outcables.all():
-            # Identify the SD that feeds this outcable.
-            generator = pipeline.steps.get(step_num=outcable.source_step)
-            source_SD = self.socket_map[(generator, outcable.source)]
+
+            generator = None
+
+            # Consider the source step of this POC
+            source_step = pipeline.steps.get(step_num=outcable.source_step)
+
+            # By default, the socket is the TO from a pipeline step
+            socket = outcable.source
+
+
+
+
+
+            # The generator of interest is usually just the source pipeline step
+            if type(source_step.transformation).__name__ != "Pipeline":
+                generator = source_step
+
+            # But if this step contains a subpipeline, the generator is the subpipeline's output cable
+            else:
+
+                generator = source_step.transformation.outcables.get(output_idx = outcable.source.dataset_idx)
+
+
+
+            source_SD = self.socket_map[(generator, socket)]
+
             file_suffix = "raw" if outcable.is_raw() else "csv"
             out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name,file_suffix)
             output_path = os.path.join(out_dir,out_file_name)

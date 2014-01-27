@@ -167,7 +167,6 @@ class ExecuteTests(TestCase):
         self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_1,dest_pin=self.mA_in_cdtm_2)
         self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_2,dest_pin=self.mA_in_cdtm_1)
 
-        #self.pY_cable_out = self.pY.create_outcable(output_name="pY_out",output_idx=1,source_step=1,source=self.mA_out)
         self.pY_cable_out = self.pY.outcables.create(output_name="pY_out",output_idx=1,source_step=1,source=self.mA_out,output_cdt=self.pY_out_cdt)
         self.pY_outwire1 = self.pY_cable_out.custom_outwires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.pY_out_cdt_cdtm_1)
         self.pY.create_outputs()
@@ -196,10 +195,10 @@ class ExecuteTests(TestCase):
         self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.pY_in_cdtm_1)
         self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.pY_in_cdtm_2)
 
-        self.pX_outcable_1 = self.pX.outcables.create(output_name="pX_outcable_1",output_idx=1,source_step=1,source=self.mA_out,output_cdt=self.pX_out_cdt_2)
+        self.pX_outcable_1 = self.pX.outcables.create(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out,output_cdt=self.pX_out_cdt_2)
         self.pX_outcable_1.custom_outwires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.pX_out_cdt_2_cdtm_1)
 
-        self.pX_outcable_2 = self.pX.outcables.create(output_name="pX_outcable_2",output_idx=2,source_step=2,source=self.pY.outputs.get(dataset_name="pY_out"),output_cdt=self.pX_out_cdt_1)
+        self.pX_outcable_2 = self.pX.outcables.create(output_name="pX_out_2",output_idx=2,source_step=2,source=self.pY.outputs.get(dataset_name="pY_out"),output_cdt=self.pX_out_cdt_1)
         self.pX_outcable_2.custom_outwires.create(source_pin=self.pY.outputs.get(dataset_name="pY_out").get_cdt().members.get(column_name="pYC"),dest_pin=self.pX_out_cdt_1_cdtm_1)
 
         self.pX.create_outputs()
