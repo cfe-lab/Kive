@@ -6,8 +6,8 @@ Prerequisites
 
 **shipyard** is a set of Django applications.  As a result, it has the following requirements:
 
-1. Python 2.x (version 2.7 or higher)
-2. Django (version 1.6 or higher recommended, version 1.5 supported)
+1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
+2. Django (version 1.6 or higher)
 
 Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
 
