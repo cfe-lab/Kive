@@ -105,7 +105,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 }
                 else {
                     // reset the second drop-down
-                    $("#id_revisions_"+suffix).html('<option value=\"\">--- select a CodeResource first ---</option>');
+                    $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
                 }
             }
         )
@@ -132,7 +132,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 })
             }
             else {
-                $("#id_revisions").html('<option value=\"\">--- select a CodeResource first ---</option>');
+                $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
             }
         }
     )

@@ -20,19 +20,50 @@
 <h3>New datatype</h3>
 <form action="" method="post">{% csrf_token %}
     <table>
-    {{ datatype_form.as_table }}
+    {% for field in datatype_form %}
+        <tr>
+        <th>{{ field.label_tag }}</th>
+        <td>
+            {{ field.errors }}
+            {{ field }} 
+            <div class="helptext">{{ field.help_text }}</div>
+        </td>
+        </tr>
+    {% endfor %}
     </table>
 
     <h3>Basic constraints</h3>
 
     <div id="int_constraints" class="constraints">
     {{ int_con_form.errors }}
-    <table>{{ int_con_form.as_table }}</table>
+    <table>
+    {% for field in int_con_form %}
+        <tr>
+        <th>{{ field.label_tag }}</th>
+        <td>
+            {{ field.errors }}
+            {{ field }} 
+            <div class="helptext">{{ field.help_text }}</div>
+        </td>
+        </tr>
+    {% endfor %}
+    </table>
     </div>
 
     <div id="str_constraints" class="constraints">
     {{ str_con_form.errors }}
-    <table>{{ str_con_form.as_table }}</table>
+    <table>
+    {% for field in str_con_form %}
+        <tr>
+        <th>{{ field.label_tag }}</th>
+        <td>
+            {{ field.errors }}
+            {{ field }} 
+            <div class="helptext">{{ field.help_text }}</div>
+        </td>
+        </tr>
+    {% endfor %}
+    </table>
     </div>
     <input type="submit" value="Submit" />
 </form>
