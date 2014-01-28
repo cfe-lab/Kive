@@ -145,9 +145,9 @@ class Run(models.Model):
 
     def __unicode__(self):
         if hasattr(self, "parent_runstep"):
-            unicode_rep = u"pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
+            unicode_rep = u"Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
         else:
-            unicode_rep = u"pipeline [{}]".format(self.pipeline)
+            unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
 
 class RunStep(models.Model):
@@ -186,7 +186,7 @@ class RunStep(models.Model):
         unique_together = ("run", "pipelinestep")
 
     def __unicode__(self):
-        unicode_rep = u"Pipeline step [{}]".format(self.pipelinestep)
+        unicode_rep = u"Runstep with PS [{}]".format(self.pipelinestep)
         return unicode_rep
 
     def clean(self):
