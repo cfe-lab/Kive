@@ -217,13 +217,16 @@ class TransformationXput(models.Model):
     def __unicode__(self):
         unicode_rep = u"";
         if self.is_raw():
-            unicode_rep = u"[{}]:raw{} {}".format(self.transformation,
-                                                  self.dataset_idx, self.dataset_name)
+            unicode_rep = u"[{}]:raw{} {}".format(
+                    self.transformation,
+                    self.dataset_idx,
+                    self.dataset_name)
         else:
-            unicode_rep = u"[{}]:{} {} {}".format(self.transformation,
-                                                  self.dataset_idx,
-                                                  self.get_cdt(),
-                                                  self.dataset_name);
+            unicode_rep = u"{} name:{} idx:{} cdt:{}".format(
+                    self.transformation,
+                    self.dataset_name,
+                    self.dataset_idx,
+                    self.get_cdt())
         return unicode_rep
 
     def is_raw(self):
