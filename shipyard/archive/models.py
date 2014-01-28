@@ -60,21 +60,6 @@ class Run(models.Model):
         blank=True,
         help_text="Step of parent run initiating this one as a sub-run")
 
-    # November 15, 2013: Runs no longer have ExecRecords.
-    # execrecord = models.ForeignKey(
-    #     "librarian.ExecRecord",
-    #     null=True,
-    #     blank=True,
-    #     related_name="runs",
-    #     help_text="Record of this run");
-
-    # reused = models.NullBooleanField(
-    #     help_text="Indicates whether this run uses the record of a previous execution",
-    #     default=None);
-
-    # November 15, 2013: changed to remove the ExecRecord and the
-    # reused flag, and also to reflect that even a reused run must
-    # have all its steps in place.
     def clean(self):
         """
         Checks coherence of the run (possibly in an incomplete state).
@@ -158,6 +143,12 @@ class Run(models.Model):
             raise ValidationError(
                 "Run \"{}\" is not complete".format(self))
 
+    def __unicode__(self):
+        if hasattr(self, "parent_runstep"):
+            unicode_rep = u"pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
+        else:
+            unicode_rep = u"pipeline [{}]".format(self.pipeline)
+        return unicode_rep
 
 class RunStep(models.Model):
     """
@@ -193,6 +184,10 @@ class RunStep(models.Model):
         # Uniqueness constraint ensures you can't have multiple RunSteps for
         # a given PipelineStep within a Run.
         unique_together = ("run", "pipelinestep")
+
+    def __unicode__(self):
+        unicode_rep = u"Pipeline step [{}]".format(self.pipelinestep)
+        return unicode_rep
 
     def clean(self):
         """
