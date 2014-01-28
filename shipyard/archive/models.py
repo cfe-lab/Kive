@@ -620,7 +620,6 @@ class RunSIC(models.Model):
         logging.debug("{}: Checking RunSIC's ExecLog".format(fn))
 
         if self.log.exists():
-            missing_output = len(self.log.first().missing_outputs()) != 0
 
             # If output of PSIC not marked as kept, there shouldn't be a dataset
             if not self.PSIC.keep_output:
@@ -630,7 +629,7 @@ class RunSIC(models.Model):
                         format(self))
 
             # If EL shows missing output
-            elif missing_output:
+            elif len(self.log.first().missing_outputs()) != 0:
                 if self.has_data():
                     raise ValidationError(
                         "RunSIC \"{}\" had missing output but a dataset was registered".
@@ -869,10 +868,6 @@ class RunOutputCable(models.Model):
             is_deleted = self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
                 dataset_name=self.pipelineoutputcable.output_name).exists()
 
-        # November 18, 2013: check if there was missing output
-        # (i.e. some kind of messed up execution) in the ExecLog.
-        missing_output = len(self.log.first().missing_outputs()) != 0
-            
         # If the output of this ROC is marked for deletion, there should be no data associated.
         if is_deleted:
             if self.has_data():
@@ -880,8 +875,10 @@ class RunOutputCable(models.Model):
                     "RunOutputCable \"{}\" is marked for deletion; no data should be produced".
                     format(self))
 
+        # November 18, 2013: check if there was missing output
+        # (i.e. some kind of messed up execution) in the ExecLog.
         # If the output of this ROC was missing on execution, there should be no data associated.
-        elif missing_output:
+        elif self.log.exists() and len(self.log.first().missing_outputs()) != 0:
             if self.has_data():
                 raise ValidationError(
                     "RunOutputCable \"{}\" had a missing output; no data should be produced".
