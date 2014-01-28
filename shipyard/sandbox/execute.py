@@ -156,7 +156,6 @@ class Sandbox:
 
         import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         logging.debug("{}: STARTING EXECUTING CABLE".format(fn))
 
         curr_record = None      # RSIC/ROC that we create, reuse, or update
@@ -169,8 +168,6 @@ class Sandbox:
         else:
             curr_run = parent_record.run
 
-        ####
-        # FIND OR CREATE A RECORD
         if not recover:
             if type(cable) == pipeline.models.PipelineStepInputCable:
                 logging.debug("{}: Not recovering - creating RSIC".format(fn))
@@ -194,13 +191,12 @@ class Sandbox:
             logging.debug("{}: Cable keeps output? {}".format(fn, cable_keeps_output))
 
 
-            # FIXME: will redefine what "reusability" means - ERs should only be
-            # considered for reuse if its inputs/outputs are valid *at this time*.
+            # FIXME: will redefine what "reusability" means - ERs should only be considered for reuse if its inputs/outputs are valid *at this time*
             
-            # To find cable ER to reuse, load cable ERIs of the same cable
-            # type taking inputSD as input
 
-            # A) Get the content type (RSIC or ROC?) of the ExecRecord's ExecLog
+            # To find cable ER to reuse, load cable ERIs of the same cable type taking inputSD as input
+
+            # A) Get the content type (RSIC/ROC) of the ExecRecord's ExecLog
             record_contenttype = ContentType.objects.get_for_model(required_record_type)
             logging.debug("{}: Searching for reusable cable ER - (linked to an '{}' ExecLog)".format(fn, record_contenttype))
 
@@ -208,10 +204,8 @@ class Sandbox:
             candidate_ERIs = ExecRecordIn.objects.filter(execrecord__generator__content_type=record_contenttype, symbolicdataset=input_SD)
 
             curr_record.reused = False
-
-            # Search for an ER we can completely reuse OR update
             for candidate_ERI in candidate_ERIs:
-                logging.debug("{}: Considering ERI {} for ER reuse/update".format(fn, candidate_ERI))
+                logging.debug("{}: Considering ERI {} for ER reuse or update".format(fn, candidate_ERI))
                 candidate_cable = candidate_ERI.execrecord.general_transf()
 
                 compatibility = False
@@ -222,10 +216,8 @@ class Sandbox:
 
                 if compatibility:
                     logging.debug("{}: Compatible ER found".format(fn))
-
                     output_SD = candidate_ERI.execrecord.execrecordouts.all()[0].symbolicdataset
 
-                    # If not keeping output, or you are but there is already data, reuse the ER
                     if not cable_keeps_output or output_SD.has_data():
                         logging.debug("{}: Reusing ER {}".format(fn, candidate_ERI.execrecord))
                         curr_record.reused = True
@@ -244,12 +236,8 @@ class Sandbox:
                             cable_dest = cable.dest
                             parent_run = parent_record.run
 
-
                         self.socket_map[(curr_run, cable, cable_dest)] = output_SD
-                        
-                        # Link this PSIC/POC with it's RSIC/ROC in cable_map
                         self.cable_map[cable] = curr_record
-
                         return curr_record
                         
                     else:
@@ -272,17 +260,14 @@ class Sandbox:
             output_SD_CDT = output_SD.get_cdt()
             output_path = self.sd_fs_map[output_SD]
         
-        ####
-        # RUN CABLE
         logging.debug("{}: No ER to reuse - committed to executing cable".format(fn))
         curr_log = None
 
-        # If dataset inputs are not on the FS, retrieve them from the DB if possible, else recover them
         if self.sd_fs_map[input_SD] == None or not os.access(self.sd_fs_map[input_SD], os.R_OK):
-            logging.debug("{}: Dataset unavailable on file system".format(fn))
+            logging.debug("{}: Dataset {} unavailable on file system".format(fn, input_SD))
 
             if input_SD.has_data():
-                logging.debug("{}: Dataset has real data: running run_cable({})".format(fn, input_SD))
+                logging.debug("{}: Dataset {} has real data: running run_cable({})".format(fn, input_SD))
                 curr_log = cable.run_cable(input_SD.dataset,output_path,curr_record)
 
             else:
@@ -561,13 +546,11 @@ class Sandbox:
                     logging.debug("{}: Finished completely reusing ER".format(fn))
                     return curr_RS
 
-
                 logging.debug("{}: Found ER, but need to perform computation to fill it in".format(fn))
                 curr_RS.reused = False
             else:
                 logging.debug("{}: No compatible ER found - will create fresh ER".format(fn))
                 curr_RS.reused = False
-
 
         else:
             logger.debug("{}: Recovering step".format(fn))
@@ -587,7 +570,6 @@ class Sandbox:
             curr_ER = curr_RS.execrecord
             had_ER_at_beginning = True
 
-
         logging.debug("{}: Checking required datasets are on the FS for running code".format(fn))
         for curr_in_SD in inputs_after_cable:
             curr_path = self.sd_fs_map[curr_in_SD]
@@ -601,7 +583,6 @@ class Sandbox:
 
         logging.debug("{}: Finished putting datasets into place: running code for this step".format(fn))
 
-
         if type(pipelinestep.transformation) == pipeline.models.Pipeline:
             logging.debug("{}: EXECUTING SUB-PIPELINE STEP".format(fn))
             self.execute_pipeline(
@@ -612,7 +593,6 @@ class Sandbox:
 
             logging.debug("{}: FINISHED EXECUTING SUB-PIPELINE STEP".format(fn))
             return curr_RS
-
 
         curr_log = archive.models.ExecLog(record=curr_RS)
         curr_log.save()
@@ -632,7 +612,6 @@ class Sandbox:
                     errwrite)
 
             logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
-            # While running, print stdout/stderr to console
             with open(stdout_path, "rb", 1) as outread:
                 errread = open(stderr_path, "rb", 0)
                 while method_popen.poll() is None:
@@ -672,8 +651,6 @@ class Sandbox:
 
         if curr_ER == None:
             logging.debug("{}: Creating fresh ER".format(fn))
-
-            # FIXME: Have Richard review this
             curr_ER = librarian.models.ExecRecord(generator=curr_log)
             curr_ER.save()
             curr_RS.execrecord = curr_ER
@@ -692,12 +669,11 @@ class Sandbox:
                 corresp_output_SD.save()
 
                 if not curr_output.is_raw():
-                    # FIXME: Have Richard review this
-                    curr_structure = librarian.models.DatasetStructure(symbolicdataset = corresp_output_SD,
-                                                                       compounddatatype=curr_output.get_cdt(),
-                                                                       num_rows=-1)
+                    curr_structure = librarian.models.DatasetStructure(
+                            symbolicdataset = corresp_output_SD,
+                            compounddatatype=curr_output.get_cdt(),
+                            num_rows=-1)
                     curr_structure.save()
-                    #corresp_output_SD.structure.create(compounddatatype=curr_output.get_cdt(),num_rows=-1)
 
                 corresp_output_SD.clean()
 
@@ -782,7 +758,7 @@ class Sandbox:
                         curr_log)
 
                 if ccl.is_fail():
-                    logging.debug("{}: content check FAILED for {}".format(fn, output_path))
+                    logging.warn("{}: content check failed for {}".format(fn, output_path))
                     bad_output_found = True
                 else:
                     logging.debug("{}: content check passed for {}".format(fn, output_path))
@@ -818,10 +794,6 @@ class Sandbox:
                 if corresp_SD not in self.sd_fs_map:
                     self.sd_fs_map[corresp_SD] = corresp_path
 
-                print "STEP COMPLETE - UPDATING MAPS"
-                print "run = {}\ngenerator = {}\nsocket = {}".format(curr_run, pipelinestep, step_output)
-
-
                 self.socket_map[(curr_run, pipelinestep, step_output)] = corresp_SD
 
         return curr_RS
@@ -830,11 +802,11 @@ class Sandbox:
         """
         Execute the specified Pipeline with the given inputs.
 
-        Top level pipeline: pipeline, input_SDs, sandbox_path, and parent_runstep are None.
+        INPUTS
+        If a top level pipeline, pipeline, input_SDs, sandbox_path,
+        and parent_runstep are all None.
 
         Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
-
-        After completing, pipeline outputs are added to sd_fs_map.
         """
 
         import inspect
@@ -958,17 +930,23 @@ class Sandbox:
 
     def recover(self, SD_to_recover, curr_run):
         """
-        Fills in SD_to_recover onto the file system.
+        Writes SD_to_recover to the file system.
 
-        Returns True if it succeeds; False otherwise.
+        INPUTS
+        SD_to_recover   Blah blah
+        curr_run        Blah blah
 
-        PRE: SD_to_recover is in the maps but no corresopnding file is
-        on the file system.
+        OUTPUTS
+        Returns True if successful - otherwise False.
+
+        PRE
+        SD_to_recover is in the maps but no corresponding file is on the file system.
         """
-        # Base case: there is an appropriate Dataset in the database.
-        # Simply write it to the correct location.
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
         if SD_to_recover.has_data():
-            # Read/write binary files in chunks of 8 megabytes
+            logging.debug("{}: Dataset is in the DB - writing it to the file system".format(fn))
             chunk_size = 1024*8
             location = self.sd_fs_map[SD_to_recover]
             saved_data = SD_to_recover.dataset
@@ -985,8 +963,7 @@ class Sandbox:
                 saved_data.dataset_file.close()
             return True
 
-        # Recursive case: look up how to generate SD_to_recover,
-        # and then do that.
+        logging.debug("{}: Performing computation to create missing Dataset".format(fn))
         generator = None
         socket = None
         for curr_run, generator, socket in socket_map:
@@ -1000,4 +977,3 @@ class Sandbox:
             curr_record = self.execute_cable(generator,None,None,None,recover=True)
 
         return curr_record.is_complete() and curr_record.successful_execution()
-        

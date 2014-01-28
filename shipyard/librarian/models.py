@@ -155,23 +155,19 @@ class SymbolicDataset(models.Model):
     
         return symDS
 
-    
-    def check_file_contents(self, file_path_to_check, summary_path,
-                            min_row, max_row, execlog):
+
+    # FIXME: use a transaction!
+    def check_file_contents(self,file_path_to_check,summary_path,min_row,max_row,execlog):
         """
-        Does a content check of a file that this SD represents.
+        Performs content check on a file, generates a CCL, and sets this SD's num_rows.
 
-        If this SD is raw, it just creates a clean CCL.
+        OUTPUTS
+        If SD is raw, creates a clean CCL.
+        If not raw, checks the file and returns CCL with/without a corresponding BadData.
 
-        This calls [CDT].summarize_CSV on the file and creates a
-        ContentCheckLog.
-        
-        Returns completed CCL and associates it with the EL
-
-        If file does not have a badly-formed header, it
-        also sets this SD's num_rows.
-
-        FIXME: use a transaction!
+        PRE
+        Should never be called twice on the same symbolic dataset, as this would
+        overwrite num_rows to a potentially new value?
         """
         import datachecking.models, inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
@@ -180,72 +176,70 @@ class SymbolicDataset(models.Model):
         ccl = self.content_checks.create(execlog=execlog)
 
         if self.is_raw():
-            logging.debug("{}: SD is raw - returning clean CCL".format(fn))
             ccl.clean()
+            logging.debug("{}: SD is raw - returning clean CCL".format(fn))
             return ccl
 
-        logging.debug("{}: SD not raw, checking CSV".format(fn))
         csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path)
 
-        # Check for a malformed header (and thus a malformed file).
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
-            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_header=True)
+            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
             bad_data.save()
-            logging.debug("{}: malformed header".format(fn))
+            logging.warn("{}: malformed header".format(fn))
             return ccl
 
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
         if max_row is not None and csv_summary["num_rows"] > max_row:
-            logging.debug("{}: too many rows".format(fn))
-            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_num_rows=True)
+            logging.warn("{}: too many rows".format(fn))
+            # FIXME: Do we only create these BD objects if they don't already exist?
+            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
             bad_data.save()
 
         if min_row is not None and csv_summary["num_rows"] < min_row:
-            logging.debug("{}: too few rows".format(fn))
-            bad_data = datachecking.models.BadData(contentchecklog = ccl, bad_num_rows=True)
+            logging.warn("{}: too few rows".format(fn))
+            # FIXME: Do we only create these BD objects if they don't already exist?
+            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
             bad_data.save()
 
         if "failing_cells" in csv_summary:
-            # Create a BadData object if it doesn't already exist.
+            logging.warn("{}: cells failed datatype check".format(fn))
+
             if csv_baddata == None:
-                csv_baddata = datachecking.models.BadData(contentchecklog = ccl)
+                csv_baddata = datachecking.models.BadData(contentchecklog=ccl)
                 csv_baddata.save()
 
-            # row, col are indices.
             for row, col in csv_summary["failing_cells"]:
                 fails = csv_summary["failing_cells"][(row,col)]
                 for failed_constr in fails:
                     new_cell_error = csv_baddata.cell_errors.create(
-                        row_num=row,
-                        column=my_CDT.get(column_idx=col))
+                            row_num=row,
+                            column=my_CDT.get(column_idx=col))
 
-                    # If the failure is a string (e.g.  "Was not
-                    # integer"), then leave constraint_failed as null.
+                    # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
                     if type(failed_constr) != str:
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()
                     new_cell_error.save()
 
-        # Our CCL should now be complete.
         ccl.clean()
         return ccl
 
-    def check_integrity(self, new_file_path, execlog,
-                        newly_computed_MD5=None):
+    def check_integrity(self,new_file_path,execlog,newly_computed_MD5=None):
         """
-        Checks integrity of this SD against the specified new file.
+        Checks integrity of SD against the md5 provided (newly_computed_MD5),
+        or in it's absence, the MD5 computed from new_file_path.
 
-        If newly_computed_MD5 is not None, use it; otherwise, compute
-        it from new_file.
-
-        Return the newly-created IntegrityCheckLog object (which is
-        linked to execlog).
+        OUTPUT
+        Returns the ICL.
         """
+        import inspect, logging
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+
         if newly_computed_MD5 == None:
             with open(new_file_path, "rb") as f:
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
@@ -253,10 +247,14 @@ class SymbolicDataset(models.Model):
         icl = self.integrity_checks.create(execlog=execlog)
                 
         if output_md5 != self.MD5_checksum:
+            logging.warn("{}: md5s do not agree".format(fn))
+
             evil_twin = SymbolicDataset.create_SD(
-                new_file_path, cdt=self.get_cdt(), user=self.user,
-                name="{}eviltwin".format(self),
-                description="MD5 conflictor of {}".format(self))
+                    new_file_path,
+                    cdt=self.get_cdt(),
+                    user=self.user,
+                    name="{}eviltwin".format(self),
+                    description="MD5 conflictor of {}".format(self))
 
             icl.usurper.create(conflicting_SD=evil_twin)
 
