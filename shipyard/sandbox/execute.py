@@ -10,7 +10,7 @@ import os.path
 import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
-from messages import error_messages
+from messages import error_messages, warning_messages
 
 class Sandbox:
     """
@@ -849,7 +849,12 @@ class Sandbox:
         sandbox_path = sandbox_path or self.sandbox_path
 
         curr_run = self.run
-        if parent_runstep != None:
+
+        if (curr_run.is_complete()):
+            logging.warn(warning_messages["pipeline_already_run"].format(self))
+            return curr_run
+
+        if parent_runstep is not None:
             logger.debug("{}: executing a sub-pipeline with input_SD {}".format(fn, input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user,parent_runstep=parent_runstep)
 
