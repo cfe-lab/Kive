@@ -14,8 +14,14 @@ from messages import error_messages, warning_messages
 
 class Sandbox:
     """
-    Represents the state of a run.
-    Keeps track of where the sandbox is, and stuff within the sandbox.
+    A Sandbox is the environment in which a Pipeline is run. It contains
+    all the information necessary to run the Pipeline, including the code
+    for all steps of the Pipeline, and the data to feed in. The Sandbox keeps
+    track of a single Run of the Pipeline it was created with. 
+    
+    Note that Sandboxes are single-use; that is, a Pipeline may only be run
+    once in a Sandbox. To run the same Pipeline again, you must create a new
+    Sandbox.
     """
 
     # sd_fs_map: maps SymDS to a FS path: the path where a data

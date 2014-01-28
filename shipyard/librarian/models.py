@@ -252,7 +252,7 @@ class SymbolicDataset(models.Model):
         
         icl = self.integrity_checks.create(execlog=execlog)
                 
-        if output_md5 != self.MD5_checksum:
+        if newly_computed_MD5 != self.MD5_checksum:
             evil_twin = SymbolicDataset.create_SD(
                 new_file_path, cdt=self.get_cdt(), user=self.user,
                 name="{}eviltwin".format(self),
