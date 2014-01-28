@@ -246,7 +246,7 @@ class SymbolicDataset(models.Model):
         
         icl = self.integrity_checks.create(execlog=execlog)
                 
-        if output_md5 != self.MD5_checksum:
+        if newly_computed_MD5 != self.MD5_checksum:
             logging.warn("{}: md5s do not agree".format(fn))
 
             evil_twin = SymbolicDataset.create_SD(
