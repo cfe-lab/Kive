@@ -273,7 +273,7 @@ class Sandbox:
             logging.debug("{}: Dataset {} unavailable on file system".format(fn, input_SD))
 
             if input_SD.has_data():
-                logging.debug("{}: Dataset {} has real data: running run_cable({})".format(fn, input_SD))
+                logging.debug("{}: Dataset {} has real data: running run_cable({})".format(fn, input_SD, input_SD))
                 curr_log = cable.run_cable(input_SD.dataset,output_path,curr_record)
 
             else:
@@ -495,7 +495,6 @@ class Sandbox:
             out_dir = os.path.join(step_run_dir, "output_data")
             in_dir = os.path.join(step_run_dir, "input_data")
             log_dir = os.path.join(step_run_dir, "logs")
-
             logging.debug("{}: Preparing file system for sandbox".format(fn))
             for workdir in [step_run_dir, in_dir, out_dir, log_dir]:
                 file_access_utils.set_up_directory(workdir)
@@ -710,10 +709,19 @@ class Sandbox:
             with open(output_path, "rb") as f:
                 output_md5 = file_access_utils.compute_md5(f)
 
+            num_rows = -1
+            if not curr_output.is_raw():
+                with open(output_path, "rb") as f:
+                    num_rows = file_access_utils.count_rows(f)
+
             if not had_ER_at_beginning:
                 output_SD.MD5_checksum = output_md5
+                output_SD.structure.num_rows = num_rows
+                output_SD.structure.save()
                 output_SD.save()
                 logging.debug("{}: First time seeing file: saving md5 {}".format(fn, output_md5))
+                if not curr_output.is_raw():
+                    logging.debug("{}: First time seeing file: saving row count {}".format(fn, num_rows))
 
             if not pipelinestep.outputs_to_delete.filter(pk=curr_output.pk).exists() and not output_ERO.has_data():
 
