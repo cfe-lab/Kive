@@ -30,8 +30,10 @@ class ExecuteTestsRM(TestCase):
         # two new pipeline families.
         self.pipeline_complement = self.make_first_pipeline("DNA complement",
             "a pipeline to complement DNA")
+        self.pipeline_reverse = self.make_first_pipeline("DNA reverse",
+            "a pipeline to reverse DNA")
         self.pipeline_revcomp = self.make_first_pipeline("DNA reverse",
-                "a pipeline to reverse strings of DNA")
+                "a pipeline to reverse and complement DNA")
 
         # Alice is only going to be manipulating DNA, so she creates a
         # "DNA" data type, and a "string" datatype for the headers. She
@@ -81,8 +83,11 @@ class ExecuteTestsRM(TestCase):
         self.create_linear_pipeline(self.pipeline_complement,
             [self.method_complement], "lab data", "complemented lab data")
         self.pipeline_complement.create_outputs()
+        self.create_linear_pipeline(self.pipeline_reverse,
+            [self.method_reverse], "lab data", "reversed lab data")
+        self.pipeline_reverse.create_outputs()
         self.create_linear_pipeline(self.pipeline_revcomp, 
-            [self.method_complement, self.method_reverse], "lab data", 
+            [self.method_reverse, self.method_complement], "lab data", 
             "reverse and complemented lab data")
         self.pipeline_revcomp.create_outputs()
 
@@ -260,13 +265,26 @@ class ExecuteTestsRM(TestCase):
 
     def test_execute_pipeline_reuse(self):
         """
-        See what happens when we try to reuse a pipeline.
+        An identical pipeline, run in a different sandbox, should reuse an ExecRecord
+        and not create an ExecLog.
         """
         self.sandbox_complement.execute_pipeline()
         sandbox2 = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
         sandbox2.execute_pipeline()
 
-    def test_execute_pipeline_recover(self):
+        step1 = self.sandbox_complement.run.runsteps.first()
+        step2 = sandbox2.run.runsteps.first()
+
+        self.assertEqual(step1.reused, False)
+        self.assertEqual(step2.reused, True)
+        self.assertEqual(step2.log.first(), None)
+        self.assertEqual(step1.execrecord, step2.execrecord)
+
+    def test_execute_pipeline_fill_in_ER(self):
+        """
+        Running an identical Pipeline where we did not keep the data around the first time
+        should fill in an existing ExecRecord, but also create a new ExecLog.
+        """
         pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family,
             revision_name="2",
             revision_desc="second version")
@@ -279,26 +297,124 @@ class ExecuteTestsRM(TestCase):
 
         sandbox = Sandbox(self.user_alice, pipeline_complement_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
-        sandbox.execute_pipeline()
-
-    def test_execute_cable_deleted_data(self):
-        """
-        What happens if we deleted the datafile?
-        """
-        scratch_dir = tempfile.mkdtemp()
-        output_path = tempfile.mkstemp(dir=scratch_dir)[1]
-        infile = tempfile.mkstemp(dir=scratch_dir, prefix="")[1]
-        shutil.copyfile(self.datafile.name, infile)
-
-        symds_todelete = SymbolicDataset.create_SD(infile,
-            name="bate", cdt=self.cdt_record, user=self.user_alice,
-            description="data the gremlins are going to delete", make_dataset=True)
-        os.remove(symds_todelete.dataset.dataset_file.name)
-
-        run = self.pipeline_complement.pipeline_instances.create(user=self.user_alice)
-        record = self.pipeline_complement.steps.first().pipelinestep_instances.create(run=run)
-        cable = self.pipeline_complement.steps.first().cables_in.first()
         self.sandbox_complement.execute_pipeline()
-        #self.sandbox_complement.execute_cable(cable, symds_todelete, output_path, record)
 
-        shutil.rmtree(scratch_dir)
+        step1 = sandbox.run.runsteps.first()
+        step2 = self.sandbox_complement.run.runsteps.first()
+
+        self.assertEqual(step1.reused, False)
+        self.assertEqual(step2.reused, False)
+        self.assertEqual(step2.log.first() is not None, True)
+        self.assertEqual(step1.execrecord, step2.execrecord)
+
+    def test_execute_pipeline_reuse_within_different_pipeline(self):
+        """
+        Running the same dataset through the same Method, in two different 
+        pipelines, should reuse an ExecRecord.
+        """
+        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
+        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [self.symds_labdata])
+        sandbox_reverse.execute_pipeline()
+        sandbox_revcomp.execute_pipeline()
+
+        step1 = sandbox_reverse.run.runsteps.first()
+        step2 = sandbox_revcomp.run.runsteps.first()
+
+        self.assertEqual(step1.reused, False)
+        self.assertEqual(step2.reused, True)
+        self.assertEqual(step2.log.first(), None)
+        self.assertEqual(step1.execrecord, step2.execrecord)
+
+    def test_execute_pipeline_output_symds(self):
+        """
+        A Pipeline with no deleted outputs should have a SymbolicDataset as an output.
+        """
+        self.sandbox_complement.execute_pipeline()
+        output = self.sandbox_complement.run.runoutputcables.first()
+        output_symds = output.execrecord.execrecordouts.first().symbolicdataset
+        self.assertEqual(output_symds is not None, True)
+
+    def test_pipeline_trivial_cable(self):
+        """
+        A trivial cable should have is_trivial() = True.
+        """
+        outcable = self.pipeline_complement.outcables.first()
+        self.assertEqual(outcable.is_trivial(), True)
+
+    def test_trivial_cable_num_rows(self):
+        """
+        A trivial cable should have the same dataset all the way through.
+        """
+        self.sandbox_complement.execute_pipeline()
+
+        step = self.sandbox_complement.run.runsteps.first()
+        step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
+
+        outcable = self.sandbox_complement.run.runoutputcables.first()
+        outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
+        outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
+
+        self.assertEqual(step_output_SD, outcable_input_SD)
+        self.assertEqual(outcable_input_SD, outcable_output_SD)
+        self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
+        self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
+
+    def test_execute_pipeline_num_rows(self):
+        """
+        A pipeline which does not change the number of rows in a dataset,
+        should have the same number of rows in all SD's along the way.
+        """
+        self.sandbox_complement.execute_pipeline()
+
+        incable = self.sandbox_complement.run.runsteps.first().RSICs.first()
+        incable_input_SD = incable.execrecord.execrecordins.first().symbolicdataset
+        incable_output_SD = incable.execrecord.execrecordins.first().symbolicdataset
+
+        step = self.sandbox_complement.run.runsteps.first()
+        step_input_SD = step.execrecord.execrecordins.first().symbolicdataset
+        step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
+
+        outcable = self.sandbox_complement.run.runoutputcables.first()
+        outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
+        outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
+
+        self.assertEqual(incable_input_SD.num_rows(), self.symds_labdata.num_rows())
+        self.assertEqual(incable_input_SD.num_rows(), incable_output_SD.num_rows())
+        self.assertEqual(incable_output_SD.num_rows(), step_input_SD.num_rows())
+        self.assertEqual(step_input_SD.num_rows(), step_output_SD.num_rows())
+        self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
+        self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
+
+    def test_execute_pipeline_reuse_evil_twin(self):
+        """
+        A Pipeline uses, in an intermediate step, a Symbolic Dataset which has previously
+        been created by another pipeline.
+
+        TODO: This takes a LONG TIME. Find out why.
+        """
+        # Feed input dataset to both reverse and complement pipelines.
+        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
+        sandbox_reverse.execute_pipeline()
+        sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
+        sandbox_complement.execute_pipeline()
+
+        # Now feed the reversed data into the reverse and complement pipeline.
+        # Out of the first step should come the input data (because we're just
+        # reversing what was reversed). Then we feed that into the complement
+        # step, which should reuse the ExecRecord from the first run of the
+        # complement pipeline.
+        outcable_reverse = sandbox_reverse.run.runoutputcables.first()
+        symds_reversed = outcable_reverse.execrecord.execrecordouts.first().symbolicdataset
+
+        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [symds_reversed])
+        sandbox_revcomp.execute_pipeline()
+
+        # What did we get out of the first (reverse) step of the reverse and
+        # complement pipeline?
+        rev_step = sandbox_revcomp.run.runsteps.first()
+        rev_output = rev_step.execrecord.execrecordouts.first().symbolicdataset
+
+        # It has the same MD5 as the input data.
+        self.assertEqual(rev_output.MD5_checksum, self.symds_labdata.MD5_checksum)
+        self.assertEqual(rev_output.usurps, self.symds_labdata)
+
