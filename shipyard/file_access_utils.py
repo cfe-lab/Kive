@@ -100,3 +100,9 @@ def compute_md5(file_to_checksum):
     md5gen = hashlib.md5()
     md5gen.update(file_to_checksum.read())
     return md5gen.hexdigest()
+
+def count_rows(file_to_count):
+    """
+    Count the number of rows in a CSV file, excluding the header.
+    """
+    return sum([1 for line in file_to_count]) - 1
