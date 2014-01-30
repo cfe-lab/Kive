@@ -54,6 +54,25 @@ class SymbolicDataset(models.Model):
         has_data_suffix = "d" if self.has_data() else ""
         return "S{}{}".format(self.pk, has_data_suffix)
 
+    def __eq__(self, other):
+        """
+        Two SymbolicDatasets are considered to be equal if they have the same,
+        non-blank MD5, or both their MD5's are blank and they are the same
+        object.
+        """
+        if isinstance(other, self.__class__):
+            if self.MD5_checksum != "" and other.MD5_checksum != "":
+                return self.MD5_checksum == other.MD5_checksum
+            elif self.MD5_checksum == "" and other.MD5_checksum == "":
+                return self is other
+            else:
+                return False
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -246,7 +265,7 @@ class SymbolicDataset(models.Model):
         
         icl = self.integrity_checks.create(execlog=execlog)
                 
-        if output_md5 != self.MD5_checksum:
+        if newly_computed_MD5 != self.MD5_checksum:
             logging.warn("{}: md5s do not agree".format(fn))
 
             evil_twin = SymbolicDataset.create_SD(
