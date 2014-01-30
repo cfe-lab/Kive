@@ -16,7 +16,7 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
-from method.tests import samplecode_path
+import file_access_utils
 
 class ExecuteTestsRM(TestCase):
 
@@ -110,7 +110,67 @@ class ExecuteTestsRM(TestCase):
         self.sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
         self.sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [self.symds_labdata])
 
-        # Begin the tests!
+        # A second version of the complement Pipeline which doesn't keep any output.
+        self.pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family,
+            revision_name="2",
+            revision_desc="second version")
+        self.pipeline_complement_v2.save()
+        self.create_linear_pipeline(self.pipeline_complement_v2,
+            [self.method_complement], "lab data", "complemented lab data")
+        last_output = self.pipeline_complement_v2.steps.last().add_deletion(
+            self.method_complement.outputs.first())
+        self.pipeline_complement_v2.outcables.first().delete()
+        self.pipeline_complement_v2.create_outputs()
+
+        # A second version of the reverse/complement Pipeline which doesn't keep 
+        # intermediate or final output.
+        self.pipeline_revcomp_v2 = Pipeline(family=self.pipeline_revcomp.family,
+            revision_name="2",
+            revision_desc="second version")
+        self.pipeline_revcomp_v2.save()
+        self.create_linear_pipeline(self.pipeline_revcomp_v2,
+            [self.method_reverse, self.method_complement], "lab data",
+            "revcomped lab data")
+        self.pipeline_revcomp_v2.steps.first().add_deletion(
+            self.method_reverse.outputs.first())
+        self.pipeline_revcomp_v2.steps.last().add_deletion(
+            self.method_complement.outputs.first())
+        self.pipeline_revcomp_v2.outcables.first().delete()
+        self.pipeline_revcomp_v2.create_outputs()
+
+        # A third version of the reverse/complement Pipeline which keeps
+        # final output, but not intermediate.
+        self.pipeline_revcomp_v3 = Pipeline(family=self.pipeline_revcomp.family,
+            revision_name="2",
+            revision_desc="second version")
+        self.pipeline_revcomp_v3.save()
+        self.create_linear_pipeline(self.pipeline_revcomp_v3,
+            [self.method_reverse, self.method_complement], "lab data",
+            "revcomped lab data")
+        self.pipeline_revcomp_v3.steps.first().add_deletion(
+            self.method_reverse.outputs.first())
+        self.pipeline_revcomp_v3.create_outputs()
+
+        # Another method which turns DNA into RNA.
+        self.coderev_DNA2RNA = self.make_first_revision("DNA to RNA",
+                "a script to reverse DNA", "DNA2RNA.sh",
+                """#!/bin/bash
+                cat $1 | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, $1 - | cut -d ',' -f 1,3 > $2
+                """)
+        self.method_DNA2RNA = self.make_first_method("DNA to RNA",
+                "a method to turn strings of DNA into RNA",
+                self.coderev_DNA2RNA)
+        self.simple_method_io(self.method_DNA2RNA, self.cdt_record,
+                "DNA_to_convert", "RNA")
+
+        # A pipeline which reverses DNA, then turns it into RNA.
+        self.pipeline_revRNA = self.make_first_pipeline("DNA to reversed RNA",
+            "a pipeline to reverse DNA and translate it to RNA")
+        self.create_linear_pipeline(self.pipeline_revRNA,
+            [self.method_reverse, self.method_DNA2RNA], "lab data", "RNA'd lab data")
+        self.pipeline_revRNA.create_outputs()
+
+        self.sep = " "*80 + "\n" + "*"*80 + "\n" + " "*80 + "\n"
 
     def create_linear_pipeline(self, pipeline, methods, indata, outdata):
         """
@@ -285,17 +345,8 @@ class ExecuteTestsRM(TestCase):
         Running an identical Pipeline where we did not keep the data around the first time
         should fill in an existing ExecRecord, but also create a new ExecLog.
         """
-        pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family,
-            revision_name="2",
-            revision_desc="second version")
-        pipeline_complement_v2.save()
-        self.create_linear_pipeline(pipeline_complement_v2,
-            [self.method_complement], "lab data", "complemented lab data")
-        pipeline_complement_v2.steps.last().add_deletion(1)
-        pipeline_complement_v2.outcables.first().delete()
-        pipeline_complement_v2.create_outputs()
 
-        sandbox = Sandbox(self.user_alice, pipeline_complement_v2, [self.symds_labdata])
+        sandbox = Sandbox(self.user_alice, self.pipeline_complement_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
         self.sandbox_complement.execute_pipeline()
 
@@ -385,36 +436,69 @@ class ExecuteTestsRM(TestCase):
         self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
         self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
 
-    def test_execute_pipeline_reuse_evil_twin(self):
+#    def test_execute_pipeline_reuse_clever(self):
+#        """
+#        A Pipeline uses, in an intermediate step, a Symbolic Dataset which has previously
+#        been created by another pipeline.
+#
+#        At the moment, this fails, because of the way equality of SD's is
+#        defined (we don't match by MD5). Possibly we will implement this in the future.
+#        """
+#        # Feed input dataset to both reverse and complement pipelines.
+#        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
+#        sandbox_reverse.execute_pipeline()
+#        sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
+#        sandbox_complement.execute_pipeline()
+#
+#        outcable_complement = sandbox_complement.run.runoutputcables.first()
+#        symds_compd = outcable_complement.execrecord.execrecordouts.first().symbolicdataset
+#
+#        # Now feed the reversed data into the reverse and complement pipeline.
+#        # Out of the first step should come the input data (because we're just
+#        # reversing what was reversed). Then we feed that into the complement
+#        # step, which should reuse the ExecRecord from the first run of the
+#        # complement pipeline.
+#        outcable_reverse = sandbox_reverse.run.runoutputcables.first()
+#        symds_reversed = outcable_reverse.execrecord.execrecordouts.first().symbolicdataset
+#
+#        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [symds_reversed])
+#        sandbox_revcomp.execute_pipeline()
+#
+#        # What did we get out of the second (complement) step of the reverse and
+#        # complement pipeline?
+#        rev_step = sandbox_revcomp.run.runsteps.first()
+#        comp_step = sandbox_revcomp.run.runsteps.last()
+#        rev_output = rev_step.execrecord.execrecordouts.first().symbolicdataset
+#        comp_output = comp_step.execrecord.execrecordouts.first().symbolicdataset
+#
+#        self.assertEqual(rev_output, self.symds_labdata)
+#        self.assertEqual(comp_output, symds_compd)
+#        self.assertEqual(comp_step.reused, True)
+
+    def test_discard_intermediate_file(self):
         """
-        A Pipeline uses, in an intermediate step, a Symbolic Dataset which has previously
-        been created by another pipeline.
-
-        TODO: This takes a LONG TIME. Find out why.
+        A Pipeline which indicates one of its intermediate outputs should not be kept,
+        should not create any datasets for that output.
         """
-        # Feed input dataset to both reverse and complement pipelines.
-        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
-        sandbox_reverse.execute_pipeline()
-        sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-        sandbox_complement.execute_pipeline()
+        step = self.pipeline_revcomp_v2.steps.first()
+        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
+        sandbox.execute_pipeline()
+        runstep = sandbox.run.runsteps.first()
+        output = runstep.execrecord.execrecordouts.first().symbolicdataset
+        self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
+        self.assertEqual(output.has_data(), False)
 
-        # Now feed the reversed data into the reverse and complement pipeline.
-        # Out of the first step should come the input data (because we're just
-        # reversing what was reversed). Then we feed that into the complement
-        # step, which should reuse the ExecRecord from the first run of the
-        # complement pipeline.
-        outcable_reverse = sandbox_reverse.run.runoutputcables.first()
-        symds_reversed = outcable_reverse.execrecord.execrecordouts.first().symbolicdataset
+    def test_recover_intermediate_dataset(self):
+        """
+        Test recovery of an intermediate dataset.
+        """
+        # Don't keep the intermediate or final output.
+        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
+        sandbox.execute_pipeline()
 
-        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [symds_reversed])
-        sandbox_revcomp.execute_pipeline()
+        print(self.sep)
 
-        # What did we get out of the first (reverse) step of the reverse and
-        # complement pipeline?
-        rev_step = sandbox_revcomp.run.runsteps.first()
-        rev_output = rev_step.execrecord.execrecordouts.first().symbolicdataset
-
-        # It has the same MD5 as the input data.
-        self.assertEqual(rev_output.MD5_checksum, self.symds_labdata.MD5_checksum)
-        self.assertEqual(rev_output.usurps, self.symds_labdata)
-
+        # This time we need the final output - that means we have to recover the intermediate
+        # output.
+        sandbox2 = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
+        sandbox2.execute_pipeline()
