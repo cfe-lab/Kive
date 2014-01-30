@@ -286,7 +286,7 @@ class SymbolicDataset(models.Model):
                 logging.debug("{}: SD '{}' failed content check".format(fn, self))
                 return False
 
-        # At this point, we are comfortable with this SD.
+        # Checks have been performed, and none of them have failed
         return True
     
 class DatasetStructure(models.Model):
@@ -294,47 +294,28 @@ class DatasetStructure(models.Model):
     Data with a Shipyard-compliant structure: a CSV file with a header.
     Encodes the CDT, and the transformation output generating this data.
 
-    Related to :model:`librarian.SymbolicDataset`
-    Related to :model:`metadata.CompoundDatatype`
+    PRECONDITION
+    Any SymbolicDataset that represents a CSV file has to have confirmed using
+    file_access_utils.summarize_CSV() that the CSV file is coherent.
     """
-    # Note: previously we were tracking the exact TransformationOutput
-    # this came from (both for its Run and its RunStep) but this is
-    # now done more cleanly using ExecRecord.
 
     symbolicdataset = models.OneToOneField(
-        SymbolicDataset,
-        related_name="structure")
+            SymbolicDataset,
+            related_name="structure")
 
     compounddatatype = models.ForeignKey(
-        "metadata.CompoundDatatype",
-        related_name="conforming_datasets")
+            "metadata.CompoundDatatype",
+            related_name="conforming_datasets")
 
-    # A value of -1 means that the file is missing or the number of
-    # rows has never been counted (e.g. if we never did a ContentCheck
-    # on it).
+    # A value of -1 means the file is missing or num rows has never been counted
     num_rows = models.IntegerField(
-        "number of rows",
-        validators=[MinValueValidator(-1)],
-        default=-1)
+            "number of rows",
+            validators=[MinValueValidator(-1)],
+            default=-1)
 
-    # October 31, 2013: we now think that it's too onerous to have 
-    # a clean() function here that opens up the CSV file and checks it.
-    # Instead we will make it a precondition that any SymbolicDataset
-    # that represents a CSV file has to have confirmed using
-    # file_access_utils.summarize_CSV() that the CSV file is coherent.
-
-    # At a later date, we might want to put in some kind of
-    # "force_check()" which actually opens the file and makes sure its
-    # contents are OK.
-
-
-# November 15, 2013: changed to not refer to Pipelines anymore.
-# Now the ExecRecord only captures *atomic* transformations.
 class ExecRecord(models.Model):
     """
-    Record of a previous execution of a Method/PipelineOutputCable/PSIC.
-
-    This record is specific to using given inputs.
+    Record of a previous execution of a Method/PSIC/POC
     """
     generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
 
@@ -345,11 +326,11 @@ class ExecRecord(models.Model):
 
         string_rep = u""
         if type(self.general_transf()) == method.models.Method:
-            string_rep = u"{}({}) = ({})".format(self.general_transf(),
-                                                 u", ".join(inputs_list),
-                                                 u", ".join(outputs_list))
+            string_rep = u"{}({}) = ({})".format(
+                    self.general_transf(),
+                    u", ".join(inputs_list),
+                    u", ".join(outputs_list))
         else:
-            # Return a representation for a cable.
             string_rep = (u"{}".format(u", ".join(inputs_list)) +
                           " ={" + u"{}".format(self.general_transf()) + "}=> " +
                           u"{}".format(u", ".join(outputs_list)))
@@ -406,24 +387,20 @@ class ExecRecord(models.Model):
                     else:
                         cable_wires = self.general_transf().custom_outwires.all()
 
-                    source_CDT = (eris[0].symbolicdataset.structure.
-                                  compounddatatype)
-                    dest_CDT = (eros[0].symbolicdataset.structure.
-                                compounddatatype)
+                    source_CDT = eris[0].symbolicdataset.structure.compounddatatype
+                    dest_CDT = (eros[0].symbolicdataset.structure.compounddatatype
 
                     for wire in cable_wires:
                         source_idx = wire.source_pin.column_idx
                         dest_idx = wire.dest_pin.column_idx
                         
                         dest_dt = dest_CDT.members.get(column_idx=dest_idx).datatype
-                        source_dt = source_CDT.members.get(
-                            column_idx=source_idx).datatype
+                        source_dt = source_CDT.members.get(column_idx=source_idx).datatype
 
                         if source_dt != dest_dt:
                             raise ValidationError(
-                                "ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source".
-                                format(self, dest_dt))
-                    
+                                    "ER \"{}\" represents a cable but DT of destination Dataset column {} does not match its source".
+                                    format(self, dest_dt))
 
     def complete_clean(self):
         """
