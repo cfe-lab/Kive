@@ -2723,6 +2723,19 @@ class PipelineStepTests(PipelineTestSetup):
                 "Step 1 contains the parent pipeline",
                 badstep.clean);
 
+    def test_pipelinestep_outputs_to_delete(self):
+        """
+        Make sure marking an output for deletion actually does so.
+        """
+        step = self.DNAcompv1_p.steps.first()
+        output = step.transformation.outputs.first()
+        step.add_deletion(output)
+        self.assertEqual(len(step.outputs_to_retain()), 0)
+        self.assertEqual(step.outputs_to_delete.count(), 1)
+        step.outputs_to_delete.remove(output)
+        self.assertEqual(len(step.outputs_to_retain()), 1)
+        self.assertEqual(step.outputs_to_delete.count(), 0)
+
 class PipelineStepRawDeleteTests(PipelineTestSetup):
 
     def test_PipelineStep_clean_raw_output_to_be_deleted_good(self):

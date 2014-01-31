@@ -380,9 +380,8 @@ class RunStep(models.Model):
 
         # If there is no exec log there is no notion of missing outputs
         outputs_missing = []
-        if self.log.all().exists():
-            outputs_missing = self.log.all().first().missing_outputs()
-
+        if self.log.count() > 0:
+            outputs_missing = self.log.first().missing_outputs()
 
         # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(
@@ -401,7 +400,7 @@ class RunStep(models.Model):
                         "Output \"{}\" of RunStep \"{}\" is deleted; no data should be associated".
                         format(to, self))
 
-            elif to in outputs_missing:
+            elif corresp_ero.symbolicdataset in outputs_missing:
                 # This output is missing; there should be no associated Dataset.
                 if self.outputs.filter(
                         symbolicdataset=corresp_ero.symbolicdataset).exists():
@@ -1152,7 +1151,12 @@ class MethodOutput(models.Model):
     Logged output of the execution of a method.
 
     This stores the stdout and stderr output, as well as the process'
-    return code.
+    return code. 
+    
+    If the return code is -1, it indicates that an operating system level error
+    was raised while trying to execute the code, ie., the code was not executable.
+    In that case, stdout will be empty, and stderr will contain the Python stack
+    trace produced when we tried to run the code with Popen.
     """
     execlog = models.OneToOneField(
         ExecLog,

@@ -2,15 +2,19 @@
 
 from django.core.files import File
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
+
 from librarian.models import ExecRecordIn
 
 # Import our Shipyard models module.
 import file_access_utils, logging_utils
 import os.path
 import shutil
+import inspect, traceback
 import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
+import datachecking.models
 from messages import error_messages, warning_messages
 
 class Sandbox:
@@ -58,7 +62,6 @@ class Sandbox:
         2) Inputs be in sd_fs_map (sub-runs)
         """
         logging_utils.setup_logging()
-        import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         logger = logging.getLogger()
 
@@ -161,7 +164,6 @@ class Sandbox:
         5) input_SD is clean
         """
 
-        import inspect
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         logging.debug("{}: STARTING EXECUTING CABLE".format(fn))
 
@@ -479,8 +481,6 @@ class Sandbox:
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
 
-        import inspect,logging
-        import django.utils.timezone
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         logging.debug("{}: STARTING EXECUTION OF STEP".format(fn))
 
@@ -609,54 +609,58 @@ class Sandbox:
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
 
         logging.debug("{}: Running code".format(fn))
-        with open(stdout_path, "wb", 1) as outwrite:
-            errwrite = open(stderr_path, "wb", 0)
-            method_popen = pipelinestep.transformation.run_code(
-                    step_run_dir,
-                    [self.sd_fs_map[x] for x in inputs_after_cable],
-                    output_paths,
-                    outwrite,
-                    errwrite)
+        input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
 
-            logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
-            with open(stdout_path, "rb", 1) as outread:
-                errread = open(stderr_path, "rb", 0)
+        trace = None # If the process caused a system level error, it will be stored here.
+        try:
+            method_popen = pipelinestep.transformation.run_code(
+                    step_run_dir, input_paths, output_paths)
+        except OSError:
+            trace = traceback.format_exc()
+            
+        with open(stdout_path, "wb", 1) as outwrite, open(stderr_path, "wb", 0) as errwrite:
+
+            # Succesful execution.
+            if trace is None:
+                logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
+                # This will wait for execution to finish, and also not read the whole output
+                # into memory at once in case it is huge.
                 while method_popen.poll() is None:
                     logging.debug("{}: Waiting for execution to finish...".format(fn))
-                    sys.stdout.write(outread.read())
-                    sys.stderr.write(errread.read())
-                    time.sleep(2)
-                outwrite.flush()
-                errwrite.flush()
-                sys.stdout.write(outread.read())
-                sys.stderr.write(errread.read())
-                errread.close()
-            errwrite.close()
+                    for line in method_popen.stdout:
+                        sys.stdout.write(line)
+                        outwrite.write(line)
+                    for line in method_popen.stderr:
+                        sys.stderr.write(line)
+                        errwrite.write(line)
+                    time.sleep(1)
+                returncode = method_popen.returncode
 
-        sys.stdout.flush()
-        sys.stderr.flush()
+            # If the process bombed, store/write the traceback.
+            else:
+                sys.stderr.write(trace)
+                errwrite.write(trace)
+                returncode = -1
+            sys.stdout.flush()
+            sys.stderr.flush()
 
-        curr_date_time = django.utils.timezone.now()
+        curr_date_time = timezone.now()
         curr_log.end_time = curr_date_time
-        logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".format(
-                fn,
-                curr_log.start_time,
-                curr_log.end_time))
+        logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".
+                format(fn, curr_log.start_time, curr_log.end_time))
         curr_log.clean()
         curr_log.save()
 
         logging.debug("{}: Storing stdout/stderr in MethodOutput".format(fn))
-        curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=method_popen.returncode)
-        with open(stdout_path, "rb") as outread:
-            errread = open(stderr_path, "rb")
+        curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=returncode)
+        with open(stdout_path, "rb") as outread, open(stderr_path, "rb") as errread:
             curr_mo.output_log.save(stdout_path, File(outread))
             curr_mo.error_log.save(stderr_path, File(errread))
-            errread.close()
         curr_mo.clean()
         curr_mo.save()
         curr_log.complete_clean()
 
-        if curr_ER == None:
+        if curr_ER is None:
             logging.debug("{}: Creating fresh ER".format(fn))
             curr_ER = librarian.models.ExecRecord(generator=curr_log)
             curr_ER.save()
@@ -703,7 +707,9 @@ class Sandbox:
             # Check that the file exists, as we did for cables.
             if not os.access(output_path, os.R_OK):
                 ccl = output_SD.content_checks.create(execlog=curr_log)
-                ccl.baddata.create(missing_output=True)
+                baddata = datachecking.models.BadData(contentchecklog=ccl, missing_output=True)
+                baddata.save()
+                ccl.baddata = baddata
                 bad_output_found = True
                 continue
 
@@ -757,21 +763,14 @@ class Sandbox:
                 new_DS.clean()
                 new_DS.save()
 
-            if bad_output_found:
-                logging.debug("{}: Already found bad data, not proceeding with anymore checks".format(fn))
-                continue
-
             if not had_ER_at_beginning:
                 logging.debug("{}: New data - performing content check".format(fn))
                 summary_path = "{}_summary".format(output_path)
 
                 # CCL is generated
                 ccl = output_SD.check_file_contents(
-                        output_path,
-                        summary_path,
-                        curr_output.get_min_row(),
-                        curr_output.get_max_row(),
-                        curr_log)
+                        output_path, summary_path, curr_output.get_min_row(),
+                        curr_output.get_max_row(), curr_log)
 
                 if ccl.is_fail():
                     logging.warn("{}: content check failed for {}".format(fn, output_path))
@@ -832,7 +831,7 @@ class Sandbox:
         is_set = (pipeline != None,input_SDs != None,sandbox_path != None,parent_runstep != None)
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
-        
+
         pipeline = pipeline or self.pipeline
         sandbox_path = sandbox_path or self.sandbox_path
 
@@ -949,6 +948,73 @@ class Sandbox:
 
         return curr_run
 
+    def first_generator_of_SD(self, SD_to_find, curr_run=None):
+        """
+        Find the (run, generator) pair which first produced a SymbolicDataset.
+        If generator is None, it indicates the socket is a Pipeline input. If
+        both generator and run are None, it means the SD wasn't found in the
+        Pipeline.
+        """
+        if curr_run is None:
+            curr_run = self.run
+
+        pipeline = curr_run.pipeline
+
+        # First check if the SD we're looking for is a Pipeline input.
+        for socket in pipeline.inputs.order_by("dataset_idx"):
+            key = (curr_run, None, socket)
+            if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                return (curr_run, None)
+
+        # If it's not a pipeline input, check all the steps.
+        steps = curr_run.runsteps.all()
+        steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
+
+        for step in steps:
+            # First check if the SD is an input to this step. In that case, it
+            # had to come in from a nontrivial cable (since we're checking the
+            # steps in order, and we already checked the inputs).
+            pipelinestep = step.pipelinestep
+            for socket in pipelinestep.transformation.inputs.order_by("dataset_idx"):
+                generator = pipelinestep.cables_in.get(dest=socket)
+                key = (curr_run, generator, socket)
+                if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                    return (curr_run, generator)
+
+            # If it wasn't an input to this step, but this step is a sub-pipeline,
+            # it might be somewhere within the sub-pipeline. Search recursively.
+            if hasattr(step, "child_run") and step.child_run is not None:
+                run, generator = self.first_generator_of_SD(SD_to_find, step.child_run)
+                if run is not None: 
+
+                    # Did we find it somewhere inside the sub-Pipeline?
+                    if generator is not None:
+                        return (run, generator)
+
+                    # If it was an input to the sub-Pipeline, we need the cable leading in.
+                    else:
+                        generator = pipelinestep.cables_in.get(dest=socket)
+                        return (curr_run, generator)
+
+            # Now check if it's an output from this step.
+            generator = pipelinestep
+            for socket in pipelinestep.transformation.outputs.order_by("dataset_idx"):
+                key = (curr_run, generator, socket)
+                if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                    return (curr_run, generator)
+
+            # Finally, check if it's at the end of a nontrivial Pipeline output cable.
+            # We don't need to check cables to other steps, since they'll be checked
+            # when we look at the other steps' inputs.
+            for outcable in pipelinestep.outcables.order_by("output_idx"):
+                socket = cable.dest
+                key = (curr_run, outcable, socket)
+                if key in self.socket_map and socket_map[key] == SD_to_find:
+                    return (curr_run, outcable)
+
+        # If we're here, we didn't find it.
+        return (None, None)
+
     def recover(self, SD_to_recover, curr_run):
         """
         Writes SD_to_recover to the file system.
@@ -982,18 +1048,16 @@ class Sandbox:
             return True
 
         logging.debug("{}: Performing computation to create missing Dataset".format(fn))
-        generator = None
-        socket = None
 
-        # This is where the precondition is important! SD_to_recover must be in socket_map.
-        # We have to find the transformation for which SD_to_recover is an *output*.
-        for r, g, s in self.socket_map:
-            if self.socket_map[(r, g, s)] == SD_to_recover:
-                if s.__class__.__name__ == "TransformationOutput":
-                    curr_run = r
-                    generator = g
-                    socket = s
-                    break
+        # Search for the generator of the SD in the Pipeline.
+        curr_run, generator = self.first_generator_of_SD(SD_to_find)
+
+        if curr_run is None:
+            raise ValueError(error_messages["SD_not_in_pipeline"].
+                format(SD_to_recover, self.pipeline))
+        elif generator is None:
+            raise ValueError(error_messages["SD_pipeline_input"].
+                format(SD_to_recover, self.pipeline))
 
         curr_record = None
         if type(generator) == pipeline.models.PipelineStep:

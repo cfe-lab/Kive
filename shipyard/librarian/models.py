@@ -31,7 +31,7 @@ class SymbolicDataset(models.Model):
 
     PRE: the actual file that the SymbolicDataset represents (whether
     it still exists or not) is/was coherent (e.g. checked using
-    file_access_utils.summarize_CSV()).
+    CDT.summarize_CSV()).
     """
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
@@ -54,11 +54,10 @@ class SymbolicDataset(models.Model):
         has_data_suffix = "d" if self.has_data() else ""
         return "S{}{}".format(self.pk, has_data_suffix)
 
-    def __eq__(self, other):
+    def md5_equal(self, other):
         """
-        Two SymbolicDatasets are considered to be equal if they have the same,
-        non-blank MD5, or both their MD5's are blank and they are the same
-        object.
+        Test whether SymbolicDatasets have the same non-blank MD5, or both
+        their MD5's are blank and they are the same object.
         """
         if isinstance(other, self.__class__):
             if self.MD5_checksum != "" and other.MD5_checksum != "":
@@ -69,9 +68,6 @@ class SymbolicDataset(models.Model):
                 return False
         else:
             return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def clean(self):
         """
@@ -94,7 +90,9 @@ class SymbolicDataset(models.Model):
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
-        return hasattr(self, "dataset")
+        if not hasattr(self, "dataset"):
+            return False
+        return self.dataset.pk is not None
     
     def is_raw(self):
         """True if this SymbolicDataset is raw, i.e. not a CSV file."""
@@ -340,7 +338,7 @@ class DatasetStructure(models.Model):
     # a clean() function here that opens up the CSV file and checks it.
     # Instead we will make it a precondition that any SymbolicDataset
     # that represents a CSV file has to have confirmed using
-    # file_access_utils.summarize_CSV() that the CSV file is coherent.
+    # CDT.summarize_CSV() that the CSV file is coherent.
 
     # At a later date, we might want to put in some kind of
     # "force_check()" which actually opens the file and makes sure its

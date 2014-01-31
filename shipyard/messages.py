@@ -20,6 +20,14 @@ error_messages = {
     "dataset_bad_type":
         'Expected source to be either a Dataset or a string, got {}',
     "execlog_swapped_times":
-        'The end time of ExecLog "{}" is before its start time.'
+        'The end time of ExecLog "{}" is before its start time.',
+    "SD_not_in_pipeline":
+        'SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered',
+    "SD_pipeline_input":
+        'SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered'
+}
 
+warning_messages = {
+    "pipeline_already_run": 
+        "A pipeline has already been run in Sandbox {}, returning the previous Run"
 }

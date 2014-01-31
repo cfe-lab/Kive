@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from messages import error_messages
 
+import shutil
 import logging, logging_utils
 import archive.models, librarian.models, metadata.models, method.models, transformation.models
 
@@ -409,9 +410,6 @@ def run_cable_h(cable, source, output_path):
     else:
         wires = cable.custom_wires.all()
 
-    # Read/write binary files in chunks
-    chunk_size = 1024*8
-    
     if type(source) == str and cable.is_trivial():
         logger.debug("{}: Cable source is a file path".format(fn))
         logger.debug("{}: Trivial cable, making sym link: os.link({},{})".format(fn, source, output_path))
@@ -421,16 +419,7 @@ def run_cable_h(cable, source, output_path):
     if type(source) == archive.models.Dataset and cable.is_trivial():
         logger.debug("{}: Cable source is a dataset object".format(fn))
         logger.debug("{}: Trivial cable: writing dataset to the file system".format(fn))
-
-        try:
-            source.dataset_file.open()
-            with open(output_path,"wb") as outfile:
-                chunk = source.dataset_file.read(chunk_size)
-                while chunk != "":
-                    outfile.write(chunk)
-                    chunk = source.dataset_file.read(chunk_size)
-        finally:
-            source.dataset_file.close()
+        shutil.copyfile(source.dataset_file.name, output_path)
         return
         
     # Make a dict encapsulating the mapping required: keyed by the output column name, with value
@@ -468,7 +457,7 @@ def run_cable_h(cable, source, output_path):
             for source_row in input_csv:
                 # row = {col1name: col1val, col2name: col2val, ...}
                 dest_row = {}
-                
+
                 # source_of = {outcol1: sourcecol5, outcol2: sourcecol1, ...}
                 for out_col_name in source_of:
                     dest_row[out_col_name] = source_row[source_of[out_col_name]]
