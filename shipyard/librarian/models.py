@@ -425,7 +425,7 @@ class ExecRecord(models.Model):
                         cable_wires = self.general_transf().custom_outwires.all()
 
                     source_CDT = eris[0].symbolicdataset.structure.compounddatatype
-                    dest_CDT = (eros[0].symbolicdataset.structure.compounddatatype
+                    dest_CDT = eros[0].symbolicdataset.structure.compounddatatype
 
                     for wire in cable_wires:
                         source_idx = wire.source_pin.column_idx
