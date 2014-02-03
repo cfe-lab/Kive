@@ -3,7 +3,8 @@ Generate an HTML form to create a new Datatype object
 """
 
 from django import forms
-from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency
+from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
+from transformation.models import TransformationInput, TransformationOutput, XputStructure
 
 # code resource forms
 class CodeResourceMinimalForm (forms.Form):
@@ -32,9 +33,37 @@ class CodeResourceRevisionForm (forms.ModelForm):
         fields = ('revision_name', 'revision_desc', 'content_file', )
 
 class CodeResourceDependencyForm (forms.ModelForm):
-    coderesource = forms.ChoiceField([('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    def __init__(self, *args, **kwargs):
+        super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
+        self.fields['coderesource'].choices = self.get_code_resource_list()
+
+    def get_code_resource_list(self):
+        return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+
+    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+
     class Meta:
         model = CodeResourceDependency
         exclude = ('coderesourcerevision', 'requirement')
 
+
+class MethodForm (forms.ModelForm):
+    class Meta:
+        model = Method
+        fields = ('family', 'driver', 'random', 'revision_name', 'revision_desc')
+
+class TransformationInputForm (forms.ModelForm):
+    class Meta:
+        model = TransformationInput # derived from abstract class TransformationXput
+        fields = ('dataset_name', 'dataset_idx', 'structure')
+
+class TransformationOutputForm (forms.ModelForm):
+    class Meta:
+        model = TransformationOutput
+        fields = ('dataset_name', 'dataset_idx', 'structure')
+
+class XputStructureForm (forms.ModelForm):
+    class Meta:
+        model = XputStructure
+        fields = ('min_row', 'max_row')

@@ -1,0 +1,43 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Methods{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="dev.html">Back to developer's portal</a>
+
+<h2>Methods</h2>
+
+<p>
+A Method is a set of instructions on how a Code Resource will be used.
+</p>
+
+<table>
+<thead>
+	<tr>
+    <th>Family</th>
+    <th>Name</th>
+	<th>Driver</th>
+    <th>Is random</th>
+	</tr>
+</thead>
+{% for method in methods %}
+<tr>
+	<td>{{ resource.name }}</a></td>
+    <td>{{ resource.filename }}</td>
+	<td>{{ resource.description }}</td>
+    <td>{{ resource.num_revisions }}</td>
+    <td>{{ resource.last_revision_date }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="methods_add">Add a new method</a>
+
+{% endblock %}

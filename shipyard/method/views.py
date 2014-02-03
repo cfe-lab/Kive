@@ -4,7 +4,7 @@ method.views
 
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
-from method.models import CodeResource, CodeResourceRevision
+from method.models import CodeResource, CodeResourceRevision, Method
 from method.forms import *
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
@@ -203,3 +203,12 @@ def resource_revise(request, id):
     return HttpResponse(t.render(c))
 
 
+def methods(request):
+    """
+    Display a list of all Methods in database.
+    """
+    methods = Method.objects.all()
+    t = loader.get_template('method/methods.html')
+    c = Context({'methods': methods})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
