@@ -1,0 +1,42 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Add Compound Datatype{% endblock %}
+
+{% block javascript %}
+<script src="/static/portal/jQuery-2.0.3.min.js"></script>
+<script src="/static/metadata/datatypes.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
+{% endblock %}
+
+{% block content %}
+
+<a href="/compound_datatypes">return to Compound Datatypes summary</a>
+
+<h2>Add a new compound datatype</h2>
+
+<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <p>
+    <input type="button" id="addForm" value="+"/>
+    <input type="button" id="removeForm" value="-"/><small>Add/subtract form fields</small></p>
+
+    <table id="cdmForms">
+    <thead>
+    <tr><th>Datatype</th><th>Column name</th><th>Column index</th></tr></thead>
+    <tbody>
+    <tr>
+        <td>{{ cdm_form.datatype }}</td>
+        <td>{{ cdm_form.column_name }}</td>
+        <td>{{ cdm_form.column_idx }}</td>
+    </tr>
+    </tbody>
+    <tbody id="extraForms">
+    </tbody>
+    </table>
+
+    <input type="submit" value="Upload" />
+</form>
+
+
+{% endblock %}

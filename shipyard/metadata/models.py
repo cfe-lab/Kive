@@ -467,6 +467,9 @@ class CompoundDatatype(models.Model):
     #   members (CompoundDatatypeMember/ForeignKey)
     #   Conforming_datasets (Dataset/ForeignKey)
 
+    def get_absolute_url(self):
+            return '/compound_datatypes/%i' % self.id
+
     def __unicode__(self):
         """ Represent CompoundDatatype with a list of it's members """
 

@@ -1,0 +1,39 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Compound Datatypes{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="/dev.html">Back to developer's portal</a>
+
+<h2>Compound Datatypes</h2>
+
+<p>
+A compound datatype is an ordered set of datatypes, describing the expected structure of
+a data set that would act as the input or output of a Method.
+</p>
+
+<table>
+<thead>
+	<tr>
+	<th>Scheme</th>
+	<th>#datasets</th>
+	</tr>
+</thead>
+{% for cd in compound_datatypes %}
+<tr>
+	<td><a href="{{ cd.get_absolute_url }}">{{ cd }}</a></td> <!--unicode representation-->
+	<td><!-- reserved for number of conforming datasets--></td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="/compound_datatype_add">Add compound datatype</a>
+
+{% endblock %}

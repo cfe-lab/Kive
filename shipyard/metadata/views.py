@@ -3,7 +3,7 @@ metadata.views
 """
 
 from django.http import HttpResponse, HttpResponseRedirect
-from metadata.models import Datatype
+from metadata.models import Datatype, CompoundDatatype
 from metadata.forms import *
 from django.template import loader, Context
 from django.core.context_processors import csrf
@@ -129,4 +129,33 @@ def datatype_detail(request, id):
     c = Context({'datatype': this_datatype,
                 'constraints': this_datatype.basic_constraints.all()})
     c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+
+def compound_datatypes(request):
+    """
+    Render list of all CompoundDatatypes
+    """
+    compound_datatypes = CompoundDatatype.objects.all()
+    t = loader.get_template('metadata/compound_datatypes.html')
+    c = Context({'compound_datatypes': compound_datatypes})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+def compound_datatype_add (request):
+    """
+    Add compound datatype from a dynamic set of CompoundDatatypeMember forms.
+    """
+    if request.method=='POST':
+        print request
+        pass
+    else:
+        cdm_form = CompoundDatatypeMemberForm()
+
+    t = loader.get_template('metadata/compound_datatype_add.html')
+    c = Context({'cdm_form': cdm_form})
+    c.update(csrf(request))
+
     return HttpResponse(t.render(c))

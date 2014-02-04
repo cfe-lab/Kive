@@ -56,12 +56,12 @@ class MethodForm (forms.ModelForm):
 class TransformationInputForm (forms.ModelForm):
     class Meta:
         model = TransformationInput # derived from abstract class TransformationXput
-        fields = ('dataset_name', 'dataset_idx', 'structure')
+        fields = ('dataset_name', 'dataset_idx')
 
 class TransformationOutputForm (forms.ModelForm):
     class Meta:
         model = TransformationOutput
-        fields = ('dataset_name', 'dataset_idx', 'structure')
+        fields = ('dataset_name', 'dataset_idx')
 
 class XputStructureForm (forms.ModelForm):
     class Meta:
