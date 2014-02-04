@@ -871,9 +871,13 @@ class Sandbox:
 
                 run_to_query = curr_run
 
-                # If the PSIC comes from another step, the generator is the source pipeline step
+                # If the PSIC comes from another step, the generator is the source pipeline step,
+                # or the output cable if it's a sub-pipeline
                 if psic.source_step != 0:
                     generator = pipeline.steps.get(step_num=psic.source_step)
+                    if socket.transformation.__class__.__name__ == "Pipeline":
+                        run_to_query = curr_run.runsteps.get(pipelinestep=generator).child_run
+                        generator = generator.transformation.outcables.get(output_idx=socket.dataset_idx)
 
                 # Otherwise, the psic comes from step 0
                 else:
@@ -882,7 +886,7 @@ class Sandbox:
                     generator = None
 
                     # If this step is a subpipeline...
-                    if parent_runstep != None:
+                    if parent_runstep is not None:
 
                         # Then the run we are interested in is the parent run
                         run_to_query = parent_runstep.run
@@ -1003,14 +1007,12 @@ class Sandbox:
                 if key in self.socket_map and self.socket_map[key] == SD_to_find:
                     return (curr_run, generator)
 
-            # Finally, check if it's at the end of a nontrivial Pipeline output cable.
-            # We don't need to check cables to other steps, since they'll be checked
-            # when we look at the other steps' inputs.
-            for outcable in pipelinestep.outcables.order_by("output_idx"):
-                socket = cable.dest
-                key = (curr_run, outcable, socket)
-                if key in self.socket_map and socket_map[key] == SD_to_find:
-                    return (curr_run, outcable)
+        # Finally, check if it's at the end of a nontrivial Pipeline output cable.
+        for outcable in pipeline.outcables.order_by("output_idx"):
+            socket = cable.dest
+            key = (curr_run, outcable, socket)
+            if key in self.socket_map and socket_map[key] == SD_to_find:
+                return (curr_run, outcable)
 
         # If we're here, we didn't find it.
         return (None, None)
