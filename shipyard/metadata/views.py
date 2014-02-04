@@ -148,9 +148,48 @@ def compound_datatype_add (request):
     """
     Add compound datatype from a dynamic set of CompoundDatatypeMember forms.
     """
-    if request.method=='POST':
-        print request
-        pass
+    if request.method == 'POST':
+        query = request.POST.dict()
+        print query
+        try:
+            # manually populate CompoundDatatypeMember objects from query
+            compound_datatype = CompoundDatatype()
+            compound_datatype.full_clean()
+            compound_datatype.save()
+
+            exceptions = []
+            to_save = []
+
+            for k in query.iterkeys():
+                if not k.startswith('datatype'):
+                    continue
+                suffix = ('_' + k.split('_')[-1]) if '_' in k else ''
+                member = CompoundDatatypeMember(compounddatatype=compound_datatype,
+                                                datatype=query['datatype'+suffix],
+                                                column_name=query['column_name'+suffix],
+                                                column_idx=query['column_idx'+suffix])
+                try:
+                    member.full_clean()
+                except ValidationError as e:
+                    exceptions.append(e.messages)
+
+                to_save.append(member)
+
+            print to_save
+
+            if exceptions:
+                print exceptions
+                compound_datatype.delete()
+                raise
+
+            for member in to_save:
+                member.save()
+            return HttpResponseRedirect('/compound_datatypes')
+
+        except:
+            # return with first set of entries - TODO: is it possible to render with all forms?
+            cdm_form = CompoundDatatypeMemberForm(request.POST)
+            pass
     else:
         cdm_form = CompoundDatatypeMemberForm()
 
