@@ -47,6 +47,24 @@ class UtilityMethods(TestCase):
         self.simple_method_io(self.method_noop, self.cdt_string,
                 "strings", "same_strings")
 
+    def make_second_pipeline(self, pipeline):
+        """
+        Create a second version of a Pipeline, in the same family as the first,
+        without making any changes. Hook up the steps to each other, but don't
+        create inputs and outputs for the new Pipeline.
+        """
+        new_pipeline = Pipeline(family=pipeline.family, revision_name="2", 
+            revision_desc="second version")
+        new_pipeline.save()
+
+        for step in pipeline.steps.all():
+            new_step = new_pipeline.steps.create(transformation=step.transformation, step_num=step.step_num)
+            for cable in step.cables_in.all():
+                if cable.source.transformation.__class__.__name__ == "PipelineStep":
+                    new_step.cables_in.create(source = cable.source,
+                        dest = cable.dest)
+        return new_pipeline
+
     def create_linear_pipeline(self, pipeline, methods, indata, outdata):
         """
         Helper function to create a "linear" pipeline, ie.
@@ -603,21 +621,41 @@ class FindSDTests(UtilityMethods):
         self.user_bob.save()
         self.setup_simple_pipeline()
         self.setup_twostep_pipeline()
+        self.setup_nested_pipeline()
 
     def tearDown(self):
         super(FindSDTests, self).tearDown()
         os.remove(self.string_datafile.name)
         os.remove(self.words_datafile.name)
+
+    def make_custom_wire(self, cable):
+        source_cdt = cable.source.structure.first().compounddatatype
+        dest_cdt = cable.dest.structure.first().compounddatatype
+        cable.custom_wires.create(source_pin=source_cdt.members.first(), 
+            dest_pin=dest_cdt.members.last())
+        cable.custom_wires.create(source_pin=source_cdt.members.last(), 
+            dest_pin=dest_cdt.members.first())
+
+    def setup_nested_pipeline(self):
+        # A two-step pipeline with custom cable wires at each step.
+        self.pipeline_nested = self.make_first_pipeline("nested pipeline",
+            "a pipeline with a sub-pipeline")
+
+        transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
+        self.create_linear_pipeline(self.pipeline_nested,
+            transforms, "data", "unchanged data")
+        cable = self.pipeline_nested.steps.last().cables_in.first()
+        self.make_custom_wire(cable)
+        self.pipeline_nested.create_outputs()
+        self.pipeline_nested.complete_clean()
     
     def setup_twostep_pipeline(self):
         """
-        (drow,word) (word,drow) (word,drow)    (drow,word)  (drow,word)    (word)
+        (drow,word) (word,drow) (word,drow)    (drow,word)  (drow,word)    (drow,word)
                          _____________              ______________
-           [o]====<>====|o           o|=====<>=====|o            o|====<>====[o]
+           [o]====<>====|o           o|=====<>=====|o            o|============[o]
                         |   reverse   |            |     noop     |
                         |_____________|            |______________|
-
-
         """
         # A code resource which reverses a file.
         self.coderev_reverse = self.make_first_revision("reverse",
@@ -650,23 +688,13 @@ class FindSDTests(UtilityMethods):
             "a method to do nothing on two columns",
             self.coderev_noop)
         self.simple_method_io(self.method_noop_backwords, self.cdt_backwords,
-            "backwords", "more backwords")
+            "backwords", "more_backwords")
 
         # A two-step pipeline with custom cable wires at each step.
         self.pipeline_twostep = self.make_first_pipeline("two-step pipeline",
             "a two-step pipeline with custom cable wires at each step")
         self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords,
             dataset_name="words_to_reverse", dataset_idx = 1)
-        self.pipeline_twostep.create_output(compounddatatype=self.cdt_string,
-            dataset_name="reversed_words", dataset_idx = 1)
-
-        def make_custom_wire(cable):
-            source_cdt = cable.source.structure.first().compounddatatype
-            dest_cdt = cable.dest.structure.first().compounddatatype
-            cable.custom_wires.create(source_pin=source_cdt.members.first(), 
-                dest_pin=dest_cdt.members.last())
-            cable.custom_wires.create(source_pin=source_cdt.members.last(), 
-                dest_pin=dest_cdt.members.first())
 
         methods = [self.method_reverse, self.method_noop_backwords]
         for i, method in enumerate(methods):
@@ -678,17 +706,14 @@ class FindSDTests(UtilityMethods):
             cable = step.cables_in.create(source_step = i, 
                 source = source,
                 dest = methods[i].inputs.first())
-            make_custom_wire(cable)
+            self.make_custom_wire(cable)
 
         cable = self.pipeline_twostep.create_outcable(output_name = "reversed_words",
             output_idx = 1,
             source_step = 2,
             source = methods[-1].outputs.first())
-        # TODO: This is unintuitive. Why should the dest pin be something from the
-        # source CDT, when we want a different destination CDT for the output?
-        cable.custom_outwires.create(source_pin=self.cdt_backwords.members.last(),
-            dest_pin=self.cdt_backwords.members.last())
 
+        self.pipeline_twostep.create_outputs()
         self.pipeline_twostep.complete_clean()
 
         # Some data to run through the two-step pipeline.
@@ -757,8 +782,69 @@ class FindSDTests(UtilityMethods):
     def test_find_symds_pipeline_input_custom_wire(self):
         """
         Finding a SymbolicDataset which was passed through a custom wire to a
-        Pipeline should return None as the generator, and the top-level run as
-        the run.
+        Pipeline should return the cable as the generator, and the top-level
+        run as the run.
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
         sandbox.execute_pipeline()
+
+        runcable = sandbox.run.runsteps.first().RSICs.first()
+        symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
+
+        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        self.assertEqual(run, sandbox.run)
+        self.assertEqual(gen, runcable.PSIC)
+
+    def test_find_symds_custom_wire(self):
+        """
+        Finding a SymbolicDataset which was produced by a custom wire as an 
+        intermediate step should return the cable as the generator, and the
+        top-level run as the run.
+        """
+        sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
+        sandbox.execute_pipeline()
+
+        runcable = sandbox.run.runsteps.last().RSICs.first()
+        symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
+
+        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        self.assertEqual(run, sandbox.run)
+        self.assertEqual(gen, runcable.PSIC)
+
+    def test_find_symds_subpipeline(self):
+        """
+        Find a symbolic dataset in a sub-pipeline, which is output from a step.
+        """
+        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
+        sandbox.execute_pipeline()
+
+        for step in sandbox.run.runsteps.all():
+            if step.pipelinestep.step_num == 2:
+                subrun = step.child_run
+                runstep = subrun.runsteps.first()
+                outrecord = runstep.execrecord.execrecordouts.first()
+                symds_to_find = outrecord.symbolicdataset
+                break
+
+        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        self.assertEqual(run, subrun)
+        self.assertEqual(gen, runstep.pipelinestep)
+
+    def test_find_symds_subpipeline_input(self):
+        """
+        Find a symbolic dataset in a sub-pipeline, which is input to the sub-pipeline
+        on a custom cable.
+        """
+        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
+        sandbox.execute_pipeline()
+
+        for step in sandbox.run.runsteps.all():
+            if step.pipelinestep.step_num == 2:
+                subrun = step.child_run
+                runstep = subrun.runsteps.first()
+                cable = runstep.RSICs.first()
+                symds_to_find = runstep.execrecord.execrecordins.first().symbolicdataset
+
+        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        self.assertEqual(run, subrun)
+        self.assertEqual(gen, cable.PSIC)
