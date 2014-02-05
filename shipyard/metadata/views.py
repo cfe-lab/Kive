@@ -148,53 +148,77 @@ def compound_datatype_add (request):
     """
     Add compound datatype from a dynamic set of CompoundDatatypeMember forms.
     """
+    t = loader.get_template('metadata/compound_datatype_add.html')
+
     if request.method == 'POST':
         query = request.POST.dict()
         print query
         try:
             # manually populate CompoundDatatypeMember objects from query
             compound_datatype = CompoundDatatype()
-            compound_datatype.full_clean()
             compound_datatype.save()
 
-            exceptions = []
+            exceptions = {}
             to_save = []
+            num_forms = sum([1 for k in query.iterkeys() if k.startswith('datatype')])
 
-            for k in query.iterkeys():
-                if not k.startswith('datatype'):
-                    continue
-                suffix = ('_' + k.split('_')[-1]) if '_' in k else ''
+            for i in range(num_forms):
+                suffix = ('_'+str(i-1) if i > 0 else '')
+
+                try:
+                    this_pk = int(query['datatype'+suffix])
+                except ValueError:
+                    exceptions.update({i: [u'Datatype must be selected']})
+                    continue # blank form, ignore
+                except:
+                    # unexpected problem
+                    raise
+
+                its_datatype = Datatype.objects.get(pk=this_pk)
                 member = CompoundDatatypeMember(compounddatatype=compound_datatype,
-                                                datatype=query['datatype'+suffix],
+                                                datatype=its_datatype,
                                                 column_name=query['column_name'+suffix],
                                                 column_idx=query['column_idx'+suffix])
                 try:
                     member.full_clean()
                 except ValidationError as e:
-                    exceptions.append(e.messages)
+                    exceptions.update({i: e.messages})
+                    pass
 
                 to_save.append(member)
 
-            print to_save
-
-            if exceptions:
-                print exceptions
+            if exceptions: # non-empty dict
                 compound_datatype.delete()
-                raise
-
-            for member in to_save:
-                member.save()
-            return HttpResponseRedirect('/compound_datatypes')
-
+                cdm_forms = []
+                for i in range(num_forms):
+                    suffix = ('_'+str(i-1) if i > 0 else '')
+                    try:
+                        its_datatype = Datatype.objects.get(pk=int(query['datatype'+suffix]))
+                    except:
+                        its_datatype = None
+                    cdm_form = CompoundDatatypeMemberForm(auto_id = ('id_%s_'+str(i-1)) if i > 0 else 'id_%s',
+                                                          initial={'datatype': its_datatype,
+                                                                    'column_name': query['column_name'+suffix],
+                                                                    'column_idx': query['column_idx'+suffix]})
+                    cdm_form.errors['Errors'] = ErrorList(exceptions.get(i, ''))
+                    cdm_forms.append(cdm_form)
+                c = Context({'cdm_forms': cdm_forms})
+                c.update(csrf(request))
+                return HttpResponse(t.render(c))
+            else:
+                # success!
+                for member in to_save:
+                    member.save()
+                return HttpResponseRedirect('/compound_datatypes')
         except:
+            raise
             # return with first set of entries - TODO: is it possible to render with all forms?
             cdm_form = CompoundDatatypeMemberForm(request.POST)
             pass
     else:
         cdm_form = CompoundDatatypeMemberForm()
 
-    t = loader.get_template('metadata/compound_datatype_add.html')
-    c = Context({'cdm_form': cdm_form})
+    c = Context({'cdm_forms': [cdm_form]})
     c.update(csrf(request))
 
     return HttpResponse(t.render(c))

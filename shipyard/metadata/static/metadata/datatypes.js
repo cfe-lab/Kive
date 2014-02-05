@@ -17,7 +17,15 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     ).change(); // trigger on load
 
     var options = document.getElementById("id_datatype").options;
-    var numberOfForms = 0;
+    var numberOfForms = $('#extraForms > tr').length;
+
+    // modify name attribute of extraForms if there are any
+    if (numberOfForms > 0) {
+        for (var i=0; i < numberOfForms; i++) {
+            $('select[id^="id_datatype_"][id$=i.toString()]]').attr(name, 'datatype_'+i)
+        }
+    }
+
     $("#addForm").click(  // query button by id selector
         function () {   // anonymous function
             numberOfForms += 1;
@@ -34,6 +42,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     )
 
     // render forms in div
+    // TODO: adding or removing forms blanks out all extra forms, another way to do this?
     var renderForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
@@ -50,35 +59,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             htmlStr += "</tr>"
         }
         $("#extraForms").html(htmlStr);
-
-        // repeated within this class-based event handler for the dynamic HTML elements
-        $("select.coderesource").on('change',
-            function() {
-                var suffix = $(this).attr('id').split('_')[2];
-                cr_id = $(this).val();
-                if (cr_id != "") {
-                    $.ajax({
-                        type: "POST",
-                        url: "get_revisions/",
-                        data: {cr_id: cr_id}, // specify data as an object
-                        datatype: "json", // type of data expected back from server
-                        success: function(result) {
-                            //console.log(result);
-                            var options = [];
-                            var arr = JSON.parse(result)
-                            $.each(arr, function(index,value) {
-                                options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                            });
-                            $("#id_revisions_"+suffix).html(options.join(''));
-                        },
-                    })
-                }
-                else {
-                    // reset the second drop-down
-                    $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
-                }
-            }
-        )
     };
 
 
