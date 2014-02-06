@@ -14,7 +14,12 @@ from django.core.validators import MinValueValidator
 import operator
 import re
 import csv
+import os
+import traceback
 from datetime import datetime
+
+from file_access_utils import set_up_directory
+from messages import error_messages
 
 class Datatype(models.Model):
     """
@@ -54,7 +59,7 @@ class Datatype(models.Model):
         max_length=64,
         default = STR,
         choices=PYTHON_TYPE_CHOICES,
-        help_text="Python type (int|str|float|bool|datetime)");
+        help_text="Python type (int|str|float|bool)");
 
     restricts = models.ManyToManyField(
         'self',
@@ -682,7 +687,8 @@ class CompoundDatatype(models.Model):
                     }
     
                     # Write a CSV header.
-                    cols_with_cc[cdtm.column_idx]["infilehandle"].write("to_test\n")
+                    header = "{}\n".format(verif_in.members.first().column_name)
+                    cols_with_cc[cdtm.column_idx]["infilehandle"].write(header)
     
     
             ####
@@ -705,7 +711,7 @@ class CompoundDatatype(models.Model):
                         failing_cells[(rownum, cdtm.column_idx)] = test_result
     
                     if cdtm.column_idx in cols_with_cc:
-                        cols_ith_cc[cdtm.column_idx]["infilehandle"].write(
+                        cols_with_cc[cdtm.column_idx]["infilehandle"].write(
                             curr_cell_value + "\n")
     
             summary["num_rows"] = num_rows
@@ -726,6 +732,7 @@ class CompoundDatatype(models.Model):
             # We need to invoke the verification method using run_code.
             # All of our inputs are in place.
             corresp_DT = cdt_members.get(column_idx=col).datatype
+            verif_method = corresp_DT.custom_constraint.verification_method
     
             input_path = cols_with_cc[col]["infilepath"]
             dir_to_run = cols_with_cc[col]["testpath"]
@@ -733,33 +740,44 @@ class CompoundDatatype(models.Model):
     
             stdout_path = os.path.join(dir_to_run, "logs", "stdout.txt")
             stderr_path = os.path.join(dir_to_run, "logs", "stderr.txt")
+
+            # TODO: This is duplicated from execute_step, we need to pull it out
+            # into its own function somewhere.
+            trace = None
+            try:
+                verif_popen = verif_method.run_code(dir_to_run, [input_path], 
+                        [output_path])
+            except OSError:
+                trace = traceback.format_exc()
             
-            with open(stdout_path, "wb"), open(stderr_path, "wb") as out, err:
-                verif_method = corresp_DT.custom_constraint.verification_method
-                test_popen = verif_method.run_code(
-                    dir_to_run, [input_path],
-                    [output_path],
-                    stdout_path, stderr_path)                                               
-                
-                # While it's running, print the captured stdout and
-                # stderr to the console.
-                with (open(stdout_path, "rb", 1), 
-                      open(stderr_path, "rb", 0)) as (outread, errread):
-                    while method_open.poll() != None:
-                        sys.stdout.write(outread.read())
-                        sys.stderr.write(errread.read())
+            with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
+                if trace is None:
+                    while verif_popen.poll() is None:
+                        for line in verif_popen.stdout:
+                            sys.stdout.write(line)
+                            out.write(line)
+                        for line in verif_popen.stderr:
+                            sys.stdout.write(line)
+                            out.write(line)
                         time.sleep(1)
-                            
+
                     # One last write....
-                    outwrite.flush()
-                    errwrite.flush()
-                    sys.stdout.write(outread.read())
-                    sys.stderr.write(errread.read())
-    
+                    for line in verif_popen.stdout:
+                        sys.stdout.write(line)
+                        out.write(line)
+                    for line in verif_popen.stderr:
+                        sys.stderr.write(line)
+                        err.write(line)
+
+                else:
+                    sys.stderr.write(trace)
+                    errwrite.write(trace)
+                    raise ValueError(error_messages["bad_constraint_checker"])
+
                 # The method has finished running.  Make sure all output
                 # has been flushed.
-                sys.stdout.flush()
-                sys.stderr.flush()
+                for stream in [out, err, sys.stdout, sys.stderr]:
+                    stream.flush()
                 
             # Now: open the resulting file, which is at output_path, and
             # make sure it's OK.  We're going to have to call
