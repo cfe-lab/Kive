@@ -186,9 +186,9 @@ def resource_revise(request, id):
             revision.save()
             return HttpResponseRedirect('/resources')
         except:
-            raise
-        # otherwise return form with user entries
-        form = CodeResourceRevisionForm(request.POST, request.FILES)
+            # otherwise return form with user entries
+            form = CodeResourceRevisionForm(request.POST, request.FILES)
+
     else:
         if last_revision:
             form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
@@ -211,4 +211,15 @@ def methods(request):
     t = loader.get_template('method/methods.html')
     c = Context({'methods': methods})
     c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+def method_add (request):
+    t = loader.get_template('method/method_add.html')
+    if request.method == 'POST':
+        pass
+    else:
+        method_form = MethodForm()
+
+    c = Context({'method_form': method_form})
     return HttpResponse(t.render(c))
