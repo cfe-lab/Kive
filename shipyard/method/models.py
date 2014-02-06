@@ -12,7 +12,7 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
-from messages import error_messages
+from constants import error_messages
 
 class CodeResource(models.Model):
     """

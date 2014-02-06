@@ -1,3 +1,5 @@
+# Constants and odds and ends that are hard-coded into the system.
+
 error_messages = {
     "header_mismatch": 
         'File "{}" should have the header "{}", but it has "{}"',
@@ -31,3 +33,23 @@ warning_messages = {
     "pipeline_already_run": 
         "A pipeline has already been run in Sandbox {}, returning the previous Run"
 }
+
+
+# Primary keys for Datatypes and CDTs that are pre-defined for the user.
+class Datatypes:
+    pass
+
+datatypes = Datatypes()
+datatypes.STR_PK = 1
+datatypes.BOOL_PK = 2
+datatypes.FLOAT_PK = 3
+datatypes.INT_PK = 4
+datatypes.NATURALNUMBER_PK = 5
+
+class CDTs:
+    pass
+
+CDTs = CDTs()
+CDTs.VERIF_IN_PK = 1
+CDTs.VERIF_OUT_PK = 2
+CDTs.PROTOTYPE_PK = 3

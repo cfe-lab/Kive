@@ -15,7 +15,7 @@ import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
 import datachecking.models
-from messages import error_messages, warning_messages
+from constants import error_messages, warning_messages
 
 class Sandbox:
     """

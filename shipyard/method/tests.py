@@ -14,7 +14,7 @@ import tempfile
 from method.models import *
 from metadata.models import *
 import metadata.tests
-from messages import error_messages
+from constants import error_messages
 
 logging.getLogger().setLevel(10) # Debug messages
 samplecode_path = "../samplecode"

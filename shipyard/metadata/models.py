@@ -16,6 +16,8 @@ import re
 import csv
 from datetime import datetime
 
+from constants import CDTs
+
 class Datatype(models.Model):
     """
     Abstract definition of a semantically atomic type of data.
@@ -115,11 +117,7 @@ class Datatype(models.Model):
     # Clean: If prototype is specified, it must have a CDT with
     # 2 columns: column 1 is a string "example" field,
     # column 2 is a bool "valid" field.  This CDT will be hard-coded
-    # and loaded i
-
-    # Clean: Check that the rows of prototype conform to the
-    # constraints (if any) specified, including those
-    # of the parent Datatypes.
+    # and loaded into the database on creation.
 
     # FIXME: when we get execution working, we'll have to also
     # check that the first column of prototype yields the second
@@ -134,6 +132,19 @@ class Datatype(models.Model):
             raise ValidationError(
                 "Datatype \"{}\" has a circular restriction".
                 format(self))
+
+        if self.prototype is not None:
+            if self.prototype.symbolicdataset.is_raw():
+                raise ValidationError(
+                    "Prototype Dataset for Datatype \"{}\" is raw".format(self)
+                )
+
+            PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+
+            if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
+                raise ValidationError(
+                    "Prototype Dataset for Datatype \"{}\" should have CDT identical to PROTOTYPE".format(self)
+                )
 
     def get_absolute_url(self):
         return '/datatypes/%i' % self.id
@@ -389,15 +400,14 @@ class CustomConstraint(models.Model):
         a CDT looking like (string to_test); it must return
         as output a CDT looking like (bool is_valid).
         """
-        # Pre-defined CDTs that the verification method must use.
-        VERIF_IN = CompoundDatatype.objects.get(pk=1)
-        VERIF_OUT = CompoundDatatype.objects.get(pk=2)
-        
         verif_method_in = self.verification_method.inputs.all()
         verif_method_out = self.verification_method.outputs.all()
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
             raise ValidationError("CustomConstraint \"{}\" verification method does not have exactly one input and one output".
                                   format(self))
+
+        VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
+        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
 
         if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
             raise ValidationError(

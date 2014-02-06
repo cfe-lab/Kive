@@ -15,7 +15,7 @@ from django.core.files import File
 import re
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import file_access_utils, logging_utils
-from messages import error_messages
+from constants import error_messages
 
 class SymbolicDataset(models.Model):
     """

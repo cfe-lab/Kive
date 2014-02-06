@@ -13,7 +13,7 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 from django.utils import timezone
 
-from messages import error_messages
+from constants import error_messages
 
 import shutil
 import logging, logging_utils
