@@ -3,7 +3,7 @@ Generate an HTML form to create a new Datatype object
 """
 
 from django import forms
-from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
+from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
 from transformation.models import TransformationInput, TransformationOutput, XputStructure
 
 # code resource forms
@@ -49,9 +49,16 @@ class CodeResourceDependencyForm (forms.ModelForm):
 
 
 class MethodForm (forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(MethodForm, self).__init__(*args, **kwargs)
+        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+
+    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
     class Meta:
         model = Method
-        fields = ('family', 'driver', 'random', 'revision_name', 'revision_desc')
+        fields = ('revision_name', 'revision_desc', 'random')
+
 
 class TransformationInputForm (forms.ModelForm):
     class Meta:

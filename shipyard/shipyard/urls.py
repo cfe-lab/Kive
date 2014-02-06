@@ -39,6 +39,7 @@ urlpatterns = patterns('',
     url(r'get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 
     url(r'methods$', 'method.views.methods', name='methods'),
+    url(r'method_add$', 'method.views.method_add', name='method_add'),
 
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
     url(r'^datasets', 'portal.views.datasets', name='datasets'),

@@ -467,9 +467,6 @@ class CompoundDatatype(models.Model):
     #   members (CompoundDatatypeMember/ForeignKey)
     #   Conforming_datasets (Dataset/ForeignKey)
 
-    def get_absolute_url(self):
-            return '/compound_datatypes/%i' % self.id
-
     def __unicode__(self):
         """ Represent CompoundDatatype with a list of it's members """
 
@@ -816,3 +813,12 @@ class CompoundDatatype(models.Model):
             summary["failing_cells"] = failing_cells
     
         return summary
+
+    def count_conforming_datasets (self):
+        """
+        Returns the number of Datasets that conform to this CompoundDatatype.
+        Is this even possible?
+        """
+        return 0
+
+    num_conforming_datasets = property(count_conforming_datasets)

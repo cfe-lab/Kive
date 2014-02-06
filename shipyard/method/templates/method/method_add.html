@@ -1,0 +1,28 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Add a new method{% endblock %}
+
+{% block javascript %}
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script src="/static/method/resources.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<a href="/resources">return to Methods summary</a>
+
+<h2>Add a new method</h2>
+
+<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <table>
+    {{ method_form.as_table }}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+
+{% endblock %}
