@@ -22,7 +22,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     // TODO: modify name attribute of extraForms if there are any
     if (numberOfForms > 0) {
         for (var i=0; i < numberOfForms; i++) {
-            $('select[id^="id_datatype_"][id$=i.toString()]]').attr(name, 'datatype_'+i)
+            $('#id_datatype_'+i).attr('name', 'datatype_'+i);
+            $('#id_column_name_'+i).attr('name', 'column_name_'+i);
+            $('#id_column_idx_'+i).attr('name', 'column_idx_'+i);
         }
     }
 
