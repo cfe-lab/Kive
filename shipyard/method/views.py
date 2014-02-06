@@ -212,3 +212,9 @@ def methods(request):
     c = Context({'methods': methods})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+
+
+def methods_add (request):
+    if request.method == 'POST':
+        pass
+    else:
