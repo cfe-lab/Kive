@@ -19,7 +19,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     var options = document.getElementById("id_datatype").options;
     var numberOfForms = $('#extraForms > tr').length;
 
-    // modify name attribute of extraForms if there are any
+    // TODO: modify name attribute of extraForms if there are any
     if (numberOfForms > 0) {
         for (var i=0; i < numberOfForms; i++) {
             $('select[id^="id_datatype_"][id$=i.toString()]]').attr(name, 'datatype_'+i)
