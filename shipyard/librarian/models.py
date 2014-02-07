@@ -455,9 +455,7 @@ class ExecRecord(models.Model):
                         source_dt = source_CDT.members.get(column_idx=source_idx).datatype
 
                         if source_dt != dest_dt:
-                            raise ValidationError(
-                                    "ER \"{}\" represents a cable but DT of destination Dataset column {} does not match its source".
-                                    format(self, dest_dt))
+                            raise ValidationError(error_messages["ER_cable_wiring_DT_mismatch"].format(self, dest_dt))
 
     def complete_clean(self):
         """
