@@ -4,6 +4,7 @@ Generate an HTML form to create a new Datatype object
 
 from django import forms
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
+from metadata.models import CompoundDatatype
 from transformation.models import TransformationInput, TransformationOutput, XputStructure
 
 # code resource forms
@@ -71,6 +72,7 @@ class TransformationOutputForm (forms.ModelForm):
         fields = ('dataset_name', 'dataset_idx')
 
 class XputStructureForm (forms.ModelForm):
+    compounddatatype = forms.ModelChoiceField(queryset = CompoundDatatype.objects.all())
     class Meta:
         model = XputStructure
-        fields = ('min_row', 'max_row')
+        fields = ('compounddatatype', 'min_row', 'max_row')

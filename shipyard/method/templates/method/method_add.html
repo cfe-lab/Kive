@@ -7,7 +7,7 @@
 
 {% block javascript %}
 <script src="/static/portal/jquery-2.0.3.min.js"></script>
-<script src="/static/method/resources.js"></script>
+<script src="/static/method/methods.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -18,7 +18,35 @@
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
-    {{ method_form.as_table }}
+    {% for field in method_form %}
+        <tr>
+        <th>{{ field.label_tag }}</th>
+        <td>
+            {{ field.errors }}
+            {{ field }}
+            <div class="helptext">{{ field.help_text }}</div>
+        </td>
+        </tr>
+    {% endfor %}
+    </table>
+
+    <p>
+    <input type="button" id="addInputForm" value="+"/>
+    <input type="button" id="removeInputForm" value="-"/>
+    <small>Add/subtract input forms</small>
+    </p>
+
+    <table id="inputForms">
+    <thead>
+    <tr><th>Name</th><th>Index</th><th></th></tr></thead>
+    <tbody id="extraInputForms">
+    {% for input_form in input_forms %}
+        <tr>
+        <td>{{ input_form.dataset_name }}</td>
+        <td>{{ input_form.dataset_idx }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
     </table>
 
     <input type="submit" value="Submit" />
