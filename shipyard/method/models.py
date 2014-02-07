@@ -553,9 +553,9 @@ class Method(transformation.models.Transformation):
             logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
 
             out_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stdout, [output_streams]))
+                    args=(method_popen, method_popen.stdout, output_streams))
             err_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stdout, [error_streams]))
+                    args=(method_popen, method_popen.stdout, error_streams))
             out_thread.start()
             err_thread.start()
             out_thread.join()
