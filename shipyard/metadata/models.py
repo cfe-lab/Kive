@@ -19,8 +19,7 @@ import traceback
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from messages import error_messages
-from constants import CDTs
+from constants import CDTs, error_messages
 from datachecking.models import VerificationLog
 
 class Datatype(models.Model):

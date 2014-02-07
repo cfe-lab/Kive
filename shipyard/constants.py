@@ -30,7 +30,9 @@ error_messages = {
     "SD_pipeline_input":
         'SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered',
     "bad_constraint_checker":
-        'Constraint checking method "{}" crashed'
+        'Constraint checking method "{}" crashed',
+    "ER_cable_wiring_DT_mismatch":
+        'ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source'
 }
 
 warning_messages = {

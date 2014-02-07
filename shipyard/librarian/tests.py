@@ -913,7 +913,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecord .* represents a cable but Datatype of destination Dataset column .* does not match its source",
+            error_messages["ER_cable_wiring_DT_mismatch"].format(".*", ".*"),
             outcable_ER.clean)
         
     def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
@@ -951,5 +951,5 @@ class ExecRecordTests(LibrarianTestSetup):
 
         self.assertRaisesRegexp(
             ValidationError,
-            "ExecRecord .* represents a cable but Datatype of destination Dataset column .* does not match its source",
+            error_messages["ER_cable_wiring_DT_mismatch"].format(".*", ".*"),
             cable_ER.clean)
