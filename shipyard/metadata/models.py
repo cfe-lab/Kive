@@ -20,6 +20,7 @@ from datetime import datetime
 
 from file_access_utils import set_up_directory
 from messages import error_messages
+from constants import CDTs
 from datachecking.models import VerificationLog
 
 class Datatype(models.Model):
@@ -121,11 +122,7 @@ class Datatype(models.Model):
     # Clean: If prototype is specified, it must have a CDT with
     # 2 columns: column 1 is a string "example" field,
     # column 2 is a bool "valid" field.  This CDT will be hard-coded
-    # and loaded i
-
-    # Clean: Check that the rows of prototype conform to the
-    # constraints (if any) specified, including those
-    # of the parent Datatypes.
+    # and loaded into the database on creation.
 
     # FIXME: when we get execution working, we'll have to also
     # check that the first column of prototype yields the second
@@ -140,6 +137,19 @@ class Datatype(models.Model):
             raise ValidationError(
                 "Datatype \"{}\" has a circular restriction".
                 format(self))
+
+        if self.prototype is not None:
+            if self.prototype.symbolicdataset.is_raw():
+                raise ValidationError(
+                    "Prototype Dataset for Datatype \"{}\" is raw".format(self)
+                )
+
+            PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+
+            if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
+                raise ValidationError(
+                    "Prototype Dataset for Datatype \"{}\" should have CDT identical to PROTOTYPE".format(self)
+                )
 
     def get_absolute_url(self):
         return '/datatypes/%i' % self.id
@@ -404,6 +414,9 @@ class CustomConstraint(models.Model):
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
             raise ValidationError("CustomConstraint \"{}\" verification method does not have exactly one input and one output".
                                   format(self))
+
+        VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
+        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
 
         if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
             raise ValidationError(
@@ -671,7 +684,9 @@ class CompoundDatatype(models.Model):
                     # into the fourth.
 
                     input_data = os.path.join(column_test_path, "input_data")
+                    set_up_directory(input_data)
                     output_data = os.path.join(column_test_path, "output_data")
+                    set_up_directory(output_data)
                     logs = os.path.join(column_test_path, "logs")
                     for workdir in [input_data, output_data, logs]:
                         set_up_directory(workdir)
@@ -687,8 +702,7 @@ class CompoundDatatype(models.Model):
                     }
     
                     # Write a CSV header.
-                    header = "{}\n".format(verif_in.members.first().column_name)
-                    cols_with_cc[cdtm.column_idx]["infilehandle"].write(header)
+                    cols_with_cc[cdtm.column_idx]["infilehandle"].write("to_test\n")
     
     
             ####
