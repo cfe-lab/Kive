@@ -205,7 +205,7 @@ class SymbolicDataset(models.Model):
         csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
-            csv_summary = my_CDT.summarize_CSV(f, summary_path)
+            csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)

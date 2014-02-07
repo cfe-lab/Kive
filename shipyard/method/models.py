@@ -14,6 +14,11 @@ import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
 from constants import error_messages
 
+import traceback
+import threading
+import logging
+import inspect
+
 class CodeResource(models.Model):
     """
     A CodeResource is any file tracked by ShipYard.
@@ -506,8 +511,69 @@ class Method(transformation.models.Transformation):
         logging.debug("{}: No compatible ERs found".format(fn))
         return None
 
-    def run_code(self, run_path, input_paths, output_paths,
-                 output_handle, error_handle):
+    def _poll_stream(self, proc, in_stream, out_streams):
+        """
+        Helper function for run_code_with_streams, which polls a Popen'ed procedure
+        for output on stream until it terminates, and prints the output to all the
+        out streams.
+        """
+        while True:
+            line = in_stream.readline()
+            if line:
+                for stream in out_streams:
+                    stream.write(line)
+            if proc.poll() is not None:
+                break
+
+    def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams, error_streams):
+        """
+        Run the method, passing each line in its stdout and stderr to any number
+        of streams. Return the Method's return code, or -1 if the Method suffers
+        an OS-level error (ie. is not executable).
+
+        INPUTS
+        run_path        see run_code
+        input_paths     see run_code
+        output_paths    see run_code
+        output_streams  list of streams (eg. open file handles) to output stderr to
+        error_streams   list of streams (eg. open file handles) to output stderr to
+
+        OUTPUTS
+        The return code of the Method's driver.
+        """
+        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
+        trace = None # If the process caused a system level error, it will be stored here.
+        try:
+            method_popen = self.run_code(run_path, input_paths, output_paths)
+        except OSError:
+            trace = traceback.format_exc()
+
+        # Succesful execution.
+        if trace is None:
+            logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
+
+            out_thread = threading.Thread(target=self._poll_stream, 
+                    args=(method_popen, method_popen.stdout, output_streams))
+            err_thread = threading.Thread(target=self._poll_stream, 
+                    args=(method_popen, method_popen.stdout, error_streams))
+            out_thread.start()
+            err_thread.start()
+            out_thread.join()
+            err_thread.join()
+
+            returncode = method_popen.returncode
+
+        # If the process bombed, store/write the traceback.
+        else:
+            for stream in error_streams:
+                stream.write(trace)
+            returncode = -1
+
+        for stream in output_streams + error_streams:
+            stream.flush()
+        return returncode
+
+    def run_code(self, run_path, input_paths, output_paths):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.
@@ -517,8 +583,6 @@ class Method(transformation.models.Transformation):
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
-        output_handle   File handle storing stdout
-        error_handle    File handle storing stderr
 
         OUTPUTS
         A running subprocess.Popen object which is asynchronous
@@ -530,6 +594,8 @@ class Method(transformation.models.Transformation):
 
         2) The caller is responsible for cleaning up the stdout/err
         file handles after the Popen has finished processing.
+
+        3) We don't handle exceptions of Popen here, the caller must do that.
         """
         import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
@@ -539,9 +605,6 @@ class Method(transformation.models.Transformation):
                 error_messages["method_bad_inputcount"].
                 format(self, self.inputs.count(), self.outputs.count(), len(input_paths), len(output_paths)))
 
-        if (not output_handle.mode.startswith("w") or not error_handle.mode.startswith("w")):
-            raise ValueError("output_handle and error_handle must be open for writing")
-        
         logging.debug("{}: Checking run_path exists: {}".format(fn, run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
 
@@ -565,17 +628,13 @@ class Method(transformation.models.Transformation):
         # The code to be executed sits in 
         # [run_path]/[driver.coderesource.name],
         # and is executable.
-        code_to_run = os.path.join(
-            run_path,
+        code_to_run = os.path.join(run_path,
             self.driver.coderesource.filename)
 
         command = [code_to_run] + input_paths + output_paths
         logging.debug("{}: subprocess.Popen({})".format(fn, command))
-        code_popen = subprocess.Popen(
-            command,
-            shell=False,
-            stdout=output_handle,
-            stderr=error_handle)
+        code_popen = subprocess.Popen(command, shell=False,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         return code_popen
 

@@ -2001,37 +2001,21 @@ class MethodTests(MethodTestSetup):
         Run a no-output method (which just prints to stdout).
         """
         empty_dir = tempfile.mkdtemp()
-        outfile = tempfile.NamedTemporaryFile(delete=False)
-        errfile = tempfile.NamedTemporaryFile(delete=False)
 
-        proc = self.noop_method.run_code(empty_dir, [self.noop_infile], [], outfile, errfile)
-        proc.communicate()
-        outfile.close(); errfile.close()
-
-        proc_out = open(outfile.name).read()
-        proc_err = open(errfile.name).read()
+        proc = self.noop_method.run_code(empty_dir, [self.noop_infile], [])
+        proc_out, proc_err = proc.communicate()
 
         self.assertEqual(proc_out, self.noop_indata)
 
-        os.remove(outfile.name)
-        os.remove(errfile.name)
         shutil.rmtree(empty_dir)
 
     def test_run_code_dir_not_empty(self):
         """
         Trying to run code in a non-empty directory should fail.
         """
-        outfile = tempfile.NamedTemporaryFile(delete=False)
-        errfile = tempfile.NamedTemporaryFile(delete=False)
-
         self.assertRaisesRegexp(ValueError,
             "Directory .* nonempty; contains file .*",
-            lambda : self.noop_method.run_code(self.scratch_dir, [self.noop_infile], [], outfile, errfile))
-
-        outfile.close(); errfile.close()
-
-        os.remove(outfile.name)
-        os.remove(errfile.name)
+            lambda : self.noop_method.run_code(self.scratch_dir, [self.noop_infile], []))
 
 class MethodFamilyTests(MethodTestSetup):
 
@@ -2040,5 +2024,4 @@ class MethodFamilyTests(MethodTestSetup):
         unicode() for MethodFamily should display it's name.
         """
         
-        self.assertEqual(unicode(self.DNAcomp_mf),
-                         "DNAcomplement");
+        self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")

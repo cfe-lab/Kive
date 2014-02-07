@@ -1,8 +1,7 @@
 """
-librarian.models
+datachecking.models
 
-Shipyard data models pertaining to the lookup of the past: ExecRecord,
-SymbolicDataset, etc.
+Shipyard models pertaining to verification of correctness of data.
 """
 
 from django.db import models
@@ -10,7 +9,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
-import librarian.models
 from constants import error_messages
 
 class ContentCheckLog(models.Model):
@@ -239,6 +237,37 @@ class IntegrityCheckLog(models.Model):
     def is_fail(self):
         """True if this integrity check is a failure."""
         return hasattr(self, "usurper")
+
+class VerificationLog(models.Model):
+    """
+    A record of running a verification Method to check CustomConstraints
+    on a Dataset.
+    """
+    # The log of the content check where we performed this verification.
+    contentchecklog = models.ForeignKey(
+        "datachecking.ContentCheckLog",
+        related_name="verification_logs")
+    # The compound datatype member which was verified.
+    CDTM = models.ForeignKey("metadata.CompoundDatatypeMember")
+    # When the verification began.
+    start_time = models.DateTimeField(auto_now_add=True)
+    # When the verification was completed.
+    end_time = models.DateTimeField(null=True)
+    # The return code from the Method's driver.
+    return_code = models.IntegerField()
+    # The verification method's standard output and standard error.
+    output_log = models.FileField(upload_to="VerificationLogs")
+    error_log = models.FileField(upload_to="VerificationLogs")
+
+    def clean(self):
+        """
+        Checks coherence of this VerificationLog.
+
+        The start time must be before the end time.
+        """
+        if self.end_time is not None:
+            return self.start_time <= self.end_time
+        return True
 
 class MD5Conflict(models.Model):
     """
