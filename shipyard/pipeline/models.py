@@ -158,7 +158,7 @@ class Pipeline(transformation.models.Transformation):
     # Helper to create raw outcables.  This is just so that our unit tests
     # can be easily amended to work in our new scheme, and wouldn't really
     # be used elsewhere.
-    @transaction.commit_on_success
+    @transaction.atomic
     def create_raw_outcable(self, raw_output_name, raw_output_idx,
                             source_step, source):
         """Creates a raw outcable."""
@@ -173,7 +173,7 @@ class Pipeline(transformation.models.Transformation):
 
     # Helper to create non-raw outcables with a default output_cdt equalling
     # that of the providing TO.
-    @transaction.commit_on_success
+    @transaction.atomic
     def create_outcable(self, output_name, output_idx, source_step,
                         source):
         """Creates a non-raw outcable taking output_cdt from the providing TO."""
@@ -322,7 +322,7 @@ class PipelineStep(models.Model):
     # Helper to create *raw* cables.  This is really just so that all our
     # unit tests can be easily amended; going forwards, there's no real reason
     # to use this.
-    @transaction.commit_on_success
+    @transaction.atomic
     def create_raw_cable(self, dest, source):
         """
         Create a raw cable feeding this PipelineStep.
@@ -342,7 +342,7 @@ class PipelineStep(models.Model):
         return new_cable
 
     # Same for deletes.
-    @transaction.commit_on_success
+    @transaction.atomic
     def add_deletion(self, output_to_delete):
         """
         Mark a TO for deletion.

@@ -44,73 +44,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    var options = document.getElementById("id_coderesource").options;
-    var numberOfForms = 0;
-    $("#addDependencyForm").click(  // query button by id selector
-        function () {   // anonymous function
-            numberOfForms += 1;
-            renderForms(numberOfForms);
-        }
-    )
-    $("#removeDependencyForm").click(
-        function() {
-            if (numberOfForms > 0) {
-                numberOfForms -= 1;
-                renderForms(numberOfForms);
-            }
-        }
-    )
-    // render forms in div
-    var renderForms = function($nForms) {
-        var htmlStr = "";
-        for (var i = 0; i < $nForms; i++) {
-            // generate drop-down menus
-            htmlStr += "<tr>";
-            htmlStr += "<td><select class=\"coderesource\" id=\"id_coderesource_" + i + "\" name=\"coderesource_" + i + "\">";
-            for (var j = 0; j < options.length; j++) {
-                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><select class=\"revisions\" id=\"id_revisions_" + i + "\" name=\"revisions_" + i + "\">";
-            htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select></td>";
-
-            // generate char fields
-            htmlStr += "<td><input id=\"id_depPath_" + i + "\" maxlength=\"255\" name=\"depPath_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_depFileName_" + i + "\" maxlength=\"255\" name=\"depFileName_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "</tr>"
-        }
-        $("#extraDependencyForms").html(htmlStr);
-
-        // repeated within this class-based event handler for the dynamic HTML elements
-        $("select.coderesource").on('change',
-            function() {
-                var suffix = $(this).attr('id').split('_')[2];
-                cr_id = $(this).val();
-                if (cr_id != "") {
-                    $.ajax({
-                        type: "POST",
-                        url: "get_revisions/",
-                        data: {cr_id: cr_id}, // specify data as an object
-                        datatype: "json", // type of data expected back from server
-                        success: function(result) {
-                            //console.log(result);
-                            var options = [];
-                            var arr = JSON.parse(result)
-                            $.each(arr, function(index,value) {
-                                options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                            });
-                            $("#id_revisions_"+suffix).html(options.join(''));
-                        },
-                    })
-                }
-                else {
-                    // reset the second drop-down
-                    $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
-                }
-            }
-        )
-    };
-
     // trigger ajax on CR drop-down to populate revision select
     $("#id_coderesource").on('change',
         function() {
@@ -135,14 +68,85 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
             }
         }
-    )
+    );
+
+    // add or subtract input forms
+    var numberOfInputForms = $('#extraInputForms > tr').length;
+    // modify name attributes for extra input forms received from server
+    for (var i=0; i < numberOfInputForms; i++) {
+        $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
+        $('#id_dataset_idx_in_'+i).attr('name', 'dataset_idx_in_'+i);
+    }
+
+    $("#addInputForm").click(  // query button by id selector
+        function () {   // anonymous function
+            numberOfInputForms += 1;
+            renderInputForms(numberOfInputForms);
+        }
+    );
+    $("#removeInputForm").click(
+        function() {
+            if (numberOfInputForms > 0) {
+                numberOfInputForms -= 1;
+                renderInputForms(numberOfInputForms);
+            }
+        }
+    );
+    var renderInputForms = function($nForms) {
+        var htmlStr = "";
+        for (var i = 0; i < $nForms; i++) {
+            // generate char fields
+            htmlStr += "<tr>"
+            htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_dataset_idx_in_" + i + "\" name=\"dataset_idx_in_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "</tr>"
+        }
+        $("#extraInputForms").html(htmlStr);
+    };
+
+    /*
+    // add or subtract output forms
+    var numberOfOutputForms = $('#extraInputForms > tr').length;
+    if (numberOfOutputForms > 0) {
+        for (var i=0; i < numberOfOutputForms; i++) {
+            $('#id_dataset_name_'+i).attr('name', 'dataset_name_'+i);
+            $('#id_dataset_idx_'+i).attr('name', 'dataset_idx_'+i);
+        }
+    }
+    $("#addOutputForm").click(  // query button by id selector
+        function () {   // anonymous function
+            numberOfOutputForms += 1;
+            renderInputForms(numberOfOutputForms);
+        }
+    );
+    $("#removeInputForm").click(
+        function() {
+            if (numberOfOutputForms > 0) {
+                numberOfOutputForms -= 1;
+                renderInputForms(numberOfOutputForms);
+            }
+        }
+    );
+    // render forms in div
+    var renderOutputForms = function($nForms) {
+        var htmlStr = "";
+        for (var i = 0; i < $nForms; i++) {
+            // generate char fields
+            htmlStr += "<tr>"
+            htmlStr += "<td><input id=\"id_dataset_name_" + i + "\" maxlength=\"128\" name=\"dataset_name_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_dataset_idx_" + i + "\" name=\"dataset_idx_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "</tr>"
+        }
+        $("#extraOutputForms").html(htmlStr);
+    };
+    */
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
         var $this = $(this);
         $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
     });
-
+    
     $('a[rel="ctrl"]').on('click', function (e) {
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
         setTimeout("$('.fulltext').fadeOut(300);", 2000);

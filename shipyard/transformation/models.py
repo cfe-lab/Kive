@@ -105,7 +105,7 @@ class Transformation(models.Model):
 
     # Helper to create inputs, which is now a 2-step operation if the input
     # is not raw.
-    @transaction.commit_on_success
+    @transaction.atomic
     def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
                      min_row=None, max_row=None):
         """
@@ -140,7 +140,7 @@ class Transformation(models.Model):
 
     
     # Same thing to create outputs.
-    @transaction.commit_on_success
+    @transaction.atomic
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
                      min_row=None, max_row=None):
         """
