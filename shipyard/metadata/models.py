@@ -10,18 +10,23 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.conf import settings
 
 import operator
 import re
 import csv
 import os
 import traceback
+import sys
 from datetime import datetime
 
 from file_access_utils import set_up_directory
 from messages import error_messages
 from constants import CDTs
 from datachecking.models import VerificationLog
+
+if settings.DEBUG:
+    import inspect
 
 class Datatype(models.Model):
     """
@@ -610,7 +615,6 @@ class CompoundDatatype(models.Model):
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
         """
-        import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         summary = {}
         
@@ -782,8 +786,7 @@ class CompoundDatatype(models.Model):
             output_summary = None
             VERIF_OUT = CompoundDatatype.objects.get(pk=2)
             with open(output_path, "rb") as test_out:
-                output_summary = summarize_CSV(
-                    test_out, VERIF_OUT,
+                output_summary = VERIF_OUT.summarize_CSV(test_out, 
                     os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
     
             if output_summary.has_key("bad_num_cols"):
