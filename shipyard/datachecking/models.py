@@ -11,6 +11,7 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
 import librarian.models
+from constants import error_messages
 
 class ContentCheckLog(models.Model):
     """
@@ -30,17 +31,34 @@ class ContentCheckLog(models.Model):
         "archive.ExecLog", null=True,
         related_name="content_checks")
 
-    check_time = models.DateTimeField("time of check", auto_now_add=True)
+    start_time = models.DateTimeField("start time",
+                                      auto_now_add=True,
+                                      help_text="Time at start of content check")
+
+    end_time = models.DateTimeField("end time",
+                                    null=True,
+                                    blank=True,
+                                    help_text="Time at end of content check")
 
     def clean(self):
         """
         Check coherence of this ContentCheckLog.
 
-        Basically all this does is call clean on any BadData
-        associated to it.
+        First, this calls clean on any BadData associated to it.  Second,
+        it checks that end_time is later than start_time.
         """
         if self.is_fail():
             self.baddata.clean()
+
+        if self.end_time is not None and self.start_time > self.end_time:
+            raise ValidationError(
+                error_messages["ccl_swapped_times"].format(self))
+
+    def is_complete(self):
+        """
+        Checks if this ContentCheckLog is finished; that is, if the end_time is set.
+        """
+        return self.end_time is not None
 
     def is_fail(self):
         """True if this content check is a failure."""
@@ -189,16 +207,34 @@ class IntegrityCheckLog(models.Model):
     execlog = models.ForeignKey("archive.ExecLog", null=True,
                                 related_name="integrity_checks")
 
-    check_time = models.DateTimeField("time of check", auto_now_add=True)
+    start_time = models.DateTimeField("start time",
+                                      auto_now_add=True,
+                                      help_text="Time at start of integrity check")
+
+    end_time = models.DateTimeField("end time",
+                                    null=True,
+                                    blank=True,
+                                    help_text="Time at end of integrity check")
 
     def clean(self):
         """
         Checks coherence of this IntegrityCheckLog.
 
-        Calls clean on its child MD5Conflict, if it exists.
+        Calls clean on its child MD5Conflict, if it exists.  Checks if
+        end_time is later than start_time.
         """
         if self.is_fail():
             self.usurper.clean()
+
+        if self.end_time is not None and self.start_time > self.end_time:
+            raise ValidationError(
+                error_messages["ccl_swapped_times"].format(self))
+
+    def is_complete(self):
+        """
+        Checks if this IntegrityCheckLog is finished; that is, if the end_time is set.
+        """
+        return self.end_time is not None
 
     def is_fail(self):
         """True if this integrity check is a failure."""

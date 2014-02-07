@@ -23,6 +23,8 @@ error_messages = {
         'Expected source to be either a Dataset or a string, got {}',
     "execlog_swapped_times":
         'The end time of ExecLog "{}" is before its start time.',
+    "ccl_swapped_times":
+        'The end time of ContentCheckLog "{}" is before its start time.',
     "SD_not_in_pipeline":
         'SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered',
     "SD_pipeline_input":

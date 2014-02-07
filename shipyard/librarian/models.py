@@ -11,6 +11,8 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
+from django.utils import timezone
+
 
 import re
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
@@ -246,6 +248,9 @@ class SymbolicDataset(models.Model):
                     new_cell_error.clean()
                     new_cell_error.save()
 
+        finish_check_time = timezone.now()
+        ccl.end_time = finish_check_time
+
         ccl.clean()
         return ccl
 
@@ -260,11 +265,16 @@ class SymbolicDataset(models.Model):
         import inspect, logging
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
+        # RL February 6: I'm choosing this to be the time of the "start" of the
+        # check, but it does raise the question: what exactly is the start and
+        # end time of an integrity check?  Is the check just the comparison
+        # of the MD5s or is it the time that you finish computing the MD5 or
+        # is it the time that you start computing the MD5?
+        icl = self.integrity_checks.create(execlog=execlog)
+
         if newly_computed_MD5 == None:
             with open(new_file_path, "rb") as f:
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
-        
-        icl = self.integrity_checks.create(execlog=execlog)
                 
         if newly_computed_MD5 != self.MD5_checksum:
             logging.warn("{}: md5s do not agree".format(fn))
@@ -278,6 +288,7 @@ class SymbolicDataset(models.Model):
 
             icl.usurper.create(conflicting_SD=evil_twin)
 
+        icl.end_time = timezone.now()
         icl.clean()
         return icl
     
@@ -297,17 +308,26 @@ class SymbolicDataset(models.Model):
             logging.debug("{}: SD '{}' may not be OK - Neither integrity nor content check performed".format(fn, self))
             return False
 
+        # Look for failed integrity/content checks, and also check that at least one
+        # check has been passed.
+        any_check_completed = False
+
         for icl in icls:
             if icl.is_fail():
                 logging.debug("{}: SD '{}' failed integrity check".format(fn, self))
                 return False
+            elif icl.is_complete():
+                any_check_completed = True
         for ccl in ccls:
             if ccl.is_fail():
                 logging.debug("{}: SD '{}' failed content check".format(fn, self))
                 return False
+            elif icl.is_complete():
+                any_check_completed = True
 
-        # Checks have been performed, and none of them have failed
-        return True
+        # At this point we know no checks have failed; return False if none of them
+        # are complete yet.
+        return any_check_completed
     
 class DatasetStructure(models.Model):
     """
