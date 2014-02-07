@@ -55,6 +55,10 @@ class ExecuteTests(TestCase):
         self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
         self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
 
+        self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
+            description="input to pipeline pX", cdt=self.pX_in_cdt)
+
         # Method + input/outputs
         self.mA = Method(revision_name="mA",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr); self.mA.save()
         self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)

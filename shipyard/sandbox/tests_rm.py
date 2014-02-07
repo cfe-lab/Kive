@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from archive.models import MethodOutput
 from librarian.models import SymbolicDataset
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, CustomConstraint
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
@@ -338,6 +338,25 @@ class ExecuteTestsRM(UtilityMethods):
     def tearDown(self):
         os.remove(self.datafile.name)
 
+    def test_execute_pipeline_spaces_in_dataset_name(self):
+        """
+        You should be allowed (?) to have spaces in the name of your dataset.
+        """
+        coderev = self.make_first_revision("test",
+                "a script for testing purposes", "test.sh",
+                """#!/bin/bash
+                cat $1 > $2
+                """)
+        method = self.make_first_method("test", "a test method", coderev)
+        self.simple_method_io(method, self.cdt_record,
+                "input name with spaces", "more spaces")
+        pipeline = self.make_first_pipeline("test", "a test pipeline")
+        self.create_linear_pipeline(pipeline, [method], "in data", "out data")
+        pipeline.create_outputs()
+        
+        sandbox = Sandbox(self.user_alice, pipeline, [self.symds_labdata])
+        sandbox.execute_pipeline()
+
     def test_execute_pipeline_run(self):
         """
         Check the coherence of Runs created when a pipeline is executed the first time.
@@ -548,11 +567,6 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox.execute_pipeline()
         steps = sandbox.run.runsteps.all()
         steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
-        print(steps)
-
-        return
-
-        print(self.sep)
 
         # This time we need the final output - that means we have to recover the intermediate
         # output.
@@ -848,3 +862,92 @@ class FindSDTests(UtilityMethods):
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
         self.assertEqual(run, subrun)
         self.assertEqual(gen, cable.PSIC)
+
+class CustomConstraintTests(TestCase):
+    """
+    Test the creation and use of custom constraints.
+    """
+
+    def setUp(self):
+        # A temporary directory to do work in.
+        self.workdir = tempfile.mkdtemp()
+
+        # A Datatype with basic constraints.
+        self.dt_basic = Datatype(name="alpha", description="strings of letters",
+                Python_type=Datatype.STR)
+        self.dt_basic.save()
+        self.dt_basic.basic_constraints.create(ruletype="regexp", rule="[A-Za-z]+")
+        
+        scriptfile = tempfile.NamedTemporaryFile(delete=False)
+        scriptfile.write(
+        """#!/bin/bash
+        row_num=1
+        for row in $(cat $1); do
+          if [[ $row_num -gt 1 ]]; then
+             if [[ "x$(echo $row | aspell list)" != "x" ]]; then
+                echo $row_num >> $2
+             fi  
+          fi  
+          row_num=$(($row_num+1))
+        done""")
+        scriptfile.close()
+
+        # A CodeResourceRevision to check if a word is spelled properly.
+        self.cr_spellcheck = CodeResource(name="spellcheck", filename="spellcheck.sh",
+                description="a custom constraint checker for correctly spelled words")
+        self.cr_spellcheck.save()
+        self.crr_spellcheck = self.cr_spellcheck.revisions.create(revision_name="1", 
+                revision_desc="first version", content_file=scriptfile.name)
+        self.mf_spellcheck = MethodFamily()
+        self.mf_spellcheck.save()
+        self.method_spellcheck = self.mf_spellcheck.members.create(
+                driver=self.crr_spellcheck)
+        self.method_spellcheck.inputs.create(dataset_name = "to_test",
+                dataset_idx = 1)
+        self.method_spellcheck.outputs.create(dataset_name = "failed_row",
+                dataset_idx = 1)
+
+        # A Datatype with custom constraints restricting the basic datatype.
+        self.dt_custom = Datatype(name="words", 
+                description="correctly spelled words", 
+                Python_type=Datatype.STR)
+        self.dt_custom.save()
+        self.dt_custom.restricts.add(self.dt_basic)
+        custom_constraint = CustomConstraint(datatype = self.dt_custom, 
+                verification_method = self.method_spellcheck)
+        custom_constraint.save()
+        self.dt_custom.custom_constraint = custom_constraint
+
+        # A compound datatype composed of alphabetic strings and correctly
+        # spelled words.
+        self.cdt_constraints = CompoundDatatype()
+        self.cdt_constraints.save()
+        self.cdt_constraints.members.create(datatype = self.dt_basic,
+                column_name = "letter strings", column_idx = 1)
+        self.cdt_constraints.members.create(datatype = self.dt_custom,
+                column_name = "words", column_idx = 2)
+
+        # A file conforming to the compound datatype.
+        self.good_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
+        self.good_datafile.write("letter strings,words\n")
+        self.good_datafile.write("abcab,hello\n")
+        self.good_datafile.write("goodbye,world")
+        self.good_datafile.close()
+
+        # A file not conforming to the compound datatype.
+        self.good_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
+        self.good_datafile.write("letter strings,words\n")
+        self.good_datafile.write("hello there,Spock\n")
+        self.good_datafile.write("l1ve,long\n")
+        self.good_datafile.write("and,prosper\n")
+        self.good_datafile.close()
+
+    def tearDown(self):
+        # Clean up the work directory.
+        shutil.rmtree(self.workdir)
+
+    def test_summarize_correct_datafile(self):
+        """
+        A conforming datafile should return a CSV summary with no errors.
+        """
+        pass

@@ -20,6 +20,7 @@ from datetime import datetime
 
 from file_access_utils import set_up_directory
 from messages import error_messages
+from datachecking.models import VerificationLog
 
 class Datatype(models.Model):
     """
@@ -572,13 +573,16 @@ class CompoundDatatype(models.Model):
                 other_CDT.is_restriction(self))
 
     
-    def summarize_CSV(self, file_to_check, summary_path):
+    def summarize_CSV(self, file_to_check, summary_path, content_check_log=None):
         """
         Give metadata on the CSV: number of rows, and any deviations
         from the CDT (defects).
 
         file_to_check: open file object set to the beginning.
-        
+
+        content_check_log: if summarize_CSV is called as part of a content check
+        on a SymbolicDataset, this is the log of that check. If this is unset, we
+        are supposed to create a 
 
         OUTPUT: a dict containing metadata about the CSV
 
@@ -667,11 +671,10 @@ class CompoundDatatype(models.Model):
                     # into the fourth.
 
                     input_data = os.path.join(column_test_path, "input_data")
-                    set_up_directory(input_data)
                     output_data = os.path.join(column_test_path, "output_data")
-                    set_up_directory(output_data)
                     logs = os.path.join(column_test_path, "logs")
-                    set_up_directory(logs)
+                    for workdir in [input_data, output_data, logs]:
+                        set_up_directory(workdir)
     
                     input_file_path = os.path.join(column_test_path,
                                                    "input_data",
@@ -728,7 +731,8 @@ class CompoundDatatype(models.Model):
         for col in cols_with_cc:
             # We need to invoke the verification method using run_code.
             # All of our inputs are in place.
-            corresp_DT = cdt_members.get(column_idx=col).datatype
+            corresp_DTM = cdt_members.get(column_idx=col)
+            corresp_DT = corresp_DTM.datatype
             verif_method = corresp_DT.custom_constraint.verification_method
     
             input_path = cols_with_cc[col]["infilepath"]
@@ -738,44 +742,23 @@ class CompoundDatatype(models.Model):
             stdout_path = os.path.join(dir_to_run, "logs", "stdout.txt")
             stderr_path = os.path.join(dir_to_run, "logs", "stderr.txt")
 
-            # TODO: This is duplicated from execute_step, we need to pull it out
-            # into its own function somewhere.
-            trace = None
-            try:
-                verif_popen = verif_method.run_code(dir_to_run, [input_path], 
-                        [output_path])
-            except OSError:
-                trace = traceback.format_exc()
-            
+            # TODO: There is still a bit of duplication here, namely in filling
+            # out the log. Perhaps put it into run_code_with_streams.
             with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
-                if trace is None:
-                    while verif_popen.poll() is None:
-                        for line in verif_popen.stdout:
-                            sys.stdout.write(line)
-                            out.write(line)
-                        for line in verif_popen.stderr:
-                            sys.stdout.write(line)
-                            out.write(line)
-                        time.sleep(1)
+                if content_check_log is not None:
+                    verif_log = VerificationLog(contentchecklog=content_check_log,
+                            CDTM = corresp_DTM)
+                    verif_log.save()
+                return_code = verif_method.run_code_with_streams(dir_to_run, 
+                        [input_path], [output_path], 
+                        [out, sys.stdout], [err, sys.stderr])
+                if content_check_log is not None:
+                    verif_log.end_time = timezone.now()
+                    verif_log.return_code = return_code
+                    verif_log.output_log.save(stdout_path, File(out))
+                    verif_log.error_log.save(stderr_path, File(err))
+                    verif_log.clean()
 
-                    # One last write....
-                    for line in verif_popen.stdout:
-                        sys.stdout.write(line)
-                        out.write(line)
-                    for line in verif_popen.stderr:
-                        sys.stderr.write(line)
-                        err.write(line)
-
-                else:
-                    sys.stderr.write(trace)
-                    errwrite.write(trace)
-                    raise ValueError(error_messages["bad_constraint_checker"])
-
-                # The method has finished running.  Make sure all output
-                # has been flushed.
-                for stream in [out, err, sys.stdout, sys.stderr]:
-                    stream.flush()
-                
             # Now: open the resulting file, which is at output_path, and
             # make sure it's OK.  We're going to have to call
             # summarize_CSV on this resulting file, but that's OK because

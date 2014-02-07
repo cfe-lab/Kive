@@ -611,41 +611,12 @@ class Sandbox:
         logging.debug("{}: Running code".format(fn))
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
 
-        trace = None # If the process caused a system level error, it will be stored here.
-        try:
-            method_popen = pipelinestep.transformation.run_code(
-                    step_run_dir, input_paths, output_paths)
-        except OSError:
-            trace = traceback.format_exc()
-            
         with open(stdout_path, "wb", 1) as outwrite, open(stderr_path, "wb", 0) as errwrite:
+            returncode = pipelinestep.transformation.run_code_with_streams(step_run_dir,
+                    input_paths, output_paths, 
+                    [sys.stdout, outwrite], [sys.stderr, errwrite])
 
-            # Succesful execution.
-            if trace is None:
-                logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
-                # This will wait for execution to finish, and also not read the whole output
-                # into memory at once in case it is huge.
-                while method_popen.poll() is None:
-                    logging.debug("{}: Waiting for execution to finish...".format(fn))
-                    for line in method_popen.stdout:
-                        sys.stdout.write(line)
-                        outwrite.write(line)
-                    for line in method_popen.stderr:
-                        sys.stderr.write(line)
-                        errwrite.write(line)
-                    time.sleep(1)
-                returncode = method_popen.returncode
-
-            # If the process bombed, store/write the traceback.
-            else:
-                sys.stderr.write(trace)
-                errwrite.write(trace)
-                returncode = -1
-            sys.stdout.flush()
-            sys.stderr.flush()
-
-        curr_date_time = timezone.now()
-        curr_log.end_time = curr_date_time
+        curr_log.end_time = timezone.now()
         logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".
                 format(fn, curr_log.start_time, curr_log.end_time))
         curr_log.clean()
@@ -1052,7 +1023,7 @@ class Sandbox:
         logging.debug("{}: Performing computation to create missing Dataset".format(fn))
 
         # Search for the generator of the SD in the Pipeline.
-        curr_run, generator = self.first_generator_of_SD(SD_to_find)
+        curr_run, generator = self.first_generator_of_SD(SD_to_recover)
 
         if curr_run is None:
             raise ValueError(error_messages["SD_not_in_pipeline"].

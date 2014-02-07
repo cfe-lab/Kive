@@ -24,7 +24,9 @@ error_messages = {
     "SD_not_in_pipeline":
         'SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered',
     "SD_pipeline_input":
-        'SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered'
+        'SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered',
+    "bad_constraint_checker":
+        'Constraint checking method "{}" crashed'
 }
 
 warning_messages = {

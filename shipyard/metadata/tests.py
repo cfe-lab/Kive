@@ -607,7 +607,7 @@ class DatatypeTests(MetadataTestSetup):
         self.assertRaisesRegexp(ValidationError,
                                 "Datatype \"dt_1\" has a circular restriction",
                                 self.dt_1.clean);
-
+        
 
 class CompoundDatatypeMemberTests(MetadataTestSetup):
     def test_cdtMember_unicode(self):

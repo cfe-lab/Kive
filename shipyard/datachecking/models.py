@@ -1,16 +1,13 @@
 """
-librarian.models
+datachecking.models
 
-Shipyard data models pertaining to the lookup of the past: ExecRecord,
-SymbolicDataset, etc.
+Shipyard models pertaining to verification of correctness of data.
 """
 
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
-
-import librarian.models
 
 class ContentCheckLog(models.Model):
     """
@@ -211,9 +208,10 @@ class VerificationLog(models.Model):
     """
     # The log of the content check where we performed this verification.
     contentchecklog = models.ForeignKey(
-        "datachecking.ContentCheckLog")
+        "datachecking.ContentCheckLog",
+        related_name="verification_logs")
     # The compound datatype member which was verified.
-    CDTM = models.ForeignKey(CompoundDatatypeMember)
+    CDTM = models.ForeignKey("metadata.CompoundDatatypeMember")
     # When the verification began.
     start_time = models.DateTimeField(auto_now_add=True)
     # When the verification was completed.
@@ -221,8 +219,8 @@ class VerificationLog(models.Model):
     # The return code from the Method's driver.
     return_code = models.IntegerField()
     # The verification method's standard output and standard error.
-    output_log = FileField(upload_to="VerificationLogs")
-    error_log = FileField(upload_to="VerificationLogs")
+    output_log = models.FileField(upload_to="VerificationLogs")
+    error_log = models.FileField(upload_to="VerificationLogs")
 
     def clean(self):
         """
