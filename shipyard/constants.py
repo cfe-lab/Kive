@@ -32,7 +32,35 @@ error_messages = {
     "bad_constraint_checker":
         'Constraint checking method "{}" crashed',
     "ER_cable_wiring_DT_mismatch":
-        'ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source'
+        'ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source',
+    "DT_circular_restriction":
+        "Datatype \"{}\" has a circular restriction",
+    "DT_prototype_raw":
+        "Prototype Dataset for Datatype \"{}\" is raw",
+    "DT_prototype_wrong_CDT":
+        "Prototype Dataset for Datatype \"{}\" should have CDT identical to PROTOTYPE",
+    "DT_several_same_constraint":
+        "Datatype \"{}\" has more than one constraint of type \"{}\"",
+    "DT_min_val_smaller_than_supertypes":
+        "Datatype \"{}\" MIN_VAL does not strictly exceed the maximum of its supertypes'",
+    "DT_max_val_larger_than_supertypes":
+        "Datatype \"{}\" MAX_VAL is not strictly smaller than the minimum of its supertypes'",
+    "DT_min_length_smaller_than_supertypes":
+        "Datatype \"{}\" MIN_LENGTH does not strictly exceed the maximum of its supertypes'",
+    "DT_max_length_larger_than_supertypes":
+        "Datatype \"{}\" MAX_LENGTH is not strictly smaller than the minimum of its supertypes'",
+    "DT_too_many_datetimeformats":
+        "Datatype \"{}\" has too many DATETIMEFORMAT restrictions acting on it",
+    "DT_min_val_exceeds_max_val":
+        "Datatype \"{}\" effective MIN_VAL exceeds effective MAX_VAL",
+    "DT_min_length_exceeds_max_length":
+        "Datatype \"{}\" effective MIN_LENGTH exceeds effective MAX_LENGTH",
+    "DT_bad_type_restriction":
+        "Datatype \"{}\" has Python type {} and cannot restrict a supertype of Python type {}",
+    "CellError_bad_BC":
+        "CellError \"{}\" refers to a BasicConstraint that does not apply to the associated column",
+    "CellError_bad_CC":
+        "CellError \"{}\" refers to a CustomConstraint that does not apply to the associated column"
 }
 
 warning_messages = {

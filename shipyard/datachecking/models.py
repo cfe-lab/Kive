@@ -174,18 +174,20 @@ class CellError(models.Model):
                     "CellError \"{}\" refers to a row that does not exist".
                     format(self))
 
+        # February 7, 2014: the constraints must belong to either the
+        # Datatype in question or to one of its supertypes.
+        # We could make this test more explicit (and look for the constraint as being
+        # exactly the effective one of its type for this Datatype) but this should
+        # be enough if both Datatypes are clean.
         if type(self.constraint_failed) == metadata.models.BasicConstraint:
-            if not self.column.datatype.basic_constraints.filter(
-                    pk=self.constraint_failed.pk).exists():
-                raise ValidationError(
-                    "CellError \"{}\" refers to a BasicConstraint that does not belong to the associated column".
-                    format(self))
+            # Note that A.is_restriction(B) is like A <= B, whereas B.is_restricted_by(A)
+            # is like B > A; we want the possible equality.
+            if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
+                raise ValidationError(error_messages["CellError_bad_BC"].format(self))
 
         elif type(self.constraint_failed) == metadata.models.CustomConstraint:
-            if self.column.datatype.custom_constraint != self.constraint_failed:
-                raise ValidationError(
-                    "CellError \"{}\" refers to a CustomConstraint that does not belong to the associated column".
-                    format(self))
+            if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
+                raise ValidationError(error_messages["CellError_bad_CC"].format(self))
 
 
 

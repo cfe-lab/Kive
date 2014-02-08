@@ -118,6 +118,161 @@ class Datatype(models.Model):
         return (self == possible_restricted_datatype or
                 possible_restricted_datatype.is_restricted_by(self))
 
+    def get_effective_min_val(self):
+        """
+        Retrieves the 'effective' MIN_VAL restriction for this instance.
+
+        That is, the most restrictive MIN_VAL-type BasicConstraint acting on this Datatype or its supertypes.
+
+        PRE: all of this instance's supertypes are clean (in the Django
+        sense), and this instance has at most one MIN_VAL BasicConstraint (and it is clean).
+        If this instance has a MIN_VAL BasicConstraint, it exceeds the maximum of those of its
+        supertypes.
+        """
+        # Because self is clean, we know there to be exactly one MIN_VAL.
+        my_min_val = self.basic_constraints.filter(ruletype=BasicConstraint.MIN_VAL)
+
+        effective_min = -float("inf")
+        effective_BC = None
+
+        # Base case: self has a MIN_VAL defined.  Since we know self to be clean,
+        # if it has a MIN_VAL then it is larger than all its supertypes'.
+        if my_min_val.exists():
+            effective_min = float(my_min_val.first().rule)
+            effective_BC = my_min_val.first()
+        else:
+            # Base case 2: self has no supertypes; in which case MIN_VAL is -\infty.
+
+            for supertype in self.restricts.all():
+                # Recursive case: self has no MIN_VAL.  Go through all of the supertypes and
+                # take the maximum.
+                supertype_BC = supertype.get_effective_min_val()
+                supertype_min_val = float(supertype_BC.rule)
+                if supertype_min_val > effective_min:
+                    effective_min = supertype_min_val
+                    effective_BC = supertype_BC
+
+        return effective_BC
+
+    def get_effective_max_val(self):
+        """
+        Retrieves the 'effective' MAX_VAL restriction for this instance.
+
+        This is analogous to get_effective_min_val.
+
+        PRE: similarly as for get_effective_min_val.
+        """
+        # This is all exactly just the converse of get_effective_min_val.
+        my_max_val = self.basic_constraints.filter(ruletype=BasicConstraint.MAX_VAL)
+
+        effective_max = float("inf")
+        effective_BC = None
+
+        if my_max_val.exists():
+            effective_max = float(my_max_val.first().rule)
+            effective_BC = my_max_val.first()
+        else:
+            for supertype in self.restricts.all():
+                supertype_BC = supertype.get_effective_max_val()
+                supertype_max_val = float(supertype_BC.rule)
+                if supertype_max_val < effective_max:
+                    effective_max = supertype_max_val
+                    effective_BC = supertype_BC
+
+        return effective_BC
+
+    def get_effective_min_length(self):
+        """
+        Retrieves the 'effective' MIN_LENGTH restriction for this instance,
+        i.e. the maximum of all of its supertypes' MIN_LENGTHs and of its own.
+
+        PRE: as for get_effective_min_val.
+        """
+        # This is all completely modified from get_effective_min_val.
+        my_min_length = self.basic_constraints.filter(ruletype=BasicConstraint.MIN_LENGTH)
+
+        effective_min = 0
+        effective_BC = None
+
+        if my_min_length.exists():
+            effective_min = float(my_min_length.first().rule)
+            effective_BC = my_min_length.first()
+        else:
+            for supertype in self.restricts.all():
+                supertype_BC = supertype.get_effective_min_length()
+                supertype_min_length = int(supertype_BC.rule)
+                if supertype_min_length > effective_min:
+                    effective_min = supertype_min_length
+                    effective_BC = supertype_BC
+
+        return effective_BC
+
+    def get_effective_max_length(self):
+        """
+        Retrieves the 'effective' MAX_LENGTH restriction for this instance,
+        i.e. the minimum of all of its supertypes' MIN_LENGTHs and of its own.
+
+        PRE: similarly to get_effective_min_length
+        """
+        # This is all completely modified from get_effective_min_length.
+        my_max_length = self.basic_constraints.filter(ruletype=BasicConstraint.MAX_LENGTH)
+
+        effective_max = float("inf")
+        effective_BC = None
+
+        if my_max_length.exists():
+            effective_max = float(my_max_length.first().rule)
+            effective_BC = my_max_length.first()
+        else:
+            for supertype in self.restricts.all():
+                supertype_BC = supertype.get_effective_max_length()
+                supertype_max_length = int(supertype_BC.rule)
+                if supertype_max_length < effective_max:
+                    effective_max = supertype_max_length
+                    effective_BC = supertype_BC
+
+        return effective_BC
+
+    def get_all_regexps(self):
+        """
+        Retrieves all of the REGEXP BasicConstraints acting on this instance.
+
+        PRE: all of this instance's supertypes are clean (in the Django
+        sense), as are this instance's REGEXP BasicConstraints.
+        """
+        all_regexp_BCs = []
+
+        for regexp_BC in self.basic_constraints.filter(ruletype=BasicConstraint.REGEXP):
+            all_regexp_BCs.append(regexp_BC)
+
+        for supertype in self.restricts.all():
+            for regexp_BC in supertype.basic_constraints.filter(ruletype=BasicConstraint.REGEXP):
+                all_regexp_BCs.append(regexp_BC)
+
+        return all_regexp_BCs
+
+    def get_effective_datetimeformat(self):
+        """
+        Retrieves the date-time format string effective for this instance.
+
+        There can only be one such format string acting on this or its supertypes.
+
+        PRE: this instance has at most one DATETIMEFORMAT BasicConstraint (and it is clean if it exists),
+        and all its supertypes are clean (in the Django sense).
+        """
+        my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
+        if my_dtf.exists():
+            return my_dtf.first()
+
+        for supertype in self.restricts.all():
+            curr_dtf = supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
+            if curr_dtf.exists():
+                return curr_dtf.first()
+
+        # If we reach this point, there is no effective datetimeformat constraint.
+        return None
+
+
     # Clean: If prototype is specified, it must have a CDT with
     # 2 columns: column 1 is a string "example" field,
     # column 2 is a bool "valid" field.  This CDT will be hard-coded
@@ -129,26 +284,91 @@ class Datatype(models.Model):
 
     # NOTE: we are going to assume that each Datatype has its own
     # well-defined constraints; we aren't going to check data
-    # against all of its Datatype's parents.  But we *will* check
-    # prototype against its parents' constraints.
+    # against all of its Datatype's supertypes.  But we *will* check
+    # prototype against its supertypes' constraints.
     def clean(self):
         if hasattr(self, "restricts") and self.is_restricted_by(self):
-            raise ValidationError(
-                "Datatype \"{}\" has a circular restriction".
-                format(self))
+            raise ValidationError(error_messages["DT_circular_restriction"].format(self))
 
         if self.prototype is not None:
             if self.prototype.symbolicdataset.is_raw():
-                raise ValidationError(
-                    "Prototype Dataset for Datatype \"{}\" is raw".format(self)
-                )
+                raise ValidationError(error_messages["DT_prototype_raw"].format(self))
 
             PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
 
             if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
+                raise ValidationError(error_messages["DT_prototype_wrong_CDT"].format(self))
+
+        # Check that restrictions are sensible against the Python type: if x <= y means "x can restrict y",
+        # INT <= FLOAT <= STR
+        # BOOL <= STR
+        admissible_Python_restrictions = {
+            Datatype.INT: [Datatype.INT, Datatype.FLOAT, Datatype.STR],
+            Datatype.FLOAT: [Datatype.FLOAT, Datatype.STR],
+            Datatype.STR: [Datatype.STR],
+            Datatype.BOOL: [Datatype.BOOl, Datatype.STR]
+            }
+
+        for supertype in self.restricts.all():
+            if supertype.Python_type not in admissible_Python_restrictions[self.Python_type]:
                 raise ValidationError(
-                    "Prototype Dataset for Datatype \"{}\" should have CDT identical to PROTOTYPE".format(self)
+                    error_messages["DT_bad_type_restriction"].format(self, self.Python_type, supertype.Python_type)
                 )
+
+        # Clean all BasicConstraints.
+        for bc in self.basic_constraints.all():
+            bc.clean()
+
+        for constr_type in [BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL,
+                            BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH,
+                            BasicConstraint.DATETIMEFORMAT]:
+            all_curr_type = self.basic_constraints.filter(ruletype=constr_type)
+            if all_curr_type.count() > 1:
+                # Check that there is at most one BasicConstraint of types (MIN|MAX)_(VAL|LENGTH)
+                # or DATETIMEFORMAT directly associated to this instance.
+                raise ValidationError(error_messages["DT_several_same_constraint"].format(self, constr_type))
+
+            elif all_curr_type.count() == 1:
+                if constr_type == BasicConstraint.MIN_VAL:
+                    my_min_val = float(all_curr_type.first().rule)
+                    supertypes_min = max(supertype.get_effective_min_val() for supertype in self.restricts.all())
+                    if my_min_val <= supertypes_min:
+                        raise ValidationError(error_messages["DT_min_val_smaller_than_supertypes"].format(self))
+
+                elif constr_type == BasicConstraint.MAX_VAL:
+                    my_max_val = float(all_curr_type.first().rule)
+                    supertypes_max = min(supertype.get_effective_max_val() for supertype in self.restricts.all())
+                    if my_max_val >= supertypes_max:
+                        raise ValidationError(error_messages["DT_max_val_larger_than_supertypes"].format(self))
+
+                elif constr_type == BasicConstraint.MIN_LENGTH:
+                    my_min_length = int(all_curr_type.first().rule)
+                    supertypes_min = max(supertype.get_effective_min_length() for supertype in self.restricts.all())
+                    if my_min_length <= supertypes_min:
+                        raise ValidationError(error_messages["DT_min_length_smaller_than_supertypes"].format(self))
+
+                elif constr_type == BasicConstraint.MAX_LENGTH:
+                    my_max_length = int(all_curr_type.first().rule)
+                    supertypes_max = min(supertype.get_effective_max_length() for supertype in self.restricts.all())
+                    if my_max_length >= supertypes_max:
+                        raise ValidationError(error_messages["DT_max_length_larger_than_supertypes"].format(self))
+
+        # Check that there is only one DATETIMEFORMAT between this Datatype and all of its supertypes.
+        my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
+        supertype_dtfs = [supertype.basic_constraints.filter(
+            ruletype=BasicConstraint.DATETIMEFORMAT).first() for supertype in self.restricts.all()]
+        if my_dtf.count() + len(supertype_dtfs) > 1:
+            raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
+
+        # Check that effective min_length <= max_length, min_val <= max_val.
+        if self.get_effective_min_val() > self.get_effective_max_val():
+            raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
+        if self.get_effective_min_length() > self.get_effective_max_length():
+            raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
+
+        # Clean the CustomConstraint if it exists.
+        if self.has_custom_constraint():
+            self.custom_constraint.clean()
 
     def get_absolute_url(self):
         return '/datatypes/%i' % self.id
@@ -180,69 +400,75 @@ class Datatype(models.Model):
         for this Datatype's Python_type are applied.
         """
         ####
-        # CHECK PYTHON TYPE
-        
         # First, try to cast it to the appropriate Python type.
+        # Then, check it against any type-specific BasicConstraints
+        # (MIN|MAX_LENGTH or DATETIMEFORMAT for strings,
+        # MIN|MAX_VAL for numerical types).
+        constraints_failed = []
         if self.Python_type == Datatype.STR:
-            # string_to_check is, by definition, a string.
-            pass
+            # string_to_check is, by definition, a string, so we skip
+            # to checking the BasicConstraints.
+            eff_min_length_BC = self.get_effective_min_length()
+            if eff_min_length_BC is not None and len(string_to_check) < int(eff_min_length_BC.rule):
+                constraints_failed.append(eff_min_length_BC)
+            else:
+                eff_max_length_BC = self.get_effective_max_length()
+                if eff_max_length_BC is not None and len(string_to_check) > int(eff_max_length_BC.rule):
+                    constraints_failed.append(eff_max_length_BC)
+
+            eff_dtf_BC = self.get_effective_datetimeformat()
+            # Attempt to make a datetime object using this format
+            # string.
+            try:
+                datetime.strptime(string_to_check, eff_dtf_BC.rule)
+            except:
+                constraints_failed.append(eff_dtf_BC)
+
+
         elif self.Python_type == Datatype.INT:
             try:
                 int(string_to_check)
             except ValueError:
                 return ["Was not integer"]
+
+            # Check the numeric-type BasicConstraints.
+            eff_min_val_BC = self.get_effective_min_val()
+            if eff_min_val_BC is not None and int(string_to_check) < float(eff_min_val_BC.rule):
+                constraints_failed.append(eff_min_val_BC)
+            else:
+                eff_max_val_BC = self.get_effective_max_val()
+                if eff_max_val_BC is not None and int(string_to_check) > float(eff_max_val_BC.rule):
+                    constraints_failed.append(eff_max_val_BC)
+
         elif self.Python_type == Datatype.FLOAT:
             try:
                 float(string_to_check)
             except ValueError:
                 return ["Was not float"]
+
+            # Same as for the int case.
+            eff_min_val_BC = self.get_effective_min_val()
+            if eff_min_val_BC is not None and float(string_to_check) < float(eff_min_val_BC.rule):
+                constraints_failed.append(eff_min_val_BC)
+            else:
+                eff_max_val_BC = self.get_effective_max_val()
+                if eff_max_val_BC is not None and float(string_to_check) > float(eff_max_val_BC.rule):
+                    constraints_failed.append(eff_max_val_BC)
+
         elif self.Python_type == Datatype.BOOL:
             bool_RE = re.compile("^(True)|(False)|(true)|(false)|(TRUE)|(FALSE)|T|F|t|f|0|1$")
             if not bool_RE.match(string_to_check):
                 return ["Was not boolean"]
 
-        # FINISHED CHECKING PYTHON TYPE
         ####
-
-        ####
-        # CHECK BASIC CONSTRAINTS
+        # Check all REGEXP-type BasicConstraints.
         constraints_failed = []
-        
-        # Go through the BasicConstraints and check them all in turn.
-        for basic_constraint in self.basic_constraints.all():
-            if (basic_constraint.ruletype == BasicConstraint.MIN_LENGTH and
-                    len(string_to_check) < int(basic_constraint.rule)):
-                constraints_failed.append(basic_constraint)
 
-            elif (basic_constraint.ruletype == BasicConstraint.MAX_LENGTH and
-                    len(string_to_check) > int(basic_constraint.rule)):
-                constraints_failed.append(basic_constraint)
+        for re_BC in self.get_all_regexps():
+            constraint_re = re.compile(re_BC.rule)
+            if not constraint_re.match(string_to_check):
+                constraints_failed.append(re_BC)
 
-            elif (basic_constraint.ruletype == BasicConstraint.MIN_VAL and
-                    float(string_to_check) < float(basic_constraint.rule)):
-                constraints_failed.append(basic_constraint)
-
-            elif (basic_constraint.ruletype == BasicConstraint.MAX_VAL and
-                    float(string_to_check) > float(basic_constraint.rule)):
-                constraints_failed.append(basic_constraint)
-
-            elif basic_constraint.ruletype == BasicConstraint.REGEXP:
-                constraint_re = re.compile(basic_constraint.rule)
-                if not constraint_re.match(string_to_check):
-                    constraints_failed.append(basic_constraint)
-
-            elif basic_constraint.ruletype == BasicConstraint.DATETIMEFORMAT:
-                # Attempt to make a datetime object using this format
-                # string.
-                try:
-                    datetime.strptime(string_to_check,
-                                      basic_constraint.rule)
-                except:
-                    constraints_failed.append(basic_constraint)
-
-        # FINISHED CHECKING BASIC CONSTRAINTS
-        ####
-                    
         return constraints_failed
 
     # Note that checking the CustomConstraint requires a place to run.
