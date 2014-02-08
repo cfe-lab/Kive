@@ -17,7 +17,7 @@ from constants import error_messages
 import traceback
 import threading
 import logging
-import inspect
+import shutil
 
 class CodeResource(models.Model):
     """
@@ -152,6 +152,10 @@ class CodeResourceRevision(models.Model):
             blank=True,
             help_text="Used to validate file contents of this resource revision");
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def __unicode__(self):
         """Represent a resource revision by it's CodeResource name and revision name"""
         
@@ -282,19 +286,8 @@ class CodeResourceRevision(models.Model):
         
     def install_h(self, install_path, base_name):
         """Helper for install."""
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
-        logging.debug("{}: Writing code to {}".format(fn, install_path))
-        curr_code = None
-        try:
-            self.content_file.open()
-            curr_code = self.content_file.read()
-        finally:
-            self.content_file.close()
-            
-        with open(os.path.join(install_path, base_name), "wb") as f:
-            f.write(curr_code)
+        self.logger.debug("Writing code to {}".format(install_path))
+        shutil.copyfile(self.content_file.name, os.path.join(install_path, base_name))
 
         # Make sure this is written with read, write, and execute
         # permission.
@@ -383,8 +376,6 @@ class CodeResourceDependency(models.Model):
                 unicode(self.requirement),
                 os.path.join(self.depPath, self.depFileName));
 
-
-
 class Method(transformation.models.Transformation):
     """
     Methods are atomic transformations.
@@ -407,6 +398,10 @@ class Method(transformation.models.Transformation):
         help_text="Is this Method broken?")
 
     pipelinesteps = generic.GenericRelation("pipeline.PipelineStep")
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def __unicode__(self):
         """Represent a method by it's revision name and method family"""
@@ -475,27 +470,24 @@ class Method(transformation.models.Transformation):
         Given a set of input SDs, find an ER that can be reused given these inputs.
         A compatible ER may have to be filled in.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
-        logging.debug("{}: Considering all pipeline steps featuring this method...".format(fn))
+        self.logger.debug("Considering all pipeline steps featuring this method...")
 
         # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
-            logging.debug("{}: Considering pipeline step '{}'".format(fn, possible_PS))
+            self.logger.debug("Considering pipeline step '{}'".format(possible_PS))
 
             # For linked runsteps which did not *completely* reuse an ER
             for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
-                logging.debug("{}: Considering non-reused runstep '{}'".format(fn,possible_RS))
+                self.logger.debug("Considering non-reused runstep '{}'".format(possible_RS))
 
                 candidate_ER = possible_RS.execrecord
 
                 if not candidate_ER.outputs_OK():
-                    logging.debug("{}: Rejecting runstep, outputs not OK".format(fn))
+                    self.logger.debug("Rejecting runstep, outputs not OK")
                     continue
 
 
-                logging.debug("{}: Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match".format(fn))
+                self.logger.debug("Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match")
 
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
@@ -505,10 +497,10 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    logging.debug("{}: All ERIs match input SDs - comitting to candidate ER {}".format(fn, candidate_ER))
+                    self.logger.debug("All ERIs match input SDs - comitting to candidate ER {}".format(candidate_ER))
                     return candidate_ER
     
-        logging.debug("{}: No compatible ERs found".format(fn))
+        self.logger.debug("No compatible ERs found")
         return None
 
     def _poll_stream(self, proc, in_stream, out_streams):
@@ -541,7 +533,6 @@ class Method(transformation.models.Transformation):
         OUTPUTS
         The return code of the Method's driver.
         """
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         trace = None # If the process caused a system level error, it will be stored here.
         try:
             method_popen = self.run_code(run_path, input_paths, output_paths)
@@ -550,7 +541,7 @@ class Method(transformation.models.Transformation):
 
         # Succesful execution.
         if trace is None:
-            logging.debug("{}: Polling Popen + displaying stdout/stderr to console".format(fn))
+            self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
             out_thread = threading.Thread(target=self._poll_stream, 
                     args=(method_popen, method_popen.stdout, output_streams))
@@ -597,30 +588,27 @@ class Method(transformation.models.Transformation):
 
         3) We don't handle exceptions of Popen here, the caller must do that.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
             raise ValueError(
                 error_messages["method_bad_inputcount"].
                 format(self, self.inputs.count(), self.outputs.count(), len(input_paths), len(output_paths)))
 
-        logging.debug("{}: Checking run_path exists: {}".format(fn, run_path))
+        self.logger.debug("Checking run_path exists: {}".format(run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
 
         for input_path in input_paths:
-            logging.debug("{}: Confirming input file exists + readable: {}".format(fn, input_path))
+            self.logger.debug("Confirming input file exists + readable: {}".format(input_path))
             f = open(input_path, "rb")
             f.close()
 
         for output_path in output_paths:
-            logging.debug("{}: Confirming output path doesn't exist: {}".format(fn,output_path))
+            self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
             can_create, reason = file_access_utils.can_create_new_file(output_path)
 
             if not can_create:
                 raise ValueError(reason)
 
-        logging.debug("{}: Installing CRR driver to FS: {}".format(fn, self.driver))
+        self.logger.debug("Installing CRR driver to FS: {}".format(self.driver))
         self.driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
@@ -632,7 +620,7 @@ class Method(transformation.models.Transformation):
             self.driver.coderesource.filename)
 
         command = [code_to_run] + input_paths + output_paths
-        logging.debug("{}: subprocess.Popen({})".format(fn, command))
+        self.logger.debug("subprocess.Popen({})".format(command))
         code_popen = subprocess.Popen(command, shell=False,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

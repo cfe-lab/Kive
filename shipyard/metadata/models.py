@@ -10,23 +10,27 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.conf import settings
 
 import operator
 import re
 import csv
 import os
-import traceback
+import sys
 from datetime import datetime
 
 from file_access_utils import set_up_directory
 from constants import CDTs, error_messages
 from datachecking.models import VerificationLog
 
+import logging
+
 class Datatype(models.Model):
     """
     Abstract definition of a semantically atomic type of data.
     Related to :model:`copperfish.CompoundDatatype`
     """
+    print(__name__)
     name = models.CharField(
         "Datatype name",
         max_length=64,
@@ -711,6 +715,10 @@ class CompoundDatatype(models.Model):
     #   members (CompoundDatatypeMember/ForeignKey)
     #   Conforming_datasets (Dataset/ForeignKey)
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def __unicode__(self):
         """ Represent CompoundDatatype with a list of it's members """
 
@@ -835,8 +843,6 @@ class CompoundDatatype(models.Model):
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
         summary = {}
         
         # A CSV reader which we will use to check individual 
@@ -844,8 +850,8 @@ class CompoundDatatype(models.Model):
         # for columns whose DT has a CustomConstraint.
         data_csv = csv.DictReader(file_to_check)
         if data_csv.fieldnames is None:
-          logging.debug("{}: file is empty")
-          return summary
+            logging.getLogger("shipyard.custom").debug("file is empty")
+            return summary
     
         # Counter for the number of rows.
         num_rows = 0
@@ -1007,8 +1013,7 @@ class CompoundDatatype(models.Model):
             output_summary = None
             VERIF_OUT = CompoundDatatype.objects.get(pk=2)
             with open(output_path, "rb") as test_out:
-                output_summary = summarize_CSV(
-                    test_out, VERIF_OUT,
+                output_summary = VERIF_OUT.summarize_CSV(test_out, 
                     os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
     
             if output_summary.has_key("bad_num_cols"):

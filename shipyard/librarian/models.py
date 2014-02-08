@@ -13,8 +13,8 @@ from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 from django.utils import timezone
 
-
 import re
+import logging
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import file_access_utils, logging_utils
 from constants import error_messages
@@ -46,6 +46,10 @@ class SymbolicDataset(models.Model):
         blank=True,
         default="",
         help_text="Validates file integrity")
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def __unicode__(self):
         """
@@ -191,15 +195,12 @@ class SymbolicDataset(models.Model):
         Should never be called twice on the same symbolic dataset, as this would
         overwrite num_rows to a potentially new value?
         """
-        import datachecking.models, inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
-        logging.debug("{}: Creating clean CCL and linking to EL".format(fn))
+        self.logger.debug("Creating clean CCL and linking to EL")
         ccl = self.content_checks.create(execlog=execlog)
 
         if self.is_raw():
             ccl.clean()
-            logging.debug("{}: SD is raw - returning clean CCL".format(fn))
+            self.logger.debug("SD is raw - returning clean CCL")
             return ccl
 
         csv_summary = None
@@ -210,25 +211,25 @@ class SymbolicDataset(models.Model):
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
             bad_data.save()
-            logging.warn("{}: malformed header".format(fn))
+            self.logger.warn("malformed header")
             return ccl
 
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
         if max_row is not None and csv_summary["num_rows"] > max_row:
-            logging.warn("{}: too many rows".format(fn))
+            self.logger.warn("too many rows")
             # FIXME: Do we only create these BD objects if they don't already exist?
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
             bad_data.save()
 
         if min_row is not None and csv_summary["num_rows"] < min_row:
-            logging.warn("{}: too few rows".format(fn))
+            self.logger.warn("too few rows")
             # FIXME: Do we only create these BD objects if they don't already exist?
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
             bad_data.save()
 
         if "failing_cells" in csv_summary:
-            logging.warn("{}: cells failed datatype check".format(fn))
+            self.logger.warn("cells failed datatype check")
 
             if csv_baddata == None:
                 csv_baddata = datachecking.models.BadData(contentchecklog=ccl)
@@ -262,9 +263,6 @@ class SymbolicDataset(models.Model):
         OUTPUT
         Returns the ICL.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         # RL February 6: I'm choosing this to be the time of the "start" of the
         # check, but it does raise the question: what exactly is the start and
         # end time of an integrity check?  Is the check just the comparison
@@ -277,7 +275,7 @@ class SymbolicDataset(models.Model):
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
                 
         if newly_computed_MD5 != self.MD5_checksum:
-            logging.warn("{}: md5s do not agree".format(fn))
+            self.logger.warn("md5s do not agree")
 
             evil_twin = SymbolicDataset.create_SD(
                     new_file_path,
@@ -297,15 +295,12 @@ class SymbolicDataset(models.Model):
         Check that this SD has been checked for integrity and contents,
         and that they have never failed either such test.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         icls = self.integrity_checks.all()
         ccls = self.content_checks.all()
 
         # Neither an integrity check nor a content check has been performed
         if not icls.exists() and not ccls.exists():
-            logging.debug("{}: SD '{}' may not be OK - Neither integrity nor content check performed".format(fn, self))
+            self.logger.debug("SD '{}' may not be OK - Neither integrity nor content check performed".format(self))
             return False
 
         # Look for failed integrity/content checks, and also check that at least one
@@ -314,15 +309,15 @@ class SymbolicDataset(models.Model):
 
         for icl in icls:
             if icl.is_fail():
-                logging.debug("{}: SD '{}' failed integrity check".format(fn, self))
+                self.logger.debug("SD '{}' failed integrity check".format(self))
                 return False
             elif icl.is_complete():
                 any_check_completed = True
         for ccl in ccls:
             if ccl.is_fail():
-                logging.debug("{}: SD '{}' failed content check".format(fn, self))
+                self.logger.debug("SD '{}' failed content check".format(self))
                 return False
-            elif icl.is_complete():
+            elif ccl.is_complete():
                 any_check_completed = True
 
         # At this point we know no checks have failed; return False if none of them
@@ -512,9 +507,6 @@ class ExecRecord(models.Model):
         outputs: an iterable of TOs we want the ER to have real data for.
         """
 
-        import inspect, logging
-        fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
-
         # Load each TO in outputs
         for curr_output in outputs:
 
@@ -522,10 +514,10 @@ class ExecRecord(models.Model):
             corresp_ero = self.execrecordouts.filter(content_type=type, object_id=curr_output.id)
 
             if not corresp_ero.first().has_data():
-                logging.debug("{}: corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested".format(fn))
+                self.logger.debug("corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
                 return False
 
-        logging.debug("{}: all outputs needed have corresponding EROs with data".format(fn))
+        self.logger.debug("all outputs needed have corresponding EROs with data")
         return True
 
     def outputs_OK(self):
@@ -713,6 +705,10 @@ class ExecRecordOut(models.Model):
     class Meta:
         unique_together = ("execrecord", "content_type", "object_id");
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def __unicode__(self):
         """
         Unicode representation of this ExecRecordOut.
@@ -745,11 +741,6 @@ class ExecRecordOut(models.Model):
         If ER is not a cable, check output belongs to ER's Method.
         The SD is compatible with generic_output. (??)
         """
-
-        import inspect
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        import logging
-
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if (type(self.execrecord.general_transf()) ==
                 pipeline.models.PipelineOutputCable):
@@ -797,8 +788,8 @@ class ExecRecordOut(models.Model):
 
         # Check that the SD is compatible with generic_output.
 
-        logging.debug("{}: ERO SD '{}' is raw? {}".format(fn, self.symbolicdataset, self.symbolicdataset.is_raw()))
-        logging.debug("{}: ERO generic_output '{}' {} is raw? {}".format(fn, self.generic_output, type(self.generic_output), self.generic_output.is_raw()))
+        self.logger.debug("ERO SD '{}' is raw? {}".format(self.symbolicdataset, self.symbolicdataset.is_raw()))
+        self.logger.debug("ERO generic_output '{}' {} is raw? {}".format(self.generic_output, type(self.generic_output), self.generic_output.is_raw()))
 
         # If SD is raw, the ERO output TO must also be raw
         if self.symbolicdataset.is_raw() != self.generic_output.is_raw():
@@ -872,7 +863,7 @@ class ExecRecordOut(models.Model):
                         "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
                         format(input_SD, self.generic_output))
 
-        logging.debug("{}: ERO is clean".format(fn))
+        self.logger.debug("ERO is clean")
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""

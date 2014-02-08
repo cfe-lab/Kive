@@ -935,12 +935,12 @@ class CustomConstraintTests(TestCase):
         self.good_datafile.close()
 
         # A file not conforming to the compound datatype.
-        self.good_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
-        self.good_datafile.write("letter strings,words\n")
-        self.good_datafile.write("hello there,Spock\n")
-        self.good_datafile.write("l1ve,long\n")
-        self.good_datafile.write("and,prosper\n")
-        self.good_datafile.close()
+        self.bad_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
+        self.bad_datafile.write("letter strings,words\n")
+        self.bad_datafile.write("hello there,Spock\n")
+        self.bad_datafile.write("l1ve,long\n")
+        self.bad_datafile.write("and,prosper\n")
+        self.bad_datafile.close()
 
     def tearDown(self):
         # Clean up the work directory.
@@ -950,4 +950,8 @@ class CustomConstraintTests(TestCase):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        pass
+        return
+        summary_path = os.path.join(self.workdir, "summary")
+        with open(self.good_datafile.name) as f:
+            summary = self.cdt_constraints.summarize_CSV(f, self.workdir)
+        self.assertEqual(summary, {"num_rows": 2})
