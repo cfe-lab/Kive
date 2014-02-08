@@ -11,6 +11,7 @@ import os, sys
 import tempfile, shutil
 import random
 import logging
+import time
 
 from librarian.models import *
 from archive.models import *
@@ -57,7 +58,9 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
 
         # Bad case (propagation): define an RSIC that is not complete.
         E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS)
-        E03_11_EL = E03_11_RSIC.log.create(end_time=timezone.now())
+        E03_11_EL = E03_11_RSIC.log.create()
+        E03_11_EL.save()
+        E03_11_EL.end_time = timezone.now()
         E03_11_EL.save()
         E03_11_ER = ExecRecord(generator=E03_11_EL)
         E03_11_ER.save()
@@ -237,8 +240,16 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         self.assertEquals(step_E2_RS.clean(), None)
 
         # Create ExecLogs with associated MethodOutputs for RunSteps.
-        step_E1_EL = step_E1_RS.log.create(end_time = timezone.now())
-        step_E2_EL = step_E2_RS.log.create(end_time = timezone.now())
+        step_E1_EL = step_E1_RS.log.create()
+        step_E1_EL.save()
+        step_E1_EL.end_time = timezone.now()
+        step_E1_EL.save()
+
+        step_E2_EL = step_E2_RS.log.create()
+        step_E2_EL.save()
+        step_E1_EL.end_time = timezone.now()
+        step_E1_EL.save()
+
         step_E1_MO = MethodOutput(execlog=step_E1_EL, return_code = 0)
         step_E2_MO = MethodOutput(execlog=step_E2_EL, return_code = 0)
         step_E1_MO.save()
@@ -1153,7 +1164,7 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         self.E11_32_output_DS.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "RunSIC .* does not keep its output; no data should be produced",
+            "RunSIC .* does not keep its output but a dataset was registered",
             E11_32_RSIC.clean)
         # Reset....
         self.E11_32_output_DS.created_by = None
@@ -1251,13 +1262,15 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
             E31_42_ROC.clean)
         # Reset....
         E31_42_ROC.execrecord = None
-        E31_42_ROC.log.add(old_log)
+        self.ER_from_record(E31_42_ROC)
 
         # Now set reused.  First we do the reused = True case.
         E31_42_ROC.reused = True
         # Bad case: ROC has associated data.
         self.singlet_DS.created_by = E31_42_ROC
         self.singlet_DS.save()
+
+
         self.assertRaisesRegexp(
             ValidationError,
             "RunOutputCable .* reused an ExecRecord and should not have generated any Datasets",

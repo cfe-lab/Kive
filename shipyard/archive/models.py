@@ -12,6 +12,7 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
 import hashlib
+import logging
 
 import file_access_utils
 from constants import error_messages
@@ -493,6 +494,10 @@ class RunSIC(models.Model):
         # within a run step.
         unique_together = ("runstep", "PSIC")
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def clean(self):
         """
         Check coherence of this RunSIC.
@@ -531,10 +536,7 @@ class RunSIC(models.Model):
              then there should be existent data associated and it should also
              be associated to the corresponding ERO.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
-        logging.debug("{}: Initiating".format(fn))
+        self.logger.debug("Initiating")
 
         if (not self.runstep.pipelinestep.cables_in.
                 filter(pk=self.PSIC.pk).exists()):
@@ -616,7 +618,7 @@ class RunSIC(models.Model):
                 format(self.PSIC))
 
         # Check whether this has a missing output.
-        logging.debug("{}: Checking RunSIC's ExecLog".format(fn))
+        self.logger.debug("Checking RunSIC's ExecLog")
 
         if self.log.exists():
 
@@ -624,7 +626,7 @@ class RunSIC(models.Model):
             if not self.PSIC.keep_output:
                 if self.has_data():
                     raise ValidationError(
-                        "RunSIC \"{}\" doesn't keep its output but a dataset was registered".
+                        "RunSIC \"{}\" does not keep its output but a dataset was registered".
                         format(self))
 
             # If EL shows missing output
@@ -782,10 +784,6 @@ class RunOutputCable(models.Model):
              trivial, then this ROC should have existent data
              associated and it should belong to the corresponding ERO
         """
-        import inspect
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        import logging
-
         if (not self.run.pipeline.outcables.
                 filter(pk=self.pipelineoutputcable.pk).exists()):
             raise ValidationError(
@@ -898,8 +896,8 @@ class RunOutputCable(models.Model):
             if not self.reused and not self.pipelineoutputcable.is_trivial():
                 if not self.has_data():
                     raise ValidationError(
-                        "{}: RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
-                        format(fn, self))
+                        "RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
+                        format(self))
 
                 # The associated data should belong to the ERO of
                 # self.execrecord (which has already been checked for
@@ -1071,6 +1069,10 @@ class ExecLog(models.Model):
                                     blank=True,
                                     help_text="Time at end of execution")
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def clean(self):
         """
         Checks coherence of this ExecLog.
@@ -1116,15 +1118,12 @@ class ExecLog(models.Model):
 
     def missing_outputs(self):
         """Returns output SDs missing output from this execution."""
-        import csv, inspect, logging
-        fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
-
         missing = []
         for ccl in self.content_checks.all():
             if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
                 missing.append(ccl.symbolicdataset)
 
-        logging.debug("{}: returning missing outputs '{}'".format(fn,missing))
+        self.logger.debug("returning missing outputs '{}'".format(missing))
         return missing
 
     def is_successful(self):

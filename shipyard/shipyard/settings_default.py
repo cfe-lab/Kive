@@ -156,11 +156,22 @@ LOGGING = {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
+    'formatters': {
+        'debug': {
+            'format': '%(asctime)s - %(name)s.%(funcName)s(): %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        }
+    },
     'handlers': {
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'debug'
         }
     },
     'loggers': {
@@ -169,5 +180,17 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'CodeResourceRevision':   {'handlers': ['console'], 'level': 'DEBUG'},
+        'ExecLog':                {'handlers': ['console'], 'level': 'DEBUG'},
+        'ExecRecord':             {'handlers': ['console'], 'level': 'DEBUG'},
+        'ExecRecordIn':           {'handlers': ['console'], 'level': 'DEBUG'},
+        'ExecRecordOut':          {'handlers': ['console'], 'level': 'DEBUG'},
+        'Method':                 {'handlers': ['console'], 'level': 'DEBUG'},
+        'PipelineStepInputCable': {'handlers': ['console'], 'level': 'DEBUG'},
+        'PipelineOutputCable':    {'handlers': ['console'], 'level': 'DEBUG'},
+        'RunSIC':                 {'handlers': ['console'], 'level': 'DEBUG'},
+        'RunOutputCable':         {'handlers': ['console'], 'level': 'DEBUG'},
+        'Sandbox':                {'handlers': ['console'], 'level': 'DEBUG'},
+        'SymbolicDataset':        {'handlers': ['console'], 'level': 'DEBUG'}
     }
 }

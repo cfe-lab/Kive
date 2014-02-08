@@ -10,7 +10,6 @@ from librarian.models import ExecRecordIn
 import file_access_utils, logging_utils
 import os.path
 import shutil
-import inspect, traceback
 import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
@@ -61,9 +60,7 @@ class Sandbox:
         1) Inputs must have real data (For top level runs), OR
         2) Inputs be in sd_fs_map (sub-runs)
         """
-        logging_utils.setup_logging()
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        logger = logging.getLogger()
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         self.user = user
         self.pipeline = pipeline
@@ -74,7 +71,7 @@ class Sandbox:
         self.ps_map = {}
         self.check_inputs()
 
-        logger.debug("{}: initializing maps".format(fn))
+        self.logger.debug("initializing maps")
         self.run = pipeline.pipeline_instances.create(user=self.user)
         for i, pipeline_input in enumerate(inputs):
             corresp_pipeline_input = pipeline.inputs.get(dataset_idx=i+1)
@@ -87,7 +84,7 @@ class Sandbox:
             self.sandbox_path = tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
 
         # Make the sandbox directory.
-        logger.debug("{}: file_access_utils.set_up_directory({})".format(fn, self.sandbox_path))
+        self.logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
         file_access_utils.set_up_directory(self.sandbox_path)
 
     def check_inputs(self):
@@ -164,8 +161,7 @@ class Sandbox:
         5) input_SD is clean
         """
 
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        logging.debug("{}: STARTING EXECUTING CABLE".format(fn))
+        self.logger.debug("STARTING EXECUTING CABLE")
 
         curr_record = None      # RSIC/ROC that we create, reuse, or update
         curr_ER = None
@@ -179,11 +175,11 @@ class Sandbox:
 
         if not recover:
             if type(cable) == pipeline.models.PipelineStepInputCable:
-                logging.debug("{}: Not recovering - creating RSIC".format(fn))
+                self.logger.debug("Not recovering - creating RSIC")
                 curr_record = cable.psic_instances.create(runstep=parent_record)
                 required_record_type = archive.models.RunSIC
             else:
-                logging.debug("{}: Not recovering - creating ROC".format(fn))
+                self.logger.debug("Not recovering - creating ROC")
                 curr_record = cable.poc_instances.create(run=parent_record)
                 required_record_type = archive.models.RunOutputCable
 
@@ -193,11 +189,12 @@ class Sandbox:
             else:
                 if parent_record.parent_runstep != None:
                     cable_keeps_output = not parent_record.parent_runstep.pipelinestep.outputs_to_delete.filter(dataset_name=cable.output_name).exists()
-                    logging.debug("{}: Sub-pipeline step - does the parent runstep keep output? {}".format(fn, cable_keeps_output))
+                    self.logger.debug("Sub-pipeline step - does the parent runstep keep output? {}".
+                            format(cable_keeps_output))
                 else:
-                    logging.debug("{}: Not a sub-pipeline, will keep output".format(fn))
+                    self.logger.debug("Not a sub-pipeline, will keep output")
                     cable_keeps_output = True
-            logging.debug("{}: Cable keeps output? {}".format(fn, cable_keeps_output))
+            self.logger.debug("Cable keeps output? {}".format(cable_keeps_output))
 
 
             # FIXME: will redefine what "reusability" means - ERs should only be considered for reuse if its inputs/outputs are valid *at this time*
@@ -207,14 +204,15 @@ class Sandbox:
 
             # A) Get the content type (RSIC/ROC) of the ExecRecord's ExecLog
             record_contenttype = ContentType.objects.get_for_model(required_record_type)
-            logging.debug("{}: Searching for reusable cable ER - (linked to an '{}' ExecLog)".format(fn, record_contenttype))
+            self.logger.debug("Searching for reusable cable ER - (linked to an '{}' ExecLog)".
+                format(record_contenttype))
 
             # B) Look at ERIs linked to the same cable type, with matching input SD
             candidate_ERIs = ExecRecordIn.objects.filter(execrecord__generator__content_type=record_contenttype, symbolicdataset=input_SD)
 
             curr_record.reused = False
             for candidate_ERI in candidate_ERIs:
-                logging.debug("{}: Considering ERI {} for ER reuse or update".format(fn, candidate_ERI))
+                self.logger.debug("Considering ERI {} for ER reuse or update".format(candidate_ERI))
                 candidate_cable = candidate_ERI.execrecord.general_transf()
 
                 compatibility = False
@@ -224,11 +222,11 @@ class Sandbox:
                     compatibility = cable.is_compatible(candidate_cable, input_SD.structure.compounddatatype)
 
                 if compatibility:
-                    logging.debug("{}: Compatible ER found".format(fn))
+                    self.logger.debug("Compatible ER found")
                     output_SD = candidate_ERI.execrecord.execrecordouts.all()[0].symbolicdataset
 
                     if not cable_keeps_output or output_SD.has_data():
-                        logging.debug("{}: Reusing ER {}".format(fn, candidate_ERI.execrecord))
+                        self.logger.debug("Reusing ER {}".format(candidate_ERI.execrecord))
                         curr_record.reused = True
                         curr_record.execrecord = candidate_ERI.execrecord
                         curr_record.clean()
@@ -251,7 +249,7 @@ class Sandbox:
                         
                     else:
                         curr_ER = candidate_ERI.execrecord
-                        logging.debug("{}: Filling in ER {}".format(fn, curr_ER))
+                        self.logger.debug("Filling in ER {}".format(curr_ER))
 
                         if not cable.is_raw():
                             source_CDT = input_SD.structure.compounddatatype
@@ -261,7 +259,7 @@ class Sandbox:
                         break
 
         else:
-            logging.debug("{}: Recovering - will update old ER".format(fn))
+            self.logger.debug("Recovering - will update old ER")
             curr_record = self.cable_map[cable]
             curr_ER = curr_record.execrecord
             input_SD = curr_ER.execrecordins.all()[0].symbolicdataset
@@ -269,38 +267,38 @@ class Sandbox:
             output_SD_CDT = output_SD.get_cdt()
             output_path = self.sd_fs_map[output_SD]
         
-        logging.debug("{}: No ER to completely reuse - committed to executing cable".format(fn))
+        self.logger.debug("No ER to completely reuse - committed to executing cable")
         curr_log = None
 
         if self.sd_fs_map[input_SD] == None or not os.access(self.sd_fs_map[input_SD], os.R_OK):
-            logging.debug("{}: Dataset {} unavailable on file system".format(fn, input_SD))
+            self.logger.debug("Dataset {} unavailable on file system".format(input_SD))
 
             if input_SD.has_data():
-                logging.debug("{}: Dataset {} has real data: running run_cable({})".format(fn, input_SD, input_SD))
+                self.logger.debug("Dataset {} has real data: running run_cable({})".format(input_SD, input_SD))
                 curr_log = cable.run_cable(input_SD.dataset,output_path,curr_record)
 
             else:
-                logging.debug("{}: Symbolic only: running recover({})".format(fn, input_SD))
+                self.logger.debug("Symbolic only: running recover({})".format(input_SD))
                 sys.exit()
                 successful_recovery = self.recover(input_SD, curr_run)
 
                 if not successful_recovery:
-                    logging.warn("{}: Recovery failed - returning incomplete RSIC/ROC (missing ExecLog)".format(fn))
+                    self.logger.warn("Recovery failed - returning incomplete RSIC/ROC (missing ExecLog)")
                     return curr_record
 
-                logging.debug("{}: Dataset recovered: running run_cable({})".format(fn, self.sd_fs_map[input_SD]))
+                self.logger.debug("Dataset recovered: running run_cable({})".format(self.sd_fs_map[input_SD]))
                 curr_log = cable.run_cable(self.sd_fs_map[input_SD],output_path, curr_record)
 
         # Datasets already on the file system are used for the cable execution directly
         else:
-            logging.debug("{}: Dataset input file exists on file system: using it for cable execution".format(fn))
+            self.logger.debug("Dataset input file exists on file system: using it for cable execution")
             dataset_path = self.sd_fs_map[input_SD]
 
             if os.access(dataset_path, os.R_OK):
-                logging.debug("{}: Running run_cable('{}')".format(fn, dataset_path))
+                self.logger.debug("Running run_cable('{}')".format(dataset_path))
                 curr_log = cable.run_cable(dataset_path,output_path,curr_record)
             else:
-                logging.error("{}: Can't access dataset on file system anymore! Returning incomplete RSIC/ROC".format(fn))
+                self.logger.error("Can't access dataset on file system anymore! Returning incomplete RSIC/ROC")
                 return curr_record
 
         ####
@@ -310,7 +308,7 @@ class Sandbox:
 
         # We attempted to run code: regardless of outcome, create an ER.
         if not recover and curr_ER == None:
-            logging.debug("{}: No ER already in use - creating fresh cable ER + ERI/ERO".format(fn))
+            self.logger.debug("No ER already in use - creating fresh cable ER + ERI/ERO")
             curr_ER = curr_log.execrecords.create()
             curr_ER.execrecordins.create(
                     generic_input=cable.source,
@@ -331,7 +329,7 @@ class Sandbox:
 
                 # Use wires to determine the CDT of the output of this cable
                 for wire in wires:
-                    logging.debug("{}: Adding CDTM: {} {}".format(fn, wire.dest_pin.column_name, wire.dest_pin.column_idx))
+                    self.logger.debug("Adding CDTM: {} {}".format(wire.dest_pin.column_name, wire.dest_pin.column_idx))
                     output_SD_CDT.members.create(
                             datatype=wire.source_pin.datatype,
                             column_name=wire.dest_pin.column_name,
@@ -341,14 +339,14 @@ class Sandbox:
 
                 # Add structure to the generated SD
                 if output_SD_CDT != None:
-                    logging.debug("{}: Registering output SD's CDT structure".format(fn))
+                    self.logger.debug("Registering output SD's CDT structure")
 
                     output_SD_structure = librarian.models.DatasetStructure(
                             symbolicdataset=output_SD,
                             compounddatatype=output_SD_CDT,
                             num_rows=-1)
                     output_SD_structure.save()
-                    logging.debug("{}: output_SD is raw? {}".format(fn, output_SD.is_raw()))
+                    self.logger.debug("output_SD is raw? {}".format(output_SD.is_raw()))
 
             # For PSICs, use the destination TO: for POCs, use the pipeline TO matched on output_name
             ero_xput = None
@@ -357,15 +355,15 @@ class Sandbox:
             else:
                 ero_xput = cable.pipeline.outputs.get(dataset_name=cable.output_name)
 
-            logging.debug("{}: Registering cable ERO".format(fn))
+            self.logger.debug("Registering cable ERO")
             curr_ER.execrecordouts.create(generic_output=ero_xput,symbolicdataset=output_SD)
             curr_ER.complete_clean()
 
         ####
         # CHECK IF FILE EXISTS (FIXME: Use transactions)
-        logging.debug("{}: Validating file created by execute_cable".format(fn))
+        self.logger.debug("Validating file created by execute_cable")
         if not os.access(output_path, os.R_OK):
-            logging.error("{}: File doesn't exist - creating CCL with BadData".format(fn))
+            self.logger.error("File doesn't exist - creating CCL with BadData")
             ccl = output_SD.content_checks.create(execlog=curr_log)
             ccl.baddata.create(missing_output=True)
             
@@ -378,7 +376,7 @@ class Sandbox:
                 with open(output_path, "rb") as f:
                     output_md5 = file_access_utils.compute_md5(f)
 
-                logging.debug("{}: Computed MD5 for file: {}".format(fn, output_md5))
+                self.logger.debug("Computed MD5 for file: {}".format(output_md5))
 
                 if not had_ER_at_beginning:
                     output_SD.MD5_checksum = output_md5
@@ -387,7 +385,7 @@ class Sandbox:
             if not recover:
 
                 if cable_keeps_output and not cable.is_trivial():
-                    logging.debug("{}: Cable keeps output for nontrivial cable: creating dataset".format(fn))
+                    self.logger.debug("Cable keeps output for nontrivial cable: creating dataset")
                     dataset_name = "{} {} {}".format(self.run.name,type(cable).__name__,curr_record.pk)
 
                     with open(output_path, "rb") as f:
@@ -400,11 +398,11 @@ class Sandbox:
                         new_dataset.save()
 
                 else:
-                    logging.debug("{}: Cable doesn't keep output or cable is trivial: not creating a dataset".format(fn))
+                    self.logger.debug("Cable doesn't keep output or cable is trivial: not creating a dataset")
 
 
                 if not had_ER_at_beginning:
-                    logging.debug("{}: Performing content check for output generated for the first time".format(fn))
+                    self.logger.debug("Performing content check for output generated for the first time")
 
                     summary_path = "{}_summary".format(output_path)
                     cable_min_row = None
@@ -419,7 +417,7 @@ class Sandbox:
                             cable_max_row = cable.source.get_max_row()
 
                     if not cable.is_trivial():
-                        logging.debug("{}: Performing content check of non-trivial output".format(fn))
+                        self.logger.debug("Performing content check of non-trivial output")
                         ccl = output_SD.check_file_contents(
                                 output_path,
                                 summary_path,
@@ -429,19 +427,19 @@ class Sandbox:
 
             # Next, the case where either we are recovering or the ER already existed: we perform an integrity check.
             elif recover or had_ER_at_beginning:
-                logging.debug("{}: Performing integrity check of previously generated dataset".format(fn))
+                self.logger.debug("Performing integrity check of previously generated dataset")
                 icl = output_SD.check_integrity(output_path,curr_log,output_md5)
 
 
         ####
         # PERFORM BOOKKEEPING (Link RSIC/ROC with ER, and save it + update maps)
         if not recover:
-            logging.debug("{}: Linking RSIC/ROC to ER".format(fn))
+            self.logger.debug("Linking RunSIC/RunOutputCable to ExecRecord")
             curr_record.execrecord = curr_ER
         else:
-            logging.debug("{}: This was a recovery - not linking RSIC/ROC to ER".format(fn))
+            self.logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
 
-        logging.debug("{}: Checking RSIC/ROC (curr_record) is complete and clean before saving".format(curr_record))
+        self.logger.debug("Checking RSIC/ROC (curr_record) is complete and clean before saving")
         curr_record.complete_clean()
         curr_record.save()
 
@@ -449,7 +447,8 @@ class Sandbox:
         # Update maps as in the reused == True case if we are not recovering.
         if not recover:
             if output_SD not in self.sd_fs_map or self.sd_fs_map[output_SD] == None:
-                logging.debug("{}: output dataset {} now exists on the FS - updating sd_fs_map".format(fn,output_SD))
+                self.logger.debug("output dataset {} now exists on the FS - updating sd_fs_map".
+                        format(output_SD))
                 self.sd_fs_map[output_SD] = output_path
 
             # Record the destination TI/TO of this PSIC/POC
@@ -463,7 +462,7 @@ class Sandbox:
             self.socket_map[(curr_run, cable, cable_dest)] = output_SD
             self.cable_map[cable] = curr_record
 
-        logging.debug("{}: DONE EXECUTING {} '{}'".format(fn, type(cable).__name__, cable))
+        self.logger.debug("DONE EXECUTING {} '{}'".format(type(cable).__name__, cable))
         return curr_record
 
     def execute_step(self,curr_run,pipelinestep,inputs,step_run_dir=None,recover=False):
@@ -481,8 +480,7 @@ class Sandbox:
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
 
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        logging.debug("{}: STARTING EXECUTION OF STEP".format(fn))
+        self.logger.debug("STARTING EXECUTION OF STEP")
 
         curr_ER = None
         output_paths = []
@@ -495,10 +493,10 @@ class Sandbox:
         in_dir = os.path.join(step_run_dir, "input_data")
 
         if not recover:
-            logging.debug("{}: Not recovering - creating new RS".format(fn))
+            self.logger.debug("Not recovering - creating new RunStep")
             curr_RS = pipelinestep.pipelinestep_instances.create(run=curr_run)
 
-            logging.debug("{}: Preparing file system for sandbox".format(fn))
+            self.logger.debug("Preparing file system for sandbox")
             for workdir in [step_run_dir, in_dir, out_dir, log_dir]:
                 file_access_utils.set_up_directory(workdir)
 
@@ -508,28 +506,28 @@ class Sandbox:
                 output_path = os.path.join(out_dir,file_name)
                 output_paths.append(output_path)
 
-            logging.debug("{}: Running step's input PSICs".format(fn))
+            self.logger.debug("Running step's input PSICs")
             for curr_input in pipelinestep.transformation.inputs.all().order_by("dataset_idx"):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_dir = os.path.join(in_dir,"step{}_{}".format(pipelinestep.step_num,curr_input.dataset_name))
-                logging.debug("{}: execute_cable('{}','{}','{}','{}')".format(fn, corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
+                self.logger.debug("execute_cable('{}','{}','{}','{}')".format(corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
                 curr_RSIC = self.execute_cable(corresp_cable, inputs[curr_input.dataset_idx-1],cable_dir,curr_RS)
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.all()[0].symbolicdataset)
 
             curr_RS.clean()
 
             # FIXME: SD generated from the previous step wasn't checked and so cannot be used
-            logging.debug("{}: Looking for ER with same transformation + input SDs".format(fn))
+            self.logger.debug("Looking for ER with same transformation + input SDs")
             if type(pipelinestep.transformation).__name__ != "Pipeline":
                 curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
 
             if curr_ER != None:
-                logging.debug("{}: Found ER, checking it provides outputs needed".format(fn))
+                self.logger.debug("Found ER, checking it provides outputs needed")
                 had_ER_at_beginning = True
                 outputs_needed = pipelinestep.outputs_to_retain()
 
                 if curr_ER.provides_outputs(outputs_needed):
-                    logging.debug("{}: Completely reusing ER {} - updating maps".format(fn, curr_ER))
+                    self.logger.debug("Completely reusing ER {} - updating maps".format(curr_ER))
                     curr_RS.reused = True
                     curr_RS.execrecord = curr_ER
                     curr_RS.complete_clean()
@@ -551,17 +549,17 @@ class Sandbox:
                         # This pipeline step, with the downstream TI, maps to corresp_SD
                         self.socket_map[(curr_run, pipelinestep, step_output)] = corresp_SD
 
-                    logging.debug("{}: Finished completely reusing ER".format(fn))
+                    self.logger.debug("Finished completely reusing ER")
                     return curr_RS
 
-                logging.debug("{}: Found ER, but need to perform computation to fill it in".format(fn))
+                self.logger.debug("Found ER, but need to perform computation to fill it in")
                 curr_RS.reused = False
             else:
-                logging.debug("{}: No compatible ER found - will create fresh ER".format(fn))
+                self.logger.debug("No compatible ER found - will create fresh ER")
                 curr_RS.reused = False
 
         else:
-            logging.debug("{}: Recovering step".format(fn))
+            self.logger.debug("Recovering step")
             step_run_dir, curr_RS = self.ps_map[pipelinestep]
             curr_ER = curr_RS.execrecord
             had_ER_at_beginning = True
@@ -577,38 +575,38 @@ class Sandbox:
                         object_id=curr_input.pk)
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
-        logging.debug("{}: Checking required datasets are on the FS for running code".format(fn))
+        self.logger.debug("Checking required datasets are on the FS for running code")
         for curr_in_SD in inputs_after_cable:
             curr_path = self.sd_fs_map[curr_in_SD]
             if not os.access(curr_path, os.F_OK):
-                logging.debug("{}: File {} not on FS: recovering".format(fn, curr_path))
+                self.logger.debug("File {} not on FS: recovering".format(curr_path))
                 successful_recovery = self.recover(curr_in_SD,curr_run)
 
                 if not successful_recovery:
-                    logging.debug("{}: Failed to recover: quitting without creating ER".format(fn))
+                    self.logger.debug("Failed to recover: quitting without creating ER")
                     return curr_record
 
-        logging.debug("{}: Finished putting datasets into place: running code for this step".format(fn))
+        self.logger.debug("Finished putting datasets into place: running code for this step")
 
         if type(pipelinestep.transformation) == pipeline.models.Pipeline:
-            logging.debug("{}: EXECUTING SUB-PIPELINE STEP".format(fn))
+            self.logger.debug("EXECUTING SUB-PIPELINE STEP")
             self.execute_pipeline(
                     pipeline=pipelinestep.transformation,
                     input_SDs=inputs_after_cable,
                     sandbox_path=step_run_dir,
                     parent_runstep=curr_RS)
 
-            logging.debug("{}: FINISHED EXECUTING SUB-PIPELINE STEP".format(fn))
+            self.logger.debug("FINISHED EXECUTING SUB-PIPELINE STEP")
             return curr_RS
 
         curr_log = archive.models.ExecLog(record=curr_RS)
         curr_log.save()
-        logging.debug("{}: Created EL for method execution at {}".format(fn, curr_log))
+        self.logger.debug("Created EL for method execution at {}".format(curr_log))
         method_popen = None
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
 
-        logging.debug("{}: Running code".format(fn))
+        self.logger.debug("Running code")
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
 
         with open(stdout_path, "wb", 1) as outwrite, open(stderr_path, "wb", 0) as errwrite:
@@ -617,12 +615,12 @@ class Sandbox:
                     [sys.stdout, outwrite], [sys.stderr, errwrite])
 
         curr_log.end_time = timezone.now()
-        logging.debug("{}: Method execution complete, saving ExecLog (started = {}, ended = {})".
-                format(fn, curr_log.start_time, curr_log.end_time))
+        self.logger.debug("Method execution complete, saving ExecLog (started = {}, ended = {})".
+                format(curr_log.start_time, curr_log.end_time))
         curr_log.clean()
         curr_log.save()
 
-        logging.debug("{}: Storing stdout/stderr in MethodOutput".format(fn))
+        self.logger.debug("Storing stdout/stderr in MethodOutput")
         curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=returncode)
         with open(stdout_path, "rb") as outread, open(stderr_path, "rb") as errread:
             curr_mo.output_log.save(stdout_path, File(outread))
@@ -632,20 +630,20 @@ class Sandbox:
         curr_log.complete_clean()
 
         if curr_ER is None:
-            logging.debug("{}: Creating fresh ER".format(fn))
+            self.logger.debug("Creating fresh ER")
             curr_ER = librarian.models.ExecRecord(generator=curr_log)
             curr_ER.save()
             curr_RS.execrecord = curr_ER
             curr_RS.save()
 
-            logging.debug("{}: Annotating ERIs for ER '{}'".format(fn, curr_ER))
+            self.logger.debug("Annotating ERIs for ER '{}'".format(curr_ER))
             for curr_input in pipelinestep.transformation.inputs.all():
                 corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
                 curr_ER.execrecordins.create(
                         generic_input=curr_input,
                         symbolicdataset=corresp_input_SD)
 
-            logging.debug("{}: Creating new SDs + EROs".format(fn))
+            self.logger.debug("Creating new SDs + EROs")
             for curr_output in pipelinestep.transformation.outputs.all():
                 corresp_output_SD = librarian.models.SymbolicDataset(MD5_checksum="")
                 corresp_output_SD.save()
@@ -664,7 +662,7 @@ class Sandbox:
                         symbolicdataset=corresp_output_SD)
 
             curr_ER.complete_clean()
-        logging.debug("{}: Finished creating fresh ER, proceeding to check outputs".format(fn))
+        self.logger.debug("Finished creating fresh ER, proceeding to check outputs")
 
         # had_output_found indicates we have detected problems with the output.
         bad_output_found = False
@@ -698,13 +696,13 @@ class Sandbox:
                 output_SD.structure.num_rows = num_rows
                 output_SD.structure.save()
                 output_SD.save()
-                logging.debug("{}: First time seeing file: saving md5 {}".format(fn, output_md5))
+                self.logger.debug("First time seeing file: saving md5 {}".format(output_md5))
                 if not curr_output.is_raw():
-                    logging.debug("{}: First time seeing file: saving row count {}".format(fn, num_rows))
+                    self.logger.debug("First time seeing file: saving row count {}".format(num_rows))
 
             if not pipelinestep.outputs_to_delete.filter(pk=curr_output.pk).exists() and not output_ERO.has_data():
 
-                logging.debug("{}: Retaining output: creating Dataset".format(fn))
+                self.logger.debug("Retaining output: creating Dataset")
 
                 desc = "run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}".format(
                         self.run.name,
@@ -735,7 +733,7 @@ class Sandbox:
                 new_DS.save()
 
             if not had_ER_at_beginning:
-                logging.debug("{}: New data - performing content check".format(fn))
+                self.logger.debug("New data - performing content check")
                 summary_path = "{}_summary".format(output_path)
 
                 # CCL is generated
@@ -744,29 +742,29 @@ class Sandbox:
                         curr_output.get_max_row(), curr_log)
 
                 if ccl.is_fail():
-                    logging.warn("{}: content check failed for {}".format(fn, output_path))
+                    self.logger.warn("content check failed for {}".format(output_path))
                     bad_output_found = True
                 else:
-                    logging.debug("{}: content check passed for {}".format(fn, output_path))
+                    self.logger.debug("content check passed for {}".format(output_path))
 
             elif had_ER_at_beginning:
-                logging.debug("{}: SD has been computed before, checking integrity of {}".format(fn, output_SD))
+                self.logger.debug("SD has been computed before, checking integrity of {}".format(output_SD))
                 icl = output_SD.check_integrity(output_path,curr_log,output_md5)
 
                 if icl.is_fail():
                     bad_output_found = True
                     
-        logging.debug("{}: Finished checking outputs".format(fn))
+        self.logger.debug("Finished checking outputs")
         curr_ER.complete_clean()
 
         if not recover:
-            logging.debug("{}: Not recovering: finishing bookkeeping".format(fn))
+            self.logger.debug("Not recovering: finishing bookkeeping")
             curr_RS.execrecord = curr_ER
             curr_RS.complete_clean()
             curr_RS.save()
 
             # Since reused=False, step_run_dir represents where the step *actually is*
-            logging.debug("Updating maps")
+            self.logger.debug("Updating maps")
             self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
     
             for step_output in pipelinestep.transformation.outputs.all():
@@ -795,10 +793,6 @@ class Sandbox:
         Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
         """
 
-        import inspect
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-        logger = logging.getLogger()
-
         is_set = (pipeline != None,input_SDs != None,sandbox_path != None,parent_runstep != None)
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
@@ -809,22 +803,22 @@ class Sandbox:
         curr_run = self.run
 
         if (curr_run.is_complete()):
-            logging.warn(warning_messages["pipeline_already_run"].format(self))
+            self.logger.warn(warning_messages["pipeline_already_run"].format(self))
             return curr_run
 
         if parent_runstep is not None:
-            logger.debug("{}: executing a sub-pipeline with input_SD {}".format(fn, input_SDs))
+            self.logger.debug("executing a sub-pipeline with input_SD {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(
                     user=self.user,
                     parent_runstep=parent_runstep)
 
 
-        logging.debug("{}: Setting up output directory".format(fn))
+        self.logger.debug("Setting up output directory")
         out_dir = os.path.join(sandbox_path, "output_data")
         file_access_utils.set_up_directory(out_dir)
 
         for step in pipeline.steps.all().order_by("step_num"):
-            logging.debug("{}: Executing step {} - looking for cables feeding into this step".format(fn, step))
+            self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
 
             step_inputs = []
             run_dir = os.path.join(sandbox_path,"step{}".format(step.step_num))
@@ -871,14 +865,14 @@ class Sandbox:
                 step_inputs.append(self.socket_map[(run_to_query, generator, socket)])
 
             curr_RS = self.execute_step(curr_run, step, step_inputs,step_run_dir=run_dir)
-            logger.debug("{}: DONE EXECUTING STEP {}".format(fn, step))
+            self.logger.debug("DONE EXECUTING STEP {}".format(step))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
-                logger.debug("{}: Step failed to execute: returning the run".format(fn))
+                self.logger.debug("Step failed to execute: returning the run")
                 curr_run.clean()
                 return curr_run
 
-        logging.debug("{}: Finished executing steps, executing POCs".format(fn))
+        self.logger.debug("Finished executing steps, executing POCs")
         for outcable in pipeline.outcables.all():
 
             generator = None
@@ -914,10 +908,10 @@ class Sandbox:
 
             if not curr_ROC.is_complete() or not curr_RS.successful_execution():
                 curr_run.clean()
-                logger.debug("Execution failed")
+                self.logger.debug("Execution failed")
                 return curr_run
 
-        logging.debug("{}: Finished executing output cables".format(fn))
+        self.logger.debug("Finished executing output cables")
         curr_run.complete_clean()
         curr_run.save()
 
@@ -1002,25 +996,22 @@ class Sandbox:
         PRE
         SD_to_recover is in the maps but no corresponding file is on the file system.
         """
-        import inspect, logging
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         if SD_to_recover.has_data():
-            logging.debug("{}: Dataset is in the DB - writing it to the file system".format(fn))
+            self.logger.debug("Dataset is in the DB - writing it to the file system")
             location = self.sd_fs_map[SD_to_recover]
             saved_data = SD_to_recover.dataset
             try:
                 saved_data.dataset_file.open()
                 shutil.copyfile(saved_data.dataset_file.name, location)
             except IOError:
-                logging.error("{}: could not copy file {} to file {}.".
-                    format(fn, saved_data.dataset_file, location))
+                self.logger.error("could not copy file {} to file {}.".
+                    format(saved_data.dataset_file, location))
                 return False
             finally:
                 saved_data.dataset_file.close()
             return True
 
-        logging.debug("{}: Performing computation to create missing Dataset".format(fn))
+        self.logger.debug("Performing computation to create missing Dataset")
 
         # Search for the generator of the SD in the Pipeline.
         curr_run, generator = self.first_generator_of_SD(SD_to_recover)
@@ -1034,13 +1025,13 @@ class Sandbox:
 
         curr_record = None
         if type(generator) == pipeline.models.PipelineStep:
-            logging.debug("{}: Executing step {} in recovery mode".format(fn, generator))
+            self.logger.debug("Executing step {} in recovery mode".format(generator))
             curr_record = self.execute_step(curr_run,generator,None,recover=True)
         elif type(generator) == pipeline.models.PipelineOutputCable:
-            logging.debug("{}: Executing output cable {} in recovery mode".format(fn, generator))
+            self.logger.debug("Executing output cable {} in recovery mode".format(generator))
             curr_record = self.execute_cable(generator,None,None,curr_run,recover=True)
         elif type(generator) == pipeline.models.PipelineStepInputCable:
-            logging.debug("{}: Executing input cable {} in recovery mode".format(fn, generator))
+            self.logger.debug("Executing input cable {} in recovery mode".format(generator))
             parent_record = curr_run.runsteps.get(
                 pipelinestep = generator.pipelinestep)
             curr_record = self.execute_cable(generator,None,None,parent_record,recover=True)
