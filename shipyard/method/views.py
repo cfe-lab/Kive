@@ -220,14 +220,10 @@ def method_add (request):
         pass
     else:
         method_form = MethodForm()
-        input_forms = [TransformationInputForm(auto_id='id_%s_in_0')]
-        output_forms = [TransformationOutputForm(auto_id='id_%s_out_0')]
-        in_xput_forms = [XputStructureForm()]
-        out_xput_forms = [XputStructureForm()]
+        input_forms = [(TransformationInputForm(auto_id='id_%s_in_0'), XputStructureForm(auto_id='id_%s_in_0'))]
+        output_forms = [(TransformationOutputForm(auto_id='id_%s_out_0'), XputStructureForm(auto_id='id_%s_out_0'))]
 
     c = Context({'method_form': method_form,
                  'input_forms': input_forms,
-                 'in_xput_forms': in_xput_forms,
-                 'output_forms': output_forms,
-                 'out_xput_forms': out_xput_forms})
+                 'output_forms': output_forms})
     return HttpResponse(t.render(c))

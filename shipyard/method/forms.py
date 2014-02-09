@@ -62,6 +62,9 @@ class MethodForm (forms.ModelForm):
 
 
 class TransformationInputForm (forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(TransformationInputForm, self).__init__(*args, **kwargs)
+        self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
     class Meta:
         model = TransformationInput # derived from abstract class TransformationXput
         fields = ('dataset_name', 'dataset_idx')
@@ -72,6 +75,10 @@ class TransformationOutputForm (forms.ModelForm):
         fields = ('dataset_name', 'dataset_idx')
 
 class XputStructureForm (forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(XputStructureForm, self).__init__(*args, **kwargs)
+        self.fields['min_row'].widget.attrs['class'] = 'shortIntField'
+        self.fields['max_row'].widget.attrs['class'] = 'shortIntField'
     compounddatatype = forms.ModelChoiceField(queryset = CompoundDatatype.objects.all())
     class Meta:
         model = XputStructure
