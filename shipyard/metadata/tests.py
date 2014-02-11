@@ -607,6 +607,18 @@ class DatatypeTests(MetadataTestSetup):
         self.assertRaisesRegexp(ValidationError,
                                 "Datatype \"dt_1\" has a circular restriction",
                                 self.dt_1.clean);
+
+    def test_datatype_clean_no_restricts(self):
+        """
+        Clean on a Datatype with no restrictions should pass.
+        """
+        datatype = Datatype(
+            name="squeaky",
+            description="a clean, new datatype",
+            Python_type=Datatype.STR)
+        # Note that this passes if the next line is uncommented.
+        #datatype.save()
+        self.assertEqual(datatype.clean(), None)
         
 
 class CompoundDatatypeMemberTests(MetadataTestSetup):
