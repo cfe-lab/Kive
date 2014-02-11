@@ -127,6 +127,7 @@ class Datatype(models.Model):
         Retrieves the 'effective' MIN_VAL restriction for this instance.
 
         That is, the most restrictive MIN_VAL-type BasicConstraint acting on this Datatype or its supertypes.
+        Returns a tuple with the BC in the first position and its float value in the second.
 
         PRE: all of this instance's supertypes are clean (in the Django
         sense), and this instance has at most one MIN_VAL BasicConstraint (and it is clean).
@@ -150,13 +151,12 @@ class Datatype(models.Model):
             for supertype in self.restricts.all():
                 # Recursive case: self has no MIN_VAL.  Go through all of the supertypes and
                 # take the maximum.
-                supertype_BC = supertype.get_effective_min_val()
-                supertype_min_val = float(supertype_BC.rule)
+                supertype_BC, supertype_min_val = supertype.get_effective_min_val()
                 if supertype_min_val > effective_min:
                     effective_min = supertype_min_val
                     effective_BC = supertype_BC
 
-        return effective_BC
+        return (effective_BC, effective_min)
 
     def get_effective_max_val(self):
         """
@@ -177,13 +177,12 @@ class Datatype(models.Model):
             effective_BC = my_max_val.first()
         else:
             for supertype in self.restricts.all():
-                supertype_BC = supertype.get_effective_max_val()
-                supertype_max_val = float(supertype_BC.rule)
+                supertype_BC, supertype_max_val = supertype.get_effective_max_val()
                 if supertype_max_val < effective_max:
                     effective_max = supertype_max_val
                     effective_BC = supertype_BC
 
-        return effective_BC
+        return (effective_BC, effective_max)
 
     def get_effective_min_length(self):
         """
@@ -199,17 +198,16 @@ class Datatype(models.Model):
         effective_BC = None
 
         if my_min_length.exists():
-            effective_min = float(my_min_length.first().rule)
+            effective_min = int(my_min_length.first().rule)
             effective_BC = my_min_length.first()
         else:
             for supertype in self.restricts.all():
-                supertype_BC = supertype.get_effective_min_length()
-                supertype_min_length = int(supertype_BC.rule)
+                supertype_BC, supertype_min_length = supertype.get_effective_min_length()
                 if supertype_min_length > effective_min:
                     effective_min = supertype_min_length
                     effective_BC = supertype_BC
 
-        return effective_BC
+        return (effective_BC, effective_min)
 
     def get_effective_max_length(self):
         """
@@ -225,17 +223,16 @@ class Datatype(models.Model):
         effective_BC = None
 
         if my_max_length.exists():
-            effective_max = float(my_max_length.first().rule)
+            effective_max = int(my_max_length.first().rule)
             effective_BC = my_max_length.first()
         else:
             for supertype in self.restricts.all():
-                supertype_BC = supertype.get_effective_max_length()
-                supertype_max_length = int(supertype_BC.rule)
+                supertype_BC, supertype_max_length = supertype.get_effective_max_length()
                 if supertype_max_length < effective_max:
                     effective_max = supertype_max_length
                     effective_BC = supertype_BC
 
-        return effective_BC
+        return (effective_BC, effective_max)
 
     def get_all_regexps(self):
         """
@@ -310,7 +307,7 @@ class Datatype(models.Model):
             Datatype.INT: [Datatype.INT, Datatype.FLOAT, Datatype.STR],
             Datatype.FLOAT: [Datatype.FLOAT, Datatype.STR],
             Datatype.STR: [Datatype.STR],
-            Datatype.BOOL: [Datatype.BOOl, Datatype.STR]
+            Datatype.BOOL: [Datatype.BOOL, Datatype.STR]
             }
 
         for supertype in self.restricts.all():
@@ -359,15 +356,20 @@ class Datatype(models.Model):
 
         # Check that there is only one DATETIMEFORMAT between this Datatype and all of its supertypes.
         my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
-        supertype_dtfs = [supertype.basic_constraints.filter(
-            ruletype=BasicConstraint.DATETIMEFORMAT).first() for supertype in self.restricts.all()]
-        if my_dtf.count() + len(supertype_dtfs) > 1:
+        supertype_dtf_count = sum(
+            [supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
+             for supertype in self.restricts.all()])
+        if my_dtf.count() + supertype_dtf_count > 1:
             raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
 
         # Check that effective min_length <= max_length, min_val <= max_val.
-        if self.get_effective_min_val() > self.get_effective_max_val():
+        eff_min_val_BC, eff_min_val = self.get_effective_min_val()
+        eff_max_val_BC, eff_max_val = self.get_effective_max_val()
+
+        if self.get_effective_min_val()[1] > self.get_effective_max_val()[1]:
             raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
-        if self.get_effective_min_length() > self.get_effective_max_length():
+
+        if self.get_effective_min_length()[1] > self.get_effective_max_length()[1]:
             raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
 
         # Clean the CustomConstraint if it exists.
