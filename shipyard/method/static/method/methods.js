@@ -76,6 +76,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     for (var i=0; i < numberOfInputForms; i++) {
         $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
         $('#id_dataset_idx_in_'+i).attr('name', 'dataset_idx_in_'+i);
+        $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
+        $('#id_min_row_in_'+i).attr('name', 'min_row_in_'+i);
+        $('#id_max_row_in_'+i).attr('name', 'max_row_in_'+i);
     }
 
     $("#addInputForm").click(  // query button by id selector
@@ -92,13 +95,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
     );
+    var options = document.getElementById("id_compounddatatype_in_0").options;
+    console.log(options.length);
     var renderInputForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
             // generate char fields
             htmlStr += "<tr>"
             htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_dataset_idx_in_" + i + "\" name=\"dataset_idx_in_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_dataset_idx_in_" + i + "\" class=\"shortIntField\" name=\"dataset_idx_in_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
+            for (var j = 0; j < options.length; j++) {
+                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
+            }
+            htmlStr += "</select></td>";
+            htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
             htmlStr += "</tr>"
         }
         $("#extraInputForms").html(htmlStr);

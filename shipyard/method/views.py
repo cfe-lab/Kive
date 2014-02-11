@@ -214,20 +214,69 @@ def methods(request):
     return HttpResponse(t.render(c))
 
 
+def return_method_forms (request):
+    """
+    Send HttpResponse Context with forms filled out with previous values including error messages
+    """
+    method_form = MethodForm(request.POST)
+
+
+
 def method_add (request):
     t = loader.get_template('method/method_add.html')
     if request.method == 'POST':
-        pass
+        query = request.POST.dict()
+        num_input_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_in_')])
+        num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
+        print query
+
+        # retrieve CodeResource revision as driver
+        try:
+            coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
+        except:
+            # CRv doesn't exist, return forms
+            method_form = MethodForm(request.POST)
+            input_forms = []
+            for i in range(num_input_forms):
+                t_form = TransformationInputForm(auto_id='id_%s_in_'+str(i),
+                                                 initial={'dataset_name': query['dataset_name_in_'+str(i)],
+                                                          'dataset_idx': query['dataset_idx_in_'+str(i)]})
+                xs_form = XputStructureForm(auto_id='id_%s_in_'+str(i),
+                                            initial={'compounddatatype': query['compounddatatype_in_'+str(i)],
+                                                     'min_row': query['min_row_in_'+str(i)],
+                                                     'max_row': query['max_row_in_'+str(i)]})
+                input_forms.append((t_form, xs_form))
+
+            output_forms = []
+            for i in range(num_input_forms):
+                t_form = TransformationOutputForm(auto_id='id_%s_out_'+str(i),
+                                                  initial={'dataset_name': query['dataset_name_out_'+str(i)],
+                                                           'dataset_idx': query['dataset_idx_out_'+str(i)]})
+                xs_form = XputStructureForm(auto_id='id_%s_out_'+str(i),
+                                            initial={'compounddatatype': query['compounddatatype_out_'+str(i)],
+                                                     'min_row': query['min_row_out_'+str(i)],
+                                                     'max_row': query['max_row_out_'+str(i)]})
+                output_forms.append((t_form, xs_form))
+
+            c = Context({'method_form': method_form,
+                 'input_forms': input_forms,
+                 'output_forms': output_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+        
+        new_method = Method(revision_name=query['revision_name'],
+                            revision_desc=query['revision_desc'],
+                            driver=coderesource_revision,
+                            random=query.has_key('random'))
+
+
     else:
         method_form = MethodForm()
-        input_forms = [TransformationInputForm(auto_id='id_%s_in_0')]
-        output_forms = [TransformationOutputForm(auto_id='id_%s_out_0')]
-        in_xput_forms = [XputStructureForm()]
-        out_xput_forms = [XputStructureForm()]
+        input_forms = [(TransformationInputForm(auto_id='id_%s_in_0'), XputStructureForm(auto_id='id_%s_in_0'))]
+        output_forms = [(TransformationOutputForm(auto_id='id_%s_out_0'), XputStructureForm(auto_id='id_%s_out_0'))]
 
     c = Context({'method_form': method_form,
                  'input_forms': input_forms,
-                 'in_xput_forms': in_xput_forms,
-                 'output_forms': output_forms,
-                 'out_xput_forms': out_xput_forms})
+                 'output_forms': output_forms})
+    c.update(csrf(request))
     return HttpResponse(t.render(c))
