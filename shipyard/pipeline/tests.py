@@ -17,6 +17,8 @@ from pipeline.models import *
 from librarian.models import *
 import method.tests
 
+from constants import datatypes
+
 samplecode_path = "../samplecode"
 
 # All classes that inherit TestCase are evaluated by the TestUtility
@@ -3540,12 +3542,14 @@ class CustomWiringTests(PipelineTestSetup):
         # Define 2 CDTs3 datatypes - one identical, one compatible, and one incompatible + make a new CDT composed of them
         # Regarding datatypes, recall [self.DNA_dt] restricts [self.string_dt]
 
-        # Define a datatype that has nothing to do with anything.
+
+        # Define a datatype that has nothing to do with anything and have it restrict
+        # the builtin Shipyard string Datatype.
         self.incompatible_dt = Datatype(
             name="Not compatible",
-            description="A datatype not having anything to do with anything",
-            Python_type=Datatype.STR)
+            description="A datatype not having anything to do with anything")
         self.incompatible_dt.save()
+        self.incompatible_dt.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
 
         # Define 2 CDTs that are unequal: (DNA, string, string), and (string, DNA, incompatible)
         cdt_1 = CompoundDatatype()
@@ -3611,9 +3615,10 @@ class CustomWiringTests(PipelineTestSetup):
         # Define a datatype that has nothing to do with anything.
         self.incompatible_dt = Datatype(
             name="poop",
-            description="poop!!",
-            Python_type="str")
+            description="poop!!")
         self.incompatible_dt.save()
+        self.incompatible_dt.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
+
 
         # Define 2 different CDTs: (DNA, string, string), and (string, DNA, incompatible)
         cdt_1 = CompoundDatatype()

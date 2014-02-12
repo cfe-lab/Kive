@@ -14,7 +14,7 @@ import tempfile
 from method.models import *
 from metadata.models import *
 import metadata.tests
-from constants import error_messages
+from constants import error_messages, datatypes
 
 logging.getLogger().setLevel(10) # Debug messages
 samplecode_path = "../samplecode"
@@ -394,9 +394,9 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 content_file = File(f))
             revision.clean()
             revision.save()
-        
-        string_dt = Datatype(name="string", description="string", Python_type=Datatype.STR)
-        string_dt.save()
+
+        # Retrieve the string type.
+        string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
         string_cdt = CompoundDatatype()
         string_cdt.save()
         string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)

@@ -12,7 +12,7 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
 from method.tests import samplecode_path
-from constants import error_messages
+from constants import error_messages, datatypes
 
 class ExecuteTests(TestCase):
 
@@ -33,10 +33,8 @@ class ExecuteTests(TestCase):
         self.mA_crr.save()
 
         # Basic DTs
-        self.string_dt = Datatype(name="string",description="str desc",Python_type=Datatype.STR)
-        self.string_dt.save()
-        self.int_dt = Datatype(name="int",description="int desc",Python_type=Datatype.INT)
-        self.int_dt.save()
+        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+        self.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
 
 		# Basic CDTs
         self.pX_in_cdt = CompoundDatatype()
