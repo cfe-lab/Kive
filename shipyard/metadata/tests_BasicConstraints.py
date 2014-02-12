@@ -7,43 +7,51 @@ from django.core.exceptions import ValidationError
 from metadata.models import *
 from method.models import CodeResourceRevision
 
+from constants import datatypes
 
 class BasicConstraintTests(TestCase):
+
+    def setUp(self):
+        """
+        General setup for BasicConstraint testing.
+        """
+        # The built-in Shipyard atomic Datatypes.
+        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        self.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        self.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
     def test_get_effective_min_val_int_no_constraint(self):
         """
         Datatype with no MIN_VAL set should have -\infty as its effective min val.
         """
-        min_minus_5 = Datatype(
-            name="MinMinus5",
-            description="Integer >= -5",
-            Python_type=Datatype.INT)
-        self.assertEquals(min_minus_5.clean())
-        min_minus_5.save()
+        no_min_set = Datatype(
+            name="NoMinSet",
+            description="No minimum set")
+        self.assertEquals(no_min_set.clean(), None)
+        no_min_set.save()
 
         # Right now, the appropriate MIN_VAL restriction is -\infty.
-        self.assertEquals(min_minus_5.get_effective_min_val(), (None, -float("Inf")))
+        self.assertEquals(no_min_set.get_effective_num_constraint(BasicConstraint.MIN_VAL), (None, -float("Inf")))
 
     def test_get_effective_min_val_int_with_constraint(self):
         """
         MIN_VAL constraint set directly on the Datatype.
         """
-        geq_minus_5 = min_minus_5.basic_constraints.create(rule=BasicConstraint.MIN_VAL, ruletype="-5")
-        self.assertEquals(geq_minus_5.clean())
+        min_minus_5 = Datatype(
+            name="MinMinus5",
+            description="Integer >= -5")
+        self.assertEquals(min_minus_5.clean(), None)
+        min_minus_5.save()
+        min_minus_5.restricts.add(self.INT)
 
-        # The appropriate MIN_VAL restriction is the one we just added.
-        self.assertEquals(min_minus_5.get_effective_min_val(), (geq_minus_5, -5))
+        geq_minus_5 = min_minus_5.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="-5")
+        self.assertEquals(geq_minus_5.full_clean(), None)
 
-        min_1 = Datatype(
-            name="Min1",
-            description="Integer >= 1",
-            Python_type=Datatype.INT
-        )
-        self.assertEquals(min_1.clean())
-        min_1.save()
-        min_1.restricts.add(min_minus_5)
+        # # The appropriate MIN_VAL restriction is the one we just added.
+        # print("min_minus_5 restricts FLOAT: {}".format(min_minus_5.is_restriction(self.FLOAT)))
+        # print("min_minus_5 restricts BOOL: {}".format(min_minus_5.is_restriction(self.BOOL)))
+        # print("min_minus_5 first BasicConstraint ruletype: {}".
+        #       format(min_minus_5.basic_constraints.all().first().ruletype))
 
-        # Right now, the appropriate MIN_VAL
-
-        geq_1 = min_1.basic_constraints.create(rule=BasicConstraint.MIN_VAL, ruletype="1")
-        self.assertEquals(geq_1.clean())
+        self.assertEquals(min_minus_5.get_effective_num_constraint(BasicConstraint.MIN_VAL), (geq_minus_5, -5))

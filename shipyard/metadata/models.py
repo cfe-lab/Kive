@@ -9,7 +9,7 @@ FIXME get all the models pointing at each other correctly!
 
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.conf import settings
 
 import operator
@@ -30,7 +30,7 @@ class Datatype(models.Model):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`copperfish.CompoundDatatype`
     """
-    print(__name__)
+    # print(__name__)
     name = models.CharField(
         "Datatype name",
         max_length=64,
@@ -79,6 +79,10 @@ class Datatype(models.Model):
         null=True,
         blank=True,
         related_name="datatype_modelled")
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def is_restricted_by(self, possible_restrictor_datatype):
         """
@@ -129,11 +133,20 @@ class Datatype(models.Model):
         That is, the most restrictive BasicConstraint of this type acting on this Datatype or its supertypes.
         Returns a tuple with the BC in the first position and its value in the second.
 
+        If this instance cannot have a numerical constraint (it does not restrict either INT or FLOAT
+        or it restricts BOOL) then return (None, [appropriate value]).
+
         PRE: all of this instance's supertypes are clean (in the Django
         sense), and this instance has at most one BasicConstraint of the specified type (and it is clean).
         If this instance has such a BasicConstraint, it exceeds the maximum of those of its
         supertypes.
         """
+        # The Shipyard builtins.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
         min_or_max = "min" if BC_type in (BasicConstraint.MIN_LENGTH, BasicConstraint.MIN_VAL) else "max"
         val_or_len = "val" if BC_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL) else "len"
 
@@ -145,7 +158,13 @@ class Datatype(models.Model):
         elif BC_type == BasicConstraint.MIN_LENGTH:
             effective_val = 0
 
-        # Base case: this instance has a constraint of this type already.
+        # Base case: this Datatype does not restrict INT or FLOAT, or it restricts BOOL.
+        if (not self.is_restriction(FLOAT)) or self.is_restriction(BOOL):
+            # self.logger.debug("Datatype \"{}\" with pk={} is not one that should have a numerical constraint".
+            #                   format(self, self.pk))
+            return (None, effective_val)
+
+        # Base case 2: this instance has a constraint of this type already.
         my_BC = self.basic_constraints.filter(ruletype=BC_type)
         if my_BC.exists():
             if val_or_len == "val":
@@ -155,10 +174,12 @@ class Datatype(models.Model):
             effective_BC = my_BC.first()
 
         else:
-            # Base case 2: this instance has no supertypes, in which case we don't touch effective_BC or
+            # Base case 3: this instance has no supertypes, in which case we don't touch effective_BC or
             # effective_val.
             if hasattr(self, "restricts"):
                 for supertype in self.restricts.all():
+                    # self.logger.debug("Checking supertype \"{}\" with pk={} for BasicConstraints of form \"{}\"".
+                    #                   format(supertype, supertype.pk, BC_type))
                     # Recursive case: go through all of the supertypes and take the maximum.
                     supertype_BC, supertype_val = supertype.get_effective_num_constraint(BC_type)
 
@@ -192,10 +213,21 @@ class Datatype(models.Model):
         Retrieves the date-time format string effective for this instance.
 
         There can only be one such format string acting on this or its supertypes.
+        Moreover, this returns None if this instance restricts any other atomic
+        type than STR.
 
         PRE: this instance has at most one DATETIMEFORMAT BasicConstraint (and it is clean if it exists),
         and all its supertypes are clean (in the Django sense).
         """
+        # The Shipyard builtins.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+        if self.is_restriction(FLOAT) or self.is_restriction(BOOL):
+            return None
+
         my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
         if my_dtf.exists():
             return my_dtf.first()
@@ -214,6 +246,19 @@ class Datatype(models.Model):
     # column 2 is a bool "valid" field.  This CDT will be hard-coded
     # and loaded into the database on creation.
     def clean(self):
+        """
+        Checks coherence of this Datatype.
+
+        Note that a Datatype must be saved into the database before it's complete,
+        as a complete Datatype must be a restriction of a Shipyard atomic Datatype
+        (STR, INT, FLOAT, or BOOL).  This necessitates a complete_clean() routine.
+        """
+        # The Shipyard builtins.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
         if hasattr(self, "restricts") and self.is_restricted_by(self):
             raise ValidationError(error_messages["DT_circular_restriction"].format(self))
 
@@ -261,10 +306,12 @@ class Datatype(models.Model):
                 if hasattr(self, "restricts"):
                     if min_or_max == "min":
                         supertypes_val = max(
-                            supertype.get_effective_num_constraint(constr_type)[1] for supertype in self.restricts)
+                            supertype.get_effective_num_constraint(constr_type)[1]
+                            for supertype in self.restricts.all())
                     else:
                         supertypes_val = min(
-                            supertype.get_effective_num_constraint(constr_type)[1] for supertype in self.restricts)
+                            supertype.get_effective_num_constraint(constr_type)[1]
+                            for supertype in self.restricts.all())
 
                 if min_or_max == "min" and my_constr_val <= supertypes_val:
                     if val_or_len == "val":
@@ -285,18 +332,46 @@ class Datatype(models.Model):
         if my_dtf_count + supertype_dtf_count > 1:
             raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
 
-        # Check that effective min_length <= max_length, min_val <= max_val.
-        if (self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1] >
-                self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]):
-            raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
+        # Check that effective min_length <= max_length, min_val <= max_val if possible;
+        # i.e. if this Datatype restricts only STR, or restricts INT/FLOAT and not BOOL, respectively.
+        # These checks don't happen if this Datatype hasn't already been saved into the database
+        # (or else there is no way that they can have effective numerical constraints).
+        if hasattr(self, "restricts") and self.is_restriction(FLOAT):
+            if (self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1] >
+                    self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]):
+                raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
 
-        if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
-                self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
-            raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
+        if hasattr(self, "restricts") and (not self.is_restriction(FLOAT) and not self.is_restriction(BOOL)):
+            if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
+                    self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
+                raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
 
         # Clean the CustomConstraint if it exists.
         if self.has_custom_constraint():
             self.custom_constraint.clean()
+
+    def is_complete(self):
+        """
+        Returns whether this Datatype has a complete definition; i.e. restricts a Shipyard atomic.
+        """
+        # The hard-coded Shipyard atomic string Datatype.  We check that this
+        # instance restricts it.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        if hasattr(self, "restricts") and self.is_restriction(STR):
+            return True
+        return False
+
+    def complete_clean(self):
+        """
+        Checks completeness and coherence of this Datatype.
+
+        First calls clean; then confirms that this Datatype restricts
+        a Shipyard atomic Datatype.
+        """
+        self.clean()
+
+        if not self.is_complete():
+            raise ValidationError(error_messages["DT_does_not_restrict_atomic"].format(self))
 
     def get_absolute_url(self):
         return '/datatypes/%i' % self.id
@@ -444,10 +519,16 @@ class BasicConstraint(models.Model):
         (DATETIMEFORMAT, "date format string (1989 C standard)")
     )
 
+    # Added the validator here to ensure that the value of ruletype is one of the allowable choices.
     ruletype = models.CharField(
         "Type of rule",
         max_length=32,
-        choices=CONSTRAINT_TYPES)
+        choices=CONSTRAINT_TYPES,
+        validators=[
+            RegexValidator(
+                re.compile("{}|{}|{}|{}|{}|{}".format(MIN_LENGTH, MAX_LENGTH, MIN_VAL, MAX_VAL, REGEXP, DATETIMEFORMAT)
+                )
+            )])
 
     rule = models.CharField(
         "Rule specification",
@@ -799,7 +880,7 @@ class CompoundDatatype(models.Model):
         cdt_members = self.members.all()
         if len(header) != cdt_members.count():
             summary["bad_num_cols"] = len(header)
-            logging.debug("{}: number of CSV columns must match number of CDT members")
+            logging.debug("number of CSV columns must match number of CDT members")
             return summary
     
         # The ith cdt member must have the same name as the ith CSV header.
@@ -807,7 +888,7 @@ class CompoundDatatype(models.Model):
         for cdtm in cdt_members:
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 bad_col_indices.append(cdtm.column_idx)
-                logging.debug("{}: Incorrect header for column {}".format(fn, cdtm.column_idx))
+                logging.debug("Incorrect header for column {}".format(cdtm.column_idx))
 
         if len(bad_col_indices) != 0:
             summary["bad_col_indices"] = bad_col_indices

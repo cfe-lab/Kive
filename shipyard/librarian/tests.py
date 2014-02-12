@@ -13,7 +13,7 @@ import tempfile
 import os.path
 
 import file_access_utils
-from constants import error_messages
+from constants import error_messages, datatypes
 
 from archive.models import *
 from pipeline.models import *
@@ -303,15 +303,12 @@ class SymbolicDatasetTests(LibrarianTestSetup):
             self.data += "patient{},{}\n".format(i, seq)
         self.header = "header,sequence"
 
-        self.datatype_dna = Datatype(name="DNA", 
-            description="sequences of ATCG", Python_type=Datatype.STR)
+        self.datatype_str = Datatype.objects.get(pk=datatypes.STR_PK)
+        self.datatype_dna = Datatype(name="DNA", description="sequences of ATCG")
         self.datatype_dna.clean()
         self.datatype_dna.save()
-        self.datatype_str = Datatype(name="string", 
-            description="sequences of ASCII characters", 
-            Python_type=Datatype.STR)
-        self.datatype_str.clean()
-        self.datatype_str.save()
+        self.datatype_dna.restricts.add(self.datatype_str)
+        self.datatype_dna.complete_clean()
         self.cdt_record = CompoundDatatype()
         self.cdt_record.save()
         self.cdt_record.members.create(datatype=self.datatype_str, 

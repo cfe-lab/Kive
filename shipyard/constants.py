@@ -84,7 +84,9 @@ error_messages = {
     "BC_bad_RE":
         "BasicConstraint \"{}\" specifies an invalid regular expression \"{}\"",
     "BC_datetimeformat_non_string":
-        "BasicConstraint \"{}\" specifies a date/time format but its parent Datatype \"{}\" is numeric or Boolean"
+        "BasicConstraint \"{}\" specifies a date/time format but its parent Datatype \"{}\" is numeric or Boolean",
+    "DT_does_not_restrict_atomic":
+        "Datatype \"{}\" does not restrict any of Shipyard atomics STR, INT, FLOAT, or BOOL"
 }
 
 warning_messages = {

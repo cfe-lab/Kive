@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from metadata.models import *
 from method.models import CodeResourceRevision
 
+from constants import datatypes
+
 class MetadataTestSetup(TestCase):
     """
     Set up a database state for unit testing.
@@ -16,18 +18,13 @@ class MetadataTestSetup(TestCase):
 
     def setUp(self):
         """Setup default database state from which to perform unit testing."""
-        # Create Datatype "string".
-        self.string_dt = Datatype(
-            name="string",
-            description="String (basically anything)",
-            Python_type=Datatype.STR)
-        self.string_dt.save()
+        # Load up atomic datatype STR.
+        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
 
         # Create Datatype "DNANucSeq" with a regexp basic constraint.
         self.DNA_dt = Datatype(
             name="DNANucSeq",
-            description="String consisting of ACGTacgt",
-            Python_type=Datatype.STR)
+            description="String consisting of ACGTacgt")
         self.DNA_dt.save()
         # DNA_dt is a restricted type of string
         self.DNA_dt.restricts.add(self.string_dt);
@@ -39,8 +36,7 @@ class MetadataTestSetup(TestCase):
         # Similarly, create Datatype "RNANucSeq".
         self.RNA_dt = Datatype(
             name="RNANucSeq",
-            description="String consisting of ACGUacgu",
-            Python_type=Datatype.STR)
+            description="String consisting of ACGUacgu")
         self.RNA_dt.save()
         # RNA_dt is a restricted type of string
         self.RNA_dt.restricts.add(self.string_dt)
@@ -217,33 +213,33 @@ class DatatypeTests(MetadataTestSetup):
         # Datatypes used to test circular restrictions.
         self.dt_1 = Datatype(
             name="dt_1",
-            description="A string (1)",
-            Python_type=Datatype.STR)
+            description="A string (1)")
         self.dt_1.save()
+        self.dt_1.restricts.add(self.string_dt)
 
         self.dt_2 = Datatype(
             name="dt_2",
-            description="A string (2)",
-            Python_type=Datatype.STR)
+            description="A string (2)")
         self.dt_2.save()
+        self.dt_2.restricts.add(self.string_dt)
 
         self.dt_3 = Datatype(
             name="dt_3",
-            description="A string (3)",
-            Python_type=Datatype.STR);
+            description="A string (3)")
         self.dt_3.save()
+        self.dt_3.restricts.add(self.string_dt)
 
         self.dt_4 = Datatype(
             name="dt_4",
-            description="A string (4)",
-            Python_type=Datatype.STR);
+            description="A string (4)")
         self.dt_4.save()
+        self.dt_4.restricts.add(self.string_dt)
 
         self.dt_5 = Datatype(
             name="dt_5",
-            description="A string (5)",
-            Python_type=Datatype.STR);
+            description="A string (5)")
         self.dt_5.save()
+        self.dt_5.restricts.add(self.string_dt)
 
 
     def test_datatype_unicode(self):
@@ -613,8 +609,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         datatype = Datatype(
             name="squeaky",
-            description="a clean, new datatype",
-            Python_type=Datatype.STR)
+            description="a clean, new datatype")
         # Note that this passes if the next line is uncommented.
         #datatype.save()
         self.assertEqual(datatype.clean(), None)
