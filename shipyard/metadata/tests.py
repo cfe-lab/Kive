@@ -605,16 +605,25 @@ class DatatypeTests(MetadataTestSetup):
 
     def test_datatype_clean_no_restricts(self):
         """
-        Clean on a Datatype with no restrictions should pass.
+        Calling clean on an unsaved Datatype with no restrictions should pass.
         """
         datatype = Datatype(
             name="squeaky",
             description="a clean, new datatype")
-        # Note that this passes if the next line is uncommented.
-        #datatype.save()
         self.assertEqual(datatype.clean(), None)
-        
 
+    def test_datatype_complete_clean_no_restricts(self):
+        """
+        Calling complete_clean on an unsaved Datatype with no restrictions should fail.
+        """
+        datatype = Datatype(
+            name="squeaky",
+            description="a clean, new datatype")
+        datatype.save()
+        self.assertRaisesRegexp(ValidationError,
+                error_messages["DT_does_not_restrict_atomic"].format(".*"),
+                datatype.complete_clean)
+        
 
 class CompoundDatatypeMemberTests(MetadataTestSetup):
     def test_cdtMember_unicode(self):
