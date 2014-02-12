@@ -20,7 +20,7 @@ import sys
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import CDTs, error_messages
+from constants import datatypes, CDTs, error_messages
 from datachecking.models import VerificationLog
 
 import logging
@@ -46,25 +46,25 @@ class Datatype(models.Model):
         "Datatype description",
         help_text="A description for this Datatype");
 
-    # Admissible Python types.
+    # Admissible "Shipyard atomic" types.
     INT = "int"
     STR = "str"
     FLOAT = "float"
     BOOL = "bool"
 
-    PYTHON_TYPE_CHOICES = (
-        (INT, 'int'),
-        (STR, 'str'),
-        (FLOAT, 'float'),
-        (BOOL, 'bool')
-    )
-
-    Python_type = models.CharField(
-        'Python variable type',
-        max_length=64,
-        default = STR,
-        choices=PYTHON_TYPE_CHOICES,
-        help_text="Python type (int|str|float|bool)");
+    # PYTHON_TYPE_CHOICES = (
+    #     (INT, 'int'),
+    #     (STR, 'str'),
+    #     (FLOAT, 'float'),
+    #     (BOOL, 'bool')
+    # )
+    #
+    # Python_type = models.CharField(
+    #     'Python variable type',
+    #     max_length=64,
+    #     default = STR,
+    #     choices=PYTHON_TYPE_CHOICES,
+    #     help_text="Python type (int|str|float|bool)");
 
     restricts = models.ManyToManyField(
         'self',
@@ -213,15 +213,6 @@ class Datatype(models.Model):
     # 2 columns: column 1 is a string "example" field,
     # column 2 is a bool "valid" field.  This CDT will be hard-coded
     # and loaded into the database on creation.
-
-    # FIXME: when we get execution working, we'll have to also
-    # check that the first column of prototype yields the second
-    # column of prototype after checking all constraints.
-
-    # NOTE: we are going to assume that each Datatype has its own
-    # well-defined constraints; we aren't going to check data
-    # against all of its Datatype's supertypes.  But we *will* check
-    # prototype against its supertypes' constraints.
     def clean(self):
         if hasattr(self, "restricts") and self.is_restricted_by(self):
             raise ValidationError(error_messages["DT_circular_restriction"].format(self))
@@ -234,23 +225,6 @@ class Datatype(models.Model):
 
             if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
                 raise ValidationError(error_messages["DT_prototype_wrong_CDT"].format(self))
-
-        # Check that restrictions are sensible against the Python type: if x <= y means "x can restrict y",
-        # INT <= FLOAT <= STR
-        # BOOL <= STR
-        admissible_Python_restrictions = {
-            Datatype.INT: [Datatype.INT, Datatype.FLOAT, Datatype.STR],
-            Datatype.FLOAT: [Datatype.FLOAT, Datatype.STR],
-            Datatype.STR: [Datatype.STR],
-            Datatype.BOOL: [Datatype.BOOL, Datatype.STR]
-            }
-
-        if hasattr(self, "restricts"):
-            for supertype in self.restricts.all():
-                if supertype.Python_type not in admissible_Python_restrictions[self.Python_type]:
-                    raise ValidationError(
-                        error_messages["DT_bad_type_restriction"].format(self, self.Python_type, supertype.Python_type)
-                    )
 
         # Clean all BasicConstraints.
         for bc in self.basic_constraints.all():
@@ -340,10 +314,10 @@ class Datatype(models.Model):
         Check the specified string against basic constraints.
 
         This includes both whether or not the string can be 
-        interpreted as the appropriate Python type, but also
+        interpreted as all of the Shipyard atomic types it inherits from, but also
         whether it then checks out against all BasicConstraints.
 
-        If it fails against even the simplest casting test (i.e.  the
+        If it fails against even the simplest casting test (i.e. the
         string could not be cast to the appropriate Python type),
         return a list containing a describing string.  If not, return
         a list of BasicConstraints that it failed (hopefully it's
@@ -351,15 +325,22 @@ class Datatype(models.Model):
 
         PRE: this Datatype and by extension all of its BasicConstraints
         are clean.  That means that only the appropriate BasicConstraints
-        for this Datatype's Python_type are applied.
+        for this Datatype are applied.
         """
         ####
-        # First, try to cast it to the appropriate Python type.
+        # First, determine what Shipyard atomic datatypes this restricts.
         # Then, check it against any type-specific BasicConstraints
         # (MIN|MAX_LENGTH or DATETIMEFORMAT for strings,
         # MIN|MAX_VAL for numerical types).
+
+        # The hard-coded Shipyard atomic types.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
         constraints_failed = []
-        if self.Python_type == Datatype.STR:
+        if self.is_restriction(STR) and not self.is_restriction(FLOAT) and not self.is_restriction(BOOL):
             # string_to_check is, by definition, a string, so we skip
             # to checking the BasicConstraints.
             eff_min_length_BC, eff_min_length = self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)
@@ -378,8 +359,8 @@ class Datatype(models.Model):
             except:
                 constraints_failed.append(eff_dtf_BC)
 
-
-        elif self.Python_type == Datatype.INT:
+        # Next, check the numeric (and non-Boolean) cases.
+        elif self.is_restriction(INT) and not self.is_restriction(BOOL):
             try:
                 int(string_to_check)
             except ValueError:
@@ -394,7 +375,7 @@ class Datatype(models.Model):
                 if eff_max_val_BC is not None and int(string_to_check) > eff_max_val:
                     constraints_failed.append(eff_max_val_BC)
 
-        elif self.Python_type == Datatype.FLOAT:
+        elif self.is_restriction(FLOAT) and not self.is_restriction(BOOL):
             try:
                 float(string_to_check)
             except ValueError:
@@ -409,7 +390,7 @@ class Datatype(models.Model):
                 if eff_max_val_BC is not None and float(string_to_check) > eff_max_val:
                     constraints_failed.append(eff_max_val_BC)
 
-        elif self.Python_type == Datatype.BOOL:
+        elif self.is_restriction(BOOL):
             bool_RE = re.compile("^(True)|(False)|(true)|(false)|(TRUE)|(FALSE)|T|F|t|f|0|1$")
             if not bool_RE.match(string_to_check):
                 return ["Was not boolean"]
@@ -477,77 +458,82 @@ class BasicConstraint(models.Model):
         """
         Check coherence of the specified rule and rule type.
 
+        First check: the parent Datatype must restrict at least one of our Shipyard atomic types, or else
+        there is no sense in creating a BasicConstraint at all.
+
         The rule types must satisfy:
          - MIN_LENGTH: rule must be castable to a non-negative integer;
-           parent DT must have Python type 'str'
-         - MAX_LENGTH: rule must be castable to a positive integer;
-           parent DT must have Python type 'str'
+           parent DT inherits from Shipyard type 'STR' and not 'FLOAT', 'INT', or 'BOOL'
+         - MAX_LENGTH: as for MIN_LENGTH but rule must be castable to a positive integer
          - (MIN|MAX)_VAL: rule must be castable to a float; parent DT
-           must have Python type 'float' or 'int'
+           must inherit from Shipyard type 'FLOAT' or 'INT'
          - REGEXP: rule must be a valid Perl-style RE
          - DATETIMEFORMAT: rule can be anything (note that it's up to you
-           to define something *useful* here); parent DT must have Python 
-           type 'str'
+           to define something *useful* here); parent DT inherits from Shipyard type 'STR'
+           and not 'FLOAT', 'INT', or 'BOOL'
         """
+        if not self.datatype.is_complete():
+            raise ValidationError(error_messages["BC_DT_not_complete"].format(self.datatype, self))
+
+        # The hard-coded Shipyard atomic types.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
         error_msg = ""
         is_error = False
+
+        # Check the rule for coherence.
         if self.ruletype == BasicConstraint.MIN_LENGTH:
-            if self.datatype.Python_type != Datatype.STR:
-                error_msg = ("Rule \"{}\" specifies a minimum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+            # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
+            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
+                error_msg = error_messages["BC_min_length_on_non_string"].format(self, self.datatype)
                 is_error = True
             try:
                 min_length = int(self.rule)
                 if min_length < 0:
-                    error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" is negative".
-                                 format(self, self.rule))
+                    error_msg = error_messages["BC_min_length_negative"].format(self, self.rule)
                     is_error = True
             except ValueError:
-                error_msg = ("Rule \"{}\" specifies a minimum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                error_msg = error_messages["BC_min_length_non_integer"].format(self, self.rule)
                 is_error = True
 
         elif self.ruletype == BasicConstraint.MAX_LENGTH:
-            if self.datatype.Python_type != Datatype.STR:
-                error_msg = ("Rule \"{}\" specifies a maximum string length but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
+                error_msg = error_messages["BC_max_length_on_non_string"].format(self, self.datatype)
                 is_error = True
             try:
                 max_length = int(self.rule)
                 if max_length < 1:
-                    error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" is non-positive".
-                                 format(self, self.rule))
+                    error_msg = error_messages["BC_max_length_non_positive"].format(self, self.rule)
                     is_error = True
             except ValueError:
-                error_msg = ("Rule \"{}\" specifies a maximum string length but \"{}\" does not specify an integer".
-                             format(self, self.rule))
+                error_msg = error_messages["BC_max_length_non_integer"].format(self, self.rule)
                 is_error = True
 
-        elif self.ruletype in (BasicConstraint.MAX_VAL, 
-                               BasicConstraint.MIN_VAL):
-            if self.datatype.Python_type not in (Datatype.INT, Datatype.FLOAT):
-                error_msg = ("Rule \"{}\" specifies a bound on a numeric value but its parent Datatype \"{}\" is not a number".
-                             format(self, self.datatype))
+        elif self.ruletype in (BasicConstraint.MAX_VAL, BasicConstraint.MIN_VAL):
+            # This should not apply to a non-numeric.
+            if not self.datatype.is_restriction(FLOAT):
+                error_msg = error_messages["BC_val_constraint_parent_non_numeric"].format(self, self.datatype)
                 is_error = True
             try:
                 val_bound = float(self.rule)
             except ValueError:
-                error_msg = ("Rule \"{}\" specifies a bound on a numeric value but \"{}\" does not specify a numeric value".
-                             format(self, self.rule))
+                error_msg = error_messages["BC_val_constraint_rule_non_numeric"].format(self, self.rule)
                 is_error = True
         
         elif self.ruletype == BasicConstraint.REGEXP:
             try:
                 re.compile(self.rule)
             except re.error:
-                error_msg = ("Rule \"{}\" specifies an invalid regular expression \"{}\"".
-                             format(self, self.rule))
+                error_msg = error_messages["BC_bad_RE"].format(self, self.rule)
                 is_error = True
 
         elif self.ruletype == BasicConstraint.DATETIMEFORMAT:
-            if self.datatype.Python_type != Datatype.STR:
-                error_msg = ("Rule \"{}\" specifies a date/time format but its parent Datatype \"{}\" is not a Python string".
-                             format(self, self.datatype))
+            # This should not apply to a boolean or a numeric.
+            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
+                error_msg = error_messages["BC_datetimeformat_non_string"].format(self, self.datatype)
                 is_error = True
 
         if is_error:
