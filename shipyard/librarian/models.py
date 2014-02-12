@@ -197,9 +197,12 @@ class SymbolicDataset(models.Model):
         """
         self.logger.debug("Creating clean CCL and linking to EL")
         ccl = self.content_checks.create(execlog=execlog)
+        ccl.save()
 
         if self.is_raw():
+            ccl.end_time = timezone.now()
             ccl.clean()
+            ccl.save()
             self.logger.debug("SD is raw - returning clean CCL")
             return ccl
 
@@ -211,6 +214,8 @@ class SymbolicDataset(models.Model):
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
             bad_data.save()
+            ccl.end_time = timezone.now()
+            ccl.save()
             self.logger.warn("malformed header")
             return ccl
 
@@ -249,10 +254,11 @@ class SymbolicDataset(models.Model):
                     new_cell_error.clean()
                     new_cell_error.save()
 
-        finish_check_time = timezone.now()
-        ccl.end_time = finish_check_time
-
+        self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
+                format(file_path_to_check, self))
+        ccl.end_time = timezone.now()
         ccl.clean()
+        ccl.save()
         return ccl
 
     def check_integrity(self,new_file_path,execlog,newly_computed_MD5=None):
@@ -322,6 +328,7 @@ class SymbolicDataset(models.Model):
 
         # At this point we know no checks have failed; return False if none of them
         # are complete yet.
+        self.logger.debug("Have any checks completed on SD '{}'? {}".format(self, any_check_completed))
         return any_check_completed
     
 class DatasetStructure(models.Model):
@@ -369,6 +376,10 @@ class ExecRecord(models.Model):
     Record of a previous execution of a Method/PSIC/POC
     """
     generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def __unicode__(self):
         """Unicode representation of this ExecRecord."""
