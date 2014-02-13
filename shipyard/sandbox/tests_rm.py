@@ -1045,7 +1045,6 @@ class CustomConstraintTests(TestCase):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        return
         summary_path = os.path.join(self.workdir, "summary")
         with open(self.good_datafile.name) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir)
