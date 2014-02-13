@@ -74,6 +74,10 @@ class Datatype(models.Model):
         blank=True,
         help_text="Captures hierarchical is-a classifications among Datatypes");
 
+    def get_restricts (self):
+        return ','.join([dt['name'] for dt in self.restricts.values()])
+    restricts_str = property(get_restricts)
+
     prototype = models.OneToOneField(
         "archive.Dataset",
         null=True,

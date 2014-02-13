@@ -1,21 +1,5 @@
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
-    $("#id_Python_type").on('change', function() {
-        if (this.value == 'str') {
-            $("#int_constraints").hide();
-            $("#str_constraints").show();
-        }
-        else if (this.value == 'int' || this.value == 'float') {
-            $("#int_constraints").show();
-            $("#str_constraints").hide();
-        }
-        else {
-            $("#int_constraints").show();
-            $("#str_constraints").show();
-        }
-    }
-    ).change(); // trigger on load
-
     var options = document.getElementById("id_datatype_0").options;
     var numberOfExtraForms = $('#extraForms > tr').length;
 

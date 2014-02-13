@@ -7,7 +7,7 @@
 
 {% block javascript %}
 <script src="/static/portal/jQuery-2.0.3.min.js"></script>
-<script src="/static/metadata/datatypes.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
+<script src="/static/metadata/compound_datatype_add.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
 {% endblock %}
 
 {% block content %}
@@ -24,30 +24,35 @@
     </p>
 
     <table id="cdmForms">
-    <thead>
-    <tr><th>Index</th><th>Datatype</th><th>Name</th><th></th></tr></thead>
-    <tbody>
-
-    <tr>
         {% with cdm_forms|first as first_form %}
-        <td>1</td>
-        <td>{{ first_form.datatype }}</td>
-        <td>{{ first_form.column_name }}</td>
-        <td>{{ first_form.errors.Errors }}</td>
-        {% endwith %}
-    </tr>
-
-    </tbody>
-    <tbody id="extraForms">
-    {% for cdm_form in cdm_forms|slice:"1:" %}
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>Datatype <div class="helptext">{{ first_form.datatype.help_text }}</div></th>
+                <th>Name <div class="helptext">{{ first_form.column_name.help_text }}</div></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
         <tr>
-        <td>{{ forloop.counter|add:"1" }}</td>
-        <td>{{ cdm_form.datatype }}</td>
-        <td>{{ cdm_form.column_name }}</td>
-        <td>{{ cdm_form.errors.Errors }}</td>
+            <td>1</td>
+            <td>{{ first_form.datatype }}</td>
+            <td>{{ first_form.column_name }}</td>
+            <td>{{ first_form.errors.Errors }}</td>
         </tr>
-    {% endfor %}
-    </tbody>
+        {% endwith %}
+
+        </tbody>
+        <tbody id="extraForms">
+        {% for cdm_form in cdm_forms|slice:"1:" %}
+            <tr>
+            <td>{{ forloop.counter|add:"1" }}</td>
+            <td>{{ cdm_form.datatype }}</td>
+            <td>{{ cdm_form.column_name }}</td>
+            <td>{{ cdm_form.errors.Errors }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
     </table>
 
     <input type="submit" value="Upload" />
