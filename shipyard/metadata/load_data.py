@@ -12,30 +12,31 @@ The CDTs we create are
  - verif_in: (string to_test)
  - verif_out: (NaturalNumber failed_row)
  - prototype_cdt: (string example, bool valid)
+
+To use this script to recreate a fixture, execfile() it from the Django shell,
+and then use ./manage.py dumpdata.  Note that as of February 2014,
+the fixture file has been customized by Art and is no longer the file
+that is directly generated from this.
 """
 from metadata.models import *
 
-STR_DT = Datatype(id=1, name="string", description="basic string type",
-                  Python_type=Datatype.STR)
+STR_DT = Datatype(id=1, name="string", description="basic string type")
 STR_DT.clean()
 STR_DT.save()
 
-BOOL_DT = Datatype(id=2, name="boolean", description="basic boolean type",
-                   Python_type=Datatype.BOOL)
+BOOL_DT = Datatype(id=2, name="boolean", description="basic boolean type")
 BOOL_DT.clean()
 BOOL_DT.save()
 BOOL_DT.restricts.add(STR_DT)
 BOOL_DT.clean()
 
-FLOAT_DT = Datatype(id=3, name="float", description="basic float type",
-                    Python_type=Datatype.FLOAT)
+FLOAT_DT = Datatype(id=3, name="float", description="basic float type")
 FLOAT_DT.clean()
 FLOAT_DT.save()
 FLOAT_DT.restricts.add(STR_DT)
 FLOAT_DT.clean()
 
-INT_DT = Datatype(id=4, name="integer", description="basic integer type",
-                  Python_type=Datatype.INT)
+INT_DT = Datatype(id=4, name="integer", description="basic integer type")
 INT_DT.clean()
 INT_DT.save()
 # We don't need to add STR_DT as a restricted type because FLOAT_DT
@@ -46,8 +47,7 @@ INT_DT.clean()
 NaturalNumber_DT = Datatype(
     id=5,
     name="natural number",
-    description="positive integer",
-    Python_type=Datatype.INT)
+    description="positive integer")
 NaturalNumber_DT.clean()
 NaturalNumber_DT.save()
 NaturalNumber_DT.restricts.add(INT_DT)

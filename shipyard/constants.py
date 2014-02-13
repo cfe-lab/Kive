@@ -55,12 +55,36 @@ error_messages = {
         "Datatype \"{}\" effective MIN_VAL exceeds effective MAX_VAL",
     "DT_min_length_exceeds_max_length":
         "Datatype \"{}\" effective MIN_LENGTH exceeds effective MAX_LENGTH",
-    "DT_bad_type_restriction":
-        "Datatype \"{}\" has Python type {} and cannot restrict a supertype of Python type {}",
     "CellError_bad_BC":
         "CellError \"{}\" refers to a BasicConstraint that does not apply to the associated column",
     "CellError_bad_CC":
-        "CellError \"{}\" refers to a CustomConstraint that does not apply to the associated column"
+        "CellError \"{}\" refers to a CustomConstraint that does not apply to the associated column",
+    "BC_DT_not_complete":
+        "Parent Datatype \"{}\" of BasicConstraint \"{}\" is not complete",
+    "BC_min_length_on_non_string":
+        ("BasicConstraint \"{}\" specifies a minimum string length but its parent Datatype \"{}\" " +
+         "is numeric or Boolean"),
+    "BC_min_length_negative":
+        "BasicConstraint \"{}\" specifies a minimum string length but \"{}\" is negative",
+    "BC_min_length_non_integer":
+        "BasicConstraint \"{}\" specifies a minimum string length but \"{}\" does not specify an integer",
+    "BC_max_length_on_non_string":
+        ("BasicConstraint \"{}\" specifies a maximum string length but its parent Datatype \"{}\" " +
+         "is numeric or Boolean"),
+    "BC_max_length_non_positive":
+        "BasicConstraint \"{}\" specifies a maximum string length but \"{}\" is non-positive",
+    "BC_max_length_non_integer":
+        "BasicConstraint \"{}\" specifies a maximum string length but \"{}\" does not specify an integer",
+    "BC_val_constraint_parent_non_numeric":
+        "BasicConstraint \"{}\" specifies a bound on a numeric value but its parent Datatype \"{}\" is not a number",
+    "BC_val_constraint_rule_non_numeric":
+        "BasicConstraint \"{}\" specifies a bound on a numeric value but \"{}\" does not specify a numeric value",
+    "BC_bad_RE":
+        "BasicConstraint \"{}\" specifies an invalid regular expression \"{}\"",
+    "BC_datetimeformat_non_string":
+        "BasicConstraint \"{}\" specifies a date/time format but its parent Datatype \"{}\" is numeric or Boolean",
+    "DT_does_not_restrict_atomic":
+        "Datatype \"{}\" does not restrict any of Shipyard atomics STR, INT, FLOAT, or BOOL"
 }
 
 warning_messages = {

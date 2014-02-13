@@ -5,6 +5,7 @@ import shutil
 import random
 import logging
 import csv
+import time
 from subprocess import Popen, PIPE
 
 from django.core.files import File
@@ -20,6 +21,8 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
 import file_access_utils
+
+from constants import error_messages, datatypes
 
 class UtilityMethods(TestCase):
 
@@ -123,10 +126,10 @@ class UtilityMethods(TestCase):
         """
         Helper function to create a new datatype.
         """
-        datatype = Datatype(name=dtname, description=dtdesc, 
-          Python_type=pytype)
-        datatype.clean()
+        datatype = Datatype(name=dtname, description=dtdesc)
         datatype.save()
+        datatype.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
+        datatype.complete_clean()
         return datatype
 
     def make_first_revision(self, resname, resdesc, resfn, contents):
@@ -196,7 +199,7 @@ class ExecuteTestsRM(UtilityMethods):
             "a pipeline to complement DNA")
         self.pipeline_reverse = self.make_first_pipeline("DNA reverse",
             "a pipeline to reverse DNA")
-        self.pipeline_revcomp = self.make_first_pipeline("DNA reverse",
+        self.pipeline_revcomp = self.make_first_pipeline("DNA revcomp",
                 "a pipeline to reverse and complement DNA")
 
         # Alice is only going to be manipulating DNA, so she creates a "DNA"
@@ -304,8 +307,8 @@ class ExecuteTestsRM(UtilityMethods):
         # A third version of the reverse/complement Pipeline which keeps
         # final output, but not intermediate.
         self.pipeline_revcomp_v3 = Pipeline(family=self.pipeline_revcomp.family,
-            revision_name="2",
-            revision_desc="second version")
+            revision_name="3",
+            revision_desc="third version")
         self.pipeline_revcomp_v3.save()
         self.create_linear_pipeline(self.pipeline_revcomp_v3,
             [self.method_reverse, self.method_complement], "lab data",
@@ -333,7 +336,17 @@ class ExecuteTestsRM(UtilityMethods):
             [self.method_reverse, self.method_DNA2RNA], "lab data", "RNA'd lab data")
         self.pipeline_revRNA.create_outputs()
 
+        # Separator to print between Pipeline executions, to make viewing logs easier.
         self.sep = " "*80 + "\n" + "*"*80 + "\n" + " "*80 + "\n"
+
+        # Figure out the MD5 of the output file created when the complement method
+        # is run on Alice's data, so we can check it later.
+        tmpdir = tempfile.mkdtemp()
+        outfile = os.path.join(tmpdir, "output")
+        self.method_complement.run_code(tmpdir, [self.datafile.name], [outfile])
+        time.sleep(1)
+        self.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
+        shutil.rmtree(tmpdir)
 
     def tearDown(self):
         os.remove(self.datafile.name)
@@ -384,6 +397,88 @@ class ExecuteTestsRM(UtilityMethods):
         self.assertEqual(runstep.complete_clean(), None)
         self.assertEqual(hasattr(runstep, "child_run"), False)
         self.assertEqual(runstep.successful_execution(), True)
+        self.assertEqual(runstep.outputs.count(), 1)
+
+    def test_execute_pipeline_symds_contents(self):
+        """
+        Test that the content checks, which take place as part of Pipeline
+        execution, pass in the ordinary Pipeline execution case.
+        """
+        run = self.sandbox_complement.execute_pipeline()
+        runstep = run.runsteps.first()
+        execrecord = runstep.execrecord
+        symds = execrecord.execrecordouts.first().symbolicdataset
+        check = symds.content_checks.first()
+
+        self.assertEqual(symds.content_checks.count(), 1) # should have been checked once
+        self.assertEqual(check.symbolicdataset, symds)
+        self.assertEqual(check.end_time is None, False)
+        self.assertEqual(check.start_time <= check.end_time, True)
+        self.assertEqual(check.start_time.date(), check.end_time.date())
+        self.assertEqual(check.is_fail(), False)
+
+    def test_execute_pipeline_symbolicdataset(self):
+        """
+        Test the integrity of a SymbolicDataset output by a PipelineStep in
+        the middle of a Pipeline.
+        """
+        run = self.sandbox_complement.execute_pipeline()
+        runstep = run.runsteps.first()
+        execrecord = runstep.execrecord
+        symds = execrecord.execrecordouts.first().symbolicdataset
+        ds = runstep.outputs.first()
+
+        sys.stderr.write(self.sep)
+
+        self.assertEqual(symds.MD5_checksum, self.labdata_compd_md5)
+        self.assertEqual(symds.dataset, ds)
+        self.assertEqual(hasattr(symds, "usurps"), False)
+        self.assertEqual(symds.has_data(), True)
+        self.assertEqual(symds.num_rows(), 10)
+        self.assertEqual(symds.is_raw(), False)
+        self.assertEqual(symds.get_cdt(), self.cdt_record)
+        self.assertEqual(symds.structure.compounddatatype, self.cdt_record)
+        self.assertEqual(symds.structure.num_rows, 10)
+        self.assertEqual(symds.is_OK(), True)
+
+    def test_execute_pipeline_runstep_execrecordout(self):
+        """
+        Check the coherence of a RunStep's ExecRecord's ExecRecordOut, created
+        when a Pipeline is executed the first time.
+        """
+        pipelinestep = self.pipeline_complement.steps.first()
+        run = self.sandbox_complement.execute_pipeline()
+        runstep = run.runsteps.first()
+        symds_out = runstep.outputs.first().symbolicdataset
+        execlog = runstep.log.first()
+        execrecord = runstep.execrecord
+        execrecordout = execrecord.execrecordouts.first()
+
+        self.assertEqual(execrecordout is None, False)
+        self.assertEqual(execrecordout.execrecord, execrecord)
+        self.assertEqual(execrecordout.symbolicdataset, symds_out)
+        self.assertEqual(execrecordout.generic_output, pipelinestep.transformation.outputs.first())
+        self.assertEqual(execrecordout.has_data(), True)
+        self.assertEqual(execrecordout.is_OK(), True)
+
+    def test_execute_pipeline_runstep_execrecord(self):
+        """
+        Check the coherence of a RunStep's ExecRecord, created when a Pipeline
+        is executed the first time.
+        """
+        run = self.sandbox_complement.execute_pipeline()
+        runstep = run.runsteps.first()
+        execlog = runstep.log.first()
+        execrecord = runstep.execrecord
+        outputs = self.method_complement.outputs.all()
+
+        self.assertEqual(execrecord.generator, execlog)
+        self.assertEqual(execrecord.runsteps.first(), runstep)
+        #self.assertEqual(execrecord.runs.first(), run)
+        self.assertEqual(execrecord.complete_clean(), None)
+        self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation)
+        self.assertEqual(execrecord.provides_outputs(outputs), True)
+        self.assertEqual(execrecord.outputs_OK(), True)
 
     def test_execute_pipeline_twice(self):
         """
@@ -416,16 +511,18 @@ class ExecuteTestsRM(UtilityMethods):
         should fill in an existing ExecRecord, but also create a new ExecLog.
         """
 
-        sandbox = Sandbox(self.user_alice, self.pipeline_complement_v2, [self.symds_labdata])
+        sandbox = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
         sandbox.execute_pipeline()
+        sys.stderr.write(self.sep)
         self.sandbox_complement.execute_pipeline()
 
         step1 = sandbox.run.runsteps.first()
         step2 = self.sandbox_complement.run.runsteps.first()
 
         self.assertEqual(step1.reused, False)
-        self.assertEqual(step2.reused, False)
-        self.assertEqual(step2.log.first() is not None, True)
+        self.assertEqual(step2.reused, True)
+        self.assertEqual(step1.log.first() is not None, True)
+        self.assertEqual(step2.log.first() is None, True)
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_reuse_within_different_pipeline(self):
@@ -873,8 +970,7 @@ class CustomConstraintTests(TestCase):
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
-        self.dt_basic = Datatype(name="alpha", description="strings of letters",
-                Python_type=Datatype.STR)
+        self.dt_basic = Datatype(name="alpha", description="strings of letters")
         self.dt_basic.save()
         self.dt_basic.basic_constraints.create(ruletype="regexp", rule="[A-Za-z]+")
         
@@ -909,8 +1005,7 @@ class CustomConstraintTests(TestCase):
 
         # A Datatype with custom constraints restricting the basic datatype.
         self.dt_custom = Datatype(name="words", 
-                description="correctly spelled words", 
-                Python_type=Datatype.STR)
+                description="correctly spelled words")
         self.dt_custom.save()
         self.dt_custom.restricts.add(self.dt_basic)
         custom_constraint = CustomConstraint(datatype = self.dt_custom, 
@@ -950,7 +1045,6 @@ class CustomConstraintTests(TestCase):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        return
         summary_path = os.path.join(self.workdir, "summary")
         with open(self.good_datafile.name) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir)

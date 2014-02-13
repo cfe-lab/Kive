@@ -15,8 +15,10 @@ from django.utils import timezone
 
 from constants import error_messages
 
+import os
+import csv
 import shutil
-import logging, logging_utils
+import logging
 import archive.models, librarian.models, metadata.models, method.models, transformation.models
 
 class PipelineFamily(transformation.models.TransformationFamily):
@@ -78,7 +80,7 @@ class Pipeline(transformation.models.Transformation):
         """
         # Transformation.clean() - check for consecutive numbering of
         # input/outputs for this pipeline as a whole
-        super(Pipeline, self).clean();
+        super(self.__class__, self).clean();
 
         # Internal pipeline STEP numbers must be consecutive from 1 to n
         all_steps = self.steps.all();
@@ -399,10 +401,7 @@ def run_cable_h(cable, source, output_path):
 
     wires is the QuerySet containing wires for this cable.
     """
-
-    import csv, inspect, logging, os
-    fn = "{}.{}()".format("Pipeline", inspect.stack()[0][3])
-    logger = logging.getLogger()
+    logger = cable.logger
 
     wires = ""
     if (type(cable).__name__ == "PipelineOutputCable"):
@@ -411,14 +410,14 @@ def run_cable_h(cable, source, output_path):
         wires = cable.custom_wires.all()
 
     if type(source) == str and cable.is_trivial():
-        logger.debug("{}: Cable source is a file path".format(fn))
-        logger.debug("{}: Trivial cable, making sym link: os.link({},{})".format(fn, source, output_path))
+        logger.debug("Cable source is a file path")
+        logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
         os.link(source, output_path)
         return
 
     if type(source) == archive.models.Dataset and cable.is_trivial():
-        logger.debug("{}: Cable source is a dataset object".format(fn))
-        logger.debug("{}: Trivial cable: writing dataset to the file system".format(fn))
+        logger.debug("Cable source is a dataset object")
+        logger.debug("Trivial cable: writing dataset to the file system")
         shutil.copyfile(source.dataset_file.name, output_path)
         return
         
@@ -488,7 +487,6 @@ class PipelineStepInputCable(models.Model):
         "transformation.TransformationInput",
         help_text="Wiring destination input hole");
     
-    
     # (source_step, source) unambiguously defines
     # the source of the cable.  source_step can't refer to a PipelineStep
     # as it might also refer to the pipeline's inputs (i.e. step 0).
@@ -516,6 +514,10 @@ class PipelineStepInputCable(models.Model):
     # source_step must be PRIOR to this step (Time moves forward)
 
     # Coherence of data is already enforced by Pipeline
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def __unicode__(self):
         """
@@ -852,7 +854,7 @@ class PipelineStepInputCable(models.Model):
         fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
 
         # Create a new log with the current start_time and a null end_time
-        logging.debug("{}: Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(fn, source,output_path))
+        self.logger.debug("Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(source,output_path))
         curr_log = archive.models.ExecLog(record=cable_record)
         curr_log.save()
 
@@ -1004,7 +1006,11 @@ class PipelineOutputCable(models.Model):
     # output names and indices.
     class Meta:
         unique_together = (("pipeline", "output_name"),
-                           ("pipeline", "output_idx"));
+                           ("pipeline", "output_idx"))
+
+    def __init__(self, *args, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(self.__class__, self).__init__(*args, **kwargs)
 
     def __unicode__(self):
         """ Represent with the pipeline name, and TO output index + name """
@@ -1220,10 +1226,7 @@ class PipelineOutputCable(models.Model):
         This uses run_cable_h and creates an ExecLog, associating it
         to cable_record.
         """
-        import inspect, logging, django.utils.timezone
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
-        logging.debug("{}: Creating ExecLog for {}".format(fn,cable_record))
+        self.logger.debug("Creating ExecLog for {}".format(cable_record))
         curr_log = archive.models.ExecLog(record=cable_record)
         curr_log.save()
         run_cable_h(self, source, output_path)

@@ -7,26 +7,24 @@ from django.core.exceptions import ValidationError
 from metadata.models import *
 from method.models import CodeResourceRevision
 
+from constants import datatypes
+
 class MetadataTestSetup(TestCase):
     """
     Set up a database state for unit testing.
     
     Other test classes that require this state can extend this one.
     """
+
     def setUp(self):
         """Setup default database state from which to perform unit testing."""
-        # Create Datatype "string".
-        self.string_dt = Datatype(
-            name="string",
-            description="String (basically anything)",
-            Python_type=Datatype.STR)
-        self.string_dt.save()
-        
+        # Load up atomic datatype STR.
+        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+
         # Create Datatype "DNANucSeq" with a regexp basic constraint.
         self.DNA_dt = Datatype(
             name="DNANucSeq",
-            description="String consisting of ACGTacgt",
-            Python_type=Datatype.STR)
+            description="String consisting of ACGTacgt")
         self.DNA_dt.save()
         # DNA_dt is a restricted type of string
         self.DNA_dt.restricts.add(self.string_dt);
@@ -34,12 +32,11 @@ class MetadataTestSetup(TestCase):
             ruletype=BasicConstraint.REGEXP,
             rule="^[ACGTacgt]*$")
         self.DNA_dt.save()
-            
+
         # Similarly, create Datatype "RNANucSeq".
         self.RNA_dt = Datatype(
             name="RNANucSeq",
-            description="String consisting of ACGUacgu",
-            Python_type=Datatype.STR)
+            description="String consisting of ACGUacgu")
         self.RNA_dt.save()
         # RNA_dt is a restricted type of string
         self.RNA_dt.restricts.add(self.string_dt)
@@ -111,13 +108,13 @@ class MetadataTestSetup(TestCase):
         ####
         # Everything above this point is used in metadata.tests.
         # This next bit is used in method.tests.
-        
+
         # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
         self.tuple_cdt = CompoundDatatype()
         self.tuple_cdt.save()
-        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="x",column_idx=1)
-        self.tuple_cdt.members.create(datatype=self.string_dt,column_name="y",column_idx=2)
-        
+        self.tuple_cdt.members.create(datatype=self.string_dt, column_name="x", column_idx=1)
+        self.tuple_cdt.members.create(datatype=self.string_dt, column_name="y", column_idx=2)
+
         # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
         self.singlet_cdt = CompoundDatatype()
         self.singlet_cdt.save()
@@ -129,9 +126,9 @@ class MetadataTestSetup(TestCase):
         self.triplet_cdt.members.create(
             datatype=self.string_dt, column_name="a", column_idx=1)
         self.triplet_cdt.members.create(
-            datatype=self.string_dt,column_name="b",column_idx=2)
+            datatype=self.string_dt, column_name="b", column_idx=2)
         self.triplet_cdt.members.create(
-            datatype=self.string_dt,column_name="c",column_idx=3)
+            datatype=self.string_dt, column_name="c", column_idx=3)
 
         ####
         # This next bit is used for pipeline.tests.
@@ -175,7 +172,7 @@ class MetadataTestSetup(TestCase):
         #### 
         # Stuff from this point on is used in librarian and archive
         # testing.
-        
+
         # October 15: more CDTs.
         self.DNA_triplet_cdt = CompoundDatatype()
         self.DNA_triplet_cdt.save()
@@ -194,7 +191,6 @@ class MetadataTestSetup(TestCase):
             datatype=self.DNA_dt, column_name="y", column_idx=2)
 
 
-
     def tearDown(self):
         """Delete any files that have been put into the database."""
         for crr in CodeResourceRevision.objects.all():
@@ -207,10 +203,9 @@ class MetadataTestSetup(TestCase):
             if crr.coderesource.filename != "":
                 crr.content_file.close()
                 crr.content_file.delete()
-        
+
 
 class DatatypeTests(MetadataTestSetup):
-    
     def setUp(self):
         """Add some DTs used to check circular restrictions."""
         super(DatatypeTests, self).setUp()
@@ -218,35 +213,35 @@ class DatatypeTests(MetadataTestSetup):
         # Datatypes used to test circular restrictions.
         self.dt_1 = Datatype(
             name="dt_1",
-            description="A string (1)",
-            Python_type=Datatype.STR)
+            description="A string (1)")
         self.dt_1.save()
+        self.dt_1.restricts.add(self.string_dt)
 
         self.dt_2 = Datatype(
             name="dt_2",
-            description="A string (2)",
-            Python_type=Datatype.STR)
+            description="A string (2)")
         self.dt_2.save()
+        self.dt_2.restricts.add(self.string_dt)
 
         self.dt_3 = Datatype(
             name="dt_3",
-            description="A string (3)",
-            Python_type=Datatype.STR);
+            description="A string (3)")
         self.dt_3.save()
+        self.dt_3.restricts.add(self.string_dt)
 
         self.dt_4 = Datatype(
             name="dt_4",
-            description="A string (4)",
-            Python_type=Datatype.STR);
+            description="A string (4)")
         self.dt_4.save()
+        self.dt_4.restricts.add(self.string_dt)
 
         self.dt_5 = Datatype(
             name="dt_5",
-            description="A string (5)",
-            Python_type=Datatype.STR);
+            description="A string (5)")
         self.dt_5.save()
-        
-    
+        self.dt_5.restricts.add(self.string_dt)
+
+
     def test_datatype_unicode(self):
         """
         Unicode representation must be the instance's name.
@@ -256,7 +251,7 @@ class DatatypeTests(MetadataTestSetup):
         self.assertEqual(unicode(my_datatype), "fhqwhgads");
 
     ### Unit tests for datatype.clean (Circular restrictions) ###
-        
+
     # Direct circular cases: start, middle, end
     # Start   dt1 restricts dt1, dt3, dt4
     # Middle  dt1 restricts dt3, dt1, dt4
@@ -322,7 +317,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
 
         self.dt_2.restricts.add(self.dt_1);
@@ -339,7 +334,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
 
         self.dt_3.restricts.add(self.dt_1);
@@ -356,7 +351,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_4.restricts.add(self.dt_1);
         self.dt_4.save();
@@ -373,7 +368,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_2.restricts.add(self.dt_5);
         self.dt_2.save();
@@ -386,7 +381,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_3.restricts.add(self.dt_5);
         self.dt_3.save();
@@ -399,7 +394,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_4.restricts.add(self.dt_5);
         self.dt_4.save();
@@ -412,7 +407,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_2.restricts.add(self.dt_4);
         self.dt_2.save();
@@ -425,7 +420,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_3.restricts.add(self.dt_4);
         self.dt_3.save();
@@ -438,7 +433,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         self.dt_1.restricts.add(self.dt_2);
         self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);        
+        self.dt_1.restricts.add(self.dt_4);
         self.dt_1.save();
         self.dt_4.restricts.add(self.dt_2);
         self.dt_4.save();
@@ -479,7 +474,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_1.save();
         self.dt_2.restricts.add(self.dt_3);
         self.dt_2.save();
-        
+
         self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
         self.assertEqual(self.dt_3.is_restricted_by(self.dt_1), True);
         self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
@@ -539,7 +534,7 @@ class DatatypeTests(MetadataTestSetup):
         self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
         self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
 
-    def test_datatype_no_restriction_clean_good (self):
+    def test_datatype_no_restriction_clean_good(self):
         """
         Datatype without any restrictions.
         """
@@ -565,7 +560,7 @@ class DatatypeTests(MetadataTestSetup):
         B restricts C
         C restricts A
         """
-         
+
         self.dt_1.restricts.add(self.dt_3);
         self.dt_1.save();
         self.dt_1.restricts.add(self.dt_2);
@@ -610,15 +605,24 @@ class DatatypeTests(MetadataTestSetup):
 
     def test_datatype_clean_no_restricts(self):
         """
-        Clean on a Datatype with no restrictions should pass.
+        Calling clean on an unsaved Datatype with no restrictions should pass.
         """
         datatype = Datatype(
             name="squeaky",
-            description="a clean, new datatype",
-            Python_type=Datatype.STR)
-        # Note that this passes if the next line is uncommented.
-        #datatype.save()
+            description="a clean, new datatype")
         self.assertEqual(datatype.clean(), None)
+
+    def test_datatype_complete_clean_no_restricts(self):
+        """
+        Calling complete_clean on an unsaved Datatype with no restrictions should fail.
+        """
+        datatype = Datatype(
+            name="squeaky",
+            description="a clean, new datatype")
+        datatype.save()
+        self.assertRaisesRegexp(ValidationError,
+                error_messages["DT_does_not_restrict_atomic"].format(".*"),
+                datatype.complete_clean)
         
 
 class CompoundDatatypeMemberTests(MetadataTestSetup):
@@ -661,33 +665,33 @@ class CompoundDatatypeTests(MetadataTestSetup):
                          "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
                          "3: <RNANucSeq> [PLAseq])");
 
-    def test_clean_single_index_good (self):
+    def test_clean_single_index_good(self):
         """
         CompoundDatatype with single index equalling 1.
         """
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
-        sad_cdt.members.create(	datatype=self.RNA_dt,
-                                column_name="ColumnTwo",
-                                column_idx=1);
+        sad_cdt.members.create(datatype=self.RNA_dt,
+                               column_name="ColumnTwo",
+                               column_idx=1);
         self.assertEqual(sad_cdt.clean(), None);
 
-    def test_clean_single_index_bad (self):
+    def test_clean_single_index_bad(self):
         """
         CompoundDatatype with single index not equalling 1.
         """
         sad_cdt = CompoundDatatype();
         sad_cdt.save();
-        sad_cdt.members.create(	datatype=self.RNA_dt,
-                                column_name="ColumnTwo",
-                                column_idx=3);
+        sad_cdt.members.create(datatype=self.RNA_dt,
+                               column_name="ColumnTwo",
+                               column_idx=3);
 
         self.assertRaisesRegexp(
             ValidationError,
             "Column indices are not consecutive starting from 1",
             sad_cdt.clean);
 
-    def test_clean_catches_consecutive_member_indices (self):
+    def test_clean_catches_consecutive_member_indices(self):
         """
         CompoundDatatype must have consecutive indices from 1 to n.
         
@@ -698,22 +702,22 @@ class CompoundDatatypeTests(MetadataTestSetup):
         good_cdt = CompoundDatatype();
         good_cdt.save();
         good_cdt.members.create(datatype=self.RNA_dt,
-                               column_name="ColumnTwo",
-                               column_idx=2);
+                                column_name="ColumnTwo",
+                                column_idx=2);
         good_cdt.members.create(datatype=self.DNA_dt,
-                               column_name="ColumnOne",
-                               column_idx=1);
+                                column_name="ColumnOne",
+                                column_idx=1);
         self.assertEqual(good_cdt.clean(), None);
 
         bad_cdt = CompoundDatatype();
         bad_cdt.save();
         bad_cdt.members.create(datatype=self.RNA_dt,
-                              column_name="ColumnOne",
-                              column_idx=3);
-        
+                               column_name="ColumnOne",
+                               column_idx=3);
+
         bad_cdt.members.create(datatype=self.DNA_dt,
-                              column_name="ColumnTwo",
-                              column_idx=1);
+                               column_name="ColumnTwo",
+                               column_idx=1);
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -724,11 +728,12 @@ class CompoundDatatypeTests(MetadataTestSetup):
         """
         Datatype members must have column names.
         """
-        cdt = CompoundDatatype(); cdt.save()
+        cdt = CompoundDatatype();
+        cdt.save()
         cdt.members.create(datatype=self.RNA_dt, column_idx=1)
         self.assertRaisesRegexp(ValidationError,
-            "{'column_name': \[u'This field cannot be blank.'\]}",
-            cdt.clean)
+                                "{'column_name': \[u'This field cannot be blank.'\]}",
+                                cdt.clean)
 
     # The following tests were previously tests on
     # DatasetStructure.clean(), but now they must be adapted as

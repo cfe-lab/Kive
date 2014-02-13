@@ -197,9 +197,12 @@ class SymbolicDataset(models.Model):
         """
         self.logger.debug("Creating clean CCL and linking to EL")
         ccl = self.content_checks.create(execlog=execlog)
+        ccl.save()
 
         if self.is_raw():
+            ccl.end_time = timezone.now()
             ccl.clean()
+            ccl.save()
             self.logger.debug("SD is raw - returning clean CCL")
             return ccl
 
@@ -211,6 +214,8 @@ class SymbolicDataset(models.Model):
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
             bad_data.save()
+            ccl.end_time = timezone.now()
+            ccl.save()
             self.logger.warn("malformed header")
             return ccl
 
@@ -249,10 +254,11 @@ class SymbolicDataset(models.Model):
                     new_cell_error.clean()
                     new_cell_error.save()
 
-        finish_check_time = timezone.now()
-        ccl.end_time = finish_check_time
-
+        self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
+                format(file_path_to_check, self))
+        ccl.end_time = timezone.now()
         ccl.clean()
+        ccl.save()
         return ccl
 
     def check_integrity(self,new_file_path,execlog,newly_computed_MD5=None):
@@ -322,6 +328,7 @@ class SymbolicDataset(models.Model):
 
         # At this point we know no checks have failed; return False if none of them
         # are complete yet.
+        self.logger.debug("Have any checks completed on SD '{}'? {}".format(self, any_check_completed))
         return any_check_completed
     
 class DatasetStructure(models.Model):
@@ -369,6 +376,10 @@ class ExecRecord(models.Model):
     Record of a previous execution of a Method/PSIC/POC
     """
     generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
+
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def __unicode__(self):
         """Unicode representation of this ExecRecord."""
@@ -490,30 +501,31 @@ class ExecRecord(models.Model):
 
     def general_transf(self):
         """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        desired_transf = None
         generating_record = self.generator.record
-        if type(generating_record) == archive.models.RunStep:
-            desired_transf = generating_record.pipelinestep.transformation
-        elif type(generating_record) == archive.models.RunSIC:
-            desired_transf = generating_record.PSIC
-        elif type(generating_record) == archive.models.RunOutputCable:
-            desired_transf = generating_record.pipelineoutputcable
-
-        return desired_transf
+        generator_type = generating_record.__class__.__name__
+        if generator_type == "RunStep":
+            return generating_record.pipelinestep.transformation
+        elif generator_type == "RunSIC":
+            return generating_record.PSIC
+        elif generator_type == "RunOutputCable":
+            return generating_record.pipelineoutputcable
 
     def provides_outputs(self, outputs):
         """
         Checks whether this ER has existent data for these outputs.
         outputs: an iterable of TOs we want the ER to have real data for.
-        """
 
+        PRE
+        1) outputs must be TransformationOutputs of the Transformation associated
+        with the RunStep/RunSIC/RunOutputCable associated with this ExecRecord 
+        (they cannot be arbitrary TransformationOutputs).
+        """
         # Load each TO in outputs
         for curr_output in outputs:
+            output_type = ContentType.objects.get_for_model(curr_output)
+            corresp_ero = self.execrecordouts.get(content_type=output_type, object_id=curr_output.id)
 
-            type = ContentType.objects.get_for_model(curr_output)
-            corresp_ero = self.execrecordouts.filter(content_type=type, object_id=curr_output.id)
-
-            if not corresp_ero.first().has_data():
+            if not corresp_ero.has_data():
                 self.logger.debug("corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
                 return False
 
@@ -524,11 +536,7 @@ class ExecRecord(models.Model):
         """
         Checks whether all of the EROs of this ER are OK.
         """
-
-        for ero in self.execrecordouts.all():
-            if not ero.is_OK():
-                return False
-        return True
+        return all([ero.is_OK() for ero in self.execrecordouts.all()])
         
 class ExecRecordIn(models.Model):
     """

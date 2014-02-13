@@ -517,6 +517,8 @@ class Sandbox:
             curr_RS.clean()
 
             # FIXME: SD generated from the previous step wasn't checked and so cannot be used
+            # Does this really need fixing? When are you ever going to run the exact same
+            # step twice in a row? -RM
             self.logger.debug("Looking for ER with same transformation + input SDs")
             if type(pipelinestep.transformation).__name__ != "Pipeline":
                 curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
@@ -912,8 +914,9 @@ class Sandbox:
                 return curr_run
 
         self.logger.debug("Finished executing output cables")
-        curr_run.complete_clean()
         curr_run.save()
+        curr_run.complete_clean()
+        self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
 
         return curr_run
 
