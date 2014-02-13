@@ -1,5 +1,5 @@
 """
-Unit tests for Shipyard's BasicConstraint class.
+Unit tests for Shipyard's BasicConstraint class and functionality relating to it.
 """
 from django.test import TestCase
 from django.core.exceptions import ValidationError
@@ -9,7 +9,7 @@ from method.models import CodeResourceRevision
 
 from constants import datatypes, error_messages
 
-class BasicConstraintTests(TestCase):
+class BasicConstraintTestSetup(TestCase):
 
     def setUp(self):
         """
@@ -20,6 +20,8 @@ class BasicConstraintTests(TestCase):
         self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
         self.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         self.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
 
     def test_get_effective_min_val_builtins(self):
         """
@@ -407,7 +409,9 @@ class BasicConstraintTests(TestCase):
 
         self.assertEquals(heir.get_effective_num_constraint(BasicConstraint.MIN_LENGTH), (None, 0))
 
-    ########
+
+class BasicConstraintCleanTests(BasicConstraintTestSetup):
+
     def __test_clean_numeric_constraint_good_h(self, builtin_type, BC_type, constr_val):
         """
         Helper for testing clean() on a well-defined (MIN|MAX)_(VAL|LENGTH) constraint.
@@ -440,7 +444,7 @@ class BasicConstraintTests(TestCase):
         """
         self.__test_clean_numeric_constraint_good_h(self.FLOAT, BasicConstraint.MIN_VAL, 987)
 
-    def test_clean_min_val_float_good(self):
+    def test_clean_max_val_float_good(self):
         """
         Testing clean() on a well-defined MAX_VAL constraint on a float.
         """
@@ -457,6 +461,20 @@ class BasicConstraintTests(TestCase):
         Testing clean() on a well-defined MAX_LENGTH constraint on a string.
         """
         self.__test_clean_numeric_constraint_good_h(self.STR, BasicConstraint.MAX_LENGTH, 8)
+
+    def test_clean_min_length_good_edge(self):
+        """
+        Testing clean() on a minimal (1) well-defined MIN_LENGTH constraint on a string.
+
+        Note that MIN_LENGTH should not be 0, as that's the default constraint on any string.
+        """
+        self.__test_clean_numeric_constraint_good_h(self.STR, BasicConstraint.MIN_LENGTH, 1)
+
+    def test_clean_max_length_good_edge(self):
+        """
+        Testing clean() on a minimal (1) well-defined MAX_LENGTH constraint on a string.
+        """
+        self.__test_clean_numeric_constraint_good_h(self.STR, BasicConstraint.MAX_LENGTH, 1)
 
     ########
     def __create_bad_numeric_constraint_h(self, builtin_type, BC_type, constr_val):
@@ -597,5 +615,623 @@ class BasicConstraintTests(TestCase):
                                 error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
                                 constr_DT.clean)
 
+    ########
+    def __test_clean_length_constraint_non_string_h(self, builtin_type, BC_type, constr_val):
+        """
+        Helper for defining tests on (MIN|MAX)_LENGTH constraints wrongly applied to non-string types.
+        """
+        constr_DT = Datatype(name="NumericalWithLengthConstraint",
+                             description="Incorrectly length-constrained Datatype")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(builtin_type)
+        constr = constr_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
 
-    # FIXME continue from here!
+        err_msg_key = "BC_length_constraint_on_non_string"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_DT),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_DT),
+                                constr_DT.clean)
+
+    def test_clean_min_length_int_bad(self):
+        """
+        Testing clean() on a badly-defined MIN_LENGTH constraint (int).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.INT, BasicConstraint.MIN_LENGTH, 50)
+
+    def test_clean_min_length_float_bad(self):
+        """
+        Testing clean() on a badly-defined MIN_LENGTH constraint (float).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.FLOAT, BasicConstraint.MIN_LENGTH, 5)
+
+    def test_clean_min_length_bool_bad(self):
+        """
+        Testing clean() on a badly-defined MIN_LENGTH constraint (float).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.BOOL, BasicConstraint.MIN_LENGTH, 12)
+
+    def test_clean_max_length_int_bad(self):
+        """
+        Testing clean() on a badly-defined MAX_LENGTH constraint (int).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.INT, BasicConstraint.MAX_LENGTH, 10000)
+
+    def test_clean_max_length_float_bad(self):
+        """
+        Testing clean() on a badly-defined MAX_LENGTH constraint (float).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.FLOAT, BasicConstraint.MAX_LENGTH, 1)
+
+    def test_clean_max_length_bool_bad(self):
+        """
+        Testing clean() on a badly-defined MAX_LENGTH constraint (bool).
+        """
+        self.__test_clean_length_constraint_non_string_h(self.BOOL, BasicConstraint.MAX_LENGTH, 47)
+
+    ########
+    def __test_clean_length_constraint_non_integer_h(self, BC_type, constr_val):
+        """
+        Helper for defining tests on (MIN|MAX)_LENGTH constraints with non-integer values.
+        """
+        constr_DT = Datatype(name="NonIntegerLengthConstraint",
+                             description="String with poorly-formed length constraint")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(self.STR)
+        constr = constr_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
+
+        err_msg_key = "BC_length_constraint_non_integer"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_val),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_val),
+                                constr_DT.clean)
+
+    def test_clean_float_min_length_bad(self):
+        """
+        Testing clean() on a badly-defined (float) MIN_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_non_integer_h(BasicConstraint.MIN_LENGTH, 4.7)
+
+    def test_clean_str_min_length_bad(self):
+        """
+        Testing clean() on a badly-defined (str) MIN_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_non_integer_h(BasicConstraint.MIN_LENGTH, "foo")
+
+    def test_clean_float_max_length_bad(self):
+        """
+        Testing clean() on a badly-defined (float) MAX_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_non_integer_h(BasicConstraint.MAX_LENGTH, 66.25)
+
+    def test_clean_str_max_length_bad(self):
+        """
+        Testing clean() on a badly-defined (str) MIN_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_non_integer_h(BasicConstraint.MAX_LENGTH, "bar")
+
+    ########
+    def __test_clean_length_constraint_too_small_h(self, BC_type, constr_val):
+        """
+        Helper for defining tests on (MIN|MAX)_LENGTH constraints whose values are too small.
+        """
+        constr_DT = Datatype(name="TooSmallLengthConstraint",
+                             description="String with too-small length constraint")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(self.STR)
+        constr = constr_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
+
+        err_msg_key = "BC_length_constraint_non_positive"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_val),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_val),
+                                constr_DT.clean)
+
+    def test_clean_min_length_non_positive_edge(self):
+        """
+        Testing clean() on an edge-case negative (0) MIN_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_too_small_h(BasicConstraint.MIN_LENGTH, 0)
+
+    def test_clean_min_length_non_positive_regular(self):
+        """
+        Testing clean() on a non-edge non-positive MIN_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_too_small_h(BasicConstraint.MIN_LENGTH, -15)
+
+    def test_clean_max_length_non_positive_edge(self):
+        """
+        Testing clean() on an edge-case non-positive (0) MAX_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_too_small_h(BasicConstraint.MAX_LENGTH, 0)
+
+    def test_clean_max_length_non_positive_regular(self):
+        """
+        Testing clean() on a non-edge non-positive MAX_LENGTH constraint.
+        """
+        self.__test_clean_length_constraint_too_small_h(BasicConstraint.MAX_LENGTH, -20)
+
+    ########
+    def __test_clean_regexp_good_h(self, builtin_type, pattern):
+        """
+        Helper to create good REGEXP-constraint test cases.
+        """
+        regexped_DT = Datatype(name="RegexpedDT",
+                               description="Datatype with good REGEXP attached")
+        regexped_DT.full_clean()
+        regexped_DT.save()
+        regexped_DT.restricts.add(builtin_type)
+        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                             rule="{}".format(pattern))
+
+        self.assertEquals(regexp_constr.clean(), None)
+        # Propagation check.
+        self.assertEquals(regexped_DT.clean(), None)
+
+    def test_clean_regexp_str_good(self):
+        """
+        Testing clean() on a string with a good REGEXP attached.
+        """
+        self.__test_clean_regexp_good_h(self.STR, "foo")
+
+    def test_clean_regexp_float_good(self):
+        """
+        Testing clean() on a float with a good REGEXP attached.
+        """
+        self.__test_clean_regexp_good_h(self.STR, "1e.+")
+
+    def test_clean_regexp_int_good(self):
+        """
+        Testing clean() on an int with a good REGEXP attached.
+        """
+        # Note that this would be a pretty dumb regexp to put on an integer!
+        self.__test_clean_regexp_good_h(self.STR, "bar")
+
+    def test_clean_regexp_bool_good(self):
+        """
+        Testing clean() on a Boolean with a good REGEXP attached.
+        """
+        # Note that this would be a pretty dumb regexp to put on an integer!
+        self.__test_clean_regexp_good_h(self.STR, "T|F")
+
+    ####
+    def __test_clean_regexp_bad_h(self, builtin_type, pattern):
+        """
+        Helper to create bad REGEXP-constraint test cases.
+        """
+        regexped_DT = Datatype(name="RegexpedDT",
+                               description="Datatype with bad REGEXP attached")
+        regexped_DT.full_clean()
+        regexped_DT.save()
+        regexped_DT.restricts.add(builtin_type)
+        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                             rule="{}".format(pattern))
+
+        err_msg_key = "BC_bad_RE"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                regexp_constr.clean)
+        # Propagation check.
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                regexped_DT.clean)
+
+    def test_clean_regexp_str_bad(self):
+        """
+        Testing clean() on a string with a bad REGEXP attached.
+        """
+        self.__test_clean_regexp_bad_h(self.STR, "(.+")
+
+    def test_clean_regexp_float_bad(self):
+        """
+        Testing clean() on a float with a bad REGEXP attached.
+        """
+        self.__test_clean_regexp_bad_h(self.FLOAT, "[a-z")
+
+    def test_clean_regexp_int_bad(self):
+        """
+        Testing clean() on an int with a bad REGEXP attached.
+        """
+        self.__test_clean_regexp_bad_h(self.INT, "1)")
+
+    def test_clean_regexp_bool_bad(self):
+        """
+        Testing clean() on a Boolean with a bad REGEXP attached.
+        """
+        self.__test_clean_regexp_bad_h(self.BOOL, "1919)")
+
+    ####
+    def __test_clean_dtf_good_h(self, format_string):
+        """
+        Helper for testing clean() on good DATETIMEFORMATs.
+        """
+        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached")
+        dtf_DT.full_clean()
+        dtf_DT.save()
+        dtf_DT.restricts.add(self.STR)
+        dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
+                                              rule=format_string)
+
+        self.assertEquals(dtf.clean(), None)
+        # Propagation check.
+        self.assertEquals(dtf_DT.clean(), None)
+
+    def test_clean_dtf_good(self):
+        """
+        Testing clean() on a good DATETIMEFORMAT BasicConstraint.
+        """
+        self.__test_clean_dtf_good_h("%Y %b %d")
+
+    def test_clean_dtf_good_2(self):
+        """
+        Testing clean() on a second good DATETIMEFORMAT BasicConstraint.
+        """
+        self.__test_clean_dtf_good_h("%A, %Y-%m-%d %H:%M:%S %z")
+
+    def test_clean_dtf_good_3(self):
+        """
+        Testing clean() on a third good DATETIMEFORMAT BasicConstraint.
+        """
+        self.__test_clean_dtf_good_h("FOOBAR")
+
+    def __test_clean_dtf_bad_h(self, builtin_type, format_string):
+        """
+        Helper for testing clean() on DATETIMEFORMATs applied to non-strings.
+        """
+        dtf_DT = Datatype(name="BadDTF", description="Non-string with a DTF constraint attached")
+        dtf_DT.full_clean()
+        dtf_DT.save()
+        dtf_DT.restricts.add(builtin_type)
+        dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
+                                              rule=format_string)
+
+        err_msg_key = "BC_datetimeformat_non_string"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                dtf.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                dtf_DT.clean)
+
+    def test_clean_dtf_float_bad(self):
+        """
+        Testing clean() on a DATETIMEFORMAT applied to a float.
+        """
+        self.__test_clean_dtf_bad_h(self.FLOAT, "%Y %b %d")
+
+    def test_clean_dtf_int_bad(self):
+        """
+        Testing clean() on a DATETIMEFORMAT applied to an int.
+        """
+        self.__test_clean_dtf_bad_h(self.INT, "FOOBAR")
+
+    def test_clean_dtf_bool_bad(self):
+        """
+        Testing clean() on a DATETIMEFORMAT applied to a Boolean.
+        """
+        self.__test_clean_dtf_bad_h(self.FLOAT, "2014-%m-%d %H:%M:%S %z")
+
+    ########
+    def __test_clean_incomplete_parent_bad_h(self, BC_type, constr_val):
+        """
+        Helper for clean() on a BasicConstraint attached to an incomplete Datatype.
+        """
+        incomplete_DT = Datatype(name="IncompleteDT", description="Datatype that does not restrict any builtin")
+        incomplete_DT.full_clean()
+        incomplete_DT.save()
+
+        constr = incomplete_DT.basic_constraints.create(ruletype=BC_type,
+                                                        rule="{}".format(constr_val))
+
+        err_msg_key = "BC_DT_not_complete"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(incomplete_DT, constr),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(incomplete_DT, constr),
+                                incomplete_DT.clean)
+
+    def test_clean_incomplete_parent_regexp_bad(self):
+        """
+        Testing clean() on a REGEXP BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.REGEXP, ".*")
+
+    def test_clean_incomplete_parent_dtf_bad(self):
+        """
+        Testing clean() on a DATETIMEFORMAT BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.DATETIMEFORMAT, "%Y %b %d")
+
+    def test_clean_incomplete_parent_min_val_bad(self):
+        """
+        Testing clean() on a MIN_VAL BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.MIN_VAL, 16)
+
+    def test_clean_incomplete_parent_max_val_bad(self):
+        """
+        Testing clean() on a MAX_VAL BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.MAX_VAL, 333333)
+
+    def test_clean_incomplete_parent_min_length_bad(self):
+        """
+        Testing clean() on a MIN_LENGTH BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.MIN_LENGTH, 2)
+
+    def test_clean_incomplete_parent_max_length_bad(self):
+        """
+        Testing clean() on a MAX_LENGTH BasicConstraint attached to an incomplete Datatype.
+        """
+        self.__test_clean_incomplete_parent_bad_h(BasicConstraint.MAX_LENGTH, 27)
+
+    ########
+    # Some "greatest hits" from the above testing cases where the
+    # parent Datatype does not directly inherit from a builtin.
+
+    def test_clean_second_gen_min_val_int_good(self):
+        """
+        Testing clean() on a well-defined MIN_VAL constraint on a second-generation integer.
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.INT)
+
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(parent_DT)
+        constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="{}".format(-7.5))
+
+        self.assertEquals(constr.clean(), None)
+        # Propagation check
+        self.assertEquals(constr_DT.clean(), None)
+
+    def test_clean_second_gen_max_val_float_bad(self):
+        """
+        Testing clean() on a badly-defined MAX_VAL constraint (second-gen float).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.FLOAT)
+
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(parent_DT)
+        constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="foo")
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                constr.clean)
+
+        # Propagation check.
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                constr_DT.clean)
+
+    def test_clean_second_gen_min_length_bool_bad(self):
+        """
+        Testing clean() on a badly-defined MIN_LENGTH constraint (second-gen Boolean).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.BOOL)
+
+        constr_DT = Datatype(name="BooleanWithLengthConstraint",
+                             description="Incorrectly length-constrained Datatype")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(parent_DT)
+        constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="{}".format(12))
+
+        err_msg_key = "BC_length_constraint_on_non_string"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_DT),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, constr_DT),
+                                constr_DT.clean)
+
+
+    def test_clean_second_gen_str_max_length_bad(self):
+        """
+        Testing clean() on a badly-defined (str) MIN_LENGTH constraint (second-gen Datatype).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.STR)
+
+        constr_DT = Datatype(name="NonIntegerLengthConstraint",
+                             description="String with poorly-formed length constraint")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(parent_DT)
+        constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="bar")
+
+        err_msg_key = "BC_length_constraint_non_integer"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, "bar"),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, "bar"),
+                                constr_DT.clean)
+
+    def test_clean_second_gen_min_length_non_positive_edge(self):
+        """
+        Testing clean() on an edge-case negative (0) MIN_LENGTH constraint (second-gen Datatype).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.STR)
+
+        constr_DT = Datatype(name="TooSmallLengthConstraint",
+                             description="String with too-small length constraint")
+        constr_DT.full_clean()
+        constr_DT.save()
+        constr_DT.restricts.add(parent_DT)
+        constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="{}".format(0))
+
+        err_msg_key = "BC_length_constraint_non_positive"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, 0),
+                                constr.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(constr, 0),
+                                constr_DT.clean)
+
+    def test_clean_second_gen_regexp_good(self):
+        """
+        Testing clean() on a second-gen Datatype with good REGEXP attached.
+        """
+        mother_DT = Datatype(name="Mother", description="Mother")
+        mother_DT.full_clean()
+        mother_DT.save()
+        mother_DT.restricts.add(self.STR)
+
+        father_DT = Datatype(name="Father", description="Father")
+        father_DT.full_clean()
+        father_DT.save()
+        father_DT.restricts.add(self.STR)
+
+        milkman_DT = Datatype(name="Milkman", description="Milkman")
+        milkman_DT.full_clean()
+        milkman_DT.save()
+        milkman_DT.restricts.add(self.FLOAT)
+
+        regexped_DT = Datatype(name="RegexpedDT",
+                               description="Datatype with good REGEXP attached")
+        regexped_DT.full_clean()
+        regexped_DT.save()
+        regexped_DT.restricts.add(mother_DT)
+        regexped_DT.restricts.add(father_DT)
+        regexped_DT.restricts.add(milkman_DT)
+        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                             rule="foo")
+
+        self.assertEquals(regexp_constr.clean(), None)
+        # Propagation check.
+        self.assertEquals(regexped_DT.clean(), None)
+
+
+    def test_clean_second_gen_regexp_bad(self):
+        """
+        Testing clean() on a second-gen Datatype with a bad REGEXP constraint.
+        """
+        Danny_DT = Datatype(name="Bob Saget", description="Ostensible father")
+        # Danny_DT.full_house()
+        Danny_DT.full_clean()
+        Danny_DT.save()
+        Danny_DT.restricts.add(self.BOOL)
+
+        Joey_DT = Datatype(name="Dave Coulier", description="Popeye imitator")
+        Joey_DT.full_clean()
+        Joey_DT.save()
+        Joey_DT.restricts.add(self.INT)
+
+        Jesse_DT = Datatype(name="John Stamos", description="Mercy-haver")
+        Jesse_DT.full_clean()
+        Jesse_DT.save()
+        Jesse_DT.restricts.add(self.FLOAT)
+
+        # The bad regexp pattern.
+        pattern = "(.+"
+
+        regexped_DT = Datatype(name="RegexpedDT",
+                               description="Datatype with bad REGEXP attached")
+        regexped_DT.full_clean()
+        regexped_DT.save()
+        regexped_DT.restricts.add(Danny_DT)
+        regexped_DT.restricts.add(Joey_DT)
+        regexped_DT.restricts.add(Jesse_DT)
+        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                             rule=pattern)
+
+        err_msg_key = "BC_bad_RE"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                regexp_constr.clean)
+        # Propagation check.
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                regexped_DT.clean)
+
+    def test_clean_second_gen_dtf_good(self):
+        """
+        Testing clean() on a good DATETIMEFORMAT (second-gen Datatype).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.STR)
+
+        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached")
+        dtf_DT.full_clean()
+        dtf_DT.save()
+        dtf_DT.restricts.add(parent_DT)
+        dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
+                                              rule="%Y %b %d")
+
+        self.assertEquals(dtf.clean(), None)
+        # Propagation check.
+        self.assertEquals(dtf_DT.clean(), None)
+
+    def test_clean_second_gen_dtf_bad_h(self):
+        """
+        Testing clean() on a DATETIMEFORMATs applied to a float (second-gen).
+        """
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT.full_clean()
+        parent_DT.save()
+        parent_DT.restricts.add(self.FLOAT)
+
+        dtf_DT = Datatype(name="BadDTF", description="Float with a DTF constraint attached")
+        dtf_DT.full_clean()
+        dtf_DT.save()
+        dtf_DT.restricts.add(parent_DT)
+        dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
+                                              rule="%Y %b %d")
+
+        err_msg_key = "BC_datetimeformat_non_string"
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                dtf.clean)
+
+        self.assertRaisesRegexp(ValidationError,
+                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                dtf_DT.clean)
+

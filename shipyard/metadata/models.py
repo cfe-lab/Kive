@@ -578,31 +578,18 @@ class BasicConstraint(models.Model):
         is_error = False
 
         # Check the rule for coherence.
-        if self.ruletype == BasicConstraint.MIN_LENGTH:
+        if self.ruletype in (BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
             # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
             if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
-                error_msg = error_messages["BC_min_length_on_non_string"].format(self, self.datatype)
+                error_msg = error_messages["BC_length_constraint_on_non_string"].format(self, self.datatype)
                 is_error = True
             try:
-                min_length = int(self.rule)
-                if min_length < 0:
-                    error_msg = error_messages["BC_min_length_negative"].format(self, self.rule)
+                length_constraint = int(self.rule)
+                if length_constraint < 1:
+                    error_msg = error_messages["BC_length_constraint_non_positive"].format(self, self.rule)
                     is_error = True
             except ValueError:
-                error_msg = error_messages["BC_min_length_non_integer"].format(self, self.rule)
-                is_error = True
-
-        elif self.ruletype == BasicConstraint.MAX_LENGTH:
-            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
-                error_msg = error_messages["BC_max_length_on_non_string"].format(self, self.datatype)
-                is_error = True
-            try:
-                max_length = int(self.rule)
-                if max_length < 1:
-                    error_msg = error_messages["BC_max_length_non_positive"].format(self, self.rule)
-                    is_error = True
-            except ValueError:
-                error_msg = error_messages["BC_max_length_non_integer"].format(self, self.rule)
+                error_msg = error_messages["BC_length_constraint_non_integer"].format(self, self.rule)
                 is_error = True
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, BasicConstraint.MIN_VAL):
