@@ -145,10 +145,12 @@ def compound_datatypes(request):
     return HttpResponse(t.render(c))
 
 
-def return_cdm_forms(request, query, num_forms, exceptions):
+def return_cdm_forms(request, exceptions):
     """
     Helper function for initializing forms with posted values and exceptions.
     """
+    query = request.POST.dict()
+    num_forms = sum([1 for k in query.iterkeys() if k.startswith('datatype')])
     cdm_forms = []
     for i in range(num_forms):
         cdm_form = CompoundDatatypeMemberForm(auto_id = 'id_%s_' + str(i),

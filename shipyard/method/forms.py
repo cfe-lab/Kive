@@ -56,6 +56,7 @@ class MethodForm (forms.ModelForm):
 
     coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+
     class Meta:
         model = Method
         fields = ('revision_name', 'revision_desc', 'random')
@@ -70,6 +71,9 @@ class TransformationInputForm (forms.ModelForm):
         fields = ('dataset_name', 'dataset_idx')
 
 class TransformationOutputForm (forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(TransformationOutputForm, self).__init__(*args, **kwargs)
+        self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
     class Meta:
         model = TransformationOutput
         fields = ('dataset_name', 'dataset_idx')
