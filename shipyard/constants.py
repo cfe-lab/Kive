@@ -25,6 +25,10 @@ error_messages = {
         'The end time of ExecLog "{}" is before its start time.',
     "ccl_swapped_times":
         'The end time of ContentCheckLog "{}" is before its start time.',
+    "verificationlog_swapped_times":
+        'The end time of VerificationLog "{}" is before its start time.',
+    "verificationlog_incomplete":
+        'VerificationLog "{}" is not complete.',
     "SD_not_in_pipeline":
         'SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered',
     "SD_pipeline_input":
@@ -84,7 +88,9 @@ error_messages = {
     "BC_datetimeformat_non_string":
         "BasicConstraint \"{}\" specifies a date/time format but its parent Datatype \"{}\" is numeric or Boolean",
     "DT_does_not_restrict_atomic":
-        "Datatype \"{}\" does not restrict any of Shipyard atomics STR, INT, FLOAT, or BOOL"
+        "Datatype \"{}\" does not restrict any of Shipyard atomics STR, INT, FLOAT, or BOOL",
+    "verification_no_output":
+        'Verification method for column {} of CompoundDatatype "{}" produced no output'
 }
 
 warning_messages = {

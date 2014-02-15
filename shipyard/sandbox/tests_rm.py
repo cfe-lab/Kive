@@ -18,6 +18,7 @@ from librarian.models import SymbolicDataset
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
+from datachecking.models import ContentCheckLog
 from sandbox.execute import Sandbox
 
 import file_access_utils
@@ -977,6 +978,7 @@ class CustomConstraintTests(TestCase):
         scriptfile = tempfile.NamedTemporaryFile(delete=False)
         scriptfile.write(
         """#!/bin/bash
+        echo failed_row > $2
         row_num=1
         for row in $(cat $1); do
           if [[ $row_num -gt 1 ]]; then
@@ -994,6 +996,7 @@ class CustomConstraintTests(TestCase):
         self.cr_spellcheck.save()
         self.crr_spellcheck = self.cr_spellcheck.revisions.create(revision_name="1", 
                 revision_desc="first version", content_file=scriptfile.name)
+        self.crr_spellcheck.save()
         self.mf_spellcheck = MethodFamily()
         self.mf_spellcheck.save()
         self.method_spellcheck = self.mf_spellcheck.members.create(
@@ -1002,6 +1005,7 @@ class CustomConstraintTests(TestCase):
                 dataset_idx = 1)
         self.method_spellcheck.outputs.create(dataset_name = "failed_row",
                 dataset_idx = 1)
+        self.method_spellcheck.save()
 
         # A Datatype with custom constraints restricting the basic datatype.
         self.dt_custom = Datatype(name="words", 
@@ -1012,6 +1016,7 @@ class CustomConstraintTests(TestCase):
                 verification_method = self.method_spellcheck)
         custom_constraint.save()
         self.dt_custom.custom_constraint = custom_constraint
+        self.dt_custom.save()
 
         # A compound datatype composed of alphabetic strings and correctly
         # spelled words.
@@ -1021,6 +1026,7 @@ class CustomConstraintTests(TestCase):
                 column_name = "letter strings", column_idx = 1)
         self.cdt_constraints.members.create(datatype = self.dt_custom,
                 column_name = "words", column_idx = 2)
+        self.cdt_constraints.save()
 
         # A file conforming to the compound datatype.
         self.good_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
@@ -1039,13 +1045,23 @@ class CustomConstraintTests(TestCase):
 
     def tearDown(self):
         # Clean up the work directory.
-        shutil.rmtree(self.workdir)
+        #shutil.rmtree(self.workdir)
+        pass
+
+    #TODO
+    def test_summarize_CSV_no_output(self):
+        """
+        A verification method which produces no output should throw a ValueError.
+        """
+        pass
 
     def test_summarize_correct_datafile(self):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        summary_path = os.path.join(self.workdir, "summary")
+        sd = SymbolicDataset.create_SD(self.good_datafile.name, cdt=self.cdt_constraints)
+        log = ContentCheckLog(symbolicdataset=sd)
+        log.save()
         with open(self.good_datafile.name) as f:
-            summary = self.cdt_constraints.summarize_CSV(f, self.workdir)
+            summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
         self.assertEqual(summary, {"num_rows": 2})

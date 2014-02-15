@@ -10,7 +10,8 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
-from django.conf import settings
+from django.core.files import File
+from django.utils import timezone
 
 import operator
 import re
@@ -51,20 +52,6 @@ class Datatype(models.Model):
     STR = "str"
     FLOAT = "float"
     BOOL = "bool"
-
-    # PYTHON_TYPE_CHOICES = (
-    #     (INT, 'int'),
-    #     (STR, 'str'),
-    #     (FLOAT, 'float'),
-    #     (BOOL, 'bool')
-    # )
-    #
-    # Python_type = models.CharField(
-    #     'Python variable type',
-    #     max_length=64,
-    #     default = STR,
-    #     choices=PYTHON_TYPE_CHOICES,
-    #     help_text="Python type (int|str|float|bool)");
 
     restricts = models.ManyToManyField(
         'self',
@@ -656,18 +643,14 @@ class CustomConstraint(models.Model):
         as output a CDT looking like (bool is_valid).
         """
         # Pre-defined CDTs that the verification method must use.
-        VERIF_IN = CompoundDatatype.objects.get(pk=1)
-        VERIF_OUT = CompoundDatatype.objects.get(pk=2)
+        VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
+        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
         
         verif_method_in = self.verification_method.inputs.all()
         verif_method_out = self.verification_method.outputs.all()
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
             raise ValidationError("CustomConstraint \"{}\" verification method does not have exactly one input and one output".
                                   format(self))
-
-        VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
-        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
-
         if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
             raise ValidationError(
                 "CustomConstraint \"{}\" verification method does not have an input CDT identical to VERIF_IN".
@@ -839,243 +822,375 @@ class CompoundDatatype(models.Model):
         return (self.is_restriction(other_CDT) and
                 other_CDT.is_restriction(self))
 
+
+    def _check_header(self, header):
+        """
+        SYNOPSIS
+        Verify that a list of field names (which we presumably read from a file) 
+        matches the anticipated header for this CompoundDatatype. This is a helper
+        function for summarize_CSV.
+
+        INPUTS
+        header  list of fields forming a header, to check against this
+                CompoundDatatype's expected header
+
+        OUTPUTS
+        A dictionary with keys indicating header errors. Possible key: value
+        pairs are the following.
+
+            - bad_num_cols: length of fieldnames, which does not match number
+              of members of this CompoundDatatype.
+            - bad_col_indices: list of column indices which do not have the same
+              name as the corresponding CompoundDatatypeMember. Will only be
+              present if the number of columns is correct.
+
+        """
+        summary = {}
+        if len(header) != self.members.count():
+            summary["bad_num_cols"] = len(header)
+            self.logger.debug("number of CSV columns must match number of CDT members")
+            return summary
+    
+        # The ith cdt member must have the same name as the ith CSV header.
+        bad_col_indices = []
+        for cdtm in self.members.all():
+            if cdtm.column_name != header[cdtm.column_idx-1]:
+                bad_col_indices.append(cdtm.column_idx)
+                self.logger.debug("Incorrect header for column {}".format(cdtm.column_idx))
+
+        if bad_col_indices:
+            summary["bad_col_indices"] = bad_col_indices
+        
+        return summary
+
+    def _columns_with_cc(self):
+        """
+        SYNOPSIS
+        Return a list of the column indices of this CompoundDatatype which have
+        a custom constraint. This is a helper function for summarize_CSV.
+        """
+        return [m.column_idx for m in self.members.all() if m.datatype.has_custom_constraint()]
+
+    def _setup_verification_path(self, column_index, summary_path):
+        """
+        Set up a path on the file system where we will run the verification
+        method for the column of this CompoundDatatype with the index
+        column_index. This is a helper function for summarize_CSV.
+
+        INPUTS
+        column_index        index of the column which we are going to verify.
+        summary_path        top-level directory in which the checks are happening,
+                            where we are going to make subdirectories to do the
+                            verification.
+
+        OUTPUTS
+        input_file_path     a file name where the data to verify should be written to.
+        """
+        verif_in = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
+        column_test_path = os.path.join(summary_path, "col{}".format(column_index))
+    
+        # Set up the paths
+        # [testing path]/col[colnum]/
+        # [testing path]/col[colnum]/input_data/
+        # [testing path]/col[colnum]/output_data/
+        # [testing path]/col[colnum]/logs/
+        
+        # We will use the first to actually run the script; the input file will
+        # go into the second; the output will go into the third; output and
+        # error logs go into the fourth.
+
+        input_data = os.path.join(column_test_path, "input_data")
+        output_data = os.path.join(column_test_path, "output_data")
+        logs = os.path.join(column_test_path, "logs")
+        for workdir in [input_data, output_data, logs]:
+            set_up_directory(workdir)
+
+        input_file_path = os.path.join(column_test_path, "input_data", "to_test.csv")
+        
+        # Write a CSV header.
+        with open(input_file_path, "wb") as f:
+            verif_in_header = [m.column_name for m in verif_in.members.all()]
+            writer = csv.DictWriter(f, fieldnames=verif_in_header)
+            writer.writeheader()
+
+        return input_file_path
+
+    def _check_basic_constraints(self, data_reader, out_handles):
+        """
+        Check the basic constraints on a CSV file, and copy the contents of
+        each column to the file handle indicated in out_handles. Return the
+        number of rows processed, and a dictionary of cells where a
+        BasicConstraint was not satisfied. Outputs a tuple (num_rows,
+        failing_cells). This is a helper function for summarize_CSV.
+        TODO: Make out_handles CSV writers or DictWriters, not file handles.
+
+        INPUTS
+        data_reader     csv.DictReader object, open on the CSV file we wish
+                        to check.
+        out_handles     dictionary of file handles, keyed by column index,
+                        where the column should be copied to. If the column
+                        index is not present in the dictionary, don't copy the
+                        column anywhere.
+
+        OUTPUTS
+        num_rows        the number of rows which were processed.
+        failing_cells   a dictionary of failed BasicContraints for cells in
+                        the CSV. Key is (row, column), and value is a list of
+                        BasicConstraints which the cell failed.
+        """
+        failing_cells = {}
+        rownum = 0
+        for i, row in enumerate(data_reader):
+            rownum = i+1
+                
+            for cdtm in self.members.all():
+                colnum = cdtm.column_idx
+                curr_cell_value = row[cdtm.column_name]
+                test_result = cdtm.datatype.check_basic_constraints(curr_cell_value)
+                    
+                # Note that i is 0-based, but our rows should be 1-based.
+                if test_result:
+                    failing_cells[(rownum, colnum)] = test_result
+    
+                if colnum in out_handles:
+                    out_handles[colnum].write(curr_cell_value + "\n")
+    
+        return (rownum, failing_cells)
+
+    def _check_verification_output(self, column_index, output_path):
+        """
+        Check the one-column CSV file, contained at output_path, which was output
+        by a verification method for the Datatype member with index column_index.
+        This is a helper function for summarize_CSV.
+
+        INPUTS
+        output_path     the CSV file to check, which was output by a verification method
+        column_index    index of the CompoundDatatypeMember for which a verification was
+                        run, resulting in the file at output_path
+
+        OUTPUTS
+        failing_cells   a dictionary of CustomConstraints which were failed in the
+                        original CSV, as indicated by the verification method's output.
+                        Keys are (row, column), and values are lists of failed custom
+                        constraints (currently, these lists may only be of length 1, since
+                        a Datatype may only have one CustomConstraint and we do not check
+                        them recursively).
+        """
+        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
+        corresp_DT = self.members.get(column_idx=column_index).datatype
+        summary_path = os.path.split(output_path)[0]
+        for i in range(2):
+            summary_path = os.path.split(summary_path)[0]
+
+        if not os.path.exists(output_path):
+            raise ValueError(error_messages["verification_no_output"].
+                    format(column_index, self))
+
+        # Now: open the resulting file, which is at output_path, and make sure
+        # it's OK.  We're going to have to call summarize_CSV on this resulting
+        # file, but that's OK because it must have a CDT (NaturalNumber
+        # failed_row), and we will define NaturalNumber to have no
+        # CustomConstraint, so that no deeper recursion will happen.
+        with open(output_path, "rb") as test_out:
+            output_summary = VERIF_OUT.summarize_CSV(test_out, 
+                os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
+
+        if output_summary.has_key("bad_num_cols"):
+            raise ValueError(
+                "Output of verification method for Datatype \"{}\" had the wrong number of columns".
+                format(corresp_DT))
+
+        if output_summary.has_key("bad_col_indices"):
+            raise ValueError(
+                "Output of verification method for Datatype \"{}\" had a malformed header".
+                format(corresp_DT))
+
+        if output_summary.has_key("failing_cells"):
+            raise ValueError(
+                "Output of verification method for Datatype \"{}\" had malformed entries".
+                format(corresp_DT))
+
+        # This should really never happen.
+        # Should this really be a value error? The previous checks are for
+        # problems with the user's code, but this one is for ours. Seems
+        # inconsistent. -RM
+        if os.path.exists(os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO")):
+            raise ValueError(
+                "Verification output CDT \"{}\" has been corrupted".
+                format(VERIF_OUT))
+
+        # Collect the row numbers of incorrect entries in this column.
+        failing_cells = {}
+        with open(output_path, "rb") as test_out:
+            test_out_csv = csv.reader(test_out)
+            next(test_out_csv) # skip header
+            for row in test_out_csv:
+                failing_cells[(row[0], col)] = [corresp_DT.custom_constraint]
+
+        return failing_cells
+
+    def _check_custom_constraint(self, column_index, input_path, content_check_log):
+        """
+        SYNOPSIS
+        Check the one-column CSV file file stored at input_path against the
+        CustomConstraint of the column_index column of this CompoundDatatype.
+        Create a new VerificationLog, which records the running of the
+        verification method, pointing to the provided ContentCheckLog.
+        This is a helper function for summarize_CSV.
+
+        INPUTS
+        column_index        index of the column whose CustomConstraint we will
+                            verify on the file
+        input_path          one-column CSV to be checked
+
+        content_check_log   this function is called during a check of the
+                            contents of a CSV file - this parameter is the log
+                            created for that check
+
+        OUTPUTS
+        output_path         the path where the verification method's output was
+                            written
+
+        ASSUMPTIONS 
+        1) input_path has been returned from _setup_verification_path for this
+        column index. This means it is in the folder 
+        [testing path]/col[colnum]/input_data.
+        """
+        # We need to invoke the verification method using run_code.
+        # All of our inputs are in place.
+        corresp_DTM = self.members.get(column_idx=column_index)
+        verif_method = corresp_DTM.datatype.custom_constraint.verification_method
+
+        # Go up two levels.
+        dir_to_run = os.path.split(os.path.split(input_path)[0])[0]
+        output_path = os.path.join(dir_to_run, "output_data", "is_valid.csv")
+        stdout_path = os.path.join(dir_to_run, "logs", "stdout.txt")
+        stderr_path = os.path.join(dir_to_run, "logs", "stderr.txt")
+
+        # TODO: There is still a bit of duplication here, namely in filling
+        # out the log. Perhaps put it into run_code_with_streams.
+        with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
+            verif_log = VerificationLog(contentchecklog=content_check_log,
+                    CDTM = corresp_DTM)
+            verif_log.save()
+            return_code = verif_method.run_code_with_streams(dir_to_run, 
+                    [input_path], [output_path], 
+                    [out, sys.stdout], [err, sys.stderr])
+            verif_log.end_time = timezone.now()
+            verif_log.return_code = return_code
+
+        with open(stdout_path, "rb") as out, open(stderr_path, "rb") as err:
+            verif_log.output_log.save(stdout_path, File(out))
+            verif_log.error_log.save(stderr_path, File(err))
+
+        verif_log.complete_clean()
+
+        return self._check_verification_output(column_index, output_path)
     
     def summarize_CSV(self, file_to_check, summary_path, content_check_log=None):
         """
+        SYNOPSIS
         Give metadata on the CSV: number of rows, and any deviations
         from the CDT (defects).
 
-        file_to_check: open file object set to the beginning.
+        INPUTS
+        file_to_check       open file object set to the beginning
+        summary_path        if any column of this CompoundDatatype has
+                            CustomConstraints, checking a CSV file will require
+                            running a verification method. summary_path is the
+                            work directory where we will do that
+        content_check_log   summarize_CSV is called as part of a content check
+                            on a SymbolicDataset; this is the log of that check
 
-        content_check_log: if summarize_CSV is called as part of a content check
-        on a SymbolicDataset, this is the log of that check. If this is unset, we
-        are supposed to create a 
-
-        OUTPUT: a dict containing metadata about the CSV
+        OUTPUT
+        summary             a dict containing metadata about the CSV, whose keys
+                            may be any of the following:
 
         - bad_num_cols: set if header has wrong number of columns;
           if so, returns number of columns in the header.
-    
         - bad_col_indices: set if header has improperly named columns;
           if so, returns list of indices of bad columns
-    
         - num_rows: number of rows
-        
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
         """
         summary = {}
-        
+
         # A CSV reader which we will use to check individual 
         # cells in the file, as well as creating external CSVs
         # for columns whose DT has a CustomConstraint.
         data_csv = csv.DictReader(file_to_check)
         if data_csv.fieldnames is None:
-            logging.getLogger("shipyard.custom").debug("file is empty")
+            self.logger.warning("file is empty")
             return summary
     
-        # Counter for the number of rows.
-        num_rows = 0
-
         ####
         # CHECK HEADER
+        self.logger.debug("Checking header")
         header = data_csv.fieldnames
+        summary.update(self._check_header(header))
         summary["header"] = header
-        cdt_members = self.members.all()
-        if len(header) != cdt_members.count():
-            summary["bad_num_cols"] = len(header)
-            logging.debug("number of CSV columns must match number of CDT members")
-            return summary
-    
-        # The ith cdt member must have the same name as the ith CSV header.
-        bad_col_indices = []
-        for cdtm in cdt_members:
-            if cdtm.column_name != header[cdtm.column_idx-1]:
-                bad_col_indices.append(cdtm.column_idx)
-                logging.debug("Incorrect header for column {}".format(cdtm.column_idx))
-
-        if len(bad_col_indices) != 0:
-            summary["bad_col_indices"] = bad_col_indices
-            return summary
         # FINISH CHECKING HEADER
         ####
-
-
 
         ####
         # CHECK CONSTRAINTS
     
-        # A dict of failing entries.
-        failing_cells = {}
-    
-        # Check if any columns have CustomConstraints.  We will use this
-        # lookup table while we're reading through the CSV file to see
-        # which columns need to be copied out for checking against
-        # CustomConstraints.
-    
-        try:
-            # Keyed by column index, maps to (path to file, file handle)
-            cols_with_cc = {}
-            for cdtm in cdt_members:
-                if cdtm.datatype.has_custom_constraint():
-                    # This column is going to require running a verification
-                    # method, so we set up a place within summary_path to do
-                    # so.
-                    column_test_path = os.path.join(
-                        summary_path, "col{}".format(cdtm.column_idx))
-    
-                    # Set up the paths
-                    # [testing path]/col[colnum]/
-                    # [testing path]/col[colnum]/input_data/
-                    # [testing path]/col[colnum]/output_data/
-                    # [testing path]/col[colnum]/logs/
-                    
-                    # We will use the first to actually run the script;
-                    # the input file will go into the second; the output
-                    # will go into the third; output and error logs go
-                    # into the fourth.
+        # Check if any columns have CustomConstraints.  We will use this lookup
+        # table while we're reading through the CSV file to see which columns
+        # need to be copied out for checking against CustomConstraints.
+        self.logger.debug("Retrieving columns with custom constrains")
+        cols_with_cc = dict.fromkeys(self._columns_with_cc())
+        self.logger.debug("{} columns with custom constrains found".format(len(cols_with_cc)))
 
-                    input_data = os.path.join(column_test_path, "input_data")
-                    set_up_directory(input_data)
-                    output_data = os.path.join(column_test_path, "output_data")
-                    set_up_directory(output_data)
-                    logs = os.path.join(column_test_path, "logs")
-                    for workdir in [input_data, output_data, logs]:
-                        set_up_directory(workdir)
-    
-                    input_file_path = os.path.join(column_test_path,
-                                                   "input_data",
-                                                   "to_test.csv")
-                    
-                    cols_with_cc[cdtm.column_idx] = {
-                        "testpath": column_test_path,
-                        "infilepath": input_file_path,
-                        "infilehandle": open(os.path.join(input_file_path), "wb")
-                    }
-    
-                    # Write a CSV header.
-                    cols_with_cc[cdtm.column_idx]["infilehandle"].write("to_test\n")
-    
-    
+        # Each column with custom constraints gets a file handle where 
+        # the results of the verification method will be written.
+        try:
+            for column in cols_with_cc:
+                self.logger.debug("Setting up verification path for column {}".
+                        format(summary_path, column))
+                input_file_path = self._setup_verification_path(column, summary_path)
+                self.logger.debug("Verification path was set up, column will be written to {}".
+                        format(input_file_path))
+                cols_with_cc[column] = open(input_file_path, "ab")
+
             ####
             # CHECK BASIC CONSTRAINTS AND COUNT ROWS
-                    
-            # Now we can actually check the data.
-            for i, row in enumerate(data_csv):
-                # Note that i is 0-based, but our rows should be 1-based.
-                rownum = i + 1
-    
-                # Increment the row count.
-                num_rows += 1
-                
-                for cdtm in cdt_members:
-                    curr_cell_value = row[cdtm.column_name]
-                    test_result = cdtm.datatype.check_basic_constraints(
-                        curr_cell_value)
-                    
-                    if len(test_result) != 0:
-                        failing_cells[(rownum, cdtm.column_idx)] = test_result
-    
-                    if cdtm.column_idx in cols_with_cc:
-                        cols_with_cc[cdtm.column_idx]["infilehandle"].write(
-                            curr_cell_value + "\n")
-    
+            self.logger.debug("Checking basic constraints")
+            num_rows, failing_cells = self._check_basic_constraints(data_csv, cols_with_cc)
             summary["num_rows"] = num_rows
-    
+            self.logger.debug("Checked basic constraints for {} rows".
+                    format(num_rows))
             # FINISHED CHECKING BASIC CONSTRAINTS AND COUNTING ROWS
             ####
     
         finally:
             for col in cols_with_cc:
-                cols_with_cc[col]["infilehandle"].close()
+                cols_with_cc[col].close()
     
         ####
         # CHECK CUSTOM CONSTRAINTS
-        
         # Now: any column that had a CustomConstraint must be checked 
-        # using the specified verification method.
+        # using the specified verification method. The handles in cols_with_cc
+        # are all closed.
+        if cols_with_cc:
+            self.logger.debug("Checking custom constraints")
         for col in cols_with_cc:
-            # We need to invoke the verification method using run_code.
-            # All of our inputs are in place.
-            corresp_DTM = cdt_members.get(column_idx=col)
-            corresp_DT = corresp_DTM.datatype
-            verif_method = corresp_DT.custom_constraint.verification_method
-    
-            input_path = cols_with_cc[col]["infilepath"]
-            dir_to_run = cols_with_cc[col]["testpath"]
-            output_path = os.path.join(dir_to_run, "output_data", "is_valid.csv")
-    
-            stdout_path = os.path.join(dir_to_run, "logs", "stdout.txt")
-            stderr_path = os.path.join(dir_to_run, "logs", "stderr.txt")
-
-            # TODO: There is still a bit of duplication here, namely in filling
-            # out the log. Perhaps put it into run_code_with_streams.
-            with open(stdout_path, "wb") as out, open(stderr_path, "wb") as err:
-                if content_check_log is not None:
-                    verif_log = VerificationLog(contentchecklog=content_check_log,
-                            CDTM = corresp_DTM)
-                    verif_log.save()
-                return_code = verif_method.run_code_with_streams(dir_to_run, 
-                        [input_path], [output_path], 
-                        [out, sys.stdout], [err, sys.stderr])
-                if content_check_log is not None:
-                    verif_log.end_time = timezone.now()
-                    verif_log.return_code = return_code
-                    verif_log.output_log.save(stdout_path, File(out))
-                    verif_log.error_log.save(stderr_path, File(err))
-                    verif_log.clean()
-
-            # Now: open the resulting file, which is at output_path, and
-            # make sure it's OK.  We're going to have to call
-            # summarize_CSV on this resulting file, but that's OK because
-            # it must have a CDT (NaturalNumber failed_row), and we
-            # will define NaturalNumber to have no CustomConstraint, so
-            # that no deeper recursion will happen.
-            output_summary = None
-            VERIF_OUT = CompoundDatatype.objects.get(pk=2)
-            with open(output_path, "rb") as test_out:
-                output_summary = VERIF_OUT.summarize_CSV(test_out, 
-                    os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
-    
-            if output_summary.has_key("bad_num_cols"):
-                raise ValueError(
-                    "Output of verification method for Datatype \"{}\" had the wrong number of columns".
-                    format(corresp_DT))
-    
-            if output_summary.has_key("bad_col_indices"):
-                raise ValueError(
-                    "Output of verification method for Datatype \"{}\" had a malformed header".
-                    format(corresp_DT))
-    
-            if output_summary.has_key("failing_cells"):
-                raise ValueError(
-                    "Output of verification method for Datatype \"{}\" had malformed entries".
-                    format(corresp_DT))
-    
-            # This should really never happen.
-            if os.path.exists(os.path.join(
-                    summary_path, "SHOULDNEVERBEWRITTENTO")):
-                raise ValueError(
-                    "Verification output CDT \"{}\" has been corrupted".
-                    format(VERIF_OUT))
-    
-            # Collect the row numbers of incorrect entries in this column.
-            with open(output_path, "rb") as test_out:
-                test_out_csv = csv.DictReader(test_out)
-                for row in test_out_csv:
-                    if (row["rownum"], col) in failing_cells:
-                        failing_cells[(row["rownum"], col)].append(
-                            corresp_DT.custom_constraint)
-                    else:
-                        failing_cells[(row["rownum"], col)] = [
-                            corresp_DT.custom_constraint
-                        ]
-    
+            for k, v in self._check_custom_constraint(col, cols_with_cc[col].name,
+                    content_check_log):
+                if k in failing_cells:
+                    failing_cells[k].extend(v)
+                else:
+                    failing_cells[k] = v
+        self.logger.debug("{} cells failed constraints".format(len(failing_cells)))
         # FINISHED CHECKING CUSTOM CONSTRAINTS
+        ####
+
+        # FINISHED CHECKING CONSTRAINTS
         ####
     
         # If there are any failing cells, then add the dict to summary.
-        if len(failing_cells) != 0:
+        if failing_cells:
             summary["failing_cells"] = failing_cells
     
         return summary

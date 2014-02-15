@@ -181,6 +181,7 @@ LOGGING = {
             'propagate': True,
         },
         'CodeResourceRevision':   {'handlers': ['console'], 'level': 'DEBUG'},
+        'CompoundDatatype':       {'handlers': ['console'], 'level': 'DEBUG'},
         'Dataset':                {'handlers': ['console'], 'level': 'DEBUG'},
         'ExecLog':                {'handlers': ['console'], 'level': 'DEBUG'},
         'ExecRecord':             {'handlers': ['console'], 'level': 'DEBUG'},

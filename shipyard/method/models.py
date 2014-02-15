@@ -505,9 +505,18 @@ class Method(transformation.models.Transformation):
 
     def _poll_stream(self, proc, in_stream, out_streams):
         """
+        SYNOPSIS
         Helper function for run_code_with_streams, which polls a Popen'ed procedure
-        for output on stream until it terminates, and prints the output to all the
-        out streams.
+        for output on in_stream until it terminates, and prints the output to
+        all the out_streams (like the Unix tee command).
+        TODO: instead of in_stream, pass a flag which controls whether to read stdout
+        or stderr.
+
+        INPUTS
+        proc            subprocess.Popen object to poll for output
+        in_stream       which of proc's streams to poll - must be either
+                        proc.stdout or proc.stderr
+        out_streams     streams to redirect output to
         """
         while True:
             line = in_stream.readline()
@@ -519,6 +528,7 @@ class Method(transformation.models.Transformation):
 
     def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams, error_streams):
         """
+        SYNOPSIS
         Run the method, passing each line in its stdout and stderr to any number
         of streams. Return the Method's return code, or -1 if the Method suffers
         an OS-level error (ie. is not executable).
@@ -527,7 +537,7 @@ class Method(transformation.models.Transformation):
         run_path        see run_code
         input_paths     see run_code
         output_paths    see run_code
-        output_streams  list of streams (eg. open file handles) to output stderr to
+        output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
 
         OUTPUTS
@@ -581,7 +591,7 @@ class Method(transformation.models.Transformation):
         ASSUMPTIONS
         1) The CRR of this Method can interface with Shipyard.
         Ie, it has positional inputs and outputs at command line:
-        script_name.py [input 1] ... [input n] [output 1] ... [output n]
+        script_name.py [input 1] ... [input n] [output 1] ... [output k]
 
         2) The caller is responsible for cleaning up the stdout/err
         file handles after the Popen has finished processing.

@@ -255,8 +255,9 @@ class VerificationLog(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     # When the verification was completed.
     end_time = models.DateTimeField(null=True)
-    # The return code from the Method's driver.
-    return_code = models.IntegerField()
+    # The return code from the Method's driver. Null indicates it hasn't
+    # completed yet.
+    return_code = models.IntegerField(null=True)
     # The verification method's standard output and standard error.
     output_log = models.FileField(upload_to="VerificationLogs")
     error_log = models.FileField(upload_to="VerificationLogs")
@@ -267,9 +268,25 @@ class VerificationLog(models.Model):
 
         The start time must be before the end time.
         """
-        if self.end_time is not None:
-            return self.start_time <= self.end_time
-        return True
+        if self.end_time is not None and self.start_time > self.end_time:
+            raise ValidationError(error_messages["verificationlog_swapped_times"])
+
+    def is_complete(self):
+        """
+        Check if this VerificationLog has completed yet (end_time and return_code
+        are set).
+        """
+        return not (self.end_time is None or self.return_code is None)
+
+    def complete_clean(self):
+        """
+        Checks that the verification log is coherent and the execution which it
+        is logging has completed.
+        """
+        self.clean()
+        if self.return_code is None or self.end_time is None:
+            raise ValidationError(error_messages["verificationlog_incomplete"].
+                    format(self))
 
 class MD5Conflict(models.Model):
     """

@@ -15,6 +15,8 @@ from django.utils import timezone
 
 import re
 import logging
+import tempfile
+
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import file_access_utils, logging_utils
 from constants import error_messages
@@ -155,14 +157,17 @@ class SymbolicDataset(models.Model):
             symDS.MD5_checksum = file_access_utils.compute_md5(f)
         symDS.clean()
         symDS.save()
+
     
         structure = None
         if cdt is not None:
             structure = DatasetStructure(symbolicdataset=symDS,compounddatatype=cdt)
 
+            run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
             # FIXME: Change /tmp/SD{} to the tmpdir mechanism
             with open(file_path, "rb") as f:
-                CSV_summary = cdt.summarize_CSV(f, "/tmp/SD{}".format(symDS.pk))
+                content_check_log = symDS.content_checks.create()
+                CSV_summary = cdt.summarize_CSV(f, run_dir, content_check_log)
                 self._validate_csv_summary(file_path, cdt, CSV_summary)
                 structure.num_rows = CSV_summary["num_rows"]
             structure.save()
