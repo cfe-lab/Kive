@@ -22,6 +22,8 @@ from sandbox.execute import Sandbox
 
 import file_access_utils
 
+from constants import error_messages, datatypes
+
 class UtilityMethods(TestCase):
 
     def setUp(self):
@@ -124,10 +126,10 @@ class UtilityMethods(TestCase):
         """
         Helper function to create a new datatype.
         """
-        datatype = Datatype(name=dtname, description=dtdesc, 
-          Python_type=pytype)
-        datatype.clean()
+        datatype = Datatype(name=dtname, description=dtdesc)
         datatype.save()
+        datatype.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
+        datatype.complete_clean()
         return datatype
 
     def make_first_revision(self, resname, resdesc, resfn, contents):
@@ -468,7 +470,7 @@ class ExecuteTestsRM(UtilityMethods):
         runstep = run.runsteps.first()
         execlog = runstep.log.first()
         execrecord = runstep.execrecord
-        outputs = runstep.outputs.all()
+        outputs = self.method_complement.outputs.all()
 
         self.assertEqual(execrecord.generator, execlog)
         self.assertEqual(execrecord.runsteps.first(), runstep)
@@ -968,8 +970,7 @@ class CustomConstraintTests(TestCase):
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
-        self.dt_basic = Datatype(name="alpha", description="strings of letters",
-                Python_type=Datatype.STR)
+        self.dt_basic = Datatype(name="alpha", description="strings of letters")
         self.dt_basic.save()
         self.dt_basic.basic_constraints.create(ruletype="regexp", rule="[A-Za-z]+")
         
@@ -1004,8 +1005,7 @@ class CustomConstraintTests(TestCase):
 
         # A Datatype with custom constraints restricting the basic datatype.
         self.dt_custom = Datatype(name="words", 
-                description="correctly spelled words", 
-                Python_type=Datatype.STR)
+                description="correctly spelled words")
         self.dt_custom.save()
         self.dt_custom.restricts.add(self.dt_basic)
         custom_constraint = CustomConstraint(datatype = self.dt_custom, 
@@ -1045,7 +1045,6 @@ class CustomConstraintTests(TestCase):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        return
         summary_path = os.path.join(self.workdir, "summary")
         with open(self.good_datafile.name) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir)

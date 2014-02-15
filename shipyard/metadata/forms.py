@@ -12,12 +12,12 @@ class DatatypeForm (forms.ModelForm):
         
     restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(), required=False, help_text='The new Datatype is a special case of one or more existing Datatypes; e.g., DNA restricts string.')
     #Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, widget=forms.Select(attrs={'onchange': 'switchConstraintForm(this.value)'}), help_text='How the Datatype will be stored in the database.')
-    Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, help_text='How the Datatype will be stored in the database.')
+    #Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, help_text='How the Datatype will be stored in the database.')
     date_created = datetime.now()
     
     class Meta:
         model = Datatype
-        fields = ('name', 'description', 'restricts', 'Python_type')
+        fields = ('name', 'description', 'restricts')
     
     #restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(),
     #   widget = FilteredSelectMultiple('name', is_stacked=False))
@@ -40,6 +40,7 @@ class StringConstraintForm (forms.Form):
 
 class CompoundDatatypeMemberForm(forms.ModelForm):
     datatype = forms.ModelChoiceField(queryset = Datatype.objects.all(), required=True, help_text="This column's expected datatype")
+    #column_idx = forms.ChoiceField(choices=[(1, '1')])
     class Meta:
         model = CompoundDatatypeMember
-        exclude = ('compounddatatype',)
+        exclude = ('compounddatatype','column_idx')

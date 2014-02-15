@@ -501,30 +501,31 @@ class ExecRecord(models.Model):
 
     def general_transf(self):
         """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        desired_transf = None
         generating_record = self.generator.record
-        if type(generating_record) == archive.models.RunStep:
-            desired_transf = generating_record.pipelinestep.transformation
-        elif type(generating_record) == archive.models.RunSIC:
-            desired_transf = generating_record.PSIC
-        elif type(generating_record) == archive.models.RunOutputCable:
-            desired_transf = generating_record.pipelineoutputcable
-
-        return desired_transf
+        generator_type = generating_record.__class__.__name__
+        if generator_type == "RunStep":
+            return generating_record.pipelinestep.transformation
+        elif generator_type == "RunSIC":
+            return generating_record.PSIC
+        elif generator_type == "RunOutputCable":
+            return generating_record.pipelineoutputcable
 
     def provides_outputs(self, outputs):
         """
         Checks whether this ER has existent data for these outputs.
         outputs: an iterable of TOs we want the ER to have real data for.
-        """
 
+        PRE
+        1) outputs must be TransformationOutputs of the Transformation associated
+        with the RunStep/RunSIC/RunOutputCable associated with this ExecRecord 
+        (they cannot be arbitrary TransformationOutputs).
+        """
         # Load each TO in outputs
         for curr_output in outputs:
+            output_type = ContentType.objects.get_for_model(curr_output)
+            corresp_ero = self.execrecordouts.get(content_type=output_type, object_id=curr_output.id)
 
-            type = ContentType.objects.get_for_model(curr_output)
-            corresp_ero = self.execrecordouts.filter(content_type=type, object_id=curr_output.id)
-
-            if not corresp_ero.first().has_data():
+            if not corresp_ero.has_data():
                 self.logger.debug("corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
                 return False
 
@@ -535,11 +536,7 @@ class ExecRecord(models.Model):
         """
         Checks whether all of the EROs of this ER are OK.
         """
-
-        for ero in self.execrecordouts.all():
-            if not ero.is_OK():
-                return False
-        return True
+        return all([ero.is_OK() for ero in self.execrecordouts.all()])
         
 class ExecRecordIn(models.Model):
     """

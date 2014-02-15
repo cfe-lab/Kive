@@ -54,6 +54,29 @@
     </tbody>
     </table>
 
+<h3>Outputs</h3>
+    <p>
+    <input type="button" id="addOutputForm" value="+"/>
+    <input type="button" id="removeOutputForm" value="-"/>
+    <small>Add/subtract output forms</small>
+    </p>
+    <table id="outputForms">
+    <thead>
+        <tr><th>Name</th><th>Index</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+    </thead>
+    <tbody id="extraOutputForms">
+    {% for output_form, xput_form in output_forms %}
+        <tr>
+        <td>{{ output_form.dataset_name }}</td>
+        <td>{{ output_form.dataset_idx }}</td>
+        <td>{{ xput_form.compounddatatype }}</td>
+        <td>{{ xput_form.min_row }}</td>
+        <td>{{ xput_form.max_row }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+
     <input type="submit" value="Submit" />
 </form>
 

@@ -19,8 +19,7 @@
 	<tr>
 	<th>Name</th>
 	<th>Description</th>
-<!-- 	<th>Restricts</th> -->
-	<th>Python type</th>
+    <th>Restricts</th>
 	<th>Date created</th>
 	</tr>
 </thead>
@@ -28,8 +27,7 @@
 <tr>
 	<td><a href="{{ datatype.get_absolute_url }}">{{ datatype.name }}</a></td>
 	<td>{{ datatype.description }}</td>
-<!-- 	<td>{{ datatype.restricts.name }}</td> -->
-    <td>{{ datatype.Python_type }}</td>
+    <td>{{ datatype.restricts_str }}</td>
     <td>{{ datatype.date_created }}</td>
 </tr>
 {% endfor %}

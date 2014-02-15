@@ -55,8 +55,6 @@ error_messages = {
         "Datatype \"{}\" effective MIN_VAL exceeds effective MAX_VAL",
     "DT_min_length_exceeds_max_length":
         "Datatype \"{}\" effective MIN_LENGTH exceeds effective MAX_LENGTH",
-    "DT_bad_type_restriction":
-        "Datatype \"{}\" has Python type {} and cannot restrict a supertype of Python type {}",
     "CellError_bad_BC":
         "CellError \"{}\" refers to a BasicConstraint that does not apply to the associated column",
     "CellError_bad_CC":
