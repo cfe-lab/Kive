@@ -219,7 +219,7 @@ class Datatype(models.Model):
             all_regexp_BCs.append(regexp_BC)
 
         for supertype in self.restricts.all():
-            for regexp_BC in supertype.basic_constraints.filter(ruletype=BasicConstraint.REGEXP):
+            for regexp_BC in supertype.get_all_regexps():
                 all_regexp_BCs.append(regexp_BC)
 
         return all_regexp_BCs

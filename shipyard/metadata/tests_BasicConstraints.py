@@ -409,6 +409,232 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
 
         self.assertEquals(heir.get_effective_num_constraint(BasicConstraint.MIN_LENGTH), (None, 0))
 
+    ########
+    def __test_get_effective_num_constraint_BC_overrides_inherited_h(self, builtin_type, supertype_builtin_type,
+                                                                     BC_type, constr_val, supertype_constr_val):
+        """
+        Helper for testing cases where a Datatype overrides its supertypes' constraints.
+        """
+        super_DT = Datatype(name="SuperDT", description="Supertype with constraint")
+        super_DT.full_clean()
+        super_DT.save()
+        super_DT.restricts.add(supertype_builtin_type)
+        super_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(supertype_constr_val))
+
+        heir_DT = Datatype(name="Heir", description="Heir of supertype with overriding constraint")
+        heir_DT.full_clean()
+        heir_DT.save()
+        heir_DT.restricts.add(builtin_type)
+        override = heir_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
+
+        self.assertEquals(heir_DT.get_effective_num_constraint(BC_type), (override, constr_val))
+
+    # We just pick a few cases to test for this situation.
+    def test_get_effective_min_val_float_overrides_inherited(self):
+        """
+        Get MIN_VAL from Datatype that overrides its inherited MIN_VAL.
+        """
+        self.__test_get_effective_num_constraint_BC_overrides_inherited_h(
+            self.FLOAT, self.FLOAT, BasicConstraint.MIN_VAL, 33, 30
+        )
+
+    def test_get_effective_max_val_int_overrides_inherited(self):
+        """
+        Get MAX_VAL from Datatype that overrides its inherited MAX_VAL.
+        """
+        self.__test_get_effective_num_constraint_BC_overrides_inherited_h(
+            self.INT, self.FLOAT, BasicConstraint.MAX_VAL, 22, 37
+        )
+
+    def test_get_effective_min_length_overrides_inherited(self):
+        """
+        Get MIN_LENGTH from Datatype that overrides its inherited MIN_LENGTH.
+        """
+        self.__test_get_effective_num_constraint_BC_overrides_inherited_h(
+            self.STR, self.STR, BasicConstraint.MIN_LENGTH, 30, 5
+        )
+
+    def test_get_effective_max_length_overrides_inherited(self):
+        """
+        Get MAX_LENGTH from Datatype that overrides its inherited MAX_LENGTH.
+        """
+        self.__test_get_effective_num_constraint_BC_overrides_inherited_h(
+            self.STR, self.STR, BasicConstraint.MAX_LENGTH, 16, 17
+        )
+
+class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
+
+    # There should be no distinction on what builtin types a Datatype
+    # inherits from, so we just shuffle through them.
+    def test_no_regexps(self):
+        """
+        Case where Datatype has no regexps defined on it.
+        """
+        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(self.STR)
+
+        self.assertEquals(my_DT.get_all_regexps(), [])
+
+    def test_no_regexps_second_gen(self):
+        """
+        Case where Datatype has no regexps defined on it and neither do its supertypes.
+        """
+        super_DT = Datatype(name="SuperDT", description="Unfettered FLOAT")
+        super_DT.save()
+        super_DT.restricts.add(self.FLOAT)
+
+        second_DT = Datatype(name="SecondDT", description="Unfettered INT")
+        second_DT.save()
+        second_DT.restricts.add(self.INT)
+
+        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(second_DT)
+
+        self.assertEquals(second_DT.get_all_regexps(), [])
+        self.assertEquals(my_DT.get_all_regexps(), [])
+
+    def test_one_direct_regexp(self):
+        """
+        Case where Datatype has one regexp defined on it.
+        """
+        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(self.BOOL)
+        regexp_BC = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                   rule="T|F")
+
+        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC])
+
+    def test_several_direct_regexps(self):
+        """
+        Case where Datatype has several regexps defined on it.
+        """
+        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(self.BOOL)
+        regexp_BC = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                   rule="T|F")
+        regexp2_BC = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                    rule="T")
+        regexp3_BC = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                    rule=".*")
+
+        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC, regexp3_BC])
+
+    def test_one_inherited_regexp(self):
+        """
+        Case where Datatype has no regexps defined on it but its supertypes do.
+        """
+        super_DT = Datatype(name="SuperDT", description="Regexped STR")
+        super_DT.save()
+        super_DT.restricts.add(self.STR)
+        regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule="1e.+")
+
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT.save()
+        second_DT.restricts.add(super_DT)
+        second_DT.restricts.add(self.FLOAT)
+
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(second_DT)
+
+        self.assertEquals(second_DT.get_all_regexps(), [regexp_BC])
+        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC])
+
+    def test_several_inherited_regexps(self):
+        """
+        Case where Datatype inherits several regexps and has none of its own.
+        """
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT.save()
+        super_DT.restricts.add(self.FLOAT)
+        regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule="1999393939.....")
+
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT.save()
+        second_DT.restricts.add(super_DT)
+        regexp2_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule="[1-9]+")
+
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(second_DT)
+
+        self.assertEquals(second_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
+        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
+
+    def test_several_once_removed_inherited_regexps(self):
+        """
+        Case where Datatype inherits several regexps from direct ancestors and has none of its own.
+        """
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT.save()
+        super_DT.restricts.add(self.FLOAT)
+        regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule="1999393939.....")
+
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT.save()
+        second_DT.restricts.add(self.FLOAT)
+        regexp2_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule="[1-9]+")
+
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(super_DT)
+        my_DT.restricts.add(second_DT)
+
+        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
+
+    def test_several_regexps_multiple_sources(self):
+        """
+        Case where Datatype inherits several regexps from ancestors and has some of its own.
+        """
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT.save()
+        super_DT.restricts.add(self.STR)
+        regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                      rule=".*")
+
+        second_DT = Datatype(name="SecondDT", description="STR inheriting a REGEXP")
+        second_DT.save()
+        second_DT.restricts.add(super_DT)
+        regexp2_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                       rule="[0-9]*")
+        regexp3_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                       rule="[1-7]*")
+
+        third_DT = Datatype(name="ThirdDT", description="STR inheriting a REGEXP")
+        third_DT.save()
+        third_DT.restricts.add(self.STR)
+        regexp4_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                       rule=".+")
+
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT.full_clean()
+        my_DT.save()
+        my_DT.restricts.add(second_DT)
+        my_DT.restricts.add(third_DT)
+        regexp5_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
+                                                       rule="[4-7]+")
+
+        second_DT_regexps = second_DT.get_all_regexps()
+        self.assertEquals(len(second_DT_regexps), 3)
+        # FIXME continue from here!
+        # self.assertEquals(second_DT.get_all_regexps(), [regexp2_BC, regexp3_BC, regexp_BC])
+        # self.assertEquals(my_DT.get_all_regexps(), [regexp5_BC, regexp2_BC, regexp3_BC, regexp_BC, regexp4_BC])
 
 class BasicConstraintCleanTests(BasicConstraintTestSetup):
 
@@ -1059,7 +1285,6 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
                                 error_messages[err_msg_key].format(constr, constr_DT),
                                 constr_DT.clean)
 
-
     def test_clean_second_gen_str_max_length_bad(self):
         """
         Testing clean() on a badly-defined (str) MIN_LENGTH constraint (second-gen Datatype).
@@ -1144,7 +1369,6 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         self.assertEquals(regexp_constr.clean(), None)
         # Propagation check.
         self.assertEquals(regexped_DT.clean(), None)
-
 
     def test_clean_second_gen_regexp_bad(self):
         """
