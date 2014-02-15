@@ -42,13 +42,13 @@ error_messages = {
     "DT_several_same_constraint":
         "Datatype \"{}\" has more than one constraint of type \"{}\"",
     "DT_min_val_smaller_than_supertypes":
-        "Datatype \"{}\" MIN_VAL does not strictly exceed the maximum of its supertypes'",
+        "Datatype \"{}\" MIN_VAL does not strictly exceed the maximum of those of its supertypes",
     "DT_max_val_larger_than_supertypes":
-        "Datatype \"{}\" MAX_VAL is not strictly smaller than the minimum of its supertypes'",
+        "Datatype \"{}\" MAX_VAL is not strictly smaller than the minimum of those of its supertypes",
     "DT_min_length_smaller_than_supertypes":
-        "Datatype \"{}\" MIN_LENGTH does not strictly exceed the maximum of its supertypes'",
+        "Datatype \"{}\" MIN_LENGTH does not strictly exceed the maximum of those of its supertypes",
     "DT_max_length_larger_than_supertypes":
-        "Datatype \"{}\" MAX_LENGTH is not strictly smaller than the minimum of its supertypes'",
+        "Datatype \"{}\" MAX_LENGTH is not strictly smaller than the minimum of those of its supertypes",
     "DT_too_many_datetimeformats":
         "Datatype \"{}\" has too many DATETIMEFORMAT restrictions acting on it",
     "DT_min_val_exceeds_max_val":

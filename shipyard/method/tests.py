@@ -17,7 +17,9 @@ import metadata.tests
 from constants import error_messages, datatypes
 
 logging.getLogger().setLevel(10) # Debug messages
-samplecode_path = "../samplecode"
+
+# This was previously defined here but has been moved to metadata.tests.
+samplecode_path = metadata.tests.samplecode_path
 
 class MethodTestSetup(metadata.tests.MetadataTestSetup):
     """
