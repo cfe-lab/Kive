@@ -504,7 +504,7 @@ class Datatype(models.Model):
 
         for re_BC in self.get_all_regexps():
             constraint_re = re.compile(re_BC.rule)
-            if not constraint_re.match(string_to_check):
+            if not constraint_re.search(string_to_check):
                 constraints_failed.append(re_BC)
 
         return constraints_failed
