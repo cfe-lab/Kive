@@ -981,7 +981,7 @@ class CompoundDatatype(models.Model):
     
         return (rownum, failing_cells)
 
-    def _check_verification_output(self, column_index, output_path):
+    def _check_verification_output(self, column_index, output_path, num_rows):
         """
         Check the one-column CSV file, contained at output_path, which was output
         by a verification method for the Datatype member with index column_index.
@@ -991,6 +991,7 @@ class CompoundDatatype(models.Model):
         output_path     the CSV file to check, which was output by a verification method
         column_index    index of the CompoundDatatypeMember for which a verification was
                         run, resulting in the file at output_path
+        num_rows        the number of rows in the CSV which was verified
 
         OUTPUTS
         failing_cells   a dictionary of CustomConstraints which were failed in the
@@ -1049,11 +1050,15 @@ class CompoundDatatype(models.Model):
             test_out_csv = csv.reader(test_out)
             next(test_out_csv) # skip header
             for row in test_out_csv:
+                if int(row[0]) > num_rows:
+                    raise ValueError(error_messages["verification_large_row"].
+                            format(corresp_DT, row[0], self, num_rows))
                 failing_cells[(int(row[0]), column_index)] = [corresp_DT.custom_constraint]
 
         return failing_cells
 
-    def _check_custom_constraint(self, column_index, input_path, content_check_log):
+    def _check_custom_constraint(self, column_index, input_path,
+            content_check_log, num_rows):
         """
         SYNOPSIS
         Check the one-column CSV file file stored at input_path against the
@@ -1066,10 +1071,10 @@ class CompoundDatatype(models.Model):
         column_index        index of the column whose CustomConstraint we will
                             verify on the file
         input_path          one-column CSV to be checked
-
         content_check_log   this function is called during a check of the
                             contents of a CSV file - this parameter is the log
                             created for that check
+        num_rows            the number of rows in the CSV to be checked
 
         OUTPUTS
         failing_cells       a dictionary of cells which failed a custom
@@ -1109,7 +1114,8 @@ class CompoundDatatype(models.Model):
 
         verif_log.complete_clean()
 
-        return self._check_verification_output(column_index, output_path)
+        return self._check_verification_output(column_index, output_path,
+                num_rows)
     
     def summarize_CSV(self, file_to_check, summary_path, content_check_log=None):
         """
@@ -1206,7 +1212,7 @@ class CompoundDatatype(models.Model):
             self.logger.debug("Checking custom constraints")
         for col in cols_with_cc:
             for k, v in self._check_custom_constraint(col, cols_with_cc[col].name,
-                    content_check_log).items():
+                    content_check_log, summary["num_rows"]).items():
                 if k in failing_cells:
                     failing_cells[k].extend(v)
                 else:

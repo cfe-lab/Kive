@@ -6,6 +6,7 @@ import random
 import logging
 import csv
 import time
+import re
 from subprocess import Popen, PIPE
 
 from django.core.files import File
@@ -18,7 +19,7 @@ from librarian.models import SymbolicDataset
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
-from datachecking.models import ContentCheckLog
+from datachecking.models import ContentCheckLog, BadData
 from sandbox.execute import Sandbox
 
 import file_access_utils
@@ -961,120 +962,197 @@ class FindSDTests(UtilityMethods):
         self.assertEqual(run, subrun)
         self.assertEqual(gen, cable.PSIC)
 
-class CustomConstraintTests(TestCase):
+class CustomConstraintTests(UtilityMethods):
     """
     Test the creation and use of custom constraints.
     """
 
     def setUp(self):
-        # A user.
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
-
-        # A temporary directory to do work in.
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
-        self.dt_basic = Datatype(name="alpha", description="strings of letters")
-        self.dt_basic.save()
-        self.dt_basic.basic_constraints.create(ruletype="regexp", rule="[A-Za-z]+")
+        self.dt_basic = self._setup_datatype("alpha", "strings of letters", 
+                [("regexp", "^[A-Za-z]+$")], 
+                [Datatype.objects.get(pk=datatypes.STR_PK)])
         
-        scriptfile = tempfile.NamedTemporaryFile(delete=False)
-        scriptfile.write(
-        """#!/bin/bash
-        echo failed_row > $2
-        row_num=0
-        for row in $(cat $1); do
-          if [[ $row_num -gt 0 ]]; then
-             if [[ "x$(echo $row | aspell list)" != "x" ]]; then
-                echo $row_num >> $2
-             fi  
-          fi  
-          row_num=$(($row_num+1))
-        done""")
-        scriptfile.close()
-
-        # A CodeResourceRevision to check if a word is spelled properly.
-        self.cr_spellcheck = CodeResource(name="spellcheck", filename="spellcheck.sh",
-                description="a custom constraint checker for correctly spelled words")
-        self.cr_spellcheck.save()
-        self.crr_spellcheck = self.cr_spellcheck.revisions.create(revision_name="1", 
-                revision_desc="first version", content_file=scriptfile.name)
-        self.crr_spellcheck.save()
-        self.mf_spellcheck = MethodFamily()
-        self.mf_spellcheck.save()
-        self.method_spellcheck = self.mf_spellcheck.members.create(
-                driver=self.crr_spellcheck)
-        self.method_spellcheck.inputs.create(dataset_name = "to_test",
-                dataset_idx = 1)
-        self.method_spellcheck.outputs.create(dataset_name = "failed_row",
-                dataset_idx = 1)
-        self.method_spellcheck.save()
-
         # A Datatype with custom constraints restricting the basic datatype.
-        self.dt_custom = Datatype(name="words", 
-                description="correctly spelled words")
-        self.dt_custom.save()
-        self.dt_custom.restricts.add(self.dt_basic)
-        custom_constraint = CustomConstraint(datatype = self.dt_custom, 
-                verification_method = self.method_spellcheck)
-        custom_constraint.save()
-        self.dt_custom.custom_constraint = custom_constraint
-        self.dt_custom.save()
+        self.dt_custom = self._setup_datatype("words", 
+                "correctly spelled words", [], [self.dt_basic])
+
+        # Set up the custom constraint, a spell checker.
+        self._setup_custom_constraint("spellcheck",
+            "a spell checker",
+            """#!/bin/bash
+            echo failed_row > $2
+            row_num=0
+            for row in $(cat $1); do
+              if [[ $row_num -gt 0 ]]; then
+                 if [[ "x$(echo $row | aspell list)" != "x" ]]; then
+                    echo $row_num >> $2
+                 fi  
+              fi  
+              row_num=$(($row_num+1))
+            done""",
+            self.dt_custom)
 
         # A compound datatype composed of alphabetic strings and correctly
         # spelled words.
-        self.cdt_constraints = CompoundDatatype()
-        self.cdt_constraints.save()
-        self.cdt_constraints.members.create(datatype = self.dt_basic,
-                column_name = "letter strings", column_idx = 1)
-        self.cdt_constraints.members.create(datatype = self.dt_custom,
-                column_name = "words", column_idx = 2)
-        self.cdt_constraints.save()
+        self.cdt_constraints = self._setup_compounddatatype(
+                [self.dt_basic, self.dt_custom],
+                ["letter strings", "words"])
 
         # A file conforming to the compound datatype.
-        self.good_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
-        self.good_datafile.write("letter strings,words\n")
-        self.good_datafile.write("abcab,hello\n")
-        self.good_datafile.write("goodbye,world")
-        self.good_datafile.close()
+        self.good_datafile = self._setup_datafile(self.cdt_constraints,
+                [["abcab", "hello"], ["goodbye", "world"]])
 
         # A file not conforming to the compound datatype.
-        self.bad_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
-        self.bad_datafile.write("letter strings,words\n")
-        self.bad_datafile.write("hello,Spock\n")
-        self.bad_datafile.write("1ive,10ng\n")
-        self.bad_datafile.write("and,prosper\n")
-        self.bad_datafile.close()
+        self.bad_datafile = self._setup_datafile(self.cdt_constraints,
+                [["hello", "Spock"], ["1ive", "10ng"], ["and", "porsper"]])
+
+    def _setup_datafile(self, compounddatatype, lines):
+        """
+        Helper function to set up a datafile for a compounddatatype on the file
+        system.
+        """
+        datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
+        header = [m.column_name for m in compounddatatype.members.all()]
+        writer = csv.writer(datafile)
+        writer.writerow(header)
+        [writer.writerow(line) for line in lines]
+        datafile.close()
+        return datafile.name
+
+    def _setup_datatype(self, name, desc, basic_constraints, restricts):
+        """
+        Helper function to set up a Datatype, given a list of basic
+        constraints (which are tuples (ruletype, rule)), and a list
+        of other datatypes to restrict.
+        """
+        datatype = Datatype(name=name, description=desc)
+        datatype.save()
+        for supertype in restricts:
+            datatype.restricts.add(supertype)
+        for ruletype, rule in basic_constraints:
+            datatype.basic_constraints.create(ruletype=ruletype, rule=rule)
+        return(datatype)
+
+    def _setup_compounddatatype(self, datatypes, column_names):
+        """
+        Helper function to create a compound datatype, given a list of members
+        and column names.
+        """
+        compounddatatype = CompoundDatatype()
+        compounddatatype.save()
+        for i in range(len(datatypes)):
+            compounddatatype.members.create(datatype=datatypes[i],
+                    column_name = column_names[i], column_idx=i+1)
+        compounddatatype.save()
+        return compounddatatype
+
+    def _setup_custom_constraint(self, name, desc, script, datatype):
+        """
+        Helper function to set up a custom constraint on a datatype.
+        
+        INPUTS
+        name        name of the code resource of the verifier
+        desc        description for the code resource of the verifier
+        script      contents of verification script
+        datatype    datatype which will recieve custom constraint
+        """
+        scriptfile = tempfile.NamedTemporaryFile(delete=False,
+                dir=self.workdir)
+        scriptfile.write(script)
+        scriptfile.close()
+
+        coderesource = CodeResource(name=name, filename="{}.sh".format(name),
+                description=desc)
+        coderesource.save()
+        revision = coderesource.revisions.create(revision_name="1", 
+                revision_desc="first version", content_file=scriptfile.name)
+        revision.save()
+        methodfamily = MethodFamily()
+        methodfamily.save()
+        method = methodfamily.members.create(driver=revision)
+        method.inputs.create(dataset_name="to_test", dataset_idx=1)
+        method.outputs.create(dataset_name="failed_row", 
+                dataset_idx=1)
+        method.save()
+        customconstraint = CustomConstraint(datatype = datatype,
+                verification_method = method)
+        customconstraint.save()
+
+    def _setup_content_check_log(self, datafile, cdt, user, name, desc):
+        """
+        Helper function to create a SymbolicDataset and ContentCheckLog
+        for a given CompoundDatatype.
+        """
+        symbolicdataset = SymbolicDataset.create_SD(datafile, cdt=cdt,
+                user=user, name=name, description=desc)
+        log = ContentCheckLog(symbolicdataset=symbolicdataset)
+        log.save()
+        return log
 
     def tearDown(self):
         # Clean up the work directory.
-        #shutil.rmtree(self.workdir)
-        pass
+        shutil.rmtree(self.workdir)
 
-    #TODO
     def test_summarize_CSV_no_output(self):
         """
         A verification method which produces no output should throw a ValueError.
         """
-        pass
+        dt_no_output = self._setup_datatype("numerics", "strings of digits",
+                [("regexp", "^[0-9]+$")],
+                [Datatype.objects.get(pk=datatypes.INT_PK)])
+        self._setup_custom_constraint("empty", "a script producing no output",
+                "#!/bin/bash", dt_no_output)
+        cdt_no_output = self._setup_compounddatatype( 
+                [dt_no_output, self.dt_basic],
+                ["numerics", "letter strings"])
+        no_output_datafile = self._setup_datafile(cdt_no_output,
+                [[123, "foo"], [456, "bar"], [789, "baz"]])
 
-    #TODO
+        self.assertRaisesRegexp(ValueError,
+                re.escape(error_messages["verification_no_output"].
+                        format(1, cdt_no_output)),
+                lambda: SymbolicDataset.create_SD(no_output_datafile, 
+                        cdt_no_output, self.user_oscar, "no output", 
+                        "data with a bad verifier"))
+
     def test_verification_method_failed_row_too_large(self):
         """
         If a verification method produces a row which is greater than the number
         of rows in the input, a ValueError should be raised.
+        TODO: This is currently failing.
         """
+        dt_big_row = self._setup_datatype("barcodes",
+                "strings of upper case alphanumerics of length between 10 and 12", 
+                [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
+                [Datatype.objects.get(pk=datatypes.STR_PK)])
+        self._setup_custom_constraint("bigrow", 
+                "a script outputting a big row number",
+                '#!/bin/bash\necho -e "failed_row\\n1000" > $2',
+                dt_big_row)
+        cdt_big_row = self._setup_compounddatatype(
+                [dt_big_row, self.dt_custom], ["barcodes", "words"])
+        big_row_datafile = self._setup_datafile(cdt_big_row,
+                [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
+
+        self.assertRaisesRegexp(ValueError,
+                re.escape(error_messages["verification_large_row"].
+                    format(dt_big_row, 1000, cdt_big_row, 2)),
+                lambda: SymbolicDataset.create_SD(big_row_datafile,
+                    cdt=cdt_big_row, user=self.user_oscar, name="big row",
+                    description="data with a verifier outputting too high a row number"))
 
     def test_summarize_correct_datafile(self):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        sd = SymbolicDataset.create_SD(self.good_datafile.name, cdt=self.cdt_constraints,
-            user=self.user_oscar, name="constraint data", 
-            description="data to test custom constraint checking")
-        log = ContentCheckLog(symbolicdataset=sd)
-        log.save()
-        with open(self.good_datafile.name) as f:
+        log = self._setup_content_check_log(self.good_datafile,
+            self.cdt_constraints, self.user_oscar, "constraint data",
+            "data to test custom constraint checking")
+        with open(self.good_datafile) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
         expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
         self.assertEqual(summary.has_key("num_rows"), True)
@@ -1089,14 +1167,13 @@ class CustomConstraintTests(TestCase):
         """
         A non-conforming datafile should return a CSV summary with appropriate errors.
         """
-        sd = SymbolicDataset.create_SD(self.bad_datafile.name, cdt=self.cdt_constraints,
-            user=self.user_oscar, name="bad data", 
-            description="invalid data to test custom constraint checking")
-        log = ContentCheckLog(symbolicdataset=sd)
-        log.save()
-        with open(self.bad_datafile.name) as f:
+        log = self._setup_content_check_log(self.bad_datafile,
+            self.cdt_constraints, self.user_oscar, "bad data",
+            "invalid data to test custom constraint checking")
+        with open(self.bad_datafile) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
         expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
+        print(summary)
         self.assertEqual(summary.has_key("num_rows"), True)
         self.assertEqual(summary.has_key("header"), True)
         self.assertEqual(summary.has_key("bad_num_cols"), False)
@@ -1106,4 +1183,6 @@ class CustomConstraintTests(TestCase):
         self.assertEqual(summary["header"], expected_header)
         self.assertEqual(summary["failing_cells"], 
             { (2, 1): [self.dt_basic.basic_constraints.first()],
-              (2, 2): [self.dt_basic.basic_constraints.first(), self.dt_custom.custom_constraint] })
+              (2, 2): [self.dt_basic.basic_constraints.first(),
+                  self.dt_custom.custom_constraint], 
+              (3, 2): [self.dt_custom.custom_constraint] })
