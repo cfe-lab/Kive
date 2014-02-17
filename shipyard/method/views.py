@@ -271,17 +271,15 @@ def method_add (request):
         query = request.POST.dict()
         print query # debugging
 
-        num_input_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_in_')])
-        num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
-        exceptions = {'inputs': {}, 'outputs': {}}
+        num_xput_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_')])
+        exceptions = {}
 
         # retrieve CodeResource revision as driver
         try:
             coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
         except:
-            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'input_forms': input_forms,
-                         'output_forms': output_forms})
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
+            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
@@ -293,10 +291,9 @@ def method_add (request):
                 method_family.full_clean()
                 method_family.save()
             except ValidationError as e:
-                family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+                family_form, method_form, xput_forms = return_method_forms(request, exceptions)
                 family_form.errors['Errors'] = ErrorList(e.messages)
-                c = Context({'family_form': family_form, 'method_form': method_form, 'input_forms': input_forms,
-                             'output_forms': output_forms})
+                c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
                 c.update(csrf(request))
                 return HttpResponse(t.render(c))
 
@@ -314,46 +311,37 @@ def method_add (request):
             new_method.save()
         except ValidationError as e:
             print e
-            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
             method_form.errors['Errors'] = ErrorList(e.messages)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'input_forms': input_forms,
-                         'output_forms': output_forms})
+            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
-        # attempt to make inputs
-        for i in range(num_input_forms):
-            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_in_'+str(i)])
-            min_row = query['min_row_in_'+str(i)]
-            max_row = query['max_row_in_'+str(i)]
+        # attempt to make inputs and outputs
+        for i in range(num_xput_forms):
+            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
+            min_row = query['min_row_'+str(i)]
+            max_row = query['max_row_'+str(i)]
             try:
-                new_input = new_method.create_input(dataset_name = query['dataset_name_in_'+str(i)],
+                if query['input_output_'+str(i)] == 'input':
+                    new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1,
+                                                        compounddatatype = my_compound_datatype,
+                                                        min_row = min_row if min_row else None,
+                                                        max_row = max_row if max_row else None)
+                else:
+                    new_output = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
                                                     dataset_idx = i+1,
                                                     compounddatatype = my_compound_datatype,
                                                     min_row = min_row if min_row else None,
                                                     max_row = max_row if max_row else None)
             except ValueError as e:
-                exceptions['inputs'].update({i: e.messages})
-
-        # attempt to make outputs
-        for i in range(num_output_forms):
-            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_out_'+str(i)])
-            min_row = query['min_row_out_'+str(i)]
-            max_row = query['max_row_out_'+str(i)]
-            try:
-                new_output = new_method.create_input(dataset_name = query['dataset_name_out_'+str(i)],
-                                                    dataset_idx = i+1,
-                                                    compounddatatype = my_compound_datatype,
-                                                    min_row = min_row if min_row else None,
-                                                    max_row = max_row if max_row else None)
-            except ValueError as e:
-                exceptions['outputs'].update({i: e.messages})
+                exceptions.update({i: e.messages})
 
         if exceptions:
             new_method.delete()
             family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'input_forms': input_forms,
-                         'output_forms': output_forms})
+            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
@@ -364,12 +352,13 @@ def method_add (request):
         # first set of forms
         family_form = MethodFamilyForm()
         method_form = MethodForm()
-        input_forms = [(TransformationInputForm(auto_id='id_%s_in_0'), XputStructureForm(auto_id='id_%s_in_0'))]
-        output_forms = [(TransformationOutputForm(auto_id='id_%s_out_0'), XputStructureForm(auto_id='id_%s_out_0'))]
+        xput_forms = [(TransformationXputForm(auto_id='id_%s_0'),
+                       XputStructureForm(auto_id='id_%s_0')),
+                      (TransformationXputForm(auto_id='id_%s_1', initial={'input_output': 'output'}),
+                       XputStructureForm(auto_id='id_%s_1'))]
 
     c = Context({'family_form': family_form,
                  'method_form': method_form,
-                 'input_forms': input_forms,
-                 'output_forms': output_forms})
+                 'xput_forms': xput_forms})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

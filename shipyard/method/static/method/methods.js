@@ -71,93 +71,55 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     );
 
     // add or subtract input forms
-    var numberOfInputForms = $('#extraInputForms > tr').length;
+    var numberOfXputForms = $('#extraXputForms > tr').length;
 
     // modify name attributes for extra input forms received from server
-    for (var i = 0; i < numberOfInputForms; i++) {
-        $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
-        $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
-        $('#id_min_row_in_'+i).attr('name', 'min_row_in_'+i);
-        $('#id_max_row_in_'+i).attr('name', 'max_row_in_'+i);
+    for (var i = 0; i < numberOfXputForms; i++) {
+        $('#id_input_output'+i).attr('name', 'input_output_'+i);
+        $('#id_dataset_name_'+i).attr('name', 'dataset_name_'+i);
+        $('#id_compounddatatype_'+i).attr('name', 'compounddatatype_'+i);
+        $('#id_min_row_'+i).attr('name', 'min_row_'+i);
+        $('#id_max_row_'+i).attr('name', 'max_row_'+i);
     }
 
-    $("#addInputForm").click(  // query button by id selector
+    $("#addXputForm").click(  // query button by id selector
         function () {   // anonymous function
-            numberOfInputForms += 1;
-            renderInputForms(numberOfInputForms);
+            numberOfXputForms += 1;
+            renderXputForms(numberOfXputForms);
         }
     );
-    $("#removeInputForm").click(
+    $("#removeXputForm").click(
         function() {
-            if (numberOfInputForms > 1) {
-                numberOfInputForms -= 1;
-                renderInputForms(numberOfInputForms);
+            if (numberOfXputForms > 2) {
+                numberOfXputForms -= 1;
+                renderXputForms(numberOfXputForms);
             }
         }
     );
-    var options = document.getElementById("id_compounddatatype_in_0").options;
-    var renderInputForms = function($nForms) {
+    var options = document.getElementById("id_compounddatatype_0").options;
+    var renderXputForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
             // generate char fields
             htmlStr += "<tr>"
             htmlStr += "<td>"+(i+1)+"</td>";
-            htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
+
+            htmlStr += "<td><select id=\"id_input_output_"+i+"\" name=\"input_output_"+i+"\">";
+            htmlStr += "<option value=\"input\">IN</option>";
+            htmlStr += "<option value=\"output\">OUT</option>";
+            htmlStr += "</select>";
+
+            htmlStr += "<td><input id=\"id_dataset_name_" + i + "\" maxlength=\"128\" name=\"dataset_name_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><select id=\"id_compounddatatype_" + i + "\" name=\"compounddatatype_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
             }
             htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_min_row_" + i + "\" class=\"shortIntField\" name=\"min_row_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_max_row_" + i + "\" class=\"shortIntField\" name=\"max_row_" + i + "\" type=\"number\" /></td>";
             htmlStr += "</tr>"
         }
-        $("#extraInputForms").html(htmlStr);
-    };
-
-
-    // add or subtract output forms
-    var numberOfOutputForms = $('#extraInputForms > tr').length;
-    if (numberOfOutputForms > 0) {
-        for (var i=0; i < numberOfOutputForms; i++) {
-            $('#id_dataset_name_out_'+i).attr('name', 'dataset_name_out_'+i);
-            $('#id_compounddatatype_out_'+i).attr('name', 'compounddatatype_out_'+i);
-            $('#id_min_row_out_'+i).attr('name', 'min_row_out_'+i);
-            $('#id_max_row_out_'+i).attr('name', 'max_row_out_'+i);
-        }
-    }
-    $("#addOutputForm").click(  // query button by id selector
-        function () {   // anonymous function
-            numberOfOutputForms += 1;
-            renderOutputForms(numberOfOutputForms);
-        }
-    );
-    $("#removeOutputForm").click(
-        function() {
-            if (numberOfOutputForms > 1) {
-                numberOfOutputForms -= 1;
-                renderOutputForms(numberOfOutputForms);
-            }
-        }
-    );
-    // render forms in div
-    var renderOutputForms = function($nForms) {
-        var htmlStr = "";
-        for (var i = 0; i < $nForms; i++) {
-            // generate char fields
-            htmlStr += "<tr>"
-            htmlStr += "<td>"+(i+1)+"</td>";
-            htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
-            for (var j = 0; j < options.length; j++) {
-                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>"
-        }
-        $("#extraOutputForms").html(htmlStr);
+        $("#extraXputForms").html(htmlStr);
     };
 
 
@@ -176,12 +138,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $('#id_family').on('change', function() {
         this_family = $(this).val();
         if (this_family == "") {
-            $('#id_name').enabled();
-            $('#id_description').enabled();
+            $('#id_name').prop('disabled', false);
+            $('#id_description').prop('disabled', false);
         } else {
             // TODO: ajax query populates these fields with values from DB
-            $('#id_name').disabled();
-            $('#id_description').disabled();
+            $('#id_name').prop('disabled', true);
+            $('#id_description').prop('disabled', true);
         }
     }).change(); // trigger on load
 });

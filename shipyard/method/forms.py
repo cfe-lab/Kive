@@ -73,21 +73,12 @@ class MethodForm (forms.ModelForm):
         fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions', 'family')
 
 
-class TransformationInputForm (forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(TransformationInputForm, self).__init__(*args, **kwargs)
-        #self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
+class TransformationXputForm (forms.ModelForm):
+    input_output = forms.ChoiceField(choices=[('input', 'IN'), ('output', 'OUT')])
     class Meta:
         model = TransformationInput # derived from abstract class TransformationXput
         fields = ('dataset_name', )
 
-class TransformationOutputForm (forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(TransformationOutputForm, self).__init__(*args, **kwargs)
-        #self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
-    class Meta:
-        model = TransformationOutput
-        fields = ('dataset_name', )
 
 class XputStructureForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):

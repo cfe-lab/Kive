@@ -40,52 +40,31 @@
 
 
 
-<h3>Inputs</h3>
+<h3>Inputs/Outputs</h3>
     <p>
-    <input type="button" id="addInputForm" value="+"/>
-    <input type="button" id="removeInputForm" value="-"/>
+    <input type="button" id="addXputForm" value="+"/>
+    <input type="button" id="removeXputForm" value="-"/>
     <small>Add/subtract input forms</small>
     </p>
 
-    <table id="inputForms">
+    <table id="xputForms">
     <thead>
-        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+        <tr><th>Index</th><th>In/Out</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
     </thead>
-    <tbody id="extraInputForms">
-    {% for input_form, xput_form in input_forms %}
+    <tbody id="extraXputForms">
+    {% for xput_form, struct_form in xput_forms %}
         <tr>
         <td>{{ forloop.counter }}</td>
-        <td>{{ input_form.dataset_name }}</td>
-        <td>{{ xput_form.compounddatatype }}</td>
-        <td>{{ xput_form.min_row }}</td>
-        <td>{{ xput_form.max_row }}</td>
+        <td>{{ xput_form.input_output }}</td>
+        <td>{{ xput_form.dataset_name }}</td>
+        <td>{{ struct_form.compounddatatype }}</td>
+        <td>{{ struct_form.min_row }}</td>
+        <td>{{ struct_form.max_row }}</td>
         </tr>
     {% endfor %}
     </tbody>
     </table>
 
-<h3>Outputs</h3>
-    <p>
-    <input type="button" id="addOutputForm" value="+"/>
-    <input type="button" id="removeOutputForm" value="-"/>
-    <small>Add/subtract output forms</small>
-    </p>
-    <table id="outputForms">
-    <thead>
-        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
-    </thead>
-    <tbody id="extraOutputForms">
-    {% for output_form, xput_form in output_forms %}
-        <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ output_form.dataset_name }}</td>
-        <td>{{ xput_form.compounddatatype }}</td>
-        <td>{{ xput_form.min_row }}</td>
-        <td>{{ xput_form.max_row }}</td>
-        </tr>
-    {% endfor %}
-    </tbody>
-    </table>
 
     <input type="submit" value="Submit" />
 </form>
