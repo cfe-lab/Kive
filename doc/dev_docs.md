@@ -194,9 +194,15 @@ length (for strings), minimum and maximum values (for integers and
 floats), matching a regular expression (for strings), and being
 formatted as a timestamp (for strings). To define a datatype for strings
 of DNA between 50 and 300 base pairs long, I could use the three
-constraints "minlen=50", "maxlen=300", and "regexp='[ATCG]+'". More
+constraints "minlen=50", "maxlen=300", and "regexp='^[ATCG]+$'". More
 concisely, I could simply use the one constraint
-"regexp='[ATCG]{50,300}'".
+"regexp='^[ATCG]{50,300}$'". 
+
+Note that both regular expressions begin with '^' and end with '$', which
+indicates that the pattern should match the whole string. If you omit these,
+values will be matched if they /begin/ with a string matching your pattern.
+For example, the string "ATTA123" is allowed under the constraint 
+"regexp='[ATCG]+'", but not under the constraint "regexp='^[ATCG]+$'".
 
 The second type of constraint is a /custom constraint/, which allows you
 to define arbitrary checks on your data based on code that you write

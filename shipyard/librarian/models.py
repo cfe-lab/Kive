@@ -141,6 +141,8 @@ class SymbolicDataset(models.Model):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
+    # TODO: raise ValueError when the wrong combination of parameters is passed
+    # (ie. user and name are None).
     def create_SD(self, file_path, cdt=None, make_dataset=True, user=None,
                   name=None, description=None):
         """
@@ -158,13 +160,11 @@ class SymbolicDataset(models.Model):
         symDS.clean()
         symDS.save()
 
-    
         structure = None
         if cdt is not None:
             structure = DatasetStructure(symbolicdataset=symDS,compounddatatype=cdt)
 
             run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-            # FIXME: Change /tmp/SD{} to the tmpdir mechanism
             with open(file_path, "rb") as f:
                 content_check_log = symDS.content_checks.create()
                 CSV_summary = cdt.summarize_CSV(f, run_dir, content_check_log)

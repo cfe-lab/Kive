@@ -967,6 +967,9 @@ class CustomConstraintTests(TestCase):
     """
 
     def setUp(self):
+        # A user.
+        self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
+
         # A temporary directory to do work in.
         self.workdir = tempfile.mkdtemp()
 
@@ -979,9 +982,9 @@ class CustomConstraintTests(TestCase):
         scriptfile.write(
         """#!/bin/bash
         echo failed_row > $2
-        row_num=1
+        row_num=0
         for row in $(cat $1); do
-          if [[ $row_num -gt 1 ]]; then
+          if [[ $row_num -gt 0 ]]; then
              if [[ "x$(echo $row | aspell list)" != "x" ]]; then
                 echo $row_num >> $2
              fi  
@@ -1038,8 +1041,8 @@ class CustomConstraintTests(TestCase):
         # A file not conforming to the compound datatype.
         self.bad_datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
         self.bad_datafile.write("letter strings,words\n")
-        self.bad_datafile.write("hello there,Spock\n")
-        self.bad_datafile.write("l1ve,long\n")
+        self.bad_datafile.write("hello,Spock\n")
+        self.bad_datafile.write("1ive,10ng\n")
         self.bad_datafile.write("and,prosper\n")
         self.bad_datafile.close()
 
@@ -1055,13 +1058,52 @@ class CustomConstraintTests(TestCase):
         """
         pass
 
+    #TODO
+    def test_verification_method_failed_row_too_large(self):
+        """
+        If a verification method produces a row which is greater than the number
+        of rows in the input, a ValueError should be raised.
+        """
+
     def test_summarize_correct_datafile(self):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        sd = SymbolicDataset.create_SD(self.good_datafile.name, cdt=self.cdt_constraints)
+        sd = SymbolicDataset.create_SD(self.good_datafile.name, cdt=self.cdt_constraints,
+            user=self.user_oscar, name="constraint data", 
+            description="data to test custom constraint checking")
         log = ContentCheckLog(symbolicdataset=sd)
         log.save()
         with open(self.good_datafile.name) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
-        self.assertEqual(summary, {"num_rows": 2})
+        expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
+        self.assertEqual(summary.has_key("num_rows"), True)
+        self.assertEqual(summary.has_key("header"), True)
+        self.assertEqual(summary.has_key("bad_num_cols"), False)
+        self.assertEqual(summary.has_key("bad_col_indices"), False)
+        self.assertEqual(summary.has_key("failing_cells"), False)
+        self.assertEqual(summary["num_rows"], 2)
+        self.assertEqual(summary["header"], expected_header)
+
+    def test_summarize_bad_datafile(self):
+        """
+        A non-conforming datafile should return a CSV summary with appropriate errors.
+        """
+        sd = SymbolicDataset.create_SD(self.bad_datafile.name, cdt=self.cdt_constraints,
+            user=self.user_oscar, name="bad data", 
+            description="invalid data to test custom constraint checking")
+        log = ContentCheckLog(symbolicdataset=sd)
+        log.save()
+        with open(self.bad_datafile.name) as f:
+            summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
+        expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
+        self.assertEqual(summary.has_key("num_rows"), True)
+        self.assertEqual(summary.has_key("header"), True)
+        self.assertEqual(summary.has_key("bad_num_cols"), False)
+        self.assertEqual(summary.has_key("bad_col_indices"), False)
+        self.assertEqual(summary.has_key("failing_cells"), True)
+        self.assertEqual(summary["num_rows"], 3)
+        self.assertEqual(summary["header"], expected_header)
+        self.assertEqual(summary["failing_cells"], 
+            { (2, 1): [self.dt_basic.basic_constraints.first()],
+              (2, 2): [self.dt_basic.basic_constraints.first(), self.dt_custom.custom_constraint] })
