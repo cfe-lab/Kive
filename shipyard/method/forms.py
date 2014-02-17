@@ -73,11 +73,10 @@ class MethodForm (forms.ModelForm):
         fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions', 'family')
 
 
-class TransformationXputForm (forms.ModelForm):
+class TransformationInputForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
-        super(TransformationXputForm, self).__init__(*args, **kwargs)
+        super(TransformationInputForm, self).__init__(*args, **kwargs)
         #self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
-    
     class Meta:
         model = TransformationInput # derived from abstract class TransformationXput
         fields = ('dataset_name', )
