@@ -96,7 +96,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     );
     var options = document.getElementById("id_compounddatatype_in_0").options;
-    console.log(options.length);
     var renderInputForms = function($nForms) {
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
@@ -116,26 +115,29 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $("#extraInputForms").html(htmlStr);
     };
 
-    /*
+
     // add or subtract output forms
     var numberOfOutputForms = $('#extraInputForms > tr').length;
     if (numberOfOutputForms > 0) {
         for (var i=0; i < numberOfOutputForms; i++) {
-            $('#id_dataset_name_'+i).attr('name', 'dataset_name_'+i);
-            $('#id_dataset_idx_'+i).attr('name', 'dataset_idx_'+i);
+            $('#id_dataset_name_out_'+i).attr('name', 'dataset_name_out_'+i);
+            $('#id_dataset_idx_out_'+i).attr('name', 'dataset_idx_out_'+i);
+            $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
+            $('#id_min_row_out_'+i).attr('name', 'min_row_out_'+i);
+            $('#id_max_row_out_'+i).attr('name', 'max_row_out_'+i);
         }
     }
     $("#addOutputForm").click(  // query button by id selector
         function () {   // anonymous function
             numberOfOutputForms += 1;
-            renderInputForms(numberOfOutputForms);
+            renderOutputForms(numberOfOutputForms);
         }
     );
-    $("#removeInputForm").click(
+    $("#removeOutputForm").click(
         function() {
             if (numberOfOutputForms > 0) {
                 numberOfOutputForms -= 1;
-                renderInputForms(numberOfOutputForms);
+                renderOutputForms(numberOfOutputForms);
             }
         }
     );
@@ -145,13 +147,20 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         for (var i = 0; i < $nForms; i++) {
             // generate char fields
             htmlStr += "<tr>"
-            htmlStr += "<td><input id=\"id_dataset_name_" + i + "\" maxlength=\"128\" name=\"dataset_name_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_dataset_idx_" + i + "\" name=\"dataset_idx_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_dataset_idx_out_" + i + "\" class=\"shortIntField\" name=\"dataset_idx_out_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
+            for (var j = 0; j < options.length; j++) {
+                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
+            }
+            htmlStr += "</select></td>";
+            htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
             htmlStr += "</tr>"
         }
         $("#extraOutputForms").html(htmlStr);
     };
-    */
+
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {

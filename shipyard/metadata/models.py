@@ -119,17 +119,23 @@ class Datatype(models.Model):
 
     def get_effective_num_constraint(self, BC_type):
         """
-        Retrieves the 'effective' BasicConstraint of the specified numerical type for this instance.
+        Gets the 'effective' BasicConstraint of the specified type.
 
-        That is, the most restrictive BasicConstraint of this type acting on this Datatype or its supertypes.
-        Returns a tuple with the BC in the first position and its value in the second.
+        That is, the most restrictive BasicConstraint of this type
+        acting on this Datatype or its supertypes.  Returns a tuple
+        with the BC in the first position and its value in the
+        second.
 
-        If this instance cannot have a numerical constraint (it does not restrict either INT or FLOAT
-        or it restricts BOOL) then return (None, [appropriate value]).
+        If this instance cannot have a numerical constraint (it does
+        not restrict either INT or FLOAT or it restricts BOOL) then
+        return (None, [appropriate value]).
 
-        PRE: all of this instance's supertypes are clean (in the Django
-        sense), and this instance has at most one BasicConstraint of the specified type (and it is clean).
-        If this instance has such a BasicConstraint, it exceeds the maximum of those of its
+        PRE: all of this instance's supertypes are clean (in the
+        Django sense), this instance has been properly defined as
+        restricting at least one of the Shipyard builtin Datatypes,
+        and this instance has at most one BasicConstraint of the
+        specified type (and it is clean).  If this instance has such
+        a BasicConstraint, it exceeds the maximum of those of its
         supertypes.
         """
         # The Shipyard builtins.
@@ -150,10 +156,16 @@ class Datatype(models.Model):
         elif BC_type == BasicConstraint.MIN_LENGTH:
             effective_val = 0
 
-        # Base case: this Datatype does not restrict INT or FLOAT, or it restricts BOOL.
-        if (not self.is_restriction(FLOAT)) or self.is_restriction(BOOL):
+        # Base case: this Datatype does not restrict INT or FLOAT,
+        # or it restricts BOOL, and this is a (MIN|MAX)_VAL restriction.
+        if val_or_len == "val" and self.get_builtin_type() in (STR, BOOL):
             # self.logger.debug("Datatype \"{}\" with pk={} is not one that should have a numerical constraint".
             #                   format(self, self.pk))
+            return (None, effective_val)
+
+        # Base case 2: this Datatype restricts any of FLOAT, INT, or
+        # BOOL, and this is a (MIN|MAX)_LENGTH restriction.
+        if (val_or_len == "len") and self.get_builtin_type() != STR:
             return (None, effective_val)
 
         # Base case 2: this instance has a constraint of this type already.
@@ -217,7 +229,7 @@ class Datatype(models.Model):
         FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
-        if self.is_restriction(FLOAT) or self.is_restriction(BOOL):
+        if self.get_builtin_type() != STR:
             return None
 
         my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
@@ -231,6 +243,32 @@ class Datatype(models.Model):
 
         # If we reach this point, there is no effective datetimeformat constraint.
         return None
+
+    def get_builtin_type(self):
+        """
+        Get the Shipyard builtin type restricted by this Datatype.
+
+        This retrieves the most restrictive one under the ordering:
+        BOOL < INT < FLOAT < STR
+
+        PRE: this Datatype restricts at least one clean Datatype
+        (thus at least restricts STR).
+        """
+        # The Shipyard builtins.
+        STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+        builtin_type = STR
+        if self.is_restriction(BOOL):
+            builtin_type = BOOL
+        elif self.is_restriction(INT):
+            builtin_type = INT
+        elif self.is_restriction(FLOAT):
+            builtin_type = FLOAT
+
+        return builtin_type
 
 
     # Clean: If prototype is specified, it must have a CDT with
@@ -327,13 +365,13 @@ class Datatype(models.Model):
         # Check that effective min_length <= max_length, min_val <= max_val if possible;
         # i.e. if this Datatype restricts only STR, or restricts INT/FLOAT and not BOOL, respectively.
         # These checks don't happen if this Datatype hasn't already been saved into the database
-        # (or else there is no way that they can have effective numerical constraints).
-        if hasattr(self, "restricts") and self.is_restriction(FLOAT):
+        # # (or else there is no way that they can have effective numerical constraints).
+        if hasattr(self, "restricts") and self.get_builtin_type() in (FLOAT, INT):
             if (self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1] >
                     self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]):
                 raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
 
-        if hasattr(self, "restricts") and (not self.is_restriction(FLOAT) and not self.is_restriction(BOOL)):
+        if hasattr(self, "restricts") and self.get_builtin_type() == STR:
             if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
                     self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
                 raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
@@ -556,36 +594,23 @@ class BasicConstraint(models.Model):
         is_error = False
 
         # Check the rule for coherence.
-        if self.ruletype == BasicConstraint.MIN_LENGTH:
+        if self.ruletype in (BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
             # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
-            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
-                error_msg = error_messages["BC_min_length_on_non_string"].format(self, self.datatype)
+            if self.datatype.get_builtin_type() != STR:
+                error_msg = error_messages["BC_length_constraint_on_non_string"].format(self, self.datatype)
                 is_error = True
             try:
-                min_length = int(self.rule)
-                if min_length < 0:
-                    error_msg = error_messages["BC_min_length_negative"].format(self, self.rule)
+                length_constraint = int(self.rule)
+                if length_constraint < 1:
+                    error_msg = error_messages["BC_length_constraint_non_positive"].format(self, self.rule)
                     is_error = True
             except ValueError:
-                error_msg = error_messages["BC_min_length_non_integer"].format(self, self.rule)
-                is_error = True
-
-        elif self.ruletype == BasicConstraint.MAX_LENGTH:
-            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
-                error_msg = error_messages["BC_max_length_on_non_string"].format(self, self.datatype)
-                is_error = True
-            try:
-                max_length = int(self.rule)
-                if max_length < 1:
-                    error_msg = error_messages["BC_max_length_non_positive"].format(self, self.rule)
-                    is_error = True
-            except ValueError:
-                error_msg = error_messages["BC_max_length_non_integer"].format(self, self.rule)
+                error_msg = error_messages["BC_length_constraint_non_integer"].format(self, self.rule)
                 is_error = True
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, BasicConstraint.MIN_VAL):
             # This should not apply to a non-numeric.
-            if not self.datatype.is_restriction(FLOAT):
+            if self.datatype.get_builtin_type() not in (FLOAT, INT):
                 error_msg = error_messages["BC_val_constraint_parent_non_numeric"].format(self, self.datatype)
                 is_error = True
             try:
@@ -603,7 +628,7 @@ class BasicConstraint(models.Model):
 
         elif self.ruletype == BasicConstraint.DATETIMEFORMAT:
             # This should not apply to a boolean or a numeric.
-            if self.datatype.is_restriction(FLOAT) or self.datatype.is_restriction(BOOL):
+            if self.datatype.get_builtin_type() != STR:
                 error_msg = error_messages["BC_datetimeformat_non_string"].format(self, self.datatype)
                 is_error = True
 

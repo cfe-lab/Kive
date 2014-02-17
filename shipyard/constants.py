@@ -46,13 +46,13 @@ error_messages = {
     "DT_several_same_constraint":
         "Datatype \"{}\" has more than one constraint of type \"{}\"",
     "DT_min_val_smaller_than_supertypes":
-        "Datatype \"{}\" MIN_VAL does not strictly exceed the maximum of its supertypes'",
+        "Datatype \"{}\" MIN_VAL does not strictly exceed the maximum of those of its supertypes",
     "DT_max_val_larger_than_supertypes":
-        "Datatype \"{}\" MAX_VAL is not strictly smaller than the minimum of its supertypes'",
+        "Datatype \"{}\" MAX_VAL is not strictly smaller than the minimum of those of its supertypes",
     "DT_min_length_smaller_than_supertypes":
-        "Datatype \"{}\" MIN_LENGTH does not strictly exceed the maximum of its supertypes'",
+        "Datatype \"{}\" MIN_LENGTH does not strictly exceed the maximum of those of its supertypes",
     "DT_max_length_larger_than_supertypes":
-        "Datatype \"{}\" MAX_LENGTH is not strictly smaller than the minimum of its supertypes'",
+        "Datatype \"{}\" MAX_LENGTH is not strictly smaller than the minimum of those of its supertypes",
     "DT_too_many_datetimeformats":
         "Datatype \"{}\" has too many DATETIMEFORMAT restrictions acting on it",
     "DT_min_val_exceeds_max_val":
@@ -65,20 +65,13 @@ error_messages = {
         "CellError \"{}\" refers to a CustomConstraint that does not apply to the associated column",
     "BC_DT_not_complete":
         "Parent Datatype \"{}\" of BasicConstraint \"{}\" is not complete",
-    "BC_min_length_on_non_string":
-        ("BasicConstraint \"{}\" specifies a minimum string length but its parent Datatype \"{}\" " +
+    "BC_length_constraint_on_non_string":
+        ("BasicConstraint \"{}\" specifies a bound on string length but its parent Datatype \"{}\" " +
          "is numeric or Boolean"),
-    "BC_min_length_negative":
-        "BasicConstraint \"{}\" specifies a minimum string length but \"{}\" is negative",
-    "BC_min_length_non_integer":
-        "BasicConstraint \"{}\" specifies a minimum string length but \"{}\" does not specify an integer",
-    "BC_max_length_on_non_string":
-        ("BasicConstraint \"{}\" specifies a maximum string length but its parent Datatype \"{}\" " +
-         "is numeric or Boolean"),
-    "BC_max_length_non_positive":
-        "BasicConstraint \"{}\" specifies a maximum string length but \"{}\" is non-positive",
-    "BC_max_length_non_integer":
-        "BasicConstraint \"{}\" specifies a maximum string length but \"{}\" does not specify an integer",
+    "BC_length_constraint_non_positive":
+        "BasicConstraint \"{}\" specifies a bound on string length but \"{}\" is non-positive",
+    "BC_length_constraint_non_integer":
+        "BasicConstraint \"{}\" specifies a bound on string length but \"{}\" does not specify an integer",
     "BC_val_constraint_parent_non_numeric":
         "BasicConstraint \"{}\" specifies a bound on a numeric value but its parent Datatype \"{}\" is not a number",
     "BC_val_constraint_rule_non_numeric":

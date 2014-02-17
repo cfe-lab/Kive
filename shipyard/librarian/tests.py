@@ -3,7 +3,6 @@ Shipyard models pertaining to the librarian app.
 """
 
 from django.test import TestCase
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
@@ -117,9 +116,10 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
         self.pE.clean()
 
-        # Define a user
-        self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-        self.myUser.save()
+        # This has been moved to MetadataTestSetup.
+        # # Define a user
+        # self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+        # self.myUser.save()
 
         # Runs for the pipelines.
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
@@ -254,13 +254,14 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_DNA_doublet_symDS_structure = self.E21_41_DNA_doublet_symDS.structure
         self.E21_41_DNA_doublet_DS = self.E21_41_DNA_doublet_symDS.dataset
 
-    def tearDown(self):
-        """Clear CodeResources and Datasets folders."""
-        super(LibrarianTestSetup, self).tearDown()
-
-        for dataset in Dataset.objects.all():
-            dataset.dataset_file.close()
-            dataset.dataset_file.delete()
+    # This functionality now lives in MetadataTestSetup.
+    # def tearDown(self):
+    #     """Clear CodeResources and Datasets folders."""
+    #     super(LibrarianTestSetup, self).tearDown()
+    #
+    #     for dataset in Dataset.objects.all():
+    #         dataset.dataset_file.close()
+    #         dataset.dataset_file.delete()
 
     def ER_from_record(self, record):
         """

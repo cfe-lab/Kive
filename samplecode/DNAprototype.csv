@@ -1,0 +1,9 @@
+example,valid
+AGCTTTTCA,True
+AGCUUUUCAAC,False
+foo,False
+A,True
+,True
+445,False
+62.77,False
+Pi,False

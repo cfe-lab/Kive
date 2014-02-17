@@ -2,12 +2,17 @@
 Unit tests for Shipyard metadata models.
 """
 from django.test import TestCase
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
 from metadata.models import *
 from method.models import CodeResourceRevision
+from archive.models import Dataset
+from librarian.models import SymbolicDataset, DatasetStructure
 
-from constants import datatypes
+from constants import datatypes, CDTs, error_messages
+
+samplecode_path = "../samplecode"
 
 class MetadataTestSetup(TestCase):
     """
@@ -18,8 +23,14 @@ class MetadataTestSetup(TestCase):
 
     def setUp(self):
         """Setup default database state from which to perform unit testing."""
-        # Load up atomic datatype STR.
-        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+        # Load up the builtin Datatypes.
+        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+        self.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        self.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+        # Many tests use self.string_dt as a name for self.STR.
+        self.string_dt = self.STR
 
         # Create Datatype "DNANucSeq" with a regexp basic constraint.
         self.DNA_dt = Datatype(
@@ -190,6 +201,11 @@ class MetadataTestSetup(TestCase):
         self.DNA_doublet_cdt.members.create(
             datatype=self.DNA_dt, column_name="y", column_idx=2)
 
+        # Define a user.  This was previously in librarian/tests.py,
+        # but we put it here now so all tests can use it.
+        self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+        self.myUser.save()
+
 
     def tearDown(self):
         """Delete any files that have been put into the database."""
@@ -203,6 +219,12 @@ class MetadataTestSetup(TestCase):
             if crr.coderesource.filename != "":
                 crr.content_file.close()
                 crr.content_file.delete()
+
+        # Also clear all datasets.  This was previously in librarian.tests
+        # but we move it here.
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.close()
+            dataset.dataset_file.delete()
 
 
 class DatatypeTests(MetadataTestSetup):
@@ -269,7 +291,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_1.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_direct_middle_clean_bad(self):
@@ -283,7 +305,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_1.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_direct_end_clean_bad(self):
@@ -297,7 +319,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_1.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_direct_clean_good(self):
@@ -324,7 +346,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_2.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_recursive_middle_clean_bad(self):
@@ -341,7 +363,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_3.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_recursive_end_clean_bad(self):
@@ -357,7 +379,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_4.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
 
@@ -571,7 +593,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_3.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
 
@@ -584,7 +606,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_1.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_circular_restriction_indirect_clean(self):
@@ -600,7 +622,7 @@ class DatatypeTests(MetadataTestSetup):
         self.dt_2.save();
 
         self.assertRaisesRegexp(ValidationError,
-                                "Datatype \"dt_1\" has a circular restriction",
+                                error_messages["DT_circular_restriction"].format(self.dt_1),
                                 self.dt_1.clean);
 
     def test_datatype_clean_no_restricts(self):
