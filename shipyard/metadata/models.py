@@ -1168,9 +1168,7 @@ class CompoundDatatype(models.Model):
         if summary.has_key("bad_num_cols") or summary.has_key("bad_col_indices"):
             return summary
 
-        ####
         # CHECK CONSTRAINTS
-    
         # Check if any columns have CustomConstraints.  We will use this lookup
         # table while we're reading through the CSV file to see which columns
         # need to be copied out for checking against CustomConstraints.
@@ -1189,21 +1187,17 @@ class CompoundDatatype(models.Model):
                         format(input_file_path))
                 cols_with_cc[column] = open(input_file_path, "ab")
 
-            ####
             # CHECK BASIC CONSTRAINTS AND COUNT ROWS
             self.logger.debug("Checking basic constraints")
             num_rows, failing_cells = self._check_basic_constraints(data_csv, cols_with_cc)
             summary["num_rows"] = num_rows
             self.logger.debug("Checked basic constraints for {} rows".
                     format(num_rows))
-            # FINISHED CHECKING BASIC CONSTRAINTS AND COUNTING ROWS
-            ####
     
         finally:
             for col in cols_with_cc:
                 cols_with_cc[col].close()
-    
-        ####
+
         # CHECK CUSTOM CONSTRAINTS
         # Now: any column that had a CustomConstraint must be checked 
         # using the specified verification method. The handles in cols_with_cc
@@ -1218,11 +1212,6 @@ class CompoundDatatype(models.Model):
                 else:
                     failing_cells[k] = v
         self.logger.debug("{} cells failed constraints".format(len(failing_cells)))
-        # FINISHED CHECKING CUSTOM CONSTRAINTS
-        ####
-
-        # FINISHED CHECKING CONSTRAINTS
-        ####
     
         # If there are any failing cells, then add the dict to summary.
         if failing_cells:

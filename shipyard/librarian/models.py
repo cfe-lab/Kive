@@ -18,6 +18,7 @@ import logging
 import tempfile
 
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
+import datachecking.models
 import file_access_utils, logging_utils
 from constants import error_messages
 
@@ -127,19 +128,6 @@ class SymbolicDataset(models.Model):
         return cdt
 
     @classmethod
-    def _validate_csv_summary(self, file_path, cdt, summary):
-        """
-        Check the output of summarize_CSV for errors.
-        """
-        if len(summary) == 0:
-            raise ValueError(error_messages["empty_file"].format(file_path))
-        if "bad_col_indices" in summary or "bad_num_cols" in summary:
-            expected_header = ",".join([m.column_name for m in cdt.members.all()])
-            raise ValueError(
-                error_messages["header_mismatch"].format(file_path, 
-                  expected_header, ",".join(summary["header"])))
-
-    @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     # TODO: raise ValueError when the wrong combination of parameters is passed
     # (ie. user and name are None).
@@ -160,19 +148,12 @@ class SymbolicDataset(models.Model):
         symDS.clean()
         symDS.save()
 
-        structure = None
         if cdt is not None:
-            structure = DatasetStructure(symbolicdataset=symDS,compounddatatype=cdt)
-
-            run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-            with open(file_path, "rb") as f:
-                content_check_log = symDS.content_checks.create()
-                CSV_summary = cdt.summarize_CSV(f, run_dir, content_check_log)
-                self._validate_csv_summary(file_path, cdt, CSV_summary)
-                structure.num_rows = CSV_summary["num_rows"]
+            structure = DatasetStructure(symbolicdataset=symDS, compounddatatype=cdt)
             structure.save()
+            run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+            symDS.check_file_contents(file_path, run_dir, None, None, None) 
     
-        dataset = None
         if make_dataset:
             dataset = archive.models.Dataset(
                 user=user, name=name, description=description,
@@ -185,7 +166,6 @@ class SymbolicDataset(models.Model):
         symDS.clean()
     
         return symDS
-
 
     # FIXME: use a transaction!
     def check_file_contents(self,file_path_to_check,summary_path,min_row,max_row,execlog):
@@ -215,6 +195,9 @@ class SymbolicDataset(models.Model):
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
+
+        if csv_summary["num_rows"] == 0:
+            self.logger.warn("file had no rows")
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
@@ -250,7 +233,7 @@ class SymbolicDataset(models.Model):
                 for failed_constr in fails:
                     new_cell_error = csv_baddata.cell_errors.create(
                             row_num=row,
-                            column=my_CDT.get(column_idx=col))
+                            column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
                     if type(failed_constr) != str:
@@ -259,8 +242,9 @@ class SymbolicDataset(models.Model):
                     new_cell_error.clean()
                     new_cell_error.save()
 
-        self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
-                format(file_path_to_check, self))
+        else:
+            self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
+                    format(file_path_to_check, self))
         ccl.end_time = timezone.now()
         ccl.clean()
         ccl.save()

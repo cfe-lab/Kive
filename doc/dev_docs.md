@@ -69,6 +69,13 @@ documentation for more details). Of course, you do not have to provide a
 return code, nor do you need to output anything to either of the
 standard streams.
 
+Shipyard puts no restrictions on what characters can appear in your
+dataset names, except those imposed by your file system. You must take
+care that your programs can handle all possible characters in file
+names. For example, on Unix, spaces are allowed. When using scripting
+languages such as bash, be careful to enclose your variables in quotes,
+(ie. "$2" instead of just $2) to avoid problems caused by spaces.
+
 This required interface means that you cannot pass additional command
 line arguments to your script. If you want to do that, write a wrapper
 for your script, perhaps in a shell scripting language like Bash, which

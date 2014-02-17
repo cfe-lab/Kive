@@ -43,7 +43,7 @@ class UtilityMethods(TestCase):
         # A code resource which does nothing.
         self.coderev_noop = self.make_first_revision("noop",
                 "a script to do nothing", "noop.sh",
-                "#!/bin/bash\n cat $1 > $2")
+                '#!/bin/bash\n cat "$1" > "$2"')
 
         # A Method telling Shipyard how to use the noop code on string data.
         self.method_noop = self.make_first_method("string noop",
@@ -223,12 +223,12 @@ class ExecuteTestsRM(UtilityMethods):
         self.coderev_complement = self.make_first_revision("DNA complement",
                 "a script to complement DNA", "complement.sh",
                 """#!/bin/bash
-                cat $1 | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, $1 - | cut -d ',' -f 1,3 > $2
+                cat "$1" | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
                 """)
         self.coderev_reverse = self.make_first_revision("DNA reverse",
                 "a script to reverse DNA", "reverse.sh",
                 """#!/bin/bash
-                cat $1 | cut -d ',' -f 2 | rev | paste -d, $1 - | cut -d ',' -f 1,3 > $2
+                cat "$1" | cut -d ',' -f 2 | rev | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
                 """)
 
         # To tell the system how to use her code, Alice creates two Methods,
@@ -323,7 +323,7 @@ class ExecuteTestsRM(UtilityMethods):
         self.coderev_DNA2RNA = self.make_first_revision("DNA to RNA",
                 "a script to reverse DNA", "DNA2RNA.sh",
                 """#!/bin/bash
-                cat $1 | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, $1 - | cut -d ',' -f 1,3 > $2
+                cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
                 """)
         self.method_DNA2RNA = self.make_first_method("DNA to RNA",
                 "a method to turn strings of DNA into RNA",
@@ -355,12 +355,12 @@ class ExecuteTestsRM(UtilityMethods):
 
     def test_execute_pipeline_spaces_in_dataset_name(self):
         """
-        You should be allowed (?) to have spaces in the name of your dataset.
+        You should be allowed to have spaces in the name of your dataset.
         """
         coderev = self.make_first_revision("test",
                 "a script for testing purposes", "test.sh",
                 """#!/bin/bash
-                cat $1 > $2
+                cat "$1" > "$2"
                 """)
         method = self.make_first_method("test", "a test method", coderev)
         self.simple_method_io(method, self.cdt_record,
@@ -371,6 +371,12 @@ class ExecuteTestsRM(UtilityMethods):
         
         sandbox = Sandbox(self.user_alice, pipeline, [self.symds_labdata])
         sandbox.execute_pipeline()
+        runstep = sandbox.run.runsteps.first()
+        execlog = runstep.log.first()
+        print(execlog.methodoutput.error_log.read())
+        self.assertEqual(runstep.successful_execution(), True)
+        self.assertEqual(execlog.missing_outputs(), [])
+        self.assertEqual(execlog.methodoutput.return_code, 0)
 
     def test_execute_pipeline_run(self):
         """
@@ -773,7 +779,7 @@ class FindSDTests(UtilityMethods):
         # A code resource which reverses a file.
         self.coderev_reverse = self.make_first_revision("reverse",
             "a script to reverse lines of a file", "reverse.sh",
-            "#!/bin/bash\nrev $1 | sed 's/\\r//g' > $2")
+            '#!/bin/bash\nrev "$1" | sed \'s/\\r//g\' > "$2"')
 
         # A CDT with two columns, word and drow.
         self.cdt_words = CompoundDatatype()
@@ -984,12 +990,12 @@ class CustomConstraintTests(UtilityMethods):
         self._setup_custom_constraint("spellcheck",
             "a spell checker",
             """#!/bin/bash
-            echo failed_row > $2
+            echo failed_row > "$2"
             row_num=0
-            for row in $(cat $1); do
+            for row in $(cat "$1"); do
               if [[ $row_num -gt 0 ]]; then
                  if [[ "x$(echo $row | aspell list)" != "x" ]]; then
-                    echo $row_num >> $2
+                    echo $row_num >> "$2"
                  fi  
               fi  
               row_num=$(($row_num+1))
@@ -1009,6 +1015,38 @@ class CustomConstraintTests(UtilityMethods):
         # A file not conforming to the compound datatype.
         self.bad_datafile = self._setup_datafile(self.cdt_constraints,
                 [["hello", "Spock"], ["1ive", "10ng"], ["and", "porsper"]])
+
+        # A pipeline to process the constraint CDT.
+        self.pipeline_noop = self._setup_onestep_pipeline("noop",
+                "does nothing", '#!/bin/bash\n cat "$1" > "$2"',
+                self.cdt_constraints)
+
+        # A pipeline to mess up the constraint CDT.
+        self.pipeline_mangle = self._setup_onestep_pipeline("mangle",
+                "messes up data", 
+                """#!/bin/bash
+                echo "letter strings,words" > "$2"
+                echo 1234,yarrr >> "$2"
+                """, self.cdt_constraints)
+
+    def _setup_onestep_pipeline(self, name, desc, script, cdt):
+        """
+        Helper function to set up a one step pipeline which passes the same
+        dataset all the way through.
+
+        name    name of the pipeline
+        desc    description for the pipeline
+        script  contents of CodeResourceRevision which will drive the method
+        cdt     CompoundDatatype used throughout the pipeline
+        """
+        coderev = self.make_first_revision(name, desc, 
+                "{}.sh".format(name), script)
+        method = self.make_first_method(name, desc, coderev)
+        self.simple_method_io(method, cdt, "in data", "out data")
+        pipeline = self.make_first_pipeline(name, desc)
+        self.create_linear_pipeline(pipeline, [method], "in data", "out data")
+        pipeline.create_outputs()
+        return pipeline
 
     def _setup_datafile(self, compounddatatype, lines):
         """
@@ -1123,7 +1161,6 @@ class CustomConstraintTests(UtilityMethods):
         """
         If a verification method produces a row which is greater than the number
         of rows in the input, a ValueError should be raised.
-        TODO: This is currently failing.
         """
         dt_big_row = self._setup_datatype("barcodes",
                 "strings of upper case alphanumerics of length between 10 and 12", 
@@ -1131,7 +1168,7 @@ class CustomConstraintTests(UtilityMethods):
                 [Datatype.objects.get(pk=datatypes.STR_PK)])
         self._setup_custom_constraint("bigrow", 
                 "a script outputting a big row number",
-                '#!/bin/bash\necho -e "failed_row\\n1000" > $2',
+                '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
                 dt_big_row)
         cdt_big_row = self._setup_compounddatatype(
                 [dt_big_row, self.dt_custom], ["barcodes", "words"])
@@ -1186,3 +1223,162 @@ class CustomConstraintTests(UtilityMethods):
               (2, 2): [self.dt_basic.basic_constraints.first(),
                   self.dt_custom.custom_constraint], 
               (3, 2): [self.dt_custom.custom_constraint] })
+
+    def _test_content_check_integrity(self, content_check, execlog, symds):
+        """
+        Things which should be true about a ContentCheckLog, whether or not
+        it indicated errors.
+        """
+        self.assertEqual(content_check.clean(), None)
+        self.assertEqual(content_check.execlog, execlog)
+        self.assertEqual(content_check.symbolicdataset, symds)
+        self.assertEqual(content_check.end_time is not None, True)
+        self.assertEqual(content_check.start_time.date(),
+                content_check.end_time.date())
+        self.assertEqual(content_check.start_time <= content_check.end_time,
+                True)
+
+    def _test_upload_data_good(self):
+        """
+        Helper function to upload good data.
+        """
+        symds_good = SymbolicDataset.create_SD(self.good_datafile,
+                cdt=self.cdt_constraints, user=self.user_oscar,
+                name="good data",
+                description="data which conforms to all its constraints")
+        return symds_good
+
+    def _test_upload_data_bad(self):
+        """
+        Helper function to upload bad data.
+        """
+        symds_bad = SymbolicDataset.create_SD(self.bad_datafile,
+                cdt=self.cdt_constraints, user=self.user_oscar,
+                name="good data",
+                description="data which conforms to all its constraints")
+        return symds_bad
+
+    def _test_execute_pipeline_constraints(self, pipeline):
+        """
+        Helper function to execute a pipeline with the cdt_constraints 
+        compound datatype as input.
+        """
+        symds_good = self._test_upload_data_good()
+        sandbox = Sandbox(self.user_oscar, pipeline, [symds_good])
+        sandbox.execute_pipeline()
+        runstep = sandbox.run.runsteps.first()
+        execlog = runstep.log.first()
+        symds_out = runstep.execrecord.execrecordouts.first().symbolicdataset
+        content_check = symds_out.content_checks.first()
+        return (content_check, execlog, symds_out)
+
+    def test_execute_pipeline_content_check_good(self):
+        """
+        Test the integrity of the ContentCheck created while running a
+        Pipeline on some data with CustomConstraints.
+        """
+        content_check, execlog, symds_out = \
+                self._test_execute_pipeline_constraints(self.pipeline_noop)
+        self._test_content_check_integrity(content_check, execlog, symds_out)
+        self.assertEqual(content_check.is_fail(), False)
+
+    def test_execute_pipeline_content_check_bad(self):
+        """
+        Test the integrity of the ContentCheck created while running a
+        Pipeline on some data with CustomConstraints, where the output data
+        does not pass the content check.
+        """
+        content_check, execlog, symds_out = \
+                self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        self._test_content_check_integrity(content_check, execlog, symds_out)
+        self.assertEqual(content_check.is_fail(), True)
+
+    def test_upload_data_content_check_good(self):
+        """
+        Test the integrity of a ContentCheck created when uploading a dataset.
+        """
+        symds_good = self._test_upload_data_good()
+        content_check = symds_good.content_checks.first()
+        self._test_content_check_integrity(content_check, None, symds_good)
+        self.assertEqual(content_check.is_fail(), False)
+
+    def test_upload_data_content_check_bad(self):
+        """
+        Test the integrity of a ContentCheck created when uploading a malformed
+        dataset.
+        """
+        symds_bad = self._test_upload_data_bad()
+        content_check = symds_bad.content_checks.first()
+        self._test_content_check_integrity(content_check, None, symds_bad)
+        self.assertEqual(content_check.is_fail(), True)
+
+    def _test_verification_log(self, verif_log, content_check, CDTM):
+        """
+        Checks which should pass for any VerificationLog, succesful or not.
+        """
+        self.assertEqual(verif_log is not None, True)
+        self.assertEqual(verif_log.clean(), None)
+        self.assertEqual(verif_log.contentchecklog, content_check) 
+        self.assertEqual(verif_log.CDTM, CDTM)
+        self.assertEqual(verif_log.end_time is not None, True)
+        self.assertEqual(verif_log.end_time.date(), verif_log.start_time.date())
+        self.assertEqual(verif_log.start_time <= verif_log.end_time, True)
+
+    def test_execute_pipeline_verification_log_good(self):
+        """
+        Test the integrity of the VerificationLog created while running a
+        Pipeline on some data with CustomConstraints.
+        """
+        content_check, execlog, symds_out = \
+                self._test_execute_pipeline_constraints(self.pipeline_noop)
+
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, 
+                self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_execute_pipeline_verification_log_bad(self):
+        """
+        Test the integrity of the VerificationLog created while running a
+        Pipeline on some data with CustomConstraints, when the data does not
+        conform.
+        """
+        content_check, execlog, symds_out = \
+                self._test_execute_pipeline_constraints(self.pipeline_mangle)
+
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, 
+                self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_upload_data_verification_log_good(self):
+        """
+        Test the integrity of the VerificationLog created while uploading
+        conforming data with CustomConstraints.
+        """
+        symds_good = self._test_upload_data_good()
+        content_check = symds_good.content_checks.first()
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, 
+                self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_upload_data_verification_log_bad(self):
+        """
+        Test the integrity of the VerificationLog created while uploading
+        non-conforming data with CustomConstraints.
+        """
+        symds_bad = self._test_upload_data_bad()
+        content_check = symds_bad.content_checks.first()
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, 
+                self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")

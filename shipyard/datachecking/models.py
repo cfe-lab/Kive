@@ -59,7 +59,9 @@ class ContentCheckLog(models.Model):
         return self.end_time is not None
 
     def is_fail(self):
-        """True if this content check is a failure."""
+        """
+        True if this content check is a failure.
+        """
         return hasattr(self, "baddata")
 
 class BadData(models.Model):
@@ -105,14 +107,13 @@ class BadData(models.Model):
                     "BadData \"{}\" has a malformed header; bad_num_rows should not be set".
                     format(self))
 
-        for cell_error in self.bad_cells.all():
-            cell_error.clean()
+        [c.clean() for c in self.cell_errors.all()]
 
 class CellError(models.Model):
     """
     Represents a cell that fails validation within a BadData object.
     """
-    baddata = models.ForeignKey(BadData, related_name="bad_cells")
+    baddata = models.ForeignKey(BadData, related_name="cell_errors")
     row_num = models.PositiveIntegerField()
     column = models.ForeignKey("metadata.CompoundDatatypeMember")
 
@@ -179,13 +180,13 @@ class CellError(models.Model):
         # We could make this test more explicit (and look for the constraint as being
         # exactly the effective one of its type for this Datatype) but this should
         # be enough if both Datatypes are clean.
-        if type(self.constraint_failed) == metadata.models.BasicConstraint:
+        if self.constraint_failed.__class__.__name__ == "BasicConstraint":
             # Note that A.is_restriction(B) is like A <= B, whereas B.is_restricted_by(A)
             # is like B > A; we want the possible equality.
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
                 raise ValidationError(error_messages["CellError_bad_BC"].format(self))
 
-        elif type(self.constraint_failed) == metadata.models.CustomConstraint:
+        elif self.constraint_failed.__class__.__name__ == "CustomConstraint":
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
                 raise ValidationError(error_messages["CellError_bad_CC"].format(self))
 
