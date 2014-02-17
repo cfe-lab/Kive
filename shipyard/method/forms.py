@@ -52,31 +52,43 @@ class CodeResourceDependencyForm (forms.ModelForm):
 class MethodForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
+
         self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+        self.fields['coderesource'].label = 'Code resource'
+        self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
+
+        self.fields['revision_name'].label = 'Name'
+        self.fields['revision_name'].help_text = 'A short name for this new method'
+
+        self.fields['revision_desc'].label = 'Description'
+        self.fields['revision_desc'].help_text = 'A detailed description for this new method'
+
+        self.fields['family'].help_text = 'Assign this new method to an existing MethodFamily, or leave blank to create new family'
 
     coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
     class Meta:
         model = Method
-        fields = ('revision_name', 'revision_desc', 'random')
+        fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions', 'family')
 
 
-class TransformationInputForm (forms.ModelForm):
+class TransformationXputForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
-        super(TransformationInputForm, self).__init__(*args, **kwargs)
-        self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
+        super(TransformationXputForm, self).__init__(*args, **kwargs)
+        #self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
+    
     class Meta:
         model = TransformationInput # derived from abstract class TransformationXput
-        fields = ('dataset_name', 'dataset_idx')
+        fields = ('dataset_name', )
 
 class TransformationOutputForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(TransformationOutputForm, self).__init__(*args, **kwargs)
-        self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
+        #self.fields['dataset_idx'].widget.attrs['class'] = 'shortIntField'
     class Meta:
         model = TransformationOutput
-        fields = ('dataset_name', 'dataset_idx')
+        fields = ('dataset_name', )
 
 class XputStructureForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -87,3 +99,11 @@ class XputStructureForm (forms.ModelForm):
     class Meta:
         model = XputStructure
         fields = ('compounddatatype', 'min_row', 'max_row')
+
+class MethodFamilyForm (forms.ModelForm):
+    def __init__ (self, *args, **kwargs):
+        super(MethodFamilyForm, self).__init__(*args, **kwargs)
+        self.fields['name'].label = 'Family name'
+        self.fields['description'].label = 'Family description'
+    class Meta:
+        model = MethodFamily

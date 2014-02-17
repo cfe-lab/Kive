@@ -72,10 +72,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // add or subtract input forms
     var numberOfInputForms = $('#extraInputForms > tr').length;
+
     // modify name attributes for extra input forms received from server
-    for (var i=0; i < numberOfInputForms; i++) {
+    for (var i = 0; i < numberOfInputForms; i++) {
         $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
-        $('#id_dataset_idx_in_'+i).attr('name', 'dataset_idx_in_'+i);
         $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
         $('#id_min_row_in_'+i).attr('name', 'min_row_in_'+i);
         $('#id_max_row_in_'+i).attr('name', 'max_row_in_'+i);
@@ -89,7 +89,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     );
     $("#removeInputForm").click(
         function() {
-            if (numberOfInputForms > 0) {
+            if (numberOfInputForms > 1) {
                 numberOfInputForms -= 1;
                 renderInputForms(numberOfInputForms);
             }
@@ -101,8 +101,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         for (var i = 0; i < $nForms; i++) {
             // generate char fields
             htmlStr += "<tr>"
+            htmlStr += "<td>"+(i+1)+"</td>";
             htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_dataset_idx_in_" + i + "\" class=\"shortIntField\" name=\"dataset_idx_in_" + i + "\" type=\"number\" /></td>";
             htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
@@ -121,8 +121,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     if (numberOfOutputForms > 0) {
         for (var i=0; i < numberOfOutputForms; i++) {
             $('#id_dataset_name_out_'+i).attr('name', 'dataset_name_out_'+i);
-            $('#id_dataset_idx_out_'+i).attr('name', 'dataset_idx_out_'+i);
-            $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
+            $('#id_compounddatatype_out_'+i).attr('name', 'compounddatatype_out_'+i);
             $('#id_min_row_out_'+i).attr('name', 'min_row_out_'+i);
             $('#id_max_row_out_'+i).attr('name', 'max_row_out_'+i);
         }
@@ -135,7 +134,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     );
     $("#removeOutputForm").click(
         function() {
-            if (numberOfOutputForms > 0) {
+            if (numberOfOutputForms > 1) {
                 numberOfOutputForms -= 1;
                 renderOutputForms(numberOfOutputForms);
             }
@@ -147,8 +146,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         for (var i = 0; i < $nForms; i++) {
             // generate char fields
             htmlStr += "<tr>"
+            htmlStr += "<td>"+(i+1)+"</td>";
             htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_dataset_idx_out_" + i + "\" class=\"shortIntField\" name=\"dataset_idx_out_" + i + "\" type=\"number\" /></td>";
             htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
@@ -172,4 +171,17 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
         setTimeout("$('.fulltext').fadeOut(300);", 2000);
     });
+
+    // hide Method Family form if a pre-existing family is selected
+    $('#id_family').on('change', function() {
+        this_family = $(this).val();
+        if (this_family == "") {
+            $('#id_name').enabled();
+            $('#id_description').enabled();
+        } else {
+            // TODO: ajax query populates these fields with values from DB
+            $('#id_name').disabled();
+            $('#id_description').disabled();
+        }
+    }).change(); // trigger on load
 });

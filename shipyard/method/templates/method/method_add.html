@@ -12,23 +12,33 @@
 
 {% block content %}
 
-<a href="/methods.html">return to Methods summary</a>
+<a href="/methods">return to Methods summary</a>
 
 <h2>Add a new method</h2>
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+
     <table>
     {% for field in method_form %}
         <tr>
         <th>{{ field.label_tag }}</th>
         <td>
-            {{ field.errors }}
             {{ field }}
             <div class="helptext">{{ field.help_text }}</div>
         </td>
+        <td>{{ field.errors }}</td>
         </tr>
     {% endfor %}
+    {% for field in family_form %}
+            <tr>
+            <th>{{ field.label_tag }}</th>
+            <td>{{ field }}<div class="helptext">{{ field.help_text }}</div></td>
+            <td>{{ field.errors }}</td>
+            </tr>
+        {% endfor %}
     </table>
+
+
 
 <h3>Inputs</h3>
     <p>
@@ -39,13 +49,13 @@
 
     <table id="inputForms">
     <thead>
-        <tr><th>Name</th><th>Index</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
     </thead>
     <tbody id="extraInputForms">
     {% for input_form, xput_form in input_forms %}
         <tr>
+        <td>{{ forloop.counter }}</td>
         <td>{{ input_form.dataset_name }}</td>
-        <td>{{ input_form.dataset_idx }}</td>
         <td>{{ xput_form.compounddatatype }}</td>
         <td>{{ xput_form.min_row }}</td>
         <td>{{ xput_form.max_row }}</td>
@@ -62,13 +72,13 @@
     </p>
     <table id="outputForms">
     <thead>
-        <tr><th>Name</th><th>Index</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
     </thead>
     <tbody id="extraOutputForms">
     {% for output_form, xput_form in output_forms %}
         <tr>
+        <td>{{ forloop.counter }}</td>
         <td>{{ output_form.dataset_name }}</td>
-        <td>{{ output_form.dataset_idx }}</td>
         <td>{{ xput_form.compounddatatype }}</td>
         <td>{{ xput_form.min_row }}</td>
         <td>{{ xput_form.max_row }}</td>
