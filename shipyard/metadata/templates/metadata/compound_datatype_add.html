@@ -23,8 +23,7 @@
     <small>Add/subtract form fields</small>
     </p>
 
-    <table id="cdmForms">
-        {% with cdm_forms|first as first_form %}
+    <table>
         <thead>
             <tr>
                 <th>Index</th>
@@ -33,25 +32,16 @@
                 <th></th>
             </tr>
         </thead>
-        <tbody>
-        <tr>
-            <td>1</td>
-            <td>{{ first_form.datatype }}</td>
-            <td>{{ first_form.column_name }}</td>
-            <td>{{ first_form.errors.Errors }}</td>
-        </tr>
-        {% endwith %}
 
-        </tbody>
-        <tbody id="extraForms">
-        {% for cdm_form in cdm_forms|slice:"1:" %}
+        <tbody id="cdmForms">
+            {% for cdm_form in cdm_forms %}
             <tr>
-            <td>{{ forloop.counter|add:"1" }}</td>
-            <td>{{ cdm_form.datatype }}</td>
-            <td>{{ cdm_form.column_name }}</td>
-            <td>{{ cdm_form.errors.Errors }}</td>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ cdm_form.datatype }}</td>
+                <td>{{ cdm_form.column_name }}</td>
+                <td>{{ cdm_form.errors.Errors }}</td>
             </tr>
-        {% endfor %}
+            {% endfor %}
         </tbody>
     </table>
 

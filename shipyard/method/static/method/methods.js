@@ -72,37 +72,24 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // add or subtract input forms
     var numberOfXputForms = $('#extraXputForms > tr').length;
+    var options = document.getElementById("id_compounddatatype_0").options;
 
     // modify name attributes for extra input forms received from server
     for (var i = 0; i < numberOfXputForms; i++) {
-        $('#id_input_output'+i).attr('name', 'input_output_'+i);
+        $('#id_input_output_'+i).attr('name', 'input_output_'+i);
         $('#id_dataset_name_'+i).attr('name', 'dataset_name_'+i);
         $('#id_compounddatatype_'+i).attr('name', 'compounddatatype_'+i);
         $('#id_min_row_'+i).attr('name', 'min_row_'+i);
         $('#id_max_row_'+i).attr('name', 'max_row_'+i);
     }
 
-    $("#addXputForm").click(  // query button by id selector
-        function () {   // anonymous function
+    // append row to table
+    $("#addXputForm").click(
+        function () {
             numberOfXputForms += 1;
-            renderXputForms(numberOfXputForms);
-        }
-    );
-    $("#removeXputForm").click(
-        function() {
-            if (numberOfXputForms > 2) {
-                numberOfXputForms -= 1;
-                renderXputForms(numberOfXputForms);
-            }
-        }
-    );
-    var options = document.getElementById("id_compounddatatype_0").options;
-    var renderXputForms = function($nForms) {
-        var htmlStr = "";
-        for (var i = 0; i < $nForms; i++) {
-            // generate char fields
-            htmlStr += "<tr>"
-            htmlStr += "<td>"+(i+1)+"</td>";
+            i = numberOfXputForms - 1; // 0-indexing
+            htmlStr = "<tr>"
+            htmlStr += "<td>"+numberOfXputForms+"</td>";
 
             htmlStr += "<td><select id=\"id_input_output_"+i+"\" name=\"input_output_"+i+"\">";
             htmlStr += "<option value=\"input\">IN</option>";
@@ -118,9 +105,18 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             htmlStr += "<td><input id=\"id_min_row_" + i + "\" class=\"shortIntField\" name=\"min_row_" + i + "\" type=\"number\" /></td>";
             htmlStr += "<td><input id=\"id_max_row_" + i + "\" class=\"shortIntField\" name=\"max_row_" + i + "\" type=\"number\" /></td>";
             htmlStr += "</tr>"
+
+            $('#extraXputForms').find('tr:last').after(htmlStr);
         }
-        $("#extraXputForms").html(htmlStr);
-    };
+    );
+    $("#removeXputForm").click(
+        function() {
+            if (numberOfXputForms > 2) {
+                numberOfXputForms -= 1;
+                $('#extraXputForms').find('tr:last').remove();
+            }
+        }
+    );
 
 
     // Pack help text into an unobtrusive icon

@@ -310,7 +310,9 @@ def method_add (request):
             new_method.full_clean()
             new_method.save()
         except ValidationError as e:
-            print e
+            if query['family'] == u'':
+                # roll-back newly created MethodFamily
+                method_family.delete()
             family_form, method_form, xput_forms = return_method_forms(request, exceptions)
             method_form.errors['Errors'] = ErrorList(e.messages)
             c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
@@ -339,6 +341,8 @@ def method_add (request):
                 exceptions.update({i: e.messages})
 
         if exceptions:
+            if query['family'] == u'':
+                method_family.delete()
             new_method.delete()
             family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
             c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
