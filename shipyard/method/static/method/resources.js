@@ -44,12 +44,28 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    var options = document.getElementById("id_coderesource").options;
+    var options = document.getElementById("id_coderesource_0").options;
     var numberOfForms = 0;
+    var nDepForms = $('#extraXputForms > tr').length;
+
     $("#addDependencyForm").click(  // query button by id selector
         function () {   // anonymous function
             numberOfForms += 1;
-            renderForms(numberOfForms);
+            i = numberOfForms - 1; // zero-based index
+            var htmlStr = "<tr>";
+            htmlStr += "<td><select class=\"coderesource\" id=\"id_coderesource_" + i + "\" name=\"coderesource_" + i + "\">";
+            for (var j = 0; j < options.length; j++) {
+                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
+            }
+            htmlStr += "</select></td>";
+            htmlStr += "<td><select class=\"revisions\" id=\"id_revisions_" + i + "\" name=\"revisions_" + i + "\">";
+            htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select></td>";
+
+            // generate char fields
+            htmlStr += "<td><input id=\"id_depPath_" + i + "\" maxlength=\"255\" name=\"depPath_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><input id=\"id_depFileName_" + i + "\" maxlength=\"255\" name=\"depFileName_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "</tr>";
+
         }
     )
     $("#removeDependencyForm").click(
@@ -65,19 +81,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var htmlStr = "";
         for (var i = 0; i < $nForms; i++) {
             // generate drop-down menus
-            htmlStr += "<tr>";
-            htmlStr += "<td><select class=\"coderesource\" id=\"id_coderesource_" + i + "\" name=\"coderesource_" + i + "\">";
-            for (var j = 0; j < options.length; j++) {
-                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><select class=\"revisions\" id=\"id_revisions_" + i + "\" name=\"revisions_" + i + "\">";
-            htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select></td>";
 
-            // generate char fields
-            htmlStr += "<td><input id=\"id_depPath_" + i + "\" maxlength=\"255\" name=\"depPath_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_depFileName_" + i + "\" maxlength=\"255\" name=\"depFileName_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "</tr>"
         }
         $("#extraDependencyForms").html(htmlStr);
 

@@ -144,6 +144,8 @@ def resource_revise(request, id):
     revision to this code resource.
     """
     t = loader.get_template('method/resource_revise.html')
+
+    # use POST information (id) to retrieve CodeResource being revised
     this_code_resource = CodeResource.objects.get(pk=id)
     all_revisions = CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
     last_revision = all_revisions[0]
@@ -151,6 +153,59 @@ def resource_revise(request, id):
     if request.method == 'POST':
         query = request.POST.dict()
 
+        # check if a file has been uploaded
+        try:
+            file_in_memory = request.FILES['content_file']
+        except:
+            # no file specified
+            form = CodeResourceRevisionForm(request.POST)
+            form._errors = min_form.errors
+            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
+            dep_form = CodeResourceDependencyForm()
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # modify actual filename prior to saving revision object
+        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # create CRv object
+        revision = CodeResourceRevision(revision_name=query['revision_name'],
+                                        revision_desc=query['revision_desc'],
+                                        coderesource=this_code_resource,
+                                        content_file=file_in_memory)
+        try:
+            revision.full_clean()
+            revision.save()
+        except ValidationError as e:
+            form = CodeResourceRevisionForm(request.POST)
+            form._errors = e.message
+            dep_form = CodeResourceDependencyForm()
+            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # bind CR dependencies
+        num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+
+    else:
+        # initial forms
+        if last_revision:
+            # this CR is being revised
+            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
+                                                     'revision_name': last_revision.revision_name})
+            # TODO: populate this with values from last revision's dependencies
+            dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
+        else:
+            form = CodeResourceRevisionForm()
+            dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
+
+    c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dep_forms': dep_forms})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+    """
         # validate name and description entries (return error if blank)
         min_form = CodeResourceMinimalForm(request.POST)
         if not min_form.is_valid():
@@ -201,7 +256,7 @@ def resource_revise(request, id):
     c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dependency_form': dep_form})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
-
+    """
 
 def methods(request):
     """
@@ -228,35 +283,20 @@ def return_method_forms (request, exceptions):
                                       'coderesource': query['coderesource'],
                                       'revisions': query['revisions'],
                                       'random': query.has_key('random')})
-
-    num_input_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_in_')])
-    num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
-
-    input_forms = []
-    for i in range(num_input_forms):
-        t_form = TransformationInputForm(auto_id='id_%s_in_'+str(i),
-                                         initial={'dataset_name': query['dataset_name_in_'+str(i)],
+    num_xput_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_')])
+    xput_forms = []
+    for i in range(num_xput_forms):
+        t_form = TransformationXputForm(auto_id='id_%s_'+str(i),
+                                         initial={'dataset_name': query['dataset_name_'+str(i)],
                                                   'dataset_idx': i})
-        xs_form = XputStructureForm(auto_id='id_%s_in_'+str(i),
-                                    initial={'compounddatatype': query['compounddatatype_in_'+str(i)],
-                                             'min_row': query['min_row_in_'+str(i)],
-                                             'max_row': query['max_row_in_'+str(i)]})
-        xs_form.errors['Errors'] = exceptions['inputs'].get(i, '')
-        input_forms.append((t_form, xs_form))
+        xs_form = XputStructureForm(auto_id='id_%s_'+str(i),
+                                    initial={'compounddatatype': query['compounddatatype_'+str(i)],
+                                             'min_row': query['min_row_'+str(i)],
+                                             'max_row': query['max_row_'+str(i)]})
+        xs_form.errors['Errors'] = exceptions.get(i, '')
+        xput_forms.append((t_form, xs_form))
 
-    output_forms = []
-    for i in range(num_output_forms):
-        t_form = TransformationOutputForm(auto_id='id_%s_out_'+str(i),
-                                          initial={'dataset_name': query['dataset_name_out_'+str(i)],
-                                                   'dataset_idx': i})
-        xs_form = XputStructureForm(auto_id='id_%s_out_'+str(i),
-                                    initial={'compounddatatype': query['compounddatatype_out_'+str(i)],
-                                             'min_row': query['min_row_out_'+str(i)],
-                                             'max_row': query['max_row_out_'+str(i)]})
-        xs_form.errors['Errors'] = exceptions['outputs'].get(i, '')
-        output_forms.append((t_form, xs_form))
-
-    return family_form, method_form, input_forms, output_forms
+    return family_form, method_form, xput_forms
 
 
 
@@ -332,7 +372,7 @@ def method_add (request):
                                                         min_row = min_row if min_row else None,
                                                         max_row = max_row if max_row else None)
                 else:
-                    new_output = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
                                                     dataset_idx = i+1,
                                                     compounddatatype = my_compound_datatype,
                                                     min_row = min_row if min_row else None,

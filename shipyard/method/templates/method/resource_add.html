@@ -30,19 +30,19 @@
     <input type="button" id="addDependencyForm" value="+"/>
     <input type="button" id="removeDependencyForm" value="-"/><small>Add/subtract dependency form fields</small></p>
     
-    <table id="dependencyForms">
-    <thead>
-    <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr></thead>
-    <tbody>
-    <tr>
-        <td>{{ dependency_form.coderesource }}</td>
-        <td>{{ dependency_form.revisions }}</td>
-        <td>{{ dependency_form.depPath }}</td>
-        <td>{{ dependency_form.depFileName }}</td>
-    </tr>
-    </tbody>
-    <tbody id="extraDependencyForms">
-    </tbody>
+    <table>
+        <thead>
+            <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr></thead>
+        <tbody id="dependencyForms">
+            {% for dep_form in dep_forms %}
+            <tr>
+                <td>{{ dep_form.coderesource }}</td>
+                <td>{{ dep_form.revisions }}</td>
+                <td>{{ dep_form.depPath }}</td>
+                <td>{{ dep_form.depFileName }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
 
     <input type="submit" value="Submit" />
