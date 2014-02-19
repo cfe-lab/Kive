@@ -209,6 +209,7 @@ class SymbolicDataset(models.Model):
 
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
+        self.structure.save()
         if max_row is not None and csv_summary["num_rows"] > max_row:
             self.logger.warn("too many rows")
             # FIXME: Do we only create these BD objects if they don't already exist?
