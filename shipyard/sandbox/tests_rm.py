@@ -52,6 +52,9 @@ class UtilityMethods(TestCase):
         self.simple_method_io(self.method_noop, self.cdt_string,
                 "strings", "same_strings")
 
+    def tearDown(self):
+        self.coderev_noop.delete()
+
     def make_second_pipeline(self, pipeline):
         """
         Create a second version of a Pipeline, in the same family as the first,
@@ -351,6 +354,10 @@ class ExecuteTestsRM(UtilityMethods):
         shutil.rmtree(tmpdir)
 
     def tearDown(self):
+        self.symds_labdata.delete()
+        self.coderev_reverse.delete()
+        self.coderev_complement.delete()
+        self.coderev_DNA2RNA.delete()
         os.remove(self.datafile.name)
 
     def test_execute_pipeline_spaces_in_dataset_name(self):
@@ -1382,3 +1389,5 @@ class CustomConstraintTests(UtilityMethods):
         self.assertEqual(verif_log.return_code, 0)
         self.assertEqual(verif_log.output_log.read(), "")
         self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_upload_data_prototype(self):
