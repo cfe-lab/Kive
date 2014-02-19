@@ -39,6 +39,8 @@ error_messages = {
         'ExecRecord \"{}\" represents a cable but Datatype of destination Dataset column {} does not match its source',
     "DT_circular_restriction":
         "Datatype \"{}\" has a circular restriction",
+    "DT_multiple_builtin_types":
+        "Datatype \"{}\" restricts supertypes of multiple built-in types other than INT and FLOAT",
     "DT_prototype_raw":
         "Prototype Dataset for Datatype \"{}\" is raw",
     "DT_prototype_wrong_CDT":
@@ -57,6 +59,8 @@ error_messages = {
         "Datatype \"{}\" has too many DATETIMEFORMAT restrictions acting on it",
     "DT_min_val_exceeds_max_val":
         "Datatype \"{}\" effective MIN_VAL exceeds effective MAX_VAL",
+    "DT_integer_min_max_val_too_narrow":
+        "Datatype \"{}\" has built-in type INT but the interval [{}, {}] does not admit any integers",
     "DT_min_length_exceeds_max_length":
         "Datatype \"{}\" effective MIN_LENGTH exceeds effective MAX_LENGTH",
     "CellError_bad_BC":

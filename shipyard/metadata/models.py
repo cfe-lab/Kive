@@ -18,6 +18,7 @@ import re
 import csv
 import os
 import sys
+import math
 from datetime import datetime
 
 from file_access_utils import set_up_directory
@@ -207,7 +208,7 @@ class Datatype(models.Model):
             all_regexp_BCs.append(regexp_BC)
 
         for supertype in self.restricts.all():
-            for regexp_BC in supertype.basic_constraints.filter(ruletype=BasicConstraint.REGEXP):
+            for regexp_BC in supertype.get_all_regexps():
                 all_regexp_BCs.append(regexp_BC)
 
         return all_regexp_BCs
@@ -289,8 +290,16 @@ class Datatype(models.Model):
         FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
-        if hasattr(self, "restricts") and self.is_restricted_by(self):
-            raise ValidationError(error_messages["DT_circular_restriction"].format(self))
+        if hasattr(self, "restricts"):
+            if self.is_restricted_by(self):
+                raise ValidationError(error_messages["DT_circular_restriction"].format(self))
+
+            # February 18, 2014: we do not allow Datatypes to simultaneously restrict
+            # supertypes whose "built-in types" are not all either STR, BOOL, or INT/FLOAT
+            # (they can be a mix of INT and FLOAT though).
+            supertype_builtin_types = set([supertype.get_builtin_type() for supertype in self.restricts.all()])
+            if len(supertype_builtin_types) > 1 and supertype_builtin_types != set([FLOAT, INT]):
+                raise ValidationError(error_messages["DT_multiple_builtin_types"].format(self))
 
         if self.prototype is not None:
             if self.prototype.symbolicdataset.is_raw():
@@ -362,15 +371,21 @@ class Datatype(models.Model):
         if my_dtf_count + supertype_dtf_count > 1:
             raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
 
-        # Check that effective min_length <= max_length, min_val <= max_val if possible;
-        # i.e. if this Datatype restricts only STR, or restricts INT/FLOAT and not BOOL, respectively.
-        # These checks don't happen if this Datatype hasn't already been saved into the database
-        # # (or else there is no way that they can have effective numerical constraints).
+        # Check that effective min_val <= max_val if applicable; if this Datatype is an
+        # integer, then check that the closed interval [min_val, max_val] actually
+        # contains any integers.
         if hasattr(self, "restricts") and self.get_builtin_type() in (FLOAT, INT):
-            if (self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1] >
-                    self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]):
+            min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1]
+            max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]
+            if (min_val > max_val):
                 raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
 
+            if self.get_builtin_type() == INT and math.floor(max_val) < math.ceil(min_val):
+                raise ValidationError(
+                    error_messages["DT_integer_min_max_val_too_narrow"].format(self, min_val, max_val)
+                )
+
+        # Check that effective min_length <= max_length if applicable.
         if hasattr(self, "restricts") and self.get_builtin_type() == STR:
             if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
                     self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
@@ -422,7 +437,10 @@ class Datatype(models.Model):
         interpreted as all of the Shipyard atomic types it inherits from, but also
         whether it then checks out against all BasicConstraints.
 
-        Return a list of BasicConstraints that it failed (hopefully it's
+        If it fails against even the simplest casting test (i.e. the
+        string could not be cast to the appropriate Python type),
+        return a list containing a describing string.  If not, return
+        a list of BasicConstraints that it failed (hopefully it's
         empty!).
 
         PRE: this Datatype and by extension all of its BasicConstraints
@@ -442,7 +460,7 @@ class Datatype(models.Model):
         BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
         constraints_failed = []
-        if self.is_restriction(STR) and not self.is_restriction(FLOAT) and not self.is_restriction(BOOL):
+        if self.get_builtin_type() == STR:
             # string_to_check is, by definition, a string, so we skip
             # to checking the BasicConstraints.
             eff_min_length_BC, eff_min_length = self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)
@@ -463,7 +481,7 @@ class Datatype(models.Model):
                   constraints_failed.append(eff_dtf_BC)
 
         # Next, check the numeric (and non-Boolean) cases.
-        elif self.is_restriction(INT) and not self.is_restriction(BOOL):
+        elif self.get_builtin_type() == INT:
             try:
                 int(string_to_check)
             except ValueError:
@@ -478,7 +496,7 @@ class Datatype(models.Model):
                 if eff_max_val_BC is not None and int(string_to_check) > eff_max_val:
                     constraints_failed.append(eff_max_val_BC)
 
-        elif self.is_restriction(FLOAT) and not self.is_restriction(BOOL):
+        elif self.get_builtin_type() == FLOAT:
             try:
                 float(string_to_check)
             except ValueError:
@@ -493,14 +511,13 @@ class Datatype(models.Model):
                 if eff_max_val_BC is not None and float(string_to_check) > eff_max_val:
                     constraints_failed.append(eff_max_val_BC)
 
-        elif self.is_restriction(BOOL):
+        elif self.get_builtin_type() == BOOL:
             bool_RE = re.compile("^(True)|(False)|(true)|(false)|(TRUE)|(FALSE)|T|F|t|f|0|1$")
             if not bool_RE.match(string_to_check):
-                return ["Was not boolean"]
+                return ["Was not Boolean"]
 
         ####
         # Check all REGEXP-type BasicConstraints.
-        constraints_failed = []
 
         for re_BC in self.get_all_regexps():
             constraint_re = re.compile(re_BC.rule)
@@ -562,7 +579,14 @@ class BasicConstraint(models.Model):
         "Rule specification",
         max_length = 100)
 
-    # TO DO: write a clean function handling the above.
+    def __unicode__(self):
+        """
+        Unicode representation of this BasicConstraint.
+
+        The representation takes the form {rule type}={rule}.
+        """
+        return u"{}={}".format(self.ruletype, self.rule)
+
     def clean(self):
         """
         Check coherence of the specified rule and rule type.
