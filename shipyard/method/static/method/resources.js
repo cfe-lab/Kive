@@ -44,9 +44,42 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
+    // trigger ajax on CR drop-down to populate revision select
+    $("#id_coderesource_0").on('change',
+        function() {
+            cr_id = $(this).val();
+            if (cr_id != "") {
+                $.ajax({
+                    type: "POST",
+                    url: "get_revisions/",
+                    data: {cr_id: cr_id}, // specify data as an object
+                    datatype: "json", // type of data expected back from server
+                    success: function(result) {
+                        var options = [];
+                        var arr = JSON.parse(result)
+                        $.each(arr, function(index,value) {
+                            options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
+                        });
+                        $("#id_revisions_0").html(options.join(''));
+                    }
+                })
+            }
+            else {
+                $("#id_revisions_0").html('<option value="">--- select a CodeResource first ---</option>');
+            }
+        }
+    )
+
     var options = document.getElementById("id_coderesource_0").options;
-    var numberOfForms = 0;
-    var nDepForms = $('#extraXputForms > tr').length;
+    var numberOfForms = $('#dependencyForms > tr').length;
+
+    // modify name attributes for extra input forms received from server
+    for (var i = 0; i < numberOfForms; i++) {
+        $('#id_coderesource_'+i).attr('name', 'coderesource_'+i);
+        $('#id_revisions_'+i).attr('name', 'revisions_'+i);
+        $('#id_depPath_'+i).attr('name', 'depPath_'+i);
+        $('#id_depFileName_'+i).attr('name', 'depFileName_'+i);
+    }
 
     $("#addDependencyForm").click(  // query button by id selector
         function () {   // anonymous function
@@ -66,80 +99,47 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             htmlStr += "<td><input id=\"id_depFileName_" + i + "\" maxlength=\"255\" name=\"depFileName_" + i + "\" type=\"text\" /></td>";
             htmlStr += "</tr>";
 
+            $('#dependencyForms').find('tr:last').after(htmlStr);
+
+            // repeated within this class-based event handler for the dynamic HTML elements
+            $("select.coderesource").on('change',
+                function() {
+                    var suffix = $(this).attr('id').split('_')[2];
+                    cr_id = $(this).val();
+                    if (cr_id != "") {
+                        $.ajax({
+                            type: "POST",
+                            url: "get_revisions/",
+                            data: {cr_id: cr_id}, // specify data as an object
+                            datatype: "json", // type of data expected back from server
+                            success: function(result) {
+                                //console.log(result);
+                                var options = [];
+                                var arr = JSON.parse(result)
+                                $.each(arr, function(index,value) {
+                                    options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
+                                });
+                                $("#id_revisions_"+suffix).html(options.join(''));
+                            },
+                        })
+                    }
+                    else {
+                        // reset the second drop-down
+                        $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
+                    }
+                }
+            )
         }
-    )
+    );
+
     $("#removeDependencyForm").click(
         function() {
-            if (numberOfForms > 0) {
+            if (numberOfForms > 1) {
                 numberOfForms -= 1;
-                renderForms(numberOfForms);
+                $('#dependencyForms').find('tr:last').remove();
             }
         }
-    )
-    // render forms in div
-    var renderForms = function($nForms) {
-        var htmlStr = "";
-        for (var i = 0; i < $nForms; i++) {
-            // generate drop-down menus
-
-        }
-        $("#extraDependencyForms").html(htmlStr);
-
-        // repeated within this class-based event handler for the dynamic HTML elements
-        $("select.coderesource").on('change',
-            function() {
-                var suffix = $(this).attr('id').split('_')[2];
-                cr_id = $(this).val();
-                if (cr_id != "") {
-                    $.ajax({
-                        type: "POST",
-                        url: "get_revisions/",
-                        data: {cr_id: cr_id}, // specify data as an object
-                        datatype: "json", // type of data expected back from server
-                        success: function(result) {
-                            //console.log(result);
-                            var options = [];
-                            var arr = JSON.parse(result)
-                            $.each(arr, function(index,value) {
-                                options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                            });
-                            $("#id_revisions_"+suffix).html(options.join(''));
-                        },
-                    })
-                }
-                else {
-                    // reset the second drop-down
-                    $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
-                }
-            }
-        )
-    };
-
-    // trigger ajax on CR drop-down to populate revision select
-    $("#id_coderesource").on('change',
-        function() {
-            cr_id = $(this).val();
-            if (cr_id != "") {
-                $.ajax({
-                    type: "POST",
-                    url: "get_revisions/",
-                    data: {cr_id: cr_id}, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        var options = [];
-                        var arr = JSON.parse(result)
-                        $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                        });
-                        $("#id_revisions").html(options.join(''));
-                    }
-                })
-            }
-            else {
-                $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
-            }
-        }
-    )
+    );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {

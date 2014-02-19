@@ -25,13 +25,14 @@ class CodeResourcePrototypeForm (forms.ModelForm):
         self.fields['content_file'].help_text = 'File containing this new code resource'
     class Meta:
         model = CodeResourceRevision
-        #fields = ('revision_name', 'revision_desc', 'content_file')
-        exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
+        fields = ('content_file', 'revision_name', 'revision_desc')
+        #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
 
 class CodeResourceRevisionForm (forms.ModelForm):
    class Meta:
         model = CodeResourceRevision
         fields = ('revision_name', 'revision_desc', 'content_file', )
+
 
 class CodeResourceDependencyForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -46,7 +47,8 @@ class CodeResourceDependencyForm (forms.ModelForm):
 
     class Meta:
         model = CodeResourceDependency
-        exclude = ('coderesourcerevision', 'requirement')
+        #exclude = ('coderesourcerevision', 'requirement')
+        fields = ('coderesource', 'revisions', 'depPath', 'depFileName')
 
 
 class MethodForm (forms.ModelForm):

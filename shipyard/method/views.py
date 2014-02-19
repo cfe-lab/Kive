@@ -4,7 +4,7 @@ method.views
 
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
-from method.models import CodeResource, CodeResourceRevision, Method
+from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
 from method.forms import *
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
@@ -27,6 +27,34 @@ def resources(request):
     return HttpResponse(t.render(c))
 
 
+
+def return_crv_forms(request, exceptions, is_new):
+    """
+    A helper function for resource_revise() to populate forms with user-submitted values
+    and form validation errors to be returned as HttpResponse.
+    """
+    query = request.POST.dict()
+    file_in_memory = request.FILES['content_file']
+    if is_new:
+        crv_form = CodeResourcePrototypeForm(initial={'revision_name': query['revision_name'],
+                                                      'revision_desc': query['revision_desc'],
+                                                      'content_file': file_in_memory.name}) # FIXME: this doesn't work
+    else:
+        crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
+                                                     'revision_desc': query['revision_desc']})
+
+    num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+    dep_forms = []
+    for i in range(num_dep_forms):
+        dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
+                                              initial={'coderesource': query['coderesource_'+str(i)],
+                                                       'revisions': query['revisions_'+str(i)]})
+        dep_form.errors['Errors'] = ErrorList(exceptions.get(i, ''))
+        dep_forms.append(dep_form)
+
+    return crv_form, dep_forms
+
+
 def resource_add(request):
     """
     Add a new code resource with a prototype (no revisions).  The FILENAME of the prototype will
@@ -40,35 +68,37 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
+        exceptions = {}
 
-        # validate name and description entries (return error if blank)
-        min_form = CodeResourceMinimalForm(request.POST)
-        if not min_form.is_valid():
-            # create unbound form
-            form = CodeResourcePrototypeForm(request.POST)
-            form._errors = min_form.errors
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
-
+        # check if a file has been uploaded
         try:
             file_in_memory = request.FILES['content_file']
         except:
             # no file specified
-            form = CodeResourcePrototypeForm(request.POST)
-            form._errors = min_form.errors
-            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+            crv_form.errors.update({'content_file': u'You must specify a file upload.'})
+            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
+        # modify actual filename prior to saving revision object
+        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
         # create new CodeResource
-        new_code_resource = CodeResource.objects.create(name=query['revision_name'],
-                                                        description=query['revision_desc'],
-                                                        filename=file_in_memory.name)
+        new_code_resource = CodeResource(name=query['revision_name'],
+                                         description=query['revision_desc'],
+                                         filename=file_in_memory.name)
+        try:
+            new_code_resource.full_clean()
+            new_code_resource.save()
+        except ValidationError as e:
+            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+            crv_form.errors.update({'revision_name': e.message_dict.get('name', [u''])[0],
+                                    'revision_desc': e.message_dict.get('description', [u''])[0]})
+
+            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
 
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
@@ -80,60 +110,50 @@ def resource_add(request):
         try:
             prototype.full_clean()
             prototype.save()
-
-            # now parse dependencies if any exist
-            to_save = []
-            exceptions = []
-            for k in query.iterkeys():
-                if not k.startswith('revisions'):
-                    continue
-
-                # see if contents of this form result in a valid CodeResourceDependency
-                rev_id = query[k]
-                if rev_id == '':
-                    # ignore incomplete or unused dependency forms
-                    print 'ignoring incomplete CodeResourceDependencyForm'
-                    continue
-
-                suffix = ('_' + k.split('_')[-1]) if '_' in k else ''
-                on_revision = CodeResourceRevision.objects.get(pk=rev_id)
-                dependency = CodeResourceDependency(coderesourcerevision=prototype,
-                                                    requirement=on_revision,
-                                                    depPath=query['depPath'+suffix],
-                                                    depFileName=query['depFileName'+suffix])
-                try:
-                    dependency.full_clean()
-                except ValidationError as e:
-                    exceptions.extend(e.messages)
-                    pass
-
-                to_save.append(dependency)
-
-            # only save CR dependencies if they all check out
-            if exceptions:
-                prototype.delete()
-                raise # delete code resource
-            else:
-                for dependency in to_save:
-                    dependency.save()
-
-            return HttpResponseRedirect('/resources')
-        except:
+        except ValidationError as e:
             new_code_resource.delete()
-            raise
+            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+            crv_form.errors = e.message_dict
+            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
 
-        # return form with last (non-valid) entries
-        form = CodeResourcePrototypeForm(request.POST, request.FILES)
-        dep_form = CodeResourceDependencyForm(request.POST)
+        # bind CR dependencies
+        num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+        to_save = []
+        for i in range(num_dep_forms):
+            on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
+            dependency = CodeResourceDependency(coderesourcerevision=prototype,
+                                                requirement = on_revision,
+                                                depPath=query['depPath_'+str(i)],
+                                                depFileName=query['depFileName_'+str(i)])
+            try:
+                dependency.full_clean()
+                to_save.append(dependency)
+            except ValidationError as e:
+                exceptions.update({i: e.messages})
+
+        if exceptions:
+            new_code_resource.delete()
+            prototype.delete() # roll back CodeResourceRevision object
+            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+
+            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # success!
+        for dependency in to_save:
+            dependency.save()
+
+        return HttpResponseRedirect('/resources')
 
     else:
         form = CodeResourcePrototypeForm()
-        dep_form = CodeResourceDependencyForm()
+        dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
 
-    t = loader.get_template('method/resource_add.html')
-    c = Context({'resource_form': form, 'dependency_form': dep_form})
+    c = Context({'resource_form': form, 'dep_forms': dep_forms})
     c.update(csrf(request))
-    
     return HttpResponse(t.render(c))
 
 
@@ -152,17 +172,16 @@ def resource_revise(request, id):
 
     if request.method == 'POST':
         query = request.POST.dict()
+        exceptions = {}
 
         # check if a file has been uploaded
         try:
             file_in_memory = request.FILES['content_file']
         except:
             # no file specified
-            form = CodeResourceRevisionForm(request.POST)
-            form._errors = min_form.errors
-            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            crv_form, dep_forms = return_crv_forms(request, exceptions)
+            crv_form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
+            c = Context({'resource_form': crv_form, 'dependency_form': dep_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
@@ -178,15 +197,17 @@ def resource_revise(request, id):
             revision.full_clean()
             revision.save()
         except ValidationError as e:
-            form = CodeResourceRevisionForm(request.POST)
-            form._errors = e.message
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
+            crv_form, dep_forms = return_crv_forms(request, exceptions)
+            crv_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'resource_form': crv_form, 'dependency_form': dep_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
         # bind CR dependencies
         num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+
+        for i in range(num_dep_forms):
+            dependency = CodeResourceDependency(coderesourcerevision=revision)
 
     else:
         # initial forms
@@ -200,63 +221,12 @@ def resource_revise(request, id):
             form = CodeResourceRevisionForm()
             dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
 
-    c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dep_forms': dep_forms})
+    c = Context({'resource_form': form, 'dep_forms': dep_forms})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 
-    """
-        # validate name and description entries (return error if blank)
-        min_form = CodeResourceMinimalForm(request.POST)
-        if not min_form.is_valid():
-            # create unbound form
-            form = CodeResourceRevisionForm(request.POST)
-            form._errors = min_form.errors
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
 
-        try:
-            file_in_memory = request.FILES['content_file']
-        except:
-            # no file specified
-            form = CodeResourceRevisionForm(request.POST)
-            form._errors = min_form.errors
-            form._errors['content_file'] = ErrorList([u'You must specify a file upload.'])
-            dep_form = CodeResourceDependencyForm()
-            c = Context({'resource_form': form, 'dependency_form': dep_form})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
-
-        # modify actual filename prior to saving revision object
-        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
-
-        revision = CodeResourceRevision(revision_name=query['revision_name'],
-                                        revision_desc=query['revision_desc'],
-                                        coderesource=this_code_resource,
-                                        content_file=file_in_memory)
-        try:
-            revision.full_clean()
-            revision.save()
-            return HttpResponseRedirect('/resources')
-        except:
-            # otherwise return form with user entries
-            form = CodeResourceRevisionForm(request.POST, request.FILES)
-
-    else:
-        if last_revision:
-            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
-                                                     'revision_name': last_revision.revision_name})
-            dep_form = CodeResourceDependencyForm(request.POST)
-        else:
-            form = CodeResourceRevisionForm()
-            dep_form = CodeResourceDependencyForm()
-
-    c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dependency_form': dep_form})
-    c.update(csrf(request))
-    return HttpResponse(t.render(c))
-    """
 
 def methods(request):
     """
@@ -297,7 +267,6 @@ def return_method_forms (request, exceptions):
         xput_forms.append((t_form, xs_form))
 
     return family_form, method_form, xput_forms
-
 
 
 
