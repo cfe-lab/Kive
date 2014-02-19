@@ -435,11 +435,11 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         err_msg_key = "BC_bad_RE"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
                                 regexp_constr.clean)
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
                                 regexped_DT.clean)
 
     def test_clean_regexp_str_bad(self):
@@ -739,7 +739,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         milkman_DT = Datatype(name="Milkman", description="Milkman")
         milkman_DT.full_clean()
         milkman_DT.save()
-        milkman_DT.restricts.add(self.FLOAT)
+        milkman_DT.restricts.add(self.STR)
 
         regexped_DT = Datatype(name="RegexpedDT",
                                description="Datatype with good REGEXP attached")
@@ -763,7 +763,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         # Danny_DT.full_house()
         Danny_DT.full_clean()
         Danny_DT.save()
-        Danny_DT.restricts.add(self.BOOL)
+        Danny_DT.restricts.add(self.INT)
 
         Joey_DT = Datatype(name="Dave Coulier", description="Popeye imitator")
         Joey_DT.full_clean()
@@ -773,7 +773,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         Jesse_DT = Datatype(name="John Stamos", description="Mercy-haver")
         Jesse_DT.full_clean()
         Jesse_DT.save()
-        Jesse_DT.restricts.add(self.FLOAT)
+        Jesse_DT.restricts.add(self.INT)
 
         # The bad regexp pattern.
         pattern = "(.+"
@@ -791,11 +791,11 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         err_msg_key = "BC_bad_RE"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
                                 regexp_constr.clean)
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(regexp_constr, re.escape(pattern)),
+                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
                                 regexped_DT.clean)
 
     def test_clean_second_gen_dtf_good(self):
