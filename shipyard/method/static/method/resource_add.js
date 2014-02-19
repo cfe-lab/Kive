@@ -45,8 +45,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // trigger ajax on CR drop-down to populate revision select
-    $("#id_coderesource_0").on('change',
+    $("[id^='id_coderesource_']").on('change',
         function() {
+            var suffix = $(this).attr('id').split('_')[2];
             cr_id = $(this).val();
             if (cr_id != "") {
                 $.ajax({
@@ -60,15 +61,15 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $.each(arr, function(index,value) {
                             options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
                         });
-                        $("#id_revisions_0").html(options.join(''));
+                        $("#id_revisions_"+suffix).html(options.join(''));
                     }
                 })
             }
             else {
-                $("#id_revisions_0").html('<option value="">--- select a CodeResource first ---</option>');
+                $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
             }
         }
-    )
+    ).change() // trigger on load
 
     var options = document.getElementById("id_coderesource_0").options;
     var numberOfForms = $('#dependencyForms > tr').length;

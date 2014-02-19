@@ -205,23 +205,51 @@ def resource_revise(request, id):
 
         # bind CR dependencies
         num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
-
+        to_save = []
         for i in range(num_dep_forms):
-            dependency = CodeResourceDependency(coderesourcerevision=revision)
+            on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
+            dependency = CodeResourceDependency(coderesourcerevision=revision,
+                                                requirement = on_revision,
+                                                depPath=query['depPath_'+str(i)],
+                                                depFileName=query['depFileName_'+str(i)])
+            try:
+                dependency.full_clean()
+                to_save.append(dependency)
+            except ValidationError as e:
+                exceptions.update({i: e.messages})
+
+        if exceptions:
+            revision.delete() # roll back CodeResourceRevision object
+            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+
+            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # success!
+        for dependency in to_save:
+            dependency.save()
+
+        return HttpResponseRedirect('/resources')
 
     else:
-        # initial forms
-        if last_revision:
-            # this CR is being revised
-            form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
-                                                     'revision_name': last_revision.revision_name})
-            # TODO: populate this with values from last revision's dependencies
-            dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
-        else:
-            form = CodeResourceRevisionForm()
-            dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
+        # this CR is being revised
+        form = CodeResourceRevisionForm(initial={'revision_desc': last_revision.revision_desc,
+                                                 'revision_name': last_revision.revision_name})
+        # TODO: populate this with values from last revision's dependencies
+        dependencies = last_revision.dependencies.all()
+        dep_forms = []
+        for i, dependency in enumerate(dependencies):
+            its_crv = dependency.coderesourcerevision
+            its_cr = its_crv.coderesource
+            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
+                                                  initial={'coderesource': its_cr.pk,
+                                                           'revisions': its_crv.pk,
+                                                           'depPath': dependency.depPath,
+                                                           'depFileName': dependency.depFileName})
+            dep_forms.append(dep_form)
 
-    c = Context({'resource_form': form, 'dep_forms': dep_forms})
+    c = Context({'resource_form': form, 'coderesource': this_code_resource, 'dep_forms': dep_forms})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
