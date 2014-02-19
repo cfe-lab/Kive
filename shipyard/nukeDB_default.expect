@@ -4,6 +4,7 @@ spawn rm -r CodeResources
 spawn rm -r VerificationScripts
 spawn rm -r Datasets
 spawn rm -r Logs
+spawn rm -r VerificationLogs
 spawn rm [PATH TO YOUR DB]
 spawn ./manage.py syncdb --traceback
 
