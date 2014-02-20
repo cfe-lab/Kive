@@ -41,6 +41,9 @@ urlpatterns = patterns('',
     url(r'methods$', 'method.views.methods', name='methods'),
     url(r'method_add$', 'method.views.method_add', name='method_add'),
 
+    url(r'pipelines$', 'pipeline.views.pipelines', name='pipelines'),
+
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
-    url(r'^datasets', 'portal.views.datasets', name='datasets'),
+
+    url(r'^datasets', 'archive.views.datasets', name='datasets'),
 )
