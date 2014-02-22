@@ -14,17 +14,33 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from archive.models import MethodOutput
-from librarian.models import SymbolicDataset
-from metadata.models import Datatype, CompoundDatatype, CustomConstraint
-from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
-from pipeline.models import Pipeline, PipelineFamily
-from datachecking.models import ContentCheckLog, BadData
+from archive.models import *
+from librarian.models import *
+from metadata.models import *
+from method.models import *
+from pipeline.models import *
+from datachecking.models import *
 from sandbox.execute import Sandbox
 
 import file_access_utils
 
-from constants import error_messages, datatypes
+from constants import *
+
+def rmf(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+def clean_files():
+    for dataset in Dataset.objects.all():
+        rmf(dataset.dataset_file.name)
+    for crr in CodeResourceRevision.objects.all():
+        rmf(crr.content_file.name)
+    for cls in [MethodOutput, VerificationLog]:
+        for output in cls.objects.all():
+            rmf(output.output_log.name)
+            rmf(output.error_log.name)
 
 class UtilityMethods(TestCase):
 
@@ -51,6 +67,9 @@ class UtilityMethods(TestCase):
                 self.coderev_noop)
         self.simple_method_io(self.method_noop, self.cdt_string,
                 "strings", "same_strings")
+
+    def tearDown(self):
+        clean_files()
 
     def make_second_pipeline(self, pipeline):
         """
@@ -351,6 +370,7 @@ class ExecuteTestsRM(UtilityMethods):
         shutil.rmtree(tmpdir)
 
     def tearDown(self):
+        clean_files()
         os.remove(self.datafile.name)
 
     def test_execute_pipeline_spaces_in_dataset_name(self):
@@ -716,6 +736,10 @@ class BadRunTests(UtilityMethods):
             name="numbers", cdt=self.cdt_string, user=self.user_grandpa,
             description="numbers which are actually strings", make_dataset=True)
 
+    def tearDown(self):
+        super(BadRunTests, self).tearDown()
+        clean_files()
+
     def test_code_bad_execution(self):
         """
         If the user's code bombs, we should get an ExecLog with a -1 return code.
@@ -744,6 +768,7 @@ class FindSDTests(UtilityMethods):
 
     def tearDown(self):
         super(FindSDTests, self).tearDown()
+        clean_files()
         os.remove(self.string_datafile.name)
         os.remove(self.words_datafile.name)
 
@@ -1029,6 +1054,12 @@ class CustomConstraintTests(UtilityMethods):
                 echo 1234,yarrr >> "$2"
                 """, self.cdt_constraints)
 
+    def tearDown(self):
+        super(self.__class__, self).tearDown()
+        os.remove(self.good_datafile)
+        os.remove(self.bad_datafile)
+        clean_files()
+
     def _setup_onestep_pipeline(self, name, desc, script, cdt):
         """
         Helper function to set up a one step pipeline which passes the same
@@ -1134,6 +1165,8 @@ class CustomConstraintTests(UtilityMethods):
     def tearDown(self):
         # Clean up the work directory.
         shutil.rmtree(self.workdir)
+        super(self.__class__, self).tearDown()
+        clean_files()
 
     def test_summarize_CSV_no_output(self):
         """
@@ -1156,6 +1189,8 @@ class CustomConstraintTests(UtilityMethods):
                 lambda: SymbolicDataset.create_SD(no_output_datafile, 
                         cdt_no_output, self.user_oscar, "no output", 
                         "data with a bad verifier"))
+
+        os.remove(no_output_datafile)
 
     def test_verification_method_failed_row_too_large(self):
         """
@@ -1181,6 +1216,8 @@ class CustomConstraintTests(UtilityMethods):
                 lambda: SymbolicDataset.create_SD(big_row_datafile,
                     cdt=cdt_big_row, user=self.user_oscar, name="big row",
                     description="data with a verifier outputting too high a row number"))
+
+        os.remove(big_row_datafile)
 
     def test_summarize_correct_datafile(self):
         """
@@ -1257,6 +1294,24 @@ class CustomConstraintTests(UtilityMethods):
                 name="good data",
                 description="data which conforms to all its constraints")
         return symds_bad
+
+    def _test_setup_prototype_good(self):
+        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        prototype_file = self._setup_datafile(prototype_cdt, 
+                [["hello", "True"], ["hell", "True"], ["hel", "False"],
+                 ["he", "True"], ["h", "False"]])
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
+                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
+                description="working prototype for constraint CDT")
+        os.remove(prototype_file)
+
+        # Add a prototype to the custom DT, and make a new CDT.
+        self.dt_custom.prototype = prototype_SD.dataset
+        self.dt_custom.save()
+        cdt = self._setup_compounddatatype(
+                [self.dt_basic, self.dt_custom],
+                ["letter strings", "words"])
+        return cdt
 
     def _test_execute_pipeline_constraints(self, pipeline):
         """
@@ -1382,3 +1437,14 @@ class CustomConstraintTests(UtilityMethods):
         self.assertEqual(verif_log.return_code, 0)
         self.assertEqual(verif_log.output_log.read(), "")
         self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_upload_data_prototype_good_contentcheck(self):
+        """
+        Test the integrity of the ContentCheckLog created when a Dataset with
+        CustomConstraints is uploaded with a working prototype.
+        """
+        cdt = self._test_setup_prototype_good()
+        symds_good = SymbolicDataset.create_SD(self.good_datafile,
+                cdt=cdt, user=self.user_oscar, name="good data",
+                description="data which conforms to all its constraints")
+        symds_good.clean()
