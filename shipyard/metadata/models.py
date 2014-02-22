@@ -19,6 +19,7 @@ import csv
 import os
 import sys
 import math
+import tempfile
 from datetime import datetime
 
 from file_access_utils import set_up_directory
@@ -76,6 +77,16 @@ class Datatype(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    @staticmethod
+    def parse_boolean(string):
+        true_RE = re.compile("^(True)|(true)|(TRUE)|T|t|1$")
+        false_RE = re.compile("^(False)|(false)|(FALSE)|F|f|0$")
+        if true_RE.match(string):
+            return True
+        elif false_RE.match(string):
+            return False
+        return None
+
     def is_restricted_by(self, possible_restrictor_datatype):
         """
         Determine if this datatype is ever *properly* restricted, directly or indirectly,
@@ -84,29 +95,15 @@ class Datatype(models.Model):
         PRE: there is no circular restriction in the possible restrictor
         datatype (this would cause an infinite recursion).
         """
-        # The default is that self is not restricted by
-        # possible_restrictor_datatype; toggle to True if it turns out
-        # that it is.
-        is_restricted = False
-        restrictions = possible_restrictor_datatype.restricts.all()
-
-        for restrictedDataType in restrictions:
-
+        for restrictedDataType in possible_restrictor_datatype.restricts.all():
             # Case 1: If restrictions restrict self, return true
-            if restrictedDataType == self:
-                is_restricted = True
-
             # Case 2: Check if any restricted Datatypes themselves restrict self
-            else:
-                theValue = self.is_restricted_by(restrictedDataType)
-
-                # If any restricted Datatypes themselves restrict self, propagate
-                # this information to the parent Datatype as restricting self
-                if theValue == True:
-                    is_restricted = True
-
-        # Return False if Case 1 is never encountered
-        return is_restricted
+            # If any restricted Datatypes themselves restrict self, propagate
+            # this information to the parent Datatype as restricting self
+            if restrictedDataType.is_restriction(self):
+                return True
+        # Return False if Cases 1 or 2 are never encountered
+        return False
 
     def is_restriction(self, possible_restricted_datatype):
         """
@@ -145,37 +142,33 @@ class Datatype(models.Model):
         FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
-        # TODO: make these functions, which we call below, not strings
-        min_or_max = "min" if BC_type in (BasicConstraint.MIN_LENGTH, BasicConstraint.MIN_VAL) else "max"
-        val_or_len = "val" if BC_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL) else "len"
+        min_or_max = min if BC_type in (BasicConstraint.MIN_LENGTH, BasicConstraint.MIN_VAL) else max
+        numeric = BC_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL)
 
         effective_BC = None
-        # Default value if this is a 'max' constraint.
-        effective_val = float("inf")
-        if BC_type == BasicConstraint.MIN_VAL:
-            effective_val = -float("inf")
-        elif BC_type == BasicConstraint.MIN_LENGTH:
-            effective_val = 0
+        # Default values. If numeric, min -oo and max oo. If not, min 0, max oo.
+        allowed_min = -float("inf") if numeric else 0
+        allowed_max = float("inf")
+        effective_val = min_or_max(allowed_max, allowed_min)
+        base_type = self.get_builtin_type()
 
         # Base case: this Datatype does not restrict INT or FLOAT,
         # or it restricts BOOL, and this is a (MIN|MAX)_VAL restriction.
-        if val_or_len == "val" and self.get_builtin_type() in (STR, BOOL):
+        # Should this be a value error? -RM
+        if numeric and base_type in (STR, BOOL):
             # self.logger.debug("Datatype \"{}\" with pk={} is not one that should have a numerical constraint".
             #                   format(self, self.pk))
             return (None, effective_val)
 
         # Base case 2: this Datatype restricts any of FLOAT, INT, or
         # BOOL, and this is a (MIN|MAX)_LENGTH restriction.
-        if (val_or_len == "len") and self.get_builtin_type() != STR:
+        elif not numeric and base_type != STR:
             return (None, effective_val)
 
         # Base case 2: this instance has a constraint of this type already.
         my_BC = self.basic_constraints.filter(ruletype=BC_type)
         if my_BC.exists():
-            if val_or_len == "val":
-                effective_val = float(my_BC.first().rule)
-            else:
-                effective_val = int(my_BC.first().rule)
+            effective_val = float(my_BC.first().rule)
             effective_BC = my_BC.first()
 
         else:
@@ -188,8 +181,7 @@ class Datatype(models.Model):
                     # Recursive case: go through all of the supertypes and take the maximum.
                     supertype_BC, supertype_val = supertype.get_effective_num_constraint(BC_type)
 
-                    if ((min_or_max == "min" and supertype_val > effective_val) or
-                            (min_or_max == "max" and supertype_val < effective_val)):
+                    if min_or_max(effective_val, supertype_val) == effective_val:
                         effective_BC = supertype_BC
                         effective_val = supertype_val
 
@@ -208,8 +200,7 @@ class Datatype(models.Model):
             all_regexp_BCs.append(regexp_BC)
 
         for supertype in self.restricts.all():
-            for regexp_BC in supertype.get_all_regexps():
-                all_regexp_BCs.append(regexp_BC)
+            all_regexp_BCs.extend(supertype.get_all_regexps())
 
         return all_regexp_BCs
 
@@ -230,7 +221,7 @@ class Datatype(models.Model):
         FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
 
-        if self.get_builtin_type() != STR:
+        if self == STR or self.get_builtin_type() != STR:
             return None
 
         my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
@@ -238,9 +229,9 @@ class Datatype(models.Model):
             return my_dtf.first()
 
         for supertype in self.restricts.all():
-            curr_dtf = supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
-            if curr_dtf.exists():
-                return curr_dtf.first()
+            curr_dtf = supertype.get_effective_datetimeformat()
+            if curr_dtf:
+                return curr_dtf
 
         # If we reach this point, there is no effective datetimeformat constraint.
         return None
@@ -255,6 +246,9 @@ class Datatype(models.Model):
         PRE: this Datatype restricts at least one clean Datatype
         (thus at least restricts STR).
         """
+        if hasattr(self, "builtin_type"):
+            return self.builtin_type
+
         # The Shipyard builtins.
         STR = Datatype.objects.get(pk=datatypes.STR_PK)
         INT = Datatype.objects.get(pk=datatypes.INT_PK)
@@ -269,27 +263,20 @@ class Datatype(models.Model):
         elif self.is_restriction(FLOAT):
             builtin_type = FLOAT
 
+        self.builtin_type = builtin_type
         return builtin_type
 
-
-    # Clean: If prototype is specified, it must have a CDT with
-    # 2 columns: column 1 is a string "example" field,
-    # column 2 is a bool "valid" field.  This CDT will be hard-coded
-    # and loaded into the database on creation.
-    def clean(self):
+    def _clean_restrictions(self):
         """
-        Checks coherence of this Datatype.
-
-        Note that a Datatype must be saved into the database before it's complete,
-        as a complete Datatype must be a restriction of a Shipyard atomic Datatype
-        (STR, INT, FLOAT, or BOOL).  This necessitates a complete_clean() routine.
+        Check that this Datatype does not create a circular 
+        restriction, and that all its supertypes have the same atomic
+        Datatype. Note that we don't require it to actually have any
+        restrictions yet, since it might be in an intermediate state
+        of creation. But if it does have any, they should be coherent. 
+        This is a helper function for clean()
         """
-        # The Shipyard builtins.
-        STR = Datatype.objects.get(pk=datatypes.STR_PK)
-        INT = Datatype.objects.get(pk=datatypes.INT_PK)
-        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
-        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
-
+        # Primary keys of Shipyard numeric types.
+        numeric_PKs = set([datatypes.FLOAT_PK, datatypes.INT_PK])
         if hasattr(self, "restricts"):
             if self.is_restricted_by(self):
                 raise ValidationError(error_messages["DT_circular_restriction"].format(self))
@@ -297,10 +284,23 @@ class Datatype(models.Model):
             # February 18, 2014: we do not allow Datatypes to simultaneously restrict
             # supertypes whose "built-in types" are not all either STR, BOOL, or INT/FLOAT
             # (they can be a mix of INT and FLOAT though).
-            supertype_builtin_types = set([supertype.get_builtin_type() for supertype in self.restricts.all()])
-            if len(supertype_builtin_types) > 1 and supertype_builtin_types != set([FLOAT, INT]):
+            supertype_builtin_types = set([])
+            for supertype in self.restricts.all():
+                supertype_builtin_types.add(supertype.get_builtin_type().pk)
+
+            if len(supertype_builtin_types) > 1 and supertype_builtin_types != numeric_PKs:
                 raise ValidationError(error_messages["DT_multiple_builtin_types"].format(self))
 
+    def _clean_prototype(self):
+        """
+        Check that, if this Datatype has a prototype defined, it is
+        coherent. Here, we don't actually check the prototype by 
+        running the verification method, we just make sure it has the
+        correct structure: it must have a CDT with 2 columns: column 1 
+        is a string "example" field, column 2 is a bool "valid" field. 
+        This CDT will be hard-coded and loaded into the database on 
+        creation. This is a helper function for clean().
+        """
         if self.prototype is not None:
             if self.prototype.symbolicdataset.is_raw():
                 raise ValidationError(error_messages["DT_prototype_raw"].format(self))
@@ -310,90 +310,178 @@ class Datatype(models.Model):
             if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
                 raise ValidationError(error_messages["DT_prototype_wrong_CDT"].format(self))
 
-        # Clean all BasicConstraints.
-        for bc in self.basic_constraints.all():
-            bc.clean()
+    def _check_num_constraint_against_supertypes(self, constraint, error_message):
+        """
+        Check that the minval/maxval/minlen/maxlen constraint on this
+        Datatype is at least as restrictive as the equivalent constraint
+        on its supertypes. This is a helper function for
+        _check_basic_constraints_against_supertypes, which in turn is a
+        helper for clean().
 
-        # Check numerical constraints for coherence against the supertypes' constraints.
-        for constr_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL,
-                            BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
-            # Extract details on what kind of constraint this is.
-            min_or_max = "min" if constr_type in (BasicConstraint.MIN_VAL, BasicConstraint.MIN_LENGTH) else "max"
-            val_or_len = "val" if constr_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL) else "length"
+        INPUTS
+        constraint      the type of constraint to check, one of 
+                        BasicConstraint.(MIN|MAX)_(VAL|LENGTH)
+        error_message   message to raise if the check fails
+        
+        ASSUMPTIONS
+        1) The current Datatype restricts at least one other Datatype
+        (ie. hasattr(self, "restricts") = True).
+        2) The current Datatype has only one of the type of constraint
+        we are going to check.
+        """
+        my_constraint = self.basic_constraints.filter(ruletype=constraint)
+        if not my_constraint.exists():
+            return
 
-            all_curr_type = self.basic_constraints.filter(ruletype=constr_type)
+        my_value = float(my_constraint.first().rule)
+        # TODO: duplicated. Maybe pass in min/max as a parameter?
+        min_or_max = min if constraint in (BasicConstraint.MIN_VAL, BasicConstraint.MIN_LENGTH) else max
 
-            if all_curr_type.count() > 1:
-                # Check that there is at most one BasicConstraint of types (MIN|MAX)_(VAL|LENGTH)
-                # directly associated to this instance.
-                raise ValidationError(error_messages["DT_several_same_constraint"].format(self, constr_type))
+        for supertype in self.restricts.all():
+            supertype_value = supertype.get_effective_num_constraint(constraint)[1]
+            if supertype_value == my_value:
+                continue
+            elif min_or_max(supertype_value, my_value) == my_value:
+                raise ValidationError(error_message)
 
-            elif all_curr_type.count() == 1:
-                my_constr_val = None
-                if val_or_len == "val":
-                    my_constr_val = float(all_curr_type.first().rule)
-                else:
-                    my_constr_val = int(all_curr_type.first().rule)
-
-                # Default constraint value for the supertypes if the constraint is a max-type.
-                supertypes_val = float("inf")
-                if constr_type == BasicConstraint.MIN_VAL:
-                    supertypes_val = -float("inf")
-                elif constr_type == BasicConstraint.MIN_LENGTH:
-                    supertypes_val = 0
-
-                if hasattr(self, "restricts"):
-                    if min_or_max == "min":
-                        supertypes_val = max(
-                            supertype.get_effective_num_constraint(constr_type)[1]
-                            for supertype in self.restricts.all())
-                    else:
-                        supertypes_val = min(
-                            supertype.get_effective_num_constraint(constr_type)[1]
-                            for supertype in self.restricts.all())
-
-                if min_or_max == "min" and my_constr_val <= supertypes_val:
-                    if val_or_len == "val":
-                        raise ValidationError(error_messages["DT_min_val_smaller_than_supertypes"].format(self))
-                    else:
-                        raise ValidationError(error_messages["DT_min_length_smaller_than_supertypes"].format(self))
-                elif min_or_max == "max" and my_constr_val >= supertypes_val:
-                    if val_or_len == "val":
-                        raise ValidationError(error_messages["DT_max_val_larger_than_supertypes"].format(self))
-                    else:
-                        raise ValidationError(error_messages["DT_max_length_larger_than_supertypes"].format(self))
-
-        # Check that there is only one DATETIMEFORMAT between this Datatype and all of its supertypes.
-        my_dtf_count = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
-        supertype_dtf_count = 0 if not hasattr(self, "restricts") else sum(
+    def _check_datetime_constraint_against_supertypes(self):
+        """
+        Check that there is only one DATETIMEFORMAT between this 
+        Datatype and all of its supertypes. This is a helper function 
+        for _check_basic_constraints_against_supertypes(), which is in
+        turn a helper for clean().
+        """
+        my_dtf_count = self.basic_constraints.filter(ruletype="datetimeformat").count()
+        supertype_dtf_count = sum(
             [supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
              for supertype in self.restricts.all()])
         if my_dtf_count + supertype_dtf_count > 1:
             raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
 
-        # Check that effective min_val <= max_val if applicable; if this Datatype is an
-        # integer, then check that the closed interval [min_val, max_val] actually
-        # contains any integers.
-        if hasattr(self, "restricts") and self.get_builtin_type() in (FLOAT, INT):
+    def _check_basic_constraints_against_supertypes(self):
+        """
+        Check constraints for coherence against the supertypes' constraints.
+        This is a helper function for clean()
+        
+        ASSUMPTIONS
+        1) This Datatype has at least one supertype.
+        """
+        # Check numerical constraints for coherence against the supertypes' constraints.
+        self._check_num_constraint_against_supertypes(BasicConstraint.MIN_VAL,
+            error_messages["DT_min_val_smaller_than_supertypes"].format(self))
+        self._check_num_constraint_against_supertypes(BasicConstraint.MAX_VAL,
+            error_messages["DT_max_val_larger_than_supertypes"].format(self))
+        self._check_num_constraint_against_supertypes(BasicConstraint.MIN_LENGTH,
+            error_messages["DT_min_length_smaller_than_supertypes"].format(self))
+        self._check_num_constraint_against_supertypes(BasicConstraint.MAX_LENGTH,
+            error_messages["DT_max_length_larger_than_supertypes"].format(self))
+        self._check_datetime_constraint_against_supertypes()
+
+    def _check_constraint_intervals(self):
+        """
+        Check that the "paired" constraints (ie. min/maxlen, min/maxval)
+        for this Datatype make sense. That is, that effective min_val <=
+        max_val if applicable, and if this Datatype is an integer, then
+        the closed interval [min_val, max_val] actually contains any
+        integers.
+
+        ASSUMPTIONS
+        1) This Datatype has at least one supertype.
+        """
+        # TODO: the following line is duplicated
+        numeric_PKs = [datatypes.FLOAT_PK, datatypes.INT_PK]
+        if self.get_builtin_type().pk in numeric_PKs:
             min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1]
             max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]
             if (min_val > max_val):
                 raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
 
-            if self.get_builtin_type() == INT and math.floor(max_val) < math.ceil(min_val):
-                raise ValidationError(
-                    error_messages["DT_integer_min_max_val_too_narrow"].format(self, min_val, max_val)
-                )
+            if (self.get_builtin_type().pk == datatypes.INT_PK and 
+                    math.floor(max_val) < math.ceil(min_val)):
+                raise ValidationError(error_messages["DT_integer_min_max_val_too_narrow"].
+                    format(self, min_val, max_val))
 
         # Check that effective min_length <= max_length if applicable.
-        if hasattr(self, "restricts") and self.get_builtin_type() == STR:
+        if self.get_builtin_type().pk == datatypes.STR_PK:
             if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
                     self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
-                raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].format(self))
+                raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].
+                        format(self))
+
+    def _clean_basic_constraints(self):
+        """
+        Check the coherence of this Datatype's basic constraints.
+        This is a helper for clean(). Note that we don't check 
+        the values against the parents here.
+        """
+        # Check that there is at most one BasicConstraint of every type except
+        # REGEXP directly associated to this instance.
+        ruletypes = self.basic_constraints.values("ruletype")
+        constraint_counts = ruletypes.annotate(count=models.Count("id"))
+        for row in constraint_counts:
+            if row["count"] > 1 and row["ruletype"] != "regexp":
+                raise ValidationError(error_messages["DT_several_same_constraint"].
+                        format(self, row["ruletype"]))
+
+        # Clean them all.
+        for bc in self.basic_constraints.all():
+            bc.clean()
+
+    def _verify_prototype(self):
+        """
+        Check that Datatype's prototype correctly identifies values as
+        being valid or invalid. 
+        
+        IMPORTANT: The best way I can see to do this is to create a new 
+        CDT, like the prototype CDT but with the required constraints on
+        the first column. We then call summarize_CSV on the resulting
+        file, and check that the failed rows from the first column are
+        the same as those marked invalid by the second column. This
+        means that 
+        """
+        if not hasattr(self, "prototype") or not self.prototype:
+            return
+
+        PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        EXAMPLE = PROTOTYPE_CDT.members.get(column_idx=1)
+        VALID = PROTOTYPE_CDT.members.get(column_idx=2)
+
+        my_prototype = CompoundDatatype()
+        my_prototype.save()
+        my_prototype.members.create(datatype=self, column_idx=1,
+                column_name=EXAMPLE.column_name)
+        my_prototype.members.create(datatype=VALID.datatype, column_idx=2,
+                column_name=VALID.column_name)
+
+        run_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
+        with open(self.prototype.dataset_file.name) as f:
+            print(my_prototype.summarize_CSV(f, run_path))
+
+        my_prototype.delete()
+
+    def clean(self):
+        """
+        Checks coherence of this Datatype.
+
+        Note that a Datatype must be saved into the database before it's complete,
+        as a complete Datatype must be a restriction of a Shipyard atomic Datatype
+        (STR, INT, FLOAT, or BOOL).  This necessitates a complete_clean() routine.
+        """
+        self._clean_restrictions()
+        self._clean_prototype()
+        self._clean_basic_constraints()
+
+        if hasattr(self, "restricts"):
+            self._check_basic_constraints_against_supertypes()
+            self._check_constraint_intervals()
 
         # Clean the CustomConstraint if it exists.
         if self.has_custom_constraint():
             self.custom_constraint.clean()
+
+        # Verify the prototype last, because we want to clean the
+        # CustomConstraint first.
+        self._verify_prototype()
 
     def is_complete(self):
         """
