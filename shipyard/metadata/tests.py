@@ -940,11 +940,7 @@ class DatatypeTests(MetadataTestSetup):
         for curr_ruletype, curr_rule in rules:
             constr_DT.basic_constraints.create(ruletype=curr_ruletype, rule="{}".format(curr_rule))
 
-        err_msg_key = ""
-        if multiple_BC_type == BasicConstraint.DATETIMEFORMAT:
-            err_msg_key = "DT_too_many_datetimeformats"
-        else:
-            err_msg_key = "DT_several_same_constraint"
+        err_msg_key = "DT_several_same_constraint"
 
         self.assertRaisesRegexp(ValidationError,
                                 error_messages[err_msg_key].format(constr_DT, multiple_BC_type),
