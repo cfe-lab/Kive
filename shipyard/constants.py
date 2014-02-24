@@ -89,7 +89,7 @@ error_messages = {
     "verification_no_output":
         'Verification method for column {} of CompoundDatatype "{}" produced no output',
     "verification_large_row":
-        'Verification method for Datatype "{}" indicated an error in row {} of SymbolicDataset "{}", which only has {} rows'
+        'Verification method for Datatype "{}" indicated an error in row {}, but only {} rows were checked'
 }
 
 warning_messages = {
