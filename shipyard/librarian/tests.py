@@ -254,15 +254,6 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_DNA_doublet_symDS_structure = self.E21_41_DNA_doublet_symDS.structure
         self.E21_41_DNA_doublet_DS = self.E21_41_DNA_doublet_symDS.dataset
 
-    # This functionality now lives in MetadataTestSetup.
-    # def tearDown(self):
-    #     """Clear CodeResources and Datasets folders."""
-    #     super(LibrarianTestSetup, self).tearDown()
-    #
-    #     for dataset in Dataset.objects.all():
-    #         dataset.dataset_file.close()
-    #         dataset.dataset_file.delete()
-
     def ER_from_record(self, record):
         """
         Helper function to create an ExecRecord from an Run, RunStep, or 
@@ -345,7 +336,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         # Try to create a symbolic dataset.
         self.assertRaisesRegexp(ValueError,
-            error_messages["header_mismatch"].format(".*", ".*", ".*"),
+            re.escape(error_messages["bad_input_file"].format(data_file.name, self.cdt_record)),
             lambda : SymbolicDataset.create_SD(file_path = data_file.name,
                 cdt = self.cdt_record, make_dataset = True, user = self.myUser,
                 name = "lab data", description = "patient sequences"))
@@ -361,7 +352,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         data_file.close()
 
         self.assertRaisesRegexp(ValueError,
-            error_messages["empty_file"].format(".*"),
+            re.escape(error_messages["bad_input_file"].format(file_path, self.cdt_record)),
             lambda : SymbolicDataset.create_SD(file_path = data_file.name,
                 cdt = self.cdt_record, make_dataset = True, user = self.myUser,
                 name = "missing data", description = "oops!"))
@@ -379,7 +370,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         data_file.close()
 
         self.assertRaisesRegexp(ValueError,
-            error_messages["header_mismatch"].format(".*", self.header, header),
+            re.escape(error_messages["bad_input_file"].format(file_path, self.cdt_record)),
             lambda : SymbolicDataset.create_SD(file_path = data_file.name,
                 cdt = self.cdt_record, make_dataset = True, user = self.myUser,
                 name = "bad data", description = "too many columns"))

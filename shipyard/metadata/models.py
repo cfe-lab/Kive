@@ -1356,7 +1356,7 @@ class CompoundDatatype(models.Model):
             header = next(data_csv)
         except StopIteration:
             self.logger.warning("file is empty")
-            return {}
+            return {"bad_num_cols": 0}
     
         # Check the header.
         self.logger.debug("Checking header")

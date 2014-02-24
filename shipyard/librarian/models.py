@@ -80,9 +80,6 @@ class SymbolicDataset(models.Model):
         else:
             return False
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -155,9 +152,12 @@ class SymbolicDataset(models.Model):
             structure = DatasetStructure(symbolicdataset=symDS, compounddatatype=cdt)
             structure.save()
             run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-            symDS.check_file_contents(file_path, run_dir, None, None, None) 
+            content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
+            if content_check.is_fail():
+                raise ValueError(error_messages["bad_input_file"].
+                        format(file_path, cdt))
             LOGGER.debug("Read {} rows from file {}".format(structure.num_rows, file_path))
-    
+
         if make_dataset:
             dataset = archive.models.Dataset(
                 user=user, name=name, description=description,
@@ -196,7 +196,6 @@ class SymbolicDataset(models.Model):
             self.logger.debug("SD is raw - returning clean CCL")
             return ccl
 
-        csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)

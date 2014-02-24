@@ -10,6 +10,9 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
+from django.core.files import File
+from django.utils import timezone
+
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
 from constants import error_messages
@@ -526,12 +529,16 @@ class Method(transformation.models.Transformation):
             if proc.poll() is not None:
                 break
 
-    def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams, error_streams):
+    def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams,
+            error_streams, log_to_fill=None):
         """
         SYNOPSIS
         Run the method, passing each line in its stdout and stderr to any number
         of streams. Return the Method's return code, or -1 if the Method suffers
-        an OS-level error (ie. is not executable).
+        an OS-level error (ie. is not executable). If log_to_fill is not None,
+        fill it in with the return code, start and end time, and set its output and
+        error logs to the _first_ provided streams (meaning these should be files,
+        not standard streams, and they must be open for reading AND writing).
 
         INPUTS
         run_path        see run_code
@@ -542,15 +549,26 @@ class Method(transformation.models.Transformation):
 
         OUTPUTS
         The return code of the Method's driver.
+
+        ASSUMPTIONS
+        1) log_to_fill, if it is provided, has not been saved yet. This is because
+        its start_time is auto_now_add, so we have to save it just before we run the code.
+        2) if log_to_fill is provided, the first entry in output_streams and error_streams
+        are handles to regular files, open for reading and writing.
         """
-        trace = None # If the process caused a system level error, it will be stored here.
+        if log_to_fill:
+            log_to_fill.save()
+
+        returncode = None
         try:
             method_popen = self.run_code(run_path, input_paths, output_paths)
         except OSError:
-            trace = traceback.format_exc()
+            for stream in error_streams:
+                traceback.print_exc(file=stream)
+            returncode = -1
 
         # Succesful execution.
-        if trace is None:
+        if returncode is None:
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
             out_thread = threading.Thread(target=self._poll_stream, 
@@ -564,14 +582,21 @@ class Method(transformation.models.Transformation):
 
             returncode = method_popen.returncode
 
-        # If the process bombed, store/write the traceback.
-        else:
-            for stream in error_streams:
-                stream.write(trace)
-            returncode = -1
-
         for stream in output_streams + error_streams:
             stream.flush()
+
+        if log_to_fill:
+            log_to_fill.end_time = timezone.now()
+            log_to_fill.return_code = returncode
+            outlog = output_streams[0]
+            errlog = error_streams[0]
+            outlog.seek(0)
+            errlog.seek(0)
+
+            log_to_fill.error_log.save(errlog.name, File(errlog))
+            log_to_fill.output_log.save(outlog.name, File(outlog))
+            log_to_fill.complete_clean()
+
         return returncode
 
     def run_code(self, run_path, input_paths, output_paths):
