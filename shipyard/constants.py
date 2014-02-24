@@ -87,9 +87,14 @@ error_messages = {
     "DT_does_not_restrict_atomic":
         "Datatype \"{}\" does not restrict any of Shipyard atomics STR, INT, FLOAT, or BOOL",
     "verification_no_output":
-        'Verification method for column {} of CompoundDatatype "{}" produced no output',
+        'Verification method for Datatype "{}" produced no output',
     "verification_large_row":
-        'Verification method for Datatype "{}" indicated an error in row {}, but only {} rows were checked'
+        'Verification method for Datatype "{}" indicated an error in row {}, but only {} rows were checked',
+    "prototype_bad_valid":
+        'The prototype for Datatype "{}" indicates the value "{}" should be valid, but it is not',
+    "prototype_bad_invalid":
+        'The prototype for Datatype "{}" indicates the value "{}" should not be valid, but it is'
+
 }
 
 warning_messages = {

@@ -158,7 +158,7 @@ LOGGING = {
     },
     'formatters': {
         'debug': {
-            'format': '%(asctime)s - %(name)s.%(funcName)s(): %(message)s',
+            'format': '%(name)s.%(funcName)s(): %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
@@ -180,6 +180,8 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'metadata.models':        {'handlers': ['console'], 'level': 'DEBUG'},
+        'librarian.models':       {'handlers': ['console'], 'level': 'DEBUG'},
         'CodeResourceRevision':   {'handlers': ['console'], 'level': 'DEBUG'},
         'CompoundDatatype':       {'handlers': ['console'], 'level': 'DEBUG'},
         'Dataset':                {'handlers': ['console'], 'level': 'DEBUG'},
