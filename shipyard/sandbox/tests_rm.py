@@ -735,6 +735,7 @@ class BadRunTests(UtilityMethods):
         self.symds_grandpa = SymbolicDataset.create_SD(self.grandpa_datafile.name,
             name="numbers", cdt=self.cdt_string, user=self.user_grandpa,
             description="numbers which are actually strings", make_dataset=True)
+        self.symds_grandpa.clean()
 
     def tearDown(self):
         super(BadRunTests, self).tearDown()
@@ -887,16 +888,13 @@ class FindSDTests(UtilityMethods):
         # Some data to run through the simple pipeline.
         self.string_datafile = tempfile.NamedTemporaryFile(delete=False)
         self.string_datafile.write("word\n")
-        for line in range(20):
-            for l in range(30):
-                i = random.randint(1,99171)
-                # Probably not cross platform :P
-                os.system("sed '{}q;d' /usr/share/dict/words >> {}".
-                    format(i, self.string_datafile.name))
         self.string_datafile.close()
+        # Aw heck.
+        os.system("cat /usr/share/dict/words >> {}".
+                format(self.string_datafile.name))
         self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
-            name="words", cdt=self.cdt_string, user=self.user_bob,
-            description="random words", make_dataset=True)
+            name="blahblah", cdt=self.cdt_string, user=self.user_bob,
+            description="blahblahblah", make_dataset=True)
 
     def test_find_symds_pipeline_input(self):
         """
@@ -1185,7 +1183,7 @@ class CustomConstraintTests(UtilityMethods):
 
         self.assertRaisesRegexp(ValueError,
                 re.escape(error_messages["verification_no_output"].
-                        format(1, cdt_no_output)),
+                        format(dt_no_output)),
                 lambda: SymbolicDataset.create_SD(no_output_datafile, 
                         cdt_no_output, self.user_oscar, "no output", 
                         "data with a bad verifier"))
@@ -1212,7 +1210,7 @@ class CustomConstraintTests(UtilityMethods):
 
         self.assertRaisesRegexp(ValueError,
                 re.escape(error_messages["verification_large_row"].
-                    format(dt_big_row, 1000, cdt_big_row, 2)),
+                    format(dt_big_row, 1000, 2)),
                 lambda: SymbolicDataset.create_SD(big_row_datafile,
                     cdt=cdt_big_row, user=self.user_oscar, name="big row",
                     description="data with a verifier outputting too high a row number"))
@@ -1447,4 +1445,21 @@ class CustomConstraintTests(UtilityMethods):
         symds_good = SymbolicDataset.create_SD(self.good_datafile,
                 cdt=cdt, user=self.user_oscar, name="good data",
                 description="data which conforms to all its constraints")
-        symds_good.clean()
+        self.assertEqual(symds_good.clean(), None)
+        content_check = symds_good.content_checks.first()
+        self._test_content_check_integrity(content_check, None, symds_good)
+        self.assertEqual(content_check.is_fail(), False)
+
+    def test_upload_data_prototype_bad_contentcheck(self):
+        """
+        Test the integrity of the ContentCheckLog created when a Dataset with
+        CustomConstraints is uploaded with a working prototype.
+        """
+        cdt = self._test_setup_prototype_bad()
+        symds_good = SymbolicDataset.create_SD(self.good_datafile,
+                cdt=cdt, user=self.user_oscar, name="good data",
+                description="data which conforms to all its constraints")
+        self.assertEqual(symds_good.clean(), None)
+        content_check = symds_good.content_checks.first()
+        self._test_content_check_integrity(content_check, None, symds_good)
+        self.assertEqual(content_check.is_fail(), True)
