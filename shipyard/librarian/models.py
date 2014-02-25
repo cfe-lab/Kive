@@ -22,6 +22,8 @@ import datachecking.models
 import file_access_utils, logging_utils
 from constants import error_messages
 
+LOGGER = logging.getLogger(__name__)
+
 class SymbolicDataset(models.Model):
     """
     Symbolic representation of a (possibly temporary) data file.
@@ -78,9 +80,6 @@ class SymbolicDataset(models.Model):
         else:
             return False
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -131,7 +130,7 @@ class SymbolicDataset(models.Model):
     # FIXME what does it do for num_rows when file_path is unset?
     # TODO: raise ValueError when the wrong combination of parameters is passed
     # (ie. user and name are None).
-    def create_SD(self, file_path, cdt=None, make_dataset=True, user=None,
+    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
                   name=None, description=None):
         """
         Helper function to make defining SDs and Datasets faster.
@@ -142,8 +141,9 @@ class SymbolicDataset(models.Model):
     
         Returns the SymbolicDataset created.
         """
+        LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
         symDS = SymbolicDataset()
-        with open(file_path, "rb") as f:
+        with open(file_path, "r") as f:
             symDS.MD5_checksum = file_access_utils.compute_md5(f)
         symDS.clean()
         symDS.save()
@@ -152,13 +152,17 @@ class SymbolicDataset(models.Model):
             structure = DatasetStructure(symbolicdataset=symDS, compounddatatype=cdt)
             structure.save()
             run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-            symDS.check_file_contents(file_path, run_dir, None, None, None) 
-    
+            content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
+            if content_check.is_fail():
+                raise ValueError(error_messages["bad_input_file"].
+                        format(file_path, cdt))
+            LOGGER.debug("Read {} rows from file {}".format(structure.num_rows, file_path))
+
         if make_dataset:
             dataset = archive.models.Dataset(
                 user=user, name=name, description=description,
                 symbolicdataset=symDS)
-            with open(file_path, "rb") as f:
+            with open(file_path, "r") as f:
                 dataset.dataset_file.save(file_path, File(f))
             dataset.clean()
             dataset.save()
@@ -168,7 +172,7 @@ class SymbolicDataset(models.Model):
         return symDS
 
     # FIXME: use a transaction!
-    def check_file_contents(self,file_path_to_check,summary_path,min_row,max_row,execlog):
+    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog):
         """
         Performs content check on a file, generates a CCL, and sets this SD's num_rows.
 
@@ -180,7 +184,8 @@ class SymbolicDataset(models.Model):
         Should never be called twice on the same symbolic dataset, as this would
         overwrite num_rows to a potentially new value?
         """
-        self.logger.debug("Creating clean CCL and linking to EL")
+        self.logger.debug("Creating clean CCL for file {} and linking to EL".
+                format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog)
         ccl.save()
 
@@ -191,13 +196,9 @@ class SymbolicDataset(models.Model):
             self.logger.debug("SD is raw - returning clean CCL")
             return ccl
 
-        csv_summary = None
         my_CDT = self.get_cdt()
         with open(file_path_to_check, "rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
-
-        if csv_summary["num_rows"] == 0:
-            self.logger.warn("file had no rows")
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
@@ -206,6 +207,9 @@ class SymbolicDataset(models.Model):
             ccl.save()
             self.logger.warn("malformed header")
             return ccl
+
+        if csv_summary["num_rows"] == 0:
+            self.logger.warn("file had no rows")
 
         csv_baddata = None
         self.structure.num_rows = csv_summary["num_rows"]
