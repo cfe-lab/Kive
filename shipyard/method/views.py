@@ -435,6 +435,7 @@ def method_revise(request, id):
 
         # attempt to make Method object
         new_method = Method(family = family, # same family
+                            revision_parent=most_recent,
                             revision_name=query['revision_name'],
                             revision_desc=query['revision_desc'],
                             driver=coderesource_revision,
