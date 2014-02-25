@@ -1,0 +1,42 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html">Back to user's portal</a>
+
+<h2>Uploaded datasets</h2>
+
+<p>
+foo
+</p>
+
+<table>
+<thead>
+	<tr>
+    <th>Uploaded by</th>
+	<th>Name</th>
+	<th>Description</th>
+	<th>Date created</th>
+	</tr>
+</thead>
+{% for dataset in datasets %}
+<tr>
+    <td>{{ dataset.user }}</td>
+	<td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>
+	<td>{{ dataset.description }}</td>
+    <td>{{ dataset.date_created }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="dataset_upload">Upload a new dataset</a>
+
+{% endblock %}
