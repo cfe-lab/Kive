@@ -75,6 +75,31 @@ class MethodForm (forms.ModelForm):
         fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions', 'family')
 
 
+class MethodReviseForm (forms.ModelForm):
+    """
+    Revise an existing method.  No need to specify MethodFamily.
+    """
+    def __init__(self, *args, **kwargs):
+        super(MethodReviseForm, self).__init__(*args, **kwargs)
+
+        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+        self.fields['coderesource'].label = 'Code resource'
+        self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
+
+        self.fields['revision_name'].label = 'Name'
+        self.fields['revision_name'].help_text = 'A short name for this new method'
+
+        self.fields['revision_desc'].label = 'Description'
+        self.fields['revision_desc'].help_text = 'A detailed description for this new method'
+
+    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+
+    class Meta:
+        model = Method
+        fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions')
+
+
 class TransformationXputForm (forms.ModelForm):
     input_output = forms.ChoiceField(choices=[('input', 'IN'), ('output', 'OUT')])
     class Meta:

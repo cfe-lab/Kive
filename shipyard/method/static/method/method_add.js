@@ -68,7 +68,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
             }
         }
-    );
+    ).change(); // trigger on load
 
     // add or subtract input forms
     var numberOfXputForms = $('#extraXputForms > tr').length;

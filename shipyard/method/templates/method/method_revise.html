@@ -3,7 +3,7 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Add a new method{% endblock %}
+{% block title %}Revise a method{% endblock %}
 
 {% block javascript %}
 <script src="/static/portal/jquery-2.0.3.min.js"></script>
@@ -14,7 +14,7 @@
 
 <a href="/methods">return to Methods summary</a>
 
-<h2>Add a new method</h2>
+<h2>Revise a method</h2>
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
@@ -29,13 +29,6 @@
         <td>{{ field.errors }}</td>
         </tr>
     {% endfor %}
-    {% for field in family_form %}
-            <tr>
-            <th>{{ field.label_tag }}</th>
-            <td>{{ field }}<div class="helptext">{{ field.help_text }}</div></td>
-            <td>{{ field.errors }}</td>
-            </tr>
-        {% endfor %}
     </table>
 
 

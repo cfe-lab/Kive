@@ -1122,11 +1122,7 @@ class CompoundDatatypeMember(models.Model):
 
     def __unicode__(self):
         """Describe a CompoundDatatypeMember with it's column number, datatype name, and column name"""
-
-        returnString = u"{}: <{}> [{}]".format(self.column_idx,
-                                               unicode(self.datatype),
-                                               self.column_name)
-
+        returnString = u'{} {}'.format(unicode(self.datatype).title(), self.column_name)
         return returnString
 
     def has_custom_constraint(self):

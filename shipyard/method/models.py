@@ -418,6 +418,9 @@ class Method(transformation.models.Transformation):
 
         return string_rep
 
+    def get_absolute_url(self):
+        return '/methods/%i' % self.id
+
     def clean(self):
         """
         Check coherence of this Method. The checks we perform are:

@@ -260,7 +260,7 @@ def methods(request):
     """
     Display a list of all Methods in database.
     """
-    methods = Method.objects.all()
+    methods = Method.objects.filter(revision_parent=None)
     t = loader.get_template('method/methods.html')
     c = Context({'methods': methods})
     c.update(csrf(request))
@@ -286,7 +286,7 @@ def return_method_forms (request, exceptions):
     for i in range(num_xput_forms):
         t_form = TransformationXputForm(auto_id='id_%s_'+str(i),
                                          initial={'dataset_name': query['dataset_name_'+str(i)],
-                                                  'dataset_idx': i})
+                                                  'input_output': query['input_output_'+str(i)]})
         xs_form = XputStructureForm(auto_id='id_%s_'+str(i),
                                     initial={'compounddatatype': query['compounddatatype_'+str(i)],
                                              'min_row': query['min_row_'+str(i)],
@@ -306,7 +306,6 @@ def method_add (request):
     t = loader.get_template('method/method_add.html')
     if request.method == 'POST':
         query = request.POST.dict()
-        print query # debugging
 
         num_xput_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_')])
         exceptions = {}
@@ -321,21 +320,17 @@ def method_add (request):
             return HttpResponse(t.render(c))
 
 
-        if query['family'] == u'':
-            # create a new MethodFamily based on completed Family Form
-            method_family = MethodFamily(name = query['name'], description = query['description'])
-            try:
-                method_family.full_clean()
-                method_family.save()
-            except ValidationError as e:
-                family_form, method_form, xput_forms = return_method_forms(request, exceptions)
-                family_form.errors['Errors'] = ErrorList(e.messages)
-                c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
-                c.update(csrf(request))
-                return HttpResponse(t.render(c))
-
-        else:
-            method_family = MethodFamily.objects.get(pk=query['family'])
+        # create a new MethodFamily based on completed Family Form
+        method_family = MethodFamily(name = query['name'], description = query['description'])
+        try:
+            method_family.full_clean()
+            method_family.save()
+        except ValidationError as e:
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
+            family_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
 
         # attempt to make Method object
         new_method = Method(family = method_family,
@@ -391,8 +386,8 @@ def method_add (request):
 
     else:
         # first set of forms
-        family_form = MethodFamilyForm()
         method_form = MethodForm()
+        family_form = MethodFamilyForm()
         xput_forms = [(TransformationXputForm(auto_id='id_%s_0'),
                        XputStructureForm(auto_id='id_%s_0')),
                       (TransformationXputForm(auto_id='id_%s_1', initial={'input_output': 'output'}),
@@ -401,5 +396,122 @@ def method_add (request):
     c = Context({'family_form': family_form,
                  'method_form': method_form,
                  'xput_forms': xput_forms})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+
+def method_revise(request, id):
+    """
+    Add a revision of an existing Method.  revision_parent is defined by the
+    previous version.
+    """
+    t = loader.get_template('method/method_revise.html')
+
+    # retrieve the most recent member of this Method's family
+    root = Method.objects.filter(pk=id)[0]
+    family = root.family
+    all_members = Method.objects.filter(family=family).order_by('-id')
+    most_recent = all_members[0]
+
+    # retrieve the most recent revision of the corresponding CR
+    this_code_resource = most_recent.driver.coderesource
+    all_revisions = CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
+    last_revision = all_revisions[0]
+
+    if request.method == 'POST':
+        query = request.POST.dict()
+
+        num_xput_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_')])
+        exceptions = {}
+
+        # retrieve CodeResource revision as driver
+        try:
+            coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
+        except:
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # attempt to make Method object
+        new_method = Method(family = family, # same family
+                            revision_name=query['revision_name'],
+                            revision_desc=query['revision_desc'],
+                            driver=coderesource_revision,
+                            random=query.has_key('random'))
+        try:
+            new_method.full_clean()
+            new_method.save()
+        except ValidationError as e:
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
+            method_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # attempt to make inputs and outputs
+        for i in range(num_xput_forms):
+            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
+            min_row = query['min_row_'+str(i)]
+            max_row = query['max_row_'+str(i)]
+            try:
+                if query['input_output_'+str(i)] == 'input':
+                    new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1,
+                                                        compounddatatype = my_compound_datatype,
+                                                        min_row = min_row if min_row else None,
+                                                        max_row = max_row if max_row else None)
+                else:
+                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
+                                                    dataset_idx = i+1,
+                                                    compounddatatype = my_compound_datatype,
+                                                    min_row = min_row if min_row else None,
+                                                    max_row = max_row if max_row else None)
+            except ValueError as e:
+                exceptions.update({i: e.messages})
+
+        if exceptions:
+            if query['family'] == u'':
+                method_family.delete()
+            new_method.delete()
+            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
+        # success!
+        return HttpResponseRedirect('/methods')
+    else:
+        method_form = MethodReviseForm(initial={'revision_name': most_recent.revision_name,
+                                          'revision_desc': most_recent.revision_desc,
+                                          'coderesource': this_code_resource.pk,
+                                          'revisions': last_revision.pk,
+                                          'random': most_recent.random})
+        xput_forms = []
+        for input in most_recent.inputs.all():
+            structure = input.structure.all()[0]
+            tx_form = TransformationXputForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'input_output': 'input',
+                                                     'dataset_name': input.dataset_name,
+                                                     'dataset_idx': input.dataset_idx})
+            xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                        initial={'compounddatatype': structure.compounddatatype,
+                                                 'min_row': structure.min_row,
+                                                 'max_row': structure.max_row})
+            xput_forms.append((tx_form, xs_form))
+
+        for output in most_recent.outputs.all():
+            structure = output.structure.all()[0]
+            tx_form = TransformationXputForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'input_output': 'output',
+                                                     'dataset_name': output.dataset_name,
+                                                     'dataset_idx': output.dataset_idx})
+            xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                        initial={'compounddatatype': structure.compounddatatype,
+                                                 'min_row': structure.min_row,
+                                                 'max_row': structure.max_row})
+            xput_forms.append((tx_form, xs_form))
+
+    c = Context({'method_form': method_form, 'xput_forms': xput_forms})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

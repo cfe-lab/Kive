@@ -31,7 +31,7 @@ A Method is a set of instructions on how a Code Resource will be used.
 {% for method in methods %}
 <tr>
 	<td>{{ method.family }}</a></td>
-    <td>{{ method.revision_name }}</td>
+    <td><a href="{{ method.get_absolute_url }}">{{ method.revision_name }}</a></td>
 	<td>{{ method.revision_desc }}</td>
     <td>{{ method.driver.revision_name }}</td>
     <td>{{ method.random }}</td>

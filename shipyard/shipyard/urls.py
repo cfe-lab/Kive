@@ -21,14 +21,13 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'portal.views.home', name='home'),
+
     url(r'^dev.html$', 'portal.views.dev', name='dev'),
+
     url(r'^datatypes$', 'metadata.views.datatypes', name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', 'metadata.views.datatype_detail', name='datatype_detail'),
     url(r'^datatype_add$', 'metadata.views.datatype_add', name='datatype_add'),
-    #url(r'datatype_add$', DatatypeFormPreview(DatatypeForm)),
-    #url(r'^datatype_add/(?P<id>\d+)_str$', StringBasicConstraintFormPreview(StringBasicConstraintForm)),
-    #url(r'^datatype_add/(?P<id>\d+)_int$', IntegerBasicConstraintFormPreview(IntegerBasicConstraintForm)),
-    #url(r'^datatype_finish/(?P<id>\d+)_(?P<Python_type>\w+)$', 'copperfish.views.datatype_add', name='datatype_add'),
+
     url(r'compound_datatypes$', 'metadata.views.compound_datatypes', name='compound_datatypes'),
     url(r'compound_datatype_add$', 'metadata.views.compound_datatype_add', name='compound_datatype_add'),
 
@@ -40,6 +39,7 @@ urlpatterns = patterns('',
 
     url(r'methods$', 'method.views.methods', name='methods'),
     url(r'method_add$', 'method.views.method_add', name='method_add'),
+    url(r'^methods/(?P<id>\d+)/$', 'method.views.method_revise', name='method_revise'),
 
     url(r'pipelines$', 'pipeline.views.pipelines', name='pipelines'),
 
