@@ -28,6 +28,28 @@ import logging
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
+def get_builtin_types(DTs):
+    """
+    Retrieves the built-in types of all DTs passed as input.
+
+    Returns a set (to remove duplicates) with all of the built-in
+    types represented in the inputs.
+
+    INPUTS
+    DTs                 iterable of Datatypes
+
+    OUTPUT
+    builtins            set of built-in Datatypes represented by DTs
+
+    ASSUMPTIONS
+    All Datatypes in DTs are clean and complete.
+    """
+    all_builtin_types = []
+    for curr_DT in DTs:
+        all_builtin_types.append(curr_DT.get_builtin_type())
+    return set(all_builtin_types)
+
+
 def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     """
     SYNOPSIS
