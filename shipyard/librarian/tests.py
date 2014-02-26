@@ -10,6 +10,7 @@ from django.utils import timezone
 import random
 import tempfile
 import os.path
+import time
 
 import file_access_utils
 from constants import error_messages, datatypes
@@ -260,7 +261,8 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         RunOutputCable (record), by creating a throwaway ExecLog.
         """
         myEL = ExecLog(record=record)
-        myEL.save()
+        myEL.start_time = timezone.now()
+        time.sleep(1)
         myEL.end_time = timezone.now()
         myEL.save()
         if record.__class__.__name__ == "RunStep":

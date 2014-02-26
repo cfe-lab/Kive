@@ -741,7 +741,6 @@ class RunOutputCable(models.Model):
         # multiply-represented within a run.
         unique_together = ("run", "pipelineoutputcable")
 
-
     def clean(self):
         """
         Check coherence of this RunOutputCable.
@@ -790,10 +789,10 @@ class RunOutputCable(models.Model):
                 "POC \"{}\" does not belong to Pipeline \"{}\"".
                 format(self.pipelineoutputcable, self.run.pipeline))
 
-        if self.log.all().exists():
-            self.log.all()[0].complete_clean()
+        if self.log.exists():
+            self.log.first().complete_clean()
 
-        if self.reused == None:
+        if self.reused is None:
             if self.log.all().exists():
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no ExecLog should be associated".
@@ -1059,11 +1058,13 @@ class ExecLog(models.Model):
     object_id = models.PositiveIntegerField()
     record = generic.GenericForeignKey("content_type", "object_id")
 
-
+    # If the start_time is unset, we haven't started executing the code yet.
     start_time = models.DateTimeField("start time",
-                                      auto_now_add=True,
+                                      null=True,
+                                      blank=True,
                                       help_text="Time at start of execution")
 
+    # If the end_time is unset, we're in the middle of execution.
     end_time = models.DateTimeField("end time",
                                     null=True,
                                     blank=True,
@@ -1087,13 +1088,21 @@ class ExecLog(models.Model):
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))
 
-        if self.end_time is not None and self.start_time > self.end_time:
+        if (self.end_time is not None and self.start_time is not None and
+                self.start_time > self.end_time):
             raise ValidationError(
                 error_messages["execlog_swapped_times"].format(self))
 
     def is_complete(self):
-        """If this is a RunStep, specifically a method, it must have a methodoutput to be complete"""
-        if type(self.record) == RunStep and type(self.record.pipelinestep.transformation) == method.models.Method:
+        """
+        If this is a RunStep, specifically a method, it must have a methodoutput to be complete.
+        It also must have a defined start and end time.
+        """
+        if self.start_time is None or self.end_time is None:
+            return False
+
+        if (self.record.__class__.__name__ == "RunStep" and 
+                self.record.pipelinestep.transformation.__class__.__name__ == "Method"):
             if not hasattr(self, "methodoutput"):
                 return False
 
@@ -1108,13 +1117,8 @@ class ExecLog(models.Model):
         """
         self.clean()
 
-        if self.end_time is None:
-            raise ValidationError("ExecLog {} does not have a specified end time".format(self))
-
         if not self.is_complete():
-            raise ValidationError(
-                "ExecLog \"{}\" represents a Method but has no associated MethodOutput".
-                format(self))
+            raise ValidationError(error_messages["incomplete_execlog"].format(self))
 
     def missing_outputs(self):
         """Returns output SDs missing output from this execution."""
@@ -1143,7 +1147,6 @@ class ExecLog(models.Model):
 
         # Having reached here, we are comfortable with the execution.
         return True
-        
 
 class MethodOutput(models.Model):
     """

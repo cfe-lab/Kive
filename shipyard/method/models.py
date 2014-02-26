@@ -530,15 +530,18 @@ class Method(transformation.models.Transformation):
                 break
 
     def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams,
-            error_streams, log_to_fill=None):
+            error_streams, timer_to_fill=None, log_to_fill=None):
         """
         SYNOPSIS
-        Run the method, passing each line in its stdout and stderr to any number
-        of streams. Return the Method's return code, or -1 if the Method suffers
-        an OS-level error (ie. is not executable). If log_to_fill is not None,
-        fill it in with the return code, start and end time, and set its output and
-        error logs to the _first_ provided streams (meaning these should be files,
-        not standard streams, and they must be open for reading AND writing).
+        Run the method, passing each line in its stdout and stderr to
+        any number of streams. Return the Method's return code, or -1 if
+        the Method suffers an OS-level error (ie. is not executable). If
+        log_to_fill is not None, fill it in with the return code, and
+        set its output and error logs to the _first_ provided streams
+        (meaning these should be files, not standard streams, and they
+        must be open for reading AND writing). If timer_to_fill is not
+        None, set its start_time and end_time immediately before and
+        after calling run_code.
 
         INPUTS
         run_path        see run_code
@@ -546,18 +549,19 @@ class Method(transformation.models.Transformation):
         output_paths    see run_code
         output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
-
-        OUTPUTS
-        The return code of the Method's driver.
+        timer_to_fill   object with start_time and end_time fields to fill in (either
+                        VerificationLog, or ExecLog)
+        log_to_fill     object with return_code, output_log, and error_log to fill in
+                        (either VerificationLog, or MethodOutput)
 
         ASSUMPTIONS
-        1) log_to_fill, if it is provided, has not been saved yet. This is because
-        its start_time is auto_now_add, so we have to save it just before we run the code.
-        2) if log_to_fill is provided, the first entry in output_streams and error_streams
+        1) if log_to_fill is provided, the first entry in output_streams and error_streams
         are handles to regular files, open for reading and writing.
         """
-        if log_to_fill:
-            log_to_fill.save()
+        if timer_to_fill:
+            timer_to_fill.start_time = timezone.now()
+            timer_to_fill.clean()
+            timer_to_fill.save()
 
         returncode = None
         try:
@@ -582,11 +586,15 @@ class Method(transformation.models.Transformation):
 
             returncode = method_popen.returncode
 
+        if timer_to_fill:
+            timer_to_fill.end_time = timezone.now()
+            timer_to_fill.clean()
+            timer_to_fill.save()
+
         for stream in output_streams + error_streams:
             stream.flush()
 
         if log_to_fill:
-            log_to_fill.end_time = timezone.now()
             log_to_fill.return_code = returncode
             outlog = output_streams[0]
             errlog = error_streams[0]
@@ -595,9 +603,8 @@ class Method(transformation.models.Transformation):
 
             log_to_fill.error_log.save(errlog.name, File(errlog))
             log_to_fill.output_log.save(outlog.name, File(outlog))
-            log_to_fill.complete_clean()
-
-        return returncode
+            log_to_fill.clean()
+            log_to_fill.save()
 
     def run_code(self, run_path, input_paths, output_paths):
         """

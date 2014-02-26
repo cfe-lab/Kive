@@ -857,6 +857,7 @@ class PipelineStepInputCable(models.Model):
         self.logger.debug("Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(source,output_path))
         curr_log = archive.models.ExecLog(record=cable_record)
         curr_log.save()
+        curr_log.start_time = timezone.now()
 
         run_cable_h(self, source, output_path)
 
@@ -1229,9 +1230,11 @@ class PipelineOutputCable(models.Model):
         self.logger.debug("Creating ExecLog for {}".format(cable_record))
         curr_log = archive.models.ExecLog(record=cable_record)
         curr_log.save()
+        curr_log.start_time = timezone.now()
         run_cable_h(self, source, output_path)
         curr_log.end_time = timezone.now()
-        curr_log.complete_clean()
+        curr_log.clean()
         curr_log.save()
+        curr_log.complete_clean()
 
         return curr_log
