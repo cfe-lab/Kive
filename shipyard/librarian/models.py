@@ -332,7 +332,7 @@ class DatasetStructure(models.Model):
 
     PRECONDITION
     Any SymbolicDataset that represents a CSV file has to have confirmed using
-    file_access_utils.summarize_CSV() that the CSV file is coherent.
+    summarize_CSV() that the CSV file is coherent.
     """
     # Note: previously we were tracking the exact TransformationOutput
     # this came from (both for its Run and its RunStep) but this is
@@ -356,7 +356,7 @@ class DatasetStructure(models.Model):
     # a clean() function here that opens up the CSV file and checks it.
     # Instead we will make it a precondition that any SymbolicDataset
     # that represents a CSV file has to have confirmed using
-    # file_access_utils.summarize_CSV() that the CSV file is coherent.
+    # summarize_CSV() that the CSV file is coherent.
 
     # At a later date, we might want to put in some kind of
     # "force_check()" which actually opens the file and makes sure its

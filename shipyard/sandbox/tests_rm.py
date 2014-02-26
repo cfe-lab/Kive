@@ -1141,9 +1141,10 @@ class CustomConstraintTests(UtilityMethods):
         methodfamily = MethodFamily()
         methodfamily.save()
         method = methodfamily.members.create(driver=revision)
-        method.inputs.create(dataset_name="to_test", dataset_idx=1)
-        method.outputs.create(dataset_name="failed_row", 
-                dataset_idx=1)
+        method.create_input("to_test", 1, 
+                compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
+        method.create_output("failed_row", 1, 
+                compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK))
         method.save()
         customconstraint = CustomConstraint(datatype = datatype,
                 verification_method = method)
@@ -1235,29 +1236,17 @@ class CustomConstraintTests(UtilityMethods):
         self.assertEqual(summary["num_rows"], 2)
         self.assertEqual(summary["header"], expected_header)
 
-    def test_summarize_bad_datafile(self):
+    def test_create_SD_bad_datafile(self):
         """
-        A non-conforming datafile should return a CSV summary with appropriate errors.
+        We sholudn't be allowed to create a SymbolicDataset from a bad file.
         """
-        log = self._setup_content_check_log(self.bad_datafile,
-            self.cdt_constraints, self.user_oscar, "bad data",
-            "invalid data to test custom constraint checking")
-        with open(self.bad_datafile) as f:
-            summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
-        expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
-        print(summary)
-        self.assertEqual(summary.has_key("num_rows"), True)
-        self.assertEqual(summary.has_key("header"), True)
-        self.assertEqual(summary.has_key("bad_num_cols"), False)
-        self.assertEqual(summary.has_key("bad_col_indices"), False)
-        self.assertEqual(summary.has_key("failing_cells"), True)
-        self.assertEqual(summary["num_rows"], 3)
-        self.assertEqual(summary["header"], expected_header)
-        self.assertEqual(summary["failing_cells"], 
-            { (2, 1): [self.dt_basic.basic_constraints.first()],
-              (2, 2): [self.dt_basic.basic_constraints.first(),
-                  self.dt_custom.custom_constraint], 
-              (3, 2): [self.dt_custom.custom_constraint] })
+        self.assertRaisesRegexp(ValueError,
+                re.escape(error_messages["bad_input_file"].
+                    format(self.bad_datafile, self.cdt_constraints)),
+                lambda: SymbolicDataset.create_SD(self.bad_datafile, 
+                    cdt=self.cdt_constraints, user=self.user_oscar,
+                    name="bad data", 
+                    description="invalid data to test custom constraint checking"))
 
     def _test_content_check_integrity(self, content_check, execlog, symds):
         """
@@ -1311,6 +1300,21 @@ class CustomConstraintTests(UtilityMethods):
                 ["letter strings", "words"])
         return cdt
 
+    def _test_setup_prototype_bad(self):
+        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        prototype_file = self._setup_datafile(prototype_cdt, 
+                [["hello", "False"], ["hell", "True"], ["hel", "False"],
+                 ["he", "True"], ["h", "False"]])
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
+                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
+                description="working prototype for constraint CDT")
+        os.remove(prototype_file)
+
+        # Add a prototype to the custom DT.
+        self.dt_custom.prototype = prototype_SD.dataset
+        self.dt_custom.save()
+        return self.dt_custom
+
     def _test_execute_pipeline_constraints(self, pipeline):
         """
         Helper function to execute a pipeline with the cdt_constraints 
@@ -1354,16 +1358,6 @@ class CustomConstraintTests(UtilityMethods):
         content_check = symds_good.content_checks.first()
         self._test_content_check_integrity(content_check, None, symds_good)
         self.assertEqual(content_check.is_fail(), False)
-
-    def test_upload_data_content_check_bad(self):
-        """
-        Test the integrity of a ContentCheck created when uploading a malformed
-        dataset.
-        """
-        symds_bad = self._test_upload_data_bad()
-        content_check = symds_bad.content_checks.first()
-        self._test_content_check_integrity(content_check, None, symds_bad)
-        self.assertEqual(content_check.is_fail(), True)
 
     def _test_verification_log(self, verif_log, content_check, CDTM):
         """
@@ -1422,20 +1416,6 @@ class CustomConstraintTests(UtilityMethods):
         self.assertEqual(verif_log.output_log.read(), "")
         self.assertEqual(verif_log.error_log.read(), "")
 
-    def test_upload_data_verification_log_bad(self):
-        """
-        Test the integrity of the VerificationLog created while uploading
-        non-conforming data with CustomConstraints.
-        """
-        symds_bad = self._test_upload_data_bad()
-        content_check = symds_bad.content_checks.first()
-        verif_log = content_check.verification_logs.first()
-        self._test_verification_log(verif_log, content_check, 
-                self.cdt_constraints.members.last())
-        self.assertEqual(verif_log.return_code, 0)
-        self.assertEqual(verif_log.output_log.read(), "")
-        self.assertEqual(verif_log.error_log.read(), "")
-
     def test_upload_data_prototype_good_contentcheck(self):
         """
         Test the integrity of the ContentCheckLog created when a Dataset with
@@ -1450,16 +1430,12 @@ class CustomConstraintTests(UtilityMethods):
         self._test_content_check_integrity(content_check, None, symds_good)
         self.assertEqual(content_check.is_fail(), False)
 
-    def test_upload_data_prototype_bad_contentcheck(self):
+    def test_upload_data_prototype_bad(self):
         """
         Test the integrity of the ContentCheckLog created when a Dataset with
         CustomConstraints is uploaded with a working prototype.
         """
-        cdt = self._test_setup_prototype_bad()
-        symds_good = SymbolicDataset.create_SD(self.good_datafile,
-                cdt=cdt, user=self.user_oscar, name="good data",
-                description="data which conforms to all its constraints")
-        self.assertEqual(symds_good.clean(), None)
-        content_check = symds_good.content_checks.first()
-        self._test_content_check_integrity(content_check, None, symds_good)
-        self.assertEqual(content_check.is_fail(), True)
+        dt = self._test_setup_prototype_bad()
+        self.assertRaisesRegexp(ValidationError,
+                re.escape(error_messages["prototype_bad_invalid"].format(dt, "hello")),
+                dt.clean)
