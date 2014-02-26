@@ -1159,12 +1159,15 @@ class MethodOutput(models.Model):
     was raised while trying to execute the code, ie., the code was not executable.
     In that case, stdout will be empty, and stderr will contain the Python stack
     trace produced when we tried to run the code with Popen.
+
+    If the return code is None, it indicates that the code execution is
+    in progress.
     """
     execlog = models.OneToOneField(
         ExecLog,
         related_name="methodoutput")
 
-    return_code = models.IntegerField("return code")
+    return_code = models.IntegerField("return code", null=True)
     
     output_log = models.FileField(
         "output log",

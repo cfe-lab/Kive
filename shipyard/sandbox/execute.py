@@ -604,6 +604,7 @@ class Sandbox:
         curr_log = archive.models.ExecLog(record=curr_RS)
         curr_log.save()
         curr_mo = archive.models.MethodOutput(execlog=curr_log)
+        curr_mo.save()
         self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))

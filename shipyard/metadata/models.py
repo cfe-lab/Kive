@@ -79,14 +79,14 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
             LOGGER.debug("Setting up verification path for column {}".
                     format(column))
             column_test_path = os.path.join(summary_path, "col{}".format(column))
-            input_file_path = setup_verification_path(column_test_path)
+            input_file_path = _setup_verification_path(column_test_path)
             LOGGER.debug("Verification path was set up, column {} will be written to {}".
                     format(column, input_file_path))
             column_paths[column] = column_test_path
             column_files[column] = open(input_file_path, "a")
 
         # Check basic constraints and count rows.
-        num_rows, failing_cells = check_basic_constraints(columns, data_csv, column_files)
+        num_rows, failing_cells = _check_basic_constraints(columns, data_csv, column_files)
         summary["num_rows"] = num_rows
         LOGGER.debug("Checked basic constraints for {} rows".format(num_rows))
 
@@ -117,7 +117,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
 
     return summary
 
-def setup_verification_path(column_test_path):
+def _setup_verification_path(column_test_path):
     """
     Set up a path on the file system where we will run the verification
     method for the column_index'th column of a CSV file.
@@ -158,7 +158,7 @@ def setup_verification_path(column_test_path):
 
     return input_file_path
 
-def check_basic_constraints(columns, data_reader, out_handles={}):
+def _check_basic_constraints(columns, data_reader, out_handles={}):
     """
     Check the basic constraints on a CSV file, and copy the contents of
     each column to the file handle indicated in out_handles. Return the
