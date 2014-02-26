@@ -9,8 +9,11 @@ from datetime import datetime
 class DatatypeForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(DatatypeForm, self).__init__(*args, **kwargs)
+        self.fields['restricts'].initial = Datatype.objects.filter(name='string')
         
-    restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(), required=False, help_text='The new Datatype is a special case of one or more existing Datatypes; e.g., DNA restricts string.')
+    restricts = forms.ModelMultipleChoiceField(queryset = Datatype.objects.all(),
+                                               required=True,
+                                               help_text='The new Datatype is a special case of one or more existing Datatypes; e.g., DNA restricts string.')
     #Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, widget=forms.Select(attrs={'onchange': 'switchConstraintForm(this.value)'}), help_text='How the Datatype will be stored in the database.')
     #Python_type = forms.ChoiceField(Datatype.PYTHON_TYPE_CHOICES, help_text='How the Datatype will be stored in the database.')
     date_created = datetime.now()

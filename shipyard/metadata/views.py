@@ -10,6 +10,7 @@ from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.forms.util import ErrorList
 from django.db import transaction, IntegrityError
+import re
 
 def datatypes(request):
     """
@@ -56,9 +57,13 @@ def datatype_add(request):
                         pass
 
                 if query['regexp']:
-                    regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=query['regexp'])
+                    # check if there are multiple regexps, as in "<pattern 1>","<pattern 2>",...
+                    # using regex from http://stackoverflow.com/questions/18144431/regex-to-split-a-csv
+                    groups = re.findall('(?:^|,)(?=[^"]|(")?)"?((?(1)[^"]*|[^,"]*))"?(?=,|$)', query['regexp'])
                     try:
-                        regexp.full_clean()
+                        for quoted, group in groups:
+                            regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=group)
+                            regexp.full_clean()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass

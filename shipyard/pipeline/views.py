@@ -6,6 +6,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
 from django.core.context_processors import csrf
 from method.models import Method, MethodFamily
+from metadata.models import CompoundDatatype
 
 def pipelines(request):
     """
@@ -13,7 +14,7 @@ def pipelines(request):
     """
     t = loader.get_template('pipeline/pipelines.html')
     method_families = MethodFamily.objects.all()
-    methods = Method.objects.all()
-    c = Context({'method_families': method_families, 'methods': methods})
+    compound_datatypes = CompoundDatatype.objects.all()
+    c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

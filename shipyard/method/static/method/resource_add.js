@@ -1,5 +1,7 @@
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
 
+
+    // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
         /*
             from https://docs.djangoproject.com/en/1.3/ref/contrib/csrf/#csrf-ajax
@@ -43,8 +45,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
         }
     });
-
-    // trigger ajax on CR drop-down to populate revision select
     $("[id^='id_coderesource_']").on('change',
         function() {
             var suffix = $(this).attr('id').split('_')[2];
