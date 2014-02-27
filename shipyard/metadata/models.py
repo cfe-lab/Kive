@@ -101,14 +101,14 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
             LOGGER.debug("Setting up verification path for column {}".
                     format(column))
             column_test_path = os.path.join(summary_path, "col{}".format(column))
-            input_file_path = setup_verification_path(column_test_path)
+            input_file_path = _setup_verification_path(column_test_path)
             LOGGER.debug("Verification path was set up, column {} will be written to {}".
                     format(column, input_file_path))
             column_paths[column] = column_test_path
             column_files[column] = open(input_file_path, "a")
 
         # Check basic constraints and count rows.
-        num_rows, failing_cells = check_basic_constraints(columns, data_csv, column_files)
+        num_rows, failing_cells = _check_basic_constraints(columns, data_csv, column_files)
         summary["num_rows"] = num_rows
         LOGGER.debug("Checked basic constraints for {} rows".format(num_rows))
 
@@ -139,7 +139,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
 
     return summary
 
-def setup_verification_path(column_test_path):
+def _setup_verification_path(column_test_path):
     """
     Set up a path on the file system where we will run the verification
     method for the column_index'th column of a CSV file.
@@ -180,7 +180,7 @@ def setup_verification_path(column_test_path):
 
     return input_file_path
 
-def check_basic_constraints(columns, data_reader, out_handles={}):
+def _check_basic_constraints(columns, data_reader, out_handles={}):
     """
     Check the basic constraints on a CSV file, and copy the contents of
     each column to the file handle indicated in out_handles. Return the
@@ -663,7 +663,7 @@ class Datatype(models.Model):
                     if (rownum, 1) not in failing_cells:
                         raise ValidationError(
                                 error_messages["prototype_bad_invalid"].
-                                format(self, row[1]))
+                                format(self, row[0]))
 
 
     def clean(self):
@@ -855,7 +855,7 @@ class Datatype(models.Model):
 
         with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
             verif_method.run_code_with_streams(summary_path, [input_path], [output_path], 
-                    [out, sys.stdout], [err, sys.stderr], verif_log)
+                    [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
 
         return self._check_verification_output(summary_path, output_path,
                 num_rows)
@@ -1097,6 +1097,13 @@ class CustomConstraint(models.Model):
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
             raise ValidationError("CustomConstraint \"{}\" verification method does not have exactly one input and one output".
                                   format(self))
+        # TODO: Quick and dirty check, test later.
+        if verif_method_in[0].is_raw():
+            raise ValidationError(
+                    'Verification method for CustomConstraint "{}" has a raw input'.format(self))
+        if verif_method_out[0].is_raw():
+            raise ValidationError(
+                    'Verification method for CustomConstraint "{}" has a raw output'.format(self))
         if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
             raise ValidationError(
                 "CustomConstraint \"{}\" verification method does not have an input CDT identical to VERIF_IN".

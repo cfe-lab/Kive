@@ -95,7 +95,9 @@ error_messages = {
     "prototype_bad_invalid":
         'The prototype for Datatype "{}" indicates the value "{}" should not be valid, but it is',
     "bad_input_file":
-        'The file "{}" does not match the CompoundDatatype "{}"'
+        'The file "{}" does not match the CompoundDatatype "{}"',
+    "incomplete_execlog":
+        'Execlog "{}" is not complete'
 }
 
 warning_messages = {

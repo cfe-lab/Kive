@@ -83,7 +83,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         self.datafile = tempfile.NamedTemporaryFile(delete=False)
         self.datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
         self.datafile.write("\n")
-        self.datafile.write("stuff,ATCG,morestuff\n")
+        self.datafile.write("ATCG\n")
         self.datafile.close()
 
         self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, 

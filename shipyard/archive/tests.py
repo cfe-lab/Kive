@@ -59,7 +59,8 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
         # Bad case (propagation): define an RSIC that is not complete.
         E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS)
         E03_11_EL = E03_11_RSIC.log.create()
-        E03_11_EL.save()
+        E03_11_EL.start_time = timezone.now()
+        time.sleep(1)
         E03_11_EL.end_time = timezone.now()
         E03_11_EL.save()
         E03_11_ER = ExecRecord(generator=E03_11_EL)
@@ -241,12 +242,14 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
 
         # Create ExecLogs with associated MethodOutputs for RunSteps.
         step_E1_EL = step_E1_RS.log.create()
-        step_E1_EL.save()
+        step_E1_EL.start_time = timezone.now()
+        time.sleep(1)
         step_E1_EL.end_time = timezone.now()
         step_E1_EL.save()
 
         step_E2_EL = step_E2_RS.log.create()
-        step_E2_EL.save()
+        step_E1_EL.start_time = timezone.now()
+        time.sleep(1)
         step_E1_EL.end_time = timezone.now()
         step_E1_EL.save()
 
@@ -1269,7 +1272,6 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         # Bad case: ROC has associated data.
         self.singlet_DS.created_by = E31_42_ROC
         self.singlet_DS.save()
-
 
         self.assertRaisesRegexp(
             ValidationError,

@@ -603,33 +603,22 @@ class Sandbox:
 
         curr_log = archive.models.ExecLog(record=curr_RS)
         curr_log.save()
-        self.logger.debug("Created EL for method execution at {}".format(curr_log))
-        method_popen = None
+        curr_mo = archive.models.MethodOutput(execlog=curr_log)
+        curr_mo.save()
+        self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
 
         self.logger.debug("Running code")
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
 
-        with open(stdout_path, "wb", 1) as outwrite, open(stderr_path, "wb", 0) as errwrite:
-            returncode = pipelinestep.transformation.run_code_with_streams(step_run_dir,
-                    input_paths, output_paths, 
-                    [sys.stdout, outwrite], [sys.stderr, errwrite])
+        with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
+            pipelinestep.transformation.run_code_with_streams(step_run_dir, input_paths,
+                    output_paths, [outwrite, sys.stdout], [errwrite, sys.stderr],
+                    curr_log, curr_mo)
 
-        curr_log.end_time = timezone.now()
-        self.logger.debug("Method execution complete, saving ExecLog (started = {}, ended = {})".
+        self.logger.debug("Method execution complete, ExecLog saved (started = {}, ended = {})".
                 format(curr_log.start_time, curr_log.end_time))
-        curr_log.clean()
-        curr_log.save()
-
-        self.logger.debug("Storing stdout/stderr in MethodOutput")
-        curr_mo = archive.models.MethodOutput(execlog=curr_log, return_code=returncode)
-        with open(stdout_path, "rb") as outread, open(stderr_path, "rb") as errread:
-            curr_mo.output_log.save(stdout_path, File(outread))
-            curr_mo.error_log.save(stderr_path, File(errread))
-        curr_mo.clean()
-        curr_mo.save()
-        curr_log.complete_clean()
 
         if curr_ER is None:
             self.logger.debug("Creating fresh ER")
