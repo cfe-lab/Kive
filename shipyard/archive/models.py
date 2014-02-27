@@ -15,7 +15,6 @@ import hashlib
 import logging
 
 import file_access_utils
-from constants import error_messages
 
 import method.models
 import transformation.models
@@ -25,13 +24,12 @@ def clean_execlogs(runx):
     Helper function to ensure a RunStep, RunSIC, or RunOutputCable has at most one
     ExecLog, and to clean it if it exists.
     """
-    if runx.log.all().exists():
+    if runx.log.exists():
        if runx.log.count() == 1:
            runx.log.first().complete_clean()
        else:
-           raise ValidationError(
-               "{} \"{}\" has {} ExecLogs but should have only one".
-               format(runx.__class__.__name__, runx, runx.log.count()))
+           raise ValidationError("{} \"{}\" has {} ExecLogs but should have only one".format(runx.__class__.__name__,
+                                                                                             runx, runx.log.count()))
 
 class Run(models.Model):
     """
@@ -51,7 +49,7 @@ class Run(models.Model):
 
     name = models.CharField("Run name", max_length=256)
     description = models.TextField("Run description", blank=True)
-    
+
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
     parent_runstep = models.OneToOneField(
@@ -80,26 +78,26 @@ class Run(models.Model):
             raise ValidationError(
                 "Pipeline of Run \"{}\" is not consistent with its parent RunStep".
                 format(self))
-                
+
         # Go through whatever steps are registered.
         most_recent_step = None
         steps_associated = None
         if self.runsteps.all().exists():
-    
+
             # Check that steps are proceeding in order.  (Multiple quenching
             # of steps is taken care of already.)
             steps_associated = sorted(
                 [rs.pipelinestep.step_num for rs in self.runsteps.all()])
-    
+
             if steps_associated != range(1, len(steps_associated)+1):
                 raise ValidationError(
                     "RunSteps of Run \"{}\" are not consecutively numbered starting from 1".
                     format(self))
-    
+
             # All steps prior to the last registered one must be complete.
             for curr_step_num in steps_associated[:-1]:
                 self.runsteps.get(pipelinestep__step_num=curr_step_num).complete_clean()
-    
+
             # The most recent step should be clean.
             most_recent_step = self.runsteps.get(
                 pipelinestep__step_num=steps_associated[-1])
@@ -108,20 +106,20 @@ class Run(models.Model):
         # If all steps are not complete, then no ROCs should be
         # associated.
         if (not self.runsteps.all().exists() or
-                steps_associated[-1] < self.pipeline.steps.count() or 
+                steps_associated[-1] < self.pipeline.steps.count() or
                 not most_recent_step.is_complete()):
             if self.runoutputcables.all().exists():
                 raise ValidationError(
                     "Run \"{}\" has not completed all of its RunSteps, so there should be no associated RunOutputCables".
                     format(self))
             return
-        
+
         # From this point on, all RunSteps are assumed to be complete.
-        
+
         # Run clean on all of its outcables.
         for run_outcable in self.runoutputcables.all():
             run_outcable.clean()
-    
+
     def is_complete(self):
         """True if this run is complete; false otherwise."""
         # A run is complete if all of its component RunSteps and RunOutputCables
@@ -136,7 +134,7 @@ class Run(models.Model):
                 return False
 
         return True
-            
+
     def complete_clean(self):
         """Checks completeness and coherence of a run."""
         self.clean()
@@ -204,7 +202,7 @@ class RunStep(models.Model):
 
          - If ELs is associated, check it is clean
          - If RSICs exist, check they are clean and complete
-         
+
          - If all RSICs are not quenched, reused, child_run, and
            execrecord should not be set, no ExecLog should be
            associated and no Datasets should be associated
@@ -239,7 +237,7 @@ class RunStep(models.Model):
 
          - check that it is complete and clean
          - check that it's coherent with pipelinestep
-         
+
          - if an output is marked for deletion or missing, there
            should be no associated Dataset
 
@@ -248,7 +246,7 @@ class RunStep(models.Model):
 
          - any associated Dataset belongs to an ERO (this checks for
            Datasets that have been wrongly assigned to this RunStep).
-        
+
         Note: don't need to check inputs for multiple quenching due to
         uniqueness.  Quenching of outputs is checked by ExecRecord.
         """
@@ -271,7 +269,7 @@ class RunStep(models.Model):
                 raise ValidationError(
                     "RunStep \"{}\" represents a sub-pipeline so no log should be associated".
                     format(self))
-            
+
             if self.outputs.all().exists():
                 raise ValidationError(
                     "RunStep \"{}\" represents a sub-pipeline and should not have generated any data".
@@ -288,7 +286,7 @@ class RunStep(models.Model):
                     format(self))
 
         clean_execlogs(self)
-        
+
         for rsic in self.RSICs.all():
             rsic.complete_clean()
 
@@ -319,12 +317,12 @@ class RunStep(models.Model):
                 raise ValidationError(
                     "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; no log should have been generated".
                     format(self))
-            
+
             if self.outputs.all().exists():
                 raise ValidationError(
                     "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; no data should have been generated".
                     format(self))
-                    
+
             if self.execrecord != None:
                 raise ValidationError(
                     "RunStep \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set".
@@ -347,7 +345,7 @@ class RunStep(models.Model):
                     raise ValidationError(
                         "RunStep \"{}\" does not have a complete log so should not have generated any Datasets".
                         format(self))
-                
+
                 if self.execrecord != None:
                     raise ValidationError(
                         "RunStep \"{}\" does not have a complete log; execrecord should not be set".
@@ -355,10 +353,10 @@ class RunStep(models.Model):
                 return
 
             # From here on, ExecLog is assumed to be complete and clean.
-                
+
             for out_data in self.outputs.all():
                 out_data.clean()
-    
+
         elif type(self.pipelinestep.transformation).__name__ == "Pipeline":
             if hasattr(self, "child_run"):
                 self.child_run.clean()
@@ -387,12 +385,12 @@ class RunStep(models.Model):
         # Go through all of the outputs.
         to_type = ContentType.objects.get_for_model(
             transformation.models.TransformationOutput)
-        
+
         for to in self.pipelinestep.transformation.outputs.all():
             # Get the associated ERO.
             corresp_ero = step_er.execrecordouts.get(
                 content_type=to_type, object_id=to.id)
-            
+
             if self.pipelinestep.outputs_to_delete.filter(
                     dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
@@ -408,7 +406,7 @@ class RunStep(models.Model):
                     raise ValidationError(
                         "Output \"{}\" of RunStep \"{}\" is missing; no data should be associated".
                         format(to, self))
-                
+
             # The corresponding ERO should have existent data.
             elif not corresp_ero.symbolicdataset.has_data():
                     raise ValidationError(
@@ -431,7 +429,7 @@ class RunStep(models.Model):
             return self.child_run.is_complete()
         # Method case:
         return self.execrecord is not None
-    
+
     def complete_clean(self):
         """Checks coherence and completeness of this RunStep."""
         self.clean()
@@ -442,7 +440,7 @@ class RunStep(models.Model):
     def successful_execution(self):
         """
         True if RunStep is successful; False otherwise.
-        
+
         The RunStep is failed if any of its cables fail, if the
         ExecLog has a non-0 return code, or if there are any
         associated failed content/integrity checks.
@@ -459,8 +457,8 @@ class RunStep(models.Model):
 
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
-            
-        
+
+
 class RunSIC(models.Model):
     """
     Annotates the action of a PipelineStepInputCable within a RunStep.
@@ -506,7 +504,7 @@ class RunSIC(models.Model):
          - PSIC belongs to runstep.pipelinestep
 
          - if an ExecLog is attached, clean it
-         
+
          - if reused is None (no decision on reusing has been made),
            no log should be associated, no data should be associated,
            and execrecord should not be set
@@ -525,10 +523,10 @@ class RunSIC(models.Model):
         (from here on execrecord is assumed to be set)
          - it must be complete and clean
          - PSIC is the same as (or compatible to) self.execrecord.general_transf()
-         
+
          - if this RunSIC does not keep its output or its output is
            missing, there should be no existent data associated.
-           
+
          - else:
            - the corresponding ERO should have existent data associated
 
@@ -576,7 +574,7 @@ class RunSIC(models.Model):
                 return
 
             # From here on, the ExecLog is known to be complete.
-            
+
             # If this cable is trivial, there should be no data
             # associated.
             if self.PSIC.is_trivial() and self.has_data():
@@ -592,11 +590,11 @@ class RunSIC(models.Model):
                         "RunSIC \"{}\" should generate at most one Dataset".
                         format(self))
                 self.output.all()[0].clean()
-        
+
         # If there is no execrecord defined, then exit.
         if self.execrecord == None:
             return
-        
+
         # At this point there must be an associated ER; check that it is
         # clean and complete.
         self.execrecord.complete_clean()
@@ -610,7 +608,7 @@ class RunSIC(models.Model):
             raise ValidationError(
                 "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
                 format(self.PSIC))
-        
+
         elif not self.PSIC.is_compatible_given_input(
                 self.execrecord.general_transf()):
             raise ValidationError(
@@ -692,11 +690,11 @@ class RunSIC(models.Model):
     def has_data(self):
         """True if associated output exists; False if not."""
         return self.output.all().exists()
-    
+
     def successful_execution(self):
         """
         True if RunSIC is successful; False otherwise.
-        
+
         The RunStep is failed if there are any associated failed
         content/integrity checks.
 
@@ -728,7 +726,7 @@ class RunOutputCable(models.Model):
     pipelineoutputcable = models.ForeignKey(
         "pipeline.PipelineOutputCable",
         related_name="poc_instances")
-    
+
     start_time = models.DateTimeField(
         "start time", auto_now_add=True,
         help_text="Time at start of running this output cable")
@@ -756,9 +754,9 @@ class RunOutputCable(models.Model):
 
          - else if it has been decided to reuse an ER, check that there
            are no associated datasets
-         
+
          - else if it has been decided not to reuse an ER:
-         
+
            - if this cable is trivial, there should be no associated
              dataset
 
@@ -789,15 +787,14 @@ class RunOutputCable(models.Model):
                 "POC \"{}\" does not belong to Pipeline \"{}\"".
                 format(self.pipelineoutputcable, self.run.pipeline))
 
-        if self.log.exists():
-            self.log.first().complete_clean()
+        clean_execlogs(self)
 
         if self.reused is None:
             if self.log.all().exists():
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no ExecLog should be associated".
                     format(self))
-            
+
             if self.has_data():
                 raise ValidationError(
                     "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
@@ -853,7 +850,7 @@ class RunOutputCable(models.Model):
             raise ValidationError(
                 "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
                 format(self))
-        
+
         elif not self.pipelineoutputcable.is_compatible(self.execrecord.general_transf()):
             raise ValidationError(
                 "POC of RunOutputCable \"{}\" is incompatible with that of its ExecRecord".
@@ -879,7 +876,7 @@ class RunOutputCable(models.Model):
                 raise ValidationError(
                     "RunOutputCable \"{}\" had a missing output; no data should be produced".
                     format(self))
-            
+
         # Otherwise, there should be data
         else:
             # The corresponding ERO should have existent data.
@@ -908,7 +905,7 @@ class RunOutputCable(models.Model):
                         "Dataset \"{}\" was produced by RunOutputCable \"{}\" but is not in an ERO of ExecRecord \"{}\"".
                         format(self.output.all()[0], self, self.execrecord))
 
-            
+
 
     def is_complete(self):
         """True if ROC is finished running; false otherwise."""
@@ -928,7 +925,7 @@ class RunOutputCable(models.Model):
     def successful_execution(self):
         """
         True if this RunOutputCable is successful; False otherwise.
-        
+
         The ROC is failed if there are any associated failed
         content/integrity checks.
 
@@ -955,20 +952,20 @@ class Dataset(models.Model):
     The clean() function should be used when a pipeline is executed to
     confirm that the dataset structure is consistent with what's
     expected from the pipeline definition.
-    
+
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
     user = models.ForeignKey(
         User,
         help_text="User that uploaded this Dataset.")
-    
+
     name = models.CharField(
         max_length=128,
         help_text="Description of this Dataset.")
-    
+
     description = models.TextField()
-    
+
     date_created = models.DateTimeField(
         "Date created",
         auto_now_add=True,
@@ -990,7 +987,7 @@ class Dataset(models.Model):
         blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     created_by = generic.GenericForeignKey("content_type", "object_id")
-    
+
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(
         upload_to="Datasets",
@@ -1005,7 +1002,7 @@ class Dataset(models.Model):
     def __unicode__(self):
         """
         Unicode representation of this Dataset.
-        
+
         This looks like "[name] (created by [user] on [date])"
         """
         return "{} (created by {} on {})".format(
@@ -1019,7 +1016,7 @@ class Dataset(models.Model):
                 "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".
                 format(self, self.compute_md5(),
                        self.symbolicdataset.MD5_checksum))
-            
+
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
         md5gen = hashlib.md5()
@@ -1029,9 +1026,9 @@ class Dataset(models.Model):
             md5 = file_access_utils.compute_md5(self.dataset_file.file)
         finally:
             self.dataset_file.close()
-        
+
         return md5
-            
+
     def check_md5(self):
         """
         Checks the MD5 checksum of the Dataset against its stored value.
@@ -1042,7 +1039,7 @@ class Dataset(models.Model):
         """
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
-    
+
 class ExecLog(models.Model):
     """
     Logs of Method/PSIC/POC execution.
@@ -1081,7 +1078,7 @@ class ExecLog(models.Model):
         If this ExecLog is for a RunStep, the RunStep represents a
         Method (as opposed to a Pipeline).
         """
-        if ((type(self.record) == RunStep) and 
+        if ((type(self.record) == RunStep) and
                 (type(self.record.pipelinestep.transformation) !=
                  method.models.Method)):
             raise ValidationError(
@@ -1090,8 +1087,7 @@ class ExecLog(models.Model):
 
         if (self.end_time is not None and self.start_time is not None and
                 self.start_time > self.end_time):
-            raise ValidationError(
-                error_messages["execlog_swapped_times"].format(self))
+            raise ValidationError('The end time of ExecLog "{}" is before its start time'.format(self))
 
     def is_complete(self):
         """
@@ -1101,7 +1097,7 @@ class ExecLog(models.Model):
         if self.start_time is None or self.end_time is None:
             return False
 
-        if (self.record.__class__.__name__ == "RunStep" and 
+        if (self.record.__class__.__name__ == "RunStep" and
                 self.record.pipelinestep.transformation.__class__.__name__ == "Method"):
             if not hasattr(self, "methodoutput"):
                 return False
@@ -1118,7 +1114,7 @@ class ExecLog(models.Model):
         self.clean()
 
         if not self.is_complete():
-            raise ValidationError(error_messages["incomplete_execlog"].format(self))
+            raise ValidationError('ExecLog "{}" is not complete'.format(self))
 
     def missing_outputs(self):
         """Returns output SDs missing output from this execution."""
@@ -1153,8 +1149,8 @@ class MethodOutput(models.Model):
     Logged output of the execution of a method.
 
     This stores the stdout and stderr output, as well as the process'
-    return code. 
-    
+    return code.
+
     If the return code is -1, it indicates that an operating system level error
     was raised while trying to execute the code, ie., the code was not executable.
     In that case, stdout will be empty, and stderr will contain the Python stack
@@ -1168,12 +1164,12 @@ class MethodOutput(models.Model):
         related_name="methodoutput")
 
     return_code = models.IntegerField("return code", null=True)
-    
+
     output_log = models.FileField(
         "output log",
         upload_to="Logs",
         help_text="Terminal output of the RunStep Method, i.e. stdout.")
-    
+
     error_log = models.FileField(
         "error log",
         upload_to="Logs",
