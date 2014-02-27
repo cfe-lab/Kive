@@ -10,7 +10,7 @@ from method.models import CodeResourceRevision
 from archive.models import Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
 
-from constants import datatypes, CDTs, error_messages
+from constants import datatypes, CDTs
 
 samplecode_path = "../samplecode"
 
@@ -38,7 +38,7 @@ class MetadataTestSetup(TestCase):
             description="String consisting of ACGTacgt")
         self.DNA_dt.save()
         # DNA_dt is a restricted type of string
-        self.DNA_dt.restricts.add(self.string_dt);
+        self.DNA_dt.restricts.add(self.string_dt)
         self.DNA_dt.basic_constraints.create(
             ruletype=BasicConstraint.REGEXP,
             rule="^[ACGTacgt]*$")
@@ -77,44 +77,44 @@ class MetadataTestSetup(TestCase):
         self.test_cdt.save()
 
         # Define DNAinput_cdt (1 member)
-        self.DNAinput_cdt = CompoundDatatype();
-        self.DNAinput_cdt.save();
+        self.DNAinput_cdt = CompoundDatatype()
+        self.DNAinput_cdt.save()
         self.DNAinput_cdt.members.create(
             datatype=self.DNA_dt,
             column_name="SeqToComplement",
-            column_idx=1);
-        self.DNAinput_cdt.full_clean();
-        self.DNAinput_cdt.save();
+            column_idx=1)
+        self.DNAinput_cdt.full_clean()
+        self.DNAinput_cdt.save()
 
         # Define DNAoutput_cdt (1 member)
-        self.DNAoutput_cdt = CompoundDatatype();
-        self.DNAoutput_cdt.save();
+        self.DNAoutput_cdt = CompoundDatatype()
+        self.DNAoutput_cdt.save()
         self.DNAoutput_cdt.members.create(
             datatype=self.DNA_dt,
             column_name="ComplementedSeq",
-            column_idx=1);
-        self.DNAoutput_cdt.full_clean();
-        self.DNAoutput_cdt.save();
+            column_idx=1)
+        self.DNAoutput_cdt.full_clean()
+        self.DNAoutput_cdt.save()
 
         # Define RNAinput_cdt (1 column)
-        self.RNAinput_cdt = CompoundDatatype();
-        self.RNAinput_cdt.save();
+        self.RNAinput_cdt = CompoundDatatype()
+        self.RNAinput_cdt.save()
         self.RNAinput_cdt.members.create(
             datatype=self.RNA_dt,
             column_name="SeqToComplement",
-            column_idx=1);
-        self.RNAinput_cdt.full_clean();
-        self.RNAinput_cdt.save();
+            column_idx=1)
+        self.RNAinput_cdt.full_clean()
+        self.RNAinput_cdt.save()
 
         # Define RNAoutput_cdt (1 column)
-        self.RNAoutput_cdt = CompoundDatatype();
-        self.RNAoutput_cdt.save();
+        self.RNAoutput_cdt = CompoundDatatype()
+        self.RNAoutput_cdt.save()
         self.RNAoutput_cdt.members.create(
             datatype=self.RNA_dt,
             column_name="ComplementedSeq",
-            column_idx=1);
-        self.RNAoutput_cdt.full_clean();
-        self.RNAoutput_cdt.save();
+            column_idx=1)
+        self.RNAoutput_cdt.full_clean()
+        self.RNAoutput_cdt.save()
 
         ####
         # Everything above this point is used in metadata.tests.
@@ -172,7 +172,7 @@ class MetadataTestSetup(TestCase):
 
         # Define CDT "doublet_cdt" with 2 members for use as an input/output
         self.doublet_cdt = CompoundDatatype()
-        self.doublet_cdt.save();
+        self.doublet_cdt.save()
         self.doublet_cdt.members.create(
             datatype=self.string_dt, column_name="x",
             column_idx=1)
@@ -268,8 +268,8 @@ class DatatypeTests(MetadataTestSetup):
         Unicode representation must be the instance's name.
 
         """
-        my_datatype = Datatype(name="fhqwhgads");
-        self.assertEqual(unicode(my_datatype), "fhqwhgads");
+        my_datatype = Datatype(name="fhqwhgads")
+        self.assertEqual(unicode(my_datatype), "fhqwhgads")
 
     ### Unit tests for datatype.clean (Circular restrictions) ###
 
@@ -284,102 +284,102 @@ class DatatypeTests(MetadataTestSetup):
         Circular, direct, start
         dt1 restricts dt1, dt3, dt4
         """
-        self.dt_1.restricts.add(self.dt_1);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_1)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
 
-        self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+        self.assertRaisesRegexp(ValidationError, 
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_direct_middle_clean_bad(self):
         """
         Circular, direct, middle
         dt1 restricts dt3, dt1, dt4
         """
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_1);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_1)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_direct_end_clean_bad(self):
         """
         Circular, direct, middle
         dt1 restricts dt3, dt4, dt1
         """
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.restricts.add(self.dt_1);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.restricts.add(self.dt_1)
+        self.dt_1.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_direct_clean_good(self):
         """
         dt1 restricts dt2, dt3, dt4
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_begin_clean_bad(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt2 restricts dt1
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
 
-        self.dt_2.restricts.add(self.dt_1);
-        self.dt_2.save();
+        self.dt_2.restricts.add(self.dt_1)
+        self.dt_2.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_recursive_middle_clean_bad(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt3 restricts dt1
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
 
-        self.dt_3.restricts.add(self.dt_1);
-        self.dt_3.save();
+        self.dt_3.restricts.add(self.dt_1)
+        self.dt_3.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_recursive_end_clean_bad(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt4 restricts dt1
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_4.restricts.add(self.dt_1);
-        self.dt_4.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_4.restricts.add(self.dt_1)
+        self.dt_4.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
 
     def test_datatype_circular_recursive_clean_good1(self):
@@ -387,78 +387,78 @@ class DatatypeTests(MetadataTestSetup):
         dt1 restricts dt2, dt3, dt4
         dt2 restricts dt5
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_5);
-        self.dt_2.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_5)
+        self.dt_2.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_clean_good2(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt3 restricts dt5
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_3.restricts.add(self.dt_5);
-        self.dt_3.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_3.restricts.add(self.dt_5)
+        self.dt_3.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_clean_good3(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt4 restricts dt5
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_4.restricts.add(self.dt_5);
-        self.dt_4.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_4.restricts.add(self.dt_5)
+        self.dt_4.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_clean_good4(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt2 restricts dt4
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_4);
-        self.dt_2.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_4)
+        self.dt_2.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_clean_good5(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt3 restricts dt4
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_3.restricts.add(self.dt_4);
-        self.dt_3.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_3.restricts.add(self.dt_4)
+        self.dt_3.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_circular_recursive_clean_good6(self):
         """
         dt1 restricts dt2, dt3, dt4
         dt4 restricts dt2
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_4.restricts.add(self.dt_2);
-        self.dt_4.save();
-        self.assertEqual(self.dt_1.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_4.restricts.add(self.dt_2)
+        self.dt_4.save()
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_direct_is_restricted_by_1(self):
         """
@@ -466,11 +466,11 @@ class DatatypeTests(MetadataTestSetup):
         dt1.is_restricted_by(dt2) - FALSE
         dt2.is_restricted_by(dt1) - TRUE
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.save()
 
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True)
 
     def test_datatype_direct_is_restricted_by_2(self):
         """
@@ -478,8 +478,8 @@ class DatatypeTests(MetadataTestSetup):
         dt1.is_restricted_by(dt2) - FALSE
         dt2.is_restricted_by(dt1) - FALSE
         """
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), False);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), False)
 
     def test_datatype_recursive_is_restricted_by_1(self):
         """
@@ -491,15 +491,15 @@ class DatatypeTests(MetadataTestSetup):
         dt2.is_restricted_by(dt1) - TRUE
         """
 
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_3);
-        self.dt_2.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_3)
+        self.dt_2.save()
 
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
-        self.assertEqual(self.dt_3.is_restricted_by(self.dt_1), True);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True);
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False)
+        self.assertEqual(self.dt_3.is_restricted_by(self.dt_1), True)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_2.is_restricted_by(self.dt_1), True)
 
     def test_datatype_recursive_is_restricted_by_2(self):
         """
@@ -507,17 +507,17 @@ class DatatypeTests(MetadataTestSetup):
         dt2 restricts dt5
         """
 
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_5);
-        self.dt_2.save();
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
-        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_5)
+        self.dt_2.save()
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False)
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True)
 
     def test_datatype_recursive_is_restricted_by_3(self):
         """
@@ -525,17 +525,17 @@ class DatatypeTests(MetadataTestSetup):
         dt3 restricts dt5
         """
 
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_3.restricts.add(self.dt_5);
-        self.dt_3.save();
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
-        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_3.restricts.add(self.dt_5)
+        self.dt_3.save()
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False)
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True)
 
     def test_datatype_recursive_is_restricted_by_4(self):
         """
@@ -543,35 +543,35 @@ class DatatypeTests(MetadataTestSetup):
         dt4 restricts dt5
         """
 
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.restricts.add(self.dt_4);
-        self.dt_1.save();
-        self.dt_4.restricts.add(self.dt_5);
-        self.dt_4.save();
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False);
-        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False);
-        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.restricts.add(self.dt_4)
+        self.dt_1.save()
+        self.dt_4.restricts.add(self.dt_5)
+        self.dt_4.save()
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_2), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_3), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_4), False)
+        self.assertEqual(self.dt_1.is_restricted_by(self.dt_5), False)
+        self.assertEqual(self.dt_5.is_restricted_by(self.dt_1), True)
 
     def test_datatype_no_restriction_clean_good(self):
         """
         Datatype without any restrictions.
         """
-        self.assertEqual(self.dt_1.clean(), None);
+        self.assertEqual(self.dt_1.clean(), None)
 
     def test_datatype_nested_valid_restrictions_clean_good(self):
         """
         Datatypes such that A restricts B, and B restricts C
         """
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_3);
-        self.dt_2.save();
-        self.assertEqual(self.dt_1.clean(), None);
-        self.assertEqual(self.dt_2.clean(), None);
-        self.assertEqual(self.dt_3.clean(), None);
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_3)
+        self.dt_2.save()
+        self.assertEqual(self.dt_1.clean(), None)
+        self.assertEqual(self.dt_2.clean(), None)
+        self.assertEqual(self.dt_3.clean(), None)
 
     def test_datatype_nested_invalid_restrictions_scrambled_clean_bad(self):
         """
@@ -582,18 +582,18 @@ class DatatypeTests(MetadataTestSetup):
         C restricts A
         """
 
-        self.dt_1.restricts.add(self.dt_3);
-        self.dt_1.save();
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_3);
-        self.dt_2.save();
-        self.dt_3.restricts.add(self.dt_1);
-        self.dt_3.save();
+        self.dt_1.restricts.add(self.dt_3)
+        self.dt_1.save()
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_3)
+        self.dt_2.save()
+        self.dt_3.restricts.add(self.dt_1)
+        self.dt_3.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
 
     def test_datatype_direct_circular_restriction_clean_bad(self):
@@ -601,12 +601,12 @@ class DatatypeTests(MetadataTestSetup):
         Datatype directly restricts itself: A restricts A
         """
 
-        self.dt_1.restricts.add(self.dt_1);
-        self.dt_1.save();
+        self.dt_1.restricts.add(self.dt_1)
+        self.dt_1.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_circular_restriction_indirect_clean(self):
         """
@@ -615,14 +615,14 @@ class DatatypeTests(MetadataTestSetup):
         B restricts A
         """
 
-        self.dt_1.restricts.add(self.dt_2);
-        self.dt_1.save();
-        self.dt_2.restricts.add(self.dt_1);
-        self.dt_2.save();
+        self.dt_1.restricts.add(self.dt_2)
+        self.dt_1.save()
+        self.dt_2.restricts.add(self.dt_1)
+        self.dt_2.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_circular_restriction"].format(self.dt_1),
-                                self.dt_1.clean);
+                                re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
+                                self.dt_1.clean)
 
     def test_datatype_clean_no_restricts(self):
         """
@@ -744,11 +744,13 @@ class DatatypeTests(MetadataTestSetup):
         your_DT.restricts.add(super_DT, super2_DT)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_multiple_builtin_types"].format(my_DT),
+                                re.escape(('Datatype "{}" restricts multiple built-in, non-numeric types'
+                                           .format(my_DT))),
                                 my_DT.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_multiple_builtin_types"].format(your_DT),
+                                re.escape(('Datatype "{}" restricts multiple built-in, non-numeric types'
+                                           .format(your_DT))),
                                 your_DT.clean)
 
     def test_clean_restricts_str_int_bad(self):
@@ -801,15 +803,14 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on a Datatype whose prototype is raw.
         """
-        DNA_raw_prototype = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "DNAprototype.csv"),
-            None, user=self.myUser,
-            name="RawPrototype", description="Prototype that is raw")
+        DNA_raw_prototype = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNAprototype.csv"), None,
+                                                      user=self.myUser, name="RawPrototype", 
+                                                      description="Prototype that is raw")
 
         self.DNA_dt.prototype = DNA_raw_prototype.dataset
 
-        self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_prototype_raw"].format(self.DNA_dt),
+        self.assertRaisesRegexp(ValidationError, 
+                                re.escape('Prototype Dataset for Datatype "{}" is raw'.format(self.DNA_dt)),
                                 self.DNA_dt.clean)
 
     def test_clean_prototype_wrong_CDT_bad(self):
@@ -822,15 +823,16 @@ class DatatypeTests(MetadataTestSetup):
         wrong_CDT.members.create(datatype=self.BOOL, column_name="thisshouldbesomethingelse", column_idx=2)
         wrong_CDT.clean()
 
-        DNA_prototype_bad_CDT = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "DNAprototype_bad_CDT.csv"),
-            wrong_CDT, user=self.myUser,
-            name="BadCDTPrototype", description="Prototype with a bad CDT")
+        DNA_prototype_bad_CDT = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNAprototype_bad_CDT.csv"),
+                                                          wrong_CDT, user=self.myUser, name="BadCDTPrototype",
+                                                          description="Prototype with a bad CDT")
 
         self.DNA_dt.prototype = DNA_prototype_bad_CDT.dataset
 
+        PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_prototype_wrong_CDT"].format(self.DNA_dt),
+                                re.escape(('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
+                                           'but it has "{}"'.format(self.DNA_dt, PROTOTYPE_CDT, wrong_CDT))),
                                 self.DNA_dt.clean)
 
     # Propagation of BasicConstraint errors is checked thoroughly in the BasicConstraint
@@ -860,7 +862,9 @@ class DatatypeTests(MetadataTestSetup):
         constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_datetimeformat_non_string"].format(constr, constr_DT),
+                                re.escape((('BasicConstraint "{}" specifies a date/time format, but its parent '
+                                            'Datatype "{}" has builtin type "{}"')
+                                            .format(constr, constr_DT, self.FLOAT))),
                                 constr_DT.clean)
 
     # Cases where a Datatype has a good BasicConstraint associated to it are well-tested in the
@@ -2336,11 +2340,11 @@ class CompoundDatatypeMemberTests(MetadataTestSetup):
         (column index, datatype name, column name)
         """
         self.assertEqual(unicode(self.test_cdt.members.all()[0]),
-                         "1: <string> [label]");
+                "string: label")
         self.assertEqual(unicode(self.test_cdt.members.all()[1]),
-                         "2: <DNANucSeq> [PBMCseq]");
+                "DNANucSeq: PBMCseq")
         self.assertEqual(unicode(self.test_cdt.members.all()[2]),
-                         "3: <RNANucSeq> [PLAseq]");
+                "RNANucSeq: PLAseq")
 
 class CompoundDatatypeTests(MetadataTestSetup):
 
@@ -2348,16 +2352,15 @@ class CompoundDatatypeTests(MetadataTestSetup):
         """
         Unicode of empty CompoundDatatype should be empty.
         """
-        empty_cdt = CompoundDatatype();
-        empty_cdt.save();
-        self.assertEqual(unicode(empty_cdt), "[empty CompoundDatatype]");
+        empty_cdt = CompoundDatatype()
+        empty_cdt.save()
+        self.assertEqual(unicode(empty_cdt), "[empty CompoundDatatype]")
 
     def test_cdt_single_member_unicode(self):
         """
         Unicode on single-member cdt returns its member.
         """
-        self.assertEqual(unicode(self.DNAinput_cdt),
-                         "(1: <DNANucSeq> [SeqToComplement])");
+        self.assertEqual(unicode(self.DNAinput_cdt), "(DNANucSeq: SeqToComplement)")
 
     def test_cdt_multiple_members_unicode(self):
         """
@@ -2365,74 +2368,63 @@ class CompoundDatatypeTests(MetadataTestSetup):
 
         Each member is in the form of unicode(CompoundDatatypeMember).
         """
-        self.assertEqual(unicode(self.test_cdt),
-                         "(1: <string> [label], 2: <DNANucSeq> [PBMCseq], " +
-                         "3: <RNANucSeq> [PLAseq])");
+        self.assertEqual(unicode(self.test_cdt), "(string: label, DNANucSeq: PBMCseq, RNANucSeq: PLAseq)")
 
     def test_clean_single_index_good(self):
         """
         CompoundDatatype with single index equalling 1.
         """
-        sad_cdt = CompoundDatatype();
-        sad_cdt.save();
+        sad_cdt = CompoundDatatype()
+        sad_cdt.save()
         sad_cdt.members.create(datatype=self.RNA_dt,
                                column_name="ColumnTwo",
-                               column_idx=1);
-        self.assertEqual(sad_cdt.clean(), None);
+                               column_idx=1)
+        self.assertEqual(sad_cdt.clean(), None)
 
     def test_clean_single_index_bad(self):
         """
         CompoundDatatype with single index not equalling 1.
         """
-        sad_cdt = CompoundDatatype();
-        sad_cdt.save();
+        sad_cdt = CompoundDatatype()
+        sad_cdt.save()
         sad_cdt.members.create(datatype=self.RNA_dt,
                                column_name="ColumnTwo",
-                               column_idx=3);
+                               column_idx=3)
 
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Column indices are not consecutive starting from 1",
-            sad_cdt.clean);
+        self.assertRaisesRegexp(ValidationError,
+            re.escape(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'.format(sad_cdt))),
+            sad_cdt.clean)
+
+    def test_clean_consecutive_member_indices_correct(self):
+        """
+        A CompoundDatatype with consecutive member indices passes clean.
+        """
+        self.assertEqual(self.test_cdt.clean(), None)
+
+        good_cdt = CompoundDatatype()
+        good_cdt.save()
+        good_cdt.members.create(datatype=self.RNA_dt, column_name="ColumnTwo", column_idx=2)
+        good_cdt.members.create(datatype=self.DNA_dt, column_name="ColumnOne", column_idx=1)
+        self.assertEqual(good_cdt.clean(), None)
 
     def test_clean_catches_consecutive_member_indices(self):
         """
-        CompoundDatatype must have consecutive indices from 1 to n.
-        
-        Otherwise, throw a ValidationError.
+        A CompoundDatatype without consecutive member indices throws a ValidationError.
         """
-        self.assertEqual(self.test_cdt.clean(), None);
+        bad_cdt = CompoundDatatype()
+        bad_cdt.save()
+        bad_cdt.members.create(datatype=self.RNA_dt, column_name="ColumnOne", column_idx=3)
+        bad_cdt.members.create(datatype=self.DNA_dt, column_name="ColumnTwo", column_idx=1)
 
-        good_cdt = CompoundDatatype();
-        good_cdt.save();
-        good_cdt.members.create(datatype=self.RNA_dt,
-                                column_name="ColumnTwo",
-                                column_idx=2);
-        good_cdt.members.create(datatype=self.DNA_dt,
-                                column_name="ColumnOne",
-                                column_idx=1);
-        self.assertEqual(good_cdt.clean(), None);
-
-        bad_cdt = CompoundDatatype();
-        bad_cdt.save();
-        bad_cdt.members.create(datatype=self.RNA_dt,
-                               column_name="ColumnOne",
-                               column_idx=3);
-
-        bad_cdt.members.create(datatype=self.DNA_dt,
-                               column_name="ColumnTwo",
-                               column_idx=1);
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Column indices are not consecutive starting from 1",
-            bad_cdt.clean);
+        self.assertRaisesRegexp(ValidationError,
+            re.escape(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'.format(bad_cdt))),
+            bad_cdt.clean)
 
     def test_clean_members_no_column_names(self):
         """
         Datatype members must have column names.
         """
-        cdt = CompoundDatatype();
+        cdt = CompoundDatatype()
         cdt.save()
         cdt.members.create(datatype=self.RNA_dt, column_idx=1)
         self.assertRaisesRegexp(ValidationError,

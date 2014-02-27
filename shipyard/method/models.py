@@ -15,7 +15,6 @@ from django.utils import timezone
 
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
-from constants import error_messages
 
 import traceback
 import threading

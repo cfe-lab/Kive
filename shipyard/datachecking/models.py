@@ -9,8 +9,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
-from constants import error_messages
-
 class ContentCheckLog(models.Model):
     """
     Denotes a check performed on a SymbolicDataset's contents.

@@ -13,7 +13,6 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 
 import metadata.models
-from constants import error_messages
 
 class TransformationFamily(models.Model):
     """

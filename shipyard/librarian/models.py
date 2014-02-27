@@ -20,7 +20,6 @@ import tempfile
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import datachecking.models
 import file_access_utils, logging_utils
-from constants import error_messages
 
 LOGGER = logging.getLogger(__name__)
 
