@@ -568,7 +568,8 @@ class Datatype(models.Model):
         for supertype in self.restricts.all():
             dtf_count += supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
         if dtf_count > 1:
-            raise ValidationError('Datatype "{}" has too many DATETIMEFORMAT restrictions acting on it'.format(self))
+            raise ValidationError(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on it, '
+                                   'but it has {}'.format(self, dtf_count)))
 
     def _check_basic_constraints_against_supertypes(self):
         """
@@ -600,8 +601,7 @@ class Datatype(models.Model):
         PRE
         1) This Datatype has at least one supertype
         """
-        builtin_type_pk = self.get_builtin_type().pk
-        if builtin_type_pk in datatypes.NUMERIC_BUILTIN_PKS:
+        if self.is_numeric():
             min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1]
             max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]
             if (min_val > max_val):
@@ -614,11 +614,12 @@ class Datatype(models.Model):
                                        .format(self, min_val, max_val)))
 
         # Check that effective min_length <= max_length if applicable.
-        elif builtin_type_pk == datatypes.STR_PK:
-            if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
-                    self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
-                raise ValidationError(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
-                                       .format(self)))
+        elif self.is_string():
+            min_length = self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1]
+            max_length = self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]
+            if (min_length > max_length):
+                raise ValidationError(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
+                                       .format(self, min_length, max_length)))
 
     def _clean_basic_constraints(self):
         """

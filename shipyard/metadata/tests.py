@@ -941,13 +941,17 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
 
+        count = 0
         for curr_ruletype, curr_rule in rules:
+            if curr_ruletype == multiple_BC_type:
+                count += 1
             constr_DT.basic_constraints.create(ruletype=curr_ruletype, rule="{}".format(curr_rule))
 
         err_msg_key = "DT_several_same_constraint"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr_DT, multiple_BC_type),
+                                re.escape(('Datatype "{}" has {} constraints of type {}, but should have at most one'
+                                           .format(constr_DT, count, multiple_BC_type))),
                                 constr_DT.clean)
 
     def test_clean_int_multiple_min_val_bad(self):
@@ -1016,36 +1020,70 @@ class DatatypeTests(MetadataTestSetup):
             "(?:{}|{})".format(BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL)
         )
 
+    def _setup_datatype(self, name, desc, rules, restricts):
+        """
+        Helper function to create a Datatype. Rules is a list of tuples (ruletype, rule),
+        and restricts is a list of supertypes.
+        """
+        dt = Datatype(name=name, description=desc)
+        dt.full_clean()
+        dt.save()
+        for supertype in restricts:
+            dt.restricts.add(supertype)
+        for ruletype, rule in rules:
+            if ruletype:
+                dt.basic_constraints.create(ruletype=ruletype, rule=rule)
+        return dt
+
+    def _setup_inheriting_datatype(self, 
+                                   super_name, super_desc, super_ruletype, super_rule, super_builtin,
+                                   cnstr_name, cnstr_desc, cnstr_ruletype, cnstr_rule):
+        """
+        Helper function to create a pair of Datatypes, one inheriting 
+        from the other.
+        """
+        super_DT = self._setup_datatype(super_name, super_desc, [(super_ruletype, super_rule)], [super_builtin])
+        constr_DT = self._setup_datatype(cnstr_name, cnstr_desc, [(cnstr_ruletype, cnstr_rule)], [super_DT])
+        return (super_DT, constr_DT)
+
+    def _setup_inheriting_datatype2(self,
+                                    super1_name, super1_desc, super1_ruletype, super1_rule, super1_builtin,
+                                    super2_name, super2_desc, super2_ruletype, super2_rule, super2_builtin,
+                                    constr_name, constr_desc, constr_ruletype, constr_rule):
+        """
+        Helper function to create three Datatypes, the first two being
+        supertypes of the third.
+        """
+        super1_DT, constr_DT = self._setup_inheriting_datatype(
+                super1_name, super1_desc, super1_ruletype, super1_rule, super1_builtin,
+                constr_name, constr_desc, constr_ruletype, constr_rule)
+        super2_DT = self._setup_datatype(super2_name, super2_desc, [(super2_ruletype, super2_rule)], [super2_builtin])
+        constr_DT.restricts.add(super2_DT)
+        return (super1_DT, super2_DT, constr_DT)
+
     ####
     def __test_clean_num_constraint_conflicts_with_supertypes_h(self, builtin_type, BC_type, constr_val,
                                                                 supertype_constr_val):
         """
         Helper to test cases where numerical constraints conflict with those of the supertypes.
         """
-        super_DT = Datatype(name="ParentDT", description="Parent with constraint")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(builtin_type)
-        super_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(supertype_constr_val))
-
-        constr_DT = Datatype(name="ConstrDT", description="Datatype whose constraint conflicts with parent")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
-        constr_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
+        super_DT, constr_DT = self._setup_inheriting_datatype("ParentDT", "Parent with constraint",
+                BC_type, supertype_constr_val, builtin_type, "ConstrDT", 
+                "Datatype whose constraint conflicts with parent",
+                BC_type, constr_val)
 
         err_msg_key = ""
         if BC_type == BasicConstraint.MIN_LENGTH:
-            err_msg_key = "DT_min_length_smaller_than_supertypes"
+            error_msg = 'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}'
         elif BC_type == BasicConstraint.MAX_LENGTH:
-            err_msg_key = "DT_max_length_larger_than_supertypes"
+            error_msg = 'Datatype "{}" has MAX_LENGTH {}, but its supertype "{}" has a shorter or equal MAX_LENGTH of {}'
         elif BC_type == BasicConstraint.MIN_VAL:
-            err_msg_key = "DT_min_val_smaller_than_supertypes"
+            error_msg = 'Datatype "{}" has MIN_VAL {}, but its supertype "{}" has a larger or equal MIN_VAL of {}'
         elif BC_type == BasicConstraint.MAX_VAL:
-            err_msg_key = "DT_max_val_larger_than_supertypes"
+            error_msg = 'Datatype "{}" has MAX_VAL {}, but its supertype "{}" has a smaller or equal MAX_VAL of {}'
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr_DT),
+                                re.escape(error_msg.format(constr_DT, constr_val, super_DT, supertype_constr_val)),
                                 constr_DT.clean)
 
     def test_clean_int_min_val_supertype_conflict_bad(self):
@@ -1092,140 +1130,83 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on the case where a Datatype has a DATETIMEFORMAT but so does its supertype.
         """
-        super_DT = Datatype(name="DateTimeDT", description="String with a DATETIMEFORMAT")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(self.STR)
-        super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
-
-        constr_DT = Datatype(name="OverwritingDateTimeDT",
-                             description="String with a DATETIMEFORMAT whose parent also has one")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
-        constr_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y-%b-%d")
+        super_DT, constr_DT = self._setup_inheriting_datatype("DateTimeDT", "String with a DATETIMEFORMAT",
+                BasicConstraint.DATETIMEFORMAT, "%Y %b %d", self.STR, "OverwritingDateTimeDT",
+                "String with a DATETIMEFORMAT whose parent also has one", 
+                BasicConstraint.DATETIMEFORMAT, "%Y-%b-%d")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_too_many_datetimeformats"].format(constr_DT),
+                                re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
+                                           'it, but it has {}'.format(constr_DT, 2))),
                                 constr_DT.clean)
 
     def test_clean_several_supertypes_have_dtfs_bad(self):
         """
         Testing clean() on the case where a Datatype has several supertypes with DATETIMEFORMATs.
         """
-        super_DT = Datatype(name="DateTimeDT", description="String with a DATETIMEFORMAT")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(self.STR)
-        super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
-
-        second_DT = Datatype(name="OtherDateTimeDT", description="Second string with a DATETIMEFORMAT")
-        second_DT.full_clean()
-        second_DT.save()
-        second_DT.restricts.add(self.STR)
-        second_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
-
-        constr_DT = Datatype(name="OverwritingDateTimeDT",
-                             description="String with a DATETIMEFORMAT whose parent also has one")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
-        constr_DT.restricts.add(second_DT)
+        dtf = BasicConstraint.DATETIMEFORMAT
+        super_DT, second_DT, constr_DT = self._setup_inheriting_datatype2(
+                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
+                "OverwritingDateTimeDT", "Second string with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
+                "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %b %d")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_too_many_datetimeformats"].format(constr_DT),
+                                re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
+                                           'it, but it has {}'.format(constr_DT, 2))),
                                 constr_DT.clean)
 
     def test_clean_dtf_several_supertypes_one_has_dtf_bad(self):
         """
         Testing clean() on the case where a Datatype has a DATETIMEFORMAT and several supertypes, one which has one.
         """
-        super_DT = Datatype(name="DateTimeDT", description="String with a DATETIMEFORMAT")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(self.STR)
-        super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
-
-        second_DT = Datatype(name="OtherDT", description="String by a different name")
-        second_DT.full_clean()
-        second_DT.save()
-        second_DT.restricts.add(self.STR)
-
-        constr_DT = Datatype(name="OverwritingDateTimeDT",
-                             description="String with a DATETIMEFORMAT whose parent also has one")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
-        constr_DT.restricts.add(second_DT)
-        constr_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %d")
+        dtf = BasicConstraint.DATETIMEFORMAT
+        super_DT, second_DT, constr_DT = self._setup_inheriting_datatype2(
+                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
+                "OtherDT", "String by a different name", None, None, self.STR,
+                "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %d")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_too_many_datetimeformats"].format(constr_DT),
+                                re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
+                                           'it, but it has {}'.format(constr_DT, 2))),
                                 constr_DT.clean)
 
     def test_clean_dtf_several_supertypes_one_has_dtf_other_is_builtin_bad(self):
         """
         Testing clean() on a DATETIMEFORMATted Datatype with two supertypes: STR and another DTFd Datatype.
         """
-        super_DT = Datatype(name="DateTimeDT", description="String with a DATETIMEFORMAT")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(self.STR)
-        super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %b %d")
-
-        constr_DT = Datatype(name="OverwritingDateTimeDT",
-                             description="String with a DATETIMEFORMAT whose parent also has one")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
+        dtf = BasicConstraint.DATETIMEFORMAT
+        super_DT, constr_DT = self._setup_inheriting_datatype(
+            "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
+            "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %d")
         constr_DT.restricts.add(self.STR)
-        constr_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT, rule="%Y %d")
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_too_many_datetimeformats"].format(constr_DT),
+                                re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
+                                           'it, but it has {}'.format(constr_DT, 2))),
                                 constr_DT.clean)
 
     def test_clean_float_conflicting_min_max_val_bad(self):
         """
         Testing clean() on a float Datatype with conflicting MIN|MAX_VAL defined directly.
         """
-        constr_DT = Datatype(name="ConflictingBoundsDT",
-                             description="Float with conflicting MIN|MAX_VAL")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(self.FLOAT)
-        constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="15")
-        constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="5")
+        constr_DT = self._setup_datatype("ConflictingBoundsDT", "Float with conflicting MIN|MAX_VAL",
+                [(BasicConstraint.MIN_VAL, "15"), (BasicConstraint.MAX_VAL, "5")], [self.FLOAT])
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_val_exceeds_max_val"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                           .format(constr_DT, 15, 5))),
                                 constr_DT.clean)
 
     def test_clean_int_conflicting_inherited_min_max_val_bad(self):
         """
         Testing clean() on an int Datatype with conflicting MIN|MAX_VAL defined on its supertypes.
         """
-        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL")
-        super_DT.full_clean()
-        super_DT.save()
-        super_DT.restricts.add(self.FLOAT)
-        super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="20")
-
-        second_DT = Datatype(name="BoundedDT", description="Int with a MAX_VAL")
-        second_DT.full_clean()
-        second_DT.save()
-        second_DT.restricts.add(self.INT)
-        second_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="18.2")
-
-        constr_DT = Datatype(name="InheritingBadBoundsDT",
-                             description="Datatype inheriting conflicting MIN|MAX_VAL")
-        constr_DT.full_clean()
-        constr_DT.save()
-        constr_DT.restricts.add(super_DT)
-        constr_DT.restricts.add(second_DT)
+        self._setup_inheriting_datatype2("BoundedDT", "Float with a MIN_VAL", BasicConstraint.MIN_VAL, "20", self.FLOAT,
+                "BoundedDT", "Int with a MAX_VAL", BasicConstraint.MAX_VAL, "18.2", self.INT,
+                "InheritingBadBoundsDT", "Datatype inheriting conflicting MIN|MAX_VAL", None, None)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_val_exceeds_max_val"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                           .format(constr_DT, 20, 18.2))),
                                 constr_DT.clean)
 
 
@@ -1247,7 +1228,8 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="6")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_val_exceeds_max_val"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                           .format(constr_DT, 17.7, 6))),
                                 constr_DT.clean)
 
     def test_clean_int_min_max_val_too_narrow_bad(self):
@@ -1263,9 +1245,9 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="15.9")
 
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(
-                                    error_messages["DT_integer_min_max_val_too_narrow"].format(constr_DT, 15.7, 15.9)
-                                ),
+                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
+                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
+                                            .format(constr_DT, 15.7, 15.9))),
                                 constr_DT.clean)
 
     def test_clean_int_inherited_min_max_val_too_narrow_bad(self):
@@ -1292,9 +1274,9 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.restricts.add(second_DT)
 
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(
-                                    error_messages["DT_integer_min_max_val_too_narrow"].format(constr_DT, 20.2, 20.55)
-                                ),
+                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
+                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
+                                            .format(constr_DT, 20.2, 20.55))),
                                 constr_DT.clean)
 
 
@@ -1317,12 +1299,10 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="17.8")
 
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(
-                                    error_messages["DT_integer_min_max_val_too_narrow"].format(constr_DT, 17.1, 17.8)
-                                ),
+                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
+                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
+                                            .format(constr_DT, 17.1, 17.8))),
                                 constr_DT.clean)
-
-
 
     def test_clean_str_conflicting_min_max_length_bad(self):
         """
@@ -1337,7 +1317,8 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="6")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_length_exceeds_max_length"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                           .format(constr_DT, 2234, 6))),
                                 constr_DT.clean)
 
     def test_clean_str_conflicting_inherited_min_max_length_bad(self):
@@ -1364,7 +1345,8 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.restricts.add(second_DT)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_length_exceeds_max_length"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
+                                           .format(constr_DT, 44, 22))),
                                 constr_DT.clean)
 
     def test_clean_str_conflicting_half_inherited_min_max_length_bad(self):
@@ -1385,7 +1367,8 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="30")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_length_exceeds_max_length"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
+                                           .format(constr_DT, 20, 30))),
                                 constr_DT.clean)
 
     # FIXME: add some tests here when CustomConstraints are fully-coded.
@@ -1454,7 +1437,8 @@ class DatatypeTests(MetadataTestSetup):
         my_DT.full_clean()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_does_not_restrict_atomic"].format(my_DT),
+                                re.escape(('Datatype "{}" does not restrict any of the Shipyard atomic Datatypes'
+                                          .format(my_DT))),
                                 my_DT.complete_clean)
 
     def test_complete_clean_incomplete(self):
@@ -1466,7 +1450,8 @@ class DatatypeTests(MetadataTestSetup):
         my_DT.save()
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_does_not_restrict_atomic"].format(my_DT),
+                                re.escape(('Datatype "{}" does not restrict any of the Shipyard atomic Datatypes'
+                                          .format(my_DT))),
                                 my_DT.complete_clean)
 
 
@@ -1530,7 +1515,8 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.restricts.add(second_DT)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["DT_min_length_exceeds_max_length"].format(constr_DT),
+                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective '
+                                          'MAX_LENGTH {}').format(costr_DT)),
                                 constr_DT.complete_clean)
 
 class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
