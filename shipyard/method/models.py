@@ -421,6 +421,14 @@ class Method(transformation.models.Transformation):
     def get_absolute_url(self):
         return '/methods/%i' % self.id
 
+    def get_num_inputs(self):
+        """Returns number of inputs."""
+        return len(self.inputs.all())
+
+    def get_num_outputs(self):
+        """Returns number of outputs."""
+        return len(self.outputs.all())
+
     def clean(self):
         """
         Check coherence of this Method. The checks we perform are:

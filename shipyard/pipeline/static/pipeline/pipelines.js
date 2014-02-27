@@ -44,6 +44,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
         }
     });
+
+    // update method drop-down
     $("[id^='id_select_method_family']").on('change',
         function() {
             mf_id = $(this).val();
@@ -92,7 +94,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     $('#id_cdt_button').on('click', function() {
         var node_label = $('#id_select_cdt option:selected').text();
-        canvasState.addShape(new CDT_Node(50, 100, 20, '#55FF55', node_label));
+        canvasState.addShape(new CDT_Node(50, 200+50*Math.random(), 20, '#55FF55', node_label));
     });
 
     $('#id_method_button').on('click', function() {
@@ -101,6 +103,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             var node_label = selected.text();
             canvasState.addShape(new MethodNode(200, 200, 80, 60, '#999999', node_label));
         }
+    });
+
+    $('#id_reset_button').on('click', function() {
+        canvasState.clear();
+        canvasState.shapes = [];
     });
 });
 
@@ -122,6 +129,7 @@ CDT_Node.prototype.draw = function(ctx) {
     ctx.fillStyle = this.fill;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, false);
+    ctx.closePath();
     ctx.fillStyle = this.fill;
     ctx.fill();
     ctx.fillStyle = 'black';
@@ -297,9 +305,12 @@ CanvasState.prototype.draw = function() {
             if (mySel.r == undefined) {
                 ctx.beginPath();
                 ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
+                ctx.closePath();
                 ctx.stroke();
             } else {
+                ctx.beginPath();
                 ctx.arc(mySel.x, mySel.y, mySel.r, 0, 2*Math.PI, false);
+                ctx.closePath();
                 ctx.stroke();
             }
         }
@@ -327,9 +338,3 @@ CanvasState.prototype.getPos = function(e) {
 
     return {x: mx, y: my};
 }
-
-function init () {
-
-}
-
-

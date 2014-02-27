@@ -42,6 +42,7 @@ urlpatterns = patterns('',
     url(r'^methods/(?P<id>\d+)/$', 'method.views.method_revise', name='method_revise'),
 
     url(r'get_method_revisions/$', 'pipeline.ajax.populate_method_revision_dropdown', name='populate_method_revision_dropdown'),
+    url(r'get_method_io/$', 'pipeline.ajax.get_method_io', name='get_method_io'),
 
     url(r'pipelines$', 'pipeline.views.pipelines', name='pipelines'),
 
