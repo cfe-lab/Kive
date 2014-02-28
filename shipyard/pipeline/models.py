@@ -435,9 +435,6 @@ def run_cable_h(cable, source, output_path):
     # Construct a list with the column names in the appropriate order.
     output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
-    if type(source) not in [archive.models.Dataset, str]:
-        raise ValueError(error_messages["dataset_bad_type"].format(type(source)))
-
     try:
         if type(source) == archive.models.Dataset:
             infile = source.dataset_file

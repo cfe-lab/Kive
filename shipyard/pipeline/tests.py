@@ -2385,24 +2385,6 @@ dataset_name="pipe_input_1_a_b_c",
         self.assertEquals(curr_out_new.get_min_row(), None)
         self.assertEquals(curr_out_new.get_max_row(), None)
  
-    def test_execute_cable_wrong_dataset_type(self):
-        """
-        You can't execute a cable by passing anything other than a Dataset or a string.
-
-        This doesn't really belong in PipelineTests but I didn't know where else to put it.
-        """
-        bob = User.objects.create_user('bobloblaw', 'bob@aol.com', '12345')
-        tmpdir = tempfile.mkdtemp()
-        run = self.DNAcompv1_p.pipeline_instances.create(user=bob)
-        step = seld.DNAcompv1_p.steps.first()
-        runstep = step.pipelinestep_instances.create(run=run)
-        record = step.cables_in.first().psic_instances.create(runstep=runstep)
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Expected source to be either a Dataset or a string, got {}'
-                                          .format(None)),
-                                lambda: step.cables_in.first().run_cable(None, tmpdir, record))
-        shutil.rmtree(tmpdir)
-
 class PipelineStepTests(PipelineTestSetup):
 
     def test_pipelineStep_without_pipeline_set_unicode(self):
