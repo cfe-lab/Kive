@@ -337,7 +337,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         # Try to create a symbolic dataset.
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(data_file_name, self.cdt_record)),
+                                          .format(data_file.name, self.cdt_record)),
                                 lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
                                                                    user=self.myUser, name="lab data", 
                                                                    description = "patient sequences"))
@@ -372,7 +372,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(data_file_name, self.cdt_record)),
+                                          .format(data_file.name, self.cdt_record)),
                                 lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
                                                                    user=self.myUser, name="bad data", 
                                                                    description="too many columns"))
@@ -842,10 +842,10 @@ class ExecRecordTests(LibrarianTestSetup):
         # Bad case: SDs don't match.
         cable_ERO.symbolicdataset = self.C1_out_symDS
         cable_ERO.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ER .* represents a trivial cable but its input and output do not match",
-            cable_ER.clean)
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
+                                          'match'.format(cable_ER)),
+                                cable_ER.clean)
 
     def test_ER_trivial_POCs_have_same_SD_on_both_sides(self):
         """ERs representing trivial POCs must have the same SymbolicDataset on both sides."""
@@ -865,10 +865,10 @@ class ExecRecordTests(LibrarianTestSetup):
         # Bad case: SDs don't match.
         outcable_ERO.symbolicdataset = self.singlet_symDS
         outcable_ERO.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ER .* represents a trivial cable but its input and output do not match",
-            outcable_ER.clean)
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
+                                          'match'.format(outcable_ER)),
+                                outcable_ER.clean)
         
 
     def test_ER_Datasets_passing_through_non_trivial_POCs(self):

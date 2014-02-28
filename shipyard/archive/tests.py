@@ -20,7 +20,6 @@ from metadata.models import *
 from pipeline.models import *
 from method.tests import samplecode_path
 import librarian.tests
-from constants import error_messages
 
 # Note that these tests use the exact same setup as librarian.
 
@@ -1268,7 +1267,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
 
         # Good case: POC belongs to the parent run's Pipeline.
-        self.assertEquals(E31_42_ROC.clean(), None)
+        self.assertIsNone(E31_42_ROC.clean())
 
         # Bad case: POC belongs to another Pipeline.
         pD_run = self.pD.pipeline_instances.create(user=self.myUser)
@@ -1395,6 +1394,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
                                     generic_output=self.A1_out)
 
         # Create an execrecord for another of the POCs.
+        E21_41_ROC.log.clear()
         E21_41_ER = self.ER_from_record(E21_41_ROC)
 
         empty_sd_source = SymbolicDataset()
@@ -1585,7 +1585,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         E21_41_ROC.save()
         self.doublet_DS.created_by = E21_41_ROC
         self.doublet_DS.save()
-        self.assertEquals(E21_41_ROC.clean(), None)
+        self.assertIsNone(E21_41_ROC.clean())
 
         # Bad case: non-trivial top-level cable, no data is associated.
         self.doublet_DS.created_by = None
