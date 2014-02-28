@@ -124,10 +124,16 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
         LOGGER.debug("Checking custom constraints on column {}".format(col))
         result = columns[col-1].check_custom_constraint(column_paths[col],
                 column_files[col].name, content_check_log)
-        for cell, error in result.items():
-            if cell[0] > num_rows:
-                raise ValueError(('Verification method for {} "{}" indicated an error in row {}, but only {} rows '
-                                  'were checked').format(columns[col-1].__class__, columns[col-1], cell[0], num_rows))
+        for row, error in result.items():
+            if row > num_rows:
+                if columns[col-1].__class__.__name__ == "Datatype":
+                    datatype = columns[col-1]
+                else:
+                    datatype = columns[col-1].datatype
+
+                raise ValueError('Verification method for Datatype "{}" indicated an error in row {}, but only {} rows '
+                                 'were checked'.format(datatype, row, num_rows))
+            cell = (row, col)
             if cell in failing_cells:
                 failing_cells[cell].extend(error)
             else:
@@ -272,6 +278,20 @@ class Datatype(models.Model):
             return False
         return None
 
+    @staticmethod
+    def parse_numeric(string):
+        """
+        Parse a string as a number, returning an integer if it looks
+        like one, otherwise a float.
+        """
+        try:
+            return int(string)
+        except ValueError:
+            try:
+                return float(string)
+            except ValueError:
+                return None
+
     def has_restriction(self):
         """
         Does this Datatype restrict any others? Note that a Datatype is
@@ -364,10 +384,7 @@ class Datatype(models.Model):
         numeric = BC_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL)
 
         # Default values. If numeric, min -oo and max oo. If not, min 0, max oo.
-        allowed_min = -float("inf") if numeric else 0
-        allowed_max = float("inf")
-        effective_val = min_or_max(allowed_max, allowed_min)
-        builtin_type_pk = self.get_builtin_type().pk
+        effective_val = min_or_max(float("inf"), -float("inf") if numeric else 0)
 
         # If it's a length constraint on a number, or a value constraint
         # on not a number, the effective constraint is None. Arguably,
@@ -376,8 +393,8 @@ class Datatype(models.Model):
         if (numeric and self.is_numeric()) or (not numeric and self.is_string()):
             my_BC = self.basic_constraints.filter(ruletype=BC_type)
             if my_BC.exists():
-                effective_val = float(my_BC.first().rule)
                 effective_BC = my_BC.first()
+                effective_val = Datatype.parse_numeric(my_BC.first().rule)
 
             else:
                 # If this instance has no supertypes, we don't touch
@@ -545,7 +562,7 @@ class Datatype(models.Model):
         if not my_constraint.exists():
             return
 
-        my_value = float(my_constraint.first().rule)
+        my_value = Datatype.parse_numeric(my_constraint.first().rule)
         # TODO: duplicated. Maybe pass in min/max as a parameter?
         min_or_max = min if constraint in (BasicConstraint.MIN_VAL, BasicConstraint.MIN_LENGTH) else max
 
@@ -669,9 +686,9 @@ class Datatype(models.Model):
                 if valid and (rownum, 1) in failing_cells:
                     raise ValidationError(('The prototype for Datatype "{}" indicates the value "{}" should be '
                                            'valid, but it failed constraints').format(self, row[0]))
-                elif (rownum, 1) not in failing_cells:
-                    raise ValidationError(('The prototype for Datatype "{}" indicates the value "{}" should be '
-                                           'invalid, but it passed all constraints').format(self, row[0]))
+                elif not valid and (rownum, 1) not in failing_cells:
+                    raise ValidationError('The prototype for Datatype "{}" indicates the value "{}" should be '
+                                          'invalid, but it passed all constraints'.format(self, row[0]))
 
     def clean(self):
         """
@@ -741,10 +758,10 @@ class Datatype(models.Model):
         BasicConstraints for this Datatype are applied.
         """
         ####
-        # First, determine what Shipyard atomic datatypes this restricts.
-        # Then, check it against any type-specific BasicConstraints
-        # (MIN|MAX_LENGTH or DATETIMEFORMAT for strings,
-        # MIN|MAX_VAL for numerical types).
+        # First, determine what Shipyard atomic datatypes this
+        # restricts.  Then, check it against any type-specific
+        # BasicConstraints (MIN|MAX_LENGTH or DATETIMEFORMAT for
+        # strings, MIN|MAX_VAL for numerical types).
 
         constraints_failed = []
         if self.is_string():
@@ -966,8 +983,8 @@ class BasicConstraint(models.Model):
            and not 'FLOAT', 'INT', or 'BOOL'
         """
         if not self.datatype.is_complete():
-            raise ValidationError(('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
-                                   .format(self.datatype, self)))
+            raise ValidationError('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
+                                  .format(self.datatype, self))
 
         error_msg = ""
         is_error = False
@@ -976,43 +993,44 @@ class BasicConstraint(models.Model):
         if self.ruletype in (BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
             # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
             if not self.datatype.is_string():
-                raise ValidationError((('BasicConstraint "{}" specifies a bound on string length, '
-                                        'but its parent Datatype "{}" is numeric or Boolean')
-                                        .format(self, self.datatype)))
+                raise ValidationError('BasicConstraint "{}" specifies a bound on string length, '
+                                      'but its parent Datatype "{}" has builtin type {}'
+                                      .format(self, self.datatype, self.datatype.get_builtin_type()))
             try:
                 length_constraint = int(self.rule)
             except ValueError:
-                raise ValidationError(('BasicConstraint "{}" specifies a bound of "{}" on string length, '
-                                       'which is not an integer').format(self, self.rule))
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                      'which is not an integer'.format(self, self.rule))
 
             if length_constraint < 1:
-                raise ValidationError(('BasicConstraint "{}" specifies a bound of "{}" on string length, '
-                                       'which is not positive').format(self, self.rule))
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                      'which is not positive'.format(self, self.rule))
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, BasicConstraint.MIN_VAL):
             # This should not apply to a non-numeric.
             if not self.datatype.is_numeric():
-                raise ValidationError(('BasicConstraint "{}" specifies a bound on numeric value, '
-                                       'but Datatype "{}" is not a number'.format(self, self.datatype)))
+                raise ValidationError('BasicConstraint "{}" specifies a bound on numeric value, '
+                                      'but its parent Datatype "{}" has builtin type {}'
+                                      .format(self, self.datatype, self.datatype.get_builtin_type()))
 
             try:
                 val_bound = float(self.rule)
             except ValueError:
-                raise ValidationError(('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
-                                       'which is not a number').format(self, self.rule))
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                      'which is not a number'.format(self, self.rule))
 
         elif self.ruletype == BasicConstraint.REGEXP:
             try:
                 re.compile(self.rule)
             except re.error:
-                raise ValidationError(('BasicConstraint "{}" specifies an invalid regular expression "{}"'
-                                       .format(self, self.rule)))
+                raise ValidationError('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                      .format(self, self.rule))
 
         # This should not apply to a boolean or a numeric.
         elif self.ruletype == BasicConstraint.DATETIMEFORMAT and not self.datatype.is_string():
-            raise ValidationError((('BasicConstraint "{}" specifies a date/time format, but its parent Datatype "{}" '
-                                    'has builtin type "{}"')
-                                    .format(self, self.datatype, self.datatype.get_builtin_type())))
+            raise ValidationError('BasicConstraint "{}" specifies a date/time format, but its parent Datatype "{}" '
+                                  'has builtin type "{}"'
+                                  .format(self, self.datatype, self.datatype.get_builtin_type()))
                 
 
 class CustomConstraint(models.Model):
@@ -1075,7 +1093,6 @@ class CompoundDatatypeMember(models.Model):
     Related to :model:`archive.models.Dataset`
     Related to :model:`metadata.models.CompoundDatatype`
     """
-
     compounddatatype = models.ForeignKey("CompoundDatatype", related_name="members",
         help_text="Links this DataType member to a particular CompoundDataType")
 
@@ -1107,20 +1124,13 @@ class CompoundDatatypeMember(models.Model):
         """
         return self.datatype.has_custom_constraint()
 
-    def check_custom_constraint(self, summary_path, input_path, num_rows, content_check_log):
+    def check_custom_constraint(self, summary_path, input_path, content_check_log):
         """
         Exactly the same as Datatype.check_custom_constraint(), except
-        we create a VerificationLog, and the failing_cells are indexed
-        by (row, column) instead of by row.
+        we create a VerificationLog.
         """
-        verif_log = VerificationLog(contentchecklog=content_check_log, CDTM=self)
-        colnum = self.column_idx
-        failing_rows = self.datatype.check_custom_constraint(summary_path, input_path, num_rows,
-                verif_log)
-        failing_cells = {}
-        for row, error in failing_rows.items():
-            failing_cells[(row, colnum)] = error
-        return failing_cells
+        verif_log = content_check_log.verification_logs.create(CDTM=self)
+        return self.datatype.check_custom_constraint(summary_path, input_path, verif_log)
 
     def check_basic_constraints(self, value):
         """
@@ -1222,14 +1232,14 @@ class CompoundDatatype(models.Model):
         # consecutive starting from one, we can go through all of this
         # CDT's members and look for the matching one.
         for member in self.members.all():
-            counterpart = other_CDT.members.get(column_idx=member.column_idx, column_name=member.column_name)
-            if not (counterpart and member.datatype.is_restriction(counterpart.datatype)):
+            try:
+                counterpart = other_CDT.members.get(column_idx=member.column_idx, column_name=member.column_name)
+                if not member.datatype.is_restriction(counterpart.datatype):
+                    return False
+            except CompoundDatatypeMember.DoesNotExist:
                 return False
-        
-        # Having reached this point, this CDT must be a restriction
-        # of other_CDT.
         return True
-
+        
     def is_identical(self, other_CDT):
         """
         True if this CDT is identical with its parameter; False otherwise.
@@ -1239,7 +1249,9 @@ class CompoundDatatype(models.Model):
 
         PRE: this CDT and other_CDT are clean.
         """
-        return (self.is_restriction(other_CDT) and other_CDT.is_restriction(self))
+        my_col_names = [m.column_name for m in self.members.order_by("column_idx")]
+        other_col_names = [m.column_name for m in other_CDT.members.order_by("column_idx")]
+        return my_col_names == other_col_names and self.is_restriction(other_CDT) and other_CDT.is_restriction(self)
 
     def _check_header(self, header):
         """

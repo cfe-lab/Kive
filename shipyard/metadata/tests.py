@@ -134,12 +134,9 @@ class MetadataTestSetup(TestCase):
 
         self.triplet_cdt = CompoundDatatype()
         self.triplet_cdt.save()
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="a", column_idx=1)
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="b", column_idx=2)
-        self.triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="c", column_idx=3)
+        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="a", column_idx=1)
+        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="b", column_idx=2)
+        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="c", column_idx=3)
 
         ####
         # This next bit is used for pipeline.tests.
@@ -147,38 +144,22 @@ class MetadataTestSetup(TestCase):
         # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
         self.triplet_squares_cdt = CompoundDatatype()
         self.triplet_squares_cdt.save()
-        self.triplet_squares_cdt.members.create(
-            datatype=self.string_dt, column_name="a^2",
-            column_idx=1)
-        self.triplet_squares_cdt.members.create(
-            datatype=self.string_dt, column_name="b^2",
-            column_idx=2)
-        self.triplet_squares_cdt.members.create(
-            datatype=self.string_dt, column_name="c^2",
-            column_idx=3)
+        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="a^2", column_idx=1)
+        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="b^2", column_idx=2)
+        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="c^2", column_idx=3)
 
         # A CDT with mixed Datatypes
         self.mix_triplet_cdt = CompoundDatatype()
         self.mix_triplet_cdt.save()
-        self.mix_triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="StrCol1",
-            column_idx=1)
-        self.mix_triplet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="DNACol2",
-            column_idx=2)
-        self.mix_triplet_cdt.members.create(
-            datatype=self.string_dt, column_name="StrCol3",
-            column_idx=3)
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt, column_name="StrCol1", column_idx=1)
+        self.mix_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="DNACol2", column_idx=2)
+        self.mix_triplet_cdt.members.create(datatype=self.string_dt, column_name="StrCol3", column_idx=3)
 
         # Define CDT "doublet_cdt" with 2 members for use as an input/output
         self.doublet_cdt = CompoundDatatype()
         self.doublet_cdt.save()
-        self.doublet_cdt.members.create(
-            datatype=self.string_dt, column_name="x",
-            column_idx=1)
-        self.doublet_cdt.members.create(
-            datatype=self.string_dt, column_name="y",
-            column_idx=2)
+        self.doublet_cdt.members.create(datatype=self.string_dt, column_name="x", column_idx=1)
+        self.doublet_cdt.members.create(datatype=self.string_dt, column_name="y", column_idx=2)
 
         #### 
         # Stuff from this point on is used in librarian and archive
@@ -187,19 +168,14 @@ class MetadataTestSetup(TestCase):
         # October 15: more CDTs.
         self.DNA_triplet_cdt = CompoundDatatype()
         self.DNA_triplet_cdt.save()
-        self.DNA_triplet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="a", column_idx=1)
-        self.DNA_triplet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="b", column_idx=2)
-        self.DNA_triplet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="c", column_idx=3)
+        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="a", column_idx=1)
+        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="b", column_idx=2)
+        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="c", column_idx=3)
 
         self.DNA_doublet_cdt = CompoundDatatype()
         self.DNA_doublet_cdt.save()
-        self.DNA_doublet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="x", column_idx=1)
-        self.DNA_doublet_cdt.members.create(
-            datatype=self.DNA_dt, column_name="y", column_idx=2)
+        self.DNA_doublet_cdt.members.create(datatype=self.DNA_dt, column_name="x", column_idx=1)
+        self.DNA_doublet_cdt.members.create(datatype=self.DNA_dt, column_name="y", column_idx=2)
 
         # Define a user.  This was previously in librarian/tests.py,
         # but we put it here now so all tests can use it.
@@ -808,9 +784,10 @@ class DatatypeTests(MetadataTestSetup):
                                                       description="Prototype that is raw")
 
         self.DNA_dt.prototype = DNA_raw_prototype.dataset
-
+        PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         self.assertRaisesRegexp(ValidationError, 
-                                re.escape('Prototype Dataset for Datatype "{}" is raw'.format(self.DNA_dt)),
+                                re.escape('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
+                                          'but it is raw'.format(self.DNA_dt, PROTOTYPE_CDT)),
                                 self.DNA_dt.clean)
 
     def test_clean_prototype_wrong_CDT_bad(self):
@@ -941,17 +918,18 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
 
-        count = 0
+        counts = {}
         for curr_ruletype, curr_rule in rules:
-            if curr_ruletype == multiple_BC_type:
-                count += 1
+            try:
+                counts[curr_ruletype] += 1
+                bad_ruletype = curr_ruletype
+            except KeyError:
+                counts[curr_ruletype] = 1
             constr_DT.basic_constraints.create(ruletype=curr_ruletype, rule="{}".format(curr_rule))
-
-        err_msg_key = "DT_several_same_constraint"
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" has {} constraints of type {}, but should have at most one'
-                                           .format(constr_DT, count, multiple_BC_type))),
+                                           .format(constr_DT, counts[bad_ruletype], bad_ruletype))),
                                 constr_DT.clean)
 
     def test_clean_int_multiple_min_val_bad(self):
@@ -1152,7 +1130,7 @@ class DatatypeTests(MetadataTestSetup):
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
-                                           'it, but it has {}'.format(constr_DT, 2))),
+                                           'it, but it has {}'.format(constr_DT, 3))),
                                 constr_DT.clean)
 
     def test_clean_dtf_several_supertypes_one_has_dtf_bad(self):
@@ -1200,8 +1178,8 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on an int Datatype with conflicting MIN|MAX_VAL defined on its supertypes.
         """
-        self._setup_inheriting_datatype2("BoundedDT", "Float with a MIN_VAL", BasicConstraint.MIN_VAL, "20", self.FLOAT,
-                "BoundedDT", "Int with a MAX_VAL", BasicConstraint.MAX_VAL, "18.2", self.INT,
+        _, _, constr_DT = self._setup_inheriting_datatype2("BoundedDT", "Float with a MIN_VAL", BasicConstraint.MIN_VAL,
+                "20", self.FLOAT, "BoundedDT", "Int with a MAX_VAL", BasicConstraint.MAX_VAL, "18.2", self.INT,
                 "InheritingBadBoundsDT", "Datatype inheriting conflicting MIN|MAX_VAL", None, None)
 
         self.assertRaisesRegexp(ValidationError,
@@ -1317,7 +1295,7 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="6")
 
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
                                            .format(constr_DT, 2234, 6))),
                                 constr_DT.clean)
 
@@ -1368,7 +1346,7 @@ class DatatypeTests(MetadataTestSetup):
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
-                                           .format(constr_DT, 20, 30))),
+                                           .format(constr_DT, 30, 20))),
                                 constr_DT.clean)
 
     # FIXME: add some tests here when CustomConstraints are fully-coded.
@@ -1516,7 +1494,7 @@ class DatatypeTests(MetadataTestSetup):
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective '
-                                          'MAX_LENGTH {}').format(costr_DT)),
+                                          'MAX_LENGTH {}').format(constr_DT, 44, 22)),
                                 constr_DT.complete_clean)
 
 class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
@@ -2417,114 +2395,41 @@ class CompoundDatatypeTests(MetadataTestSetup):
                                 "{'column_name': \[u'This field cannot be blank.'\]}",
                                 cdt.clean)
 
-    # The following tests were previously tests on
-    # DatasetStructure.clean(), but now they must be adapted as
-    # tests on summarize_CSV.
+    def test_create_SD_raw(self):
+        """
+        Creating a raw SD should pass clean
+        """
+        path = os.path.join(samplecode_path, "doublet_cdt.csv")
+        raw_SD = SymbolicDataset.create_SD(path, make_dataset=True, user=self.myUser, name="something",
+                description="desc")
+        self.assertEqual(raw_SD.clean(), None)
+        self.assertEqual(raw_SD.dataset.clean(), None)
 
-    # def test_clean_must_be_coherent_with_structure_if_applicable(self):
-    #     # Valid dataset - raw (No structure defined)
-    #     self.doublet_symDS = SymbolicDataset()
-    #     self.doublet_symDS.save()
-    #     self.doublet_DS = None
-    #     with open(os.path.join(samplecode_path, "doublet_cdt.csv"), "rb") as f:
-    #         self.doublet_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_symDS)
-    #         self.doublet_DS.save()
-    #     self.assertEqual(self.doublet_DS.clean(), None)
+    def test_create_SD_valid(self):
+        """
+        Creating an SD with a CDT, where the file conforms, should be OK.
+        """
+        path = os.path.join(samplecode_path, "doublet_cdt.csv")
+        doublet_SD = SymbolicDataset.create_SD(path, cdt=self.doublet_cdt, make_dataset=True, user=self.myUser,
+                name="something", description="desc")
+        self.assertEqual(doublet_SD.clean(), None)
+        self.assertEqual(doublet_SD.structure.clean(), None)
+        self.assertEqual(doublet_SD.dataset.clean(), None)
 
-    #     # Valid dataset - doublet
-    #     self.doublet_DS_structure_valid = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.doublet_cdt)
-    #     self.doublet_DS_structure_valid.save()
-    #     self.assertEqual(self.doublet_DS.clean(), None)
-    #     self.assertEqual(self.doublet_DS_structure_valid.clean(), None)
-    #     self.doublet_DS_structure_valid.delete()
+    def test_create_SD_bad_num_cols(self):
+        # Define a dataset, but with the wrong number of headers
+        path = os.path.join(samplecode_path, "step_0_triplet_3_rows.csv")
+        self.assertRaisesRegexp(ValueError,
+                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                          .format(path, self.doublet_cdt)),
+                lambda: SymbolicDataset.create_SD(path, cdt=self.doublet_cdt, user=self.myUser, name="DS1",
+                    description="DS1 desc"))
 
-    #     # Invalid: Wrong number of columns
-    #     self.doublet_DS_structure = DatasetStructure(dataset=self.doublet_DS,compounddatatype=self.triplet_cdt)
-    #     self.doublet_DS_structure.save()
-    #     errorMessage = "Dataset \".*\" does not have the same number of columns as its CDT"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_DS.clean)
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_DS_structure.clean)
-        
-    #     # Invalid: Incorrect column header
-    #     self.doublet_wrong_header_symDS = SymbolicDataset()
-    #     self.doublet_wrong_header_symDS.save()
-    #     self.doublet_wrong_header_DS = None
-    #     with open(os.path.join(samplecode_path, "doublet_cdt_incorrect_header.csv"), "rb") as f:
-    #         self.doublet_wrong_header_DS = Dataset(user=self.myUser,name="doublet",description="lol",dataset_file=File(f),symbolicdataset=self.doublet_wrong_header_symDS)
-    #         self.doublet_wrong_header_DS.save()
-    #     self.doublet_wrong_header_DS_structure = DatasetStructure(dataset=self.doublet_wrong_header_DS,compounddatatype=self.doublet_cdt)
-    #     errorMessage = "Column .* of Dataset \".*\" is named .*, not .* as specified by its CDT"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_wrong_header_DS.clean)
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, self.doublet_wrong_header_DS_structure.clean)
-    
-    # def test_clean_check_CSV(self):
-
-    #     # triplet_DS has CSV format conforming to it's CDT
-    #     self.triplet_symDS.structure.clean()
-
-    #     # Define a dataset, but with the wrong number of headers
-    #     symDS = SymbolicDataset()
-    #     symDS.save()
-    #     DS1 = None
-    #     with open(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), "rb") as f:
-    #         DS1 = Dataset(user=self.myUser,name="DS1",description="DS1 desc",dataset_file=File(f),symbolicdataset=symDS)
-    #         DS1.save()
-    #     structure = DatasetStructure(dataset=DS1,compounddatatype=self.doublet_cdt)
-
-    #     errorMessage = "Dataset \".*\" does not have the same number of columns as its CDT"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, structure.clean)
-
-    #     # Define a dataset with the right number of header columns, but the wrong column names
-    #     symDS2 = SymbolicDataset()
-    #     symDS2.save()
-    #     DS2 = None
-    #     with open(os.path.join(samplecode_path, "three_random_columns.csv"), "rb") as f:
-    #         DS2 = Dataset(user=self.myUser,name="DS2",description="DS2 desc",dataset_file=File(f),symbolicdataset=symDS2)
-    #         DS2.save()
-    #     structure2 = DatasetStructure(dataset=DS2,compounddatatype=self.triplet_cdt)
-
-    #     errorMessage = "Column 1 of Dataset \".*\" is named .*, not .* as specified by its CDT"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage, structure2.clean)
-
-
-
-    # def test_dataset_clean_incorrect_number_of_CSV_header_fields_bad(self):
-
-    #     uploaded_sd = SymbolicDataset.create_SD(
-    #         os.path.join(samplecode_path, "script_2_output_2.csv"),
-    #         self.triplet_cdt,
-    #         make_dataset=False)
-            
-    #     new_structure = uploaded_sd.structure
-
-    #     # Attach a file with the wrong number of columns.
-    #     uploaded_dataset = Dataset(
-    #         user=self.myUser,name="uploaded_dataset",
-    #         description="hehe",
-    #         symbolicdataset=uploaded_sd)
-    #     with open(os.path.join(samplecode_path, "script_2_output_2.csv"), "rb") as f:
-    #         uploaded_dataset.dataset_file.save("script_2_output_2.csv", File(f))
-    #         uploaded_dataset.save()
-
-    #     errorMessage = "Dataset .* does not have the same number of columns as its CDT"
-    #     self.assertRaisesRegexp(
-    #         ValidationError, errorMessage,
-    #         new_structure.clean)
-
-    # def test_dataset_clean_correct_number_of_CSV_header_fields_but_incorrect_contents_bad(self):
-
-    #     uploaded_sd = SymbolicDataset()
-    #     uploaded_sd.save()
-    #     uploaded_dataset = None
-    #     with open(os.path.join(samplecode_path, "three_random_columns.csv"), "rb") as f:
-    #         uploaded_dataset = Dataset(
-    #             user=self.myUser,name="uploaded_raw_dataset",
-    #             description="hehe",dataset_file=File(f),
-    #             symbolicdataset=uploaded_sd)
-    #         uploaded_dataset.save()
-    #     new_structure = DatasetStructure(dataset=uploaded_dataset,
-    #                                      compounddatatype=self.triplet_cdt)
-    #     new_structure.save()
-
-    #     errorMessage = "Column .* of Dataset .* is named .*, not .* as specified by its CDT"
-    #     self.assertRaisesRegexp(ValidationError,errorMessage,uploaded_dataset.clean)
+    def test_create_SD_bad_col_names(self):
+        # Define a dataset with the right number of header columns, but the wrong column names
+        path = os.path.join(samplecode_path, "three_random_columns.csv")
+        self.assertRaisesRegexp(ValueError,
+                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                          .format(path, self.triplet_cdt)),
+                lambda: SymbolicDataset.create_SD(path, cdt=self.triplet_cdt, user=self.myUser, name="DS1",
+                    description="DS1 desc"))

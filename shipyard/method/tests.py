@@ -14,7 +14,7 @@ import tempfile
 from method.models import *
 from metadata.models import *
 import metadata.tests
-from constants import error_messages, datatypes
+from constants import datatypes
 
 logging.getLogger().setLevel(10) # Debug messages
 
@@ -1995,8 +1995,9 @@ class MethodTests(MethodTestSetup):
             dataset_name = "input",
             dataset_idx = 1);
         self.assertRaisesRegexp(ValidationError,
-            error_messages["driver_metapackage"].format(".*", ".*"),
-            m.clean)
+                                re.escape('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it '
+                                          'has no content file.'.format(m, rev)),
+                                m.clean)
 
     def test_run_code_nooutput(self):
         """
