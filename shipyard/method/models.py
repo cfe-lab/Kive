@@ -34,20 +34,21 @@ class CodeResource(models.Model):
     # contains a slash. They can't start or end with spaces.
     filename = models.CharField("Resource file name", max_length=255, help_text="The filename for this resource",
                                 blank=True, validators=[
-                                    RegexValidator(re.compile("^(\b|([-_.()\w]+ *)*[-_.()\w]+)$"))
+                                    RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
+                                                   message="Invalid code resource filename"),
                                 ])
 
     description = models.TextField("Resource description")
 
-    def count_revisions(self):
+    @property
+    def num_revisions(self):
         """
         Number of revisions associated with this CodeResource.
         """
         return CodeResourceRevision.objects.filter(coderesource=self).count()
 
-    num_revisions = property(count_revisions)
-
-    def get_last_revision_date(self):
+    @property
+    def last_revision_date(self):
         """
         Date of most recent revision to this CodeResource.
         """
@@ -57,8 +58,6 @@ class CodeResource(models.Model):
         revision_dates = [revision.revision_DateTime for revision in revisions]
         revision_dates.sort() # ascending order
         return revision_dates[0]
-
-    last_revision_date = property(get_last_revision_date)
 
     def get_absolute_url(self):
         return '/resources/%i' % self.id
