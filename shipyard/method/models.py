@@ -436,8 +436,8 @@ class Method(transformation.models.Transformation):
         """
         super(Method, self).clean()
         if not self.driver.content_file:
-            raise ValidationError(error_messages["driver_metapackage"].
-                format(self, self.driver))
+            raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
+                                  'content file.'.format(self, self.driver))
 
     def save(self, *args, **kwargs):
         """
@@ -641,9 +641,9 @@ class Method(transformation.models.Transformation):
         3) We don't handle exceptions of Popen here, the caller must do that.
         """
         if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
-            raise ValueError(
-                error_messages["method_bad_inputcount"].
-                format(self, self.inputs.count(), self.outputs.count(), len(input_paths), len(output_paths)))
+            raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
+                             .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
+                                     len(output_paths)))
 
         self.logger.debug("Checking run_path exists: {}".format(run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
@@ -660,7 +660,7 @@ class Method(transformation.models.Transformation):
             if not can_create:
                 raise ValueError(reason)
 
-        self.logger.debug("Installing CRR driver to FS: {}".format(self.driver))
+        self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
         self.driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff

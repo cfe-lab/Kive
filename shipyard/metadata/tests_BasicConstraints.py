@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from metadata.models import *
 from method.models import CodeResourceRevision
 
-from constants import datatypes, error_messages
+from constants import datatypes
 
 class BasicConstraintTestSetup(TestCase):
 
@@ -108,12 +108,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.INT, BasicConstraint.MIN_VAL, "foo")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr.clean)
 
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr_DT.clean)
 
     def test_clean_max_val_int_bad(self):
@@ -124,12 +126,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.INT, BasicConstraint.MAX_VAL, "foo")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr.clean)
 
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr_DT.clean)
 
     def test_clean_min_val_float_bad(self):
@@ -140,12 +144,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.FLOAT, BasicConstraint.MIN_VAL, "foo")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr.clean)
 
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr_DT.clean)
 
     def test_clean_max_val_float_bad(self):
@@ -156,12 +162,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.FLOAT, BasicConstraint.MAX_VAL, "foo")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr.clean)
 
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr_DT.clean)
 
     def test_clean_min_val_str_bad(self):
@@ -172,11 +180,15 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.STR, BasicConstraint.MIN_VAL, "300")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.STR)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.STR)),
                                 constr_DT.clean)
 
 
@@ -188,11 +200,15 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.STR, BasicConstraint.MAX_VAL, "300")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.STR)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.STR)),
                                 constr_DT.clean)
 
 
@@ -204,11 +220,15 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.BOOL, BasicConstraint.MIN_VAL, "300")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr_DT.clean)
 
     def test_clean_max_val_bool_bad(self):
@@ -219,11 +239,15 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
             self.BOOL, BasicConstraint.MAX_VAL, "300")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_parent_non_numeric"].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on numeric value, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr_DT.clean)
 
     ########
@@ -241,11 +265,15 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         err_msg_key = "BC_length_constraint_on_non_string"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on string length, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, builtin_type)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on string length, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, builtin_type)),
                                 constr_DT.clean)
 
     def test_clean_min_length_int_bad(self):
@@ -299,11 +327,13 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         err_msg_key = "BC_length_constraint_non_integer"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_val),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not an integer'.format(constr, constr_val)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_val),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not an integer'.format(constr, constr_val)),
                                 constr_DT.clean)
 
     def test_clean_float_min_length_bad(self):
@@ -345,11 +375,13 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         err_msg_key = "BC_length_constraint_non_positive"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_val),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not positive'.format(constr, constr_val)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_val),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not positive'.format(constr, constr_val)),
                                 constr_DT.clean)
 
     def test_clean_min_length_non_positive_edge(self):
@@ -424,22 +456,20 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper to create bad REGEXP-constraint test cases.
         """
-        regexped_DT = Datatype(name="RegexpedDT",
-                               description="Datatype with bad REGEXP attached")
+        regexped_DT = Datatype(name="RegexpedDT", description="Datatype with bad REGEXP attached")
         regexped_DT.full_clean()
         regexped_DT.save()
         regexped_DT.restricts.add(builtin_type)
-        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
-                                                             rule="{}".format(pattern))
-
-        err_msg_key = "BC_bad_RE"
+        regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="{}".format(pattern))
 
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
+                                re.escape('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                          .format(regexp_constr, pattern)),
                                 regexp_constr.clean)
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
+                                re.escape('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                          .format(regexp_constr, pattern)),
                                 regexped_DT.clean)
 
     def test_clean_regexp_str_bad(self):
@@ -511,14 +541,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
                                               rule=format_string)
 
-        err_msg_key = "BC_datetimeformat_non_string"
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                re.escape('BasicConstraint "{}" specifies a date/time format, but its parent Datatype '
+                                          '"{}" has builtin type "{}"'.format(dtf, dtf_DT, builtin_type)),
                                 dtf.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                re.escape('BasicConstraint "{}" specifies a date/time format, but its parent Datatype '
+                                          '"{}" has builtin type "{}"'.format(dtf, dtf_DT, builtin_type)),
                                 dtf_DT.clean)
 
     def test_clean_dtf_float_bad(self):
@@ -548,17 +578,18 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         incomplete_DT.full_clean()
         incomplete_DT.save()
 
-        constr = incomplete_DT.basic_constraints.create(ruletype=BC_type,
-                                                        rule="{}".format(constr_val))
+        constr = incomplete_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
 
         err_msg_key = "BC_DT_not_complete"
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(incomplete_DT, constr),
+                                re.escape('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
+                                          .format(incomplete_DT, constr)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(incomplete_DT, constr),
+                                re.escape('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
+                                          .format(incomplete_DT, constr)),
                                 incomplete_DT.clean)
 
     def test_clean_incomplete_parent_regexp_bad(self):
@@ -636,12 +667,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="foo")
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr.clean)
 
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                error_messages["BC_val_constraint_rule_non_numeric"].format(constr, "foo"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                          'which is not a number'.format(constr, "foo")),
                                 constr_DT.clean)
 
     def test_clean_second_gen_min_length_bool_bad(self):
@@ -660,14 +693,16 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         constr_DT.restricts.add(parent_DT)
         constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="{}".format(12))
 
-        err_msg_key = "BC_length_constraint_on_non_string"
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on string length, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, constr_DT),
+                                re.escape('BasicConstraint "{}" specifies a bound on string length, '
+                                          'but its parent Datatype "{}" has builtin type {}'
+                                          .format(constr, constr_DT, self.BOOL)),
                                 constr_DT.clean)
 
     def test_clean_second_gen_str_max_length_bad(self):
@@ -686,14 +721,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         constr_DT.restricts.add(parent_DT)
         constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="bar")
 
-        err_msg_key = "BC_length_constraint_non_integer"
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, "bar"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not an integer'.format(constr, "bar")),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, "bar"),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not an integer'.format(constr, "bar")),
                                 constr_DT.clean)
 
     def test_clean_second_gen_min_length_non_positive_edge(self):
@@ -712,14 +747,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         constr_DT.restricts.add(parent_DT)
         constr = constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="{}".format(0))
 
-        err_msg_key = "BC_length_constraint_non_positive"
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, 0),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not positive'.format(constr, 0)),
                                 constr.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(constr, 0),
+                                re.escape('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                          'which is not positive'.format(constr, 0)),
                                 constr_DT.clean)
 
     def test_clean_second_gen_regexp_good(self):
@@ -788,14 +823,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         regexp_constr = regexped_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                              rule=pattern)
 
-        err_msg_key = "BC_bad_RE"
-
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
+                                re.escape('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                          .format(regexp_constr, pattern)),
                                 regexp_constr.clean)
         # Propagation check.
         self.assertRaisesRegexp(ValidationError,
-                                re.escape(error_messages[err_msg_key].format(regexp_constr, pattern)),
+                                re.escape('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                          .format(regexp_constr, pattern)),
                                 regexped_DT.clean)
 
     def test_clean_second_gen_dtf_good(self):
@@ -834,14 +869,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         dtf = dtf_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
                                               rule="%Y %b %d")
 
-        err_msg_key = "BC_datetimeformat_non_string"
-
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                re.escape('BasicConstraint "{}" specifies a date/time format, but its parent Datatype '
+                                          '"{}" has builtin type "{}"'.format(dtf, dtf_DT, self.FLOAT)),
                                 dtf.clean)
 
         self.assertRaisesRegexp(ValidationError,
-                                error_messages[err_msg_key].format(dtf, dtf_DT),
+                                re.escape('BasicConstraint "{}" specifies a date/time format, but its parent Datatype '
+                                          '"{}" has builtin type "{}"'.format(dtf, dtf_DT, self.FLOAT)),
                                 dtf_DT.clean)
 
 class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
