@@ -13,7 +13,7 @@ import os.path
 import time
 
 import file_access_utils
-from constants import error_messages, datatypes
+from constants import datatypes
 
 from archive.models import *
 from pipeline.models import *
@@ -231,11 +231,9 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         
         # October 15, 2013: SymbolicDatasets that go into and come out
         # of cable E01_21 and E21_41.
-        self.DNA_triplet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "DNA_triplet.csv"),
-            self.DNA_triplet_cdt,
-            user=self.myUser, name="DNA_triplet",
-            description="DNA triplet data")
+        self.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
+                                                           self.DNA_triplet_cdt, user=self.myUser, name="DNA_triplet", 
+                                                           description="DNA triplet data")
         self.DNA_triplet_symDS_structure = self.DNA_triplet_symDS.structure
         self.DNA_triplet_DS = self.DNA_triplet_symDS.dataset
 
@@ -338,11 +336,11 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         # Try to create a symbolic dataset.
         self.assertRaisesRegexp(ValueError,
-            re.escape(error_messages["bad_input_file"].format(data_file.name, self.cdt_record)),
-            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = "lab data", description = "patient sequences"))
-
+                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                          .format(data_file_name, self.cdt_record)),
+                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
+                                                                   user=self.myUser, name="lab data", 
+                                                                   description = "patient sequences"))
         os.remove(data_file.name)
 
     def test_empty_file(self):
@@ -354,10 +352,11 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         data_file.close()
 
         self.assertRaisesRegexp(ValueError,
-            re.escape(error_messages["bad_input_file"].format(file_path, self.cdt_record)),
-            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = "missing data", description = "oops!"))
+                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                          .format(file_path, self.cdt_record)),
+                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
+                                                                   user=self.myUser, name="missing data", 
+                                                                   description="oops!"))
 
     def test_too_many_columns(self):
         """
@@ -372,10 +371,12 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         data_file.close()
 
         self.assertRaisesRegexp(ValueError,
-            re.escape(error_messages["bad_input_file"].format(file_path, self.cdt_record)),
-            lambda : SymbolicDataset.create_SD(file_path = data_file.name,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = "bad data", description = "too many columns"))
+                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                          .format(data_file_name, self.cdt_record)),
+                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
+                                                                   user=self.myUser, name="bad data", 
+                                                                   description="too many columns"))
+        os.remove(data_file.name)
 
     def test_dataset_created(self):
         """
@@ -874,12 +875,8 @@ class ExecRecordTests(LibrarianTestSetup):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         outcable_ER = self.ER_from_record(outcable_ROC)
-        outcable_ERI = outcable_ER.execrecordins.create(
-            generic_input=self.D1_out,
-            symbolicdataset=self.C1_in_symDS)
-        outcable_ERO = outcable_ER.execrecordouts.create(
-            generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
+        outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, symbolicdataset=self.C1_in_symDS)
+        outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, symbolicdataset=self.E1_out_symDS)
 
         # Good case: the Datatypes are exactly those needed.
         self.assertEqual(outcable_ER.clean(), None)
@@ -896,18 +893,20 @@ class ExecRecordTests(LibrarianTestSetup):
         outcable_ERI.save()
         outcable_ERO.symbolicdataset = self.E21_41_DNA_doublet_symDS
         outcable_ERO.save()
-        self.assertEqual(outcable_ER.clean(), None)
+        self.assertIsNone(outcable_ER.clean())
 
         # Bad case: cable does some casting.
-        output_col1 = (self.E21_41_DNA_doublet_symDS.structure.compounddatatype.
-                       members.get(column_idx=1))
+        output_col1 = (self.E21_41_DNA_doublet_symDS.structure.compounddatatype.members.get(column_idx=1))
         output_col1.datatype = self.string_dt
         output_col1.save()
 
-        self.assertRaisesRegexp(
-            ValidationError,
-            error_messages["ER_cable_wiring_DT_mismatch"].format(".*", ".*"),
-            outcable_ER.clean)
+        source_datatype = outcable_ERI.symbolicdataset.structure.compounddatatype.members.get(column_idx=1).datatype
+        dest_datatype = output_col1.datatype
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecRecord "{}" represents a cable, but the Datatype of its destination '
+                                          'column, "{}", does not match the Datatype of its source column, "{}"'
+                                          .format(outcable_ER, dest_datatype, source_datatype)),
+                                outcable_ER.clean)
         
     def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
         """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
@@ -941,8 +940,11 @@ class ExecRecordTests(LibrarianTestSetup):
                        compounddatatype.members.get(column_idx=1))
         output_col1.datatype = self.string_dt
         output_col1.save()
+        source_datatype = cable_ERI.symbolicdataset.structure.compounddatatype.members.get(column_idx=1).datatype
+        dest_datatype = output_col1.datatype
 
-        self.assertRaisesRegexp(
-            ValidationError,
-            error_messages["ER_cable_wiring_DT_mismatch"].format(".*", ".*"),
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecRecord "{}" represents a cable, but the Datatype of its destination '
+                                          'column, "{}", does not match the Datatype of its source column, "{}"'
+                                          .format(cable_ER, dest_datatype, source_datatype)),
             cable_ER.clean)

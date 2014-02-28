@@ -10,6 +10,7 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.core.files import File
 from django.utils import timezone
 
@@ -23,46 +24,20 @@ import shutil
 
 class CodeResource(models.Model):
     """
-    A CodeResource is any file tracked by ShipYard.
+    A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
+    name = models.CharField( "Resource name", max_length=255, help_text="The name for this resource")
 
-    name = models.CharField(
-        "Resource name",
-        max_length=255,
-        help_text="The name for this resource");
+    # File names must either be empty, or be 1 or more of any from
+    # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
+    # contains a slash. They can't start or end with spaces.
+    filename = models.CharField("Resource file name", max_length=255, help_text="The filename for this resource",
+                                blank=True, validators=[
+                                    RegexValidator(re.compile("^(\b|([-_.()\w]+ *)*[-_.()\w]+)$"))
+                                ])
 
-    filename = models.CharField(
-        "Resource file name",
-        max_length=255,
-        help_text="The filename for this resource",
-        blank=True);
-
-    description = models.TextField("Resource description");
-
-    def isValidFileName(self):
-
-        # Code resources have no filenames if they are a meta-package of dependencies
-        if self.filename == "":
-            return True
-    
-        # File names cannot start with 1 or more spaces
-        if re.search("^\s+", self.filename):
-            return False
-
-        # Names cannot end with 1 or more trailing spaces
-        if re.search("\s+$", self.filename):
-            return False
-
-        # Names must be 1 or more of any from {alphanumeric, space, "-._()"}
-        # This will prevent "../" as it contains a slash
-        regex = "^[-_.() {}{}]+$".format(string.ascii_letters, string.digits)
-        if re.search(regex, self.filename):
-            pass
-        else:
-            return False
-
-        return True
+    description = models.TextField("Resource description")
 
     def count_revisions(self):
         """
@@ -87,19 +62,6 @@ class CodeResource(models.Model):
 
     def get_absolute_url(self):
         return '/resources/%i' % self.id
-
-    def clean(self):
-        """
-        CodeResource name must be valid.
-
-        It must not contain a leading space character or "..",
-        must not end in space, and be composed of letters,
-        numbers, dash, underscore, paranthesis, and space.
-        """
-        
-        if not self.isValidFileName():
-            raise ValidationError("Invalid code resource filename");
-
 
     def __unicode__(self):
         return self.name;
