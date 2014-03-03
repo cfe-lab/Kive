@@ -10,12 +10,12 @@ FIXME get all the models pointing at each other correctly!
 from django.db import models
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.core.files import File
 from django.utils import timezone
 
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
-from constants import error_messages
 
 import traceback
 import threading
@@ -24,56 +24,31 @@ import shutil
 
 class CodeResource(models.Model):
     """
-    A CodeResource is any file tracked by ShipYard.
+    A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
+    name = models.CharField( "Resource name", max_length=255, help_text="The name for this resource")
 
-    name = models.CharField(
-        "Resource name",
-        max_length=255,
-        help_text="The name for this resource");
+    # File names must either be empty, or be 1 or more of any from
+    # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
+    # contains a slash. They can't start or end with spaces.
+    filename = models.CharField("Resource file name", max_length=255, help_text="The filename for this resource",
+                                blank=True, validators=[
+                                    RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
+                                                   message="Invalid code resource filename"),
+                                ])
 
-    filename = models.CharField(
-        "Resource file name",
-        max_length=255,
-        help_text="The filename for this resource",
-        blank=True);
+    description = models.TextField("Resource description")
 
-    description = models.TextField("Resource description");
-
-    def isValidFileName(self):
-
-        # Code resources have no filenames if they are a meta-package of dependencies
-        if self.filename == "":
-            return True
-    
-        # File names cannot start with 1 or more spaces
-        if re.search("^\s+", self.filename):
-            return False
-
-        # Names cannot end with 1 or more trailing spaces
-        if re.search("\s+$", self.filename):
-            return False
-
-        # Names must be 1 or more of any from {alphanumeric, space, "-._()"}
-        # This will prevent "../" as it contains a slash
-        regex = "^[-_.() {}{}]+$".format(string.ascii_letters, string.digits)
-        if re.search(regex, self.filename):
-            pass
-        else:
-            return False
-
-        return True
-
-    def count_revisions(self):
+    @property
+    def num_revisions(self):
         """
         Number of revisions associated with this CodeResource.
         """
         return CodeResourceRevision.objects.filter(coderesource=self).count()
 
-    num_revisions = property(count_revisions)
-
-    def get_last_revision_date(self):
+    @property
+    def last_revision_date(self):
         """
         Date of most recent revision to this CodeResource.
         """
@@ -84,23 +59,8 @@ class CodeResource(models.Model):
         revision_dates.sort() # ascending order
         return revision_dates[0]
 
-    last_revision_date = property(get_last_revision_date)
-
     def get_absolute_url(self):
         return '/resources/%i' % self.id
-
-    def clean(self):
-        """
-        CodeResource name must be valid.
-
-        It must not contain a leading space character or "..",
-        must not end in space, and be composed of letters,
-        numbers, dash, underscore, paranthesis, and space.
-        """
-        
-        if not self.isValidFileName():
-            raise ValidationError("Invalid code resource filename");
-
 
     def __unicode__(self):
         return self.name;
@@ -437,8 +397,8 @@ class Method(transformation.models.Transformation):
         """
         super(Method, self).clean()
         if not self.driver.content_file:
-            raise ValidationError(error_messages["driver_metapackage"].
-                format(self, self.driver))
+            raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
+                                  'content file.'.format(self, self.driver))
 
     def save(self, *args, **kwargs):
         """
@@ -642,9 +602,9 @@ class Method(transformation.models.Transformation):
         3) We don't handle exceptions of Popen here, the caller must do that.
         """
         if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
-            raise ValueError(
-                error_messages["method_bad_inputcount"].
-                format(self, self.inputs.count(), self.outputs.count(), len(input_paths), len(output_paths)))
+            raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
+                             .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
+                                     len(output_paths)))
 
         self.logger.debug("Checking run_path exists: {}".format(run_path))
         file_access_utils.set_up_directory(run_path, tolerate=True)
@@ -661,7 +621,7 @@ class Method(transformation.models.Transformation):
             if not can_create:
                 raise ValueError(reason)
 
-        self.logger.debug("Installing CRR driver to FS: {}".format(self.driver))
+        self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
         self.driver.install(run_path)
 
         # At this point, run_path has all of the necessary stuff

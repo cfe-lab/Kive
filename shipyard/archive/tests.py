@@ -20,11 +20,23 @@ from metadata.models import *
 from pipeline.models import *
 from method.tests import samplecode_path
 import librarian.tests
-from constants import error_messages
 
 # Note that these tests use the exact same setup as librarian.
 
 class RunStepTests(librarian.tests.LibrarianTestSetup):
+
+    def test_runstep_many_execlogs(self):
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        run_step = self.step_E1.pipelinestep_instances.create(run=run)
+        run_step.reused = False
+        for i in range(2):
+            run_step.log.create(start_time=timezone.now(),
+                                end_time=timezone.now())
+        self.assertRaisesRegexp(ValidationError,
+                re.escape('RunStep "{}" has {} ExecLogs but should have only one'.
+                          format(run_step, 2)),
+                run_step.clean)
+
 
     def test_RunStep_clean(self):
         """Check coherence tests for RunStep at all stages of its creation."""
@@ -927,6 +939,20 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
 class RunSICTests(librarian.tests.LibrarianTestSetup):
 
+    def test_RSIC_many_execlogs(self):
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        runstep = self.pE.steps.first().pipelinestep_instances.create(run=run)
+        cable = self.pE.steps.first().cables_in.first()
+        rsic = cable.psic_instances.create(runstep=runstep)
+        rsic.reused = False
+        for i in range(2):
+            rsic.log.create(start_time=timezone.now(),
+                            end_time=timezone.now())
+        self.assertRaisesRegexp(ValidationError,
+                'RunSIC "{}" has {} ExecLogs but should have only one'.
+                        format(rsic, 2),
+                rsic.clean)
+
     def test_RSIC_clean_early(self):
         """Checks coherence of a RunSIC up to the point at which reused is set."""
         # Define some infrastructure.
@@ -1220,6 +1246,18 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         
 class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
 
+    def test_ROC_many_execlogs(self):
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        run_output_cable = self.E31_42.poc_instances.create(run=run)
+        run_output_cable.reused = False
+        for i in range(2):
+            run_output_cable.log.create(start_time=timezone.now(),
+                                        end_time=timezone.now())
+        self.assertRaisesRegexp(ValidationError,
+                'RunOutputCable "{}" has {} ExecLogs but should have only one'.
+                        format(run_output_cable, 2),
+                run_output_cable.clean)
+
     def test_ROC_clean(self):
         """Checks coherence of a RunOutputCable at all stages of its creation."""
         # Define a run for pE so that this ROC has something to belong to.
@@ -1229,7 +1267,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         E31_42_ROC = self.E31_42.poc_instances.create(run=pE_run)
 
         # Good case: POC belongs to the parent run's Pipeline.
-        self.assertEquals(E31_42_ROC.clean(), None)
+        self.assertIsNone(E31_42_ROC.clean())
 
         # Bad case: POC belongs to another Pipeline.
         pD_run = self.pD.pipeline_instances.create(user=self.myUser)
@@ -1356,6 +1394,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
                                     generic_output=self.A1_out)
 
         # Create an execrecord for another of the POCs.
+        E21_41_ROC.log.clear()
         E21_41_ER = self.ER_from_record(E21_41_ROC)
 
         empty_sd_source = SymbolicDataset()
@@ -1546,7 +1585,7 @@ class RunOutputCableTests(librarian.tests.LibrarianTestSetup):
         E21_41_ROC.save()
         self.doublet_DS.created_by = E21_41_ROC
         self.doublet_DS.save()
-        self.assertEquals(E21_41_ROC.clean(), None)
+        self.assertIsNone(E21_41_ROC.clean())
 
         # Bad case: non-trivial top-level cable, no data is associated.
         self.doublet_DS.created_by = None

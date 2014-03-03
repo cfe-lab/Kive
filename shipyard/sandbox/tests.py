@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 
 from django.core.files import File
 from django.contrib.auth.models import User
@@ -12,7 +14,7 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 
 from method.tests import samplecode_path
-from constants import error_messages, datatypes
+from constants import datatypes
 
 class ExecuteTests(TestCase):
 
@@ -228,10 +230,10 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_bad_inputcount"].format(".*", ".*", 0),
-            lambda: Sandbox(self.myUser, p, []))
+                                re.escape('Pipeline "{}" expects 1 inputs, but 0 were supplied'.format(p)),
+                                lambda: Sandbox(self.myUser, p, []))
 
     def test_sandbox_too_many_inputs(self):
         """
@@ -240,8 +242,8 @@ class SandboxTests(ExecuteTests):
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_bad_inputcount"].format(".*", 0, 1),
-            lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
+                                lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_correct_inputs(self):
         """
@@ -262,8 +264,9 @@ class SandboxTests(ExecuteTests):
         p.save()
         p.create_input(dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_expected_raw"].format(".*", 1, ".*"),
-            lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
+                                          'CompoundDatatype "{}"'.format(p, 1, self.symDS.structure.compounddatatype)),
+                                lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_nonraw_expected_raw_supplied(self):
         """
@@ -271,12 +274,13 @@ class SandboxTests(ExecuteTests):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
-        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         raw_symDS = SymbolicDataset()
         raw_symDS.save()
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_expected_nonraw"].format(".*", 1, ".*"),
-            lambda: Sandbox(self.myUser, p, [raw_symDS]))
+                                re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
+                                          .format(p, 1, self.pX_in_cdt)),
+                                lambda: Sandbox(self.myUser, p, [raw_symDS]))
 
     def test_sandbox_cdt_mismatch(self):
         """
@@ -287,7 +291,9 @@ class SandboxTests(ExecuteTests):
         p.save()
         p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_cdt_mismatch"].format(".*", 1, ".*", ".*"),
+                                re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one '
+                                          'with CompoundDatatype "{}"'
+                                          .format(p, 1, self.mA_in_cdt, self.symDS.structure.compounddatatype)),
             lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_too_many_rows(self):
@@ -300,7 +306,8 @@ class SandboxTests(ExecuteTests):
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 2, max_row = 4)
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_bad_numrows"].format(".*", 1, 2, 4, ".*"),
+                                re.escape('Pipeline "{}" expected input {} to have between {} and {} rows, but got one '
+                                'with {}'.format(p, 1, 2, 4, self.symDS.num_rows())),
             lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_too_few_rows(self):
@@ -313,5 +320,6 @@ class SandboxTests(ExecuteTests):
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 20)
         self.assertRaisesRegexp(ValueError,
-            error_messages["pipeline_bad_numrows"].format(".*", 1, 20, ".*", ".*"),
+                                re.escape('Pipeline "{}" expected input {} to have between {} and {} rows, but got one '
+                                'with {}'.format(p, 1, 20, sys.maxint, self.symDS.num_rows())),
             lambda: Sandbox(self.myUser, p, [self.symDS]))

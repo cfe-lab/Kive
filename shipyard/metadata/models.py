@@ -21,7 +21,7 @@ import tempfile
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import datatypes, CDTs, error_messages
+from constants import datatypes, CDTs
 from datachecking.models import VerificationLog
 
 import logging
@@ -49,13 +49,12 @@ def get_builtin_types(DTs):
         all_builtin_types.append(curr_DT.get_builtin_type())
     return set(all_builtin_types)
 
-
 def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     """
     SYNOPSIS
-    Inspect a CSV file, whose columns are expected to contain instances of
-    the provided datatypes. Report any deviations from the datatypes, as 
-    well as the number of rows and the header.
+    Inspect a CSV file, whose columns are expected to contain instances
+    of the provided datatypes. Report any deviations from the datatypes,
+    as well as the number of rows and the header.
 
     INPUTS
     columns             list of either Datatypes or CompoundDatatypeMembers 
@@ -80,15 +79,15 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     2) the file has the correct number of columns (ie. the same number as
     the length of the columns parameter).
     """
-    # A CSV reader which we will use to check individual 
-    # cells in the file, as well as creating external CSVs
-    # for columns whose DT has a CustomConstraint.
+    # A CSV reader which we will use to check individual cells in the
+    # file, as well as creating external CSVs for columns whose DT has a
+    # CustomConstraint.
     summary = {}
 
-    # If the header was malformed, just return the summary. We don't keep
-    # Check if any columns have CustomConstraints. We will use this lookup
-    # table while we're reading through the CSV file to see which columns
-    # need to be copied out into their own file.
+    # If the header was malformed, just return the summary. We don't
+    # keep Check if any columns have CustomConstraints. We will use this
+    # lookup table while we're reading through the CSV file to see which
+    # columns need to be copied out into their own file.
     cols_with_cc = [i for i, c in enumerate(columns, start=1) if c.has_custom_constraint()]
     column_files = dict.fromkeys(cols_with_cc) # files to write columns to
     column_paths = dict.fromkeys(cols_with_cc) # working directories to do checks in
@@ -98,8 +97,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     # the results of the verification method will be written.
     try:
         for column in cols_with_cc:
-            LOGGER.debug("Setting up verification path for column {}".
-                    format(column))
+            LOGGER.debug("Setting up verification path for column {}".format(column))
             column_test_path = os.path.join(summary_path, "col{}".format(column))
             input_file_path = _setup_verification_path(column_test_path)
             LOGGER.debug("Verification path was set up, column {} will be written to {}".
@@ -125,16 +123,25 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
         # so it's OK to pass it to Datatype.check_custom_constraint.
         LOGGER.debug("Checking custom constraints on column {}".format(col))
         result = columns[col-1].check_custom_constraint(column_paths[col],
-                column_files[col].name, num_rows, content_check_log)
-        for cell, error in result.items():
+                column_files[col].name, content_check_log)
+        for row, error in result.items():
+            if row > num_rows:
+                if columns[col-1].__class__.__name__ == "Datatype":
+                    datatype = columns[col-1]
+                else:
+                    datatype = columns[col-1].datatype
+
+                raise ValueError('Verification method for Datatype "{}" indicated an error in row {}, but only {} rows '
+                                 'were checked'.format(datatype, row, num_rows))
+            cell = (row, col)
             if cell in failing_cells:
                 failing_cells[cell].extend(error)
             else:
                 failing_cells[cell] = error
-    LOGGER.debug("{} cells failed constraints".format(len(failing_cells)))
 
     # If there are any failing cells, then add the dict to summary.
     if failing_cells:
+        LOGGER.debug("{} cells failed constraints".format(len(failing_cells)))
         summary["failing_cells"] = failing_cells
 
     return summary
@@ -227,44 +234,36 @@ class Datatype(models.Model):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`copperfish.CompoundDatatype`
     """
-    name = models.CharField( "Datatype name", max_length=64,
-        help_text="The name for this Datatype")
+    name = models.CharField( "Datatype name", max_length=64, help_text="The name for this Datatype")
+    description = models.TextField("Datatype description", help_text="A description for this Datatype")
 
     # auto_now_add: set to now on instantiation (editable=False)
-    date_created = models.DateTimeField("Date created",
-        auto_now_add=True, help_text="Date Datatype was defined")
+    date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date Datatype was defined")
 
-    description = models.TextField("Datatype description",
-        help_text="A description for this Datatype")
+    restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
+                                       help_text="Captures hierarchical is-a classifications among Datatypes")
 
-    # Admissible "Shipyard atomic" types.
-    INT = "int"
-    STR = "str"
-    FLOAT = "float"
-    BOOL = "bool"
-
-    restricts = models.ManyToManyField(
-        'self',
-        symmetrical=False,
-        related_name="restricted_by",
-        null=True,
-        blank=True,
-        help_text="Captures hierarchical is-a classifications among Datatypes")
-
-    def get_restricts (self):
+    def get_restricts(self):
         return ','.join([dt['name'] for dt in self.restricts.values()])
     restricts_str = property(get_restricts)
 
-    prototype = models.OneToOneField(
-        "archive.Dataset",
-        null=True,
-        blank=True,
-        related_name="datatype_modelled")
+    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled")
+    # TODO: related_name for custom_constraint?
+    custom_constraint = models.OneToOneField("metadata.CustomConstraint", null=True, blank=True)
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.effective_constraints = {}
+
+    def __str__(self):
+        return self.name
+
+    def __unicode__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return '/datatypes/{}'.format(self.id)
 
     @staticmethod
     def parse_boolean(string):
@@ -279,10 +278,61 @@ class Datatype(models.Model):
             return False
         return None
 
+    @staticmethod
+    def parse_numeric(string):
+        """
+        Parse a string as a number, returning an integer if it looks
+        like one, otherwise a float.
+        """
+        try:
+            return int(string)
+        except ValueError:
+            try:
+                return float(string)
+            except ValueError:
+                return None
+
+    def has_restriction(self):
+        """
+        Does this Datatype restrict any others? Note that a Datatype is
+        not complete if it has no restrictions. 
+        """
+        return hasattr(self, "restricts")
+
+    def has_prototype(self):
+        """
+        Does this Datatype have a prototype defined?
+        """
+        return self.prototype is not None
+
+    def has_basic_constraints(self):
+        """
+        Does this Datatype have any basic constraints?
+        """
+        return hasattr(self, "basic_constraints")
+
+    def has_custom_constraint(self):
+        """
+        Does this Datatype have a custom constraint?
+        """
+        return self.custom_constraint is not None
+
+    def is_numeric(self):
+        """
+        Does this Datatype restrict an INT or a FLOAT?
+        """
+        return self.get_builtin_type().pk in datatypes.NUMERIC_BUILTIN_PKS
+
+    def is_string(self):
+        """
+        Does this Datatype restrict a STR?
+        """
+        return self.get_builtin_type().pk == datatypes.STR_PK
+
     def is_restricted_by(self, possible_restrictor_datatype):
         """
-        Determine if this datatype is ever *properly* restricted, directly or indirectly,
-        by a given datatype.
+        Determine if this datatype is ever *properly* restricted,
+        directly or indirectly, by a given datatype.
         
         PRE: there is no circular restriction in the possible restrictor
         datatype (this would cause an infinite recursion).
@@ -304,8 +354,7 @@ class Datatype(models.Model):
         This induces a partial ordering A <= B if A is a restriction of B.
         For example, a DNA sequence is a restriction of a string.
         """
-        return (self == possible_restricted_datatype or
-                possible_restricted_datatype.is_restricted_by(self))
+        return (self == possible_restricted_datatype or possible_restricted_datatype.is_restricted_by(self))
 
     def get_effective_num_constraint(self, BC_type):
         """
@@ -334,37 +383,23 @@ class Datatype(models.Model):
         min_or_max = min if BC_type in (BasicConstraint.MIN_LENGTH, BasicConstraint.MIN_VAL) else max
         numeric = BC_type in (BasicConstraint.MIN_VAL, BasicConstraint.MAX_VAL)
 
-        effective_BC = None
         # Default values. If numeric, min -oo and max oo. If not, min 0, max oo.
-        allowed_min = -float("inf") if numeric else 0
-        allowed_max = float("inf")
-        effective_val = min_or_max(allowed_max, allowed_min)
-        builtin_type_pk = self.get_builtin_type().pk
+        effective_val = min_or_max(float("inf"), -float("inf") if numeric else 0)
 
-        # Base case: this Datatype does not restrict INT or FLOAT,
-        # or it restricts BOOL, and this is a (MIN|MAX)_VAL restriction.
-        # Should this be a value error? -RM
-        if numeric and builtin_type_pk in (datatypes.STR_PK, datatypes.BOOL_PK):
-            # self.logger.debug("Datatype \"{}\" with pk={} is not one that should have a numerical constraint".
-            #                   format(self, self.pk))
-            effective_BC = None
-
-        # Base case 2: this Datatype restricts any of FLOAT, INT, or
-        # BOOL, and this is a (MIN|MAX)_LENGTH restriction.
-        elif not numeric and builtin_type_pk != datatypes.STR_PK:
-            effective_BC = None
-
-        # Base case 2: this instance has a constraint of this type already.
-        else:
+        # If it's a length constraint on a number, or a value constraint
+        # on not a number, the effective constraint is None. Arguably,
+        # this should be a ValueError.
+        effective_BC = None
+        if (numeric and self.is_numeric()) or (not numeric and self.is_string()):
             my_BC = self.basic_constraints.filter(ruletype=BC_type)
             if my_BC.exists():
-                effective_val = float(my_BC.first().rule)
                 effective_BC = my_BC.first()
+                effective_val = Datatype.parse_numeric(my_BC.first().rule)
 
             else:
-                # Base case 3: this instance has no supertypes, in which case we don't touch effective_BC or
-                # effective_val.
-                if hasattr(self, "restricts"):
+                # If this instance has no supertypes, we don't touch
+                # effective_BC or effective_val.
+                if self.has_restriction():
                     for supertype in self.restricts.all():
                         # self.logger.debug("Checking supertype \"{}\" with pk={} for BasicConstraints of form \"{}\"".
                         #                   format(supertype, supertype.pk, BC_type))
@@ -381,16 +416,15 @@ class Datatype(models.Model):
 
     def get_all_regexps(self):
         """
-        Retrieves all of the REGEXP BasicConstraints acting on this instance.
+        Retrieves all of the REGEXP BasicConstraints acting on this
+        instance.
 
         PRE: all of this instance's supertypes are clean (in the Django
         sense), as are this instance's REGEXP BasicConstraints.
         """
         if hasattr(self, "all_regexps"):
             return self.all_regexps
-        all_regexp_BCs = []
-        for regexp_BC in self.basic_constraints.filter(ruletype=BasicConstraint.REGEXP):
-            all_regexp_BCs.append(regexp_BC)
+        all_regexp_BCs = list(self.basic_constraints.filter(ruletype=BasicConstraint.REGEXP))
         for supertype in self.restricts.all():
             all_regexp_BCs.extend(supertype.get_all_regexps())
         self.all_regexps = all_regexp_BCs
@@ -398,33 +432,34 @@ class Datatype(models.Model):
 
     def get_effective_datetimeformat(self):
         """
-        Retrieves the date-time format string effective for this instance.
+        Retrieves the date-time format string effective for this
+        instance.
 
-        There can only be one such format string acting on this or its supertypes.
-        Moreover, this returns None if this instance restricts any other atomic
-        type than STR.
+        There can only be one such format string acting on this or its
+        supertypes.  Moreover, this returns None if this instance
+        restricts any other atomic type than STR.
 
-        PRE: this instance has at most one DATETIMEFORMAT BasicConstraint (and it is clean if it exists),
-        and all its supertypes are clean (in the Django sense).
+        PRE: this instance has at most one DATETIMEFORMAT
+        BasicConstraint (and it is clean if it exists), and all its
+        supertypes are clean (in the Django sense).
         """
         if BasicConstraint.DATETIMEFORMAT in self.effective_constraints:
             return self.effective_constraints[BasicConstraint.DATETIMEFORMAT]
 
-        if self.pk == datatypes.STR_PK or self.get_builtin_type().pk != datatypes.STR_PK:
-            return None
-        my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
-        if my_dtf.exists():
-            return my_dtf.first()
-
-        for supertype in self.restricts.all():
-            curr_dtf = supertype.get_effective_datetimeformat()
-            if curr_dtf:
-                self.effective_constraints[BasicConstraint.DATETIMEFORMAT] = curr_dtf
-                return curr_dtf
+        result = None
+        if self.is_string() and self.pk != datatypes.STR_PK:
+            my_dtf = self.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT)
+            if my_dtf.exists():
+                result = my_dtf.first()
+            else:
+                for supertype in self.restricts.all():
+                    result = result or supertype.get_effective_datetimeformat()
+                    if result:
+                        break
 
         # If we reach this point, there is no effective datetimeformat constraint.
-        self.effective_constraints[BasicConstraint.DATETIMEFORMAT] = None
-        return None
+        self.effective_constraints[BasicConstraint.DATETIMEFORMAT] = result
+        return result
 
     def get_builtin_type(self):
         """
@@ -458,49 +493,51 @@ class Datatype(models.Model):
 
     def _clean_restrictions(self):
         """
-        Check that this Datatype does not create a circular 
-        restriction, and that all its supertypes have the same atomic
-        Datatype. Note that we don't require it to actually have any
-        restrictions yet, since it might be in an intermediate state
-        of creation. But if it does have any, they should be coherent. 
-        This is a helper function for clean()
+        Check that this Datatype does not create a circular restriction,
+        and that all its supertypes have the same atomic Datatype. This
+        is a helper function for clean()
+
+        PRE
+        This Datatype has at least one supertype.
         """
+        if self.is_restricted_by(self):
+            raise ValidationError('Datatype "{}" has a circular restriction'.format(self))
+
+        # February 18, 2014: we do not allow Datatypes to simultaneously restrict
+        # supertypes whose "built-in types" are not all either STR, BOOL, or INT/FLOAT
+        # (they can be a mix of INT and FLOAT though).
+        supertype_builtin_types = set([])
+        for supertype in self.restricts.all():
+            supertype_builtin_types.add(supertype.get_builtin_type().pk)
+
         # Primary keys of Shipyard numeric types.
-        numeric_PKs = set([datatypes.FLOAT_PK, datatypes.INT_PK])
-        if hasattr(self, "restricts"):
-            if self.is_restricted_by(self):
-                raise ValidationError(error_messages["DT_circular_restriction"].format(self))
-
-            # February 18, 2014: we do not allow Datatypes to simultaneously restrict
-            # supertypes whose "built-in types" are not all either STR, BOOL, or INT/FLOAT
-            # (they can be a mix of INT and FLOAT though).
-            supertype_builtin_types = set([])
-            for supertype in self.restricts.all():
-                supertype_builtin_types.add(supertype.get_builtin_type().pk)
-
-            if len(supertype_builtin_types) > 1 and supertype_builtin_types != numeric_PKs:
-                raise ValidationError(error_messages["DT_multiple_builtin_types"].format(self))
+        if len(supertype_builtin_types) > 1 and supertype_builtin_types != datatypes.NUMERIC_BUILTIN_PKS:
+            raise ValidationError('Datatype "{}" restricts multiple built-in, non-numeric types'.format(self))
 
     def _clean_prototype(self):
         """
-        Check that, if this Datatype has a prototype defined, it is
-        coherent. Here, we don't actually check the prototype by 
-        running the verification method, we just make sure it has the
-        correct structure: it must have a CDT with 2 columns: column 1 
-        is a string "example" field, column 2 is a bool "valid" field. 
-        This CDT will be hard-coded and loaded into the database on 
-        creation. This is a helper function for clean().
+        Check that this Datatype's prototype is coherent. Here, we don't
+        actually check the prototype by running the verification method,
+        we just make sure it has the correct structure: it must have a
+        CDT with 2 columns: column 1 is a string "example" field, column
+        2 is a bool "valid" field.  This CDT will be hard-coded and
+        loaded into the database on creation. This is a helper function
+        for clean().
+
+        PRE
+        This datatype has a prototype.
         """
-        if self.prototype is not None:
-            if self.prototype.symbolicdataset.is_raw():
-                raise ValidationError(error_messages["DT_prototype_raw"].format(self))
+        PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        if self.prototype.symbolicdataset.is_raw():
+            raise ValidationError(('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
+                    'but it is raw').format(self, PROTOTYPE_CDT))
 
-            PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        my_prototype_cdt = self.prototype.symbolicdataset.get_cdt()
+        if not my_prototype_cdt.is_identical(PROTOTYPE_CDT):
+            raise ValidationError(('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
+                    'but it has "{}"').format(self, PROTOTYPE_CDT, my_prototype_cdt))
 
-            if not self.prototype.symbolicdataset.get_cdt().is_identical(PROTOTYPE_CDT):
-                raise ValidationError(error_messages["DT_prototype_wrong_CDT"].format(self))
-
-            self.prototype.clean()
+        self.prototype.clean()
 
     def _check_num_constraint_against_supertypes(self, constraint, error_message):
         """
@@ -513,60 +550,61 @@ class Datatype(models.Model):
         INPUTS
         constraint      the type of constraint to check, one of 
                         BasicConstraint.(MIN|MAX)_(VAL|LENGTH)
-        error_message   message to raise if the check fails
+        error_message   message to raise if the check fails (see code for
+                        format)
         
-        ASSUMPTIONS
+        PRE
         1) The current Datatype restricts at least one other Datatype
-        (ie. hasattr(self, "restricts") = True).
-        2) The current Datatype has only one of the type of constraint
-        we are going to check.
+        2) The current Datatype has at most one of the type of constraint
+        we are going to check
         """
         my_constraint = self.basic_constraints.filter(ruletype=constraint)
         if not my_constraint.exists():
             return
 
-        my_value = float(my_constraint.first().rule)
+        my_value = Datatype.parse_numeric(my_constraint.first().rule)
         # TODO: duplicated. Maybe pass in min/max as a parameter?
         min_or_max = min if constraint in (BasicConstraint.MIN_VAL, BasicConstraint.MIN_LENGTH) else max
 
         for supertype in self.restricts.all():
             supertype_value = supertype.get_effective_num_constraint(constraint)[1]
-            if supertype_value == my_value:
-                continue
-            elif min_or_max(supertype_value, my_value) == my_value:
-                raise ValidationError(error_message)
+            if supertype_value == my_value or min_or_max(supertype_value, my_value) == my_value:
+                raise ValidationError(error_message.format(self, my_value, supertype, supertype_value))
 
     def _check_datetime_constraint_against_supertypes(self):
         """
-        Check that there is only one DATETIMEFORMAT between this 
-        Datatype and all of its supertypes. This is a helper function 
+        Check that there is only one DATETIMEFORMAT between this
+        Datatype and all of its supertypes. This is a helper function
         for _check_basic_constraints_against_supertypes(), which is in
         turn a helper for clean().
+
+        PRE
+        1) The current Datatype restricts at least one other Datatype
         """
-        my_dtf_count = self.basic_constraints.filter(ruletype="datetimeformat").count()
-        supertype_dtf_count = sum(
-            [supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
-             for supertype in self.restricts.all()])
-        if my_dtf_count + supertype_dtf_count > 1:
-            raise ValidationError(error_messages["DT_too_many_datetimeformats"].format(self))
+        dtf_count = self.basic_constraints.filter(ruletype="datetimeformat").count()
+        for supertype in self.restricts.all():
+            dtf_count += supertype.basic_constraints.filter(ruletype=BasicConstraint.DATETIMEFORMAT).count()
+        if dtf_count > 1:
+            raise ValidationError(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on it, '
+                                   'but it has {}'.format(self, dtf_count)))
 
     def _check_basic_constraints_against_supertypes(self):
         """
-        Check constraints for coherence against the supertypes' constraints.
-        This is a helper function for clean()
+        Check constraints for coherence against the supertypes'
+        constraints. This is a helper function for clean().
         
-        ASSUMPTIONS
-        1) This Datatype has at least one supertype.
+        PRE
+        1) This Datatype has at least one supertype
         """
         # Check numerical constraints for coherence against the supertypes' constraints.
         self._check_num_constraint_against_supertypes(BasicConstraint.MIN_VAL,
-            error_messages["DT_min_val_smaller_than_supertypes"].format(self))
+                'Datatype "{}" has MIN_VAL {}, but its supertype "{}" has a larger or equal MIN_VAL of {}')
         self._check_num_constraint_against_supertypes(BasicConstraint.MAX_VAL,
-            error_messages["DT_max_val_larger_than_supertypes"].format(self))
+                'Datatype "{}" has MAX_VAL {}, but its supertype "{}" has a smaller or equal MAX_VAL of {}')
         self._check_num_constraint_against_supertypes(BasicConstraint.MIN_LENGTH,
-            error_messages["DT_min_length_smaller_than_supertypes"].format(self))
+                'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}')
         self._check_num_constraint_against_supertypes(BasicConstraint.MAX_LENGTH,
-            error_messages["DT_max_length_larger_than_supertypes"].format(self))
+                'Datatype "{}" has MAX_LENGTH {}, but its supertype "{}" has a shorter or equal MAX_LENGTH of {}')
         self._check_datetime_constraint_against_supertypes()
 
     def _check_constraint_intervals(self):
@@ -575,37 +613,36 @@ class Datatype(models.Model):
         for this Datatype make sense. That is, that effective min_val <=
         max_val if applicable, and if this Datatype is an integer, then
         the closed interval [min_val, max_val] actually contains any
-        integers.
+        integers. This is a helper function for clean().
 
-        ASSUMPTIONS
-        1) This Datatype has at least one supertype.
+        PRE
+        1) This Datatype has at least one supertype
         """
-        # TODO: the following line is duplicated
-        numeric_PKs = [datatypes.FLOAT_PK, datatypes.INT_PK]
-        builtin_type_pk = self.get_builtin_type().pk
-        if builtin_type_pk in numeric_PKs:
+        if self.is_numeric():
             min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)[1]
             max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)[1]
             if (min_val > max_val):
-                raise ValidationError(error_messages["DT_min_val_exceeds_max_val"].format(self))
+                raise ValidationError(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
+                                       .format(self, min_val, max_val)))
 
-            if (self.get_builtin_type().pk == datatypes.INT_PK and 
-                    math.floor(max_val) < math.ceil(min_val)):
-                raise ValidationError(error_messages["DT_integer_min_max_val_too_narrow"].
-                    format(self, min_val, max_val))
+            if (self.get_builtin_type().pk == datatypes.INT_PK and math.floor(max_val) < math.ceil(min_val)):
+                raise ValidationError((('Datatype "{}" has built-in type INT, but there are no integers between its '
+                                        'effective MIN_VAL {} and its effective MAX_VAL {}')
+                                       .format(self, min_val, max_val)))
 
         # Check that effective min_length <= max_length if applicable.
-        elif builtin_type_pk == datatypes.STR_PK:
-            if (self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1] >
-                    self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]):
-                raise ValidationError(error_messages["DT_min_length_exceeds_max_length"].
-                        format(self))
+        elif self.is_string():
+            min_length = self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)[1]
+            max_length = self.get_effective_num_constraint(BasicConstraint.MAX_LENGTH)[1]
+            if (min_length > max_length):
+                raise ValidationError(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
+                                       .format(self, min_length, max_length)))
 
     def _clean_basic_constraints(self):
         """
         Check the coherence of this Datatype's basic constraints.
         This is a helper for clean(). Note that we don't check 
-        the values against the parents here.
+        the values against the supertypes here.
         """
         # Check that there is at most one BasicConstraint of every type except
         # REGEXP directly associated to this instance.
@@ -613,10 +650,8 @@ class Datatype(models.Model):
         constraint_counts = ruletypes.annotate(count=models.Count("id"))
         for row in constraint_counts:
             if row["count"] > 1 and row["ruletype"] != "regexp":
-                raise ValidationError(error_messages["DT_several_same_constraint"].
-                        format(self, row["ruletype"]))
-
-        # Clean them all.
+                raise ValidationError(('Datatype "{}" has {} constraints of type {}, but should have at most one'
+                                       .format(self, row["count"], row["ruletype"])))
         for bc in self.basic_constraints.all():
             bc.clean()
 
@@ -626,19 +661,14 @@ class Datatype(models.Model):
         being valid or invalid. 
 
         ASSUMPTIONS
-        1) self.prototype is clean
+        1) This Datatype has a prototype, and it is clean
         """
-        if not hasattr(self, "prototype") or not self.prototype:
-            return
-
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
         summary_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
         with open(self.prototype.dataset_file.name) as f:
             reader = csv.reader(f)
             header = next(reader) # skip header - we already know it's good from cleaning the prototype
-            self.logger.debug("Calling summarize_CSV on prototype")
-            summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)],
-                    reader, summary_path)
+            summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader, summary_path)
 
         try:
             failing_cells = summary["failing_cells"].keys()
@@ -649,68 +679,55 @@ class Datatype(models.Model):
             reader = csv.reader(f)
             next(reader) # skip header again
             for rownum, row in enumerate(reader, start=1):
-                # This has to be not None, since the prototype passed clean.
+                # This has to be not None, since the prototype was
+                # succesfully uploaded.
                 valid = Datatype.parse_boolean(row[1])
 
-                # Prototype says valid, but constraint fails.
-                if valid:
-                    if (rownum, 1) in failing_cells:
-                        raise ValidationError(
-                                error_messages["prototype_bad_valid"].
-                                format(self, row[0]))
-                # Prototype says invalid, but constraint passes.
-                else:
-                    if (rownum, 1) not in failing_cells:
-                        raise ValidationError(
-                                error_messages["prototype_bad_invalid"].
-                                format(self, row[0]))
-
+                if valid and (rownum, 1) in failing_cells:
+                    raise ValidationError(('The prototype for Datatype "{}" indicates the value "{}" should be '
+                                           'valid, but it failed constraints').format(self, row[0]))
+                elif not valid and (rownum, 1) not in failing_cells:
+                    raise ValidationError('The prototype for Datatype "{}" indicates the value "{}" should be '
+                                          'invalid, but it passed all constraints'.format(self, row[0]))
 
     def clean(self):
         """
-        Checks coherence of this Datatype.
+        Checks coherence of this Datatype. Since there is no procedure
+        for creating Datatypes except via the constructor, the checks
+        can happen in any order.
 
-        Note that a Datatype must be saved into the database before it's complete,
-        as a complete Datatype must be a restriction of a Shipyard atomic Datatype
-        (STR, INT, FLOAT, or BOOL).  This necessitates a complete_clean() routine.
+        Note that a Datatype must be saved into the database before it's
+        complete, as a complete Datatype must be a restriction of a
+        Shipyard atomic Datatype (STR, INT, FLOAT, or BOOL).  This
+        necessitates a complete_clean() routine.
         """
-        self.logger.debug('Cleaning restrictions on Datatype "{}"'.format(self))
-        self._clean_restrictions()
-        self.logger.debug('Cleaning prototype for Datatype "{}"'.format(self))
-        self._clean_prototype()
-        self.logger.debug('Cleaning basic constraints for Datatype "{}"'.format(self))
-        self._clean_basic_constraints()
+        if self.has_restriction():
+            self.logger.debug('Cleaning restrictions on Datatype "{}"'.format(self))
+            self._clean_restrictions()
 
-        if hasattr(self, "restricts"):
-            self.logger.debug('Checking basic constraints for Datatype "{}" against supertypes'.
-                    format(self))
-            self._check_basic_constraints_against_supertypes()
-            self.logger.debug('Checking basic constraint intervals for Datatype "{}"'.
-                    format(self))
-            self._check_constraint_intervals()
+        if self.has_basic_constraints():
+            self.logger.debug('Cleaning basic constraints for Datatype "{}"'.format(self))
+            self._clean_basic_constraints()
+            if self.has_restriction():
+                self._check_constraint_intervals()
+                self._check_basic_constraints_against_supertypes()
 
-        # Clean the CustomConstraint if it exists.
         if self.has_custom_constraint():
-            self.logger.debug('Checking custom constraint for Datatype "{}"'.
-                    format(self))
+            self.logger.debug('Checking custom constraint for Datatype "{}"'.format(self))
             self.custom_constraint.clean()
 
-        # Verify the prototype last, because we want to clean the
-        # CustomConstraint first.
-        self._verify_prototype()
-
-        self.logger.debug('Datatype "{}" is clean'.format(self))
+        if self.has_prototype():
+            self.logger.debug('Cleaning prototype for Datatype "{}"'.format(self))
+            self._clean_prototype()
+            self._verify_prototype()
 
     def is_complete(self):
         """
-        Returns whether this Datatype has a complete definition; i.e. restricts a Shipyard atomic.
+        Returns whether this Datatype has a complete definition; i.e.
+        restricts a Shipyard atomic.
         """
-        # The hard-coded Shipyard atomic string Datatype.  We check that this
-        # instance restricts it.
         STR = Datatype.objects.get(pk=datatypes.STR_PK)
-        if hasattr(self, "restricts") and self.is_restriction(STR):
-            return True
-        return False
+        return self.has_restriction() and self.is_restriction(STR)
 
     def complete_clean(self):
         """
@@ -720,48 +737,34 @@ class Datatype(models.Model):
         a Shipyard atomic Datatype.
         """
         self.clean()
-
         if not self.is_complete():
-            raise ValidationError(error_messages["DT_does_not_restrict_atomic"].format(self))
-
-    def get_absolute_url(self):
-        return '/datatypes/%i' % self.id
-
-    def __unicode__(self):
-        """Describe Datatype by name"""
-        return self.name
-
-    def has_custom_constraint(self):
-        """Tells whether this Datatype has a CustomConstraint."""
-        return hasattr(self, "custom_constraint")
+            raise ValidationError('Datatype "{}" does not restrict any of the Shipyard atomic Datatypes'.format(self))
 
     def check_basic_constraints(self, string_to_check):
         """
         Check the specified string against basic constraints.
 
-        This includes both whether or not the string can be 
-        interpreted as all of the Shipyard atomic types it inherits from, but also
+        This includes both whether or not the string can be interpreted
+        as all of the Shipyard atomic types it inherits from, but also
         whether it then checks out against all BasicConstraints.
 
         If it fails against even the simplest casting test (i.e. the
-        string could not be cast to the appropriate Python type),
-        return a list containing a describing string.  If not, return
-        a list of BasicConstraints that it failed (hopefully it's
-        empty!).
+        string could not be cast to the appropriate Python type), return
+        a list containing a describing string.  If not, return a list of
+        BasicConstraints that it failed (hopefully it's empty!).
 
         PRE: this Datatype and by extension all of its BasicConstraints
-        are clean.  That means that only the appropriate BasicConstraints
-        for this Datatype are applied.
+        are clean.  That means that only the appropriate
+        BasicConstraints for this Datatype are applied.
         """
         ####
-        # First, determine what Shipyard atomic datatypes this restricts.
-        # Then, check it against any type-specific BasicConstraints
-        # (MIN|MAX_LENGTH or DATETIMEFORMAT for strings,
-        # MIN|MAX_VAL for numerical types).
+        # First, determine what Shipyard atomic datatypes this
+        # restricts.  Then, check it against any type-specific
+        # BasicConstraints (MIN|MAX_LENGTH or DATETIMEFORMAT for
+        # strings, MIN|MAX_VAL for numerical types).
 
         constraints_failed = []
-        builtin_type_pk = self.get_builtin_type().pk
-        if builtin_type_pk == datatypes.STR_PK:
+        if self.is_string():
             # string_to_check is, by definition, a string, so we skip
             # to checking the BasicConstraints.
             eff_min_length_BC, eff_min_length = self.get_effective_num_constraint(BasicConstraint.MIN_LENGTH)
@@ -782,37 +785,25 @@ class Datatype(models.Model):
                     constraints_failed.append(eff_dtf_BC)
 
         # Next, check the numeric (and non-Boolean) cases.
-        elif builtin_type_pk == datatypes.INT_PK:
+        elif self.is_numeric():
+            is_int = self.get_builtin_type().pk == datatypes.INT_PK
+            parse, type_str = (int, "integer") if is_int else (float, "float")
             try:
-                int(string_to_check)
+                parse(string_to_check)
             except ValueError:
-                return ["Was not integer"]
+                return ["Was not {}".format(type_str)]
 
             # Check the numeric-type BasicConstraints.
             eff_min_val_BC, eff_min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)
-            if eff_min_val_BC is not None and int(string_to_check) < eff_min_val:
+            if eff_min_val_BC is not None and parse(string_to_check) < eff_min_val:
                 constraints_failed.append(eff_min_val_BC)
             else:
                 eff_max_val_BC, eff_max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)
-                if eff_max_val_BC is not None and int(string_to_check) > eff_max_val:
+                if eff_max_val_BC is not None and parse(string_to_check) > eff_max_val:
                     constraints_failed.append(eff_max_val_BC)
 
-        elif builtin_type_pk == datatypes.FLOAT_PK:
-            try:
-                float(string_to_check)
-            except ValueError:
-                return ["Was not float"]
-
-            # Same as for the int case.
-            eff_min_val_BC, eff_min_val = self.get_effective_num_constraint(BasicConstraint.MIN_VAL)
-            if eff_min_val_BC is not None and float(string_to_check) < eff_min_val:
-                constraints_failed.append(eff_min_val_BC)
-            else:
-                eff_max_val_BC, eff_max_val = self.get_effective_num_constraint(BasicConstraint.MAX_VAL)
-                if eff_max_val_BC is not None and float(string_to_check) > eff_max_val:
-                    constraints_failed.append(eff_max_val_BC)
-
-        elif builtin_type_pk == datatypes.BOOL_PK:
+        # Otherwise, it's a boolean.
+        else:
             if Datatype.parse_boolean(string_to_check) is None:
                 return ["Was not Boolean"]
 
@@ -825,7 +816,7 @@ class Datatype(models.Model):
 
         return constraints_failed
 
-    def check_custom_constraint(self, summary_path, input_path, num_rows, verif_log=None):
+    def check_custom_constraint(self, summary_path, input_path, verif_log=None):
         """
         SYNOPSIS
         Check the one-column CSV file file stored at input_path against this
@@ -835,7 +826,6 @@ class Datatype(models.Model):
         summary_path        the work directory where we will run the
                             verification method
         input_path          one-column CSV to be checked
-        num_rows            the number of rows in the CSV to be checked
         verif_log           VerificationLog to fill out
 
         OUTPUTS
@@ -857,27 +847,30 @@ class Datatype(models.Model):
             verif_method.run_code_with_streams(summary_path, [input_path], [output_path], 
                     [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
 
-        return self._check_verification_output(summary_path, output_path,
-                num_rows)
+        return self._check_verification_output(summary_path, output_path)
 
-    def _check_verification_output(self, summary_path, output_path, num_rows):
+    def _check_verification_output(self, summary_path, output_path):
         """
-        Check the one-column CSV file, contained at output_path, which was output
-        by a verification method for this Dataype's CustomConstraint. This is
-        a helper function for check_custom_constraint.
+        Check the one-column CSV file, contained at output_path, which
+        was output by a verification method for this Dataype's
+        CustomConstraint. This is a helper function for
+        check_custom_constraint.
 
         INPUTS
-        summary_path    the working directory where the check on the CustomConstraint
-                        was performed
-        output_path     the CSV file to check, which was output by a verification method
-        num_rows        the number of rows in the CSV which was verified
+        summary_path    the working directory where the check on the 
+                        CustomConstraint was performed
+        output_path     the CSV file to check, which was output by a
+                        verification method
 
         OUTPUTS
-        failing_cells   a dictionary of CustomConstraints which were failed in the
-                        original CSV, as indicated by the verification method's output.
-                        Keys are row number, and values are lists of failed custom constraints
-                        (currently, these lists may only be of length 1, since a Datatype may only
-                        have one CustomConstraint and we do not check them recursively).
+        failing_cells   a dictionary of CustomConstraints which were
+                        failed in the original CSV, as indicated by the
+                        verification method's output.  Keys are row
+                        number, and values are lists of failed custom
+                        constraints (currently, these lists may only be
+                        of length 1, since a Datatype may only have one
+                        CustomConstraint and we do not check them
+                        recursively).
 
         ASSUMPTIONS
         1) This is called from inside check_custom_constraint.
@@ -885,7 +878,7 @@ class Datatype(models.Model):
         VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
 
         if not os.path.exists(output_path):
-            raise ValueError(error_messages["verification_no_output"].format(self))
+            raise ValueError('Verification method for Datatype "{}" produced no output'.format(self))
 
         # Now: open the resulting file, which is at output_path, and make sure
         # it's OK.  We're going to have to call summarize_CSV on this resulting
@@ -893,32 +886,24 @@ class Datatype(models.Model):
         # failed_row), and we will define NaturalNumber to have no
         # CustomConstraint, so that no deeper recursion will happen.
         with open(output_path, "r") as test_out:
-            output_summary = VERIF_OUT.summarize_CSV(test_out, 
-                os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
+            output_summary = VERIF_OUT.summarize_CSV(test_out, os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
 
         if output_summary.has_key("bad_num_cols"):
-            raise ValueError(
-                "Output of verification method for Datatype \"{}\" had the wrong number of columns".
-                format(self))
+            raise ValueError(('Output of verification method for Datatype "{}" had the wrong number of columns'
+                              .format(self)))
 
         if output_summary.has_key("bad_col_indices"):
-            raise ValueError(
-                "Output of verification method for Datatype \"{}\" had a malformed header".
-                format(self))
+            raise ValueError('Output of verification method for Datatype "{}" had a malformed header'.format(self))
 
         if output_summary.has_key("failing_cells"):
-            raise ValueError(
-                "Output of verification method for Datatype \"{}\" had malformed entries".
-                format(self))
+            raise ValueError('Output of verification method for Datatype "{}" had malformed entries'.format(self))
 
         # This should really never happen.
         # Should this really be a value error? The previous checks are for
         # problems with the user's code, but this one is for ours. Seems
         # inconsistent. -RM
         if os.path.exists(os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO")):
-            raise ValueError(
-                "Verification output CDT \"{}\" has been corrupted".
-                format(VERIF_OUT))
+            raise ValueError('Verification output CDT "{}" has been corrupted'.format(VERIF_OUT))
 
         # Collect the row numbers of incorrect entries in this column.
         failing_cells = {}
@@ -926,9 +911,6 @@ class Datatype(models.Model):
             test_out_csv = csv.reader(test_out)
             next(test_out_csv) # skip header
             for row in test_out_csv:
-                if int(row[0]) > num_rows:
-                    raise ValueError(error_messages["verification_large_row"].
-                            format(self, row[0], num_rows))
                 failing_cells[int(row[0])] = [self.custom_constraint]
 
         return failing_cells
@@ -940,13 +922,10 @@ class BasicConstraint(models.Model):
     The admissible constraints are:
      - (min|max)len (string)
      - (min|max)val (numeric)
-     - (min|max)prec (float)
      - regexp (this will work on anything)
      - datetimeformat (string -- this is a special case)
     """
-    datatype = models.ForeignKey(
-        Datatype,
-        related_name="basic_constraints")
+    datatype = models.ForeignKey(Datatype, related_name="basic_constraints")
 
     # Define the choices for rule type.
     MIN_LENGTH = "minlen"
@@ -968,19 +947,14 @@ class BasicConstraint(models.Model):
     )
 
     # Added the validator here to ensure that the value of ruletype is one of the allowable choices.
-    ruletype = models.CharField(
-        "Type of rule",
-        max_length=32,
-        choices=CONSTRAINT_TYPES,
+    ruletype = models.CharField("Type of rule", max_length=32, choices=CONSTRAINT_TYPES,
         validators=[
             RegexValidator(
                 re.compile("{}|{}|{}|{}|{}|{}".format(MIN_LENGTH, MAX_LENGTH, MIN_VAL, MAX_VAL, REGEXP, DATETIMEFORMAT)
                 )
             )])
 
-    rule = models.CharField(
-        "Rule specification",
-        max_length = 100)
+    rule = models.CharField("Rule specification", max_length = 100)
 
     def __unicode__(self):
         """
@@ -1009,53 +983,55 @@ class BasicConstraint(models.Model):
            and not 'FLOAT', 'INT', or 'BOOL'
         """
         if not self.datatype.is_complete():
-            raise ValidationError(error_messages["BC_DT_not_complete"].format(self.datatype, self))
+            raise ValidationError('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
+                                  .format(self.datatype, self))
 
         error_msg = ""
         is_error = False
-        base_type_pk = self.datatype.get_builtin_type().pk
 
         # Check the rule for coherence.
         if self.ruletype in (BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
             # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
-            if base_type_pk != datatypes.STR_PK:
-                error_msg = error_messages["BC_length_constraint_on_non_string"].format(self, self.datatype)
-                is_error = True
+            if not self.datatype.is_string():
+                raise ValidationError('BasicConstraint "{}" specifies a bound on string length, '
+                                      'but its parent Datatype "{}" has builtin type {}'
+                                      .format(self, self.datatype, self.datatype.get_builtin_type()))
             try:
                 length_constraint = int(self.rule)
-                if length_constraint < 1:
-                    error_msg = error_messages["BC_length_constraint_non_positive"].format(self, self.rule)
-                    is_error = True
             except ValueError:
-                error_msg = error_messages["BC_length_constraint_non_integer"].format(self, self.rule)
-                is_error = True
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                      'which is not an integer'.format(self, self.rule))
+
+            if length_constraint < 1:
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on string length, '
+                                      'which is not positive'.format(self, self.rule))
 
         elif self.ruletype in (BasicConstraint.MAX_VAL, BasicConstraint.MIN_VAL):
             # This should not apply to a non-numeric.
-            if base_type_pk not in (datatypes.FLOAT_PK, datatypes.INT_PK):
-                error_msg = error_messages["BC_val_constraint_parent_non_numeric"].format(self, self.datatype)
-                is_error = True
+            if not self.datatype.is_numeric():
+                raise ValidationError('BasicConstraint "{}" specifies a bound on numeric value, '
+                                      'but its parent Datatype "{}" has builtin type {}'
+                                      .format(self, self.datatype, self.datatype.get_builtin_type()))
+
             try:
                 val_bound = float(self.rule)
             except ValueError:
-                error_msg = error_messages["BC_val_constraint_rule_non_numeric"].format(self, self.rule)
-                is_error = True
-        
+                raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
+                                      'which is not a number'.format(self, self.rule))
+
         elif self.ruletype == BasicConstraint.REGEXP:
             try:
                 re.compile(self.rule)
             except re.error:
-                error_msg = error_messages["BC_bad_RE"].format(self, self.rule)
-                is_error = True
+                raise ValidationError('BasicConstraint "{}" specifies an invalid regular expression "{}"'
+                                      .format(self, self.rule))
 
-        elif self.ruletype == BasicConstraint.DATETIMEFORMAT:
-            # This should not apply to a boolean or a numeric.
-            if base_type_pk != datatypes.STR_PK:
-                error_msg = error_messages["BC_datetimeformat_non_string"].format(self, self.datatype)
-                is_error = True
-
-        if is_error:
-            raise ValidationError(error_msg)
+        # This should not apply to a boolean or a numeric.
+        elif self.ruletype == BasicConstraint.DATETIMEFORMAT and not self.datatype.is_string():
+            raise ValidationError('BasicConstraint "{}" specifies a date/time format, but its parent Datatype "{}" '
+                                  'has builtin type "{}"'
+                                  .format(self, self.datatype, self.datatype.get_builtin_type()))
+                
 
 class CustomConstraint(models.Model):
     """
@@ -1063,15 +1039,10 @@ class CustomConstraint(models.Model):
 
     These will be specified in the form of Methods that
     take a CSV of strings (which is the parent of all
-    Datatypes) and return T/F for 
+    Datatypes) and return a CSV of integers indicating which rows
+    contain invalid values.
     """
-    datatype = models.OneToOneField(
-        Datatype,
-        related_name="custom_constraint")
-
-    verification_method = models.ForeignKey(
-        "method.Method",
-        related_name="custom_constraints")
+    verification_method = models.ForeignKey("method.Method", related_name="custom_constraints")
 
     # Clean: Methods which function as CustomConstraints must take in
     # a column of strings named "to_test" and returns a column of
@@ -1122,25 +1093,16 @@ class CompoundDatatypeMember(models.Model):
     Related to :model:`archive.models.Dataset`
     Related to :model:`metadata.models.CompoundDatatype`
     """
-
-    compounddatatype = models.ForeignKey(
-        "CompoundDatatype",
-        related_name="members",
+    compounddatatype = models.ForeignKey("CompoundDatatype", related_name="members",
         help_text="Links this DataType member to a particular CompoundDataType")
 
-    datatype = models.ForeignKey(
-        Datatype,
-        help_text="Specifies which DataType this member is")
+    datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is")
 
-    column_name = models.CharField(
-        "Column name",
-        blank=False,
-        max_length=128,
+    column_name = models.CharField("Column name", blank=False, max_length=128,
         help_text="Gives datatype a 'column name' as an alternative to column index")
 
     # MinValueValidator(1) constrains column_idx to be >= 1
-    column_idx = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)],
+    column_idx = models.PositiveIntegerField(validators=[MinValueValidator(1)],
         help_text="The column number of this DataType")
 
     # Define database indexing rules to ensure tuple uniqueness
@@ -1150,9 +1112,11 @@ class CompoundDatatypeMember(models.Model):
                            ("compounddatatype", "column_idx"))
 
     def __unicode__(self):
-        """Describe a CompoundDatatypeMember with it's column number, datatype name, and column name"""
-        returnString = u'{} {}'.format(unicode(self.datatype).title(), self.column_name)
-        return returnString
+        """
+        Describe a CompoundDatatypeMember with it's column number,
+        datatype name, and column name
+        """
+        return u'{}: {}'.format(unicode(self.datatype), self.column_name)
 
     def has_custom_constraint(self):
         """
@@ -1160,20 +1124,13 @@ class CompoundDatatypeMember(models.Model):
         """
         return self.datatype.has_custom_constraint()
 
-    def check_custom_constraint(self, summary_path, input_path, num_rows, content_check_log):
+    def check_custom_constraint(self, summary_path, input_path, content_check_log):
         """
-        Exactly the same as Datatype.check_custom_constraint(), except we
-        create a VerificationLog, and the failing_cells are indexed by (row, column)
-        instead of by row.
+        Exactly the same as Datatype.check_custom_constraint(), except
+        we create a VerificationLog.
         """
-        verif_log = VerificationLog(contentchecklog=content_check_log, CDTM=self)
-        colnum = self.column_idx
-        failing_rows = self.datatype.check_custom_constraint(summary_path, input_path, num_rows,
-                verif_log)
-        failing_cells = {}
-        for row, error in failing_rows.items():
-            failing_cells[(row, colnum)] = error
-        return failing_cells
+        verif_log = content_check_log.verification_logs.create(CDTM=self)
+        return self.datatype.check_custom_constraint(summary_path, input_path, verif_log)
 
     def check_basic_constraints(self, value):
         """
@@ -1239,17 +1196,16 @@ class CompoundDatatype(models.Model):
 
     # clean() is executed prior to save() to perform model validation
     def clean(self):
-        """Check if Datatype members have consecutive indices from 1 to n"""
+        """
+        Check if Datatype members have consecutive indices from 1 to n
+        """
         column_indices = []
 
-        # += is shorthand for extend() - concatenate a list with another list
-        for member in self.members.all():
+        for i, member in enumerate(self.members.order_by("column_idx"), start=1):
             member.full_clean()
-            column_indices += [member.column_idx]
-
-        # Check if the sorted list is exactly a sequence from 1 to n
-        if sorted(column_indices) != range(1, self.members.count()+1):
-            raise ValidationError("Column indices are not consecutive starting from 1")
+            if member.column_idx != i:
+                raise ValidationError(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'
+                                       .format(self)))
 
     def is_restriction(self, other_CDT):
         """
@@ -1276,17 +1232,14 @@ class CompoundDatatype(models.Model):
         # consecutive starting from one, we can go through all of this
         # CDT's members and look for the matching one.
         for member in self.members.all():
-            counterpart = other_CDT.members.get(
-                column_idx=member.column_idx)
-            if (member.column_name != counterpart.column_name or
-                    not member.datatype.is_restriction(
-                        counterpart.datatype)):
+            try:
+                counterpart = other_CDT.members.get(column_idx=member.column_idx, column_name=member.column_name)
+                if not member.datatype.is_restriction(counterpart.datatype):
+                    return False
+            except CompoundDatatypeMember.DoesNotExist:
                 return False
-        
-        # Having reached this point, this CDT must be a restriction
-        # of other_CDT.
         return True
-
+        
     def is_identical(self, other_CDT):
         """
         True if this CDT is identical with its parameter; False otherwise.
@@ -1296,36 +1249,36 @@ class CompoundDatatype(models.Model):
 
         PRE: this CDT and other_CDT are clean.
         """
-        return (self.is_restriction(other_CDT) and
-                other_CDT.is_restriction(self))
-
+        my_col_names = [m.column_name for m in self.members.order_by("column_idx")]
+        other_col_names = [m.column_name for m in other_CDT.members.order_by("column_idx")]
+        return my_col_names == other_col_names and self.is_restriction(other_CDT) and other_CDT.is_restriction(self)
 
     def _check_header(self, header):
         """
         SYNOPSIS
-        Verify that a list of field names (which we presumably read from a file) 
-        matches the anticipated header for this CompoundDatatype. This is a helper
-        function for summarize_CSV.
+        Verify that a list of field names (which we presumably read from
+        a file) matches the anticipated header for this
+        CompoundDatatype. This is a helper function for summarize_CSV.
 
         INPUTS
         header  list of fields forming a header, to check against this
                 CompoundDatatype's expected header
 
         OUTPUTS
-        A dictionary with keys indicating header errors. Possible key: value
-        pairs are the following.
+        A dictionary with keys indicating header errors. Possible key:
+        value pairs are the following.
 
-            - bad_num_cols: length of fieldnames, which does not match number
-              of members of this CompoundDatatype.
-            - bad_col_indices: list of column indices which do not have the same
-              name as the corresponding CompoundDatatypeMember. Will only be
-              present if the number of columns is correct.
+            - bad_num_cols: length of fieldnames, which does not match
+              number of members of this CompoundDatatype.
+            - bad_col_indices: list of column indices which do not have
+              the same name as the corresponding CompoundDatatypeMember.
+              Will only be present if the number of columns is correct.
 
         """
         summary = {}
         if len(header) != self.members.count():
             summary["bad_num_cols"] = len(header)
-            self.logger.debug("number of CSV columns must match number of CDT members")
+            self.logger.debug("Number of CSV columns must match number of CDT members")
             return summary
     
         # The ith cdt member must have the same name as the ith CSV header.
@@ -1333,8 +1286,8 @@ class CompoundDatatype(models.Model):
         for cdtm in self.members.all():
             if cdtm.column_name != header[cdtm.column_idx-1]:
                 bad_col_indices.append(cdtm.column_idx)
-                self.logger.debug('Incorrect header for column {}: expected "{}", got "{}"'.
-                        format(cdtm.column_idx, cdtm.column_name, header[cdtm.column_idx-1]))
+                self.logger.debug(('Incorrect header for column {}: expected "{}", got "{}"'
+                                   .format(cdtm.column_idx, cdtm.column_name, header[cdtm.column_idx-1])))
 
         if bad_col_indices:
             summary["bad_col_indices"] = bad_col_indices
@@ -1380,7 +1333,7 @@ class CompoundDatatype(models.Model):
         try:
             header = next(data_csv)
         except StopIteration:
-            self.logger.warning("file is empty")
+            self.logger.warning("File {} is empty".format(file_to_check))
             return {"bad_num_cols": 0}
     
         # Check the header.

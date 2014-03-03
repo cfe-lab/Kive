@@ -20,7 +20,6 @@ import tempfile
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import datachecking.models
 import file_access_utils, logging_utils
-from constants import error_messages
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,14 +42,11 @@ class SymbolicDataset(models.Model):
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
-    MD5_checksum = models.CharField(
-        max_length=64,
+    MD5_checksum = models.CharField( max_length=64,
         validators=[RegexValidator(
-            regex=re.compile("(^[1234567890AaBbCcDdEeFf]{32}$)|(^$)"),
+            regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
             message="MD5 checksum is not either 32 hex characters or blank")],
-        blank=True,
-        default="",
-        help_text="Validates file integrity")
+        blank=True, default="", help_text="Validates file integrity")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -154,14 +150,21 @@ class SymbolicDataset(models.Model):
             run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
             content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
             if content_check.is_fail():
-                raise ValueError(error_messages["bad_input_file"].
-                        format(file_path, cdt))
+                if content_check.baddata.bad_header:
+                    raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                     .format(file_path, cdt))
+                elif content_check.baddata.cell_errors.exists():
+                    error = content_check.baddata.cell_errors.first()
+                    cdtm = error.column
+                    raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                                     'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
+                else:
+                    # Shouldn't reach here.
+                    raise ValueError('The file "{}" was malformed'.format(file_path))
             LOGGER.debug("Read {} rows from file {}".format(structure.num_rows, file_path))
 
         if make_dataset:
-            dataset = archive.models.Dataset(
-                user=user, name=name, description=description,
-                symbolicdataset=symDS)
+            dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=symDS)
             with open(file_path, "r") as f:
                 dataset.dataset_file.save(file_path, File(f))
             dataset.clean()
@@ -184,8 +187,8 @@ class SymbolicDataset(models.Model):
         Should never be called twice on the same symbolic dataset, as this would
         overwrite num_rows to a potentially new value?
         """
-        self.logger.debug("Creating clean CCL for file {} and linking to EL".
-                format(file_path_to_check))
+        self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
+                          .format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog)
         ccl.save()
 
@@ -347,10 +350,7 @@ class DatasetStructure(models.Model):
             related_name="conforming_datasets")
 
     # A value of -1 means the file is missing or num rows has never been counted
-    num_rows = models.IntegerField(
-            "number of rows",
-            validators=[MinValueValidator(-1)],
-            default=-1)
+    num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
 
     # October 31, 2013: we now think that it's too onerous to have 
     # a clean() function here that opens up the CSV file and checks it.
@@ -418,11 +418,10 @@ class ExecRecord(models.Model):
                 
                 # If the cable is trivial, then the ERI and ERO should
                 # have the same SymbolicDataset (if they both exist).
-                if (self.general_transf().is_trivial() and
-                        eris[0].symbolicdataset != eros[0].symbolicdataset):
-                    raise ValidationError(
-                        "ER \"{}\" represents a trivial cable but its input and output do not match".
-                        format(self))
+                if self.general_transf().is_trivial():
+                    if eris[0].symbolicdataset != eros[0].symbolicdataset:
+                        raise ValidationError(('ExecRecord "{}" represents a trivial cable but its input and output '
+                                               'do not match').format(self))
 
                 # If the cable is not trivial and both sides have
                 # data, then the column *Datatypes* on the destination
@@ -455,7 +454,9 @@ class ExecRecord(models.Model):
                         source_dt = source_CDT.members.get(column_idx=source_idx).datatype
 
                         if source_dt != dest_dt:
-                            raise ValidationError(error_messages["ER_cable_wiring_DT_mismatch"].format(self, dest_dt))
+                            raise ValidationError(('ExecRecord "{}" represents a cable, but the Datatype '
+                                                   'of its destination column, "{}", does not match the Datatype '
+                                                   'of its source column, "{}"').format(self, dest_dt, source_dt))
 
     def complete_clean(self):
         """

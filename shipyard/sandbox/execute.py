@@ -14,7 +14,6 @@ import logging, sys, time
 import tempfile
 import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
 import datachecking.models
-from constants import error_messages, warning_messages
 
 class Sandbox:
     """
@@ -73,8 +72,8 @@ class Sandbox:
 
         self.logger.debug("initializing maps")
         self.run = pipeline.pipeline_instances.create(user=self.user)
-        for i, pipeline_input in enumerate(inputs):
-            corresp_pipeline_input = pipeline.inputs.get(dataset_idx=i+1)
+        for i, pipeline_input in enumerate(inputs, start=1):
+            corresp_pipeline_input = pipeline.inputs.get(dataset_idx=i)
             self.socket_map[(self.run, None, corresp_pipeline_input)] = pipeline_input
             self.sd_fs_map[pipeline_input] = None
 
@@ -97,34 +96,29 @@ class Sandbox:
         """
         # First quick check that the number of inputs are the same.
         if len(self.inputs) != self.pipeline.inputs.count():
-            raise ValueError(error_messages["pipeline_bad_inputcount"].
-                format(self.pipeline, self.pipeline.inputs.count(), len(self.inputs)))
+            raise ValueError('Pipeline "{}" expects {} inputs, but {} were supplied'
+                             .format(self.pipeline, self.pipeline.inputs.count(), len(self.inputs)))
         
         # Check each individual input.
-        for i, supplied_input in enumerate(self.inputs):
-            pipeline_input = self.pipeline.inputs.get(dataset_idx=i+1)
+        for i, supplied_input in enumerate(self.inputs, start=1):
+            pipeline_input = self.pipeline.inputs.get(dataset_idx=i)
             pipeline_raw = pipeline_input.is_raw()
             supplied_raw = supplied_input.is_raw()
 
-            if pipeline_raw:
-                if supplied_raw:
-                    continue
-                else:
-                    raise ValueError(error_messages["pipeline_expected_raw"].
-                        format(self.pipeline, i+1, supplied_input.get_cdt()))
-
-            # Pipeline expected input is not raw.
-            elif supplied_raw:
-                raise ValueError(error_messages["pipeline_expected_nonraw"].
-                    format(self.pipeline, i+1, pipeline_input.get_cdt()))
+            if pipeline_raw != supplied_raw:
+                if pipeline_raw:
+                    raise ValueError('Pipeline "{}" expected input {} to be raw, but got one with CompoundDatatype '
+                                     '"{}"'.format(self.pipeline, i, supplied_input.get_cdt()))
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
+                                 .format(self.pipeline, i, pipeline_input.get_cdt()))
 
             # Neither is raw.
             supplied_cdt = supplied_input.get_cdt()
             pipeline_cdt = pipeline_input.get_cdt()
 
             if not supplied_cdt.is_restriction(pipeline_cdt):
-                raise ValueError(error_messages["pipeline_cdt_mismatch"].
-                    format(self.pipeline, i+1, pipeline_cdt, supplied_cdt))
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one with '
+                                 'CompoundDatatype "{}"'.format(self.pipeline, i, pipeline_cdt, supplied_cdt))
 
             # The CDT's match. Is the number of rows okay?
             minrows = pipeline_input.get_min_row() or 0
@@ -132,8 +126,8 @@ class Sandbox:
             maxrows = maxrows if maxrows is not None else sys.maxint
 
             if not minrows <= supplied_input.num_rows() <= maxrows:
-                raise ValueError(error_messages["pipeline_bad_numrows"].
-                    format(self.pipeline, i+1, minrows, maxrows, supplied_input.num_rows()))
+                raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
+                                 .format(self.pipeline, i, minrows, maxrows, supplied_input.num_rows()))
 
     def execute_cable(self,cable,input_SD,output_path,parent_record,recover=False):
         """
@@ -647,11 +641,7 @@ class Sandbox:
                     curr_structure.save()
 
                 corresp_output_SD.clean()
-
-                curr_ER.execrecordouts.create(
-                        generic_output=curr_output,
-                        symbolicdataset=corresp_output_SD)
-
+                curr_ER.execrecordouts.create(generic_output=curr_output, symbolicdataset=corresp_output_SD)
             curr_ER.complete_clean()
         self.logger.debug("Finished creating fresh ER, proceeding to check outputs")
 
@@ -673,7 +663,6 @@ class Sandbox:
                 bad_output_found = True
                 continue
 
-            output_md5 = ""
             with open(output_path, "rb") as f:
                 output_md5 = file_access_utils.compute_md5(f)
 
@@ -695,31 +684,19 @@ class Sandbox:
 
                 self.logger.debug("Retaining output: creating Dataset")
 
-                desc = "run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}".format(
-                        self.run.name,
-                        self.user,
-                        pipelinestep.step_num,
-                        pipelinestep.transformation,
-                        curr_output.dataset_name)
+                desc = ("run: {}\nuser: {}\nstep: {}\nmethod: {}\noutput: {}"
+                        .format(self.run.name, self.user, pipelinestep.step_num, pipelinestep.transformation,
+                                curr_output.dataset_name))
 
-                name = "run:{}__step:{}__output:{}".format(
-                            self.run.name,
-                            pipelinestep.step_num,
-                            curr_output.dataset_name)
+                name = "run:{}__step:{}__output:{}".format(self.run.name, pipelinestep.step_num,
+                                                           curr_output.dataset_name)
 
-                new_DS = archive.models.Dataset(
-                        user=self.user,
-                        name=name,
-                        description=desc,
-                        symbolicdataset=output_SD,
-                        created_by=curr_RS)
+                new_DS = archive.models.Dataset(user=self.user, name=name, description=desc, symbolicdataset=output_SD,
+                                                created_by=curr_RS)
 
                 # dataset_idx is 1-based, and output_paths is 0-based.
                 with open(output_path, "rb") as f:
-                    new_DS.dataset_file.save(
-                            os.path.basename(output_path),
-                            File(f))
-
+                    new_DS.dataset_file.save(os.path.basename(output_path), File(f))
                 new_DS.clean()
                 new_DS.save()
 
@@ -728,9 +705,8 @@ class Sandbox:
                 summary_path = "{}_summary".format(output_path)
 
                 # CCL is generated
-                ccl = output_SD.check_file_contents(
-                        output_path, summary_path, curr_output.get_min_row(),
-                        curr_output.get_max_row(), curr_log)
+                ccl = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
+                                                    curr_output.get_max_row(), curr_log)
 
                 if ccl.is_fail():
                     self.logger.warn("content check failed for {}".format(output_path))
@@ -794,7 +770,7 @@ class Sandbox:
         curr_run = self.run
 
         if (curr_run.is_complete()):
-            self.logger.warn(warning_messages["pipeline_already_run"].format(self))
+            self.logger.warn('A Pipeline has already been run in Sandbox "{}", returning the previous Run'.format(self))
             return curr_run
 
         if parent_runstep is not None:
@@ -1009,11 +985,11 @@ class Sandbox:
         curr_run, generator = self.first_generator_of_SD(SD_to_recover)
 
         if curr_run is None:
-            raise ValueError(error_messages["SD_not_in_pipeline"].
-                format(SD_to_recover, self.pipeline))
+            raise ValueError('SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered'
+                             .format(SD_to_recover, self.pipeline))
         elif generator is None:
-            raise ValueError(error_messages["SD_pipeline_input"].
-                format(SD_to_recover, self.pipeline))
+            raise ValueError('SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered'
+                             .format(SD_to_recover, self.pipeline))
 
         curr_record = None
         if type(generator) == pipeline.models.PipelineStep:
