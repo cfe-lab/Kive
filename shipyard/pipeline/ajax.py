@@ -23,7 +23,7 @@ def get_method_io (request):
     if request.is_ajax():
         method_id = request.POST.get('mid')
         response_data = {}
-        methods = Method.objects.filter(pk=method_id)
+        method = Method.objects.filter(pk=method_id)[0]
         response_data.update({'inputs': method.get_num_inputs(),
                               'outputs': method.get_num_outputs()})
         return HttpResponse(json.dumps(response_data), content_type='application/json')

@@ -100,8 +100,24 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $('#id_method_button').on('click', function() {
         var selected = $('#id_select_method option:selected');
         if (selected.val() != "") {
+            var mid = selected.val();
+            var n_inputs = null;
+            var n_outputs = null;
             var node_label = selected.text();
-            canvasState.addShape(new MethodNode(200, 200, 80, 60, '#999999', node_label));
+            if (mid != '') {
+                $.ajax({
+                    type: "POST",
+                    url: "get_method_io/",
+                    data: {mid: mid}, // specify data as an object
+                    datatype: "json", // type of data expected back from server
+                    success: function(result) {
+                        console.log(result);
+                        n_inputs = result['inputs'];
+                        n_outputs = result['outputs'];
+                        canvasState.addShape(new MethodNode(200, 200, 80, 20, '#999999', node_label, n_inputs, n_outputs));
+                    }
+                });
+            }
         }
     });
 
@@ -149,11 +165,25 @@ CDT_Node.prototype.contains = function(mx, my) {
 }
 
 
-function MethodNode (x, y, w, h, fill, label) {
+function MethodNode (x, y, w, spacing, fill, label, n_inputs, n_outputs) {
+    /*
+    A MethodNode is a rectangle of constant width (w) and varying height (h)
+    where h is proportional to the maximum number of xputs (inputs or outputs).
+    h = max(n_inputs, n_ouputs) * spacing
+    Holes for inputs and outputs are drawn at some (inset) into the left
+    and right sides, respectively.  The width must be greater than 2 * inset.
+    */
     this.x = x || 0;
     this.y = y || 0;
     this.w = w || 10;
-    this.h = h || 10;
+    this.n_inputs = n_inputs || 1;
+    this.n_outputs = n_outputs || 1;
+    console.log(this.n_inputs);
+    console.log(this.n_outputs);
+    this.spacing = spacing || 10; // vertical separation between pins
+    console.log(this.spacing);
+    this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
+    console.log(this.h);
     this.fill = fill || "#AAAAAA";
     this.label = label || '';
 }
@@ -161,6 +191,15 @@ function MethodNode (x, y, w, h, fill, label) {
 MethodNode.prototype.draw = function(ctx) {
     ctx.fillStyle = this.fill;
     ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.fillStyle = '#FFFFFF';
+    for (var i=0; i < this.n_inputs; i++) {
+        ctx.beginPath();
+        ctx.arc(this.x + 10, this.y + this.h * i * 1.5, 5, 0, 2 * Math.PI, true);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.beginPath();
+
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
