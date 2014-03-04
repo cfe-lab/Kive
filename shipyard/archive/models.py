@@ -54,60 +54,36 @@ class Run(models.Model):
 
     def clean(self):
         """
-        Checks coherence of the run (possibly in an incomplete state).
+        Checks coherence of the Run (possibly in an incomplete state).
 
         The procedure:
          - if parent_runstep is not None, then pipeline should be
            consistent with it
-         - check RSs; no RS should be associated without the previous
-           ones being complete
-         - if not all RSs are complete, no ROCs should be associated
-          (from here on all RSs are assumed to be complete)
-           - clean all associated ROCs
+         - RunSteps should all be clean, and should be consecutively
+           numbered starting from 1
+         - all associated RunStepOutputCables must be from RunSteps
+           which are associated (ie. at least in progress), and must
+           be clean
         """
-        if (self.parent_runstep != None and
-                self.pipeline != self.parent_runstep.pipelinestep.transformation):
-            raise ValidationError(
-                'Pipeline of Run "{}" is not consistent with its parent RunStep'.
-                format(self))
+        if (self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation):
+            raise ValidationError('Pipeline of Run "{}" is not consistent with its parent RunStep'.format(self))
 
-        # Go through whatever steps are registered.
-        most_recent_step = None
-        steps_associated = None
-        if self.runsteps.all().exists():
-
-            # Check that steps are proceeding in order.  (Multiple quenching
-            # of steps is taken care of already.)
-            steps_associated = sorted([rs.pipelinestep.step_num for rs in self.runsteps.all()])
-
-            if steps_associated != range(1, len(steps_associated)+1):
+        # Go through whatever steps are registered. All must be clean.
+        for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
+            if runstep.pipelinestep.step_num != i:
                 raise ValidationError('RunSteps of Run "{}" are not consecutively numbered starting from 1'
-                                      .format(self))
+                        .format(self))
+            # RunStepInputCables are cleaned within RunStep.clean()
+            runstep.clean()
 
-            # All steps prior to the last registered one must be complete.
-            for curr_step_num in steps_associated[:-1]:
-                self.runsteps.get(pipelinestep__step_num=curr_step_num).complete_clean()
-
-            # The most recent step should be clean.
-            most_recent_step = self.runsteps.get(
-                pipelinestep__step_num=steps_associated[-1])
-            most_recent_step.clean()
-
-        # If all steps are not complete, then no ROCs should be
-        # associated.
-        if (not self.runsteps.all().exists() or
-                steps_associated[-1] < self.pipeline.steps.count() or
-                not most_recent_step.is_complete()):
-            if self.runoutputcables.all().exists():
-                raise ValidationError(
-                    "Run \"{}\" has not completed all of its RunSteps, so there should be no associated RunOutputCables".
-                    format(self))
-            return
-
-        # From this point on, all RunSteps are assumed to be complete.
-
-        # Run clean on all of its outcables.
+        # Can't have RunOutputCables from non-existent RunSteps.
         for run_outcable in self.runoutputcables.all():
+            source_step = run_outcable.pipelineoutputcable.source_step
+            try:
+                self.runsteps.get(pipelinestep__step_num=source_step)
+            except RunStep.DoesNotExist:
+                raise ValidationError('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep'
+                                      .format(self, source_step))
             run_outcable.clean()
 
     def is_complete(self):
@@ -138,6 +114,9 @@ class Run(models.Model):
         else:
             unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
+
+    def is_subrun(self):
+        return self.parent_runstep is not None
 
 class RunStep(models.Model):
     """
@@ -447,7 +426,6 @@ class RunStep(models.Model):
 
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
-
 
 class RunSIC(models.Model):
     """
