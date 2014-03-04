@@ -94,7 +94,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     $('#id_cdt_button').on('click', function() {
         var node_label = $('#id_select_cdt option:selected').text();
-        canvasState.addShape(new CDT_Node(50, 200+50*Math.random(), 20, '#55FF55', node_label));
+        canvasState.addShape(new CDT_Node(100, 200+50*Math.random(), 20, '#55FF55', node_label));
     });
 
     $('#id_method_button').on('click', function() {
@@ -111,10 +111,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     data: {mid: mid}, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        console.log(result);
-                        n_inputs = result['inputs'];
-                        n_outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(200, 200, 80, 20, '#999999', node_label, n_inputs, n_outputs));
+                        inputs = result['inputs'];
+                        outputs = result['outputs'];
+                        canvasState.addShape(new MethodNode(200, 200, 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
                     }
                 });
             }
@@ -152,7 +151,7 @@ CDT_Node.prototype.draw = function(ctx) {
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
     ctx.fillText(this.label, this.x, this.y+40);
-}
+};
 
 CDT_Node.prototype.contains = function(mx, my) {
     // determine if mouse pointer coordinates (mx, my) are
@@ -162,11 +161,12 @@ CDT_Node.prototype.contains = function(mx, my) {
     var dy = this.y - my;
     var hypo = Math.sqrt((dx * dx) + (dy * dy));
     return (hypo <= this.r);
-}
+};
 
 
-function MethodNode (x, y, w, spacing, fill, label, n_inputs, n_outputs) {
+function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
     /*
+    CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
     where h is proportional to the maximum number of xputs (inputs or outputs).
     h = max(n_inputs, n_ouputs) * spacing
@@ -176,39 +176,122 @@ function MethodNode (x, y, w, spacing, fill, label, n_inputs, n_outputs) {
     this.x = x || 0;
     this.y = y || 0;
     this.w = w || 10;
-    this.n_inputs = n_inputs || 1;
-    this.n_outputs = n_outputs || 1;
-    console.log(this.n_inputs);
-    console.log(this.n_outputs);
+    this.inputs = inputs;
+    this.outputs = outputs;
+
+    this.n_inputs = Object.keys(inputs).length;
+    this.n_outputs = Object.keys(outputs).length;
+
+    this.inset = inset || 10; // distance in for holes
+    this.offset = offset || 10; // space between bottom of node and label
+
     this.spacing = spacing || 10; // vertical separation between pins
-    console.log(this.spacing);
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
-    console.log(this.h);
     this.fill = fill || "#AAAAAA";
     this.label = label || '';
+
+    this.in_magnets = [];
+    for (var i = 0; i < this.n_inputs; i++) {
+        this_input = inputs[i+1]; // 1-indexed
+        magnet = new Magnet(x = this.x + this.inset,
+            y = this.y + this.spacing * (i+0.5),
+            r = 5,
+            attract = 2,
+            fill = '#FFFFFF',
+            cdt = this_input['cdt_pk'],
+            label = this_input['cdt_label']
+        );
+        this.in_magnets.push(magnet);
+    }
+
+    this.out_magnets = [];
+    for (var key in this.outputs) {
+        var this_output = this.outputs[key];
+        magnet = new Magnet(x = this.x + this.w - this.inset,
+            y = this.y + this.spacing * (i+0.5),
+            r = 5,
+            attract = 2,
+            fill = '#FFFFFF',
+            cdt = this_output['cdt_pk'],
+            label = this_output['cdt_label']
+        );
+        this.out_magnets.push(magnet);
+    }
+
+    console.log(this.out_magnets);
 }
 
 MethodNode.prototype.draw = function(ctx) {
     ctx.fillStyle = this.fill;
     ctx.fillRect(this.x, this.y, this.w, this.h);
-    ctx.fillStyle = '#FFFFFF';
-    for (var i=0; i < this.n_inputs; i++) {
-        ctx.beginPath();
-        ctx.arc(this.x + 10, this.y + this.h * i * 1.5, 5, 0, 2 * Math.PI, true);
-        ctx.closePath();
-        ctx.fill();
+
+    for (var i = 0; i < this.in_magnets.length; i++) {
+        magnet = this.in_magnets[i];
+        magnet.draw(ctx, this.x + this.inset, this.y + this.spacing * (i+0.5));
     }
-    ctx.beginPath();
+    for (var i = 0; i < this.out_magnets.length; i++) {
+        magnet = this.out_magnets[i];
+        magnet.draw(ctx, this.x + this.w - this.inset, this.y + this.spacing * (i+0.5));
+    }
 
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w / 2, this.y+80);
-}
+    ctx.fillText(this.label, this.x + this.w / 2, this.y+this.h+this.offset);
+};
 
 MethodNode.prototype.contains = function(mx, my) {
     return (this.x <= mx) && (this.x + this.w >= mx) && (this.y <= my) && (this.y + this.h >= my);
+};
+
+
+function Magnet (x, y, r, attract, fill, cdt, label) {
+    /*
+    A Magnet is the attachment point for a Node (shape) given a
+    Connector.  It is always contained within a shape.
+     */
+    this.x = x;
+    this.y = y;
+    this.r = r; // radius
+    this.attract = attract; // radius of Connector attraction
+    this.fill = fill || "#FFFFFF";
+    this.cdt = cdt; // primary key to CDT
+    this.label = label || '';
 }
+
+Magnet.prototype.draw = function(ctx, x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, this.r, 0, 2 * Math.PI, true);
+    ctx.closePath();
+    ctx.fillStyle = this.fill;
+    ctx.fill();
+};
+
+Magnet.prototype.contains = function(mx, my) {
+    var dx = this.x - mx;
+    var dy = this.y - my;
+    var hypo = Math.sqrt((dx * dx) + (dy * dy));
+    return (hypo <= this.r + this.attract);
+};
+
+
+function Connector (fromX, fromY, toX, toY) {
+    /*
+    A Connector is a line drawn between two Magnets.
+     */
+    this.fromX = fromX;
+    this.fromY = fromY;
+    this.toX = toX;
+    this.toY = toY;
+}
+
+Connector.prototype.draw = function(ctx) {
+    ctx.strokeStyle = 'black';
+    ctx.beginPath();
+    ctx.moveTo(this.fromX, this.fromY);
+    ctx.lineTo(this.toX, this.toY);
+    ctx.closePath();
+};
 
 
 function CanvasState (canvas) {
@@ -241,6 +324,7 @@ function CanvasState (canvas) {
 
     this.valid = false; // if false, canvas will redraw everything
     this.shapes = []; // collection of shapes to be drawn
+    this.connections = []; // collection of connectors between shapes
     this.dragging = false; // if mouse drag
 
     this.selection = null; // reference to active (selected) object
@@ -275,7 +359,23 @@ CanvasState.prototype.doDown = function(e) {
     var pos = this.getPos(e);
     var mx = pos.x;
     var my = pos.y;
+    // are we in an end-zone?
+    if (mx < 0.1*this.width) {
+        console.log('left endzone');
+
+        this.dragoffx = mx;
+        this.dragoffy = my;
+        this.dragging = true;
+        this.selection = null; // use this to indicate that we are drawing an edge
+        this.valid = false; // activate canvas
+        return;
+    }
+    if (mx > 0.9*this.width) {
+        console.log('right endzone');
+    }
+
     var shapes = this.shapes;
+    var connections = this.connections;
     var l = shapes.length;
     for (var i = l-1; i >= 0; i--) {
         // check shapes in reverse order
@@ -295,29 +395,56 @@ CanvasState.prototype.doDown = function(e) {
         this.selection = null;
         this.valid = false;
     }
-}
+};
 
 CanvasState.prototype.doMove = function(e) {
     if (this.dragging) {
         var mouse = this.getPos(e);
-        this.selection.x = mouse.x - this.dragoffx;
-        this.selection.y = mouse.y - this.dragoffy;
-        this.valid = false; // redraw
+
+        if (this.selection == null) {
+            // draw a line
+
+        } else {
+            if (mouse.x < 0.1*this.width || mouse.x > 0.9*this.width) {
+                // prevent shapes from moving into end-zones
+                return;
+            }
+
+            // move a shape
+            this.selection.x = mouse.x - this.dragoffx;
+            this.selection.y = mouse.y - this.dragoffy;
+            this.valid = false; // redraw
+        }
     }
-}
+};
 
 CanvasState.prototype.doUp = function(e) {
     this.dragging = false;
-}
+};
 
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
     this.valid = false;
-}
+};
 
 CanvasState.prototype.clear = function() {
+    // wipe canvas content clean before redrawing
     this.ctx.clearRect(0, 0, this.width, this.height);
-}
+
+    // draw raw data end-zone
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, this.width * 0.1, this.height);
+    this.ctx.closePath();
+    this.ctx.fillStyle = '#AAFFAA';
+    this.ctx.fill();
+
+    // draw output end-zone
+    this.ctx.beginPath();
+    this.ctx.rect(this.width * 0.9, 0, this.width, this.height);
+    this.ctx.closePath();
+    this.ctx.fillStyle = '#FFAAAA';
+    this.ctx.fill();
+};
 
 CanvasState.prototype.draw = function() {
     if (!this.valid) {
@@ -336,8 +463,11 @@ CanvasState.prototype.draw = function() {
             shapes[i].draw(ctx);
         }
 
-        // draw selection ring
-        if (this.selection != null) {
+        if (this.selection == null) {
+            // draw Connector
+        } else {
+            // draw selection ring
+
             ctx.strokeStyle = this.selectionColor;
             ctx.lineWidth = this.selectionWidth;
             var mySel = this.selection;
@@ -356,7 +486,7 @@ CanvasState.prototype.draw = function() {
 
         this.valid = true;
     }
-}
+};
 
 CanvasState.prototype.getPos = function(e) {
     // returns a JavaScript object with x, y coordinates defined
@@ -376,4 +506,4 @@ CanvasState.prototype.getPos = function(e) {
     my = e.pageY - offsetY;
 
     return {x: mx, y: my};
-}
+};

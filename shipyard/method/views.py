@@ -122,6 +122,10 @@ def resource_add(request):
         num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
         to_save = []
         for i in range(num_dep_forms):
+            this_cr = query['coderesource_'+str(i)]
+            if this_cr == '':
+                # ignore blank CR dependency forms
+                continue
             on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
             dependency = CodeResourceDependency(coderesourcerevision=prototype,
                                                 requirement = on_revision,
