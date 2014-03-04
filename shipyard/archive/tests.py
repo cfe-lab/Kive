@@ -759,16 +759,19 @@ class RunTests(librarian.tests.LibrarianTestSetup):
     def test_Run_clean_previous_incomplete_runstep(self):
         """
         A Run whose second RunStep is associated, but whose first step
-        is not complete, is not clean.
+        is not complete, is clean.
+
+        TODO: when we add the check to RunStep.clean that the
+        SymbolicDatasets feeding it are present, this will fail by
+        propagation. The test setup will need to be modified to put in
+        place the inputs to steps 1 and 2.
         """
         self.step_through_run_creation("second_step")
         self.step_E1_RS.execrecord = None
         self.step_E1_RS.reused = None
         self.step_E1_RS.log.clear()
         self.step_E1_RS.save()
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunStep "{}" is not complete'.format(self.step_E1_RS)),
-                                self.pE_run.clean)
+        self.assertIsNone(self.pE_run.clean())
 
     def test_Run_clean_badly_numbered_steps(self):
         """
@@ -815,29 +818,26 @@ class RunTests(librarian.tests.LibrarianTestSetup):
                                           .format(self.step_E2_RS)),
                                 self.pE_run.clean)
 
-    def test_Run_clean_not_enough_RunSteps(self):
+    def test_Run_clean_RunOutputCable_no_RunStep(self):
         """
-        A Run with RunOutputCables, but not enough associated RunSteps,
-        is not clean.
+        A Run with a RunOutputCable from a non-associated RunStep is not
+        clean.
         """
         self.step_through_run_creation("sub_pipeline")
         self.E31_42.poc_instances.create(run=self.pE_run)
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('Run "{}" has not completed all of its RunSteps, so there should be no '
-                                          'associated RunOutputCables'.format(self.pE_run)),
+                                re.escape('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep' 
+                                          .format(self.pE_run, 3)),
                                 self.pE_run.clean)
 
     def test_Run_clean_outcable_incomplete_last_RunStep(self):
         """
-        A Run with a RunOutputCable, but a final RunStep which is not
-        complete, is itself not clean.
+        A Run with a RunOutputCable, and a final RunStep which is clean
+        but not complete, is clean.
         """
         self.step_through_run_creation("third_step")
         self.pE.outcables.first().poc_instances.create(run=self.pE_run)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('Run "{}" has not completed all of its RunSteps, so there should be no '
-                                          'associated RunOutputCables'.format(self.pE_run)),
-                                self.pE_run.clean)
+        self.assertIsNone(self.pE_run.clean())
 
     def test_Run_clean_two_complete_RunSteps(self):
         """
