@@ -40,23 +40,16 @@ class Run(models.Model):
     Related to :model:`archive.models.Dataset`
     """
     user = models.ForeignKey(User, help_text="User who performed this run")
-    start_time = models.DateTimeField("start time", auto_now_add=True,
-                                      help_text="Time at start of run")
-    pipeline = models.ForeignKey(
-        "pipeline.Pipeline",
-        related_name="pipeline_instances",
-        help_text="Pipeline used in this run")
+    start_time = models.DateTimeField("start time", auto_now_add=True, help_text="Time at start of run")
+    pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
+                                 help_text="Pipeline used in this run")
 
     name = models.CharField("Run name", max_length=256)
     description = models.TextField("Run description", blank=True)
 
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
-    parent_runstep = models.OneToOneField(
-        "RunStep",
-        related_name="child_run",
-        null=True,
-        blank=True,
+    parent_runstep = models.OneToOneField("RunStep", related_name="child_run", null=True, blank=True,
         help_text="Step of parent run initiating this one as a sub-run")
 
     def clean(self):
@@ -68,15 +61,14 @@ class Run(models.Model):
            consistent with it
          - check RSs; no RS should be associated without the previous
            ones being complete
-         - if not all RSs are complete, no ROCs should be associated,
-           ER should not be set
+         - if not all RSs are complete, no ROCs should be associated
           (from here on all RSs are assumed to be complete)
            - clean all associated ROCs
         """
         if (self.parent_runstep != None and
                 self.pipeline != self.parent_runstep.pipelinestep.transformation):
             raise ValidationError(
-                "Pipeline of Run \"{}\" is not consistent with its parent RunStep".
+                'Pipeline of Run "{}" is not consistent with its parent RunStep'.
                 format(self))
 
         # Go through whatever steps are registered.
@@ -86,13 +78,11 @@ class Run(models.Model):
 
             # Check that steps are proceeding in order.  (Multiple quenching
             # of steps is taken care of already.)
-            steps_associated = sorted(
-                [rs.pipelinestep.step_num for rs in self.runsteps.all()])
+            steps_associated = sorted([rs.pipelinestep.step_num for rs in self.runsteps.all()])
 
             if steps_associated != range(1, len(steps_associated)+1):
-                raise ValidationError(
-                    "RunSteps of Run \"{}\" are not consecutively numbered starting from 1".
-                    format(self))
+                raise ValidationError('RunSteps of Run "{}" are not consecutively numbered starting from 1'
+                                      .format(self))
 
             # All steps prior to the last registered one must be complete.
             for curr_step_num in steps_associated[:-1]:
@@ -109,9 +99,8 @@ class Run(models.Model):
                 steps_associated[-1] < self.pipeline.steps.count() or
                 not most_recent_step.is_complete()):
             if self.runoutputcables.all().exists():
-                raise ValidationError(
-                    "Run \"{}\" has not completed all of its RunSteps, so there should be no associated RunOutputCables".
-                    format(self))
+                raise ValidationError('Run "{}" has not completed all of its RunSteps, so there should be no '
+                                      'associated RunOutputCables'.format(self))
             return
 
         # From this point on, all RunSteps are assumed to be complete.
@@ -148,6 +137,9 @@ class Run(models.Model):
         else:
             unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
+
+    def is_subrun(self):
+        return self.parent_runstep is not None
 
 class RunStep(models.Model):
     """
@@ -458,7 +450,6 @@ class RunStep(models.Model):
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
 
-
 class RunSIC(models.Model):
     """
     Annotates the action of a PipelineStepInputCable within a RunStep.
@@ -716,20 +707,13 @@ class RunOutputCable(models.Model):
     Related to :model:`pipeline.models.PipelineOutputCable`
     """
     run = models.ForeignKey(Run, related_name="runoutputcables")
-    execrecord = models.ForeignKey(
-        "librarian.ExecRecord",
-        null=True, blank=True,
-        related_name="runoutputcables")
-    reused = models.NullBooleanField(
-        help_text="Denotes whether this run reused the action of an output cable",
-        default=None)
-    pipelineoutputcable = models.ForeignKey(
-        "pipeline.PipelineOutputCable",
-        related_name="poc_instances")
+    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="runoutputcables")
+    reused = models.NullBooleanField(help_text="Denotes whether this run reused the action of an output cable",
+                                     default=None) 
+    pipelineoutputcable = models.ForeignKey("pipeline.PipelineOutputCable", related_name="poc_instances")
 
-    start_time = models.DateTimeField(
-        "start time", auto_now_add=True,
-        help_text="Time at start of running this output cable")
+    start_time = models.DateTimeField("start time", auto_now_add=True, 
+                                      help_text="Time at start of running this output cable")
 
     log = generic.GenericRelation("ExecLog")
     output = generic.GenericRelation("Dataset")
