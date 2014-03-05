@@ -117,11 +117,6 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_wire2 = self.E21_41.custom_outwires.create(source_pin=self.triplet_cdt.members.all()[2],dest_pin=self.doublet_cdt.members.all()[0])
         self.pE.clean()
 
-        # This has been moved to MetadataTestSetup.
-        # # Define a user
-        # self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-        # self.myUser.save()
-
         # Runs for the pipelines.
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.pD_run.save()

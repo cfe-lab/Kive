@@ -353,7 +353,6 @@ class RunStep(models.Model):
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
-
     def clean(self):
         """
         Check coherence of this RunStep.
@@ -1010,7 +1009,7 @@ class Dataset(models.Model):
         """If this Dataset has an MD5 set, verify the dataset file integrity"""
         if not self.check_md5():
             raise ValidationError(
-                "File integrity of \"{}\" lost.  Current checksum \"{}\" does not equal expected checksum \"{}\"".
+                "File integrity of \"{}\" lost. Current checksum \"{}\" does not equal expected checksum \"{}\"".
                 format(self, self.compute_md5(),
                        self.symbolicdataset.MD5_checksum))
 

@@ -20,10 +20,66 @@ from metadata.models import *
 from pipeline.models import *
 from method.tests import samplecode_path
 import librarian.tests
+from file_access_utils import compute_md5
+
+# TODO: Put this someplace better, maybe shipyard/testing_utils.py?
+from sandbox.tests_rm import clean_files
 
 # Note that these tests use the exact same setup as librarian.
+def make_complete_non_reused(record, input_SDs, output_SDs):
+    """
+    Helper function to do everything necessary to make a RunStep, 
+    RunOutputCable, or RunStepInputCable complete, when it has not
+    reused an ExecRecord (ie. make a new ExecRecord).
+    """
+    record_type = record.__class__.__name__
+    record.reused = False
+
+    execlog = ExecLog(record=record, start_time=timezone.now(), end_time=timezone.now())
+    execlog.save()
+    if record_type == "RunStep":
+        MethodOutput(execlog=execlog, return_code=0).save()
+    execrecord = ExecRecord(generator=execlog)
+    execrecord.save()
+
+    # TODO: This needs a helper get_pipeline_component or something.
+    if record_type == "RunStep":
+        inputs = list(record.pipelinestep.transformation.inputs.all())
+        outputs = list(record.pipelinestep.transformation.outputs.all())
+    elif record_type == "RunOutputCable":
+        inputs = [record.pipelineoutputcable.source]
+        transf = record.run.pipeline
+        outputs = [transf.outputs.get(dataset_idx=record.pipelineoutputcable.output_idx)]
+    else:
+        inputs = [record.PSIC.source]
+        outputs = [record.PSIC.dest]
+
+    for i, inp in enumerate(inputs):
+        execrecord.execrecordins.create(generic_input=inp, symbolicdataset=input_SDs[i])
+    for i, outp in enumerate(outputs):
+        execrecord.execrecordouts.create(generic_output=outp, symbolicdataset=output_SDs[i])
+        if record_type == "RunOutputCable" and not record.pipelineoutputcable.is_trivial():
+            record.output.add(output_SDs[i].dataset)
+
+    record.execrecord = execrecord
+    record.clean()
+    record.save()
+
+def complete_RSICs(runstep, input_SDs, output_SDs):
+    """
+    Helper function to create and complete all the RunSIC's needed for
+    a given RunStep. input_SDs and output_SDs are lists of the input and
+    output symbolic datasets for each cable, in order.
+    """
+    for i, cable in enumerate(runstep.pipelinestep.cables_in.order_by("dest__dataset_idx")):
+        rsic = cable.psic_instances.create(runstep=runstep)
+        make_complete_non_reused(rsic, [input_SDs[i]], [output_SDs[i]])
 
 class RunStepTests(librarian.tests.LibrarianTestSetup):
+
+    def tearDown(self):
+        super(self.__class__, self).tearDown()
+        clean_files()
 
     def test_runstep_many_execlogs(self):
         run = self.pE.pipeline_instances.create(user=self.myUser)
@@ -37,591 +93,467 @@ class RunStepTests(librarian.tests.LibrarianTestSetup):
                           format(run_step, 2)),
                 run_step.clean)
 
+    def step_through_runstep_creation(self, bp):
+        """
+        Helper function to step through creation of a RunStep, breaking
+        at a certain point (see the code for what these points are).
+        """
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        if bp == "empty_runs": return
 
-    def test_RunStep_clean(self):
-        """Check coherence tests for RunStep at all stages of its creation."""
-        # Create some infrastructure for our RunSteps.
-        pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "first_runstep": return
 
-        # Bad case: RS has a PS that does not belong to the pipeline.
-        step_D1_RS = self.step_D1.pipelinestep_instances.create(run=pE_run)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "PipelineStep .* of RunStep .* does not belong to Pipeline .*",
-            step_D1_RS.clean)
+        self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
+        make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
+        if bp == "first_rsic": return 
+        
+        make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
+        if bp == "first_runstep_complete": return
 
-        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=pE_run)
+        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "second_runstep": return
 
-        # Bad case: step E1 should not have a child_run defined.
-        pD_run = self.pD.pipeline_instances.create(user=self.myUser)
-        pD_run.parent_runstep = step_E1_RS
-        pD_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "PipelineStep of RunStep .* is not a Pipeline but a child run exists",
-            step_E1_RS.clean)
+        complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS], 
+                                        [self.D1_in_symDS, self.singlet_symDS])
+        if bp == "second_runstep_complete": return
+        
+        # Associate and complete sub-Pipeline.
+        self.pD_run.parent_runstep = self.step_E2_RS
+        self.pD_run.save()
+        self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
+        complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], 
+                                        [self.D1_in_symDS, self.singlet_symDS])
+        make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
+        pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
+        make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        if bp == "sub_pipeline": return
 
-        # Moving on....
-        pD_run.parent_runstep = None
-        pD_run.save()
+    def test_RunStep_clean_wrong_pipeline(self):
+        """
+        A RunStep which has a PipelineStep from one Pipeline, but a Run
+        for a different Pipeline, is not clean.
+        """
+        self.step_through_runstep_creation("empty_runs")
+        runstep = self.step_D1.pipelinestep_instances.create(run=self.pE_run)
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('PipelineStep "{}" of RunStep "{}" does not belong to Pipeline "{}"'
+                                          .format(self.step_D1, runstep, self.pE)),
+                                runstep.clean)
 
-        # Good case: no RSICs.
-        self.assertEquals(step_E1_RS.clean(), None)
+    def test_RunStep_clean_child_run_for_method(self):
+        """
+        A RunStep which represents a Method should not have a child_run
+        defined.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.pD_run.parent_runstep = self.step_E1_RS
+        self.pD_run.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('PipelineStep of RunStep "{}" is not a Pipeline but a child run exists'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Bad case (propagation): define an RSIC that is not complete.
-        E03_11_RSIC = self.E03_11.psic_instances.create(runstep=step_E1_RS)
-        E03_11_EL = E03_11_RSIC.log.create()
-        E03_11_EL.start_time = timezone.now()
-        time.sleep(1)
-        E03_11_EL.end_time = timezone.now()
-        E03_11_EL.save()
-        E03_11_ER = ExecRecord(generator=E03_11_EL)
-        E03_11_ER.save()
-        E03_11_ER.execrecordins.create(generic_input=self.E3_rawin,
-                                       symbolicdataset=self.raw_symDS)
-        E03_11_ER.execrecordouts.create(generic_output=self.A1_rawin,
-                                        symbolicdataset=self.raw_symDS)
+    def test_RunStep_clean_no_RunSICs(self):
+        """
+        A RunStep with no RunSIC's is clean.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.assertIsNone(self.step_E1_RS.clean())
 
-        E03_11_RSIC.reused = False
-        E03_11_RSIC.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunSIC .* has no ExecRecord",
-            step_E1_RS.clean)
+    def test_RunStep_clean_incomplete_RunSIC(self):
+        """
+        A RunStep with an incomplete RunSIC is not clean.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        self.E03_11_RSIC.execrecord = None
+        self.E03_11_RSIC.save()
+        self.assertRaisesRegexp(ValidationError, re.escape('RunSIC "{}" has no ExecRecord'.format(self.E03_11_RSIC)),
+                                self.step_E1_RS.clean)
 
-        # Good propagation case: RSIC is complete.
-        E03_11_RSIC.execrecord = E03_11_ER
-        E03_11_RSIC.save()
-        self.assertEquals(step_E1_RS.clean(), None)
+    def test_RunStep_complete_RunSIC(self):
+        """
+        A RunStep with a complete RunSIC is clean.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        self.assertIsNone(self.step_E1_RS.clean())
 
-        # Bad case: cables not quenched, but there is an associated dataset.
-        E03_11_RSIC.delete()
-        self.doublet_DS.created_by = step_E1_RS
+    def test_RunStep_inputs_unquenched_with_data(self):
+        """
+        A RunStep with unquenched input cables, but an associated
+        Dataset, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; no data should have been generated",
-            step_E1_RS.clean)
-        # Reset....
-        self.doublet_DS.created_by = None
-        self.doublet_DS.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Bad case: cables not quenched, but reused is set.
-        step_E1_RS.reused = False
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; reused and execrecord should not be set",
-            step_E1_RS.clean)
+    def test_RunStep_input_unquenched_with_reused(self):
+        """
+        A RunStep with unquenched input cables, but which has decided
+        not to reuse an ExecRecord, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.step_E1_RS.reused = False
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" inputs not quenched; reused and execrecord should not be set'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Bad case: cables not quenched, but execrecord is set
-        step_E1_RS.reused = None
-        # Define ER for mA
-        mA_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
-        mA_ER = self.ER_from_record(mA_RS)
-        mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
-                                              generic_input=self.A1_rawin)
-        mA_ER_out = mA_ER.execrecordouts.create(symbolicdataset=self.doublet_symDS,
-                                                generic_output=self.A1_out)
-        step_E1_RS.execrecord = mA_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; reused and execrecord should not be set",
-            step_E1_RS.clean)
+    def test_RunStep_input_unquenched_with_execrecord(self):
+        """
+        A RunStep with unquenched input cables, but which has an
+        associated ExecRecord, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.E03_11_RSIC.delete()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" inputs not quenched; reused and execrecord should not be set'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Reset....
-        step_E1_RS.execrecord = None
-
-        # Bad case: PS is a Pipeline, PS has child_run set, but cables are not
-        # quenched.
-        step_E2_RS = self.step_E2.pipelinestep_instances.create(run=pE_run)
+    def test_RunStep_input_unquenched_with_child_run(self):
+        """
+        A RunStep with unquenched input cables, but which has a
+        child_run, is not clean.
+        """
+        self.step_through_runstep_creation("second_runstep")
         pD_run.parent_runstep = step_E2_RS
         pD_run.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* inputs not quenched; child_run should not be set",
-            step_E2_RS.clean)
+        self.assertRaisesRegexp(ValidationError, 
+                                re.escape('RunStep "{}" inputs not quenched; child_run should not be set'
+                                          .format(self.step_E2_RS)),
+                                self.step_E2_RS.clean)
 
-        # Reset....
-        pD_run.parent_runstep = None
-        pD_run.save()
-        E03_11_RSIC = self.E03_11.psic_instances.create(
-            runstep=step_E1_RS,
-            reused=False,
-            execrecord=E03_11_ER)
-        self.assertEquals(step_E1_RS.clean(), None)
+    def test_RunStep_clean_inputs_quenched(self):
+        """
+        A RunStep with all its inputs quenched is clean.
+        """
+        self.step_through_runstep_creation("second_runstep_complete")
+        self.assertIsNone(self.step_E2_RS.clean())
 
-        # Quench cables for step E2 as well.
-        E01_21_RSIC = self.E01_21.psic_instances.create(
-            runstep = step_E2_RS, reused=False)
-        E01_21_ER = self.ER_from_record(E01_21_RSIC)
-        E01_21_ER.execrecordins.create(generic_input=self.E1_in,
-                                       symbolicdataset=self.triplet_symDS)
-        E01_21_ER.execrecordouts.create(generic_output=self.D1_in,
-                                        symbolicdataset=self.D1_in_symDS)
-        E01_21_RSIC.execrecord = E01_21_ER
-        E01_21_RSIC.save()
+    def test_RunStep_clean_undecided_reused_with_execrecord(self):
+        """
+        A RunStep which has not decided whether to reuse an ExecRecord,
+        but which has one associated, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
 
-        E02_22_RSIC = self.E02_22.psic_instances.create(
-            runstep=step_E2_RS, reused=False)
-        E02_22_ER = self.ER_from_record(E02_22_RSIC)
-        E02_22_ER.execrecordins.create(generic_input=self.E2_in,
-                                       symbolicdataset=self.singlet_symDS)
-        E02_22_ER.execrecordouts.create(generic_output=self.D2_in,
-                                        symbolicdataset=self.singlet_symDS)
-        E02_22_RSIC.execrecord = E02_22_ER
-        E02_22_RSIC.save()
-        self.assertEquals(step_E2_RS.clean(), None)
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
+        rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
+        make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
+        make_complete_non_reused(other_runstep, [self.raw_symDS], [self.doublet_symDS])
 
-        
-        # Bad case: reused is not set, but there is an associated dataset.
-        self.doublet_DS.created_by = step_E1_RS
+        self.step_E1_RS.reused = None
+        runstep_PK = self.step_E1_RS.pk
+        self.step_E1_RS.log.first().delete()
+        print("*"*80)
+        print(RunStep.objects.get(pk=runstep_PK))
+        print("*"*80)
+        self.step_E1_RS.execrecord = other_runstep.execrecord
+
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" has not decided whether or not to reuse an ExecRecord; '
+                                          'execrecord should not be set'.format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_clean_undecided_reused_with_execlog(self):
+        """
+        A RunStep which has not decided whether to reuse an ExecRecord,
+        but which has an ExecLog, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.step_E1_RS.reused = None
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" has not decided whether or not to reuse an ExecRecord; '
+                                          'no log should have been generated'.format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_clean_undecided_reused_with_data(self):
+        """
+        A RunStep which has not decided whether to reuse an ExecRecord,
+        but which has output SymbolicDatasets, is not clean.
+        """
+        # Give step_E1_RS a complete ExecLog.
+        self.step_through_runstep_creation("first_runstep_complete")
+
+        # To bypass the check for quenched inputs, we have to create
+        # another ExecRecord which matches step_E1.
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
+        rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
+        make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
+        make_complete_non_reused(other_runstep, [self.raw_symDS], [self.doublet_symDS])
+
+        self.step_E1_RS.reused = None
+        self.step_E1_RS.execrecord = other_runstep.execrecord
+
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" has not decided whether or not to reuse an ExecRecord; '
+                                          'no log should have been generated'.format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_clean_reused_with_data(self):
+        """
+        A RunStep which has decided to reuse an ExecRecord, but which
+        has output SymbolicDatasets, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.step_E1_RS.reused = True
+        self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; no data should have been generated",
-            step_E1_RS.clean)
-        # Reset....
-        self.doublet_DS.created_by = None
-        self.doublet_DS.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" reused an ExecRecord and should not have generated any Datasets'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Bad case: reused not set, but ER is.
-        step_E1_RS.execrecord = mA_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
-            step_E1_RS.clean)
+    def test_RunStep_clean_subpipeline_with_execlog(self):
+        """
+        A RunStep which has a child run should have no ExecLog.
+        """
+        self.step_through_runstep_creation("sub_pipeline")
+        ExecLog(record=self.step_E2_RS, start_time=timezone.now(), end_time=timezone.now()).save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" represents a sub-pipeline so no log should be associated'
+                                          .format(self.step_E2_RS)),
+                                self.step_E2_RS.clean)
 
-        # Jan 14: not necessary anymore, since ExecRecords can no longer point to pipelines. -Rosemary
-        pD_ER = self.ER_from_record(step_D1_RS)
-        #step_E2_RS.execrecord = pD_ER
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* has not decided whether or not to reuse an ExecRecord; execrecord should not be set",
-        #    step_E2_RS.clean)
-        ## Proceeding....
-        step_E1_RS.execrecord = None
-        step_E2_RS.execrecord = None
-        step_E2_RS.reused = None
+    def test_RunStep_clean_subpipeline_with_dataset(self):
+        """
+        A RunStep which has a child run should have no associated output
+        Datasets.
+        """
+        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_E2_RS.outputs.add(self.singlet_symDS.dataset)
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" represents a sub-pipeline and should not have generated any '
+                                          'data'.format(self.step_E2_RS)),
+                                self.step_E2_RS.clean)
 
-        # Jan 14: this exception doesn't appear in the code anymore. Is this no longer
-        # a restriction? -Rosemary
-        # Bad case: PS is a Pipeline, reused is not set, child_run is set.
-        #pD_run.parent_runstep = step_E2_RS
-        #pD_run.save()
-        #step_E2_RS.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* has not decided whether or not to reuse an ExecRecord; child_run should not be set",
-        #    step_E2_RS.clean)
-        ## Proceeding....
-        #pD_run.parent_runstep = None
-        #pD_run.save()
+    def test_RunStep_clean_subpipeline_with_reused(self):
+        """
+        A RunStep which has a child run should not have set reused.
+        """
+        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_E2_RS.reused = True
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" represents a sub-pipeline so reused should not be set'
+                                          .format(self.step_E2_RS)),
+                                self.step_E2_RS.clean)
 
-        # Bad case: reused = True, there is data associated to this RS.
-        step_E1_RS.reused = True
-        self.doublet_DS.created_by = step_E1_RS
-        self.doublet_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* reused an ExecRecord and should not have generated any Datasets",
-            step_E1_RS.clean)
+    def test_RunStep_clean_subpipeline_with_execrecord(self):
+        """
+        A RunStep which has a child run should not have an execrecord.
+        """
+        self.step_through_runstep_creation("second_runstep_complete")
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E2.pipelinestep_instances.create(run=other_run)
+        execlog = ExecLog(record=other_runstep, start_time=timezone.now(), end_time=timezone.now())
+        execlog.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
+        self.step_E2_RS.execrecord = execrecord
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" represents a sub-pipeline so execrecord should not be set'
+                                          .format(self.step_E2_RS)),
+                                self.step_E2_RS.clean)
 
-        # Jan 14: This exception doesn't appear in the code anymore. Replaced with a test for
-        # being a sub-pipeline and being reused (which can't happen?).
-        # Bad case: reused = True and child_run is set.
-        step_E2_RS.reused = True
-        #pD_run.parent_runstep = step_E2_RS
-        #pD_run.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* reused an ExecRecord and should not have a child run",
-        #    step_E2_RS.clean)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* represents a sub-pipeline so reused should not be set",
-            step_E2_RS.clean)
+    def test_RunStep_clean_subpipeline_good(self):
+        """
+        A RunStep representing a sub-pipeline, which has not set
+        reused and has no ExecLog, is clean.
+        """
+        self.step_through_runstep_creation("second_runstep")
+        self.assertIsNone(self.step_E2_RS.clean())
 
-        # Reset....
-        step_E2_RS.reused = None
-        self.doublet_DS.created_by = None
-        self.doublet_DS.save()
-        pD_run.parent_runstep = None
-        pD_run.save()
+    def test_RunStep_clean_reused_no_execrecord(self):
+        """
+        A RunStep which has decided to reuse an ExecRecord, but doesn't
+        have one associated yet, is clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.step_E1_RS.reused = True
+        self.step_E1_RS.execrecord = None
+        self.assertIsNone(self.step_E1_RS.clean())
 
-        # Good case: reused = True and ER is not.
-        self.assertEquals(step_E1_RS.clean(), None)
-        self.assertEquals(step_E2_RS.clean(), None)
-
-        # Create ExecLogs with associated MethodOutputs for RunSteps.
-        step_E1_EL = step_E1_RS.log.create()
-        step_E1_EL.start_time = timezone.now()
-        time.sleep(1)
-        step_E1_EL.end_time = timezone.now()
-        step_E1_EL.save()
-
-        step_E2_EL = step_E2_RS.log.create()
-        step_E1_EL.start_time = timezone.now()
-        time.sleep(1)
-        step_E1_EL.end_time = timezone.now()
-        step_E1_EL.save()
-
-        step_E1_MO = MethodOutput(execlog=step_E1_EL, return_code = 0)
-        step_E2_MO = MethodOutput(execlog=step_E2_EL, return_code = 0)
-        step_E1_MO.save()
-        step_E2_MO.save()
-        step_E1_EL.methodoutput = step_E1_MO
-        step_E2_EL.methodoutput = step_E2_MO
-        
-        # Bad propagation case: reused = False and associated data is not clean.
-        step_E1_RS.reused = False
-        self.doublet_DS.created_by = step_E1_RS
+    def test_RunStep_clean_non_reused_bad_data(self):
+        """
+        A RunStep which has decided not to reuse an ExecRecord,
+        and has bad output data, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.step_E1_RS.reused = False
+        self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_symDS.MD5_checksum = "foo"
         self.doublet_DS.save()
         self.doublet_symDS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "File integrity of .* lost.  Current checksum .* does not equal expected checksum .*",
-            step_E1_RS.clean)
+        with open(self.doublet_DS.dataset_file.name) as f:
+            checksum = compute_md5(f)
 
-        # Good propagation case for E1: reused = False, associated data is clean.
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
+                                          'checksum "{}"'.format(self.doublet_DS, checksum, "foo")),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_clean_non_reused_good_data(self):
+        """
+        A RunStep which has decided not to reuse an ExecRecord, and has
+        clean output data, is clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
         self.doublet_symDS.MD5_checksum = self.doublet_DS.compute_md5()
         self.doublet_DS.save()
         self.doublet_symDS.save()
-        self.assertEquals(step_E1_RS.clean(), None)
-
-        # Jan 15: This scenario is no longer good, since ExecLogs are now only 
-        # associated with atomic transformations, but step_E2 is a sub-pipeline.
-        # Replaced with a test that sub-pipelines can't have ExecLogs, nor can
-        # they set reused (why the second one?). -Rosemary
-        # Good propagation case for E2: reused = False and no child run is set.
-        step_E2_RS.reused = False
-        #self.assertEquals(step_E2_RS.clean(), None)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* represents a sub-pipeline so no log should be associated",
-            step_E2_RS.clean)
-
-        # Remove the log, should still fail because reused is set.
-        step_E2_RS.log = step_E2_RS.log.none()
-        step_E2_RS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* represents a sub-pipeline so reused should not be set",
-            step_E2_RS.clean)
-
-        # Good case: sub-pipeline with no log and unset reused.
-        step_E2_RS.reused = None
-        step_E2_RS.save()
-        self.assertEquals(step_E2_RS.clean(), None)
-
-        # Good case: child run is set and clean.
-        pD_run.parent_runstep = step_E2_RS
-        pD_run.save()
-        self.assertEquals(step_E2_RS.clean(), None)
-
-        # Jan 15: No longer relevant, since Runs can't have ExecRecords anymore. -Rosemary
-        # Bad propagation case: child run is set but not clean.
-        #pD_run.execrecord = pD_ER
-        #pD_run.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "Run .* has not decided whether or not to reuse an ER yet, so execrecord should not be set",
-        #    step_E2_RS.clean)
-        ## Reset....
-        #pD_run.execrecord = None
-        #pD_run.save()
-
-        # Bad case: child run is set and clean, but there is data
-        # associated with the RunStep.
-        self.C1_in_DS.created_by = step_E2_RS
-        self.C1_in_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* represents a sub-pipeline and should not have generated any data",
-            step_E2_RS.clean)
-        # Reset....
-        self.C1_in_DS.created_by = None
-        self.C1_in_DS.save()
-
-        # Bad case: child run is set and clean, but ER is also set.
-        pD_run.execrecord = None
-        pD_run.save()
-        step_E2_RS.execrecord = pD_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* represents a sub-pipeline so execrecord should not be set",
-            step_E2_RS.clean)
-
-        # Reset....
-        step_E2_RS.execrecord = None
-
-        # From here on, we do tests where execrecord (or child_run.execrecord) is set.
-        # Bad propagation case: execrecord is not complete.
-        mA_ER_in.delete()
-        step_E1_RS.execrecord = mA_ER
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input\(s\) to ExecRecord .* are not quenched",
-            step_E1_RS.clean)
-
-        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
-        # an ExecRecord. -Rosemary
-        #pD_run.reused = True
-        #pD_run.execrecord = pD_ER
-        #pD_run.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "Input\(s\) to ExecRecord .* are not quenched",
-        #    step_E2_RS.clean)
-
-        # Reset....
-        #pD_run.parent_runstep = None
-        #pD_run.save()
+        self.assertIsNone(self.step_E1_RS.clean())    
         
-        # Good propagation cases: ERs are complete, outputs are not deleted, all
-        # associated data belongs to an ERO of this ER (i.e. this case proceeds
-        # to the end).
-        mA_ER_in = mA_ER.execrecordins.create(symbolicdataset=self.raw_symDS,
-                                              generic_input=self.A1_rawin)
-        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
-                                              generic_input=self.D1_in)
-        pD_ER_in = pD_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
-                                              generic_input=self.D2_in)
-        pD_ER_out = pD_ER.execrecordouts.create(
-            symbolicdataset=self.C1_in_symDS,
-            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
-        self.assertEquals(step_E1_RS.clean(), None)
-        self.assertEquals(step_E2_RS.clean(), None)
-        
-        # Bad case: ER points to the wrong transformation.
-        # Jan 15: TODO The data types are checked first, making this exception hard to reach.
-        # To test this, I have to make two methods with the same inputs and outputs.
-        #step_E1_RS.execrecord = pD_ER
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* points to transformation .* but corresponding ER does not",
-        #    step_E1_RS.clean)
+    def test_RunStep_clean_good_child_run(self):
+        """
+        A RunStep with a child_run which is clean, is also clean.
+        """
+        self.step_through_runstep_creation("sub_pipeline")
+        self.assertIsNone(self.step_E3_RS.clean())
 
-        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
-        # an ExecRecord. -Rosemary
-        #step_E2_RS.execrecord = mA_ER
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* points to transformation .* but corresponding ER does not",
-        #    step_E2_RS.clean)
-        #step_E2_RS.execrecord = pD_ER
-        #step_E2_RS.save()
+    def test_RunStep_clean_good_child_run(self):
+        """
+        A RunStep with a child_run which is not clean, is also not
+        clean. Note: this isn't quite the same as the original test,
+        I'm having trouble hitting the "execrecord should not be set"
+        error.
+        """
+        self.step_through_runstep_creation("sub_pipeline")
+        self.step_D1_RS.reused = None
+        self.step_D1_RS.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" has not decided whether or not to reuse an ExecRecord; '
+                                          'no log should have been generated'.format(self.step_D1_RS)),
+                                self.step_E2_RS.clean)
 
-        # Reset....
-        #step_E1_RS.execrecord = mA_ER
-        #step_E1_RS.save()
+    def test_RunStep_clean_bad_execrecord(self):
+        """
+        A RunStep whose ExecRecord is not clean, is also not clean.
+        """
+        self.step_through_runstep_creation("first_step_complete")
+        execrecord = self.step_E1_RS.execrecord
+        execrecord.execrecordins.first().delete()
+        self.assertRaisesRegexp(ValidationError, 
+                                re.escape('Input(s) to ExecRecord "{}" are not quenched'.format(execrecord)),
+                                self.step_E1_RS.clean)
 
-        # Bad case: step E1's output is marked for deletion, and step
-        # is not reused, but there is an associated Dataset.
-        self.step_E1.outputs_to_delete.add(
-            self.mA.outputs.get(dataset_name="A1_out"))
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Output .* of RunStep .* is deleted; no data should be associated",
-            step_E1_RS.clean)
+    def test_RunStep_clean_good_execrecord(self):
+        """
+        A RunStep representing a Method with a clean ExecRecord and no
+        other problems, is clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.assertIsNone(self.step_E1_RS.clean())
 
-        # Bad case: output not deleted, but ERO has no existent data.
-        self.step_E1.outputs_to_delete.remove(
-            self.mA.outputs.get(dataset_name="A1_out"))
-        self.step_E1.save()
-        empty_symDS = SymbolicDataset()
-        empty_symDS.save()
-        structure = DatasetStructure(symbolicdataset=empty_symDS, compounddatatype=self.doublet_cdt)
-        structure.save()
-        empty_symDS.structure = structure
-        mA_ER_out.symbolicdataset = empty_symDS
-        mA_ER_out.save()
+    def test_RunStep_execrecord_wrong_transformation(self):
+        """
+        If a RunStep has an associated ExecRecord, it must point to
+        the same transformation that the RunStep does.
+        """
+        self.step_through_runstep_creation("sub_pipeline")
+        self.step_E1_RS.execrecord.generator = self.step_D1_RS
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" points to transformation "{}" but corresponding ER does not'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        self.assertRaisesRegexp(
-            ValidationError,
-            "ExecRecordOut .* of RunStep .* should reference existent data",
-            step_E1_RS.clean)
-        # Reset....
-        mA_ER_out.symbolicdataset = self.doublet_symDS
-        mA_ER_out.save()
+    def test_RunStep_deleted_output_with_data(self):
+        """
+        A RunStep with an output marked for deletion, should not have
+        any Datasets associated to that output.
+        """
+        self.step_through_runstep_creation("first_step_complete")
+        self.step_E1.outputs_to_delete.add(self.mA.outputs.get(dataset_name="A1_out"))
+        output = self.step_E1.transformation.outputs.first()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('Output "{}" of RunStep "{}" is deleted; no data should be associated'
+                                          .format(output, self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Jan 15: No longer relevant, since step_E2 is a sub-pipeline so it can't have
-        # an ExecRecord. -Rosemary
-        #pD_ER_out.symbolicdataset = empty_symDS
-        #pD_ER_out.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "ExecRecordOut .* of RunStep .* should reference existent data",
-        #    step_E2_RS.clean)
-        # Reset....
-        #pD_ER_out.symbolicdataset = self.C1_in_symDS
-        #pD_ER_out.save()
+    def test_RunStep_missing_output_with_data(self):
+        """
+        A RunStep with a missing output, should not have any Datasets
+        associated to that output.
+        """
+        self.step_through_runstep_creation("first_step_complete")
+        content_check = ContentCheckLog(symbolicdataset=self.doublet_symDS, execlog=self.step_E1_RS.log.first())
+        content_check.save()
+        BadData(contentchecklog=content_check, missing_output=True).save()
 
-        # Bad case: ER is not reused, output was not deleted, but no Dataset is associated.
-        # Jan 15: This exception doesn't seem to be in the code anymore. -Rosemary
-        #self.doublet_DS.created_by = None
-        #self.doublet_DS.save()
-        #self.assertRaisesRegexp(
-        #    ValidationError,
-        #    "RunStep .* did not reuse an ExecRecord, had no child run, and output .* was not deleted; a corresponding Dataset should be associated",
-        #    step_E1_RS.clean)
-        ## Reset....
-        #self.doublet_DS.created_by = step_E1_RS
-        #self.doublet_DS.save()
+        output = self.step_E1.transformation.outputs.first()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('Output "{}" of RunStep "{}" is missing; no data should be associated'
+                                          .format(output, self.step_E1_RS)),
+                                self.step_E1_RS.clean)
 
-        # Bad case: there is an associated dataset that does not belong to any ERO
-        # of this ER.
-        self.triplet_DS.created_by = step_E1_RS
+    def test_RunStep_kept_output_without_data(self):
+        """
+        A RunStep which keeps its outputs, but has an ExecRecordOut
+        without data, is not clean.
+        """
+        self.step_through_runstep_creation("first_step_complete")
+        ero = self.step_E1_RS.execrecord.execrecordouts.first()
+        ero.symbolicdataset.dataset.delete()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
+                                          .format(ero, self.step_E1_RS)),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_output_not_in_ExecRecord(self):
+        """
+        A RunStep with a Dataset not in its ExecRecord is not clean.
+        """
+        self.step_through_runstep_creation("first_step")
+        self.triplet_DS.created_by = self.step_E1_RS
         self.triplet_DS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* generated Dataset .* but it is not in its ExecRecord",
-            step_E1_RS.clean)
-        # Reset....
-        self.triplet_DS.created_by = None
-        self.triplet_DS.save()
-        
-        # Let's check some of the above cases for step E2 when it's *not* reused.
-        # Sadly this means we have to define a whole sub-run for pD.
-        # Jan 15: Actually E2 can never be reused, because it is a sub-pipeline.
-        # But we still need the sub-run for some of the below tests.
-        pD_run.parent_runstep = step_E2_RS
-        pD_run.reused = False
-        
-        step_D1_RS.run = pD_run
-        step_D1_RS.reused = False
-        D01_11_RSIC = self.D01_11.psic_instances.create(runstep=step_D1_RS,
-                                                        reused=False)
-        D01_11_ER = self.ER_from_record(D01_11_RSIC)
-        D01_11_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
-                                       generic_input=self.D1_in)
-        D01_11_ER.execrecordouts.create(symbolicdataset=self.D1_in_symDS,
-                                        generic_output=self.B1_in)
-        D01_11_RSIC.execrecord = D01_11_ER
-        D01_11_RSIC.save()
-        
-        D02_12_RSIC = self.D02_12.psic_instances.create(runstep=step_D1_RS,
-                                                        reused=False)
-        D02_12_ER = self.ER_from_record(D02_12_RSIC)
-        D02_12_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
-                                       generic_input=self.D2_in)
-        D02_12_ER.execrecordouts.create(symbolicdataset=self.singlet_symDS,
-                                        generic_output=self.B2_in)
-        D02_12_RSIC.execrecord = D02_12_ER
-        D02_12_RSIC.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
+                                          .format(self.step_E1_RS, self.triplet_DS)),
+                                self.step_E1_RS.clean)
 
-        # Method mB is step step_D1 of pipeline pD.
-        step_D1_RS.log = step_D1_RS.log.none()
-        mB_ER = self.ER_from_record(step_D1_RS)
-        mB_ER.execrecordins.create(symbolicdataset=self.D1_in_symDS,
-                                   generic_input=self.B1_in)
-        mB_ER.execrecordins.create(symbolicdataset=self.singlet_symDS,
-                                   generic_input=self.B2_in)
-        mB_ER.execrecordouts.create(
-            symbolicdataset=self.C1_in_symDS,
-            generic_output=self.mB.outputs.get(dataset_name="B1_out"))
-        self.C1_in_DS.created_by = step_D1_RS
-        self.C1_in_DS.save()
-        step_D1_RS.execrecord = mB_ER
-        step_D1_RS.save()
-        
-        D11_21_ROC = self.D11_21.poc_instances.create(run=pD_run,
-                                                      reused=False)
-        D11_21_ER = self.ER_from_record(D11_21_ROC)
-        D11_21_ER.execrecordins.create(
-            symbolicdataset=self.C1_in_symDS,
-            generic_input=self.mB.outputs.get(dataset_name="B1_out"))
-        D11_21_ER.execrecordouts.create(
-            symbolicdataset=self.C1_in_symDS,
-            generic_output=self.pD.outputs.get(dataset_name="D1_out"))
-        D11_21_ROC.execrecord = D11_21_ER
-        D11_21_ROC.save()
+    def test_RunStep_subpipeline_complete(self):
+        """
+        A RunStep with a complete and clean child run is itself clean
+        and complete.
+        """
+        self.step_through_runstep_creation("sub_pipeline")
+        self.assertTrue(step_E2_RS.is_complete())
+        self.assertIsNone(step_E2_RS.complete_clean(), None)
 
-        # pD_ER was already defined above.
-        pD_run.runsteps.add(step_D1_RS)
-        pD_run.save()
-
-        # None of the bad cases really work in this setting, because other checks
-        # will catch them all!
-        self.assertEquals(step_E2_RS.clean(), None)
-
-        # Finally, check is_complete and complete_clean.
-        self.assertEquals(step_E1_RS.is_complete(), True)
-        self.assertEquals(step_E1_RS.complete_clean(), None)
-
-        step_E1_RS.execrecord = None
+    def test_RunStep_complete_clean_no_execrecord(self):
+        """
+        A RunStep with no ExecRecord is not complete.
+        """
+        self.step_through_runstep_creation("first_runstep")
         self.assertEquals(step_E1_RS.is_complete(), False)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* is not complete",
-            step_E1_RS.complete_clean)
+        self.assertRaisesRegexp(ValidationError, 
+                                re.escape('RunStep "{}" is not complete'.format(self.step_E1_RS)),
+                                self.step_E1_RS.complete_clean)
 
-        # Propagation check on complete_clean:
-        step_E1_RS.reused = None
-        step_E1_ER = self.ER_from_record(step_E1_RS)
-        step_E1_RS.execrecord = step_E1_ER
-        step_E1_RS.log = step_E1_RS.log.none()
-        step_E1_RS.save()
-        self.assertRaisesRegexp(
-            ValidationError,
-            "RunStep .* has not decided whether or not to reuse an ExecRecord; no data should have been generated",
-            step_E1_RS.complete_clean)
-
-        step_E2_RS.child_run = pD_run
-        step_E2_RS.save()
-        self.assertEquals(step_E2_RS.is_complete(), True)
-        self.assertEquals(step_E2_RS.complete_clean(), None)
+    def test_RunStep_bad_clean_propagation(self):
+        """
+        A RunStep which is not clean, also should not pass
+        complete_clean.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.save()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.complete_clean)
 
 class RunTests(librarian.tests.LibrarianTestSetup):
 
-    def make_complete_non_reused(self, record, input_SDs, output_SDs):
-        """
-        Helper function to do everything necessary to make a RunStep, 
-        RunOutputCable, or RunStepInputCable complete, when it has not
-        reused an ExecRecord (ie. make a new ExecRecord).
-        """
-        record_type = record.__class__.__name__
-        record.reused = False
-
-        execlog = ExecLog(record=record, start_time=timezone.now(), end_time=timezone.now())
-        execlog.save()
-        if record_type == "RunStep":
-            MethodOutput(execlog=execlog, return_code=0).save()
-        execrecord = ExecRecord(generator=execlog)
-        execrecord.save()
-
-        # TODO: This needs a helper get_pipeline_component or something.
-        if record_type == "RunStep":
-            inputs = list(record.pipelinestep.transformation.inputs.all())
-            outputs = list(record.pipelinestep.transformation.outputs.all())
-        elif record_type == "RunOutputCable":
-            inputs = [record.pipelineoutputcable.source]
-            transf = record.run.pipeline
-            outputs = [transf.outputs.get(dataset_idx=record.pipelineoutputcable.output_idx)]
-        else:
-            inputs = [record.PSIC.source]
-            outputs = [record.PSIC.dest]
-
-        for i, inp in enumerate(inputs):
-            execrecord.execrecordins.create(generic_input=inp, symbolicdataset=input_SDs[i])
-        for i, outp in enumerate(outputs):
-            execrecord.execrecordouts.create(generic_output=outp, symbolicdataset=output_SDs[i])
-            if record_type == "RunOutputCable" and not record.pipelineoutputcable.is_trivial():
-                record.output.add(output_SDs[i].dataset)
-
-        record.execrecord = execrecord
-        record.clean()
-        record.save()
-
-    def complete_RSICs(self, runstep, input_SDs, output_SDs):
-        """
-        Helper function to create and complete all the RunSIC's needed for
-        a given RunStep. input_SDs and output_SDs are lists of the input and
-        output symbolic datasets for each cable, in order.
-        """
-        for i, cable in enumerate(runstep.pipelinestep.cables_in.order_by("dest__dataset_idx")):
-            rsic = cable.psic_instances.create(runstep=runstep)
-            self.make_complete_non_reused(rsic, [input_SDs[i]], [output_SDs[i]])
+    def tearDown(self):
+        super(self.__class__, self).tearDown()
+        clean_files()
 
     def step_through_run_creation(self, bp):
         """
@@ -639,11 +571,11 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         # First RunSIC associated and completed.
         step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
-        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+        make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
         if bp == "first_cable": return
 
         # First RunStep completed.
-        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
+        make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         if bp == "first_step_complete": return
 
         # Second RunStep associated.
@@ -653,7 +585,7 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         # Sub-pipeline for step 2 - reset step_E2_RS.
         self.step_E2_RS.delete()
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
-        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS], 
+        complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS], 
                                              [self.D1_in_symDS, self.singlet_symDS])
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
@@ -661,11 +593,11 @@ class RunTests(librarian.tests.LibrarianTestSetup):
 
         # Complete sub-Pipeline.
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], 
+        complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], 
                                              [self.D1_in_symDS, self.singlet_symDS])
-        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
+        make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
-        self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         if bp == "sub_pipeline_complete": return
 
         # Third RunStep associated.
@@ -673,21 +605,21 @@ class RunTests(librarian.tests.LibrarianTestSetup):
         if bp == "third_step": return
 
         # Third RunStep completed.
-        self.complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS], 
+        complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS], 
                                              [self.C1_in_symDS, self.C2_in_symDS])
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
+        make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
                                                        [self.singlet_symDS, self.raw_symDS, self.raw_symDS])
         if bp == "third_step_complete": return
 
         # Outcables associated.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.doublet_symDS])
+        make_complete_non_reused(roc1, [self.C1_in_symDS], [self.doublet_symDS])
         if bp == "first_outcable": return
 
         roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc2, [self.singlet_symDS], [self.singlet_symDS])
+        make_complete_non_reused(roc2, [self.singlet_symDS], [self.singlet_symDS])
         roc3 = self.pE.outcables.get(output_idx=3).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc3, [self.C3_out_symDS], [self.C3_out_symDS])
+        make_complete_non_reused(roc3, [self.C3_out_symDS], [self.C3_out_symDS])
 
         if bp == "outcables_done": return
 
