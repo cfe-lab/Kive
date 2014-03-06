@@ -768,7 +768,7 @@ class FindSDTests(UtilityMethods):
         """
         # A code resource which reverses a file.
         self.coderev_reverse = self.make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
-            ("#!/usr/bin/python\n"
+            ("#!/usr/bin/env python\n"
              "import sys\n"
              "import csv\n"
              "with open(sys.argv[1]) as infile, open(sys.argv[2], 'w') as outfile:\n"
