@@ -63,7 +63,7 @@ class CodeResource(models.Model):
         return '/resources/%i' % self.id
 
     def __unicode__(self):
-        return self.name;
+        return self.name
     
 
 class CodeResourceRevision(models.Model):
@@ -83,15 +83,15 @@ class CodeResourceRevision(models.Model):
 
     coderesource = models.ForeignKey(
             CodeResource,
-            related_name="revisions");  
+            related_name="revisions")
         
     revision_name = models.CharField(
             max_length=128,
-            help_text="A name to differentiate revisions of a CodeResource");
+            help_text="A name to differentiate revisions of a CodeResource")
 
     revision_DateTime = models.DateTimeField(
             auto_now_add=True,
-            help_text="Date this resource revision was uploaded");
+            help_text="Date this resource revision was uploaded")
 
     revision_parent = models.ForeignKey(
             'self',
@@ -101,19 +101,23 @@ class CodeResourceRevision(models.Model):
 
     revision_desc = models.TextField(
             "Revision description",
-            help_text="A description for this particular resource revision");
+            help_text="A description for this particular resource revision")
 
     content_file = models.FileField(
             "File contents",
             upload_to="CodeResources",
             null=True,
             blank=True,
-            help_text="File contents of this code resource revision");
+            help_text="File contents of this code resource revision")
 
     MD5_checksum = models.CharField(
             max_length=64,
             blank=True,
-            help_text="Used to validate file contents of this resource revision");
+            help_text="Used to validate file contents of this resource revision")
+
+    # Enforce unique revision names within a CodeResource.
+    class Meta:
+        unique_together = ("coderesource", "revision_name")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
