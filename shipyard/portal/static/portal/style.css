@@ -138,3 +138,13 @@ form select {
     width: 60px;
 }
 
+@font-face {
+    font-family: 'Lato';
+    src: local('Lato-Regular'), url('/static/portal/Lato/Lato-Regular.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Lato';
+    src: local('Lato-Bold'), url('/static/portal/Lato/Lato-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+/* TODO: get italic fonts to load */
