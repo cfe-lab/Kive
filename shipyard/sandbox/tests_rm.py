@@ -767,43 +767,41 @@ class FindSDTests(UtilityMethods):
                         |_____________|            |______________|
         """
         # A code resource which reverses a file.
-        self.coderev_reverse = self.make_first_revision("reverse",
-            "a script to reverse lines of a file", "reverse.sh",
-            '#!/bin/bash\nrev "$1" | sed \'s/\\r//g\' > "$2"')
+        self.coderev_reverse = self.make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
+            ("#!/usr/bin/python\n"
+             "import sys\n"
+             "import csv\n"
+             "with open(sys.argv[1]) as infile, open(sys.argv[2], 'w') as outfile:\n"
+             "  reader = csv.reader(infile)\n"
+             "  writer = csv.writer(outfile)\n"
+             "  for row in reader:\n"
+             "      writer.writerow([row[1][::-1], row[0][::-1]])\n"))
 
         # A CDT with two columns, word and drow.
         self.cdt_words = CompoundDatatype()
         self.cdt_words.save()
-        self.cdt_words.members.create(datatype=self.datatype_str,
-            column_name="word", column_idx=1)
-        self.cdt_words.members.create(datatype=self.datatype_str,
-            column_name="drow", column_idx=2)
+        self.cdt_words.members.create(datatype=self.datatype_str, column_name="word", column_idx=1)
+        self.cdt_words.members.create(datatype=self.datatype_str, column_name="drow", column_idx=2)
 
         # A second CDT, much like the first :]
         self.cdt_backwords = CompoundDatatype()
         self.cdt_backwords.save()
-        self.cdt_backwords.members.create(datatype=self.datatype_str,
-            column_name="drow", column_idx=1)
-        self.cdt_backwords.members.create(datatype=self.datatype_str,
-            column_name="word", column_idx=2)
+        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="drow", column_idx=1)
+        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="word", column_idx=2)
 
         # Methods for the reverse CRR, and noop CRR with backwords CDT.
-        self.method_reverse = self.make_first_method("string reverse",
-            "a method to reverse strings",
-            self.coderev_reverse)
-        self.simple_method_io(self.method_reverse, self.cdt_words,
-            "words_to_reverse", "reversed_words")
-        self.method_noop_backwords = self.make_first_method("noop",
-            "a method to do nothing on two columns",
-            self.coderev_noop)
-        self.simple_method_io(self.method_noop_backwords, self.cdt_backwords,
-            "backwords", "more_backwords")
+        self.method_reverse = self.make_first_method("string reverse", "a method to reverse strings",
+                                                     self.coderev_reverse)
+        self.simple_method_io(self.method_reverse, self.cdt_words, "words_to_reverse", "reversed_words")
+        self.method_noop_backwords = self.make_first_method("noop", "a method to do nothing on two columns",
+                                                            self.coderev_noop)
+        self.simple_method_io(self.method_noop_backwords, self.cdt_backwords, "backwords", "more_backwords")
 
         # A two-step pipeline with custom cable wires at each step.
         self.pipeline_twostep = self.make_first_pipeline("two-step pipeline",
-            "a two-step pipeline with custom cable wires at each step")
-        self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords,
-            dataset_name="words_to_reverse", dataset_idx = 1)
+                                                         "a two-step pipeline with custom cable wires at each step")
+        self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords, dataset_name="words_to_reverse",
+                                           dataset_idx=1)
 
         methods = [self.method_reverse, self.method_noop_backwords]
         for i, method in enumerate(methods):
@@ -827,14 +825,15 @@ class FindSDTests(UtilityMethods):
 
         # Some data to run through the two-step pipeline.
         self.words_datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.words_datafile.write('drow,word\n')
+        writer = csv.writer(self.words_datafile)
+        writer.writerow(["drow", "word"])
         for line in range(20):
             i = random.randint(1,99171)
             sed = Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
                         stdout=PIPE)
             word, _ = sed.communicate()
             word = word.strip()
-            self.words_datafile.write('{},{}\n'.format(word[::-1], word))
+            writer.writerow([word[::-1], word])
         self.words_datafile.close()
 
         self.symds_backwords = SymbolicDataset.create_SD(self.words_datafile.name,
@@ -867,6 +866,8 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
         sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
         run, gen = sandbox.first_generator_of_SD(self.symds_words)
         self.assertEqual(run, sandbox.run)
@@ -879,8 +880,10 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
         sandbox.execute_pipeline()
-        symds_out = sandbox.run.runsteps.first().execrecord.execrecordouts.first().symbolicdataset
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
+        symds_out = sandbox.run.runsteps.first().execrecord.execrecordouts.first().symbolicdataset
         run, gen = sandbox.first_generator_of_SD(symds_out)
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, self.pipeline_noop.steps.first())
@@ -893,6 +896,8 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
         sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
         runcable = sandbox.run.runsteps.first().RSICs.first()
         symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
@@ -909,6 +914,8 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
         sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
         runcable = sandbox.run.runsteps.last().RSICs.first()
         symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
@@ -923,6 +930,8 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
         sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
         for step in sandbox.run.runsteps.all():
             if step.pipelinestep.step_num == 2:
@@ -943,6 +952,8 @@ class FindSDTests(UtilityMethods):
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
         sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertTrue(sandbox.run.successful_execution())
 
         for step in sandbox.run.runsteps.all():
             if step.pipelinestep.step_num == 2:
