@@ -916,7 +916,8 @@ class RunSICTests(librarian.tests.LibrarianTestSetup):
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = True
-        self.E11_32_RSIC.execrecord.execrecordouts.first().generic_output = self.C1_in
+        ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
+        self.C1_in.execrecordouts_referencing.add(ero)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Input "{}" is not the one fed by the PSIC of ExecRecord "{}"'
                                           .format(self.C1_in, self.E11_32_RSIC)),
