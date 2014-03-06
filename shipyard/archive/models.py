@@ -349,7 +349,7 @@ class RunStep(models.Model):
         # Check that any associated data belongs to an ERO of this ER
         # Supposed to be the datasets attached to this runstep (Produced by this runstep)
         for out_data in self.outputs.all():
-            if not step_er.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
+            if not self.execrecord.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
@@ -639,11 +639,10 @@ class RunSIC(models.Model):
 
             else:
                 # The corresponding ERO should have existent data.
-                corresp_ero = self.execrecord.execrecordouts.all()[0]
+                corresp_ero = self.execrecord.execrecordouts.first()
                 if not corresp_ero.has_data():
-                    raise ValidationError(
-                        "RunSIC \"{}\" keeps its output; ExecRecordOut \"{}\" should reference existent data".
-                        format(self, corresp_ero))
+                    raise ValidationError('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
+                                          'data'.format(self, corresp_ero))
 
                 # If reused == False and the cable is not trivial,
                 # there should be associated data, and it should match that
