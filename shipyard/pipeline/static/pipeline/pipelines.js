@@ -1,3 +1,12 @@
+
+/*
+    TODO: if shape (CDT_Node, MethodNode) or Connector selected and user hits backspace, erase object
+    TODO: make Connectors selectable by mouse
+    TODO: Connector can link to output end-zone
+    TODO: submit shape and connector info as POST data
+    FIXME: figure out why extra lines are being drawn (non-closed path)?
+*/
+
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
 
     // trigger ajax on CR drop-down to populate revision select
@@ -93,8 +102,17 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     var canvasState = new CanvasState(canvas);
 
     $('#id_cdt_button').on('click', function() {
-        var node_label = $('#id_select_cdt option:selected').text();
-        canvasState.addShape(new CDT_Node(100, 200+50*Math.random(), 20, '#55FF55', node_label));
+        var choice = $('#id_select_cdt option:selected');
+        var cdt = choice.val(); // primary key
+        var node_label = choice.text();
+        canvasState.addShape(new CDT_Node(x = 100,
+            y = 200+50*Math.random(),
+            r = 20,
+            fill = '#33FF33',
+            inset = 10,
+            offset = 30,
+            pk = cdt,
+            label = node_label));
     });
 
     $('#id_method_button').on('click', function() {
@@ -113,7 +131,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         inputs = result['inputs'];
                         outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(200, 200, 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
+                        canvasState.addShape(new MethodNode(200, 200 + 50*Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
                     }
                 });
             }
@@ -121,8 +139,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     $('#id_reset_button').on('click', function() {
+        // remove all objects from canvas
         canvasState.clear();
         canvasState.shapes = [];
+        canvasState.connectors = [];
+    });
+
+    $('id_delete_button').on('click', function() {
+        // remove selected object from canvas
+        // TODO: trigger this event with backspace key also
+        canvasState.deleteObject();
     });
 });
 
@@ -131,31 +157,40 @@ $(document).ready(function(){ // wait for page to finish loading before executin
  The following code is based on canvas interactivity example by Simon Sarris.
  HTML5 Unleashed (2014) Pearson Education Inc.
  */
-function CDT_Node (x, y, r, fill, label) {
+function CDT_Node (x, y, r, fill, inset, offset, pk, label) {
     // CDT node constructor with default values
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
     this.r = r || 10; // radius
     this.fill = fill || "#AAAAAA";
+    this.inset = inset || 5; // distance of magnet from center
+    this.offset = offset || 12; // distance of label from center
+    this.pk = pk;
     this.label = label || '';
     this.in_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    var magnet = new Magnet(this.x, this.y, this.r/2, "white", null)
+    var magnet = new Magnet(this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
     this.out_magnets = [magnet];
 }
 
 CDT_Node.prototype.draw = function(ctx) {
+    // draw circle
     ctx.fillStyle = this.fill;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, false);
     ctx.closePath();
-    ctx.fillStyle = this.fill;
     ctx.fill();
+
+    // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y+40);
+    ctx.fillText(this.label, this.x, this.y+this.offset);
+
+    // draw magnet
+    out_magnet = this.out_magnets[0];
+    out_magnet.draw(ctx, this.x+this.inset, this.y);
 };
 
 CDT_Node.prototype.contains = function(mx, my) {
@@ -187,7 +222,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
     this.n_inputs = Object.keys(inputs).length;
     this.n_outputs = Object.keys(outputs).length;
 
-    this.inset = inset || 10; // distance in for holes
+    this.inset = inset || 10; // distance from left or right edge to center of hole
     this.offset = offset || 10; // space between bottom of node and label
 
     this.spacing = spacing || 10; // vertical separation between pins
@@ -225,9 +260,11 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
 }
 
 MethodNode.prototype.draw = function(ctx) {
+    // draw rectangle
     ctx.fillStyle = this.fill;
     ctx.fillRect(this.x, this.y, this.w, this.h);
 
+    // draw magnets
     for (var i = 0; i < this.in_magnets.length; i++) {
         magnet = this.in_magnets[i];
         magnet.draw(ctx, this.x + this.inset, this.y + this.spacing * (i+0.5));
@@ -237,6 +274,7 @@ MethodNode.prototype.draw = function(ctx) {
         magnet.draw(ctx, this.x + this.w - this.inset, this.y + this.spacing * (i+0.5));
     }
 
+    // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
@@ -250,6 +288,7 @@ MethodNode.prototype.contains = function(mx, my) {
 
 function Magnet (x, y, r, attract, fill, cdt, label) {
     /*
+    CONSTRUCTOR
     A Magnet is the attachment point for a Node (shape) given a
     Connector.  It is always contained within a shape.
      */
@@ -263,8 +302,11 @@ function Magnet (x, y, r, attract, fill, cdt, label) {
 }
 
 Magnet.prototype.draw = function(ctx, x, y) {
+    // update values passed from shape
+    this.x = x;
+    this.y = y;
     ctx.beginPath();
-    ctx.arc(x, y, this.r, 0, 2 * Math.PI, true);
+    ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
     ctx.fillStyle = this.fill;
     ctx.fill();
 };
@@ -282,6 +324,17 @@ function Connector (from_x, from_y, out_magnet) {
     /*
     Constructor.
     A Connector is a line drawn between two Magnets.
+    Actions:
+    - on mouse down in raw data end-zone OR an out-magnet:
+        - push new Connector to list
+        - assign out-magnet CDT
+        - else assign x, y in end-zone (TODO: zip to other coords?)
+    - on mouse move
+        - update line with mouse move
+        - light up all CDT-matched in-magnets
+        - if mouse in vicinity of CDT-matched in-magnet, jump to magnet
+    - on mouse up
+        - if mouse NOT on CDT-matched in-magnet, delete Connector
      */
     this.in_magnet = null;
     this.out_magnet = out_magnet || null;
@@ -323,6 +376,14 @@ Connector.prototype.draw = function(ctx) {
 
     ctx.stroke();
 };
+
+Connector.prototype.contains = function(mx, my) {
+    /*
+    Determine if mouse coordinates are on or close to this
+    connector.
+     */
+
+}
 
 
 function CanvasState (canvas) {
@@ -396,7 +457,7 @@ CanvasState.prototype.doDown = function(e) {
 
     // are we in raw data end-zone?
     if (mx < 0.1*this.width) {
-        // create Connector
+        // create Connector from raw data end-zone
         conn = new Connector(from_x = mx, from_y = my);
         connectors.push(conn);
         this.selection = conn;
@@ -414,19 +475,25 @@ CanvasState.prototype.doDown = function(e) {
         // check shapes in reverse order
         if (shapes[i].contains(mx, my)) {
             var mySel = shapes[i];
+            console.log(mySel);
             // are we clicking on an out-magnet?
             out_magnets = mySel.out_magnets;
             for (var j = 0; j < out_magnets.length; j++) {
                 out_magnet = out_magnets[j];
                 if (out_magnet.contains(mx, my)) {
-                    // create Connector
+                    // create Connector from this out-magnet
                     conn = new Connector(null, null, out_magnet);
                     connectors.push(conn);
                     this.selection = conn;
+                    this.dragoffx = mx - conn.fromX;
+                    this.dragoffy = my - conn.fromY;
+                    this.dragging = true;
+                    this.valid = false; // activate canvas
+                    return;
                 }
             }
 
-            // we are moving a shape
+            // otherwise we are moving the shape
             this.dragoffx = mx - mySel.x;
             this.dragoffy = my - mySel.y;
             this.dragging = true;
@@ -444,8 +511,16 @@ CanvasState.prototype.doDown = function(e) {
 };
 
 CanvasState.prototype.doMove = function(e) {
+    /*
+    event handler for mouse motion over canvas
+     */
     var mouse = this.getPos(e);
+    var shapes = this.shapes;
+    var i = 0;
+    var shape = null;
+
     if (this.dragging) {
+        // are we carrying a shape or Connector?
         if (this.selection != null) {
             if (mouse.x < 0.1*this.width || mouse.x > 0.9*this.width) {
                 // prevent shapes from moving into end-zones
@@ -454,36 +529,39 @@ CanvasState.prototype.doMove = function(e) {
             this.selection.x = mouse.x - this.dragoffx;
             this.selection.y = mouse.y - this.dragoffy;
             this.valid = false; // redraw
-        }
-    } else {
-        // make magnets light up when moving around canvas
-        var shapes = this.shapes;
 
-        this.ctx.strokeStyle = this.selectionColor;
-        this.ctx.lineWidth = this.selectionWidth;
+            // are we carrying a connector?
+            if (this.selection.fromX != undefined) {
+                for (i = 0; i < shapes.length; i++) {
+                    shape = shapes[i];
+                    if (shape.in_magnets == undefined) {
+                        // ignore Connectors
+                        continue;
+                    }
+                    var in_magnets = shape.in_magnets;
+                    for (var j = 0; j < in_magnets.length; j++) {
+                        var in_magnet = in_magnets[j];
 
-        for (var i = 0; i < shapes.length; i++) {
-            var shape = shapes[i];
-            if (shape.contains(mouse.x, mouse.y)) {
-                var in_magnets = shape.in_magnets;
-                for (var j = 0; j < in_magnets.length; j++) {
-                    var in_magnet = in_magnets[j];
-                    if (in_magnet.contains(mouse.x, mouse.y)) {
-                        in_magnet.fill = 'yellow';
-                    } else {
-                        in_magnet.fill = 'white';
+                        if (this.selection.out_magnet.cdt == in_magnet.cdt) {
+                            // light up magnet
+                            in_magnet.fill = 'yellow';
+                            if (in_magnet.contains(this.selection.x, this.selection.y)) {
+                                // jump to magnet
+                                this.selection.x = in_magnet.x;
+                                this.selection.y = in_magnet.y;
+                                this.selection.in_magnet = in_magnet;
+                            }
+                        } else {
+                            in_magnet.fill = 'white';
+                        }
+
                     }
                 }
-                var out_magnets = shape.out_magnets;
-                for (j = 0; j < out_magnets.length; j++) {
-                    var out_magnet = out_magnets[j];
-                    if (out_magnet.contains(mouse.x, mouse.y)) {
-                        out_magnet.fill = 'yellow';
-                    } else {
-                        out_magnet.fill = 'white';
-                    }
-                }
+            } else {
+                // carrying a shape
             }
+
+
         }
     }
 };
@@ -496,10 +574,23 @@ CanvasState.prototype.doUp = function(e) {
         return; // no Connectors!
     }
     connector = this.connectors[l-1];
-    if (connector.out_magnet == null) {
-        // if not then remove
+    if (connector.in_magnet == null) {
+        // not connected, delete Connector
         this.connectors.pop();
         this.valid = false; // redraw canvas to remove this Connector
+    }
+
+    // turn off all in-magnets
+    var shapes = this.shapes;
+    for (var i = 0; i < shapes.length; i++) {
+        var shape = shapes[i];
+        if (shape.in_magnets != undefined) {
+            var in_magnets = shape.in_magnets;
+            for (var j = 0; j < in_magnets.length; j++) {
+                var in_magnet = in_magnets[j];
+                in_magnet.fill = 'white';
+            }
+        }
     }
 };
 
@@ -593,3 +684,19 @@ CanvasState.prototype.getPos = function(e) {
 
     return {x: mx, y: my};
 };
+
+CanvasState.prototype.deleteObject = function() {
+    // delete selected object
+    var mySel = this.selection;
+    if (mySel != null) {
+        if (mySel.isPrototypeOf(Connector)) {
+            // remove selected Connector from list
+
+        } else if (mySel.isPrototypeOf(MethodNode)) {
+            // delete Connectors associated with MethodNode
+            // remove MethodNode from list
+        } else {
+
+        }
+    }
+}
