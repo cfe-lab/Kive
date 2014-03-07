@@ -18,6 +18,8 @@ import file_access_utils
 
 import method.models
 import transformation.models
+import stopwatch.models
+
 
 def clean_execlogs(runx):
     """Count and clean ExecLogs of Run(Step|SIC|OutputCable).
@@ -31,16 +33,15 @@ def clean_execlogs(runx):
        else:
            raise ValidationError("{} \"{}\" has {} ExecLogs but should have only one".format(runx.__class__.__name__,
                                                                                              runx, runx.log.count()))
-
-class Run(models.Model):
-    """Stores data associated with an execution of a pipeline.
+class Run(stopwatch.models.Stopwatch):
+    """
+    Stores data associated with an execution of a pipeline.
 
     Related to :model:`pipeline.models.Pipeline`
     Related to :model:`archive.models.RunStep`
     Related to :model:`archive.models.Dataset`
     """
     user = models.ForeignKey(User, help_text="User who performed this run")
-    start_time = models.DateTimeField("start time", auto_now_add=True, help_text="Time at start of run")
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
                                  help_text="Pipeline used in this run")
 
@@ -52,11 +53,14 @@ class Run(models.Model):
     parent_runstep = models.OneToOneField("RunStep", related_name="child_run", null=True, blank=True,
         help_text="Step of parent run initiating this one as a sub-run")
 
+    # Implicitly, this also has start_time and end_time through inheritance.
+
     def clean(self):
         """
         Checks coherence of the Run (possibly in an incomplete state).
 
         The procedure:
+         - check coherence of start_time and end_time
          - if parent_runstep is not None, then pipeline should be
            consistent with it
          - RunSteps should all be clean, and should be consecutively
@@ -65,6 +69,9 @@ class Run(models.Model):
            which are associated (ie. at least in progress), and must
            be clean
         """
+        # Check that start- and end-time are coherent.
+        stopwatch.models.Stopwatch.clean(self)
+
         if (self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation):
             raise ValidationError('Pipeline of Run "{}" is not consistent with its parent RunStep'.format(self))
 
@@ -121,8 +128,58 @@ class Run(models.Model):
     def is_subrun(self):
         return self.parent_runstep is not None
 
-class RunStep(models.Model):
-    """Annotates the execution of a PipelineStep within a Run.
+    def successful_execution(self):
+        """
+        Checks if this Run is successful (so far).
+
+        PRE
+        This Run is clean and complete.
+        """
+        # Check steps for success.
+        for step in self.runsteps.all():
+            if not step.successful_execution():
+                return False
+
+        # All steps checked out.  Check outcables.
+        for outcable in self.runoutputcables.all():
+            if not outcable.successful_execution():
+                return False
+
+        # So far so good.
+        return True
+
+    def get_coordinates(self):
+        """
+        Retrieves a tuple of pipeline coordinates of this Run.
+
+        This tuple looks like (x_1, x_2, x_3, ...) where x_1 is the step number
+        of the top-level run that this Run sits in; x_2 is the step number of
+        the first-level-down sub-run this sits in, etc.  The length of the
+        tuple is given by how deeply nested this Run is.
+
+        Returns an empty tuple if this is a top-level run.
+        """
+        # Base case: this is a top-level run.  Return None.
+        if self.parent_runstep == None:
+            return ()
+        # Otherwise, return the coordinates of the parent RunStep.
+        return self.parent_runstep.get_coordinates()
+
+    def get_top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        # Base case: this is the top-level Run.
+        if self.parent_runstep is None:
+            return self
+
+        # Otherwise, return the top-level run of the parent RunStep.
+        return self.parent_runstep.get_top_level_run()
+
+
+class RunStep(stopwatch.models.Stopwatch):
+    """
+    Annotates the execution of a pipeline step within a run.
 
     Related to :model:`archive.models.Run`
     Related to :model:`librarian.models.ExecRecord`
@@ -137,9 +194,15 @@ class RunStep(models.Model):
                                      help_text="Denotes whether this run step reuses a previous execution")
     pipelinestep = models.ForeignKey("pipeline.PipelineStep", related_name="pipelinestep_instances")
 
-    start_time = models.DateTimeField("start time", auto_now_add=True, help_text="Time at start of run step")
     log = generic.GenericRelation("ExecLog")
+
+    invoked_logs = generic.GenericRelation("ExecLog",
+                                           content_type_field="content_type_iel",
+                                           object_id_field="object_id_iel")
+
     outputs = generic.GenericRelation("Dataset")
+
+    # Implicit through inheritance: start_time, end_time.
 
     class Meta:
         # Uniqueness constraint ensures you can't have multiple RunSteps for
@@ -357,6 +420,7 @@ class RunStep(models.Model):
         Check coherence of this RunStep.
 
         The checks we perform, in sequence:
+         - check that start_time and end_time are coherent
          - pipelinestep is consistent with run
          - if pipelinestep is a method, there should be no child_run
 
@@ -383,6 +447,9 @@ class RunStep(models.Model):
         Note: don't need to check inputs for multiple quenching due to
         uniqueness.  Quenching of outputs is checked by ExecRecord.
         """
+        # Check that the times are coherent.
+        stopwatch.models.Stopwatch.clean(self)
+
         # Does pipelinestep belong to run.pipeline?
         if not self.run.pipeline.steps.filter(pk=self.pipelinestep.pk).exists():
             raise ValidationError('PipelineStep "{}" of RunStep "{}" does not belong to Pipeline "{}"'
@@ -426,12 +493,34 @@ class RunStep(models.Model):
     def is_complete(self):
         """
         True if RunStep is complete; False otherwise.
+
+        This is similar to the procedure to check for completeness
+        of RunSIC, with the additional wrinkle that a RunStep
+        can fail while its cables are running before it even
+        gets to the recovery stage.  Also, if it represents
+        a sub-Pipeline, then it simply checks if its child_run
+        is complete.
         """
         # Sub-Pipeline case:
         if self.has_subrun():
             return self.child_run.is_complete()
+
         # Method case:
-        return self.execrecord is not None
+        if self.execrecord is not None:
+            return True
+
+        # At this point we know that it is not finished successfully;
+        # check whether it failed during either cables or during recovery.
+        for cable in self.RSICs.all():
+            if not (cable.is_complete() or not cable.has_started()):
+                return False
+
+        for invoked_log in self.invoked_logs.all():
+            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
+                return False
+
+        # At this point, we know that it's failed but complete.
+        return True
 
     def complete_clean(self):
         """
@@ -445,9 +534,15 @@ class RunStep(models.Model):
         """
         True if RunStep is successful; False otherwise.
 
-        The RunStep is failed if any of its cables fail, if the
-        ExecLog has a non-0 return code, or if there are any
-        associated failed content/integrity checks.
+        The RunStep is failed if:
+         - any of its cables failed (fail during cables)
+
+         - any of its invoked_logs is failed (fail during either
+           recovery of inputs or during its own execution if it's
+           a Method)
+
+         - its child_run has failed (if it fails during execution
+           of the sub-Pipeline)
 
         PRE: this RunStep is clean and complete.
         """
@@ -455,14 +550,43 @@ class RunStep(models.Model):
             if not cable.successful_execution():
                 return False
 
-        if not self.log.all().exists():
-            return True
+        # At this point we know that all the cables were successful;
+        # we check for failure during recovery or during its own
+        # execution.
+        for invoked_log in self.invoked_logs.all():
+            if not invoked_log.is_successful():
+                return False
 
-        # From this point on it is known that there is an ExecLog.
-        return self.log.first().is_successful()
+        # In the case that this is a sub-Pipeline, check if child_run
+        # is successful.
+        if hasattr(self, "child_run"):
+            return self.child_run.successful_execution()
 
-class RunSIC(models.Model):
-    """The execution of a PipelineStepInputCable within a RunStep.
+        # No logs failed, and this wasn't a sub-Pipeline, so....
+        return True
+
+    def get_coordinates(self):
+        """
+        Retrieves a tuple of pipeline coordinates of this RunStep.
+
+        The ith coordinate gives the step number in the ith-deeply-nested
+        sub-Run that this RunStep belongs to.
+        """
+        # Get the coordinates of the parent Run.
+        run_coords = self.run.get_coordinates()
+        # Tack on the coordinate within that run.
+        return run_coords + (self.pipelinestep.step_num,)
+
+    def get_top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.run.get_top_level_run()
+
+
+class RunSIC(stopwatch.models.Stopwatch):
+    """
+    Annotates the action of a PipelineStepInputCable within a RunStep.
 
     Related to :model:`archive.models.RunStep`
     Related to :model:`librarian.models.ExecRecord`
@@ -474,11 +598,14 @@ class RunSIC(models.Model):
                                      default=None)
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
-    start_time = models.DateTimeField("start time", auto_now_add=True, 
-                                      help_text="Time at start of running this input cable")
-
     log = generic.GenericRelation("ExecLog")
     output = generic.GenericRelation("Dataset")
+
+    invoked_logs = generic.GenericRelation("ExecLog",
+                                           content_type_field="content_type_iel",
+                                           object_id_field="object_id_iel")
+
+    # Implicit from Stopwatch: start_time, end_time.
 
     class Meta:
         # Uniqueness constraint ensures that no POC is multiply-represented
@@ -681,6 +808,7 @@ class RunSIC(models.Model):
         Check coherence of this RunSIC.
 
         In sequence, the checks we perform:
+         - check coherence of start_time and end_time
          - PSIC belongs to runstep.pipelinestep
 
          - if an ExecLog is attached, clean it
@@ -698,6 +826,9 @@ class RunSIC(models.Model):
            and _clean_without_execlog)
         """
         self.logger.debug("Initiating")
+
+        # Check coherence of the times.
+        stopwatch.models.Stopwatch.clean(self)
 
         if (not self.runstep.pipelinestep.cables_in.filter(pk=self.PSIC.pk).exists()):
             raise ValidationError('PSIC "{}" does not belong to PipelineStep "{}"'
@@ -724,8 +855,34 @@ class RunSIC(models.Model):
             self._clean_without_execlog()
 
     def is_complete(self):
-        """True if RunSIC is complete; false otherwise."""
-        return self.execrecord is not None
+        """
+        True if RunSIC is complete; false otherwise.
+
+        This checks something different depending on whether the RunSIC
+        is successful or not.  If it's successful, then the only thing
+        to check is whether or not the ExecRecord is set.  If it's
+        failed, then it checks different conditions:
+         - if it failed during recover(), then there should be no ER
+           but all ELs are either complete or were never started.
+         - if it failed during its own execution, then there should be
+           an ExecRecord.
+
+        So, if there is an ExecRecord, then it's complete; if not, then
+        check whether its failed and has only completed or never-started
+        ExecLogs.
+        """
+        if self.execrecord is not None:
+            return True
+
+        # At this point we know that execrecord == None; check if it
+        # failed during recovery and finished.
+        for invoked_log in self.invoked_logs.all():
+            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
+                return False
+
+        # Now we made it through all of the invoked_logs and they were all
+        # either complete or never started, so....
+        return True
 
     def complete_clean(self):
         """Check completeness and coherence of this RunSIC."""
@@ -740,19 +897,35 @@ class RunSIC(models.Model):
     def successful_execution(self):
         """True if RunSIC is successful; False otherwise.
 
-        The RunStep is failed if there are any associated failed
-        content/integrity checks.
+        The RunSIC is failed if any of its invoked ExecLogs have
+        failed.
 
-        PRE: this RunSIC is clean and complete.
+        PRE: this RunSIC is clean, and so are all of its invoked_logs.
+        (It's OK that they might not be complete.)
         """
-        log_qs = self.log.all()
-        if not log_qs.exists():
-            return True
+        for invoked_log in self.invoked_logs.all():
+            if not invoked_log.is_successful():
+                return True
+        return False
 
-        # From this point on it is known that there is an ExecLog.
-        return log_qs[0].is_successful()
+    def get_coordinates(self):
+        """
+        Retrieves a tuple of pipeline coordinates of this RunSIC.
 
-class RunOutputCable(models.Model):
+        This is simply the coordinates of the RunStep it belongs to.
+        Implicitly, if you are comparing a RunSIC with a RunStep that has
+        the same coordinates, the RunSIC is deemed to come first.
+        """
+        return self.runstep.get_coordinates()
+
+    def get_top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.runstep.get_top_level_run()
+
+
+class RunOutputCable(stopwatch.models.Stopwatch):
     """
     Annotates the action of a PipelineOutputCable within a run.
 
@@ -766,11 +939,10 @@ class RunOutputCable(models.Model):
                                      default=None) 
     pipelineoutputcable = models.ForeignKey("pipeline.PipelineOutputCable", related_name="poc_instances")
 
-    start_time = models.DateTimeField("start time", auto_now_add=True, 
-                                      help_text="Time at start of running this output cable")
-
     log = generic.GenericRelation("ExecLog")
     output = generic.GenericRelation("Dataset")
+
+    # Implicit through inheritance: start_time, end_time.
 
     class Meta:
         # Uniqueness constraint ensures that no POC is
@@ -781,6 +953,7 @@ class RunOutputCable(models.Model):
         """Check coherence of this RunOutputCable.
 
         In sequence, the checks we perform are:
+         - check coherence of start_time and end_time.
          - pipelineoutputcable belongs to run.pipeline
 
          - if an ExecLog is attached, complete_clean it
@@ -818,6 +991,8 @@ class RunOutputCable(models.Model):
              trivial, then this ROC should have existent data
              associated and it should belong to the corresponding ERO
         """
+        stopwatch.models.Stopwatch.clean(self)
+
         if not self.run.pipeline.outcables.filter(pk=self.pipelineoutputcable.pk).exists():
             raise ValidationError('POC "{}" does not belong to Pipeline "{}"'
                                   .format(self.pipelineoutputcable, self.run.pipeline))
@@ -917,8 +1092,19 @@ class RunOutputCable(models.Model):
                                           'ExecRecord "{}"'.format(self.output.first(), self, self.execrecord))
 
     def is_complete(self):
-        """True if ROC is finished running; false otherwise."""
-        return self.execrecord is not None
+        """
+        True if this ROC is complete; false otherwise.
+
+        This does basically the same checks as RunSIC.is_complete().
+        """
+        if self.execrecord is not None:
+            return True
+
+        for invoked_log in self.invoked_logs.all():
+            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
+                return False
+
+        return True
 
     def complete_clean(self):
         """Check completeness and coherence of this RunOutputCable."""
@@ -934,19 +1120,32 @@ class RunOutputCable(models.Model):
     def successful_execution(self):
         """True if this RunOutputCable is successful; False otherwise.
 
-        The ROC is failed if there are any associated failed
-        content/integrity checks.
-
-        This is basically exactly the same as for an RSIC.
-
-        PRE: this ROC is clean and complete.
+        Again, exactly the same as for RunSIC.
         """
-        log_qs = self.log.all()
-        if not log_qs.exists():
-            return True
+        any_failed = False
+        for invoked_log in self.invoked_logs.all():
+            if not invoked_log.is_successful():
+                any_failed = True
+                break
 
-        # From this point on it is known that there is an ExecLog.
-        return log_qs[0].is_successful()
+        return any_failed
+
+    def get_coordinates(self):
+        """
+        Retrieves a tuple of pipeline coordinates of this RunOutputCable.
+
+        This is simply the coordinates of the Run that contains it;
+        implicitly, any ROCs with these coordinates is deemed to come
+        after all of the RunSteps belonging to the same Run.
+        """
+        return self.run.get_coordinates()
+
+    def get_top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.run.get_top_level_run()
+
 
 class Dataset(models.Model):
     """
@@ -1047,7 +1246,8 @@ class Dataset(models.Model):
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
 
-class ExecLog(models.Model):
+
+class ExecLog(stopwatch.models.Stopwatch):
     """
     Logs of Method/PSIC/POC execution.
     Records the start/end times of execution.
@@ -1062,17 +1262,14 @@ class ExecLog(models.Model):
     object_id = models.PositiveIntegerField()
     record = generic.GenericForeignKey("content_type", "object_id")
 
-    # If the start_time is unset, we haven't started executing the code yet.
-    start_time = models.DateTimeField("start time",
-                                      null=True,
-                                      blank=True,
-                                      help_text="Time at start of execution")
+    content_type_iel = models.ForeignKey(
+        ContentType,
+        limit_choices_to={"model__in": {"RunStep", "RunOutputCable", "RunSIC"}}
+    )
+    object_id_iel = models.PositiveIntegerField()
+    invoking_record = generic.GenericForeignKey("content_type_iel", "object_id_iel")
 
-    # If the end_time is unset, we're in the middle of execution.
-    end_time = models.DateTimeField("end time",
-                                    null=True,
-                                    blank=True,
-                                    help_text="Time at end of execution")
+    # Since this inherits from Stopwatch, it has start_time and end_time.
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -1083,8 +1280,13 @@ class ExecLog(models.Model):
         Checks coherence of this ExecLog.
 
         If this ExecLog is for a RunStep, the RunStep represents a
-        Method (as opposed to a Pipeline).
+        Method (as opposed to a Pipeline).  Moreover, the invoking
+        record must not be earlier than the record it belongs to.
+        Also, the end time must exceed the start time if both are set.
         """
+        # First make sure the start- and end-times are coherent.
+        stopwatch.models.Stopwatch.clean(self)
+
         if ((type(self.record) == RunStep) and
                 (type(self.record.pipelinestep.transformation) !=
                  method.models.Method)):
@@ -1092,16 +1294,43 @@ class ExecLog(models.Model):
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))
 
-        if (self.end_time is not None and self.start_time is not None and
-                self.start_time > self.end_time):
-            raise ValidationError('The end time of ExecLog "{}" is before its start time'.format(self))
+        if record.get_top_level_run() != invoking_record.get_top_level_run():
+            raise ValidationError(
+                'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.
+                format(self)
+            )
+
+        # Check that invoking_record is not earlier than record.
+        record_coords = record.get_coordinates()
+        invoking_record_coords = invoking_record.get_coordinates()
+
+        # We have to respect the hierarchy that in case of ties, RSIC is earlier than RunStep,
+        # and both are earlier than ROC.
+        tied = True
+        for i in range(min(len(record_coords), len(invoking_record_coords))):
+            if record_coords[i] > invoking_record_coords[i]:
+                raise ValidationError(
+                    'ExecLog "{}" is invoked earlier than the RunStep/RSIC/ROC it belongs to'.format(self)
+                )
+            elif record_coords[i] < invoking_record_coords[i]:
+                tied = False
+                break
+
+        # In the case of a tie, we use the precedence that RunSICs are
+        # earlier than RunSteps, and both are earlier than RunOutputCables.
+        # RunSICs and RunOutputCables that are at the same level are OK.
+        if tied:
+            if type(record) == RunOutputCable and type(invoking_record) != RunOutputCable:
+                raise ValidationError('ExecLog "{}" is invoked earlier than the ROC it belongs to'.format(self))
+            elif type(record) == RunStep and type(invoking_record) == RunSIC:
+                raise ValidationError('ExecLog "{}" is invoked earlier than the RunStep it belongs to'.format(self))
 
     def is_complete(self):
         """
         If this is a RunStep, specifically a method, it must have a methodoutput to be complete.
         It also must have a defined start and end time.
         """
-        if self.start_time is None or self.end_time is None:
+        if not self.has_ended():
             return False
 
         if (self.record.__class__.__name__ == "RunStep" and
@@ -1134,7 +1363,12 @@ class ExecLog(models.Model):
         return missing
 
     def is_successful(self):
-        """True if this execution was successful; False otherwise."""
+        """
+        True if this execution is successful (so far); False otherwise.
+
+        Note that the execution may still be in progress when we call this;
+        this function tells us if anything has gone wrong so far.
+        """
         # If this ExecLog has a MethodOutput, check its return code.
         if (hasattr(self, "methodoutput") and
                 self.methodoutput.return_code != 0):
@@ -1148,8 +1382,10 @@ class ExecLog(models.Model):
             if ccl.is_fail():
                 return False
 
-        # Having reached here, we are comfortable with the execution.
+        # Having reached here, we are comfortable with the execution --
+        # note that it may still be in progress!
         return True
+
 
 class MethodOutput(models.Model):
     """

@@ -26,18 +26,18 @@ class TransformationFamily(models.Model):
     name = models.CharField(
         "Transformation family name",
 		max_length=128,
-		help_text="The name given to a group of methods/pipelines");
+		help_text="The name given to a group of methods/pipelines")
 
     description = models.TextField(
         "Transformation family description",
-		help_text="A description for this collection of methods/pipelines");
+		help_text="A description for this collection of methods/pipelines")
 
     def __unicode__(self):
         """ Describe transformation family by it's name """
-        return self.name;
+        return self.name
 
     class Meta:
-        abstract = True;
+        abstract = True
 
 class Transformation(models.Model):
     """
@@ -53,25 +53,25 @@ class Transformation(models.Model):
     revision_name = models.CharField(
 		"Transformation revision name",
 		max_length=128,
-		help_text="The name of this transformation revision");
+		help_text="The name of this transformation revision")
 
     revision_DateTime = models.DateTimeField(
 		"Revision creation date",
-		auto_now_add = True);
+		auto_now_add = True)
 
     revision_desc = models.TextField(
 		"Transformation revision description",
-		help_text="Description of this transformation revision");
+		help_text="Description of this transformation revision")
 
     # inputs/outputs associated with transformations via GenericForeignKey
     # And can be accessed from within Transformations via GenericRelation
-    inputs = generic.GenericRelation("transformation.TransformationInput");
-    outputs = generic.GenericRelation("transformation.TransformationOutput");
+    inputs = generic.GenericRelation("transformation.TransformationInput")
+    outputs = generic.GenericRelation("transformation.TransformationOutput")
 
     execrecords = generic.GenericRelation("librarian.ExecRecord")
 
     class Meta:
-        abstract = True;
+        abstract = True
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
@@ -88,19 +88,19 @@ class Transformation(models.Model):
     def check_output_indices(self):
         """Check that output indices are numbered consecutively from 1."""
         # Append each output index (hole number) to a list
-        output_nums = [];
+        output_nums = []
         for curr_output in self.outputs.all():
-            output_nums += [curr_output.dataset_idx];
+            output_nums += [curr_output.dataset_idx]
 
         # Indices must be consecutively numbered from 1 to n
         if sorted(output_nums) != range(1, self.outputs.count()+1):
             raise ValidationError(
-                "Outputs are not consecutively numbered starting from 1");
+                "Outputs are not consecutively numbered starting from 1")
 
     def clean(self):
         """Validate transformation inputs and outputs."""
-        self.check_input_indices();
-        self.check_output_indices();
+        self.check_input_indices()
+        self.check_output_indices()
 
     # Helper to create inputs, which is now a 2-step operation if the input
     # is not raw.
@@ -207,11 +207,11 @@ class TransformationXput(models.Model):
     execrecordouts_referencing = generic.GenericRelation("librarian.ExecRecordOut")
 
     class Meta:
-        abstract = True;
+        abstract = True
 
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("content_type", "object_id", "dataset_name"),
-                           ("content_type", "object_id", "dataset_idx"));
+                           ("content_type", "object_id", "dataset_idx"))
 
     def __unicode__(self):
         unicode_rep = u"";
@@ -262,12 +262,12 @@ class XputStructure(models.Model):
     """
     content_type = models.ForeignKey(
         ContentType,
-        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")});
-    object_id = models.PositiveIntegerField();
+        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")})
+    object_id = models.PositiveIntegerField()
     transf_xput = generic.GenericForeignKey("content_type", "object_id")
 
     # The expected compounddatatype of the input/output
-    compounddatatype = models.ForeignKey("metadata.CompoundDatatype");
+    compounddatatype = models.ForeignKey("metadata.CompoundDatatype")
     
     # Nullable fields indicating that this dataset has
     # restrictions on how many rows it can have
@@ -275,13 +275,13 @@ class XputStructure(models.Model):
         "Minimum row",
         help_text="Minimum number of rows this input/output returns",
         null=True,
-        blank=True);
+        blank=True)
 
     max_row = models.PositiveIntegerField(
         "Maximum row",
         help_text="Maximum number of rows this input/output returns",
         null=True,
-        blank=True);
+        blank=True)
 
     class Meta:
         unique_together = ("content_type", "object_id")

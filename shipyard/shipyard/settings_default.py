@@ -141,6 +141,7 @@ INSTALLED_APPS = (
     'datachecking',
     'sandbox',
     'portal',
+    'stopwatch'
 )
 
 # A sample logging configuration. The only tangible logging
