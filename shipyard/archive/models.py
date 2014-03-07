@@ -20,9 +20,10 @@ import method.models
 import transformation.models
 
 def clean_execlogs(runx):
-    """
-    Helper function to ensure a RunStep, RunSIC, or RunOutputCable has at most one
-    ExecLog, and to clean it if it exists.
+    """Count and clean ExecLogs of Run(Step|SIC|OutputCable).
+
+    Helper function to ensure a RunStep, RunSIC, or RunOutputCable has
+    at most one ExecLog, and to clean it if it exists.
     """
     if runx.log.exists():
        if runx.log.count() == 1:
@@ -32,8 +33,7 @@ def clean_execlogs(runx):
                                                                                              runx, runx.log.count()))
 
 class Run(models.Model):
-    """
-    Stores data associated with an execution of a pipeline.
+    """Stores data associated with an execution of a pipeline.
 
     Related to :model:`pipeline.models.Pipeline`
     Related to :model:`archive.models.RunStep`
@@ -122,8 +122,7 @@ class Run(models.Model):
         return self.parent_runstep is not None
 
 class RunStep(models.Model):
-    """
-    Annotates the execution of a pipeline step within a run.
+    """Annotates the execution of a PipelineStep within a Run.
 
     Related to :model:`archive.models.Run`
     Related to :model:`librarian.models.ExecRecord`
@@ -463,29 +462,20 @@ class RunStep(models.Model):
         return self.log.first().is_successful()
 
 class RunSIC(models.Model):
-    """
-    Annotates the action of a PipelineStepInputCable within a RunStep.
+    """The execution of a PipelineStepInputCable within a RunStep.
 
     Related to :model:`archive.models.RunStep`
     Related to :model:`librarian.models.ExecRecord`
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
     runstep = models.ForeignKey(RunStep, related_name="RSICs")
-    execrecord = models.ForeignKey(
-        "librarian.ExecRecord",
-        null=True,
-        blank=True,
-        related_name="RSICs")
-    reused = models.NullBooleanField(
-        help_text="Denotes whether this run reused the action of an output cable",
-        default=None)
-    PSIC = models.ForeignKey(
-        "pipeline.PipelineStepInputCable",
-        related_name="psic_instances")
+    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="RSICs")
+    reused = models.NullBooleanField(help_text="Denotes whether this run reused the action of an output cable",
+                                     default=None)
+    PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
-    start_time = models.DateTimeField(
-        "start time", auto_now_add=True,
-        help_text="Time at start of running this input cable")
+    start_time = models.DateTimeField("start time", auto_now_add=True, 
+                                      help_text="Time at start of running this input cable")
 
     log = generic.GenericRelation("ExecLog")
     output = generic.GenericRelation("Dataset")
@@ -499,21 +489,51 @@ class RunSIC(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def clean(self):
+    def _clean_undecided_reused(self):
         """
-        Check coherence of this RunSIC.
-
-        In sequence, the checks we perform:
-         - PSIC belongs to runstep.pipelinestep
-
-         - if an ExecLog is attached, clean it
+        Check coherence of a RunSIC which has not decided whether or
+        or not to reuse an ExecRecord:
 
          - if reused is None (no decision on reusing has been made),
            no log should be associated, no data should be associated,
            and execrecord should not be set
 
-         - else if reused is True, no data should be associated.
-         - else if reused is False:
+        This is a helper for clean().
+        
+        PRE
+        This RunSIC has reused = None (the decision to reuse an
+        ExecRecord or not has not yet been made).
+        """
+        general_error = 'RunSIC "{}" has not decided whether or not to reuse an ExecRecord'.format(self)
+        if self.log.all().exists():
+            raise ValidationError("{}; no log should have been generated".format(general_error))
+        if self.has_data():
+            raise ValidationError("{}; no Datasets should be associated".format(general_error))
+        if self.execrecord:
+            raise ValidationError("{}; execrecord should not be set yet".format(general_error))
+
+    def _clean_reused(self):
+        """
+        Check coherence of a RunSIC which has decided to reuse an
+        ExecRecord:
+
+         - if reused is True, no data should be associated.
+
+        This is a helper for clean().
+        
+        PRE
+        This RunSIC has reused = True (has decided to reuse an ExecRecord).
+        """ 
+        if self.has_data():
+            raise ValidationError('RunSIC "{}" reused an ExecRecord and should not have generated any Datasets'
+                                  .format(self))
+
+    def _clean_not_reused(self):
+        """
+        Check coherence of a RunSIC which has decided not to reuse an
+        ExecRecord:
+
+         - if reused is False:
 
            - if no ExecLog is attached yet or it is not complete,
              there should be no associated Dataset
@@ -523,9 +543,70 @@ class RunSIC(models.Model):
            - if the cable is trivial, there should be no associated Dataset
            - otherwise, make sure there is at most one Dataset, and clean it
              if it exists
-        (from here on execrecord is assumed to be set)
+
+        This is a helper for clean().
+
+        PRE
+        This RunSIC has reused = False (has decided not to reuse an
+        ExecRecord).
+
+        OUTPUT
+        True if there are more checks to do within clean, False if clean
+        should return right away.
+        """ 
+        if not self.log.exists() or not self.log.first().is_complete():
+            if self.has_data():
+                raise ValidationError('RunSIC "{}" does not have a complete log so should not have generated any '
+                                      'Datasets'.format(self))
+            return False
+ 
+        # From here on, the ExecLog is known to be complete.
+
+        # If this cable is trivial, there should be no data
+        # associated.
+        if self.has_data():
+            if self.PSIC.is_trivial():
+                raise ValidationError('RunSIC "{}" is trivial and should not have generated any Datasets'.format(self))
+
+        # Otherwise, check that there is at most one Dataset
+        # attached, and clean it.
+            if self.output.count() > 1:
+                raise ValidationError('RunSIC "{}" should generate at most one Dataset'.format(self))
+            self.output.first().clean()
+        return True
+
+    def _clean_execrecord(self):
+        """
+        Check coherence of the RunSIC's associated ExecRecord:
+
          - it must be complete and clean
+         - it must represent a PSIC
          - PSIC is the same as (or compatible to) self.execrecord.general_transf()
+
+        This is a helper for clean().
+
+        PRE
+        This RunSIC has an ExecRecord.
+        """
+        # At this point there must be an associated ER; check that it is
+        # clean and complete.
+        self.execrecord.complete_clean()
+
+        # Check that PSIC and execrecord.general_transf() are compatible
+        # given that the SymbolicDataset represented in the ERI is the
+        # input to both.  (This must be true because our Pipeline was
+        # well-defined.)
+        # TODO: Helpers for transformation
+        if self.execrecord.general_transf().__class__.__name__ != "PipelineStepInputCable":
+            raise ValidationError('ExecRecord of RunSIC "{}" does not represent a PSIC'.format(self))
+
+        elif not self.PSIC.is_compatible_given_input(self.execrecord.general_transf()):
+            raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
+
+    def _clean_with_execlog(self):
+        """
+        If this RunSIC has an ExecLog (that is, code was run during its
+        execution), make sure it is in a coherent state:
 
          - if this RunSIC does not keep its output or its output is
            missing, there should be no existent data associated.
@@ -536,147 +617,111 @@ class RunSIC(models.Model):
            - if the PSIC is not trivial and this RunSIC does not reuse an ER,
              then there should be existent data associated and it should also
              be associated to the corresponding ERO.
+        
+        This is a helper function for clean.
+
+        PRE
+        This RunSIC has an ExecLog AND an ExecRecord.
+        """
+        # If output of PSIC not marked as kept, there shouldn't be a dataset
+        if not self.PSIC.keep_output:
+            if self.has_data():
+                raise ValidationError('RunSIC "{}" does not keep its output but a dataset was registered'.format(self))
+
+        # If EL shows missing output
+        elif self.log.first().missing_outputs():
+            if self.has_data():
+                raise ValidationError('RunSIC "{}" had missing output but a dataset was registered'.format(self))
+
+        else:
+            # The corresponding ERO should have existent data.
+            # TODO: helper to get the ExecRecordOut without calling first().
+            corresp_ero = self.execrecord.execrecordouts.first()
+            if not corresp_ero.has_data():
+                raise ValidationError('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
+                                      'data'.format(self, corresp_ero))
+
+            # If reused == False and the cable is not trivial,
+            # there should be associated data, and it should match that
+            # of corresp_ero.
+            if not self.reused and not self.PSIC.is_trivial():
+                if not self.has_data():
+                    raise ValidationError('RunSIC "{}" was not reused, trivial, or deleted; it should have '
+                                          'produced data'.format(self))
+
+                if corresp_ero.symbolicdataset.dataset != self.output.first():
+                    raise ValidationError('Dataset "{}" was produced by RunSIC "{}" but is not in an ERO of '
+                                          'ExecRecord "{}"'.format(self.output.first(), self, self.execrecord))
+
+    def _clean_without_execlog(self):
+        """
+        If this RunSIC has no ExecLog (that is, it either recycled an
+        ExecRecord, or is incomplete), make sure it is coherent:
+          
+          - if it is reusing an ExecRecord, it should not have output
+          - if it is not reusing an ExecRecord, it is incomplete,
+            and should not have data or an ExecRecord.
+        """
+        # Case 1: Completely recycled ER (reused = true): it should
+        # not have an RSIC.output (No registered dataset)
+        if self.reused and self.output.exists():
+            raise ValidationError('RunSIC "{}" was reused but has a registered dataset')
+
+        # Case 2: Still executing (reused = false): there should be
+        # no RSIC.output and no ER
+        if not self.reused:
+            general_error = 'RunSIC "{}" not reused and has no ExecLog'.format(self)
+            if self.output.exists():
+                raise ValidationError("{}, but has a Dataset output".format(general_error))
+            if self.execrecord.exists():
+                raise ValidationError("{}, but has an ExecRecord".format(general_error))
+
+    def clean(self):
+        """
+        Check coherence of this RunSIC.
+
+        In sequence, the checks we perform:
+         - PSIC belongs to runstep.pipelinestep
+
+         - if an ExecLog is attached, clean it
+
+         - perform relevant coherence checks based on whether the RunSIC
+           has decided to reuse an ExecRecord (see _clean_undecided_reused,
+           _clean_reused, and _clean_not_reused)
+
+        (from here on execrecord is assumed to be set)
+
+         - clean the ExecRecord(see _clean_execrecord)
+
+         - perform relevant coherence cehcks based on whether the RunSIC
+           has an ExecLog (ie. code was run) (see _clean_with_execlog
+           and _clean_without_execlog)
         """
         self.logger.debug("Initiating")
 
-        if (not self.runstep.pipelinestep.cables_in.
-                filter(pk=self.PSIC.pk).exists()):
-            raise ValidationError(
-                "PSIC \"{}\" does not belong to PipelineStep \"{}\"".
-                format(self.PSIC, self.runstep.pipelinestep))
+        if (not self.runstep.pipelinestep.cables_in.filter(pk=self.PSIC.pk).exists()):
+            raise ValidationError('PSIC "{}" does not belong to PipelineStep "{}"'
+                                  .format(self.PSIC, self.runstep.pipelinestep))
 
         clean_execlogs(self)
 
         if self.reused is None:
-            if self.log.all().exists():
-                raise ValidationError(
-                    "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; no log should have been generated".
-                    format(self))
-            if self.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
-                    format(self))
-            if self.execrecord != None:
-                raise ValidationError(
-                    "RunSIC \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
-                    format(self))
-
+            self._clean_undecided_reused()
         elif self.reused:
-            if self.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" reused an ExecRecord and should not have generated any Datasets".
-                    format(self))
-
-        else:
-            if (not self.log.all().exists() or
-                    not self.log.all()[0].is_complete()):
-                if self.has_data():
-                    raise ValidationError(
-                        "RunSIC \"{}\" does not have a complete log so should not have generated any Datasets".
-                        format(self))
-                return
-
-            # From here on, the ExecLog is known to be complete.
-
-            # If this cable is trivial, there should be no data
-            # associated.
-            if self.PSIC.is_trivial() and self.has_data():
-                raise ValidationError(
-                    "RunSIC \"{}\" is trivial and should not have generated any Datasets".
-                    format(self))
-
-            # Otherwise, check that there is at most one Dataset
-            # attached, and clean it.
-            elif self.has_data():
-                if self.output.count() > 1:
-                    raise ValidationError(
-                        "RunSIC \"{}\" should generate at most one Dataset".
-                        format(self))
-                self.output.all()[0].clean()
-
-        # If there is no execrecord defined, then exit.
-        if self.execrecord == None:
+            self._clean_reused()
+        elif not self._clean_not_reused():
             return
 
-        # At this point there must be an associated ER; check that it is
-        # clean and complete.
-        self.execrecord.complete_clean()
+        # If there is no execrecord defined, then exit.
+        if self.execrecord is None: return
+        self._clean_execrecord()
 
-        # Check that PSIC and execrecord.general_transf() are compatible
-        # given that the SymbolicDataset represented in the ERI is the
-        # input to both.  (This must be true because our Pipeline was
-        # well-defined.)
-
-        if (type(self.execrecord.general_transf()).__name__ != "PipelineStepInputCable"):
-            raise ValidationError(
-                "ExecRecord of RunSIC \"{}\" does not represent a PSIC".
-                format(self.PSIC))
-
-        elif not self.PSIC.is_compatible_given_input(
-                self.execrecord.general_transf()):
-            raise ValidationError(
-                "PSIC of RunSIC \"{}\" is incompatible with that of its ExecRecord".
-                format(self.PSIC))
-
-        # Check whether this has a missing output.
         self.logger.debug("Checking RunSIC's ExecLog")
 
         if self.log.exists():
-
-            # If output of PSIC not marked as kept, there shouldn't be a dataset
-            if not self.PSIC.keep_output:
-                if self.has_data():
-                    raise ValidationError(
-                        "RunSIC \"{}\" does not keep its output but a dataset was registered".
-                        format(self))
-
-            # If EL shows missing output
-            elif len(self.log.first().missing_outputs()) != 0:
-                if self.has_data():
-                    raise ValidationError(
-                        "RunSIC \"{}\" had missing output but a dataset was registered".
-                        format(self))
-
-            else:
-                # The corresponding ERO should have existent data.
-                corresp_ero = self.execrecord.execrecordouts.first()
-                if not corresp_ero.has_data():
-                    raise ValidationError('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
-                                          'data'.format(self, corresp_ero))
-
-                # If reused == False and the cable is not trivial,
-                # there should be associated data, and it should match that
-                # of corresp_ero.
-                if not self.reused and not self.PSIC.is_trivial():
-                    if not self.has_data():
-                        raise ValidationError(
-                            "RunSIC \"{}\" was not reused, trivial, or deleted; it should have produced data".
-                            format(self))
-
-                    if corresp_ero.symbolicdataset.dataset != self.output.all()[0]:
-                        raise ValidationError(
-                            "Dataset \"{}\" was produced by RunSIC \"{}\" but is not in an ERO of ExecRecord \"{}\"".
-                            format(self.output.all()[0], self, self.execrecord))
-
-        # Case: RSIC has no log
+            self._clean_with_execlog()
         else:
-
-            # Case 1: Completely recycled ER (reused = true): it should not have an RSIC.output (No registered dataset)
-            if self.reused and self.output.exists():
-                raise ValidationError("RunSIC '{}' was reused but has a registered dataset")
-
-            # Case 2: Still executing (reused = false): there should be no RSIC.output and no ER
-            if not self.reused:
-                if self.output.all().exists():
-                    raise ValidationError("RunSIC '{}' not reused and has no log, but has a dataset output")
-                if self.execrecord.all().exists():
-                    raise ValidationError("RunSIC '{}' not reused and has no log, but has an ER")
-
-
-
-
-
-
+            self._clean_without_execlog()
 
     def is_complete(self):
         """True if RunSIC is complete; false otherwise."""
@@ -686,16 +731,14 @@ class RunSIC(models.Model):
         """Check completeness and coherence of this RunSIC."""
         self.clean()
         if not self.is_complete():
-            raise ValidationError(
-                "RunSIC \"{}\" has no ExecRecord".format(self))
+            raise ValidationError('RunSIC "{}" has no ExecRecord'.format(self))
 
     def has_data(self):
         """True if associated output exists; False if not."""
         return self.output.all().exists()
 
     def successful_execution(self):
-        """
-        True if RunSIC is successful; False otherwise.
+        """True if RunSIC is successful; False otherwise.
 
         The RunStep is failed if there are any associated failed
         content/integrity checks.
@@ -735,8 +778,7 @@ class RunOutputCable(models.Model):
         unique_together = ("run", "pipelineoutputcable")
 
     def clean(self):
-        """
-        Check coherence of this RunOutputCable.
+        """Check coherence of this RunOutputCable.
 
         In sequence, the checks we perform are:
          - pipelineoutputcable belongs to run.pipeline
@@ -776,49 +818,38 @@ class RunOutputCable(models.Model):
              trivial, then this ROC should have existent data
              associated and it should belong to the corresponding ERO
         """
-        if (not self.run.pipeline.outcables.
-                filter(pk=self.pipelineoutputcable.pk).exists()):
-            raise ValidationError(
-                "POC \"{}\" does not belong to Pipeline \"{}\"".
-                format(self.pipelineoutputcable, self.run.pipeline))
+        if not self.run.pipeline.outcables.filter(pk=self.pipelineoutputcable.pk).exists():
+            raise ValidationError('POC "{}" does not belong to Pipeline "{}"'
+                                  .format(self.pipelineoutputcable, self.run.pipeline))
 
         clean_execlogs(self)
 
+        # TODO: This is duplicated from RunSIC.clean
         if self.reused is None:
+            general_error = 'RunOutputCable "{}" has not decided whether or not to reuse an ExecRecord'.format(self)
             if self.log.all().exists():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no ExecLog should be associated".
-                    format(self))
+                raise ValidationError("{}; no ExecLog should be associated".format(general_error))
 
             if self.has_data():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; no Datasets should be associated".
-                    format(self))
+                raise ValidationError("{}; no Datasets should be associated".format(general_error))
 
-            if self.execrecord != None:
-                raise ValidationError(
-                    "RunOutputCable \"{}\" has not decided whether or not to reuse an ExecRecord; execrecord should not be set yet".
-                    format(self))
+            if self.execrecord:
+                raise ValidationError("{}; execrecord should not be set yet".format(general_error))
 
         elif self.reused:
             if self.has_data():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" reused an ExecRecord and should not have generated any Datasets".
-                    format(self))
+                raise ValidationError('RunOutputCable "{}" reused an ExecRecord and should not have generated any '
+                                      'Datasets'.format(self))
         else:
             # If this cable is trivial, there should be no data associated.
-            if self.pipelineoutputcable.is_trivial():
-                if self.has_data():
-                    raise ValidationError(
-                        "RunOutputCable \"{}\" is trivial and should not have generated any Datasets".
-                        format(self))
+            if self.pipelineoutputcable.is_trivial() and self.has_data():
+                raise ValidationError('RunOutputCable "{}" is trivial and should not have generated any Datasets'
+                                      .format(self))
 
-            if (not self.log.all().exists() or
-                    not self.log.all()[0].is_complete()):
+            if not self.log.all().exists() or not self.log.first().is_complete():
                 if self.has_data():
-                    raise ValidationError(
-                        "RunOutputCable \"{}\" does not have a complete log so should not have generated any Datasets".
-                        format(self))
+                    raise ValidationError('RunOutputCable "{}" does not have a complete log so should not have '
+                                          'generated any Datasets'.format(self))
 
                 return
 
@@ -829,82 +860,65 @@ class RunOutputCable(models.Model):
             # attached, and clean it.
             elif self.has_data():
                 if self.output.count() > 1:
-                    raise ValidationError(
-                        "RunOutputCable \"{}\" should generate at most one Dataset".
-                        format(self))
-                self.output.all()[0].clean()
+                    raise ValidationError('RunOutputCable "{}" should generate at most one Dataset'.format(self))
+                self.output.first().clean()
 
-        if self.execrecord == None:
-            return
+        if self.execrecord is None: return
 
         # self.execrecord is set, so complete_clean it.
         self.execrecord.complete_clean()
 
         # ER must point to a cable compatible with the one this RunOutputCable points to.
-        if type(self.execrecord.general_transf()).__name__ != "PipelineOutputCable":
-            raise ValidationError(
-                "ExecRecord of RunOutputCable \"{}\" does not represent a POC".
-                format(self))
+        if self.execrecord.general_transf().__class__.__name__ != "PipelineOutputCable":
+            raise ValidationError('ExecRecord of RunOutputCable "{}" does not represent a POC'.format(self))
 
         elif not self.pipelineoutputcable.is_compatible(self.execrecord.general_transf()):
-            raise ValidationError(
-                "POC of RunOutputCable \"{}\" is incompatible with that of its ExecRecord".
-                format(self))
+            raise ValidationError('POC of RunOutputCable "{}" is incompatible with that of its ExecRecord'.format(self))
 
         is_deleted = False
-        if self.run.parent_runstep != None:
+        if self.run.parent_runstep is not None:
             is_deleted = self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
                 dataset_name=self.pipelineoutputcable.output_name).exists()
 
         # If the output of this ROC is marked for deletion, there should be no data associated.
         if is_deleted:
             if self.has_data():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" is marked for deletion; no data should be produced".
-                    format(self))
+                raise ValidationError('RunOutputCable "{}" is marked for deletion; no data should be produced'
+                                      .format(self))
 
         # November 18, 2013: check if there was missing output
         # (i.e. some kind of messed up execution) in the ExecLog.
         # If the output of this ROC was missing on execution, there should be no data associated.
-        elif self.log.exists() and len(self.log.first().missing_outputs()) != 0:
+        elif self.log.exists() and self.log.first().missing_outputs():
             if self.has_data():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" had a missing output; no data should be produced".
-                    format(self))
+                raise ValidationError('RunOutputCable "{}" had a missing output; no data should be produced'
+                                      .format(self))
 
         # Otherwise, there should be data
         else:
             # The corresponding ERO should have existent data.
             corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
             if not corresp_ero.has_data():
-                raise ValidationError(
-                    "RunOutputCable \"{}\" was not deleted and did not have missing output; ExecRecordOut \"{}\" should reference existent data".
-                    format(self, corresp_ero))
-
-
+                raise ValidationError('RunOutputCable "{}" was not deleted and did not have missing output; '
+                                      'ExecRecordOut "{}" should reference existent data'.format(self, corresp_ero))
 
             # If step was not reused and cable was not trivial, there should be data with the ROC
             if not self.reused and not self.pipelineoutputcable.is_trivial():
                 if not self.has_data():
-                    raise ValidationError(
-                        "RunOutputCable \"{}\" was not reused, trivial, or deleted; it should have produced data".
-                        format(self))
+                    raise ValidationError('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
+                                          'produced data'.format(self))
 
                 # The associated data should belong to the ERO of
                 # self.execrecord (which has already been checked for
                 # completeness and cleanliness).
-                if (not self.execrecord.execrecordouts.filter(
-                        symbolicdataset=self.output.all()[0].symbolicdataset).
-                        exists()):
-                    raise ValidationError(
-                        "Dataset \"{}\" was produced by RunOutputCable \"{}\" but is not in an ERO of ExecRecord \"{}\"".
-                        format(self.output.all()[0], self, self.execrecord))
-
-
+                if not self.execrecord.execrecordouts.filter(
+                           symbolicdataset=self.output.first().symbolicdataset).exists():
+                    raise ValidationError('Dataset "{}" was produced by RunOutputCable "{}" but is not in an ERO of '
+                                          'ExecRecord "{}"'.format(self.output.first(), self, self.execrecord))
 
     def is_complete(self):
         """True if ROC is finished running; false otherwise."""
-        return self.execrecord != None
+        return self.execrecord is not None
 
     def complete_clean(self):
         """Check completeness and coherence of this RunOutputCable."""
@@ -918,8 +932,7 @@ class RunOutputCable(models.Model):
         return self.output.all().exists()
 
     def successful_execution(self):
-        """
-        True if this RunOutputCable is successful; False otherwise.
+        """True if this RunOutputCable is successful; False otherwise.
 
         The ROC is failed if there are any associated failed
         content/integrity checks.
@@ -934,7 +947,6 @@ class RunOutputCable(models.Model):
 
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
-
 
 class Dataset(models.Model):
     """

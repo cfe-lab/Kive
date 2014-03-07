@@ -745,8 +745,7 @@ class ExecRecordOut(models.Model):
         The SD is compatible with generic_output. (??)
         """
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
-        if (type(self.execrecord.general_transf()) ==
-                pipeline.models.PipelineOutputCable):
+        if (type(self.execrecord.general_transf()) == pipeline.models.PipelineOutputCable):
             parent_er_outcable = self.execrecord.general_transf()
 
             # ERO TO must belong to the same pipeline as the ER POC
@@ -762,13 +761,11 @@ class ExecRecordOut(models.Model):
                     format(self))
 
         # Second case: parent ER represents a PSIC.
-        elif (type (self.execrecord.general_transf()) ==
-              pipeline.models.PipelineStepInputCable):
+        elif (type (self.execrecord.general_transf()) == pipeline.models.PipelineStepInputCable):
             parent_er_psic = self.execrecord.general_transf()
 
             # This ERO must point to a TI.
-            if (type(self.generic_output) !=
-                    transformation.models.TransformationInput):
+            if (type(self.generic_output) != transformation.models.TransformationInput):
                 raise ValidationError(
                     "Parent of ExecRecordOut \"{}\" represents a PSIC; ERO must be a TransformationInput".
                     format(self))
