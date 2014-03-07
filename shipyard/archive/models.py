@@ -40,24 +40,17 @@ class Run(models.Model):
     Related to :model:`archive.models.Dataset`
     """
     user = models.ForeignKey(User, help_text="User who performed this run")
-    start_time = models.DateTimeField("start time", auto_now_add=True,
-                                      help_text="Time at start of run")
-    pipeline = models.ForeignKey(
-        "pipeline.Pipeline",
-        related_name="pipeline_instances",
-        help_text="Pipeline used in this run")
+    start_time = models.DateTimeField("start time", auto_now_add=True, help_text="Time at start of run")
+    pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
+                                 help_text="Pipeline used in this run")
 
     name = models.CharField("Run name", max_length=256)
     description = models.TextField("Run description", blank=True)
 
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
-    parent_runstep = models.OneToOneField(
-        "RunStep",
-        related_name="child_run",
-        null=True,
-        blank=True,
-        help_text="Step of parent run initiating this one as a sub-run")
+    parent_runstep = models.OneToOneField("RunStep", related_name="child_run", null=True, blank=True,
+                                          help_text="Step of parent run initiating this one as a sub-run")
 
     def clean(self):
         """
@@ -148,6 +141,15 @@ class Run(models.Model):
         else:
             unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
+
+    def successful_execution(self):
+        """
+        Did this Run execute succesfully?
+
+        PRE
+        This Run is clean and complete.
+        """
+        return all([step.successful_execution() for step in self.runsteps.all()])
 
 class RunStep(models.Model):
     """
@@ -457,7 +459,6 @@ class RunStep(models.Model):
 
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
-
 
 class RunSIC(models.Model):
     """
@@ -939,7 +940,6 @@ class RunOutputCable(models.Model):
 
         # From this point on it is known that there is an ExecLog.
         return log_qs[0].is_successful()
-
 
 class Dataset(models.Model):
     """
