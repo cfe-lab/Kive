@@ -42,7 +42,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         record_type = record.__class__.__name__
         record.reused = False
     
-        execlog = ExecLog(record=record, start_time=timezone.now(), end_time=timezone.now())
+        execlog = ExecLog(record=record, invoking_record=record, start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
         if record_type == "RunStep":
             MethodOutput(execlog=execlog, return_code=0).save()
@@ -95,7 +95,8 @@ class RunStepTests(ArchiveTestSetup):
         run_step = self.step_E1.pipelinestep_instances.create(run=run)
         run_step.reused = False
         for i in range(2):
-            run_step.log.create(start_time=timezone.now(),
+            run_step.log.create(invoking_record=run_step,
+                                start_time=timezone.now(),
                                 end_time=timezone.now())
         self.assertRaisesRegexp(ValidationError,
                 re.escape('RunStep "{}" has {} ExecLogs but should have only one'.
@@ -318,7 +319,8 @@ class RunStepTests(ArchiveTestSetup):
         A RunStep which has a child run should have no ExecLog.
         """
         self.step_through_runstep_creation("sub_pipeline")
-        ExecLog(record=self.step_E2_RS, start_time=timezone.now(), end_time=timezone.now()).save()
+        ExecLog(record=self.step_E2_RS, invoking_record=self.step_E2_RS,
+                start_time=timezone.now(), end_time=timezone.now()).save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" represents a sub-pipeline so no log should be associated'
                                           .format(self.step_E2_RS)),
@@ -354,7 +356,8 @@ class RunStepTests(ArchiveTestSetup):
         self.step_through_runstep_creation("second_runstep_complete")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_runstep = self.step_E2.pipelinestep_instances.create(run=other_run)
-        execlog = ExecLog(record=other_runstep, start_time=timezone.now(), end_time=timezone.now())
+        execlog = ExecLog(record=other_runstep, invoking_record=other_runstep,
+                          start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
         execrecord = ExecRecord(generator=execlog)
         execrecord.save()
@@ -825,7 +828,8 @@ class RunSICTests(ArchiveTestSetup):
         rsic = cable.psic_instances.create(runstep=runstep)
         rsic.reused = False
         for i in range(2):
-            rsic.log.create(start_time=timezone.now(),
+            rsic.log.create(invoking_record=rsic,
+                            start_time=timezone.now(),
                             end_time=timezone.now())
         self.assertRaisesRegexp(ValidationError,
                 'RunSIC "{}" has {} ExecLogs but should have only one'.
@@ -1228,7 +1232,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         run_output_cable = self.E31_42.poc_instances.create(run=run)
         run_output_cable.reused = False
         for i in range(2):
-            run_output_cable.log.create(start_time=timezone.now(),
+            run_output_cable.log.create(invoking_record=run_output_cable,
+                                        start_time=timezone.now(),
                                         end_time=timezone.now())
         self.assertRaisesRegexp(ValidationError,
                 'RunOutputCable "{}" has {} ExecLogs but should have only one'.

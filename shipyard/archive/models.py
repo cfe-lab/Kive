@@ -33,6 +33,8 @@ def clean_execlogs(runx):
        else:
            raise ValidationError("{} \"{}\" has {} ExecLogs but should have only one".format(runx.__class__.__name__,
                                                                                              runx, runx.log.count()))
+
+
 class Run(stopwatch.models.Stopwatch):
     """
     Stores data associated with an execution of a pipeline.
@@ -511,16 +513,20 @@ class RunStep(stopwatch.models.Stopwatch):
 
         # At this point we know that it is not finished successfully;
         # check whether it failed during either cables or during recovery.
-        for cable in self.RSICs.all():
-            if not (cable.is_complete() or not cable.has_started()):
-                return False
+        if not self.successful_execution():
+            for cable in self.RSICs.all():
+                if not (cable.is_complete() or not cable.has_started()):
+                    return False
 
-        for invoked_log in self.invoked_logs.all():
-            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
-                return False
+            for invoked_log in self.invoked_logs.all():
+                if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
+                    return False
 
-        # At this point, we know that it's failed but complete.
-        return True
+            # At this point, we know that it's failed but complete.
+            return True
+
+        # At this point, we know that it is successful but incomplete.
+        return False
 
     def complete_clean(self):
         """
@@ -584,19 +590,18 @@ class RunStep(stopwatch.models.Stopwatch):
         return self.run.get_top_level_run()
 
 
-class RunSIC(stopwatch.models.Stopwatch):
+class RunCable(stopwatch.models.Stopwatch):
     """
-    Annotates the action of a PipelineStepInputCable within a RunStep.
+    Abstract class inherited by RunSIC and RunOutputCable.
 
-    Related to :model:`archive.models.RunStep`
-    Related to :model:`librarian.models.ExecRecord`
-    Related to :model:`pipeline.models.PipelineStepInputCable`
+    Since those classes share so much functionality, this
+    abstract class will encapsulate that stuff and RSIC/ROC
+    can extend it where necessary.
     """
-    runstep = models.ForeignKey(RunStep, related_name="RSICs")
-    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="RSICs")
+    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True,
+                                   related_name="%(app_label)s_%(class)s_related")
     reused = models.NullBooleanField(help_text="Denotes whether this run reused the action of an output cable",
                                      default=None)
-    PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
     log = generic.GenericRelation("ExecLog")
     output = generic.GenericRelation("Dataset")
@@ -608,17 +613,44 @@ class RunSIC(stopwatch.models.Stopwatch):
     # Implicit from Stopwatch: start_time, end_time.
 
     class Meta:
-        # Uniqueness constraint ensures that no POC is multiply-represented
-        # within a run step.
-        unique_together = ("runstep", "PSIC")
+        abstract = True
 
     def __init__(self, *args, **kwargs):
+        """Instantiate and set up a logger."""
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    def has_data(self):
+        """True if associated output exists; False if not."""
+        return self.output.all().exists()
+
+    def keeps_output(self):
+        """
+        True if this RunCable retains its output; false otherwise.
+
+        This is an abstract function that must be implemented by
+        RunSIC and RunOutputCable
+        """
+        pass
+
+    def _cable_type_str(self):
+        """
+        Helper to retrieve the class name of this cable.
+
+        That is, a RunSIC will return "RunSIC" and a
+        RunOutputCable will return "RunOutputCable".
+        """
+        return self.__class__.__name__
+
+    def _pipeline_cable(self):
+        """
+        Abstract function that retrieves the PSIC/POC.
+        """
+        pass
+
     def _clean_undecided_reused(self):
         """
-        Check coherence of a RunSIC which has not decided whether or
+        Check coherence of a RunCable which has not decided whether or
         or not to reuse an ExecRecord:
 
          - if reused is None (no decision on reusing has been made),
@@ -626,12 +658,13 @@ class RunSIC(stopwatch.models.Stopwatch):
            and execrecord should not be set
 
         This is a helper for clean().
-        
+
         PRE
-        This RunSIC has reused = None (the decision to reuse an
+        This RunCable has reused = None (the decision to reuse an
         ExecRecord or not has not yet been made).
         """
-        general_error = 'RunSIC "{}" has not decided whether or not to reuse an ExecRecord'.format(self)
+        general_error = '{} "{}" has not decided whether or not to reuse an ExecRecord'.format(
+            self._cable_type_str(), self)
         if self.log.all().exists():
             raise ValidationError("{}; no log should have been generated".format(general_error))
         if self.has_data():
@@ -641,23 +674,23 @@ class RunSIC(stopwatch.models.Stopwatch):
 
     def _clean_reused(self):
         """
-        Check coherence of a RunSIC which has decided to reuse an
+        Check coherence of a RunCable which has decided to reuse an
         ExecRecord:
 
          - if reused is True, no data should be associated.
 
         This is a helper for clean().
-        
+
         PRE
-        This RunSIC has reused = True (has decided to reuse an ExecRecord).
-        """ 
+        This RunCable has reused = True (has decided to reuse an ExecRecord).
+        """
         if self.has_data():
-            raise ValidationError('RunSIC "{}" reused an ExecRecord and should not have generated any Datasets'
-                                  .format(self))
+            raise ValidationError('{} "{}" reused an ExecRecord and should not have generated any Datasets'
+                                  .format(self._cable_type_str(), self))
 
     def _clean_not_reused(self):
         """
-        Check coherence of a RunSIC which has decided not to reuse an
+        Check coherence of a RunCable which has decided not to reuse an
         ExecRecord:
 
          - if reused is False:
@@ -674,33 +707,272 @@ class RunSIC(stopwatch.models.Stopwatch):
         This is a helper for clean().
 
         PRE
-        This RunSIC has reused = False (has decided not to reuse an
+        This RunCable has reused = False (has decided not to reuse an
         ExecRecord).
 
         OUTPUT
         True if there are more checks to do within clean, False if clean
         should return right away.
-        """ 
+        """
         if not self.log.exists() or not self.log.first().is_complete():
             if self.has_data():
-                raise ValidationError('RunSIC "{}" does not have a complete log so should not have generated any '
-                                      'Datasets'.format(self))
+                raise ValidationError('{} "{}" does not have a complete log so should not have generated any '
+                                      'Datasets'.format(self._cable_type_str(), self))
             return False
- 
+
         # From here on, the ExecLog is known to be complete.
 
         # If this cable is trivial, there should be no data
         # associated.
         if self.has_data():
-            if self.PSIC.is_trivial():
-                raise ValidationError('RunSIC "{}" is trivial and should not have generated any Datasets'.format(self))
+            if self._pipeline_cable().is_trivial():
+                raise ValidationError(
+                    '{} "{}" is trivial and should not have generated any Datasets'.format(
+                        self._cable_type_str(), self)
+                )
 
-        # Otherwise, check that there is at most one Dataset
-        # attached, and clean it.
+            # Otherwise, check that there is at most one Dataset
+            # attached, and clean it.
             if self.output.count() > 1:
-                raise ValidationError('RunSIC "{}" should generate at most one Dataset'.format(self))
+                raise ValidationError('{} "{}" should generate at most one Dataset'.format(
+                    self._cable_type_str(), self))
             self.output.first().clean()
         return True
+
+    def _clean_execrecord(self):
+        """
+        Check coherence of the RunCable's associated ExecRecord.
+
+        This is an abstract function that must be overridden by
+        RunSIC and RunOutputCable, as most of this is case-specific.
+
+        PRE
+        This RunCable has an ExecRecord.
+        """
+        self.execrecord.complete_clean()
+
+    def _clean_cable_coherent(self):
+        """
+        Checks that the cable is coherent with its parent.
+
+        This is an abstract function that must be implemented
+        by both RunSIC and RunOutputCable.
+        """
+        pass
+
+    def _clean_with_execlog(self):
+        """
+        If this RunCable has an ExecLog (that is, code was run during its
+        execution), make sure it is in a coherent state:
+
+         - if this RunCable does not keep its output or its output is
+           missing, there should be no existent data associated.
+
+         - else:
+           - the corresponding ERO should have existent data associated
+
+           - if the PSIC/POC is not trivial and this RunCable does not reuse an ER,
+             then there should be existent data associated and it should also
+             be associated to the corresponding ERO.
+
+        This is a helper function for clean.
+
+        PRE
+        This RunCable has an ExecLog AND an ExecRecord.
+        """
+        # If output of the cable not marked as kept, there shouldn't be a Dataset.
+        if not self._pipeline_cable().keeps_output():
+            if self.has_data():
+                raise ValidationError(
+                    '{} "{}" does not keep its output but a dataset was registered'.format(
+                        self._cable_type_str(), self)
+                )
+
+        # If EL shows missing output, there shouldn't be a Dataset.
+        elif self.log.first().missing_outputs():
+            if self.has_data():
+                raise ValidationError('{} "{}" had missing output but a dataset was registered'.format(
+                    self._cable_type_str(), self))
+
+        else:
+            # The corresponding ERO should have existent data.
+            # TODO: helper to get the ExecRecordOut without calling first().
+            corresp_ero = self.execrecord.execrecordouts.first()
+            if not corresp_ero.has_data():
+                raise ValidationError('{} "{}" keeps its output; ExecRecordOut "{}" should reference existent '
+                                      'data'.format(self._cable_type_str(), self, corresp_ero))
+
+            # If reused == False and the cable is not trivial,
+            # there should be associated data, and it should match that
+            # of corresp_ero.
+            if not self.reused and not self._pipeline_cable().is_trivial():
+                if not self.has_data():
+                    raise ValidationError('{} "{}" was not reused, trivial, or deleted; it should have '
+                                          'produced data'.format(self._cable_type_str(), self))
+
+                if corresp_ero.symbolicdataset.dataset != self.output.first():
+                    raise ValidationError('Dataset "{}" was produced by {} "{}" but is not in an ERO of '
+                                          'ExecRecord "{}"'.format(self.output.first(), self._cable_type_str(),
+                                          self, self.execrecord))
+
+    def _clean_without_execlog(self):
+        """
+        If this RunCable has no ExecLog (that is, it either recycled an
+        ExecRecord, or is incomplete), make sure it is coherent:
+
+          - if it is reusing an ExecRecord, it should not have output
+          - if it is not reusing an ExecRecord, it is incomplete,
+            and should not have data or an ExecRecord.
+        """
+        # Case 1: Completely recycled ER (reused = true): it should
+        # not have any registered dataset)
+        if self.reused and self.output.exists():
+            raise ValidationError('{} "{}" was reused but has a registered dataset'.format(
+                self._cable_type_str(), self
+            ))
+
+        # Case 2: Still executing (reused = false): there should be
+        # no RSIC.output and no ER
+        if not self.reused:
+            general_error = '{} "{}" not reused and has no ExecLog'.format(self._cable_type_str(), self)
+            if self.output.exists():
+                raise ValidationError("{}, but has a Dataset output".format(general_error))
+            if self.execrecord.exists():
+                raise ValidationError("{}, but has an ExecRecord".format(general_error))
+
+    def clean(self):
+        """
+        Check coherence of this RunCable.
+
+        In sequence, the checks we perform:
+         - check coherence of start_time and end_time
+         - PSIC/POC belongs to runstep.pipelinestep/run.pipeline
+
+         - if an ExecLog is attached, clean it
+
+         - perform relevant coherence checks based on whether the RunCable
+           has decided to reuse an ExecRecord (see _clean_undecided_reused,
+           _clean_reused, and _clean_not_reused)
+
+        (from here on execrecord is assumed to be set)
+
+         - clean the ExecRecord(see _clean_execrecord)
+
+         - perform relevant coherence checks based on whether the RunCable
+           has an ExecLog (ie. code was run) (see _clean_with_execlog
+           and _clean_without_execlog)
+        """
+        self.logger.debug("Initiating")
+
+        # Check coherence of the times.
+        stopwatch.models.Stopwatch.clean(self)
+
+        self._clean_cable_coherent()
+
+        clean_execlogs(self)
+
+        if self.reused is None:
+            self._clean_undecided_reused()
+        elif self.reused:
+            self._clean_reused()
+        elif not self._clean_not_reused():
+            return
+
+        # If there is no execrecord defined, then exit.
+        if self.execrecord is None: return
+        self._clean_execrecord()
+
+        self.logger.debug("Checking {}'s ExecLog".format(self._cable_type_str()))
+
+        if self.log.exists():
+            self._clean_with_execlog()
+        else:
+            self._clean_without_execlog()
+
+    def is_complete(self):
+        """
+        True if RunCable is complete; false otherwise.
+
+        This checks something different depending on whether the RunCable
+        is successful or not.  If it's successful, then the only thing
+        to check is whether or not the ExecRecord is set.  If it's
+        failed, then it checks different conditions:
+         - if it failed during recover(), then there should be no ER
+           but all ELs are either complete or were never started.
+         - if it failed during its own execution, then there should be
+           an ExecRecord.
+
+        So, if there is an ExecRecord, then it's complete; if not, then
+        check whether its failed and has only completed or never-started
+        ExecLogs.
+        """
+        if self.execrecord is not None:
+            return True
+
+        # At this point we know that execrecord == None; check if it
+        # failed during recovery and finished.
+        if not self.successful_execution():
+            for invoked_log in self.invoked_logs.all():
+                if not (invoked_log.is_complete() or not invoked_log.has_started()):
+                    return False
+
+            # Now we made it through all of the invoked_logs and they were all
+            # either complete or never started, so....
+            return True
+
+        # Now we know that it's successful but incomplete.
+        return False
+
+    def complete_clean(self):
+        """Check completeness and coherence of this RunCable."""
+        self.clean()
+        if not self.is_complete():
+            raise ValidationError('{} "{}" is not complete'.format(self._cable_type_str(), self))
+
+    def successful_execution(self):
+        """True if RunCable is successful; False otherwise.
+
+        The RunCable is failed if any of its invoked ExecLogs have
+        failed.
+
+        PRE: this RunCable is clean, and so are all of its invoked_logs.
+        (It's OK that they might not be complete.)
+        """
+        for invoked_log in self.invoked_logs.all():
+            if not invoked_log.is_successful():
+                return False
+        return True
+
+
+class RunSIC(RunCable):
+    """
+    Annotates the action of a PipelineStepInputCable within a RunStep.
+
+    Related to :model:`archive.models.RunStep`
+    Related to :model:`librarian.models.ExecRecord`
+    Related to :model:`pipeline.models.PipelineStepInputCable`
+    """
+    runstep = models.ForeignKey(RunStep, related_name="RSICs")
+    PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
+
+    # Implicit from RunCable: execrecord, reused, log, output, invoked_logs, start_time, end_time.
+
+    class Meta:
+        # Uniqueness constraint ensures that no POC is multiply-represented
+        # within a run step.
+        unique_together = ("runstep", "PSIC")
+
+    def _pipeline_cable(self):
+        """
+        Retrieves the PSIC of this RunSIC.
+        """
+        return self.PSIC
+
+    def keeps_output(self):
+        """
+        True if the underlying PSIC retains its output; False otherwise.
+        """
+        return self.PSIC.keep_output
 
     def _clean_execrecord(self):
         """
@@ -730,183 +1002,13 @@ class RunSIC(stopwatch.models.Stopwatch):
         elif not self.PSIC.is_compatible_given_input(self.execrecord.general_transf()):
             raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
 
-    def _clean_with_execlog(self):
+    def _clean_cable_coherent(self):
         """
-        If this RunSIC has an ExecLog (that is, code was run during its
-        execution), make sure it is in a coherent state:
-
-         - if this RunSIC does not keep its output or its output is
-           missing, there should be no existent data associated.
-
-         - else:
-           - the corresponding ERO should have existent data associated
-
-           - if the PSIC is not trivial and this RunSIC does not reuse an ER,
-             then there should be existent data associated and it should also
-             be associated to the corresponding ERO.
-        
-        This is a helper function for clean.
-
-        PRE
-        This RunSIC has an ExecLog AND an ExecRecord.
+        Checks that the PSIC and PipelineStep are coherent.
         """
-        # If output of PSIC not marked as kept, there shouldn't be a dataset
-        if not self.PSIC.keep_output:
-            if self.has_data():
-                raise ValidationError('RunSIC "{}" does not keep its output but a dataset was registered'.format(self))
-
-        # If EL shows missing output
-        elif self.log.first().missing_outputs():
-            if self.has_data():
-                raise ValidationError('RunSIC "{}" had missing output but a dataset was registered'.format(self))
-
-        else:
-            # The corresponding ERO should have existent data.
-            # TODO: helper to get the ExecRecordOut without calling first().
-            corresp_ero = self.execrecord.execrecordouts.first()
-            if not corresp_ero.has_data():
-                raise ValidationError('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
-                                      'data'.format(self, corresp_ero))
-
-            # If reused == False and the cable is not trivial,
-            # there should be associated data, and it should match that
-            # of corresp_ero.
-            if not self.reused and not self.PSIC.is_trivial():
-                if not self.has_data():
-                    raise ValidationError('RunSIC "{}" was not reused, trivial, or deleted; it should have '
-                                          'produced data'.format(self))
-
-                if corresp_ero.symbolicdataset.dataset != self.output.first():
-                    raise ValidationError('Dataset "{}" was produced by RunSIC "{}" but is not in an ERO of '
-                                          'ExecRecord "{}"'.format(self.output.first(), self, self.execrecord))
-
-    def _clean_without_execlog(self):
-        """
-        If this RunSIC has no ExecLog (that is, it either recycled an
-        ExecRecord, or is incomplete), make sure it is coherent:
-          
-          - if it is reusing an ExecRecord, it should not have output
-          - if it is not reusing an ExecRecord, it is incomplete,
-            and should not have data or an ExecRecord.
-        """
-        # Case 1: Completely recycled ER (reused = true): it should
-        # not have an RSIC.output (No registered dataset)
-        if self.reused and self.output.exists():
-            raise ValidationError('RunSIC "{}" was reused but has a registered dataset')
-
-        # Case 2: Still executing (reused = false): there should be
-        # no RSIC.output and no ER
-        if not self.reused:
-            general_error = 'RunSIC "{}" not reused and has no ExecLog'.format(self)
-            if self.output.exists():
-                raise ValidationError("{}, but has a Dataset output".format(general_error))
-            if self.execrecord.exists():
-                raise ValidationError("{}, but has an ExecRecord".format(general_error))
-
-    def clean(self):
-        """
-        Check coherence of this RunSIC.
-
-        In sequence, the checks we perform:
-         - check coherence of start_time and end_time
-         - PSIC belongs to runstep.pipelinestep
-
-         - if an ExecLog is attached, clean it
-
-         - perform relevant coherence checks based on whether the RunSIC
-           has decided to reuse an ExecRecord (see _clean_undecided_reused,
-           _clean_reused, and _clean_not_reused)
-
-        (from here on execrecord is assumed to be set)
-
-         - clean the ExecRecord(see _clean_execrecord)
-
-         - perform relevant coherence cehcks based on whether the RunSIC
-           has an ExecLog (ie. code was run) (see _clean_with_execlog
-           and _clean_without_execlog)
-        """
-        self.logger.debug("Initiating")
-
-        # Check coherence of the times.
-        stopwatch.models.Stopwatch.clean(self)
-
         if (not self.runstep.pipelinestep.cables_in.filter(pk=self.PSIC.pk).exists()):
             raise ValidationError('PSIC "{}" does not belong to PipelineStep "{}"'
                                   .format(self.PSIC, self.runstep.pipelinestep))
-
-        clean_execlogs(self)
-
-        if self.reused is None:
-            self._clean_undecided_reused()
-        elif self.reused:
-            self._clean_reused()
-        elif not self._clean_not_reused():
-            return
-
-        # If there is no execrecord defined, then exit.
-        if self.execrecord is None: return
-        self._clean_execrecord()
-
-        self.logger.debug("Checking RunSIC's ExecLog")
-
-        if self.log.exists():
-            self._clean_with_execlog()
-        else:
-            self._clean_without_execlog()
-
-    def is_complete(self):
-        """
-        True if RunSIC is complete; false otherwise.
-
-        This checks something different depending on whether the RunSIC
-        is successful or not.  If it's successful, then the only thing
-        to check is whether or not the ExecRecord is set.  If it's
-        failed, then it checks different conditions:
-         - if it failed during recover(), then there should be no ER
-           but all ELs are either complete or were never started.
-         - if it failed during its own execution, then there should be
-           an ExecRecord.
-
-        So, if there is an ExecRecord, then it's complete; if not, then
-        check whether its failed and has only completed or never-started
-        ExecLogs.
-        """
-        if self.execrecord is not None:
-            return True
-
-        # At this point we know that execrecord == None; check if it
-        # failed during recovery and finished.
-        for invoked_log in self.invoked_logs.all():
-            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
-                return False
-
-        # Now we made it through all of the invoked_logs and they were all
-        # either complete or never started, so....
-        return True
-
-    def complete_clean(self):
-        """Check completeness and coherence of this RunSIC."""
-        self.clean()
-        if not self.is_complete():
-            raise ValidationError('RunSIC "{}" has no ExecRecord'.format(self))
-
-    def has_data(self):
-        """True if associated output exists; False if not."""
-        return self.output.all().exists()
-
-    def successful_execution(self):
-        """True if RunSIC is successful; False otherwise.
-
-        The RunSIC is failed if any of its invoked ExecLogs have
-        failed.
-
-        PRE: this RunSIC is clean, and so are all of its invoked_logs.
-        (It's OK that they might not be complete.)
-        """
-        for invoked_log in self.invoked_logs.all():
-            if not invoked_log.is_successful():
-                return True
-        return False
 
     def get_coordinates(self):
         """
@@ -925,7 +1027,7 @@ class RunSIC(stopwatch.models.Stopwatch):
         return self.runstep.get_top_level_run()
 
 
-class RunOutputCable(stopwatch.models.Stopwatch):
+class RunOutputCable(RunCable):
     """
     Annotates the action of a PipelineOutputCable within a run.
 
@@ -934,113 +1036,50 @@ class RunOutputCable(stopwatch.models.Stopwatch):
     Related to :model:`pipeline.models.PipelineOutputCable`
     """
     run = models.ForeignKey(Run, related_name="runoutputcables")
-    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="runoutputcables")
-    reused = models.NullBooleanField(help_text="Denotes whether this run reused the action of an output cable",
-                                     default=None) 
     pipelineoutputcable = models.ForeignKey("pipeline.PipelineOutputCable", related_name="poc_instances")
 
-    log = generic.GenericRelation("ExecLog")
-    output = generic.GenericRelation("Dataset")
-
-    # Implicit through inheritance: start_time, end_time.
+    # Implicit from RunCable: execrecord, reused, log, output, invoked_logs, start_time, end_time.
 
     class Meta:
         # Uniqueness constraint ensures that no POC is
         # multiply-represented within a run.
         unique_together = ("run", "pipelineoutputcable")
 
-    def clean(self):
-        """Check coherence of this RunOutputCable.
-
-        In sequence, the checks we perform are:
-         - check coherence of start_time and end_time.
-         - pipelineoutputcable belongs to run.pipeline
-
-         - if an ExecLog is attached, complete_clean it
-
-         - if no decision has been made on reuse, check that no log is
-           associated, no data has been associated, and that ER is
-           unset
-
-         - else if it has been decided to reuse an ER, check that there
-           are no associated datasets
-
-         - else if it has been decided not to reuse an ER:
-
-           - if this cable is trivial, there should be no associated
-             dataset
-
-           - if no ExecLog is attached yet or it is incomplete, there
-             should be no associated dataset yet
-
-           (from here on, ExecLog is known to be attached and complete)
-
-           - otherwise, clean any associated dataset
-
-        (after this point it is assumed that ER is set)
-         - check that it is complete and clean
-         - check that it's coherent with pipelineoutputcable
-
-         - if this ROC's output was marked for deletion or
-           missing output, then no data should be associated
-
-         - else the corresponding ERO should have existent data
-           associated
-
-           - if this ROC did not reuse an ER and the cable is not
-             trivial, then this ROC should have existent data
-             associated and it should belong to the corresponding ERO
+    def _pipeline_cable(self):
         """
-        stopwatch.models.Stopwatch.clean(self)
+        Retrieves the POC of this RunOutputCable.
+        """
+        return self.pipelineoutputcable
 
-        if not self.run.pipeline.outcables.filter(pk=self.pipelineoutputcable.pk).exists():
-            raise ValidationError('POC "{}" does not belong to Pipeline "{}"'
-                                  .format(self.pipelineoutputcable, self.run.pipeline))
+    def keeps_output(self):
+        """
+        True if the underlying POC retains its output; False otherwise.
+        """
+        if self.run.parent_runstep is None:
+            return True
 
-        clean_execlogs(self)
+        # At this point we know that this is a sub-Pipeline.  Check
+        # if the parent PipelineStep deletes this output.
+        if self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
+                dataset_idx=self.pipelineoutputcable.output_idx).exists():
+            return False
+        return True
 
-        # TODO: This is duplicated from RunSIC.clean
-        if self.reused is None:
-            general_error = 'RunOutputCable "{}" has not decided whether or not to reuse an ExecRecord'.format(self)
-            if self.log.all().exists():
-                raise ValidationError("{}; no ExecLog should be associated".format(general_error))
+    def _clean_execrecord(self):
+        """
+        Check coherence of the RunOutputCable's associated ExecRecord:
 
-            if self.has_data():
-                raise ValidationError("{}; no Datasets should be associated".format(general_error))
+         - it must be complete and clean
+         - it must represent a POC
+         - POC is the same as (or compatible to) self.execrecord.general_transf()
 
-            if self.execrecord:
-                raise ValidationError("{}; execrecord should not be set yet".format(general_error))
+        This is a helper for clean().
 
-        elif self.reused:
-            if self.has_data():
-                raise ValidationError('RunOutputCable "{}" reused an ExecRecord and should not have generated any '
-                                      'Datasets'.format(self))
-        else:
-            # If this cable is trivial, there should be no data associated.
-            if self.pipelineoutputcable.is_trivial() and self.has_data():
-                raise ValidationError('RunOutputCable "{}" is trivial and should not have generated any Datasets'
-                                      .format(self))
-
-            if not self.log.all().exists() or not self.log.first().is_complete():
-                if self.has_data():
-                    raise ValidationError('RunOutputCable "{}" does not have a complete log so should not have '
-                                          'generated any Datasets'.format(self))
-
-                return
-
-            # From here on, ExecLog is known to be appropriately
-            # attached and complete.
-
-            # Otherwise, check that there is at most one Dataset
-            # attached, and clean it.
-            elif self.has_data():
-                if self.output.count() > 1:
-                    raise ValidationError('RunOutputCable "{}" should generate at most one Dataset'.format(self))
-                self.output.first().clean()
-
-        if self.execrecord is None: return
-
-        # self.execrecord is set, so complete_clean it.
+        PRE
+        This RunOutputCable has an ExecRecord.
+        """
+        # At this point there must be an associated ER; check that it is
+        # clean and complete.
         self.execrecord.complete_clean()
 
         # ER must point to a cable compatible with the one this RunOutputCable points to.
@@ -1050,85 +1089,13 @@ class RunOutputCable(stopwatch.models.Stopwatch):
         elif not self.pipelineoutputcable.is_compatible(self.execrecord.general_transf()):
             raise ValidationError('POC of RunOutputCable "{}" is incompatible with that of its ExecRecord'.format(self))
 
-        is_deleted = False
-        if self.run.parent_runstep is not None:
-            is_deleted = self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
-                dataset_name=self.pipelineoutputcable.output_name).exists()
-
-        # If the output of this ROC is marked for deletion, there should be no data associated.
-        if is_deleted:
-            if self.has_data():
-                raise ValidationError('RunOutputCable "{}" is marked for deletion; no data should be produced'
-                                      .format(self))
-
-        # November 18, 2013: check if there was missing output
-        # (i.e. some kind of messed up execution) in the ExecLog.
-        # If the output of this ROC was missing on execution, there should be no data associated.
-        elif self.log.exists() and self.log.first().missing_outputs():
-            if self.has_data():
-                raise ValidationError('RunOutputCable "{}" had a missing output; no data should be produced'
-                                      .format(self))
-
-        # Otherwise, there should be data
-        else:
-            # The corresponding ERO should have existent data.
-            corresp_ero = self.execrecord.execrecordouts.get(execrecord=self.execrecord)
-            if not corresp_ero.has_data():
-                raise ValidationError('RunOutputCable "{}" was not deleted and did not have missing output; '
-                                      'ExecRecordOut "{}" should reference existent data'.format(self, corresp_ero))
-
-            # If step was not reused and cable was not trivial, there should be data with the ROC
-            if not self.reused and not self.pipelineoutputcable.is_trivial():
-                if not self.has_data():
-                    raise ValidationError('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
-                                          'produced data'.format(self))
-
-                # The associated data should belong to the ERO of
-                # self.execrecord (which has already been checked for
-                # completeness and cleanliness).
-                if not self.execrecord.execrecordouts.filter(
-                           symbolicdataset=self.output.first().symbolicdataset).exists():
-                    raise ValidationError('Dataset "{}" was produced by RunOutputCable "{}" but is not in an ERO of '
-                                          'ExecRecord "{}"'.format(self.output.first(), self, self.execrecord))
-
-    def is_complete(self):
+    def _clean_cable_coherent(self):
         """
-        True if this ROC is complete; false otherwise.
-
-        This does basically the same checks as RunSIC.is_complete().
+        Checks that the POC and Pipeline are coherent.
         """
-        if self.execrecord is not None:
-            return True
-
-        for invoked_log in self.invoked_logs.all():
-            if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
-                return False
-
-        return True
-
-    def complete_clean(self):
-        """Check completeness and coherence of this RunOutputCable."""
-        self.clean()
-        if not self.is_complete():
-            raise ValidationError(
-                "RunOutputCable \"{}\" has no ExecRecord".format(self))
-
-    def has_data(self):
-        """True if associated output exists; False if not."""
-        return self.output.all().exists()
-
-    def successful_execution(self):
-        """True if this RunOutputCable is successful; False otherwise.
-
-        Again, exactly the same as for RunSIC.
-        """
-        any_failed = False
-        for invoked_log in self.invoked_logs.all():
-            if not invoked_log.is_successful():
-                any_failed = True
-                break
-
-        return any_failed
+        if not self.run.pipeline.outcables.filter(pk=self.pipelineoutputcable.pk).exists():
+            raise ValidationError('POC "{}" does not belong to Pipeline "{}"'
+                                  .format(self.pipelineoutputcable, self.run.pipeline))
 
     def get_coordinates(self):
         """
@@ -1258,13 +1225,15 @@ class ExecLog(stopwatch.models.Stopwatch):
     content_type = models.ForeignKey(
         ContentType,
         limit_choices_to = { "model__in":
-                            ("RunStep", "RunOutputCable","RunSIC")})
+                            ("RunStep", "RunOutputCable","RunSIC")},
+        related_name="type_belonging_to")
     object_id = models.PositiveIntegerField()
     record = generic.GenericForeignKey("content_type", "object_id")
 
     content_type_iel = models.ForeignKey(
         ContentType,
-        limit_choices_to={"model__in": {"RunStep", "RunOutputCable", "RunSIC"}}
+        limit_choices_to={"model__in": {"RunStep", "RunOutputCable", "RunSIC"}},
+        related_name="type_invoked_by"
     )
     object_id_iel = models.PositiveIntegerField()
     invoking_record = generic.GenericForeignKey("content_type_iel", "object_id_iel")
@@ -1294,15 +1263,15 @@ class ExecLog(stopwatch.models.Stopwatch):
                 "ExecLog \"{}\" does not correspond to a Method or cable".
                 format(self))
 
-        if record.get_top_level_run() != invoking_record.get_top_level_run():
+        if self.record.get_top_level_run() != self.invoking_record.get_top_level_run():
             raise ValidationError(
                 'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.
                 format(self)
             )
 
         # Check that invoking_record is not earlier than record.
-        record_coords = record.get_coordinates()
-        invoking_record_coords = invoking_record.get_coordinates()
+        record_coords = self.record.get_coordinates()
+        invoking_record_coords = self.invoking_record.get_coordinates()
 
         # We have to respect the hierarchy that in case of ties, RSIC is earlier than RunStep,
         # and both are earlier than ROC.
@@ -1320,9 +1289,9 @@ class ExecLog(stopwatch.models.Stopwatch):
         # earlier than RunSteps, and both are earlier than RunOutputCables.
         # RunSICs and RunOutputCables that are at the same level are OK.
         if tied:
-            if type(record) == RunOutputCable and type(invoking_record) != RunOutputCable:
+            if type(self.record) == RunOutputCable and type(self.invoking_record) != RunOutputCable:
                 raise ValidationError('ExecLog "{}" is invoked earlier than the ROC it belongs to'.format(self))
-            elif type(record) == RunStep and type(invoking_record) == RunSIC:
+            elif type(self.record) == RunStep and type(self.invoking_record) == RunSIC:
                 raise ValidationError('ExecLog "{}" is invoked earlier than the RunStep it belongs to'.format(self))
 
     def is_complete(self):
