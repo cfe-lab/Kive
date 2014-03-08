@@ -1,0 +1,35 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Revise a code resource{% endblock %}
+
+{% block javascript %}
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script src="/static/method/resource_add.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<a href="/resources">return to Code Resource summary</a>
+
+<h2>Revise a code resource</h2>
+
+<h3>Code resource information:</h3>
+<table>
+<tr><td>Name</td><td>{{ coderesource.name }}</td></tr>
+<tr><td>Filename</td><td>{{ coderesource.filename }}</td></tr>
+<tr><td>Description</td><td>{{ coderesource.description }}</td></tr>
+<tr><td># revisions</td><td>{{ coderesource.num_revisions }}</td></tr>
+<tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
+</table>
+
+    <table>
+    {{ for revision in revisions }}
+        
+    {{ endfor }}
+    </table>
+
+
+{% endblock %}
