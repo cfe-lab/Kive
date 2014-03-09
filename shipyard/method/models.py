@@ -60,7 +60,10 @@ class CodeResource(models.Model):
         return revision_dates[0]
 
     def get_absolute_url(self):
-        return '/resources/%i' % self.id
+        """
+        A page that displays all revisions of this CodeResource
+        """
+        return '/resource_revisions/%i' % self.id
 
     def __unicode__(self):
         return self.name

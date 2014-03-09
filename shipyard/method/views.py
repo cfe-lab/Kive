@@ -27,6 +27,17 @@ def resources(request):
     return HttpResponse(t.render(c))
 
 
+def resource_revisions(request, id):
+    """
+    Display a list of all revisions of a specific Code Resource in database.
+    """
+    coderesource = CodeResource.objects.get(pk=id)
+    revisions = CodeResourceRevision.objects.filter(coderesource=coderesource)
+    t = loader.get_template('method/resource_revisions.html')
+    c = Context({'coderesource': coderesource, 'revisions': revisions})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
 
 def return_crv_forms(request, exceptions, is_new):
     """
@@ -81,12 +92,9 @@ def resource_add(request):
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
-        # modify actual filename prior to saving revision object
-        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
-
         # create new CodeResource
-        new_code_resource = CodeResource(name=query['revision_name'],
-                                         description=query['revision_desc'],
+        new_code_resource = CodeResource(name=query['resource_name'],
+                                         description=query['resource_desc'],
                                          filename=file_in_memory.name)
         try:
             new_code_resource.full_clean()

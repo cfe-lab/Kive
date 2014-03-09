@@ -33,7 +33,8 @@ urlpatterns = patterns('',
 
     url(r'resources$', 'method.views.resources', name='resources'),
     url(r'resource_add$', 'method.views.resource_add', name='resource_add'),
-    url(r'^resources/(?P<id>\d+)/$', 'method.views.resource_revise', name='resource_revise'),
+    url(r'^resource_revisions/(?P<id>\d+)/$', 'method.views.resource_revisions', name='resource_revisions'),
+    url(r'^resource_revise/(?P<id>\d+)/$', 'method.views.resource_revise', name='resource_revise'),
 
     url(r'get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 

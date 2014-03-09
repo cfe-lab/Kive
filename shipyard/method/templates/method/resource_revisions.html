@@ -25,11 +25,19 @@
 <tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
 </table>
 
-    <table>
-    {{ for revision in revisions }}
-        
-    {{ endfor }}
-    </table>
+<h3>Revisions:</h3>
+<table>
+<tr>
+    <th>Name</th>
+    <th>Description</th>
+</tr>
+{% for revision in revisions %}
+<tr>
+    <td>{{ revision.revision_name }}</td>
+    <td>{{ revision.revision_desc }}</td>
+</tr>
+{% endfor %}
+</table>
 
 
 {% endblock %}

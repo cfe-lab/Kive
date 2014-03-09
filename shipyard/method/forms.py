@@ -16,16 +16,40 @@ class CodeResourceMinimalForm (forms.Form):
     revision_desc = forms.CharField(max_length=255)
 
 class CodeResourcePrototypeForm (forms.ModelForm):
+    """
+    A form for submitting the first version of a CodeResource, which
+    we refer to as the "prototype".  We require two sets of names and
+    descriptions.  The first set refer to the CodeResource itself,
+    which is an abstraction of a file that is going to be revised many
+    times.  The resource name should be something that refers to the actual
+    function of the CodeResource (e.g., NucleotideTranslator) rather than
+    revision names that are only meant to tell different version apart,
+    (e.g., "Scarlet (1)", "Bicycle (2)", "Henry (3)").
+    """
+    # additional form fields for CodeResource object
+    resource_name = forms.CharField(max_length=255,
+                                    label='Resource name',
+                                    help_text='A name that refers to the actual function of the CodeResource.')
+    resource_desc = forms.CharField(widget = forms.Textarea(attrs={'rows':5}),
+                                    label = 'Resource description',
+                                    help_text='A brief description of what this CodeResource (this and all subsequent '
+                                              'versions) is supposed to do')
+
     def __init__(self, *args, **kwargs):
         super(CodeResourcePrototypeForm, self).__init__(*args, **kwargs)
-        self.fields['revision_name'].label = 'Name of prototype'
-        self.fields['revision_name'].help_text = 'A short name for this prototype'
-        self.fields['revision_desc'].label = 'Description'
-        self.fields['revision_desc'].help_text = 'A detailed description of this prototype'
+        self.fields['revision_name'].label = 'Prototype name'
+        self.fields['revision_name'].help_text = 'A short name for this prototype, ' \
+                                                 'used only to differentiate it from subsequent versions.'
+
+        self.fields['revision_desc'].label = 'Prototype description'
+        self.fields['revision_desc'].help_text = 'A brief description of this prototype'
+        self.fields['revision_desc'].initial = 'Prototype version'
+        self.fields['revision_desc'].widget = forms.Textarea(attrs={'rows': 2})
+
         self.fields['content_file'].help_text = 'File containing this new code resource'
     class Meta:
         model = CodeResourceRevision
-        fields = ('content_file', 'revision_name', 'revision_desc')
+        fields = ('resource_name', 'resource_desc', 'content_file', 'revision_name', 'revision_desc')
         #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
 
 class CodeResourceRevisionForm (forms.ModelForm):
