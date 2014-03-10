@@ -3,7 +3,7 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Revise a code resource{% endblock %}
+{% block title %}Add code resource revision{% endblock %}
 
 {% block javascript %}
 <script src="/static/portal/jquery-2.0.3.min.js"></script>
@@ -14,23 +14,37 @@
 
 <a href="/resources">return to Code Resource summary</a>
 
-<h2>Revise a code resource</h2>
-
-<h3>Code resource information:</h3>
-<table>
-<tr><td>Name</td><td>{{ coderesource.name }}</td></tr>
-<tr><td>Filename</td><td>{{ coderesource.filename }}</td></tr>
-<tr><td>Description</td><td>{{ coderesource.description }}</td></tr>
-<tr><td># revisions</td><td>{{ coderesource.num_revisions }}</td></tr>
-<tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
-</table>
+<h2>Add code resource revision</h2>
 
 
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
         <!-- this form is pre-populated with the data of the last revision -->
-    {{ resource_form.as_table }}
+        <tr>
+            <td></td>
+            <th>Previous</th>
+            <th>Current</th>
+        </tr>
+        <tr>
+            <th>{{ resource_form.content_file.label }} <div class="helptext">{{ resource_form.content_file.help_text }}</div></th>
+            <td style="font-style:italic">{{ coderesource.filename }}</td>
+            <td>{{ resource_form.content_file }}<br>
+                <div style="color:red">{{ resource_form.content_file.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_name.label }} <div class="helptext">{{ resource_form.revision_name.help_text }}</div></th>
+            <td></td>
+            <td>{{ coderesource.num_revisions|add:"1" }} ({{ resource_form.revision_name }})
+                <div style="color:red">{{ resource_form.revision_name.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_desc.label }} <div class="helptext">{{ resource_form.revision_desc.help_text }}</div></th>
+            <td style="font-style:italic">{{ parent_revision.revision_desc }}</td>
+            <td>{{ resource_form.revision_desc }}<br>
+                <div style="color:red">{{ resource_form.revision_desc.errors }}</div>
+            </td>
+        </tr>
     </table>
     <h3>Dependencies</h3>
     <p>

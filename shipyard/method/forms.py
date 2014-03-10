@@ -53,9 +53,12 @@ class CodeResourcePrototypeForm (forms.ModelForm):
         #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
 
 class CodeResourceRevisionForm (forms.ModelForm):
-   class Meta:
+    def __init__(self, *args, **kwargs):
+        super(CodeResourceRevisionForm, self).__init__(*args, **kwargs)
+        self.fields['content_file'].label = 'File'
+    class Meta:
         model = CodeResourceRevision
-        fields = ('revision_name', 'revision_desc', 'content_file', )
+        fields = ('content_file', 'revision_name', 'revision_desc', )
 
 
 class CodeResourceDependencyForm (forms.ModelForm):

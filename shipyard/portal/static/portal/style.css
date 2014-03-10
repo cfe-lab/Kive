@@ -147,4 +147,9 @@ form select {
     src: local('Lato-Bold'), url('/static/portal/Lato/Lato-Bold.ttf') format('truetype');
     font-weight: bold;
 }
+@font-face {
+    font-family: 'Lato';
+    src: local('Lato-Italic'), url('/static/portal/Lato/Lato-Italic.ttf') format('truetype');
+    font-style: italic;
+}
 /* TODO: get italic fonts to load */

@@ -283,6 +283,13 @@ class CodeResourceRevision(models.Model):
             
             dep.requirement.install_h(path_for_deps, dep_fn)
 
+    def get_absolute_url(self):
+        """
+        A page that displays all revisions of this CodeResource
+        """
+        return '/resource_revision_add/%i' % self.id
+
+
 class CodeResourceDependency(models.Model):
     """
     Dependencies of a CodeResourceRevision - themselves also CRRs.
