@@ -177,7 +177,8 @@ class RunStepTests(ArchiveTestSetup):
         self.step_through_runstep_creation("first_rsic")
         self.E03_11_RSIC.execrecord = None
         self.E03_11_RSIC.save()
-        self.assertRaisesRegexp(ValidationError, re.escape('RunSIC "{}" has no ExecRecord'.format(self.E03_11_RSIC)),
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('{} "{}" is not complete'.format("RunSIC", self.E03_11_RSIC)),
                                 self.step_E1_RS.clean)
 
     def test_RunStep_complete_RunSIC(self):
@@ -799,8 +800,8 @@ class RunTests(ArchiveTestSetup):
         cable1.reused = None
         cable1.save()
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has not decided whether or not to reuse an ExecRecord; '
-                                          'no ExecLog should be associated'.format(cable1)),
+                                re.escape('{} "{}" has not decided whether or not to reuse an ExecRecord; '
+                                          'no log should have been generated'.format("RunOutputCable", cable1)),
                                 self.pE_run.clean)
 
     def test_Run_clean_one_complete_RunOutputCable(self):
@@ -1025,7 +1026,7 @@ class RunSICTests(ArchiveTestSetup):
         self.E11_32_RSIC.execrecord = None
         self.assertFalse(self.E11_32_RSIC.is_complete())
         self.assertRaisesRegexp(ValidationError, 
-                                re.escape('RunSIC "{}" has no ExecRecord'.format(self.E11_32_RSIC)),
+                                re.escape('{} "{}" is not complete'.format("RunSIC", self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
     def test_RunSIC_clean_not_reused_no_execrecord(self):
@@ -1222,7 +1223,8 @@ class RunSICTests(ArchiveTestSetup):
         self.E11_32_RSIC.reused = False
         self.E11_32_RSIC.execrecord = None
         self.assertFalse(self.E11_32_RSIC.is_complete())
-        self.assertRaisesRegexp(ValidationError, re.escape('RunSIC "{}" has no ExecRecord'.format(self.E11_32_RSIC)),
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('{} "{}" is not complete'.format("RunSIC", self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
 class RunOutputCableTests(ArchiveTestSetup):
@@ -1353,6 +1355,9 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("roc_created")
         self.E31_42_ROC.reused = False
+        self.E31_42_ROC.log.create(invoking_record=self.E31_42_ROC,
+                                   start_time=timezone.now(),
+                                   end_time=timezone.now())
         self.singlet_DS.created_by = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
@@ -1461,8 +1466,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.triplet_3_rows_DS.created_by = self.D11_21_ROC
         self.triplet_3_rows_DS.save()
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" is marked for deletion; no data should be produced'
-                                          .format(self.D11_21_ROC)),
+                                re.escape('{} "{}" does not keep its output but a dataset was registered'
+                                          .format("RunOutputCable", self.D11_21_ROC)),
                                 self.D11_21_ROC.clean)
 
     def test_ROC_clean_kept_output_no_data(self):
@@ -1625,7 +1630,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.D11_21_ROC.execrecord = None
         self.assertFalse(self.D11_21_ROC.is_complete())
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has no ExecRecord'.format(self.D11_21_ROC)),
+                                re.escape('{} "{}" is not complete'.format("RunOutputCable", self.D11_21_ROC)),
                                 self.D11_21_ROC.complete_clean)
 
 class DatasetTests(librarian.tests.LibrarianTestSetup):
