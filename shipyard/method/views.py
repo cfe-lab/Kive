@@ -195,6 +195,8 @@ def resource_revision_add(request, id):
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
+        # is this file identical to another CodeResourceRevision?
+
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -287,13 +289,16 @@ def resource_revision_add(request, id):
 
 def methods(request):
     """
-    Display a list of all Methods in database.
+    Display a list of all MethodFamily objects in database.
+    A MethodFamily class has no member variables of its own, so we
+    query for all "root" methods (with no parents).
     """
     methods = Method.objects.filter(revision_parent=None)
     t = loader.get_template('method/methods.html')
     c = Context({'methods': methods})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+
 
 
 def return_method_forms (request, exceptions):
@@ -348,9 +353,8 @@ def method_add (request):
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
-
-        # create a new MethodFamily based on completed Family Form
-        method_family = MethodFamily(name = query['name'], description = query['description'])
+        # use this prototype Method's name and description to initialize the MethodFamily
+        method_family = MethodFamily(name = query['revision_name'], description = query['revision_desc'])
         try:
             method_family.full_clean()
             method_family.save()
@@ -382,30 +386,40 @@ def method_add (request):
 
         # attempt to make inputs and outputs
         for i in range(num_xput_forms):
-            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
-            min_row = query['min_row_'+str(i)]
-            max_row = query['max_row_'+str(i)]
-            try:
+            cdt_id = query['compounddatatype_'+str(i)]
+            if cdt_id == '__raw__':
+                # request for unstructured input/output
                 if query['input_output_'+str(i)] == 'input':
                     new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1)
+                else:
+                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1)
+            else:
+                my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
+                min_row = query['min_row_'+str(i)]
+                max_row = query['max_row_'+str(i)]
+                try:
+                    if query['input_output_'+str(i)] == 'input':
+                        new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                            dataset_idx = i+1,
+                                                            compounddatatype = my_compound_datatype,
+                                                            min_row = min_row if min_row else None,
+                                                            max_row = max_row if max_row else None)
+                    else:
+                        new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
                                                         dataset_idx = i+1,
                                                         compounddatatype = my_compound_datatype,
                                                         min_row = min_row if min_row else None,
                                                         max_row = max_row if max_row else None)
-                else:
-                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
-                                                    dataset_idx = i+1,
-                                                    compounddatatype = my_compound_datatype,
-                                                    min_row = min_row if min_row else None,
-                                                    max_row = max_row if max_row else None)
-            except ValueError as e:
-                exceptions.update({i: e.messages})
+                except ValueError as e:
+                    exceptions.update({i: e.messages})
 
         if exceptions:
             if query['family'] == u'':
                 method_family.delete()
             new_method.delete()
-            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
             c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
@@ -481,24 +495,33 @@ def method_revise(request, id):
 
         # attempt to make inputs and outputs
         for i in range(num_xput_forms):
-            my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
-            min_row = query['min_row_'+str(i)]
-            max_row = query['max_row_'+str(i)]
-            try:
+            if cdt_id == '__raw__':
+                # request for unstructured input/output
                 if query['input_output_'+str(i)] == 'input':
                     new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1)
+                else:
+                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
+                                                        dataset_idx = i+1)
+            else:
+                my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
+                min_row = query['min_row_'+str(i)]
+                max_row = query['max_row_'+str(i)]
+                try:
+                    if query['input_output_'+str(i)] == 'input':
+                        new_input = new_method.create_input(dataset_name = query['dataset_name_'+str(i)],
+                                                            dataset_idx = i+1,
+                                                            compounddatatype = my_compound_datatype,
+                                                            min_row = min_row if min_row else None,
+                                                            max_row = max_row if max_row else None)
+                    else:
+                        new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
                                                         dataset_idx = i+1,
                                                         compounddatatype = my_compound_datatype,
                                                         min_row = min_row if min_row else None,
                                                         max_row = max_row if max_row else None)
-                else:
-                    new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
-                                                    dataset_idx = i+1,
-                                                    compounddatatype = my_compound_datatype,
-                                                    min_row = min_row if min_row else None,
-                                                    max_row = max_row if max_row else None)
-            except ValueError as e:
-                exceptions.update({i: e.messages})
+                except ValueError as e:
+                    exceptions.update({i: e.messages})
 
         if exceptions:
             if query['family'] == u'':
@@ -514,9 +537,10 @@ def method_revise(request, id):
     else:
         method_form = MethodReviseForm(initial={'revision_name': most_recent.revision_name,
                                           'revision_desc': most_recent.revision_desc,
-                                          'coderesource': this_code_resource.pk,
                                           'revisions': last_revision.pk,
                                           'random': most_recent.random})
+        method_form.fields['revisions'].choices = [(x.id, x.revision_name) for x in all_revisions]
+
         xput_forms = []
         for input in most_recent.inputs.all():
             structure = input.structure.all()[0]

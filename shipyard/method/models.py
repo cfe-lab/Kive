@@ -228,6 +228,8 @@ class CodeResourceRevision(models.Model):
         except ValueError as e:
             self.MD5_checksum = "";
 
+        # TODO: duplicate coderesourcerevision based on MD5 should not be permitted - Art.
+
         # Check for a circular dependency.
         if self.has_circular_dependence():
             raise ValidationError("Self-referential dependency"); 

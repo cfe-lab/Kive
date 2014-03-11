@@ -18,6 +18,13 @@
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
+<p>
+    A Method is the application of a CodeResource to data.  Because there can be
+    more than one way to use a given CodeResource, there can be multiple Methods
+    defined on the same CR.  Thus, a Method's NAME and DESCRIPTION should be
+    sufficiently informative to differentiate between different uses of a CR, or
+    revisions of this specific Method.
+</p>
     <table>
     {% for field in method_form %}
         <tr>
@@ -29,18 +36,15 @@
         <td>{{ field.errors }}</td>
         </tr>
     {% endfor %}
-    {% for field in family_form %}
-            <tr>
-            <th>{{ field.label_tag }}</th>
-            <td>{{ field }}<div class="helptext">{{ field.help_text }}</div></td>
-            <td>{{ field.errors }}</td>
-            </tr>
-        {% endfor %}
     </table>
 
 
 
 <h3>Inputs/Outputs</h3>
+    <p>
+        An input/output is how we plug <i>structured</i> (comma-separated values, CSV) or <i>unstructured</i> data (any
+        other format) into a CodeResource.
+    </p>
     <p>
     <input type="button" id="addXputForm" value="+"/>
     <input type="button" id="removeXputForm" value="-"/>

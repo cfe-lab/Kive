@@ -82,6 +82,7 @@ class MethodForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
 
+        # this is required to re-populate the drop-down with CRs created since first load
         self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
         self.fields['coderesource'].label = 'Code resource'
         self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
@@ -92,14 +93,12 @@ class MethodForm (forms.ModelForm):
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
-        self.fields['family'].help_text = 'Assign this new method to an existing MethodFamily, or leave blank to create new family'
-
     coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
     class Meta:
         model = Method
-        fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions', 'family')
+        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'random')
 
 
 class MethodReviseForm (forms.ModelForm):
@@ -109,22 +108,18 @@ class MethodReviseForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
 
-        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
-        self.fields['coderesource'].label = 'Code resource'
-        self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
-
         self.fields['revision_name'].label = 'Name'
         self.fields['revision_name'].help_text = 'A short name for this new method'
 
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
-    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
-    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+    #coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    revisions = forms.ChoiceField() # to be populated by view function
 
     class Meta:
         model = Method
-        fields = ('revision_name', 'revision_desc', 'random', 'coderesource', 'revisions')
+        fields = ('revisions', 'revision_name', 'revision_desc', 'random')
 
 
 class TransformationXputForm (forms.ModelForm):
@@ -137,9 +132,15 @@ class TransformationXputForm (forms.ModelForm):
 class XputStructureForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(XputStructureForm, self).__init__(*args, **kwargs)
+        self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + \
+                                                  [(x.id, x.__unicode__()) for x in CompoundDatatype.objects.all()]
         self.fields['min_row'].widget.attrs['class'] = 'shortIntField'
         self.fields['max_row'].widget.attrs['class'] = 'shortIntField'
-    compounddatatype = forms.ModelChoiceField(queryset = CompoundDatatype.objects.all())
+
+    choices = [('', '--------'), ('__raw__', 'Unstructured')]
+    choices.extend([(x.id, x.__unicode__()) for x in CompoundDatatype.objects.all()])
+
+    compounddatatype = forms.ChoiceField(choices=choices)
     class Meta:
         model = XputStructure
         fields = ('compounddatatype', 'min_row', 'max_row')
