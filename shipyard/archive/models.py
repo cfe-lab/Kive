@@ -243,7 +243,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
         if self.log.all().exists():
             raise ValidationError("{}; no log should have been generated".format(general_error))
         if self.invoked_logs.all().exists():
-            raise ValidationError("{}; no other steps or cables should have been invoked".format(general_error))
+            raise ValidationError("{}; no steps or cables should have been invoked".format(general_error))
         if self.has_data():
             raise ValidationError("{}; no Datasets should be associated".format(general_error))
         if self.execrecord:
@@ -266,7 +266,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
             raise ValidationError('{} "{}" reused an ExecRecord and should not have generated any Datasets'
                                   .format(self.__class__.__name__, self))
         if self.invoked_logs.exists():
-            raise ValidationError('{} "{}" reused an ExecRecord; no other steps or cables should have been invoked')
+            raise ValidationError('{} "{}" reused an ExecRecord; no steps or cables should have been invoked')
 
     # Note: what clean() does in the not-reused case is specific to
     # the class, so the _clean_not_reused() method is overridden
@@ -316,7 +316,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
                        self.__class__.__name__, self)
                )
 
-            preceding_logs = self.invoked_logs.exclude(pk=self.log.pk)
+            preceding_logs = self.invoked_logs.exclude(pk=self.log.first().pk)
             if not all([x.is_complete() for x in preceding_logs]):
                raise ValidationError(
                    'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
@@ -329,7 +329,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
                        self.__class__.__name__, self)
                )
 
-    def _clean_no_execrecord_yet(self):
+    def _clean_has_execlog_no_execrecord_yet(self):
         """
         Check coherence after log is set but before execrecord is set.
 
@@ -338,7 +338,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
         PRE: log is set and complete, execrecord is not set yet.
         """
         # There should be no CCLs/ICLs yet.
-        if self.log.integrity_checks.exists() or self.log.content_checks.exists():
+        if self.log.first().integrity_checks.exists() or self.log.first().content_checks.exists():
             raise ValidationError(
                 '{} "{}" does not have an ExecRecord so should not have any data checks'.format(
                     self.__class__.__name__, self)
@@ -356,8 +356,8 @@ class RunAtomic(stopwatch.models.Stopwatch):
             curr_SD = ero.symbolicdataset
 
             total_checks = (
-                self.log.integrity_checks.filter(symbolicdataset=curr_SD).count() +
-                self.log.content_checks.filter(symbolicdataset=curr_SD).count()
+                self.log.first().integrity_checks.filter(symbolicdataset=curr_SD).count() +
+                self.log.first().content_checks.filter(symbolicdataset=curr_SD).count()
             )
 
             if total_checks > 1:
@@ -378,6 +378,8 @@ class RunAtomic(stopwatch.models.Stopwatch):
         have been checked with an ICL/CCL and passed, or some
         EL/ICL/CCL failed and the rest are complete (not all outputs
         have to have been checked).
+
+        PRE: this RunAtomic is clean.
         """
         # Is there an ExecRecord?  If not, check if this failed during
         # recovery and then completed.
@@ -385,13 +387,13 @@ class RunAtomic(stopwatch.models.Stopwatch):
             if not self.successful_execution():
 
                 for invoked_log in self.invoked_logs.all():
-                    if not self.invoked_log.is_complete():
+                    if not invoked_log.is_complete():
                         return False
 
-                    if not all([x.is_complete() for x in self.integrity_checks.all()]):
+                    if not all([x.is_complete() for x in invoked_log.integrity_checks.all()]):
                         return False
 
-                    if not all([x.is_complete() for x in self.content_checks.all()]):
+                    if not all([x.is_complete() for x in invoked_log.content_checks.all()]):
                         return False
 
                 # All ELs, and ICLs/CCLs are complete, albeit
@@ -407,17 +409,20 @@ class RunAtomic(stopwatch.models.Stopwatch):
         if self.reused:
             return True
 
-        # From here on we know we are not reusing.
+        # From here on we know we are not reusing and ExecRecord is
+        # set -- therefore log is set.
+
         # Check that either every output has been successfully checked
         # or one+ has failed and the rest are complete.
-        if self.log.all_checks_passed():
+        if self.log.first().all_checks_passed():
             return True
 
         # From here on we know that at least one of the checks failed.
-        if (any([x.is_fail() for x in self.integrity_checks.all()]) or
-                any([x.is_fail() for x in self.content_checks.all()])):
-            if (all([x.is_complete() for x in self.integrity_checks.all()]) and
-                    all([x.is_complete() for x in self.content_checks.all()])):
+        my_log = self.log.first()
+        if (any([x.is_fail() for x in my_log.integrity_checks.all()]) or
+                any([x.is_fail() for x in my_log.content_checks.all()])):
+            if (all([x.is_complete() for x in my_log.integrity_checks.all()]) and
+                    all([x.is_complete() for x in my_log.content_checks.all()])):
                 return True
 
         # At this point, we know that it is unsuccessful and incomplete.
@@ -443,9 +448,9 @@ class RunAtomic(stopwatch.models.Stopwatch):
         for invoked_log in self.invoked_logs.all():
             if not invoked_log.is_successful():
                 return False
-            if any([x.is_fail() for x in self.integrity_checks.all()]):
+            if any([x.is_fail() for x in invoked_log.integrity_checks.all()]):
                 return False
-            if any([x.is_fail() for x in self.content_checks.all()]):
+            if any([x.is_fail() for x in invoked_log.content_checks.all()]):
                 return False
         return True
 
@@ -771,8 +776,8 @@ class RunStep(RunAtomic):
         # Check that if there is no execrecord then log has no
         # associated CCLs or ICLs.  (It can't, as execution can't have
         # finished yet.)
-        if self.execrecord is None:
-            self._clean_no_execrecord_yet()
+        if self.log.exists() and self.execrecord is None:
+            self._clean_has_execlog_no_execrecord_yet()
             return
 
         # From here on, the appropriate ER is known to be set.
@@ -1046,30 +1051,41 @@ class RunCable(RunAtomic):
                                           'ExecRecord "{}"'.format(self.output.first(), self._cable_type_str(),
                                           self, self.execrecord))
 
-    def _clean_without_execlog(self):
+    def _clean_without_execlog_reused_check_output(self):
         """
-        If this RunCable has no ExecLog (that is, it either recycled an
-        ExecRecord, or is incomplete), make sure it is coherent:
+        Check coherence of a reused RunCable with no ExecLog.
 
-          - if it is reusing an ExecRecord, it should not have output
-          - if it is not reusing an ExecRecord, it is incomplete,
-            and should not have data or an ExecRecord.
+        In this state, it should not have any registered output Datasets.
+
+        This is a helper for clean().
+
+        PRE: this RunCable is reused, has no ExecLog, and passes clean
+        up to the point that this function is invoked.
         """
         # Case 1: Completely recycled ER (reused = true): it should
         # not have any registered dataset)
-        if self.reused and self.output.exists():
+        if self.output.exists():
             raise ValidationError('{} "{}" was reused but has a registered dataset'.format(
                 self._cable_type_str(), self
             ))
 
-        # Case 2: Still executing (reused = false): there should be
-        # no RSIC.output and no ER
-        if not self.reused:
-            general_error = '{} "{}" not reused and has no ExecLog'.format(self._cable_type_str(), self)
-            if self.output.exists():
-                raise ValidationError("{}, but has a Dataset output".format(general_error))
-            if self.execrecord.exists():
-                raise ValidationError("{}, but has an ExecRecord".format(general_error))
+    def _clean_without_execlog_not_reused(self):
+        """
+        Check coherence of a non-reused RunCable without an ExecLog.
+
+        In this state, execution is incomplete, so it should not have
+        any outputs or an ExecRecord.
+
+        This is a helper for clean().
+
+        PRE: this RunCable is not reused, has no ExecLog, and passes
+        clean up to the point that this function is invoked.
+        """
+        general_error = '{} "{}" not reused and has no ExecLog'.format(self._cable_type_str(), self)
+        if self.output.exists():
+            raise ValidationError("{}, but has a Dataset output".format(general_error))
+        if self.execrecord is not None:
+            raise ValidationError("{}, but has an ExecRecord".format(general_error))
 
     def clean(self):
         """
@@ -1111,15 +1127,25 @@ class RunCable(RunAtomic):
 
         self.logger.debug("Checking {}'s ExecLog".format(self._cable_type_str()))
 
-        if self.log.exists():
-            self._clean_with_execlog()
+        # Handle cases where the log either exists or does not exist.
+        if not self.log.exists():
+            if self.reused:
+                self._clean_without_execlog_reused_check_output()
+            else:
+                self._clean_without_execlog_not_reused()
+                # We know we don't have an ER at this point so we stop.
+                return
         else:
-            self._clean_without_execlog()
+            self._clean_with_execlog()
 
-        # If there is no execrecord defined, then check for
-        # spurious CCLs and ICLs.
+        # At this point, we know that the log either exists or should
+        # not exist (i.e. this is a reused step).
+
+        # If there is no execrecord defined but there is a log, then
+        # check for spurious CCLs and ICLs and stop.
         if self.execrecord is None:
-            self._clean_no_execrecord_yet()
+            if self.log.exists():
+                self._clean_has_execlog_no_execrecord_yet()
             return
 
         # Now, we know there to be an ExecRecord.
@@ -1548,7 +1574,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         output by this execution, and check that all of the outputs
         have been tested exactly once and all passed.
         """
-        if self.record.execrecord = None:
+        if self.record.execrecord is None:
             return False
 
         # From here on, we know that this ExecLog corresponds to the
@@ -1577,7 +1603,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         First check that all checks have been performed; then check
         that all of the tests have passed.
         """
-        if not all_checks_performed():
+        if not self.all_checks_performed():
             return False
 
         # From here on, we know that this ExecLog corresponds to the

@@ -191,6 +191,7 @@ class SymbolicDataset(models.Model):
                           .format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog)
         ccl.save()
+        ccl.start_time = timezone.now()
 
         if self.is_raw():
             ccl.end_time = timezone.now()
@@ -272,6 +273,7 @@ class SymbolicDataset(models.Model):
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
         icl = self.integrity_checks.create(execlog=execlog)
+        icl.start_time = timezone.now()
 
         if newly_computed_MD5 == None:
             with open(new_file_path, "rb") as f:

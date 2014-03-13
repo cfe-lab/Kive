@@ -253,7 +253,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         Helper function to create an ExecRecord from an Run, RunStep, or 
         RunOutputCable (record), by creating a throwaway ExecLog.
         """
-        myEL = ExecLog(record=record)
+        myEL = ExecLog(record=record, invoking_record=record)
         myEL.start_time = timezone.now()
         time.sleep(1)
         myEL.end_time = timezone.now()

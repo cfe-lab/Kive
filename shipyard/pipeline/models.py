@@ -830,6 +830,7 @@ class PipelineStepInputCable(models.Model):
         # the wiring matches, we can....
         return True
 
+    # FIXME this is going to need to be fixed when we get to execution!
     def run_cable(self, source, output_path, cable_record):
         """
         Perform cable transformation on the input.
@@ -851,8 +852,8 @@ class PipelineStepInputCable(models.Model):
         # Create a new log with the current start_time and a null end_time
         self.logger.debug("Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(source,output_path))
         curr_log = archive.models.ExecLog(record=cable_record)
-        curr_log.save()
         curr_log.start_time = timezone.now()
+        curr_log.save()
 
         run_cable_h(self, source, output_path)
 
