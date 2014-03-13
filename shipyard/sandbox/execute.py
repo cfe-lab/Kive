@@ -240,7 +240,7 @@ class Sandbox:
                         self.socket_map[(curr_run, cable, cable_dest)] = output_SD
                         self.cable_map[cable] = curr_record
                         return curr_record
-                        
+
                     else:
                         curr_ER = candidate_ERI.execrecord
                         self.logger.debug("Filling in ER {}".format(curr_ER))

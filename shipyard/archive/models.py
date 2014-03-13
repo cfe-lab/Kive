@@ -87,15 +87,38 @@ class Run(stopwatch.models.Stopwatch):
         True if this run is complete; false otherwise.
         """
         # A run is complete if all of its component RunSteps and
-        # RunOutputCables are complete.
+        # RunOutputCables are complete, or if any one fails and the
+        # rest are complete.  If anything is incomplete, immediately
+        # bail and return False.
+        anything_failed = False
+        all_exist = True
+
         for step in self.pipeline.steps.all():
             corresp_rs = self.runsteps.filter(pipelinestep=step)
-            if not corresp_rs.exists() or not corresp_rs[0].is_complete():
+            if not corresp_rs.exists():
+                all_exist = False
+            elif not corresp_rs.first().is_complete():
                 return False
+            elif not corresp_rs.successful_execution():
+                anything_failed = True
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
-            if not corresp_roc.exists() or not corresp_roc[0].is_complete():
+            if not corresp_roc.exists():
+                all_exist = False
+            elif not corresp_roc.first().is_complete():
                 return False
+            elif not corresp_rs.successful_execution():
+                anything_failed = True
+
+        # At this point, all RunSteps and ROCs that exist are complete.
+        if anything_failed:
+            # This is the "unsuccessful complete" case.
+            return True
+        elif not all_exist:
+            # This is the "successful incomplete" case.
+            return False
+
+        # Nothing failed and all exist; we are complete and successful.
         return True
 
     def complete_clean(self):
@@ -206,7 +229,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
         or not to reuse an ExecRecord:
 
          - if reused is None (no decision on reusing has been made),
-           no log should be associated, no data should be associated,
+           no log or invoked_logs should be associated, no data should be associated,
            and execrecord should not be set
 
         This is a helper for clean().
@@ -219,6 +242,8 @@ class RunAtomic(stopwatch.models.Stopwatch):
             self.__class__.__name__, self)
         if self.log.all().exists():
             raise ValidationError("{}; no log should have been generated".format(general_error))
+        if self.invoked_logs.all().exists():
+            raise ValidationError("{}; no other steps or cables should have been invoked".format(general_error))
         if self.has_data():
             raise ValidationError("{}; no Datasets should be associated".format(general_error))
         if self.execrecord:
@@ -230,6 +255,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
         ExecRecord:
 
          - if reused is True, no data should be associated.
+         - also, there should be no invoked_logs.
 
         This is a helper for clean().
 
@@ -239,6 +265,8 @@ class RunAtomic(stopwatch.models.Stopwatch):
         if self.has_data():
             raise ValidationError('{} "{}" reused an ExecRecord and should not have generated any Datasets'
                                   .format(self.__class__.__name__, self))
+        if self.invoked_logs.exists():
+            raise ValidationError('{} "{}" reused an ExecRecord; no other steps or cables should have been invoked')
 
     # Note: what clean() does in the not-reused case is specific to
     # the class, so the _clean_not_reused() method is overridden
@@ -250,12 +278,18 @@ class RunAtomic(stopwatch.models.Stopwatch):
         Helper function to ensure a RunStep, RunSIC, or RunOutputCable
         has at most one ExecLog, and to clean it if it exists.  Also,
         clean all invoked_logs, and check coherence between log and
-        invoked_logs; if there are invoked_logs, then log must also be
-        among the invoked_logs.
+        invoked_logs; if there are invoked_logs and log is set, then
+        log must also be among the invoked_logs.
+
+        It also cleans all associated ContentCheckLogs and
+        IntegrityCheckLogs in the process.
+
+        Then, it checks that if log is complete then all of the
+        invoked_logs must also be complete.
         """
         if self.log.exists():
            if self.log.count() == 1:
-               self.log.first().complete_clean()
+               self.log.first().clean()
            else:
                raise ValidationError(
                    '{} "{}" has {} ExecLogs but should have only one'.format(
@@ -263,22 +297,131 @@ class RunAtomic(stopwatch.models.Stopwatch):
                )
 
         for invoked_log in self.invoked_logs.all():
-            invoked_log.complete_clean()
+            invoked_log.clean()
 
-        if self.invoked_logs.all().exists():
+            for ccl in invoked_log.content_checks.all():
+                ccl.clean()
+            for icl in invoked_log.integrity_checks.all():
+                icl.clean()
+
+        # If log exists and there are invoked_logs, log should be among
+        # the invoked logs.  If log exists, any preceding logs should
+        # be complete and all tests should have passed (since they were
+        # recoveries happening before we could carry out the execution
+        # that log represents).
+        if self.invoked_logs.exists() and self.log.exists():
             if not self.invoked_logs.filter(pk=self.log.first().pk).exists():
                raise ValidationError(
-                   '{} "{}" has invoked ExecLogs but its own ExecLog is not one of them'.format(
+                   'ExecLog of {} "{}" is not included with its invoked ExecLogs'.format(
                        self.__class__.__name__, self)
                )
 
+            preceding_logs = self.invoked_logs.exclude(pk=self.log.pk)
+            if not all([x.is_complete() for x in preceding_logs]):
+               raise ValidationError(
+                   'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
+                       self.__class__.__name__, self)
+               )
+
+            if not all([x.all_checks_passed() for x in preceding_logs]):
+               raise ValidationError(
+                   'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+                       self.__class__.__name__, self)
+               )
+
+    def _clean_no_execrecord_yet(self):
+        """
+        Check coherence after log is set but before execrecord is set.
+
+        This is a helper called during the course of clean().
+
+        PRE: log is set and complete, execrecord is not set yet.
+        """
+        # There should be no CCLs/ICLs yet.
+        if self.log.integrity_checks.exists() or self.log.content_checks.exists():
+            raise ValidationError(
+                '{} "{}" does not have an ExecRecord so should not have any data checks'.format(
+                    self.__class__.__name__, self)
+            )
+
+    def _clean_outputs_overchecked(self):
+        """
+        Check that outputs are not overquenched with CCLs/ICLs.
+
+        This is a helper called during the course of clean().
+
+        PRE: log is set and complete, execrecord is set and complete.
+        """
+        for ero in self.execrecord.execrecordouts.all():
+            curr_SD = ero.symbolicdataset
+
+            total_checks = (
+                self.log.integrity_checks.filter(symbolicdataset=curr_SD).count() +
+                self.log.content_checks.filter(symbolicdataset=curr_SD).count()
+            )
+
+            if total_checks > 1:
+                raise ValidationError(
+                    '{} "{}" has multiple Integrity/ContentCheckLogs for output SymbolicDataset {} '
+                    'of ExecLog "{}"'.format(self.__class__.__name__, self, curr_SD)
+                )
+
     def is_complete(self):
         """
-        True if this RunAtomic is complete; False otherwise.
+        True if this RunAtomic is complete; false otherwise.
 
-        This is abstract and must be overridden.
+        Note that this is overridden by RunStep.
+
+        If this RunAtomic is reused, then completeness == having an ER.
+
+        If this RunAtomic is not reused, then either all of its outputs
+        have been checked with an ICL/CCL and passed, or some
+        EL/ICL/CCL failed and the rest are complete (not all outputs
+        have to have been checked).
         """
-        pass
+        # Is there an ExecRecord?  If not, check if this failed during
+        # recovery and then completed.
+        if self.execrecord is None:
+            if not self.successful_execution():
+
+                for invoked_log in self.invoked_logs.all():
+                    if not self.invoked_log.is_complete():
+                        return False
+
+                    if not all([x.is_complete() for x in self.integrity_checks.all()]):
+                        return False
+
+                    if not all([x.is_complete() for x in self.content_checks.all()]):
+                        return False
+
+                # All ELs, and ICLs/CCLs are complete, albeit
+                # with a failure somewhere.
+                return True
+
+            # At this point we know that this is still a successful
+            # execution that isn't complete.
+            return False
+
+        # From here on, we know there is an ExecRecord; therefore reused
+        # is set.
+        if self.reused:
+            return True
+
+        # From here on we know we are not reusing.
+        # Check that either every output has been successfully checked
+        # or one+ has failed and the rest are complete.
+        if self.log.all_checks_passed():
+            return True
+
+        # From here on we know that at least one of the checks failed.
+        if (any([x.is_fail() for x in self.integrity_checks.all()]) or
+                any([x.is_fail() for x in self.content_checks.all()])):
+            if (all([x.is_complete() for x in self.integrity_checks.all()]) and
+                    all([x.is_complete() for x in self.content_checks.all()])):
+                return True
+
+        # At this point, we know that it is unsuccessful and incomplete.
+        return False
 
     def complete_clean(self):
         """
@@ -287,6 +430,24 @@ class RunAtomic(stopwatch.models.Stopwatch):
         self.clean()
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
+
+    def successful_execution(self):
+        """True if RunAtomic is successful; False otherwise.
+
+        Any RunAtomic is failed if any of its invoked ExecLogs have
+        failed, or if any CCLs/ICLs have failed.
+
+        PRE: this RunAtomic is clean, and so are all of its invoked_logs.
+        (It's OK that they might not be complete.)
+        """
+        for invoked_log in self.invoked_logs.all():
+            if not invoked_log.is_successful():
+                return False
+            if any([x.is_fail() for x in self.integrity_checks.all()]):
+                return False
+            if any([x.is_fail() for x in self.content_checks.all()]):
+                return False
+        return True
 
 
 class RunStep(RunAtomic):
@@ -360,7 +521,8 @@ class RunStep(RunAtomic):
 
          - If all RSICs are not quenched, reused, child_run, and
            execrecord should not be set, no ExecLog should be
-           associated and no Datasets should be associated
+           associated, there should be no invoked_logs, and no
+           Datasets should be associated
 
         This is a helper function for clean.
 
@@ -379,6 +541,8 @@ class RunStep(RunAtomic):
                 raise ValidationError("{}; child_run should not be set".format(general_error))
             if self.log.all().exists():
                 raise ValidationError("{}; no log should have been generated".format(general_error))
+            if self.invoked_logs.all().exists():
+                raise ValidationError("{}; no other steps or cables should have been invoked".format(general_error))
             if self.outputs.all().exists():
                 raise ValidationError("{}; no data should have been generated".format(general_error))
             return False
@@ -390,8 +554,9 @@ class RunStep(RunAtomic):
         make sure it is in a coherent state:
 
          - if we haven't decided whether or not to reuse an ER and
-           this is a method, no log should be associated, no Datasets
-           should be associated, and execrecord should not be set
+           this is a method, no log or invoked_log should be
+           associated, no Datasets should be associated, and
+           execrecord should not be set
 
         (from here on, reused is assumed to be set)
 
@@ -399,6 +564,7 @@ class RunStep(RunAtomic):
            that:
 
            - there are no associated Datasets.
+           - there are no associated invoked_logs.
 
          - else if we are not reusing an ER and this is a Method:
 
@@ -523,10 +689,15 @@ class RunStep(RunAtomic):
            _clean_with_subrun)
 
          - if an EL is associated, check it is clean (see the module
-           function clean_execlogs)
+           function _clean_execlogs)
+
          - if there are any invoked_logs, check they are clean; also
            check that this RunStep has an associated EL and that that
-           EL is also one of the invoked_logs (also in clean_execlogs)
+           EL is also one of the invoked_logs (also in _clean_execlogs)
+
+         - check coherence of any CCLs and ICLs associated to its
+           invoked_logs (in _clean_execlogs)
+
          - check coherence of RSICs (see _clean_inputs)
 
         (from here on all RSICs are assumed to be quenched)
@@ -536,11 +707,19 @@ class RunStep(RunAtomic):
          - else if this is a Pipeline:
            - clean child_run if it exists
 
+        (from here on, log and invoked_logs are known to be complete
+         and clean)
+
+         - if execrecord is not set, no ICLs and CCLs should be
+           associated with the associated log.
+
         (from here on, it is assumed that this is a Method and
          execrecord is set)
 
          - check the execrecord (see _clean_execrecord)
          - check the outputs (see _clean_outputs)
+
+         - check for overquenching of the outputs by CCLs/ICLs
 
         Note: don't need to check inputs for multiple quenching due to
         uniqueness.  Quenching of outputs is checked by ExecRecord.
@@ -566,90 +745,108 @@ class RunStep(RunAtomic):
         elif self.pipelinestep.transformation.__class__.__name__ == "Pipeline":
             self._clean_with_subrun()
 
+        # Clean all ExecLogs and their CCLs/ICLs, and make sure that
+        # all preceding this step's ExecLog are complete and successful
+        # before this one's is started.
         self._clean_execlogs()
+
 
         # If any inputs are not quenched, stop checking.
         if not self._clean_cables_in(): return
 
         # From here on, RSICs are assumed to be quenched.
+
+        # Perform tests specific to the Method and Pipeline cases.
         if self.pipelinestep.transformation.__class__.__name__ == "Method":
             if not self._clean_with_method(): return
-
-        # From here on, ExecLog is assumed to be complete and clean.
         elif self.pipelinestep.transformation.__class__.__name__ == "Pipeline":
             if self.has_subrun():
                 self.child_run.clean()
             return
 
-        # From here on, we know that this is a Method.
-        if not self.execrecord: return
+        # From here on, we know that this represents a Method, log is
+        # assumed to be complete and clean, and so are the
+        # invoked_logs().
+
+        # Check that if there is no execrecord then log has no
+        # associated CCLs or ICLs.  (It can't, as execution can't have
+        # finished yet.)
+        if self.execrecord is None:
+            self._clean_no_execrecord_yet()
+            return
 
         # From here on, the appropriate ER is known to be set.
         self._clean_execrecord()
         self._clean_outputs()
 
+        # Check whether the CCLs/ICLs are overquenching the outputs.
+        self._clean_outputs_overchecked()
+
     def is_complete(self):
         """
         True if RunStep is complete; False otherwise.
 
-        This is similar to the procedure to check for completeness
-        of RunSIC, with the additional wrinkle that a RunStep
-        can fail while its cables are running before it even
+        This extends the procedure to check for completeness of a
+        RunAtomic.  In addition to the ways a RunAtomic can fail, a
+        RunStep can fail while its cables are running before it even
         gets to the recovery stage.  Also, if it represents
         a sub-Pipeline, then it simply checks if its child_run
         is complete.
+
+        PRE: this RunStep must be clean.
         """
         # Sub-Pipeline case:
-        if self.has_subrun():
-            return self.child_run.is_complete()
+        if self.pipelinestep.transformation.__class__.__name__ == "Pipeline":
+            if self.has_subrun():
+                return self.child_run.is_complete()
+            # At this point, child_run hasn't been set yet, so we can
+            # say that it isn't complete.
+            return False
 
-        # Method case:
-        if self.execrecord is not None:
+        # From here on we know we are in the Method case.  Check that
+        # all PSICs have an RSIC that are complete and successful --
+        # in which case go on and check the same stuff as RunAtomic --
+        # or that some RSIC failed and the rest are complete, and
+        # return.  Any incomplete RSIC causes us to return False.
+        all_cables_exist = True
+        any_cables_failed = False
+        for curr_cable in self.pipelinestep.cables_in.all():
+            corresp_RSIC = self.RSICs.filter(PSIC=curr_cable)
+            if not corresp_RSIC.exists():
+                all_cables_exist = False
+            elif not corresp_RSIC.first().is_complete():
+                return False
+            elif not corresp_RSIC.successful_execution():
+                any_cables_failed = True
+
+        # At this point we know that all RSICs that exist are complete.
+        if any_cables_failed:
             return True
+        elif not all_cables_exist:
+            return False
 
-        # At this point we know that it is not finished successfully;
-        # check whether it failed during either cables or during recovery.
-        if not self.successful_execution():
-            for cable in self.RSICs.all():
-                if not (cable.is_complete() or not cable.has_started()):
-                    return False
-
-            for invoked_log in self.invoked_logs.all():
-                if not (self.invoked_log.is_complete() or not self.invoked_log.has_started()):
-                    return False
-
-            # At this point, we know that it's failed but complete.
-            return True
-
-        # At this point, we know that it is successful but incomplete.
-        return False
+        # At this point we know that all RSICs exist, and are complete
+        # and successful.  Proceed to check the RunAtomic stuff.
+        return RunAtomic.is_complete(self)
 
     def successful_execution(self):
         """
         True if RunStep is successful; False otherwise.
 
-        The RunStep is failed if:
-         - any of its cables failed (fail during cables)
-
-         - any of its invoked_logs is failed (fail during either
-           recovery of inputs or during its own execution if it's
-           a Method)
-
-         - its child_run has failed (if it fails during execution
-           of the sub-Pipeline)
+        This inherits from RunAtomic's method, with the additional
+        wrinkle that a RunStep fails if any of its cables fails, or if
+        its child_run has failed.
 
         PRE: this RunStep is clean and complete.
         """
-        for cable in self.RSICs.all():
-            if not cable.successful_execution():
-                return False
+        if any([not cable.successful_execution() for cable in self.RSICs.all()]):
+            return False
 
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
         # execution.
-        for invoked_log in self.invoked_logs.all():
-            if not invoked_log.is_successful():
-                return False
+        if not RunAtomic.successful_execution(self):
+            return False
 
         # In the case that this is a sub-Pipeline, check if child_run
         # is successful.
@@ -912,10 +1109,6 @@ class RunCable(RunAtomic):
         elif not self._clean_not_reused():
             return
 
-        # If there is no execrecord defined, then exit.
-        if self.execrecord is None: return
-        self._clean_execrecord()
-
         self.logger.debug("Checking {}'s ExecLog".format(self._cable_type_str()))
 
         if self.log.exists():
@@ -923,53 +1116,16 @@ class RunCable(RunAtomic):
         else:
             self._clean_without_execlog()
 
-    def is_complete(self):
-        """
-        True if RunCable is complete; false otherwise.
+        # If there is no execrecord defined, then check for
+        # spurious CCLs and ICLs.
+        if self.execrecord is None:
+            self._clean_no_execrecord_yet()
+            return
 
-        This checks something different depending on whether the RunCable
-        is successful or not.  If it's successful, then the only thing
-        to check is whether or not the ExecRecord is set.  If it's
-        failed, then it checks different conditions:
-         - if it failed during recover(), then there should be no ER
-           but all ELs are either complete or were never started.
-         - if it failed during its own execution, then there should be
-           an ExecRecord.
-
-        So, if there is an ExecRecord, then it's complete; if not, then
-        check whether its failed and has only completed or never-started
-        ExecLogs.
-        """
-        if self.execrecord is not None:
-            return True
-
-        # At this point we know that execrecord == None; check if it
-        # failed during recovery and finished.
-        if not self.successful_execution():
-            for invoked_log in self.invoked_logs.all():
-                if not (invoked_log.is_complete() or not invoked_log.has_started()):
-                    return False
-
-            # Now we made it through all of the invoked_logs and they were all
-            # either complete or never started, so....
-            return True
-
-        # Now we know that it's successful but incomplete.
-        return False
-
-    def successful_execution(self):
-        """True if RunCable is successful; False otherwise.
-
-        The RunCable is failed if any of its invoked ExecLogs have
-        failed.
-
-        PRE: this RunCable is clean, and so are all of its invoked_logs.
-        (It's OK that they might not be complete.)
-        """
-        for invoked_log in self.invoked_logs.all():
-            if not invoked_log.is_successful():
-                return False
-        return True
+        # Now, we know there to be an ExecRecord.
+        self._clean_execrecord()
+        # Check whether the CCLs/ICLs are overquenching the outputs.
+        self._clean_outputs_overchecked()
 
 
 class RunSIC(RunCable):
@@ -1329,8 +1485,10 @@ class ExecLog(stopwatch.models.Stopwatch):
 
     def is_complete(self):
         """
-        If this is a RunStep, specifically a method, it must have a methodoutput to be complete.
-        It also must have a defined start and end time.
+        Checks completeness of this ExecLog.
+
+        The execution must have ended (i.e. end_time is
+        set) and a MethodOutput must be in place if appropriate.
         """
         if not self.has_ended():
             return False
@@ -1372,20 +1530,71 @@ class ExecLog(stopwatch.models.Stopwatch):
         this function tells us if anything has gone wrong so far.
         """
         # If this ExecLog has a MethodOutput, check its return code.
-        if (hasattr(self, "methodoutput") and
-                self.methodoutput.return_code != 0):
+        if (hasattr(self, "methodoutput") and self.methodoutput.return_code != 0):
             return False
-
-        for icl in self.integrity_checks.all():
-            if icl.is_fail():
-                return False
-
-        for ccl in self.content_checks.all():
-            if ccl.is_fail():
-                return False
 
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!
+        return True
+
+    # FIXME: this isn't broken but it seems redundant and could just be folded directly
+    # into all_checks_passed.  Do we ever find a use for this?
+    def all_checks_performed(self):
+        """
+        True if every output of this ExecLog has been checked.
+
+        If the parent record does not have an ExecRecord yet, return
+        False; otherwise, use the ExecRecord to look up all of the SDs
+        output by this execution, and check that all of the outputs
+        have been tested exactly once and all passed.
+        """
+        if self.record.execrecord = None:
+            return False
+
+        # From here on, we know that this ExecLog corresponds to the
+        # creation or filling-in of an ExecRecord.  Go through the
+        # EROs and check that all of the corresponding ICL/CCLs are
+        # present and passed.
+        for ero in self.record.execrecord.execrecordouts.all():
+            is_checked = False
+            corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+            if corresp_icls.exists():
+                is_checked = True
+
+            corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
+            if corresp_ccls.exists():
+                is_checked = True
+
+            if not is_checked:
+                return False
+
+        return True
+
+    def all_checks_passed(self):
+        """
+        True if every output of this ExecLog has passed its check.
+
+        First check that all checks have been performed; then check
+        that all of the tests have passed.
+        """
+        if not all_checks_performed():
+            return False
+
+        # From here on, we know that this ExecLog corresponds to the
+        # creation or filling-in of an ExecRecord.  Go through the
+        # EROs and check that all of the corresponding ICL/CCLs are
+        # present and passed.
+        for ero in self.record.execrecord.execrecordouts.all():
+            corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+            if corresp_icls.exists():
+                if corresp_icls.first().is_fail():
+                    return False
+
+            corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
+            if corresp_ccls.exists():
+                if corresp_ccls.first().is_fail():
+                    return False
+
         return True
 
 
