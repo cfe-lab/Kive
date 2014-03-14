@@ -405,6 +405,11 @@ class Method(transformation.models.Transformation):
         """Returns number of outputs."""
         return len(self.outputs.all())
 
+    @property
+    def family_size(self):
+        """Returns size of this Method's family"""
+        return len(Method.objects.filter(family=self.family))
+
     def clean(self):
         """
         Check coherence of this Method. The checks we perform are:
@@ -434,6 +439,7 @@ class Method(transformation.models.Transformation):
 
         # If parent revision exists, and inputs/outputs haven't been registered,
         # copy all inputs/outputs (Including raws) from parent revision to this revision
+        """
         if (self.inputs.count() + self.outputs.count() == 0):
             for parent_input in self.revision_parent.inputs.all():
                 new_input = self.inputs.create(
@@ -454,6 +460,7 @@ class Method(transformation.models.Transformation):
                         compounddatatype = parent_output.get_cdt(),
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
+        """
 
     def find_compatible_ER(self, input_SDs):
         """

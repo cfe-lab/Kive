@@ -495,6 +495,7 @@ def method_revise(request, id):
 
         # attempt to make inputs and outputs
         for i in range(num_xput_forms):
+            cdt_id = query['compounddatatype_'+str(i)]
             if cdt_id == '__raw__':
                 # request for unstructured input/output
                 if query['input_output_'+str(i)] == 'input':
@@ -504,7 +505,7 @@ def method_revise(request, id):
                     new_output = new_method.create_output(dataset_name = query['dataset_name_'+str(i)],
                                                         dataset_idx = i+1)
             else:
-                my_compound_datatype = CompoundDatatype.objects.get(pk=query['compounddatatype_'+str(i)])
+                my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
                 min_row = query['min_row_'+str(i)]
                 max_row = query['max_row_'+str(i)]
                 try:
@@ -549,7 +550,7 @@ def method_revise(request, id):
                                                      'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
             xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
-                                        initial={'compounddatatype': structure.compounddatatype,
+                                        initial={'compounddatatype': structure.compounddatatype.id,
                                                  'min_row': structure.min_row,
                                                  'max_row': structure.max_row})
             xput_forms.append((tx_form, xs_form))
@@ -561,7 +562,7 @@ def method_revise(request, id):
                                                      'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
             xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
-                                        initial={'compounddatatype': structure.compounddatatype,
+                                        initial={'compounddatatype': structure.compounddatatype.id,
                                                  'min_row': structure.min_row,
                                                  'max_row': structure.max_row})
             xput_forms.append((tx_form, xs_form))
