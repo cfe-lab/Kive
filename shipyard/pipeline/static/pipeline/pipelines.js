@@ -475,7 +475,6 @@ CanvasState.prototype.doDown = function(e) {
         // check shapes in reverse order
         if (shapes[i].contains(mx, my)) {
             var mySel = shapes[i];
-            console.log(mySel);
             // are we clicking on an out-magnet?
             out_magnets = mySel.out_magnets;
             for (var j = 0; j < out_magnets.length; j++) {
@@ -522,10 +521,7 @@ CanvasState.prototype.doMove = function(e) {
     if (this.dragging) {
         // are we carrying a shape or Connector?
         if (this.selection != null) {
-            if (mouse.x < 0.1*this.width || mouse.x > 0.9*this.width) {
-                // prevent shapes from moving into end-zones
-                return;
-            }
+
             this.selection.x = mouse.x - this.dragoffx;
             this.selection.y = mouse.y - this.dragoffy;
             this.valid = false; // redraw
@@ -542,7 +538,14 @@ CanvasState.prototype.doMove = function(e) {
                     for (var j = 0; j < in_magnets.length; j++) {
                         var in_magnet = in_magnets[j];
 
-                        if (this.selection.out_magnet.cdt == in_magnet.cdt) {
+                        var connector_carrying_cdt;
+                        if (this.selection.out_magnet == null) {
+                            connector_carrying_cdt = '__raw__';
+                        } else {
+                            connector_carrying_cdt = this.selection.out_magnet.cdt;
+                        }
+
+                        if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = 'yellow';
                             if (in_magnet.contains(this.selection.x, this.selection.y)) {
@@ -551,14 +554,15 @@ CanvasState.prototype.doMove = function(e) {
                                 this.selection.y = in_magnet.y;
                                 this.selection.in_magnet = in_magnet;
                             }
-                        } else {
-                            in_magnet.fill = 'white';
                         }
-
                     }
                 }
             } else {
                 // carrying a shape
+                if (mouse.x < 0.1*this.width || mouse.x > 0.9*this.width) {
+                    // prevent shapes from being carried into end-zones
+                    return;
+                }
             }
 
 
@@ -575,9 +579,13 @@ CanvasState.prototype.doUp = function(e) {
     }
     connector = this.connectors[l-1];
     if (connector.in_magnet == null) {
-        // not connected, delete Connector
-        this.connectors.pop();
-        this.valid = false; // redraw canvas to remove this Connector
+        // has connector been carried into output end-zone?
+        var mouse = this.getPos(e);
+        if (mouse.x < 0.9 * this.canvas.width || connector.out_magnet == undefined) {
+            // not connected, delete Connector
+            this.connectors.pop();
+            this.valid = false; // redraw canvas to remove this Connector
+        }
     }
 
     // turn off all in-magnets

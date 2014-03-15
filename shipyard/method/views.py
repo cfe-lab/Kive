@@ -542,29 +542,40 @@ def method_revise(request, id):
                                           'random': most_recent.random})
         method_form.fields['revisions'].choices = [(x.id, x.revision_name) for x in all_revisions]
 
+        # pre-populate input/output forms with values of parent Method
         xput_forms = []
         for input in most_recent.inputs.all():
-            structure = input.structure.all()[0]
             tx_form = TransformationXputForm(auto_id='id_%s_'+str(len(xput_forms)),
                                             initial={'input_output': 'input',
                                                      'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
-            xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
-                                        initial={'compounddatatype': structure.compounddatatype.id,
-                                                 'min_row': structure.min_row,
-                                                 'max_row': structure.max_row})
+            if input.structure.count() > 0:
+                structure = input.structure.all()[0]
+                xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'compounddatatype': structure.compounddatatype.id,
+                                                     'min_row': structure.min_row,
+                                                     'max_row': structure.max_row})
+            else:
+                xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'compounddatatype': '__raw__'})
+
             xput_forms.append((tx_form, xs_form))
 
         for output in most_recent.outputs.all():
-            structure = output.structure.all()[0]
             tx_form = TransformationXputForm(auto_id='id_%s_'+str(len(xput_forms)),
                                             initial={'input_output': 'output',
                                                      'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
-            xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
-                                        initial={'compounddatatype': structure.compounddatatype.id,
-                                                 'min_row': structure.min_row,
-                                                 'max_row': structure.max_row})
+            if output.structure.count() > 0:
+                structure = output.structure.all()[0]
+                xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'compounddatatype': structure.compounddatatype.id,
+                                                     'min_row': structure.min_row,
+                                                     'max_row': structure.max_row})
+            else:
+                xs_form = XputStructureForm(auto_id='id_%s_'+str(len(xput_forms)),
+                                            initial={'compounddatatype': '__raw__'})
+
             xput_forms.append((tx_form, xs_form))
 
     c = Context({'method_form': method_form, 'xput_forms': xput_forms})
