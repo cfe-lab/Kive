@@ -153,3 +153,7 @@ form select {
     font-style: italic;
 }
 /* TODO: get italic fonts to load */
+
+.errortext {
+    color: #FF0000;
+}

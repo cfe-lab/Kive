@@ -38,7 +38,7 @@ def datatype_add(request):
             new_datatype = dform.save() # this has to be saved to database to be passed to BasicConstraint()
             minlen, maxlen, regexp, minval, maxval = None, None, None, None, None
 
-            if new_datatype.Python_type == 'str':
+            if query['Python_type'] in ['string', 'boolean']:
                 # manually create and validate BasicConstraint objects
                 if query['minlen']:
                     minlen = BasicConstraint(datatype=new_datatype, ruletype='minlen', rule=query['minlen'])
@@ -68,7 +68,7 @@ def datatype_add(request):
                         exceptions.extend(e.messages)
                         pass
 
-            elif new_datatype.Python_type in ['int', 'float']:
+            elif query['Python_type'] in ['integer', 'float']:
                 if query['minval']:
                     minval = BasicConstraint(datatype=new_datatype, ruletype='minval', rule=query['minval'])
                     try:
