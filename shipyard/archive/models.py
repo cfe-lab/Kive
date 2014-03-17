@@ -99,7 +99,7 @@ class Run(stopwatch.models.Stopwatch):
                 all_exist = False
             elif not corresp_rs.first().is_complete():
                 return False
-            elif not corresp_rs.successful_execution():
+            elif not corresp_rs.first().successful_execution():
                 anything_failed = True
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
@@ -107,7 +107,7 @@ class Run(stopwatch.models.Stopwatch):
                 all_exist = False
             elif not corresp_roc.first().is_complete():
                 return False
-            elif not corresp_rs.successful_execution():
+            elif not corresp_rs.first().successful_execution():
                 anything_failed = True
 
         # At this point, all RunSteps and ROCs that exist are complete.
@@ -776,16 +776,18 @@ class RunStep(RunAtomic):
         # Check that if there is no execrecord then log has no
         # associated CCLs or ICLs.  (It can't, as execution can't have
         # finished yet.)
-        if self.log.exists() and self.execrecord is None:
-            self._clean_has_execlog_no_execrecord_yet()
-            return
+        if self.log.exists():
+            if self.execrecord is None:
+                self._clean_has_execlog_no_execrecord_yet()
+                return
 
         # From here on, the appropriate ER is known to be set.
         self._clean_execrecord()
         self._clean_outputs()
 
         # Check whether the CCLs/ICLs are overquenching the outputs.
-        self._clean_outputs_overchecked()
+        if self.log.exists():
+            self._clean_outputs_overchecked()
 
     def is_complete(self):
         """
@@ -821,7 +823,7 @@ class RunStep(RunAtomic):
                 all_cables_exist = False
             elif not corresp_RSIC.first().is_complete():
                 return False
-            elif not corresp_RSIC.successful_execution():
+            elif not corresp_RSIC.first().successful_execution():
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
@@ -1151,7 +1153,8 @@ class RunCable(RunAtomic):
         # Now, we know there to be an ExecRecord.
         self._clean_execrecord()
         # Check whether the CCLs/ICLs are overquenching the outputs.
-        self._clean_outputs_overchecked()
+        if self.log.exists():
+            self._clean_outputs_overchecked()
 
 
 class RunSIC(RunCable):
@@ -1575,6 +1578,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         have been tested exactly once and all passed.
         """
         if self.record.execrecord is None:
+            print("No execrecord!")
             return False
 
         # From here on, we know that this ExecLog corresponds to the

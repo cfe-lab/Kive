@@ -830,8 +830,7 @@ class PipelineStepInputCable(models.Model):
         # the wiring matches, we can....
         return True
 
-    # FIXME this is going to need to be fixed when we get to execution!
-    def run_cable(self, source, output_path, cable_record):
+    def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform cable transformation on the input.
         Creates an ExecLog, associating it to cable_record.
@@ -839,19 +838,12 @@ class PipelineStepInputCable(models.Model):
 
         INPUTS
         source          Either the Dataset to run through the cable, or a file path containing the data.
-        output_path
+        output_path     where the cable should put its output
         cable_record    RSIC/ROC for this step.
-
-        OUTPUT
-        curr_log        The exec log created while executing.
+        curr_log        ExecLog to fill in for execution
         """
-
-        import inspect
-        fn = "{}.{}()".format(self.__class__.__name__, inspect.stack()[0][3])
-
         # Create a new log with the current start_time and a null end_time
         self.logger.debug("Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(source,output_path))
-        curr_log = archive.models.ExecLog(record=cable_record)
         curr_log.start_time = timezone.now()
         curr_log.save()
 
@@ -861,7 +853,6 @@ class PipelineStepInputCable(models.Model):
         curr_log.end_time = timezone.now()
         curr_log.complete_clean()
         curr_log.save()
-        return curr_log
 
 class CustomCableWire(models.Model):
     """
@@ -1216,7 +1207,7 @@ class PipelineOutputCable(models.Model):
 
         return True
         
-    def run_cable(self, source, output_path, cable_record):
+    def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform the cable-specified transformation on the input.
 
@@ -1224,13 +1215,10 @@ class PipelineOutputCable(models.Model):
         to cable_record.
         """
         self.logger.debug("Creating ExecLog for {}".format(cable_record))
-        curr_log = archive.models.ExecLog(record=cable_record)
-        curr_log.save()
         curr_log.start_time = timezone.now()
+        curr_log.save()
         run_cable_h(self, source, output_path)
         curr_log.end_time = timezone.now()
         curr_log.clean()
         curr_log.save()
         curr_log.complete_clean()
-
-        return curr_log

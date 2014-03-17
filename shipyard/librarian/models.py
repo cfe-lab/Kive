@@ -175,6 +175,7 @@ class SymbolicDataset(models.Model):
         return symDS
 
     # FIXME: use a transaction!
+    # TODO: clean this up, end_time is set in too many places
     def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog):
         """
         Performs content check on a file, generates a CCL, and sets this SD's num_rows.

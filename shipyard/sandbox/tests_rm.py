@@ -465,7 +465,7 @@ class ExecuteTestsRM(UtilityMethods):
         outputs = self.method_complement.outputs.all()
 
         self.assertEqual(execrecord.generator, execlog)
-        self.assertEqual(execrecord.runsteps.first(), runstep)
+        #self.assertEqual(execrecord.runsteps.first(), runstep)
         #self.assertEqual(execrecord.runs.first(), run)
         self.assertEqual(execrecord.complete_clean(), None)
         self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation)
@@ -478,7 +478,7 @@ class ExecuteTestsRM(UtilityMethods):
         """
         run1 = self.sandbox_complement.execute_pipeline()
         run2 = self.sandbox_complement.execute_pipeline()
-        self.assertEqual(run1 is run2, True)
+        self.assertEqual(run1 is run2, True) 
 
     def test_execute_pipeline_reuse(self):
         """
@@ -689,7 +689,18 @@ class BadRunTests(UtilityMethods):
             [self.method_faulty, self.method_noop], "data", "the abyss")
         self.pipeline_faulty.create_outputs()
 
-        # Some data to run through the faulty pipeline.
+        # A code resource, method, and pipeline which fail.
+        self.coderev_fubar = self.make_first_revision("fubar", "a script which always fails",
+            "fubar.sh", "#!/bin/bash\nexit 1")
+        self.method_fubar = self.make_first_method("fubar", "a method which always fails", self.coderev_fubar)
+        self.method_fubar.clean()
+        self.simple_method_io(self.method_fubar, self.cdt_string, "strings", "broken strings")
+        self.pipeline_fubar = self.make_first_pipeline("fubar pipeline", "a pipeline which always fails")
+        self.create_linear_pipeline(self.pipeline_fubar,
+            [self.method_noop, self.method_fubar, self.method_noop], "indata", "outdata")
+        self.pipeline_fubar.create_outputs()
+
+        # Some data to run through the faulty pipelines.
         self.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
         self.grandpa_datafile.write("word\n")
         for line in range(20):
@@ -717,6 +728,26 @@ class BadRunTests(UtilityMethods):
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
         self.assertEqual(log.missing_outputs(), [interm_SD])
+
+    def test_method_fails(self):
+        """Properly handle a failed method in a pipeline."""
+        sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.symds_grandpa])
+        sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertFalse(sandbox.run.successful_execution())
+
+        runstep1 = sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        self.assertIsNone(runstep1.complete_clean())
+        self.assertTrue(runstep1.successful_execution())
+
+        runstep2 = sandbox.run.runsteps.get(pipelinestep__step_num=2)
+        self.assertIsNone(runstep2.complete_clean())
+        self.assertFalse(runstep2.successful_execution())
+
+        log = runstep2.log.first()
+        self.assertFalse(log.is_successful())
+        self.assertEqual(log.methodoutput.return_code, 1)
+        self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
 
 class FindSDTests(UtilityMethods):
     """
