@@ -109,7 +109,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 })
             }
         }
-    );
+    ).change();
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {

@@ -38,7 +38,8 @@ class IntegerConstraintForm (forms.Form):
 class StringConstraintForm (forms.Form):
     minlen = forms.IntegerField(required=False, help_text='Minimum string length (must be non-negative integer)')
     maxlen = forms.IntegerField(required=False, help_text='Maximum string length (must be non-negative integer)')
-    regexp = forms.CharField(required=False, help_text='A regular expression that can be recognized by the Python re module (Perl-like syntax).')
+    regexp = forms.CharField(required=False, help_text='A regular expression that can be recognized by the Python re module (Perl-like syntax). '
+                                                       'To define multiple regexes, enclose each in double-quotes (") and separate with commas (,).')
 
 class CompoundDatatypeMemberForm(forms.ModelForm):
     datatype = forms.ModelChoiceField(queryset = Datatype.objects.all(), required=True, help_text="This column's expected datatype")
