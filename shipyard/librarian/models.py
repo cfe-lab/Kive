@@ -61,21 +61,6 @@ class SymbolicDataset(models.Model):
         has_data_suffix = "d" if self.has_data() else ""
         return "S{}{}".format(self.pk, has_data_suffix)
 
-    def md5_equal(self, other):
-        """
-        Test whether SymbolicDatasets have the same non-blank MD5, or both
-        their MD5's are blank and they are the same object.
-        """
-        if isinstance(other, self.__class__):
-            if self.MD5_checksum != "" and other.MD5_checksum != "":
-                return self.MD5_checksum == other.MD5_checksum
-            elif self.MD5_checksum == "" and other.MD5_checksum == "":
-                return self is other
-            else:
-                return False
-        else:
-            return False
-
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -88,12 +73,6 @@ class SymbolicDataset(models.Model):
         """
         if self.has_data():
             self.dataset.clean()
-        
-        # If there is an associated DatasetStructure, clean the structure
-        # October 31, 2013: having simplified our checks on the structure
-        # (i.e. removing them totally), this is no longer relevant.
-        # if not self.is_raw():
-        #     self.structure.clean()
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
@@ -106,21 +85,23 @@ class SymbolicDataset(models.Model):
         return not hasattr(self, "structure")
             
     def num_rows(self):
-        """
-        Returns number of rows in the associated Dataset.
+        """Returns number of rows in the associated Dataset.
 
         This returns None if the Dataset is raw.
         """
-        if self.is_raw():
-            return None
-        return self.structure.num_rows
+        return (None if self.is_raw() else self.structure.num_rows)
 
     def get_cdt(self):
         """
         Retrieve the CDT of this SymbolicDataset (none if it is raw).
         """
-        cdt = None if self.is_raw() else self.structure.compounddatatype
-        return cdt
+        return (None if self.is_raw() else self.structure.compounddatatype)
+
+    def create_structure(self, compounddatatype, num_rows=-1):
+        """Add a DatasetStructure to this SymbolicDataset."""
+        if not self.is_raw():
+            raise ValueError('CompoundDatatype "{}" already has a structure.')
+        DatasetStructure(symbolicdataset=self, compounddatatype=compounddatatype, num_rows=num_rows).save()
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?

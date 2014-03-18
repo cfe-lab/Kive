@@ -33,7 +33,6 @@ class PipelineFamily(transformation.models.TransformationFamily):
     pass
 
 
-
 class Pipeline(transformation.models.Transformation):
     """
     A particular pipeline revision.
@@ -78,39 +77,39 @@ class Pipeline(transformation.models.Transformation):
         """
         # Transformation.clean() - check for consecutive numbering of
         # input/outputs for this pipeline as a whole
-        super(self.__class__, self).clean();
+        super(self.__class__, self).clean()
 
         # Internal pipeline STEP numbers must be consecutive from 1 to n
-        all_steps = self.steps.all();
-        step_nums = [];
+        all_steps = self.steps.all()
+        step_nums = []
 
         for step in all_steps:
-            step_nums += [step.step_num];
+            step_nums += [step.step_num]
 
         if sorted(step_nums) != range(1, len(all_steps)+1):
             raise ValidationError(
-                "Steps are not consecutively numbered starting from 1");
+                "Steps are not consecutively numbered starting from 1")
 
         # Check that steps are clean; this also checks the cabling between steps.
         # Note: we don't call *complete_clean* because this may refer to a
         # "transient" state of the Pipeline whereby it is not complete yet.
         for step in all_steps:
-            step.clean();
+            step.clean()
 
         # Check pipeline output wiring for coherence
-        output_indices = [];
-        output_names = [];
+        output_indices = []
+        output_names = []
 
         # Validate each PipelineOutput(Raw)Cable
         for outcable in self.outcables.all():
             outcable.clean()
-            output_indices += [outcable.output_idx];
-            output_names += [outcable.output_name];
+            output_indices += [outcable.output_idx]
+            output_names += [outcable.output_name]
 
         # PipelineOutputCables must be numbered consecutively
         if sorted(output_indices) != range(1, self.outcables.count()+1):
             raise ValidationError(
-                "Outputs are not consecutively numbered starting from 1");
+                "Outputs are not consecutively numbered starting from 1")
 
     def complete_clean(self):
         """
@@ -120,14 +119,14 @@ class Pipeline(transformation.models.Transformation):
         - there is at least 1 step
         - steps are complete, not just clean
         """
-        self.clean();
+        self.clean()
         
-        all_steps = self.steps.all();
+        all_steps = self.steps.all()
         if all_steps.count == 0:
-            raise ValidationError("Pipeline {} has no steps".format(unicode(self)));
+            raise ValidationError("Pipeline {} has no steps".format(unicode(self)))
 
         for step in all_steps:
-            step.complete_clean();
+            step.complete_clean()
 
     def create_outputs(self):
         """
@@ -201,19 +200,19 @@ class PipelineStep(models.Model):
     """
     pipeline = models.ForeignKey(
             Pipeline,
-            related_name="steps");
+            related_name="steps")
 
     # Pipeline steps are associated with a transformation
     content_type = models.ForeignKey(
             ContentType,
-            limit_choices_to = {"model__in": ("method", "pipeline")});
+            limit_choices_to = {"model__in": ("method", "pipeline")})
 
-    object_id = models.PositiveIntegerField();
-    transformation = generic.GenericForeignKey("content_type", "object_id");
-    step_num = models.PositiveIntegerField(validators=[MinValueValidator(1)]);
+    object_id = models.PositiveIntegerField()
+    transformation = generic.GenericForeignKey("content_type", "object_id")
+    step_num = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
     # Which outputs of this step we want to delete.
-    # Previously, this was done via another explicit class (PipelineStepDelete);
+    # Previously, this was done via another explicit class (PipelineStepDelete)
     # this is more compact.
     # -- August 21, 2013
     outputs_to_delete = models.ManyToManyField(
@@ -226,8 +225,8 @@ class PipelineStep(models.Model):
 
         pipeline_name = "[no pipeline assigned]";   
         if hasattr(self, "pipeline"):
-            pipeline_name = unicode(self.pipeline);
-        return "{} step {}".format(pipeline_name, self.step_num);
+            pipeline_name = unicode(self.pipeline)
+        return "{} step {}".format(pipeline_name, self.step_num)
 
 
     def recursive_pipeline_check(self, pipeline):
@@ -237,25 +236,25 @@ class PipelineStep(models.Model):
         cleaned and does not contain any circularities.  If it does this
         function can be fragile!
         """
-        contains_pipeline = False;
+        contains_pipeline = False
 
         # Base case 1: the transformation is a method and can't possibly contain the pipeline.
         if type(self.transformation) == method.models.Method:
-            contains_pipeline = False;
+            contains_pipeline = False
 
         # Base case 2: this step's transformation exactly equals the pipeline specified
         elif self.transformation == pipeline:
-            contains_pipeline = True;
+            contains_pipeline = True
 
         # Recursive case: go through all of the target pipeline steps and check if
         # any substeps exactly equal the transformation: if it does, we have circular pipeline references
         else:
-            transf_steps = self.transformation.steps.all();
+            transf_steps = self.transformation.steps.all()
             for step in transf_steps:
-                step_contains_pipeline = step.recursive_pipeline_check(pipeline);
+                step_contains_pipeline = step.recursive_pipeline_check(pipeline)
                 if step_contains_pipeline:
-                    contains_pipeline = True;
-        return contains_pipeline;
+                    contains_pipeline = True
+        return contains_pipeline
 
     def clean(self):
         """
@@ -275,7 +274,7 @@ class PipelineStep(models.Model):
         # the specified pipeline at all.
         if self.recursive_pipeline_check(self.pipeline):
             raise ValidationError("Step {} contains the parent pipeline".
-                                  format(self.step_num));
+                                  format(self.step_num))
 
         # Check for multiple cabling to any of the step's inputs.
         for transformation_input in self.transformation.inputs.all():
@@ -301,7 +300,7 @@ class PipelineStep(models.Model):
             if not self.transformation.outputs.filter(pk=otd.pk).exists():
                 raise ValidationError(
                     "Transformation at step {} does not have output \"{}\"".
-                    format(self.step_num, otd));
+                    format(self.step_num, otd))
 
     def complete_clean(self):
         """Executed after the step's wiring has been fully defined, and
@@ -401,24 +400,15 @@ def run_cable_h(cable, source, output_path):
     """
     logger = cable.logger
 
-    wires = ""
-    if (type(cable).__name__ == "PipelineOutputCable"):
-        wires = cable.custom_outwires.all()
-    else:
+    if cable.is_incable:
         wires = cable.custom_wires.all()
+    else:
+        wires = cable.custom_outwires.all()
 
-    if type(source) == str and cable.is_trivial():
-        logger.debug("Cable source is a file path")
+    if cable.is_trivial():
         logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
-        os.link(source, output_path)
-        return
+        return os.link(source, output_path)
 
-    if type(source) == archive.models.Dataset and cable.is_trivial():
-        logger.debug("Cable source is a dataset object")
-        logger.debug("Trivial cable: writing dataset to the file system")
-        shutil.copyfile(source.dataset_file.name, output_path)
-        return
-        
     # Make a dict encapsulating the mapping required: keyed by the output column name, with value
     # being the input column name.
     source_of = {}
@@ -435,12 +425,8 @@ def run_cable_h(cable, source, output_path):
     # Construct a list with the column names in the appropriate order.
     output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
-    try:
-        if type(source) == archive.models.Dataset:
-            infile = source.dataset_file
-            infile.open()
-        elif type(source) == str:
-            infile = open(source, "rb")
+    with open(source, "rb") as infile:
+        infile = open(source, "rb")
 
         input_csv = csv.DictReader(infile)
 
@@ -458,9 +444,6 @@ def run_cable_h(cable, source, output_path):
 
                 output_csv.writerow(dest_row)
 
-    finally:
-        infile.close()
-
 class PipelineStepInputCable(models.Model):
     """
     Represents the "cables" feeding into the transformation of a
@@ -472,29 +455,23 @@ class PipelineStepInputCable(models.Model):
     Related to :model:`pipeline.models.PipelineStep`
     """
     # The step (Which has a transformation) where we define incoming cabling
-    pipelinestep = models.ForeignKey(
-        PipelineStep,
-        related_name = "cables_in");
+    pipelinestep = models.ForeignKey(PipelineStep, related_name = "cables_in")
     
     # Input hole (TransformationInput) of the transformation
     # at this step to which the cable leads
-    dest = models.ForeignKey(
-        "transformation.TransformationInput",
-        help_text="Wiring destination input hole");
+    dest = models.ForeignKey("transformation.TransformationInput",
+                             help_text="Wiring destination input hole")
     
     # (source_step, source) unambiguously defines
     # the source of the cable.  source_step can't refer to a PipelineStep
     # as it might also refer to the pipeline's inputs (i.e. step 0).
-    source_step = models.PositiveIntegerField("Step providing the input source",
-                                              help_text="Cabling source step");
+    source_step = models.PositiveIntegerField("Step providing the input source", help_text="Cabling source step")
 
-    content_type = models.ForeignKey(
-            ContentType,
-            limit_choices_to = {"model__in": ("TransformationOutput",
-                                              "TransformationInput")});
-    object_id = models.PositiveIntegerField();
+    content_type = models.ForeignKey(ContentType,
+                                     limit_choices_to = {"model__in": ("TransformationOutput", "TransformationInput")})
+    object_id = models.PositiveIntegerField()
     # Wiring source output hole.
-    source = generic.GenericForeignKey("content_type", "object_id");
+    source = generic.GenericForeignKey("content_type", "object_id")
 
     custom_wires = generic.GenericRelation("CustomCableWire")
 
@@ -529,8 +506,22 @@ class PipelineStepInputCable(models.Model):
             step_str = unicode(self.pipelinestep)
         if self.is_raw():
             is_raw_str = "(raw)"
-        return "{}:{}{}".format(step_str, self.dest.dataset_name, is_raw_str);
+        return "{}:{}{}".format(step_str, self.dest.dataset_name, is_raw_str)
 
+    @property
+    def is_incable(self):
+        """Is this an input cable, as opposed to an output cable?"""
+        return True
+
+    @property
+    def min_rows_out(self):
+        """Minimum number of rows this cable can output."""
+        return self.dest.get_min_row()
+
+    @property
+    def max_rows_out(self):
+        """Maximum number of rows this cable can output."""
+        return self.dest.get_max_row()
     
     def clean(self):
         """
@@ -557,32 +548,32 @@ class PipelineStepInputCable(models.Model):
                 "Cable \"{}\" has mismatched source (\"{}\") and destination (\"{}\")".
                 format(self, self.source, self.dest))
 
-        # input_requested = self.source;
-        # requested_from = self.source_step;
-        # feed_to_input = self.dest;
+        # input_requested = self.source
+        # requested_from = self.source_step
+        # feed_to_input = self.dest
         # step_trans = self.pipelinestep.transformation
 
         # Does the source come from a step prior to this one?
         if self.source_step >= self.pipelinestep.step_num:
             raise ValidationError(
                 "Step {} requests input from a later step".
-                format(self.pipelinestep.step_num));
+                format(self.pipelinestep.step_num))
 
         # Does the specified input defined for this transformation exist?
         if not self.pipelinestep.transformation.inputs.filter(
                 pk=self.dest.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not have input \"{}\"".
-                format(self.pipelinestep.step_num, unicode(self.dest)));
+                format(self.pipelinestep.step_num, unicode(self.dest)))
 
         # Check that the source is available.
         if self.source_step == 0:
             # Look for the desired input among the Pipeline inputs.
-            pipeline_inputs = self.pipelinestep.pipeline.inputs.all();
+            pipeline_inputs = self.pipelinestep.pipeline.inputs.all()
             if self.source not in pipeline_inputs:
                 raise ValidationError(
                     "Pipeline does not have input \"{}\"".
-                    format(unicode(self.source)));
+                    format(unicode(self.source)))
 
         # If not from step 0, input derives from the output of a pipeline step
         else:
@@ -818,11 +809,9 @@ class PipelineStepInputCable(models.Model):
         # We know they aren't trivial at this point, so check wiring.
         for wire in self.custom_wires.all():
             # Get the corresponding wire in other_cable.
-            corresp_wire = other_cable.custom_wires.get(
-                dest_pin=wire.dest_pin)
+            corresp_wire = other_cable.custom_wires.get(dest_pin=wire.dest_pin)
 
-            if (wire.source_pin.column_idx !=
-                    corresp_wire.source_pin.column_idx):
+            if (wire.source_pin.column_idx != corresp_wire.source_pin.column_idx):
                 return False
 
         # By the fact that self and other_cable are clean, we know
@@ -842,8 +831,9 @@ class PipelineStepInputCable(models.Model):
         cable_record    RSIC/ROC for this step.
         curr_log        ExecLog to fill in for execution
         """
-        # Create a new log with the current start_time and a null end_time
-        self.logger.debug("Creating ExecLog and calling run_cable_h(source='{}', output_path='{}'".format(source,output_path))
+        # Set the ExecLog's start time.
+        self.logger.debug("Filling in ExecLog and calling run_cable_h(source='{}', output_path='{}'"
+                          .format(source,output_path))
         curr_log.start_time = timezone.now()
         curr_log.save()
 
@@ -866,8 +856,8 @@ class CustomCableWire(models.Model):
     """
     content_type = models.ForeignKey(
         ContentType,
-        limit_choices_to = {"model__in": ("PipelineOutputCable", "PipelineStepInputCable")});
-    object_id = models.PositiveIntegerField();
+        limit_choices_to = {"model__in": ("PipelineOutputCable", "PipelineStepInputCable")})
+    object_id = models.PositiveIntegerField()
     cable = generic.GenericForeignKey("content_type", "object_id")
 
     # CDT member on the source output hole
@@ -951,41 +941,26 @@ class PipelineOutputCable(models.Model):
     Related to :model:`pipeline.models.Pipeline`
     Related to :model:`transformation.models.TransformationOutput`
     """
-    pipeline = models.ForeignKey(
-        Pipeline,
-        related_name="outcables")
+    pipeline = models.ForeignKey(Pipeline, related_name="outcables")
 
-    output_name = models.CharField(
-        "Output hole name",
-        max_length=128,
-        help_text="Pipeline output hole name")
+    output_name = models.CharField("Output hole name", max_length=128, help_text="Pipeline output hole name")
 
     # We need to specify both the output name and the output index because
     # we are defining the outputs of the Pipeline indirectly through
     # this wiring information - name/index mapping is stored...?
-    output_idx = models.PositiveIntegerField(
-        "Output hole index",
-        validators=[MinValueValidator(1)],
-        help_text="Pipeline output hole index")
+    output_idx = models.PositiveIntegerField("Output hole index", validators=[MinValueValidator(1)],
+                                             help_text="Pipeline output hole index")
 
     # If null, the source must be raw
-    output_cdt = models.ForeignKey(
-        "metadata.CompoundDatatype",
-        blank=True,
-        null=True,
-        related_name="cables_leading_to")
+    output_cdt = models.ForeignKey("metadata.CompoundDatatype", blank=True, null=True, related_name="cables_leading_to")
 
     # source_step refers to an actual step of the pipeline and
     # source actually refers to one of the outputs at that step.
     # This is enforced via clean()s.
-    source_step = models.PositiveIntegerField(
-        "Source pipeline step number",
-        validators=[MinValueValidator(1)],
-        help_text="Source step at which output comes from")
+    source_step = models.PositiveIntegerField("Source pipeline step number", validators=[MinValueValidator(1)],
+                                              help_text="Source step at which output comes from")
 
-    source = models.ForeignKey(
-        "transformation.TransformationOutput",
-        help_text="Source output hole")
+    source = models.ForeignKey("transformation.TransformationOutput", help_text="Source output hole")
 
     custom_outwires = generic.GenericRelation("CustomCableWire")
     
@@ -1003,14 +978,34 @@ class PipelineOutputCable(models.Model):
     def __unicode__(self):
         """ Represent with the pipeline name, and TO output index + name """
 
-        pipeline_name = "[no pipeline set]";
+        pipeline_name = "[no pipeline set]"
         if self.pipeline != None:
-            pipeline_name = unicode(self.pipeline);
+            pipeline_name = unicode(self.pipeline)
 
         return "POC feeding Output_idx [{}], Output_name [{}] for pipeline [{}]".format(
                 self.output_idx,
                 self.output_name,
                 pipeline_name)
+
+    @property
+    def is_incable(self):
+        """Is this an input cable, as opposed to an output cable?"""
+        return False
+
+    @property
+    def dest(self):
+        """Where does this cable go?"""
+        return self.pipeline.outputs.get(dataset_name=self.output_name)
+
+    @property
+    def min_rows_out(self):
+        """Minimum number of rows this cable can output."""
+        return self.source.get_min_row()
+
+    @property
+    def max_rows_out(self):
+        """Maximum number of rows this cable can output."""
+        return self.source.get_max_row()
 
     def clean(self):
         """
@@ -1024,15 +1019,15 @@ class PipelineOutputCable(models.Model):
         # Step number must be valid for this pipeline
         if self.source_step > self.pipeline.steps.all().count():
             raise ValidationError(
-                "Output requested from a non-existent step");
+                "Output requested from a non-existent step")
         
-        source_ps = self.pipeline.steps.get(step_num=self.source_step);
+        source_ps = self.pipeline.steps.get(step_num=self.source_step)
 
         # Try to find a matching output hole
         if not source_ps.transformation.outputs.filter(pk=self.source.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not produce output \"{}\"".
-                format(self.source_step, self.source));
+                format(self.source_step, self.source))
 
         outwires = self.custom_outwires.all()
 

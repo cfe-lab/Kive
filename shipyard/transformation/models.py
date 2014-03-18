@@ -241,17 +241,11 @@ class TransformationXput(models.Model):
 
     def get_min_row(self):
         """Accessor that returns min_row for this xput (and None if it is raw)."""
-        my_min_row = None
-        if not self.is_raw():
-            my_min_row = self.structure.all()[0].min_row
-        return my_min_row
+        return (None if self.is_raw() else self.structure.first().min_row)
 
     def get_max_row(self):
         """Accessor that returns max_row for this xput (and None if it is raw)."""
-        my_max_row = None
-        if not self.is_raw():
-            my_max_row = self.structure.all()[0].max_row
-        return my_max_row
+        return (None if self.is_raw() else self.structure.first().max_row)
 
 class XputStructure(models.Model):
     """

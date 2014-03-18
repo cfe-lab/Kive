@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 import hashlib
 import logging
@@ -218,6 +219,22 @@ class RunAtomic(stopwatch.models.Stopwatch):
     def has_data(self):
         """
         Returns whether or not this instance has an associated Dataset.
+
+        This is abstract and must be overridden.
+        """
+        pass
+
+    @property
+    def component(self):
+        """Pipeline component represented by this RunAtomic.
+
+        This is abstract and must be overridden.
+        """
+        pass
+
+    @property
+    def parent_run(self):
+        """Run of which this RunAtomic is part.
 
         This is abstract and must be overridden.
         """
@@ -479,6 +496,14 @@ class RunStep(RunAtomic):
     def __unicode__(self):
         unicode_rep = u"Runstep with PS [{}]".format(self.pipelinestep)
         return unicode_rep
+
+    @property
+    def component(self):
+        return self.pipelinestep
+
+    @property
+    def parent_run(self):
+        return self.run
 
     def has_subrun(self):
         """
@@ -898,6 +923,23 @@ class RunCable(RunAtomic):
     class Meta:
         abstract = True
 
+    @classmethod
+    def create(cls, cable, parent):
+        """Create a RunCable from a Pipeline*Cable.
+        
+        INPUTS
+        cable       a PipelineStepInputCable or PipelineOutputCable
+        parent      the parent RunStep (for an incable) or Run (for an
+                    outcable) for the new RunCable
+        """
+        if cable.is_incable:
+            runcable = RunSIC(start_time=timezone.now(), PSIC=cable, runstep=parent)
+        else:
+            runcable = RunOutputCable(start_time=timezone.now(), pipelineoutputcable=cable, run=parent)
+        runcable.clean()
+        runcable.save()
+        return runcable
+
     def has_data(self):
         """True if associated output exists; False if not."""
         return self.output.all().exists()
@@ -1181,6 +1223,14 @@ class RunSIC(RunCable):
         """
         return self.PSIC
 
+    @property
+    def component(self):
+        return self.PSIC
+
+    @property
+    def parent_run(self):
+        return self.runstep.run
+
     def keeps_output(self):
         """
         True if the underlying PSIC retains its output; False otherwise.
@@ -1268,6 +1318,14 @@ class RunOutputCable(RunCable):
         Retrieves the POC of this RunOutputCable.
         """
         return self.pipelineoutputcable
+
+    @property
+    def component(self):
+        return self.pipelineoutputcable
+
+    @property
+    def parent_run(self):
+        return self.run
 
     def keeps_output(self):
         """
@@ -1461,6 +1519,13 @@ class ExecLog(stopwatch.models.Stopwatch):
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def create(cls, record, invoking_record):
+        execlog = cls(record=record, invoking_record=invoking_record)
+        execlog.clean()
+        execlog.save()
+        return execlog
 
     def clean(self):
         """
