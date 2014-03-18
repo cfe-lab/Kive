@@ -40,13 +40,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             var sr_origin = '//' + host;
             var origin = protocol + sr_origin;
             // Allow absolute or scheme relative URLs to same origin
-            return (url == origin || url.slice(0, origin.length + 1) == origin + '/') ||
-                (url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/') ||
+            return url == origin || url.slice(0, origin.length + 1) == origin + '/' ||
+                url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/' ||
                 // or any other URL that isn't scheme relative or absolute i.e relative.
                 !(/^(\/\/|http:|https:).*/.test(url));
         }
         function safeMethod(method) {
-            return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+            return [ 'GET', 'HEAD', 'OPTIONS', 'TRACE' ].indexOf(method) > -1;
         }
 
         if (!safeMethod(settings.type) && sameOrigin(settings.url)) {
@@ -55,9 +55,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // update method drop-down
-    $("[id^='id_select_method_family']").on('change',
+//    $("[id^='id_select_method_family']").on('change', // Are these still being generated dynamically in quantity? —JN
+    $("#id_select_method_family").on('change',
         function() {
-            mf_id = $(this).val();
+            mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
             if (mf_id != "") {
                 $.ajax({
                     type: "POST",
@@ -105,36 +106,37 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var choice = $('#id_select_cdt option:selected');
         var cdt = choice.val(); // primary key
         var node_label = choice.text();
-        canvasState.addShape(new CDT_Node(x = 100,
-            y = 200+50*Math.random(),
+        canvasState.addShape(new CDT_Node(
+            x = 100,
+            y = 200 + 50 * Math.random(),
             r = 20,
             fill = '#33FF33',
             inset = 10,
             offset = 30,
             pk = cdt,
-            label = node_label));
+            label = node_label
+        ));
     });
 
     $('#id_method_button').on('click', function() {
         var selected = $('#id_select_method option:selected');
-        if (selected.val() != "") {
-            var mid = selected.val();
+        var mid = selected.val();
+
+        if (mid != "") {
             var n_inputs = null;
             var n_outputs = null;
             var node_label = selected.text();
-            if (mid != '') {
-                $.ajax({
-                    type: "POST",
-                    url: "get_method_io/",
-                    data: {mid: mid}, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        inputs = result['inputs'];
-                        outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(200, 200 + 50*Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
-                    }
-                });
-            }
+            $.ajax({
+                type: "POST",
+                url: "get_method_io/",
+                data: {mid: mid}, // specify data as an object
+                datatype: "json", // type of data expected back from server
+                success: function(result) {
+                    inputs = result['inputs'];
+                    outputs = result['outputs'];
+                    canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
+                }
+            });
         }
     });
 
@@ -145,7 +147,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         canvasState.connectors = [];
     });
 
-    $('id_delete_button').on('click', function() {
+    $('#id_delete_button').on('click', function() {
         // remove selected object from canvas
         // TODO: trigger this event with backspace key also
         canvasState.deleteObject();
@@ -171,7 +173,7 @@ function CDT_Node (x, y, r, fill, inset, offset, pk, label) {
 
     // CDT node always has one magnet
     var magnet = new Magnet(this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
-    this.out_magnets = [magnet];
+    this.out_magnets = [ magnet ];
 }
 
 CDT_Node.prototype.draw = function(ctx) {
@@ -186,11 +188,11 @@ CDT_Node.prototype.draw = function(ctx) {
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y+this.offset);
+    ctx.fillText(this.label, this.x, this.y + this.offset);
 
     // draw magnet
     out_magnet = this.out_magnets[0];
-    out_magnet.draw(ctx, this.x+this.inset, this.y);
+    out_magnet.draw(ctx, this.x + this.inset, this.y);
 };
 
 CDT_Node.prototype.contains = function(mx, my) {
@@ -199,8 +201,7 @@ CDT_Node.prototype.contains = function(mx, my) {
     // to radius
     var dx = this.x - mx;
     var dy = this.y - my;
-    var hypo = Math.sqrt((dx * dx) + (dy * dy));
-    return (hypo <= this.r);
+    return Math.sqrt(dx*dx + dy*dy) <= this.r;
 };
 
 
@@ -233,8 +234,9 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
     this.in_magnets = [];
     for (var key in this.inputs) {
         var this_input = this.inputs[key];
-        var magnet = new Magnet(x = this.x + this.inset,
-            y = this.y + this.spacing * (this.in_magnets.length+0.5),
+        var magnet = new Magnet(
+            x = this.x + this.inset,
+            y = this.y + this.spacing * (this.in_magnets.length + .5),
             r = 5,
             attract = 2,
             fill = '#FFFFFF',
@@ -247,8 +249,9 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
     this.out_magnets = [];
     for (key in this.outputs) {
         var this_output = this.outputs[key];
-        magnet = new Magnet(x = this.x + this.w - this.inset,
-            y = this.y + this.spacing * (this.out_magnets.length+0.5),
+        magnet = new Magnet(
+            x = this.x + this.w - this.inset,
+            y = this.y + this.spacing * (this.out_magnets.length + .5),
             r = 5,
             attract = 2,
             fill = '#FFFFFF',
@@ -267,22 +270,22 @@ MethodNode.prototype.draw = function(ctx) {
     // draw magnets
     for (var i = 0; i < this.in_magnets.length; i++) {
         magnet = this.in_magnets[i];
-        magnet.draw(ctx, this.x + this.inset, this.y + this.spacing * (i+0.5));
+        magnet.draw(ctx, this.x + this.inset, this.y + this.spacing * (i + .5));
     }
     for (i = 0; i < this.out_magnets.length; i++) {
         magnet = this.out_magnets[i];
-        magnet.draw(ctx, this.x + this.w - this.inset, this.y + this.spacing * (i+0.5));
+        magnet.draw(ctx, this.x + this.w - this.inset, this.y + this.spacing * (i + .5));
     }
 
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w / 2, this.y+this.h+this.offset);
+    ctx.fillText(this.label, this.x + this.w / 2, this.y + this.h + this.offset);
 };
 
 MethodNode.prototype.contains = function(mx, my) {
-    return (this.x <= mx) && (this.x + this.w >= mx) && (this.y <= my) && (this.y + this.h >= my);
+    return this.x <= mx && this.x + this.w >= mx && this.y <= my && this.y + this.h >= my;
 };
 
 
@@ -314,9 +317,7 @@ Magnet.prototype.draw = function(ctx, x, y) {
 Magnet.prototype.contains = function(mx, my) {
     var dx = this.x - mx;
     var dy = this.y - my;
-    var hypo = Math.sqrt((dx * dx) + (dy * dy));
-    var result = (hypo <= (this.r + this.attract));
-    return (result);
+    return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
 };
 
 
@@ -427,7 +428,7 @@ function CanvasState (canvas) {
     var myState = this; // save reference to this particular CanvasState
 
     // de-activate double-click selection of text on page
-    canvas.addEventListener('selectstart', function(e) {e.preventDefault(); return false; }, false);
+    canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
 
     canvas.addEventListener('mousedown', function(e) {
         myState.doDown(e); // listener registered on mousedown event
@@ -527,10 +528,10 @@ CanvasState.prototype.doMove = function(e) {
             this.valid = false; // redraw
 
             // are we carrying a connector?
-            if (this.selection.fromX != undefined) {
+            if (typeof this.selection.fromX != 'undefined') {
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
-                    if (shape.in_magnets == undefined) {
+                    if (typeof shape.in_magnets == 'undefined') {
                         // ignore Connectors
                         continue;
                     }
@@ -539,7 +540,7 @@ CanvasState.prototype.doMove = function(e) {
                         var in_magnet = in_magnets[j];
 
                         var connector_carrying_cdt;
-                        if (this.selection.out_magnet == null) {
+                        if (this.selection.out_magnet === null) {
                             connector_carrying_cdt = '__raw__';
                         } else {
                             connector_carrying_cdt = this.selection.out_magnet.cdt;
@@ -559,7 +560,7 @@ CanvasState.prototype.doMove = function(e) {
                 }
             } else {
                 // carrying a shape
-                if (mouse.x < 0.1*this.width || mouse.x > 0.9*this.width) {
+                if (mouse.x < 0.1 * this.width || mouse.x > 0.9 * this.width) {
                     // prevent shapes from being carried into end-zones
                     return;
                 }
@@ -577,11 +578,11 @@ CanvasState.prototype.doUp = function(e) {
     if (l == 0) {
         return; // no Connectors!
     }
-    connector = this.connectors[l-1];
-    if (connector.in_magnet == null) {
+    connector = this.connectors[ l-1 ];
+    if (connector.in_magnet === null) {
         // has connector been carried into output end-zone?
         var mouse = this.getPos(e);
-        if (mouse.x < 0.9 * this.canvas.width || connector.out_magnet == undefined) {
+        if (mouse.x < 0.9 * this.canvas.width || typeof connector.out_magnet == 'undefined') {
             // not connected, delete Connector
             this.connectors.pop();
             this.valid = false; // redraw canvas to remove this Connector
@@ -592,7 +593,7 @@ CanvasState.prototype.doUp = function(e) {
     var shapes = this.shapes;
     for (var i = 0; i < shapes.length; i++) {
         var shape = shapes[i];
-        if (shape.in_magnets != undefined) {
+        if (typeof shape.in_magnets != 'undefined') {
             var in_magnets = shape.in_magnets;
             for (var j = 0; j < in_magnets.length; j++) {
                 var in_magnet = in_magnets[j];
@@ -639,7 +640,7 @@ CanvasState.prototype.draw = function() {
         for (var i = 0; i < l; i++) {
             var shape = shapes[i];
             // skip shapes moved off the screen
-            if (shape.x > this.width || shape.y > this.height || shape.x + 2*shape.r < 0 || shape.y + 2*shape.r < 0) {
+            if (shape.x > this.width || shape.y > this.height || shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
                 continue;
             }
             shapes[i].draw(ctx);
@@ -656,17 +657,15 @@ CanvasState.prototype.draw = function() {
             ctx.strokeStyle = this.selectionColor;
             ctx.lineWidth = this.selectionWidth;
             var mySel = this.selection;
-            if (mySel.r == undefined) {
-                ctx.beginPath();
+            
+            ctx.beginPath();
+            if (typeof mySel.r == 'undefined') {
                 ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
-                ctx.closePath();
-                ctx.stroke();
             } else {
-                ctx.beginPath();
                 ctx.arc(mySel.x, mySel.y, mySel.r, 0, 2*Math.PI, false);
-                ctx.closePath();
-                ctx.stroke();
             }
+            ctx.closePath();
+            ctx.stroke();
         }
 
         this.valid = true;
@@ -677,11 +676,11 @@ CanvasState.prototype.getPos = function(e) {
     // returns a JavaScript object with x, y coordinates defined
     var element = this.canvas, offsetX = 0, offsetY = 0, mx, my;
 
-    if (element.offsetParent !== undefined) {
+    if (typeof element.offsetParent !== 'undefined') {
         do {
             offsetX += element.offsetLeft;
             offsetY += element.offsetTop;
-        } while ((element = element.offsetParent));
+        } while (element = element.offsetParent);
     }
 
     offsetX += this.stylePaddingLeft + this.styleBorderLeft + this.htmlLeft;
@@ -690,13 +689,13 @@ CanvasState.prototype.getPos = function(e) {
     mx = e.pageX - offsetX;
     my = e.pageY - offsetY;
 
-    return {x: mx, y: my};
+    return { x: mx, y: my };
 };
 
 CanvasState.prototype.deleteObject = function() {
     // delete selected object
     var mySel = this.selection;
-    if (mySel != null) {
+    if (mySel !== null) {
         if (mySel.isPrototypeOf(Connector)) {
             // remove selected Connector from list
 
