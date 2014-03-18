@@ -45,7 +45,15 @@ def return_crv_forms(request, exceptions, is_new):
     and form validation errors to be returned as HttpResponse.
     """
     query = request.POST.dict()
-    crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
+    if is_new:
+        # creating a new CodeResource
+        crv_form = CodeResourcePrototypeForm(initial={'resource_name': query['resource_name'],
+                                                      'resource_desc': query['resource_desc'],
+                                                      'revision_name': query['revision_name'],
+                                                      'revision_desc': query['revision_desc']})
+    else:
+        # revising a code resource
+        crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
                                                  'revision_desc': query['revision_desc']})
 
     # FIXME: returns ErrorList of unicode strings, e.g., [u'This field cannot be blank']

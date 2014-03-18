@@ -586,6 +586,8 @@ CanvasState.prototype.doUp = function(e) {
             this.connectors.pop();
             this.valid = false; // redraw canvas to remove this Connector
         }
+    } else if (connector.in_magnet.parent()) {
+
     }
 
     // turn off all in-magnets
