@@ -172,7 +172,7 @@ function CDT_Node (x, y, r, fill, inset, offset, pk, label) {
     this.in_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    var magnet = new Magnet(this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
+    var magnet = new Magnet(this, this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
     this.out_magnets = [ magnet ];
 }
 
@@ -235,6 +235,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
     for (var key in this.inputs) {
         var this_input = this.inputs[key];
         var magnet = new Magnet(
+            parent = this,
             x = this.x + this.inset,
             y = this.y + this.spacing * (this.in_magnets.length + .5),
             r = 5,
@@ -250,6 +251,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
     for (key in this.outputs) {
         var this_output = this.outputs[key];
         magnet = new Magnet(
+            parent = this,
             x = this.x + this.w - this.inset,
             y = this.y + this.spacing * (this.out_magnets.length + .5),
             r = 5,
@@ -289,12 +291,13 @@ MethodNode.prototype.contains = function(mx, my) {
 };
 
 
-function Magnet (x, y, r, attract, fill, cdt, label) {
+function Magnet (parent, x, y, r, attract, fill, cdt, label) {
     /*
     CONSTRUCTOR
     A Magnet is the attachment point for a Node (shape) given a
     Connector.  It is always contained within a shape.
      */
+    this.parent = parent;
     this.x = x;
     this.y = y;
     this.r = r; // radius
@@ -367,7 +370,7 @@ Connector.prototype.draw = function(ctx) {
         ctx.moveTo(this.out_magnet.x, this.out_magnet.y);
     }
 
-    if (this.in_magnet == null) {
+    if (this.in_magnet == null || this.in_magnet == '__output__') {
         // being drawn with no attachment
         ctx.lineTo(this.x, this.y);
     } else {
@@ -523,14 +526,25 @@ CanvasState.prototype.doMove = function(e) {
         // are we carrying a shape or Connector?
         if (this.selection != null) {
 
+            // update coordinates of this shape/connector
             this.selection.x = mouse.x - this.dragoffx;
             this.selection.y = mouse.y - this.dragoffy;
             this.valid = false; // redraw
 
             // are we carrying a connector?
             if (typeof this.selection.fromX != 'undefined') {
+                // get this connector's shape
+                var own_shape = null;
+                if (this.selection.out_magnet !== null) {
+                    own_shape = this.selection.out_magnet.parent;
+                }
+
+                // check if connector has been dragged to an in-magnet
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
+                    if (own_shape !== null && shape == own_shape) {
+                        continue;
+                    }
                     if (typeof shape.in_magnets == 'undefined') {
                         // ignore Connectors
                         continue;
@@ -565,9 +579,8 @@ CanvasState.prototype.doMove = function(e) {
                     return;
                 }
             }
-
-
         }
+        // TODO: else dragging on canvas - we could implement block selection here
     }
 };
 
@@ -578,17 +591,31 @@ CanvasState.prototype.doUp = function(e) {
     if (l == 0) {
         return; // no Connectors!
     }
-    connector = this.connectors[ l-1 ];
+    connector = this.connectors[ l-1 ]; // last object
+
     if (connector.in_magnet === null) {
         // has connector been carried into output end-zone?
         var mouse = this.getPos(e);
-        if (mouse.x < 0.9 * this.canvas.width || typeof connector.out_magnet == 'undefined') {
-            // not connected, delete Connector
-            this.connectors.pop();
-            this.valid = false; // redraw canvas to remove this Connector
-        }
-    } else if (connector.in_magnet.parent()) {
 
+        if (mouse.x > 0.9 * this.canvas.width) {
+            // Connector drawn into output end-zone
+            if (connector.out_magnet == null || connector.out_magnet.parent.constructor == CDT_Node) {
+                // disallow Connectors directly between end-zones, or from CDT node to end-zone
+                this.connectors.pop();
+                this.valid = false;
+            } else {
+                // valid Connector, assign non-null value
+                connector.in_magnet = '__output__';
+                connector.x = mouse.x;
+                connector.y = mouse.y;
+            }
+        } else {
+            if (connector.in_magnet == null) {
+                // not connected, delete Connector
+                this.connectors.pop();
+                this.valid = false; // redraw canvas to remove this Connector
+            }
+        }
     }
 
     // turn off all in-magnets
