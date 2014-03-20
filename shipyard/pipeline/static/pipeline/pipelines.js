@@ -305,6 +305,7 @@ function Magnet (parent, x, y, r, attract, fill, cdt, label) {
     this.fill = fill || "#FFFFFF";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
+    this.connected = null; // linked to a Connector
 }
 
 Magnet.prototype.draw = function(ctx, x, y) {
@@ -363,31 +364,54 @@ Connector.prototype.draw = function(ctx) {
     ctx.strokeStyle = '#AAAAAA';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
-    if (this.out_magnet == null) {
-        ctx.moveTo(this.fromX, this.fromY);
-    } else {
-        // attachment to out-magnet of a shape that may have moved
-        ctx.moveTo(this.out_magnet.x, this.out_magnet.y);
+
+    if (this.out_magnet !== null) {
+        // update coordinates in case magnet has moved
+        this.fromX = this.out_magnet.x;
+        this.fromY = this.out_magnet.y;
     }
 
-    if (this.in_magnet == null || this.in_magnet == '__output__') {
-        // being drawn with no attachment
-        ctx.lineTo(this.x, this.y);
-    } else {
+    if (this.in_magnet !== null && this.in_magnet !== '__output__') {
         // attachment to in-magnet of a shape that may have moved
-        ctx.lineTo(this.in_magnet.x, this.in_magnet.y);
+        this.x = this.in_magnet.x;
+        this.y = this.in_magnet.y;
     }
+
+    ctx.moveTo(this.fromX, this.fromY);
+    ctx.lineTo(this.x, this.y);
 
     ctx.stroke();
 };
 
-Connector.prototype.contains = function(mx, my) {
+Connector.prototype.contains = function(mx, my, pad) {
     /*
-    Determine if mouse coordinates are on or close to this
-    connector.
+    Determine if mouse coordinates (x,y) are on or close to this
+    connector with coordinates (x1,y1) and (x2,y2).
+    This is based on three criteria:
+    (1) x1 < x < x2
+    (2) y1 < y < y2
+    (3) the distance of x,y to the line is below cutoff,
+        see http://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
      */
-
-}
+    return (
+        ((this.x < mx) !== (this.fromX < mx))
+        &&
+        ((this.y < my) !== (this.fromY < my))
+        &&
+        (Math.abs(
+                (
+                    (this.y-this.fromY)*mx
+                    - (this.x-this.fromX)*my
+                    + this.x*this.fromY
+                    - this.y*this.fromX
+                ) / Math.sqrt(
+                            (this.x-this.fromX)*(this.x-this.fromX) +
+                            (this.y-this.fromY)*(this.y-this.fromY)
+                    )
+            ) < pad
+        )
+    )
+};
 
 
 function CanvasState (canvas) {
@@ -474,8 +498,19 @@ CanvasState.prototype.doDown = function(e) {
         return;
     }
 
-    var l = shapes.length;
+    // did we click on a Connector?
+    var l = connectors.length;
     for (var i = l-1; i >= 0; i--) {
+        if (connectors[i].contains(mx, my, 5)) {
+            this.selection = connectors[i];
+            this.valid = false; // highlight but no drag
+            return;
+        }
+    }
+
+    // did we click on a shape?
+    l = shapes.length;
+    for (i = l-1; i >= 0; i--) {
         // check shapes in reverse order
         if (shapes[i].contains(mx, my)) {
             var mySel = shapes[i];
@@ -483,9 +518,10 @@ CanvasState.prototype.doDown = function(e) {
             out_magnets = mySel.out_magnets;
             for (var j = 0; j < out_magnets.length; j++) {
                 out_magnet = out_magnets[j];
-                if (out_magnet.contains(mx, my)) {
+                if (out_magnet.contains(mx, my) && out_magnet.connected == null) {
                     // create Connector from this out-magnet
                     conn = new Connector(null, null, out_magnet);
+                    out_magnet.connected = conn;
                     connectors.push(conn);
                     this.selection = conn;
                     this.dragoffx = mx - conn.fromX;
@@ -552,7 +588,6 @@ CanvasState.prototype.doMove = function(e) {
                     var in_magnets = shape.in_magnets;
                     for (var j = 0; j < in_magnets.length; j++) {
                         var in_magnet = in_magnets[j];
-
                         var connector_carrying_cdt;
                         if (this.selection.out_magnet === null) {
                             connector_carrying_cdt = '__raw__';
@@ -563,11 +598,12 @@ CanvasState.prototype.doMove = function(e) {
                         if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = 'yellow';
-                            if (in_magnet.contains(this.selection.x, this.selection.y)) {
+                            if (in_magnet.connected == null && in_magnet.contains(this.selection.x, this.selection.y)) {
                                 // jump to magnet
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
                                 this.selection.in_magnet = in_magnet;
+                                in_magnet.connected = this.selection;
                             }
                         }
                     }
@@ -601,7 +637,12 @@ CanvasState.prototype.doUp = function(e) {
             // Connector drawn into output end-zone
             if (connector.out_magnet == null || connector.out_magnet.parent.constructor == CDT_Node) {
                 // disallow Connectors directly between end-zones, or from CDT node to end-zone
+                if (connector.out_magnet !== null) {
+                    // free up this magnet
+                    connector.out_magnet.connected = null;
+                }
                 this.connectors.pop();
+                this.selection = null;
                 this.valid = false;
             } else {
                 // valid Connector, assign non-null value
@@ -612,7 +653,12 @@ CanvasState.prototype.doUp = function(e) {
         } else {
             if (connector.in_magnet == null) {
                 // not connected, delete Connector
+                if (connector.out_magnet !== null) {
+                    // free up out-magnet
+                    connector.out_magnet.connected = null;
+                }
                 this.connectors.pop();
+                this.selection = null;
                 this.valid = false; // redraw canvas to remove this Connector
             }
         }
@@ -688,10 +734,13 @@ CanvasState.prototype.draw = function() {
             var mySel = this.selection;
             
             ctx.beginPath();
-            if (typeof mySel.r == 'undefined') {
+            if (mySel.constructor == MethodNode) {
                 ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
-            } else {
+            } else if (mySel.constructor == CDT_Node) {
                 ctx.arc(mySel.x, mySel.y, mySel.r, 0, 2*Math.PI, false);
+            } else if (mySel.constructor == Connector && this.dragging == false) {
+                ctx.moveTo(mySel.x, mySel.y);
+                ctx.lineTo(mySel.fromX, mySel.fromY);
             }
             ctx.closePath();
             ctx.stroke();
@@ -725,14 +774,25 @@ CanvasState.prototype.deleteObject = function() {
     // delete selected object
     var mySel = this.selection;
     if (mySel !== null) {
-        if (mySel.isPrototypeOf(Connector)) {
+        if (mySel.constructor == Connector) {
             // remove selected Connector from list
+            mySel.in_magnet.connected = null;
+            if (mySel.out_magnet !== null) {
+                mySel.out_magnet.connected = null;
+            }
 
-        } else if (mySel.isPrototypeOf(MethodNode)) {
+            var index = this.connectors.indexOf(mySel);
+            this.connectors.splice(index, 1);
+        } else if (mySel.constructor == MethodNode) {
             // delete Connectors associated with MethodNode
-            // remove MethodNode from list
-        } else {
+            // remove MethodNode from list and any attached Connectors
 
+        } else if (mySel.constructor == CDT_Node) {
+
+        } else {
+            return;
         }
+        this.selection = null;
+        this.valid = false; // re-draw canvas to make Connector disappear
     }
 }
