@@ -8,6 +8,7 @@ from django.core.context_processors import csrf
 from method.models import MethodFamily
 from metadata.models import CompoundDatatype
 from pipeline.models import Pipeline
+import json
 
 def pipelines(request):
     """
@@ -31,6 +32,16 @@ def pipeline_add(request):
     compound_datatypes = CompoundDatatype.objects.all()
     c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
     c.update(csrf(request))
-    return HttpResponse(t.render(c))
+
+    if request.method == 'POST':
+        print request
+        query = request.POST.dict()
+        print query
+        response_data = {'foo': 'bar'}
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+    else:
+        return HttpResponse(t.render(c))
+
+
 
 
