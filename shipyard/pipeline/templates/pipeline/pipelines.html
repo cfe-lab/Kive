@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Pipelines{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<a href="dev.html">Back to developer's portal</a>
+
+<h2>Pipelines</h2>
+
+<p>
+A pipeline is the deployment of one or more Methods to process
+data.
+</p>
+
+<table>
+<thead>
+	<tr>
+    <th>Family</th>
+    <th># revisions</th>
+    <th>Name</th>
+    <th>Description</th>
+	</tr>
+</thead>
+{% for pipeline in pipelines %}
+<tr>
+	<td><a href="{{ pipeline.get_absolute_url }}">{{ pipeline.family }}</a></td>
+    <td>{{ pipeline.family_size }}</td>
+    <td>{{ pipeline.revision_name }}</td>
+	<td>{{ pipeline.revision_desc }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="pipeline_add">Add a new pipeline</a>
+
+{% endblock %}
