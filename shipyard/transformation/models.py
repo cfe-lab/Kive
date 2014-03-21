@@ -50,14 +50,10 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationOutput`
     """
 
-    revision_name = models.CharField(
-		"Transformation revision name",
-		max_length=128,
-		help_text="The name of this transformation revision")
+    revision_name = models.CharField("Transformation revision name", max_length=128,
+		                             help_text="The name of this transformation revision")
 
-    revision_DateTime = models.DateTimeField(
-		"Revision creation date",
-		auto_now_add = True)
+    revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add = True)
 
     revision_desc = models.TextField(
 		"Transformation revision description",
@@ -72,6 +68,11 @@ class Transformation(models.Model):
 
     class Meta:
         abstract = True
+
+    @property
+    def is_pipeline(self):
+        """Is this a Pipeline, as opposed to a Method?"""
+        return self.__class__.__name__ == "Pipeline"
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
@@ -284,10 +285,14 @@ class TransformationInput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    pass
+    @property
+    def is_input(self):
+        return True
 
 class TransformationOutput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    pass
+    @property
+    def is_input(self):
+        return False

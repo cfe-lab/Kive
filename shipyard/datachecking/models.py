@@ -21,16 +21,30 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
     execution of a Pipeline (i.e. a Run), on the uploading of data,
     or on a manually-specified check.
     """
-    symbolicdataset = models.ForeignKey(
-        "librarian.SymbolicDataset",
-        related_name="content_checks")
+    symbolicdataset = models.ForeignKey("librarian.SymbolicDataset", related_name="content_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey(
-        "archive.ExecLog", null=True,
-        related_name="content_checks")
+    execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
 
     # Implicit through inheritance: start_time, end_time.
+
+    def add_missing_output(self):
+        """Add a BadData for missing output."""
+        baddata = BadData(contentchecklog=self, missing_output=True)
+        baddata.clean()
+        baddata.save()
+
+    def add_bad_num_rows(self):
+        """Add a BadData for bad number of rows."""
+        baddata = BadData(contentchecklog=self, bad_num_rows=True)
+        baddata.clean()
+        baddata.save()
+
+    def add_bad_header(self):
+        """Add a BadData for bad number of rows."""
+        baddata = BadData(contentchecklog=self, bad_header=True)
+        baddata.clean()
+        baddata.save()
 
     def clean(self):
         """

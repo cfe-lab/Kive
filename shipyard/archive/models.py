@@ -240,6 +240,14 @@ class RunAtomic(stopwatch.models.Stopwatch):
         """
         pass
 
+    def make_complete(self, execrecord, reused):
+        """Make this RunAtomic complete."""
+        self.reused = reused
+        self.execrecord = execrecord
+        self.end_time = timezone.now()
+        self.save()
+        self.complete_clean()
+
     def _clean_undecided_reused(self):
         """
         Check coherence of a RunAtomic which has not decided whether or
@@ -504,6 +512,18 @@ class RunStep(RunAtomic):
     @property
     def parent_run(self):
         return self.run
+
+    @property
+    def step_num(self):
+        return self.pipelinestep.step_num
+
+    @classmethod
+    def create(cls, pipelinestep, run):
+        """Create a new RunStep from a PipelineStep."""
+        runstep = cls(pipelinestep=pipelinestep, run=run, start_time=timezone.now())
+        runstep.clean()
+        runstep.save()
+        return runstep
 
     def has_subrun(self):
         """
@@ -1405,20 +1425,13 @@ class Dataset(models.Model):
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
-    user = models.ForeignKey(
-        User,
-        help_text="User that uploaded this Dataset.")
+    user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
 
-    name = models.CharField(
-        max_length=128,
-        help_text="Description of this Dataset.")
+    name = models.CharField(max_length=128, help_text="Description of this Dataset.")
 
     description = models.TextField()
 
-    date_created = models.DateTimeField(
-        "Date created",
-        auto_now_add=True,
-        help_text="Date of Dataset creation.")
+    date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date of Dataset creation.")
 
     # Four cases from which Datasets can originate:
     #
@@ -1426,27 +1439,17 @@ class Dataset(models.Model):
     # Case 2: from the transformation of a RunStep
     # Case 3: from the execution of a POC (i.e. from a ROC)
     # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {
-            "model__in": ("RunStep", "RunOutputCable",
-                          "RunSIC")
-        },
-        null=True,
-        blank=True)
+    content_type = models.ForeignKey(ContentType, null=True, blank=True,
+                                     limit_choices_to = { "model__in": ("RunStep", "RunOutputCable", "RunSIC") })
     object_id = models.PositiveIntegerField(null=True, blank=True)
     created_by = generic.GenericForeignKey("content_type", "object_id")
 
     # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(
-        upload_to="Datasets",
-        help_text="Physical path where datasets are stored",
-        null=False)
+    dataset_file = models.FileField(upload_to="Datasets", help_text="Physical path where datasets are stored",
+                                    null=False)
 
     # Datasets always have a referring SymbolicDataset
-    symbolicdataset = models.OneToOneField(
-        "librarian.SymbolicDataset",
-        related_name="dataset")
+    symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
     def __unicode__(self):
         """
@@ -1454,17 +1457,14 @@ class Dataset(models.Model):
 
         This looks like "[name] (created by [user] on [date])"
         """
-        return "{} (created by {} on {})".format(
-            self.name, self.user, self.date_created)
+        return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
 
 
     def clean(self):
         """If this Dataset has an MD5 set, verify the dataset file integrity"""
         if not self.check_md5():
-            raise ValidationError(
-                "File integrity of \"{}\" lost. Current checksum \"{}\" does not equal expected checksum \"{}\"".
-                format(self, self.compute_md5(),
-                       self.symbolicdataset.MD5_checksum))
+            raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
+                                  '"{}"'.format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
@@ -1525,6 +1525,10 @@ class ExecLog(stopwatch.models.Stopwatch):
         execlog = cls(record=record, invoking_record=invoking_record)
         execlog.clean()
         execlog.save()
+        if isinstance(record, RunStep) and not record.has_subrun():
+            method_output = MethodOutput(execlog=execlog)
+            method_output.clean()
+            method_output.save()
         return execlog
 
     def clean(self):
@@ -1708,18 +1712,19 @@ class MethodOutput(models.Model):
     If the return code is None, it indicates that the code execution is
     in progress.
     """
-    execlog = models.OneToOneField(
-        ExecLog,
-        related_name="methodoutput")
+    execlog = models.OneToOneField(ExecLog, related_name="methodoutput")
 
     return_code = models.IntegerField("return code", null=True)
 
-    output_log = models.FileField(
-        "output log",
-        upload_to="Logs",
-        help_text="Terminal output of the RunStep Method, i.e. stdout.")
+    output_log = models.FileField("output log", upload_to="Logs",
+                                  help_text="Terminal output of the RunStep Method, i.e. stdout.")
 
-    error_log = models.FileField(
-        "error log",
-        upload_to="Logs",
-        help_text="Terminal error output of the RunStep Method, i.e. stderr.")
+    error_log = models.FileField("error log", upload_to="Logs",
+                                 help_text="Terminal error output of the RunStep Method, i.e. stderr.")
+    
+    @classmethod
+    def create(cls, execlog):
+        methodoutput = cls(execlog=execlog)
+        methodoutput.clean()
+        methodoutput.save()
+        return methodoutput

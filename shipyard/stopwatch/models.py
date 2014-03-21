@@ -5,6 +5,7 @@ Shipyard abstract class defining anything that has a start- and end-time.
 All such classes should extend Stopwatch.
 """
 from django.db import models
+from django.utils import timezone
 
 # Create your models here.
 class Stopwatch(models.Model):
@@ -53,3 +54,15 @@ class Stopwatch(models.Model):
         PRE: this object is clean.
         """
         return (self.end_time is not None)
+
+    def start(self):
+        """Start the stopwatch."""
+        self.start_time = timezone.now()
+        self.clean()
+        self.save()
+
+    def stop(self):
+        """Stop the stopwatch."""
+        self.end_time = timezone.now()
+        self.clean()
+        self.save()

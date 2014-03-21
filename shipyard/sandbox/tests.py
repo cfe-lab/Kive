@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import tempfile
 
 from django.core.files import File
 from django.contrib.auth.models import User
@@ -275,12 +276,15 @@ class SandboxTests(ExecuteTests):
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
-        raw_symDS = SymbolicDataset()
-        raw_symDS.save()
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf.write("foo")
+        tf.close()
+        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo", description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
                                 lambda: Sandbox(self.myUser, p, [raw_symDS]))
+        os.remove(tf.name)
 
     def test_sandbox_cdt_mismatch(self):
         """

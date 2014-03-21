@@ -19,3 +19,18 @@ CDTs = CDTs()
 CDTs.VERIF_IN_PK = 1
 CDTs.VERIF_OUT_PK = 2
 CDTs.PROTOTYPE_PK = 3
+
+class DirectoryNames:
+    pass
+
+dirnames = DirectoryNames()
+dirnames.IN_DIR = "input_data"
+dirnames.OUT_DIR = "output_data"
+dirnames.LOG_DIR = "logs"
+
+class Extensions:
+    pass
+
+extensions = Extensions()
+extensions.CSV = "csv"
+extensions.RAW = "raw"

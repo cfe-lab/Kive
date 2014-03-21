@@ -198,13 +198,10 @@ class PipelineStep(models.Model):
     Related to :model:`pipeline.models.PipelineStepInput`
     Related to :model:`pipeline.models.PipelineStepDelete`
     """
-    pipeline = models.ForeignKey(
-            Pipeline,
-            related_name="steps")
+    pipeline = models.ForeignKey(Pipeline, related_name="steps")
 
     # Pipeline steps are associated with a transformation
-    content_type = models.ForeignKey(
-            ContentType,
+    content_type = models.ForeignKey(ContentType,
             limit_choices_to = {"model__in": ("method", "pipeline")})
 
     object_id = models.PositiveIntegerField()
@@ -223,11 +220,25 @@ class PipelineStep(models.Model):
     def __unicode__(self):
         """ Represent with the pipeline and step number """
 
-        pipeline_name = "[no pipeline assigned]";   
+        pipeline_name = "[no pipeline assigned]"
         if hasattr(self, "pipeline"):
             pipeline_name = unicode(self.pipeline)
         return "{} step {}".format(pipeline_name, self.step_num)
 
+    @property
+    def is_subpipeline(self):
+        """Is this PipelineStep a sub-pipeline?"""
+        return self.transformation.is_pipeline
+    
+    @property
+    def inputs(self):
+        """Inputs to this PipelineStep, ordered by index."""
+        return self.transformation.inputs.order_by("dataset_idx")
+    
+    @property
+    def outputs(self):
+        """Outputs from this PipelineStep, ordered by index."""
+        return self.transformation.outputs.order_by("dataset_idx")
 
     def recursive_pipeline_check(self, pipeline):
         """Given a pipeline, check if this step contains it.
@@ -361,7 +372,6 @@ class PipelineStep(models.Model):
                 
         return outputs_needed
 
-
 # A helper function that will be called both by PSICs and
 # POCs to tell whether they are trivial.
 def cable_trivial_h(cable, cable_wires):
@@ -389,7 +399,6 @@ def cable_trivial_h(cable, cable_wires):
             return False
 
     return True
-
 
 # Helper that will be called by both PSIC and POC.
 def run_cable_h(cable, source, output_path):
@@ -522,6 +531,16 @@ class PipelineStepInputCable(models.Model):
     def max_rows_out(self):
         """Maximum number of rows this cable can output."""
         return self.dest.get_max_row()
+
+    @property
+    def inputs(self):
+        """Inputs to this cable (only one)."""
+        return [self.source]
+    
+    @property
+    def outputs(self):
+        """Outputs from this cable (only one)."""
+        return [self.dest]
     
     def clean(self):
         """
@@ -1006,6 +1025,16 @@ class PipelineOutputCable(models.Model):
     def max_rows_out(self):
         """Maximum number of rows this cable can output."""
         return self.source.get_max_row()
+
+    @property
+    def inputs(self):
+        """Inputs to this cable (only one)."""
+        return [self.source]
+    
+    @property
+    def outputs(self):
+        """Outputs from this cable (only one)."""
+        return [self.dest]
 
     def clean(self):
         """

@@ -103,6 +103,33 @@ class SymbolicDataset(models.Model):
             raise ValueError('CompoundDatatype "{}" already has a structure.')
         DatasetStructure(symbolicdataset=self, compounddatatype=compounddatatype, num_rows=num_rows).save()
 
+    def set_MD5(self, file_path):
+        """Set the MD5 hash from a file."""
+        with open(file_path, "rb") as f:
+            self.MD5_checksum = file_access_utils.compute_md5(f)
+        self.clean()
+        self.save()
+
+    @classmethod
+    def create_empty(cls, compound_datatype):
+        """Create an empty SymbolicDataset.
+        
+        The new SymbolicDataset will have a blank MD5 and a structure
+        with the given CompoundDatatype and a row count of -1.
+
+        INPUTS
+        compound_datatype   CompoundDatatype for the new symbolic
+                            dataset, which may be None if the new
+                            SymbolicDataset should be raw
+        """
+        symbolic_dataset = cls(MD5_checksum="")
+        symbolic_dataset.save()
+        if compound_datatype is not None:
+            symbolic_dataset.create_structure(compound_datatype)
+        symbolic_dataset.clean()
+        symbolic_dataset.save()
+        return symbolic_dataset
+
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     # TODO: raise ValueError when the wrong combination of parameters is passed
@@ -119,11 +146,8 @@ class SymbolicDataset(models.Model):
         Returns the SymbolicDataset created.
         """
         LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
-        symDS = SymbolicDataset()
-        with open(file_path, "r") as f:
-            symDS.MD5_checksum = file_access_utils.compute_md5(f)
-        symDS.clean()
-        symDS.save()
+        symDS = cls()
+        symDS.set_MD5(file_path)
 
         if cdt is not None:
             structure = DatasetStructure(symbolicdataset=symDS, compounddatatype=cdt)
@@ -159,27 +183,25 @@ class SymbolicDataset(models.Model):
     # TODO: clean this up, end_time is set in too many places
     def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog):
         """
-        Performs content check on a file, generates a CCL, and sets this SD's num_rows.
+        Performs content check on a file, generates a CCL, and sets this
+        SD's num_rows.
 
         OUTPUTS
         If SD is raw, creates a clean CCL.
-        If not raw, checks the file and returns CCL with/without a corresponding BadData.
+        If not raw, checks the file and returns CCL with/without a
+        corresponding BadData.
 
         PRE
-        Should never be called twice on the same symbolic dataset, as this would
-        overwrite num_rows to a potentially new value?
+        Should never be called twice on the same symbolic dataset, as
+        this would overwrite num_rows to a potentially new value?
         """
         self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
                           .format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog)
-        ccl.save()
-        ccl.start_time = timezone.now()
+        ccl.start()
 
         if self.is_raw():
-            ccl.end_time = timezone.now()
-            ccl.clean()
-            ccl.save()
-            self.logger.debug("SD is raw - returning clean CCL")
+            ccl.stop()
             return ccl
 
         my_CDT = self.get_cdt()
@@ -187,44 +209,41 @@ class SymbolicDataset(models.Model):
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
-            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_header=True)
-            bad_data.save()
-            ccl.end_time = timezone.now()
-            ccl.save()
             self.logger.warn("malformed header")
+            ccl.add_bad_header()
+            ccl.stop()
             return ccl
 
         if csv_summary["num_rows"] == 0:
             self.logger.warn("file had no rows")
 
-        csv_baddata = None
+        csv_baddata = False
         self.structure.num_rows = csv_summary["num_rows"]
         self.structure.save()
         if max_row is not None and csv_summary["num_rows"] > max_row:
             self.logger.warn("too many rows")
             # FIXME: Do we only create these BD objects if they don't already exist?
-            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
-            bad_data.save()
+            ccl.add_bad_num_rows()
+            csv_baddata = True
 
         if min_row is not None and csv_summary["num_rows"] < min_row:
             self.logger.warn("too few rows")
             # FIXME: Do we only create these BD objects if they don't already exist?
-            bad_data = datachecking.models.BadData(contentchecklog=ccl,bad_num_rows=True)
-            bad_data.save()
+            ccl.add_bad_num_rows()
+            csv_baddata = True
 
         if "failing_cells" in csv_summary:
             self.logger.warn("cells failed datatype check")
 
-            if csv_baddata == None:
-                csv_baddata = datachecking.models.BadData(contentchecklog=ccl)
-                csv_baddata.save()
+            if not csv_baddata:
+                datachecking.models.BadData(contentchecklog=ccl).save()
+                csv_baddata = True
 
             for row, col in csv_summary["failing_cells"]:
                 fails = csv_summary["failing_cells"][(row,col)]
                 for failed_constr in fails:
-                    new_cell_error = csv_baddata.cell_errors.create(
-                            row_num=row,
-                            column=my_CDT.members.get(column_idx=col))
+                    new_cell_error = csv_baddata.cell_errors.create(row_num=row,
+                                                                    column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
                     if type(failed_constr) != str:
@@ -236,12 +255,10 @@ class SymbolicDataset(models.Model):
         else:
             self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
                     format(file_path_to_check, self))
-        ccl.end_time = timezone.now()
-        ccl.clean()
-        ccl.save()
+        ccl.stop()
         return ccl
 
-    def check_integrity(self,new_file_path,execlog,newly_computed_MD5=None):
+    def check_integrity(self, new_file_path, execlog, newly_computed_MD5=None):
         """
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
         or in it's absence, the MD5 computed from new_file_path.
@@ -255,7 +272,7 @@ class SymbolicDataset(models.Model):
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
         icl = self.integrity_checks.create(execlog=execlog)
-        icl.start_time = timezone.now()
+        icl.start()
 
         if newly_computed_MD5 == None:
             with open(new_file_path, "rb") as f:
@@ -376,6 +393,31 @@ class ExecRecord(models.Model):
                           " ={" + u"{}".format(self.general_transf()) + "}=> " +
                           u"{}".format(u", ".join(outputs_list)))
         return string_rep
+
+    @classmethod
+    def create_complete(cls, generator, component, input_SDs, output_SDs):
+        """Create a complete ExecRecord.
+        
+        INPUTS
+        generator       ExecLog generating this ExecRecord
+        component       Pipeline component the ExecRecord is for (a 
+                        PipelineStep, PipelineOutputCable, or 
+                        PipelineStepInputCable)
+        input_SDs       list of SymbolicDatasets input to the component
+                        during execution, in order of their index
+        output_SDs      list of SymbolicDatasets output by the component
+                        during execution, in order of their index
+        """
+        execrecord = cls(generator=generator)
+        execrecord.clean()
+        execrecord.save()
+        for i, component_input in enumerate(component.inputs):
+            execrecord.execrecordins.create(generic_input=component_input, symbolicdataset=input_SDs[i])
+        for i, component_output in enumerate(component.outputs):
+            execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
+        execrecord.save()
+        execrecord.complete_clean()
+        return execrecord
 
     def clean(self):
         """
@@ -524,11 +566,8 @@ class ExecRecordIn(models.Model):
     The symbolic input may map to deleted data, e.g. if it was a deleted output
     of a previous step in a pipeline.
     """
-    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord",
-                                   related_name="execrecordins")
-    symbolicdataset = models.ForeignKey(
-        SymbolicDataset,
-        help_text="Symbol for the dataset fed to this input")
+    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord", related_name="execrecordins")
+    symbolicdataset = models.ForeignKey(SymbolicDataset, help_text="Symbol for the dataset fed to this input")
     
     content_type = models.ForeignKey(
         ContentType,
@@ -817,8 +856,7 @@ class ExecRecordOut(models.Model):
             # If it refers to a PSIC, then SD CDT must be a
             # restriction of generic_output's CDT.
             else:
-                if not input_SD.structure.compounddatatype.is_restriction(
-                        self.generic_output.get_cdt()):
+                if not input_SD.structure.compounddatatype.is_restriction(self.generic_output.get_cdt()):
                     raise ValidationError(
                         "CDT of SymbolicDataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
                         format(input_SD, self.generic_output))

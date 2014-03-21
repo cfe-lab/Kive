@@ -4,16 +4,24 @@ from django.core.files import File
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-from librarian.models import ExecRecordIn
+import archive.models
+import librarian.models
+import metadata.models
+import pipeline.models 
+import transformation.models
+import datachecking.models
 
-# Import our Shipyard models module.
-import file_access_utils, logging_utils
+import file_access_utils
+import logging_utils
+from constants import dirnames, extensions
+
 import os.path
 import shutil
-import logging, sys, time
+import logging
+import sys
+import time
 import tempfile
-import archive.models, librarian.models, metadata.models, pipeline.models, transformation.models
-import datachecking.models
+import errno
 
 class Sandbox:
     """
@@ -44,25 +52,27 @@ class Sandbox:
         
     # cable_map maps cables to ROC/RSIC.
 
-    def __init__(self, user, pipeline, inputs, sandbox_path=None):
+    def __init__(self, user, my_pipeline, inputs, sandbox_path=None):
         """
         Sets up a sandbox environment to run a Pipeline: space on
         the file system, along with sd_fs_map/socket_map/etc.
 
         INPUTS
         user          User running the pipeline.
-        pipeline      Pipeline to run.
+        my_pipeline   Pipeline to run.
         inputs        List of SDs to feed into the pipeline.
         sandbox_path  Where on the filesystem to execute.
 
         PRECONDITIONS
-        1) Inputs must have real data (For top level runs), OR
-        2) Inputs be in sd_fs_map (sub-runs)
+        inputs must have real data
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
+        assert all([i.has_data() for i in inputs])
 
+        self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
+
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
-        self.pipeline = pipeline
+        self.pipeline = my_pipeline
         self.inputs = inputs
         self.sd_fs_map = {}
         self.socket_map = {}
@@ -70,21 +80,51 @@ class Sandbox:
         self.ps_map = {}
         self.check_inputs()
 
-        self.logger.debug("initializing maps")
-        self.run = pipeline.pipeline_instances.create(start_time=timezone.now(), user=self.user)
-        for i, pipeline_input in enumerate(inputs, start=1):
-            corresp_pipeline_input = pipeline.inputs.get(dataset_idx=i)
-            self.socket_map[(self.run, None, corresp_pipeline_input)] = pipeline_input
-            self.sd_fs_map[pipeline_input] = None
-
         # Determine a sandbox path.
-        self.sandbox_path = sandbox_path
-        if sandbox_path == None:
-            self.sandbox_path = tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
+        self.sandbox_path = sandbox_path or tempfile.mkdtemp(prefix=self.sandbox_path_prefix)
+
+        self.logger.debug("initializing maps")
+        for i, pipeline_input in enumerate(inputs, start=1):
+            corresp_pipeline_input = self.pipeline.inputs.get(dataset_idx=i)
+            self.socket_map[(self.run, None, corresp_pipeline_input)] = pipeline_input
+            self.sd_fs_map[pipeline_input] = self.pipeline_input_path(corresp_pipeline_input)
 
         # Make the sandbox directory.
         self.logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
         file_access_utils.set_up_directory(self.sandbox_path)
+        file_access_utils.set_up_directory(self.pipeline_input_dir())
+
+    @property
+    def sandbox_path_prefix(self):
+        """Default prefix for path on file system for this Sandbox."""
+        return "user{}_run{}_".format(self.user, self.run.pk)
+
+    def default_step_dir(self, pipelinestep):
+        """Default path on file system for running a PipelineStep."""
+        return os.path.join(self.sandbox_path, "step{}".format(pipelinestep.step_num))
+
+    def pipeline_input_dir(self):
+        """Directory to put Pipeline inputs in."""
+        return os.path.join(self.sandbox_path, dirnames.IN_DIR)
+
+    def pipeline_input_path(self, transformationinput):
+        """Path on file system for Pipeline input."""
+        return os.path.join(self.pipeline_input_dir(), "run{}_{}".format(self.run.pk, transformationinput.dataset_name))
+
+    def step_run_dir(self, runstep):
+        """Root directory where RunStep will run."""
+        return os.path.join(self.sandbox_path, *["step{}".format(c) for c in runstep.get_coordinates()])
+
+    def step_xput_path(self, runstep, transformationxput):
+        """Path in Sandbox for PipelineStep TransformationXput."""
+        file_suffix = extensions.RAW if transformationxput.is_raw() else extensions.CSV
+        file_name = "step{}_{}.{}".format(runstep.step_num, transformationxput.dataset_name, file_suffix)
+
+        if transformationxput.is_input:
+            xput_dir = dirnames.IN_DIR
+        else:
+            xput_dir = dirnames.OUT_DIR
+        return os.path.join(self.step_run_dir(runstep), xput_dir, file_name)
 
     def check_inputs(self):
         """
@@ -147,33 +187,21 @@ class Sandbox:
     def find_symbolicdataset(self, symbolicdataset):
         """Find the location of a SymbolicDataset on the file system.
 
-        Preferentially, we return the SymbolicDataset's location in the
-        Sandbox. If it's not there, we try to return the path to the 
-        Dataset file in the databale.
-
         INPUTS
         symbolicdataset     SymbolicDataset to locate
 
         OUTPUTS
-        location            the path of symbolicdataset in either the
-                            Sandbox or in the Database 
+        location            the path of symbolicdataset in the Sandbox,
+                            or None if it's not there
         """
         try:
             location = self.sd_fs_map[symbolicdataset]
-            self.logger.debug("Dataset {} file exists in the Sandbox".format(symbolicdataset))
         except KeyError:
             self.logger.debug("Dataset {} is not in the Sandbox".format(symbolicdataset))
-            location = None
+            return None
 
-        if location is None:
-            try:
-                location = symbolicdataset.dataset.dataset_file.name
-                self.logger.debug("Dataset {} has real data".format(symbolicdataset))
-            except librarian.models.Dataset.DoesNotExist:
-                pass
+        return (location if location and file_access_utils.file_exists(location) else None)
 
-        return (location if location and os.access(location, os.R_OK) else None)
-        
     # TODO: not sure where to put this
     def sanitize_save(self, obj):
         """Clean, save, and complete_clean an object."""
@@ -182,6 +210,38 @@ class Sandbox:
         obj.complete_clean()
         return obj
 
+    def clean_save(self, obj):
+        """Clean and save an object."""
+        obj.clean()
+        obj.save()
+        return obj
+
+    def _setup_step_paths(self, step_run_dir, recover):
+        """Set up paths for running a PipelineStep.
+        
+        INPUTS
+        step_run_dir    root directory where step will be run
+        recover         are we recovering? (if so, test if the 
+                        directories are there instead of creating
+                        them)
+
+        OUTPUTS
+        in_dir          directory to put step's inputs
+        out_dir         directory where step will put its outputs
+        log_dir         directory to put logs in
+        """
+        log_dir = os.path.join(step_run_dir, dirnames.LOG_DIR)
+        out_dir = os.path.join(step_run_dir, dirnames.OUT_DIR)
+        in_dir = os.path.join(step_run_dir, dirnames.IN_DIR)
+        for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
+            if not recover:
+                file_access_utils.set_up_directory(workdir)
+            else:
+                if not (os.path.exists(workdir) and os.path.isdir(workdir)):
+                    raise ValueError('Path {} does not exist or is not a directory')
+        return (in_dir, out_dir, log_dir)
+
+    # TODO: module function of librarian?
     def _find_cable_execrecord(self, runcable, input_SD):
         """Find an ExecRecord which may be reused by a RunCable
 
@@ -204,8 +264,9 @@ class Sandbox:
         self.logger.debug("Searching for reusable cable ER - (linked to an '{}' ExecLog)".format(record_contenttype))
 
         # Look at ERIs linked to the same cable type, with matching input SD
-        candidate_ERIs = ExecRecordIn.objects.filter(execrecord__generator__content_type=record_contenttype, 
-                                                     symbolicdataset=input_SD)
+        all_ERIs = librarian.models.ExecRecordIn.objects
+        candidate_ERIs = all_ERIs.filter(execrecord__generator__content_type=record_contenttype, 
+                                         symbolicdataset=input_SD)
 
         for candidate_ERI in candidate_ERIs:
             self.logger.debug("Considering ERI {} for ER reuse or update".format(candidate_ERI))
@@ -315,43 +376,6 @@ class Sandbox:
             archive.models.Dataset(created_by=runcable, dataset_file = File(f), name=dataset_name,
                                    symbolicdataset=output_SD, user=self.run.user).save()
 
-    def _create_cable_execrecord(self, cable, execlog, input_SD, output_SD):
-        """Create an ExecRecord for a cable execution."""
-        execrecord = execlog.execrecords.create()
-        execrecord.execrecordins.create(generic_input=cable.source, symbolicdataset=input_SD)
-        execrecord.execrecordouts.create(generic_output=cable.dest, symbolicdataset=output_SD)
-        execrecord.complete_clean()
-        return execrecord
-
-    def _create_symbolicdataset(self, compounddatatype):
-        """Create an empty SymbolicDataset."""
-        symbolicdataset = librarian.models.SymbolicDataset(MD5_checksum="")
-        symbolicdataset.save()
-
-        if compounddatatype is not None:
-            # Add structure to the generated SD
-            self.logger.debug("Registering SD's CDT structure")
-            symbolicdataset.create_structure(compounddatatype)
-        
-        symbolicdataset.clean()
-        return symbolicdataset
-
-    def _hash_symbolicdataset(self, symbolicdataset, path):
-        """Compute the MD5 hash for a SymbolicDataset."""
-        with open(path, "rb") as f:
-            symbolicdataset.MD5_checksum = file_access_utils.compute_md5(f)
-            self.logger.debug("Computed MD5 for file: {}".format(symbolicdataset.MD5_checksum))
-            symbolicdataset.save()
-
-    # TODO: should be a member function of RunAtomic?
-    def _finalize_runatomic(self, runatomic, execrecord, reused):
-        """Complete a RunAtomic by setting execrecord and reused."""
-        runatomic.reused = reused
-        runatomic.execrecord = execrecord
-        runatomic.end_time = timezone.now()
-        runatomic.save()
-        runatomic.complete_clean()
-
     def _update_cable_maps(self, runcable, output_SD, output_path):
         """Update maps after cable execution.
         
@@ -365,6 +389,28 @@ class Sandbox:
         self.socket_map[(runcable.parent_run, cable, cable.dest)] = output_SD
         self.cable_map[cable] = runcable
 
+    def _update_step_maps(self, runstep, step_run_dir, output_paths):
+        """Update maps after pipeline step execution.
+        
+        INPUTS
+        runstep         RunStep responsible for execution
+        step_run_dir    directory where execution was done
+        output_paths    paths where RunStep outputs were written,
+                        ordered by index
+        """
+        pipelinestep = runstep.component
+        self.ps_map[pipelinestep] = (step_run_dir, runstep)
+        execrecordouts = runstep.execrecord.execrecordouts
+
+        for i, step_output in enumerate(pipelinestep.transformation.outputs.order_by("dataset_idx")):
+            corresp_ero = execrecordouts.get(content_type=ContentType.objects.get_for_model(type(step_output)),
+                                             object_id=step_output.pk)
+            corresp_SD = corresp_ero.symbolicdataset
+            self.register_symbolicdataset(corresp_SD, output_paths[i])
+
+            # This pipeline step, with the downstream TI, maps to corresp_SD
+            self.socket_map[(runstep.parent_run, pipelinestep, step_output)] = corresp_SD
+
     def _register_missing_output(self, output_SD, execlog, start_time):
         """Create a failed ContentCheckLog for missing cable output
         
@@ -375,8 +421,9 @@ class Sandbox:
         start_time      time when we started checking for missing output
         """
         self.logger.error("File doesn't exist - creating CCL with BadData")
-        ccl = output_SD.content_checks.create(start_time=start_time, end_time=timezone.now(), execlog=execlog)
-        ccl.baddata.create(missing_output=True)
+        ccl = output_SD.content_checks.create(start_time=start_time, execlog=execlog)
+        ccl.stop()
+        ccl.add_missing_output()
 
     def recover_cable(self, cable, invoking_record):
         """Execute cable in recovery mode.
@@ -432,7 +479,7 @@ class Sandbox:
         start_time = timezone.now()
 
         # File created? No.
-        if not os.access(output_path, os.R_OK):
+        if not file_access_utils.file_exists(output_path):
 
             # Make BadData (Missing output).
             self._register_missing_output(output_SD, curr_log, start_time)
@@ -492,7 +539,7 @@ class Sandbox:
             if not curr_record.keeps_output() or output_SD.has_data():
                 self.logger.debug("Reusing ER {}".format(curr_ER))
                 self._update_cable_maps(curr_record, output_SD, output_path)
-                self._finalize_runatomic(curr_record, curr_ER, True)
+                curr_record.make_complete(curr_ER, True)
                 return curr_record
 
         # ER with compatible cable exists and completely reusable? No.
@@ -507,7 +554,7 @@ class Sandbox:
 
         dataset_path = self.find_symbolicdataset(input_SD)
 
-        # Is input in the sandbox, or does input have actual data? No.
+        # Is input in the sandbox? No.
         if dataset_path is None:
 
             # Recover dataset.
@@ -518,7 +565,7 @@ class Sandbox:
 
                 # End. Return incomplete curr_record.
                 self.logger.warn("Recovery failed - returning incomplete RSIC/ROC (missing ExecLog)")
-                return self.sanitize_save(curr_record)
+                return self.clean_save(curr_record)
 
             # Success? Yes.
             dataset_path = self.find_symbolicdataset(input_SD)
@@ -540,10 +587,10 @@ class Sandbox:
             if cable.is_trivial():
                 output_SD = input_SD
             else:
-                output_SD = self._create_symbolicdataset(output_SD_CDT)
+                output_SD = librarian.models.SymbolicDataset.create_empty(output_SD_CDT)
 
             # Make ER, linking it to the EL.
-            curr_ER = self._create_cable_execrecord(cable, curr_log, input_SD, output_SD)
+            curr_ER = librarian.models.ExecRecord.create_complete(curr_log, cable, [input_SD], [output_SD])
 
         # Link ER to RunCable.
         curr_record.execrecord = curr_ER
@@ -552,7 +599,7 @@ class Sandbox:
         start_time = timezone.now()
 
         # File created? No.
-        if not os.access(output_path, os.R_OK):
+        if not file_access_utils.file_exists(output_path):
 
             # Make BadData (Missing output).
             self._register_missing_output(output_SD, curr_log, start_time)
@@ -564,7 +611,7 @@ class Sandbox:
         # Set symbolic dataset's MD5 if this is the first time the file
         # was generated, and the cable is non-trivial.
         if not cable.is_trivial() and not had_ER_at_beginning:
-            self._hash_symbolicdataset(output_SD, output_path)
+            output_SD.set_MD5(output_path)
 
         # If cable keeps output, register dataset with SD + RSIC/ROC
         if curr_record.keeps_output() and not cable.is_trivial():
@@ -601,6 +648,71 @@ class Sandbox:
         # End. Return curr_record.
         return self.sanitize_save(curr_record)
 
+    def recover_step(self, pipelinestep, invoking_record):
+        """Execute a PipelineStep in recovery mode."""
+        self.logger.debug("STARTING EXECUTION OF STEP {} IN RECOVERY MODE".format(pipelinestep))
+        curr_run = invoking_record.parent_run
+
+        # Retrieve appropriate RunStep.
+        step_run_dir, curr_RS = self.ps_map[pipelinestep]
+
+        # Retrieve output_paths and inputs_after_cable from maps
+        for curr_output in pipelinestep.outputs:
+            corresp_SD = self.socket_map[(curr_run, pipelinestep, curr_output)]
+            output_paths.append(self.sd_fs_map[corresp_SD])
+
+        inputs_after_cable = []
+        for curr_input in pipelinestep.inputs:
+            corresp_ERI = curr_ER.execrecordins.get(generic_input=curr_input)
+            inputs_after_cable.append(corresp_ERI.symbolicdataset)
+
+        input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
+        self.logger.debug("Checking required datasets are on the FS for running code")
+        for curr_in_SD in inputs_after_cable:
+
+            # Are required datasets on the file system? No.
+            if self.find_symbolicdataset(curr_in_SD) is None:
+
+                # Run recover() on missing datasets.
+                self.logger.debug("Dataset {} not on FS: recovering".format(curr_in_SD))
+
+                # Success? No.
+                if not self.recover(curr_in_SD, curr_RS):
+
+                    # Failed recovery: return RunStep with the failed ExecLogs
+                    # (the ExecLogs were put in place by recover())
+                    self.logger.debug("Failed to recover: quitting without creating ER")
+                    return curr_record
+
+        # Are requierd datasets on the file system? Yes.
+        # Is step a pipeline or a method? Pipeline.
+        if pipelinestep.is_subpipeline:
+
+            # Execute sub-pipeline.
+            self.logger.debug("EXECUTING SUB-PIPELINE STEP")
+            self.execute_pipeline(pipeline=pipelinestep.transformation, input_SDs=inputs_after_cable,
+                                  sandbox_path=step_run_dir, parent_runstep=curr_RS)
+            self.logger.debug("FINISHED EXECUTING SUB-PIPELINE STEP")
+
+            # End. Return curr_RS.
+            return curr_RS
+
+        # Is step a pipeline or a method? Method.
+        # Create ExecLog (and MethodOutput) invoked by recovering 
+        # RunAtomic.
+        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
+        self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
+        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
+        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+
+
+        self.logger.debug("Running code")
+
+        with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
+            pipelinestep.transformation.run_code_with_streams(step_run_dir, input_paths,
+                    output_paths, [outwrite, sys.stdout], [errwrite, sys.stderr],
+                    curr_log, curr_mo)
+
     def execute_step(self, curr_run, pipelinestep, inputs, step_run_dir=None, recover=False, invoking_record=None):
         """
         Execute the PipelineStep on the inputs.
@@ -615,7 +727,6 @@ class Sandbox:
         Outputs written to: [step run dir]/output_data/step[step num]_[output name]
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
-
         self.logger.debug("STARTING EXECUTION OF STEP")
 
         curr_ER = None
@@ -624,72 +735,69 @@ class Sandbox:
         had_ER_at_beginning = False
 
         if step_run_dir is None:
-            step_run_dir = os.path.join(self.sandbox_path, "step{}".format(pipelinestep.step_num))
+            step_run_dir = self.default_step_dir(pipelinestep)
 
-        log_dir = os.path.join(step_run_dir, "logs")
-        out_dir = os.path.join(step_run_dir, "output_data")
-        in_dir = os.path.join(step_run_dir, "input_data")
+        # Set up run/input/output/log directories
+        self.logger.debug("Preparing file system for sandbox")
+        in_dir, out_dir, log_dir = self._setup_step_paths(step_run_dir, recover)
 
         if not recover:
+            # Create new RunStep.
             self.logger.debug("Not recovering - creating new RunStep")
-            curr_RS = pipelinestep.pipelinestep_instances.create(start_time=timezone.now(), run=curr_run)
+            curr_RS = archive.models.RunStep.create(pipelinestep, curr_run)
+            invoking_record = curr_RS
 
-            if not invoking_record:
-                invoking_record = curr_RS
+            # Construct output_paths from outputs of this step's transformation.
+            # TODO: we can figure these out on the fly, why have them at all?
+            for curr_output in pipelinestep.outputs:
+                output_paths.append(self.step_xput_path(curr_RS, curr_output))
 
-            self.logger.debug("Preparing file system for sandbox")
-            for workdir in [step_run_dir, in_dir, out_dir, log_dir]:
-                file_access_utils.set_up_directory(workdir)
-
-            for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
-                file_suffix = "raw" if curr_output.is_raw() else "csv"
-                file_name = "step{}_{}.{}".format(pipelinestep.step_num, curr_output.dataset_name,file_suffix)
-                output_path = os.path.join(out_dir,file_name)
-                output_paths.append(output_path)
-
+            # Run cables.
             self.logger.debug("Running step's input PSICs")
-            for curr_input in pipelinestep.transformation.inputs.all().order_by("dataset_idx"):
+            for i, curr_input in enumerate(pipelinestep.inputs):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
-                cable_dir = os.path.join(in_dir,"step{}_{}".format(pipelinestep.step_num,curr_input.dataset_name))
-                self.logger.debug("execute_cable('{}','{}','{}','{}')".format(corresp_cable, inputs[curr_input.dataset_idx-1], cable_dir, curr_RS))
-                curr_RSIC = self.execute_cable(corresp_cable, inputs[curr_input.dataset_idx-1],cable_dir,curr_RS)
-                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.all()[0].symbolicdataset)
+                cable_path = self.step_xput_path(curr_RS, curr_input)
+                self.logger.debug("execute_cable('{}','{}','{}','{}')"
+                                  .format(corresp_cable, inputs[i], cable_path, curr_RS))
+
+                # Run execute_cable() on an input and store output symDS
+                # in inputs_after_cable.
+                curr_RSIC = self.execute_cable(corresp_cable, inputs[i], cable_path, curr_RS)
+
+                # Cable failed. Do not create ER for this step; return runstep.
+                if not curr_RSIC.successful_execution():
+                    self.logger.error("PipelineStepInputCable failed.")
+                    return curr_RS
+
+                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
 
             curr_RS.clean()
 
             # FIXME: SD generated from the previous step wasn't checked and so cannot be used
             self.logger.debug("Looking for ER with same transformation + input SDs")
-            if type(pipelinestep.transformation).__name__ != "Pipeline":
+            if type(pipelinestep.transformation).__name__ == "Method":
                 curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
 
-            if curr_ER != None:
-                self.logger.debug("Found ER, checking it provides outputs needed")
+            # Use existing ER.
+            if curr_ER is not None:
                 had_ER_at_beginning = True
+
+                self.logger.debug("Found ER, checking it provides outputs needed")
+
+                # Determine what TO's are not deleted, store in outputs_needed.
                 outputs_needed = pipelinestep.outputs_to_retain()
 
+                # ER is completely reusable? Yes.
                 if curr_ER.provides_outputs(outputs_needed):
                     self.logger.debug("Completely reusing ER {} - updating maps".format(curr_ER))
-                    curr_RS.reused = True
-                    curr_RS.execrecord = curr_ER
-                    curr_RS.clean()
-                    curr_RS.save()
 
-                    # This step would have been executed at step_run_dir with curr_RS
-                    self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
+                    # Set curr_RS as reused.
+                    curr_RS.make_complete(curr_ER, True)
 
-                    for step_output in pipelinestep.transformation.outputs.all():
-                        corresp_ero = curr_ER.execrecordouts.get(
-                                content_type=ContentType.objects.get_for_model(type(step_output)),
-                                object_id=step_output.pk)
-                        corresp_SD = corresp_ero.symbolicdataset
-                        corresp_path = output_paths[step_output.dataset_idx-1]
+                    # Update maps.
+                    self._update_step_maps(curr_RS, step_run_dir, output_paths)
 
-                        if corresp_SD not in self.sd_fs_map:
-                            self.sd_fs_map[corresp_SD] = corresp_path
-
-                        # This pipeline step, with the downstream TI, maps to corresp_SD
-                        self.socket_map[(curr_run, pipelinestep, step_output)] = corresp_SD
-
+                    # End. Return curr_RS.
                     self.logger.debug("Finished completely reusing ER")
                     curr_RS.complete_clean()
                     return curr_RS
@@ -706,45 +814,37 @@ class Sandbox:
             curr_ER = curr_RS.execrecord
             had_ER_at_beginning = True
 
-            for curr_output in pipelinestep.transformation.outputs.all().order_by("dataset_idx"):
+            for curr_output in pipelinestep.outputs:
                 corresp_SD = self.socket_map[(curr_run, pipelinestep, curr_output)]
                 output_paths.append(self.sd_fs_map[corresp_SD])
 
             # Retrieve the input SDs from the ER.
-            for curr_input in pipelinestep.transformation.inputs.all().order_by("dataset_idx"):
-                corresp_ERI = curr_ER.execrecordins.get(
-                        content_type=ContentType.objects.get_for_model(transformation.models.TransformationInput),
-                        object_id=curr_input.pk)
+            for curr_input in pipelinestep.inputs:
+                corresp_ERI = curr_ER.execrecordins.get(generic_input=curr_input)
+                #corresp_ERI = curr_ER.execrecordins.get(
+                #        content_type=ContentType.objects.get_for_model(transformation.models.TransformationInput),
+                #        object_id=curr_input.pk)
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
         self.logger.debug("Checking required datasets are on the FS for running code")
         for curr_in_SD in inputs_after_cable:
-            curr_path = self.sd_fs_map[curr_in_SD]
-            if not os.access(curr_path, os.F_OK):
-                self.logger.debug("File {} not on FS: recovering".format(curr_path))
-                successful_recovery = self.recover(curr_in_SD, curr_RS)
-
-                if not successful_recovery:
+            if self.find_symbolicdataset(curr_in_SD) is None:
+                self.logger.debug("Dataset {} not on FS: recovering".format(curr_in_SD))
+                if not self.recover(curr_in_SD, curr_RS):
                     self.logger.debug("Failed to recover: quitting without creating ER")
                     return curr_record
 
         self.logger.debug("Finished putting datasets into place: running code for this step")
 
-        if type(pipelinestep.transformation) == pipeline.models.Pipeline:
+        if pipelinestep.is_subpipeline:
             self.logger.debug("EXECUTING SUB-PIPELINE STEP")
-            self.execute_pipeline(
-                    pipeline=pipelinestep.transformation,
-                    input_SDs=inputs_after_cable,
-                    sandbox_path=step_run_dir,
-                    parent_runstep=curr_RS)
+            self.execute_pipeline(pipeline=pipelinestep.transformation, input_SDs=inputs_after_cable,
+                                  sandbox_path=step_run_dir, parent_runstep=curr_RS)
 
             self.logger.debug("FINISHED EXECUTING SUB-PIPELINE STEP")
             return curr_RS
 
-        curr_log = archive.models.ExecLog(record=curr_RS, invoking_record=invoking_record)
-        curr_log.save()
-        curr_mo = archive.models.MethodOutput(execlog=curr_log)
-        curr_mo.save()
+        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
         self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
@@ -755,46 +855,29 @@ class Sandbox:
         with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
             pipelinestep.transformation.run_code_with_streams(step_run_dir, input_paths,
                     output_paths, [outwrite, sys.stdout], [errwrite, sys.stderr],
-                    curr_log, curr_mo)
+                    curr_log, curr_log.methodoutput)
 
         self.logger.debug("Method execution complete, ExecLog saved (started = {}, ended = {})".
                 format(curr_log.start_time, curr_log.end_time))
 
         if curr_ER is None:
-            self.logger.debug("Creating fresh ER")
-            curr_ER = librarian.models.ExecRecord(generator=curr_log)
-            curr_ER.save()
+            self.logger.debug("Creating new SymbolicDatasets for PipelineStep outputs.")
+            output_SDs = []
+            for curr_output in pipelinestep.outputs:
+                output_SDs.append(librarian.models.SymbolicDataset.create_empty(curr_output.get_cdt()))
+
+            self.logger.debug("Creating fresh ExecRecord")
+            curr_ER = librarian.models.ExecRecord.create_complete(curr_log, pipelinestep, inputs_after_cable,
+                                                                  output_SDs)
             curr_RS.execrecord = curr_ER
             curr_RS.save()
 
-            self.logger.debug("Annotating ERIs for ER '{}'".format(curr_ER))
-            for curr_input in pipelinestep.transformation.inputs.all():
-                corresp_input_SD = inputs_after_cable[curr_input.dataset_idx-1]
-                curr_ER.execrecordins.create(
-                        generic_input=curr_input,
-                        symbolicdataset=corresp_input_SD)
-
-            self.logger.debug("Creating new SDs + EROs")
-            for curr_output in pipelinestep.transformation.outputs.all():
-                corresp_output_SD = librarian.models.SymbolicDataset(MD5_checksum="")
-                corresp_output_SD.save()
-
-                if not curr_output.is_raw():
-                    curr_structure = librarian.models.DatasetStructure(
-                            symbolicdataset = corresp_output_SD,
-                            compounddatatype=curr_output.get_cdt(),
-                            num_rows=-1)
-                    curr_structure.save()
-
-                corresp_output_SD.clean()
-                curr_ER.execrecordouts.create(generic_output=curr_output, symbolicdataset=corresp_output_SD)
-            curr_ER.complete_clean()
         self.logger.debug("Finished creating fresh ER, proceeding to check outputs")
 
         # had_output_found indicates we have detected problems with the output.
         bad_output_found = False
-        for curr_output in pipelinestep.transformation.outputs.all():
-            output_path = output_paths[curr_output.dataset_idx-1]
+        for i, curr_output in enumerate(pipelinestep.outputs):
+            output_path = output_paths[i]
             output_ERO = curr_ER.execrecordouts.get(
                     content_type=ContentType.objects.get_for_model(transformation.models.TransformationOutput),
                     object_id=curr_output.pk)
@@ -802,30 +885,15 @@ class Sandbox:
         
             # Check that the file exists, as we did for cables.
             start_time = timezone.now()
-            if not os.access(output_path, os.R_OK):
-                ccl = output_SD.content_checks.create(start_time=start_time, end_time=timezone.now(), execlog=curr_log)
-                baddata = datachecking.models.BadData(contentchecklog=ccl, missing_output=True)
-                baddata.save()
-                ccl.baddata = baddata
+            if not file_access_utils.file_exists(output_path):
+                self._register_missing_output(output_SD, curr_log, start_time)
                 bad_output_found = True
+                # TODO: should this be continue? do we stop as soon as missing output is found?
                 continue
 
-            with open(output_path, "rb") as f:
-                output_md5 = file_access_utils.compute_md5(f)
-
-            num_rows = -1
-            if not curr_output.is_raw():
-                with open(output_path, "rb") as f:
-                    num_rows = file_access_utils.count_rows(f)
-
             if not had_ER_at_beginning:
-                output_SD.MD5_checksum = output_md5
-                output_SD.structure.num_rows = num_rows
-                output_SD.structure.save()
-                output_SD.save()
-                self.logger.debug("First time seeing file: saving md5 {}".format(output_md5))
-                if not curr_output.is_raw():
-                    self.logger.debug("First time seeing file: saving row count {}".format(num_rows))
+                output_SD.set_MD5(output_path)
+                self.logger.debug("First time seeing file: saving md5 {}".format(output_SD.MD5_checksum))
 
             if not pipelinestep.outputs_to_delete.filter(pk=curr_output.pk).exists() and not output_ERO.has_data():
 
@@ -841,7 +909,6 @@ class Sandbox:
                 new_DS = archive.models.Dataset(user=self.user, name=name, description=desc, symbolicdataset=output_SD,
                                                 created_by=curr_RS)
 
-                # dataset_idx is 1-based, and output_paths is 0-based.
                 with open(output_path, "rb") as f:
                     new_DS.dataset_file.save(os.path.basename(output_path), File(f))
                 new_DS.clean()
@@ -863,7 +930,7 @@ class Sandbox:
 
             elif had_ER_at_beginning:
                 self.logger.debug("SD has been computed before, checking integrity of {}".format(output_SD))
-                icl = output_SD.check_integrity(output_path,curr_log,output_md5)
+                icl = output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
 
                 if icl.is_fail():
                     bad_output_found = True
@@ -873,26 +940,11 @@ class Sandbox:
 
         if not recover:
             self.logger.debug("Not recovering: finishing bookkeeping")
-            curr_RS.execrecord = curr_ER
-            curr_RS.clean()
-            curr_RS.save()
+            curr_RS.make_complete(curr_ER, False)
 
             # Since reused=False, step_run_dir represents where the step *actually is*
             self.logger.debug("Updating maps")
-            self.ps_map[pipelinestep] = (step_run_dir, curr_RS)
-    
-            for step_output in pipelinestep.transformation.outputs.all():
-                corresp_ero = curr_ER.execrecordouts.get(
-                        content_type=ContentType.objects.get_for_model(type(step_output)),
-                        object_id=step_output.pk)
-    
-                corresp_SD = corresp_ero.symbolicdataset
-                corresp_path = output_paths[step_output.dataset_idx-1]
-    
-                if corresp_SD not in self.sd_fs_map:
-                    self.sd_fs_map[corresp_SD] = corresp_path
-
-                self.socket_map[(curr_run, pipelinestep, step_output)] = corresp_SD
+            self._update_step_maps(curr_RS, step_run_dir, output_paths)
 
         curr_RS.complete_clean()
         return curr_RS
@@ -923,13 +975,11 @@ class Sandbox:
 
         if parent_runstep is not None:
             self.logger.debug("executing a sub-pipeline with input_SD {}".format(input_SDs))
-            curr_run = pipeline.pipeline_instances.create(
-                    user=self.user,
-                    parent_runstep=parent_runstep)
+            curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
 
 
         self.logger.debug("Setting up output directory")
-        out_dir = os.path.join(sandbox_path, "output_data")
+        out_dir = os.path.join(sandbox_path, dirnames.OUT_DIR)
         file_access_utils.set_up_directory(out_dir)
 
         for step in pipeline.steps.all().order_by("step_num"):
