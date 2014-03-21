@@ -155,9 +155,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $(document).on('keydown', function(e) {
         // backspace key also removes selected object
         if (e.which === 8 && !$(e.target).is("input, textarea")) {
+            // prevent backspace from triggering browser to navigate back one page
             e.preventDefault();
         }
         canvasState.deleteObject();
+    })
+
+    $('#id_submit_button').on('click', function() {
+        canvasState.checkPipeline();
     })
 });
 
@@ -858,4 +863,8 @@ CanvasState.prototype.deleteObject = function() {
         this.selection = null;
         this.valid = false; // re-draw canvas to make Connector disappear
     }
+}
+
+CanvasState.prototype.checkPipeline = function() {
+
 }
