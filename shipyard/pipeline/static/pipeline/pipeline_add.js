@@ -867,18 +867,18 @@ CanvasState.prototype.deleteObject = function() {
 
 CanvasState.prototype.submitForm = function() {
     var shapes = this.shapes;
-    var data = {'revision_name': $('id_revision_name').val()};
+    var data = { 'revision_name': $('#id_revision_name').val() };
 
     for (var i = 0; i < shapes.length; i++) {
 
     }
 
-    console.log(JSON.stringify(data));
+    console.log("line 876: " + JSON.stringify(data));
 
     $.ajax({
         type: "POST",
         url: "pipeline_add",
-        contentType: 'json',
+        contentType: 'text/javascript',
         data: JSON.stringify(data),
         datatype: "json",
         success: function(result) {
