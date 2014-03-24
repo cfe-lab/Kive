@@ -1,5 +1,5 @@
 body {
-	font: 14pt 'Lato', sans-serif;
+	font: 12pt 'Lato', sans-serif;
 	margin: 0;
 	background: url('/static/portal/bg_tile.png');
 }
@@ -16,16 +16,16 @@ a:visited {
 #wrapper {
     width: 80%;
     max-width: 55em;
-    min-width: 35em;
+    min-width: 40em;
     background-color: #fff;
     border-left: 3px solid #06a;
     padding: 0 0 1em 0;
     position: static;
     top: 0; bottom: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 #inner_wrap {
-    margin: .5em 2em .5em 4em;
+    margin: .5em 3em .5em 4em;
 }
 table {
     border: 0;
@@ -43,10 +43,18 @@ th, td {
     padding: .5em;
     text-align: left;
     vertical-align: top;
+    background-color: #fff;
 }
 tr:hover td,
 tr:hover th {
     background-color: #f0f0f0;
+}
+tr.inputs td {
+    border: 1px solid #eee;
+    padding: 0;
+}
+tr.inputs input {
+    border: 0;
 }
 #wrapper > a {
     font-size: .8em;

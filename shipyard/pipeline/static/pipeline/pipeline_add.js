@@ -878,9 +878,9 @@ CanvasState.prototype.submitForm = function() {
     $.ajax({
         type: "POST",
         url: "pipeline_add",
-        contentType: 'text/javascript',
+        contentType: 'text/javascript; charset=UTF-8',
         data: JSON.stringify(data),
-        datatype: "json",
+        dataType: "json",
         success: function(result) {
             console.log(result);
         }
