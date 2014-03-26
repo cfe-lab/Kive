@@ -505,7 +505,7 @@ class Method(transformation.models.Transformation):
                 break
 
     def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams,
-            error_streams, timer_to_fill=None, log_to_fill=None):
+            error_streams, stopwatch=None, log_to_fill=None):
         """
         SYNOPSIS
         Run the method, passing each line in its stdout and stderr to
@@ -524,7 +524,7 @@ class Method(transformation.models.Transformation):
         output_paths    see run_code
         output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
-        timer_to_fill   object with start_time and end_time fields to fill in (either
+        stopwatch       object with start_time and end_time fields to fill in (either
                         VerificationLog, or ExecLog)
         log_to_fill     object with return_code, output_log, and error_log to fill in
                         (either VerificationLog, or MethodOutput)
@@ -533,10 +533,10 @@ class Method(transformation.models.Transformation):
         1) if log_to_fill is provided, the first entry in output_streams and error_streams
         are handles to regular files, open for reading and writing.
         """
-        if timer_to_fill:
-            timer_to_fill.start_time = timezone.now()
-            timer_to_fill.clean()
-            timer_to_fill.save()
+        if stopwatch:
+            stopwatch.start()
+            stopwatch.clean()
+            stopwatch.save()
 
         returncode = None
         try:
@@ -561,14 +561,16 @@ class Method(transformation.models.Transformation):
 
             returncode = method_popen.returncode
 
-        if timer_to_fill:
-            timer_to_fill.end_time = timezone.now()
-            timer_to_fill.clean()
-            timer_to_fill.save()
+        if stopwatch:
+            stopwatch.stop()
+            stopwatch.clean()
+            stopwatch.save()
 
         for stream in output_streams + error_streams:
             stream.flush()
 
+        # TODO: I'm not sure how this is going to handle huge output, 
+        # it would be better to update the logs as we go.
         if log_to_fill:
             log_to_fill.return_code = returncode
             outlog = output_streams[0]

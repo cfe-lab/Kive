@@ -1260,12 +1260,14 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
         self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
-        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         # Define some custom wiring for D11_21: swap the first two columns.
         pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
         self.D11_21.custom_outwires.create(source_pin=pin1, dest_pin=pin2)
         self.D11_21.custom_outwires.create(source_pin=pin2, dest_pin=pin1)
         if bp == "subrun": return
+
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        if bp == "subrun_complete": return
 
     def test_ROC_clean_correct_parent_run(self):
         """PipelineOutputCable belongs to parent Run's Pipeline.
@@ -1461,10 +1463,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         marked the relevant output for deletion, should not have
         any associated Datasets."""
 
-        self.step_through_roc_creation("subrun")
+        self.step_through_roc_creation("subrun_complete")
         self.step_E2.outputs_to_delete.add(self.pD.outputs.get(dataset_name="D1_out"))
-        self.triplet_3_rows_DS.created_by = self.D11_21_ROC
-        self.triplet_3_rows_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" does not keep its output but a dataset was registered'
                                           .format("RunOutputCable", self.D11_21_ROC)),
@@ -1477,7 +1477,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         not marked the relevant output for deletion, should have a
         Dataset in its ExecRecordOut.
         """
-        self.step_through_roc_creation("subrun")
+        self.step_through_roc_creation("subrun_complete")
         self.triplet_3_rows_DS.created_by = self.D11_21_ROC
         self.triplet_3_rows_DS.save()
         self.C1_in_DS.delete()
@@ -1518,7 +1518,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         an ExecRecord, where the PipelineStep has not marked the output
         for deletion, should produce data.
         """
-        self.step_through_roc_creation("subrun")
+        self.step_through_roc_creation("subrun_complete")
         self.assertFalse(self.D11_21_ROC.output.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
@@ -1545,7 +1545,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         A RunOutputCable with the same Dataset in its ExecRecordOut as
         in its output, is clean.
         """
-        self.step_through_roc_creation("subrun")
+        self.step_through_roc_creation("subrun_complete")
         self.D11_21_ROC.output.add(self.C1_in_DS)
         self.assertIsNone(self.D11_21_ROC.clean())
 

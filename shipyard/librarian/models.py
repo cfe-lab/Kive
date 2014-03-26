@@ -16,6 +16,7 @@ from django.utils import timezone
 import re
 import logging
 import tempfile
+import hashlib
 
 import archive.models, metadata.models, method.models, pipeline.models, transformation.models
 import datachecking.models
@@ -61,6 +62,11 @@ class SymbolicDataset(models.Model):
         has_data_suffix = "d" if self.has_data() else ""
         return "S{}{}".format(self.pk, has_data_suffix)
 
+    @property
+    def is_missing(self):
+        """Is this SymbolicDataset missing data?"""
+        return 
+
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -79,7 +85,7 @@ class SymbolicDataset(models.Model):
         if not hasattr(self, "dataset"):
             return False
         return self.dataset.pk is not None
-    
+
     def is_raw(self):
         """True if this SymbolicDataset is raw, i.e. not a CSV file."""
         return not hasattr(self, "structure")
@@ -101,7 +107,10 @@ class SymbolicDataset(models.Model):
         """Add a DatasetStructure to this SymbolicDataset."""
         if not self.is_raw():
             raise ValueError('CompoundDatatype "{}" already has a structure.')
-        DatasetStructure(symbolicdataset=self, compounddatatype=compounddatatype, num_rows=num_rows).save()
+        structure = DatasetStructure(symbolicdataset=self, compounddatatype=compounddatatype, num_rows=num_rows)
+        structure.clean()
+        structure.save()
+        return structure
 
     def set_MD5(self, file_path):
         """Set the MD5 hash from a file."""
@@ -110,73 +119,130 @@ class SymbolicDataset(models.Model):
         self.clean()
         self.save()
 
-    @classmethod
-    def create_empty(cls, compound_datatype):
-        """Create an empty SymbolicDataset.
+    def set_MD5_and_count_rows(self, file_path):
+        """Set the MD5 hash and number of rows from a file.
+
+        PRE
+        This SymbolicDataset must have a DatasetStructure
+        """
+        assert not self.is_raw()
+
+        num_rows = -1 # skip header
+        md5gen = hashlib.md5()
+        with open(file_path, "r") as f:
+            for line in f:
+                md5gen.update(line)
+                num_rows += 1
+        self.structure.num_rows = num_rows
+        self.MD5_checksum = md5gen.hexdigest()
+        self.clean()
+        self.save()
+
+    def register_dataset(self, file_path, user, name, description, created_by=None):
+        """Create and register a new Dataset for this SymbolicDataset.
+
+        Note that this does NOT compute an MD5 for the new Dataset, nor
+        does it do an integrity check if self already has an MD5 set.
         
-        The new SymbolicDataset will have a blank MD5 and a structure
-        with the given CompoundDatatype and a row count of -1.
+        INPUTS
+        file_path           file to upload as the new Dataset
+        user                user who uploaded the Dataset
+        name                name for the new Dataset
+        description         description for the new Dataset
+        created_by          a RunAtomic which created this Dataset, or
+                            None if the Dataset was uploaded by the 
+                            user
+
+        PRE
+        self must not have a Dataset already associated
+        """
+        assert not self.has_data()
+
+        dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=self)
+        if created_by:
+            dataset.created_by = created_by
+        with open(file_path, "r") as f:
+            dataset.dataset_file.save(file_path, File(f))
+        dataset.clean()
+        dataset.save()
+
+    def mark_missing(self, start_time, end_time, execlog):
+        """Mark a SymbolicDataset as missing output.
 
         INPUTS
-        compound_datatype   CompoundDatatype for the new symbolic
-                            dataset, which may be None if the new
-                            SymbolicDataset should be raw
+        start_time      time when we started checking for the file
+        end_time        time when check for file finished
+        execlog         ExecLog of execution which did not produce 
+                        output
         """
-        symbolic_dataset = cls(MD5_checksum="")
-        symbolic_dataset.save()
-        if compound_datatype is not None:
-            symbolic_dataset.create_structure(compound_datatype)
-        symbolic_dataset.clean()
-        symbolic_dataset.save()
-        return symbolic_dataset
+        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog)
+        ccl.add_missing_output()
 
     @classmethod
+    def create_empty(cls, compound_datatype=None):
+        """Create an empty SymbolicDataset.
+
+        INPUTS
+        compound_datatype   CompoundDatatype for the new SymbolicDataset
+                            (None indicates a raw SymbolicDataset)
+
+        OUTPUTS
+        empty_SD            SymbolicDataset with a blank MD5 and an
+                            appropriate DatasetStructure
+        """
+        empty_SD = cls(MD5_checksum="")
+        empty_SD.clean()
+        empty_SD.save()
+        if compound_datatype:
+            empty_SD.create_structure(compound_datatype)
+        return empty_SD
+        
+    @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    # TODO: raise ValueError when the wrong combination of parameters is passed
-    # (ie. user and name are None).
     def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
-                  name=None, description=None):
+                  name=None, description=None, created_by=None, check=True):
         """
         Helper function to make defining SDs and Datasets faster.
     
         user, name, and description must all be set if make_dataset=True.
         make_dataset creates a Dataset from the given file path to go
-        with the SD.
+        with the SD. created_by can be a RunAtomic to register the
+        Dataset with, or None if it was uploaded by the user (or if 
+        make_dataset=False). If check_dataset is True, do a ContentCheck
+        on the file.
     
         Returns the SymbolicDataset created.
         """
         LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
-        symDS = cls()
-        symDS.set_MD5(file_path)
+        symDS = cls.create_empty(cdt)
 
-        if cdt is not None:
-            structure = DatasetStructure(symbolicdataset=symDS, compounddatatype=cdt)
-            structure.save()
-            run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-            content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
-            if content_check.is_fail():
-                if content_check.baddata.bad_header:
-                    raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                     .format(file_path, cdt))
-                elif content_check.baddata.cell_errors.exists():
-                    error = content_check.baddata.cell_errors.first()
-                    cdtm = error.column
-                    raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                     'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
-                else:
-                    # Shouldn't reach here.
-                    raise ValueError('The file "{}" was malformed'.format(file_path))
-            LOGGER.debug("Read {} rows from file {}".format(structure.num_rows, file_path))
+        if cdt is None:
+            symDS.set_MD5(file_path)
+        else:
+            symDS.set_MD5_and_count_rows(file_path)
+
+            if check:
+                run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+                content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
+                if content_check.is_fail():
+                    if content_check.baddata.bad_header:
+                        raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                         .format(file_path, cdt))
+                    elif content_check.baddata.cell_errors.exists():
+                        error = content_check.baddata.cell_errors.first()
+                        cdtm = error.column
+                        raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                                         'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
+                    else:
+                        # Shouldn't reach here.
+                        raise ValueError('The file "{}" was malformed'.format(file_path))
+                LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_path))
 
         if make_dataset:
-            dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=symDS)
-            with open(file_path, "r") as f:
-                dataset.dataset_file.save(file_path, File(f))
-            dataset.clean()
-            dataset.save()
+            symDS.register_dataset(file_path, user, name, description, created_by)
     
         symDS.clean()
-    
+        symDS.save()
         return symDS
 
     # FIXME: use a transaction!
@@ -296,38 +362,40 @@ class SymbolicDataset(models.Model):
     
     def is_OK(self):
         """
-        Check that this SD has been checked for integrity and contents,
-        and that they have never failed either such test.
+        Check that this SD has passed a check for contents if not raw,
+        and it has never failed any check for integrity or contents.
         """
         icls = self.integrity_checks.all()
         ccls = self.content_checks.all()
 
-        # Neither an integrity check nor a content check has been performed
-        if not icls.exists() and not ccls.exists():
-            self.logger.debug("SD '{}' may not be OK - Neither integrity nor content check performed".format(self))
+        # No content check has been performed.
+        if not (self.is_raw() or ccls.exists()):
+            self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
             return False
 
         # Look for failed integrity/content checks, and also check that at least one
-        # check has been passed.
-        any_check_completed = False
-
+        # content check has been passed.
         for icl in icls:
             if icl.is_fail():
                 self.logger.debug("SD '{}' failed integrity check".format(self))
                 return False
-            elif icl.is_complete():
-                any_check_completed = True
+
+        # No failed integrity checks: in the raw case, we're done.
+        if self.is_raw():
+            return True
+
+        content_check_completed = False
         for ccl in ccls:
             if ccl.is_fail():
                 self.logger.debug("SD '{}' failed content check".format(self))
                 return False
             elif ccl.is_complete():
-                any_check_completed = True
+                content_check_completed = True
 
-        # At this point we know no checks have failed; return False if none of them
-        # are complete yet.
-        self.logger.debug("Have any checks completed on SD '{}'? {}".format(self, any_check_completed))
-        return any_check_completed
+        # At this point we know no checks have failed; return False if
+        # none of the checks are complete yet.
+        self.logger.debug("Has a content check completed on SD '{}'?  {}".format(self, content_check_completed))
+        return content_check_completed
     
 class DatasetStructure(models.Model):
     """
@@ -414,10 +482,21 @@ class ExecRecord(models.Model):
         for i, component_input in enumerate(component.inputs):
             execrecord.execrecordins.create(generic_input=component_input, symbolicdataset=input_SDs[i])
         for i, component_output in enumerate(component.outputs):
-            execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
+            er = execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
         execrecord.save()
         execrecord.complete_clean()
         return execrecord
+
+    def get_execrecordout(self, xput):
+        """Get the ExecRecordOut for a TransformationXput.
+
+        INPUTS
+        xput        TransformationXput to get ExecRecordOut for
+        """
+        try:
+            return self.execrecordouts.get(content_type=ContentType.objects.get_for_model(xput), object_id=xput.pk)
+        except ExecRecordOut.DoesNotExist:
+            return None
 
     def clean(self):
         """

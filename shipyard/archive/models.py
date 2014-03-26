@@ -240,13 +240,12 @@ class RunAtomic(stopwatch.models.Stopwatch):
         """
         pass
 
-    def make_complete(self, execrecord, reused):
-        """Make this RunAtomic complete."""
+    def link_execrecord(self, execrecord, reused):
+        """Link an ExecRecord to this RunAtomic."""
         self.reused = reused
         self.execrecord = execrecord
-        self.end_time = timezone.now()
+        self.clean()
         self.save()
-        self.complete_clean()
 
     def _clean_undecided_reused(self):
         """
@@ -517,6 +516,14 @@ class RunStep(RunAtomic):
     def step_num(self):
         return self.pipelinestep.step_num
 
+    @property
+    def transformation(self):
+        return self.pipelinestep.transformation
+
+    @property
+    def pipeline(self):
+        return self.pipelinestep.pipeline
+
     @classmethod
     def create(cls, pipelinestep, run):
         """Create a new RunStep from a PipelineStep."""
@@ -524,6 +531,23 @@ class RunStep(RunAtomic):
         runstep.clean()
         runstep.save()
         return runstep
+
+    # TODO: fix for sub-pipelines
+    def output_name(self, output):
+        """Name for Dataset generated from a TransformationOutput."""
+        assert self.pipelinestep.transformation.outputs.filter(pk=output.pk).exists()
+        return "run{}_step{}_output{}".format(self.run.pk, self.step_num, output.dataset_name)
+
+    def output_description(self, output):
+        """Desc for Dataset generated from a TransformationOutput."""
+        assert self.pipelinestep.transformation.outputs.filter(pk=output.pk).exists()
+        desc = ('Generated data from a run of pipeline "{}" started at {} by {}\n'
+                .format(self.pipeline, self.run.start_time, self.run.user))
+        desc += "run: {}\n".format(self.run.pk)
+        desc += "user: {}\n".format(self.run.user)
+        desc += "step: {}\n".format(self.step_num)
+        desc += "output: {}".format(output.dataset_name)
+        return desc
 
     def has_subrun(self):
         """
@@ -534,6 +558,19 @@ class RunStep(RunAtomic):
     def has_data(self):
         """True if associated output exists; False if not."""
         return self.outputs.all().exists()
+
+    def keeps_output(self, output):
+        """Whether the RunStep keeps the given output.
+
+        INPUTS
+        output      TransformationOutput to check
+        
+        PRE
+        The provided output is a TransformationOutput of the RunStep's
+        PipelineStep's Transformation.
+        """
+        assert self.pipelinestep.transformation.outputs.filter(pk=output.pk).exists()
+        return not self.pipelinestep.outputs_to_delete.filter(pk=output.pk).exists()
 
     def _clean_with_subrun(self):
         """
@@ -1251,10 +1288,30 @@ class RunSIC(RunCable):
     def parent_run(self):
         return self.runstep.run
 
+    @property
+    def pipeline(self):
+        return self.PSIC.pipelinestep.pipeline
+
+    # TODO: fix for sub-pipelines
+    def output_name(self):
+        return "run{}_step{}_input{}".format(self.parent_run.pk, self.runstep.step_num, self.PSIC.dest.dataset_idx)
+
+    def output_description(self):
+        run = self.get_top_level_run()
+        desc = ('Generated data from a run of pipeline "{}" started at {} by {}\n'
+                .format(self.pipeline, run.start_time, run.user))
+        desc += "run: {}\n".format(run.pk)
+        desc += "user: {}\n".format(run.user)
+        desc += "step: {}\n".format(self.runstep.step_num)
+        desc += "input: {}".format(self.PSIC.dest.dataset_name)
+        return desc
+
     def keeps_output(self):
         """
         True if the underlying PSIC retains its output; False otherwise.
         """
+        if self.PSIC.is_trivial():
+            return False
         return self.PSIC.keep_output
 
     def _clean_execrecord(self):
@@ -1347,19 +1404,37 @@ class RunOutputCable(RunCable):
     def parent_run(self):
         return self.run
 
+    @property
+    def pipeline(self):
+        return self.pipelineoutputcable.pipeline
+
+    # TODO: fix for sub-pipelines
+    def output_name(self):
+        return "run{}_output{}".format(self.run.pk, self.pipelineoutputcable.output_idx)
+
+    def output_description(self):
+        run = self.get_top_level_run()
+        desc = ('Generated data from a run of pipeline "{}" started at {} by {}\n'
+                .format(self.pipeline, run.start_time, run.user))
+        desc += "run: {}\n".format(run.pk)
+        desc += "user: {}\n".format(run.user)
+        desc += "output: {}".format(self.pipelineoutputcable.output_name)
+        return desc
+
     def keeps_output(self):
         """
         True if the underlying POC retains its output; False otherwise.
         """
+        if self.pipelineoutputcable.is_trivial():
+            return False
+
         if self.run.parent_runstep is None:
             return True
 
         # At this point we know that this is a sub-Pipeline.  Check
         # if the parent PipelineStep deletes this output.
-        if self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
-                dataset_idx=self.pipelineoutputcable.output_idx).exists():
-            return False
-        return True
+        return not self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
+                dataset_idx=self.pipelineoutputcable.output_idx).exists()
 
     def _clean_execrecord(self):
         """
@@ -1647,7 +1722,6 @@ class ExecLog(stopwatch.models.Stopwatch):
         have been tested exactly once and all passed.
         """
         if self.record.execrecord is None:
-            print("No execrecord!")
             return False
 
         # From here on, we know that this ExecLog corresponds to the
