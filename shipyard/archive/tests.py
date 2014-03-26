@@ -557,6 +557,53 @@ class RunStepTests(ArchiveTestSetup):
                                           .format(self.step_E1_RS)),
                                 self.step_E1_RS.complete_clean)
 
+    ####
+    # keeps_output tests added March 26, 2014 -- RL
+    def test_RunStep_keeps_output_true(self):
+        """
+        A RunStep with retained output.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.assertTrue(self.step_E1_RS.keeps_output(self.A1_out))
+
+    def test_RunStep_keeps_output_false(self):
+        """
+        A RunStep with deleted output.
+        """
+        self.step_through_runstep_creation("first_runstep")
+        self.step_E1.add_deletion(self.A1_out)
+        self.assertFalse(self.step_E1_RS.keeps_output(self.A1_out))
+
+    def test_RunStep_keeps_output_multiple_outputs(self):
+        """
+        A RunStep with several outputs, none deleted.
+        """
+        # This is copied from RunTests.step_through_run_creation.
+
+        # Third RunStep associated.
+        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
+
+        self.assertTrue(self.step_E3_RS.keeps_output(self.C1_out))
+        self.assertTrue(self.step_E3_RS.keeps_output(self.C2_rawout))
+        self.assertTrue(self.step_E3_RS.keeps_output(self.C3_rawout))
+
+    def test_RunStep_keeps_output_multiple_outputs_some_deleted(self):
+        """
+        A RunStep with several outputs, some deleted.
+        """
+        # This is copied from RunTests.step_through_run_creation.
+
+        # Third RunStep associated.
+        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E3.add_deletion(self.C1_out)
+        self.step_E3.add_deletion(self.C3_rawout)
+
+        self.assertFalse(self.step_E3_RS.keeps_output(self.C1_out))
+        # The deletions shouldn't affect C2_rawout.
+        self.assertTrue(self.step_E3_RS.keeps_output(self.C2_rawout))
+        self.assertFalse(self.step_E3_RS.keeps_output(self.C3_rawout))
+
+
 class RunTests(ArchiveTestSetup):
 
     def step_through_run_creation(self, bp):
@@ -1227,6 +1274,35 @@ class RunSICTests(ArchiveTestSetup):
                                 re.escape('{} "{}" is not complete'.format("RunSIC", self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
+
+    ####
+    # keeps_output tests added March 26, 2014 -- RL.
+    def test_RunSIC_keeps_output_trivial(self):
+        """
+        A trivial RunSIC should have keeps_output() return False regardless of the keep_output setting.
+        """
+        self.step_through_runsic_creation("runstep_completed")
+        self.E21_31.keep_output = True
+        self.assertFalse(self.E11_32_RSIC.keeps_output())
+        self.E21_31.keep_output = False
+        self.assertFalse(self.E11_32_RSIC.keeps_output())
+
+    def test_RunSIC_keeps_output_true(self):
+        """
+        A RunSIC that keeps its output should have keeps_output() return True.
+        """
+        self.step_through_runsic_creation("rsic_completed")
+        self.E11_32.keep_output = True
+        self.assertTrue(self.E11_32_RSIC.keeps_output())
+
+    def test_RunSIC_keeps_output_false(self):
+        """
+        A RunSIC that discards its output should have keeps_output() return False.
+        """
+        self.step_through_runsic_creation("rsic_completed")
+        self.E11_32.keep_output = False
+        self.assertFalse(self.E11_32_RSIC.keeps_output())
+
 class RunOutputCableTests(ArchiveTestSetup):
 
     def test_ROC_many_execlogs(self):
@@ -1632,6 +1708,83 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" is not complete'.format("RunOutputCable", self.D11_21_ROC)),
                                 self.D11_21_ROC.complete_clean)
+
+    ####
+    # keeps_output tests added March 26, 2014 -- RL.
+    def test_ROC_keeps_output_top_level_trivial(self):
+        """
+        A top-level trivial RunSIC should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("trivial_roc_completed")
+        self.assertFalse(self.E31_42_ROC.keeps_output())
+
+    def test_ROC_keeps_output_top_level_custom(self):
+        """
+        A top-level custom RunSIC should have keeps_output() return True.
+        """
+        self.step_through_roc_creation("custom_roc_completed")
+        self.assertTrue(self.E21_41_ROC.keeps_output())
+
+    def test_ROC_keeps_output_top_level_trivial_incomplete(self):
+        """
+        A top-level trivial incomplete RunSIC should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("roc_created")
+        self.assertFalse(self.E31_42_ROC.keeps_output())
+
+    def test_ROC_keeps_output_top_level_custom_incomplete(self):
+        """
+        A top-level custom incomplete RunSIC should have keeps_output() return True.
+        """
+        self.step_through_roc_creation("roc_created")
+        self.assertTrue(self.E21_41_ROC.keeps_output())
+
+    def test_ROC_keeps_output_subrun_trivial_true(self):
+        """
+        A trivial POC of a sub-run that doesn't discard its output should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("subrun_complete")
+        self.D11_21.custom_outwires.all().delete()
+        self.assertFalse(self.D11_21_ROC.keeps_output())
+
+    def test_ROC_keeps_output_subrun_custom_true(self):
+        """
+        A custom POC of a sub-run that doesn't discard its output should have keeps_output() return True.
+        """
+        self.step_through_roc_creation("subrun_complete")
+        self.assertTrue(self.D11_21_ROC.keeps_output())
+
+    def test_ROC_keeps_output_subrun_custom_false(self):
+        """
+        A custom POC of a sub-run that does discard its output should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("subrun_complete")
+        self.step_E2.add_deletion(self.D1_out)
+        self.assertFalse(self.D11_21_ROC.keeps_output())
+
+    def test_ROC_keeps_output_incomplete_subrun_trivial_true(self):
+        """
+        A trivial POC of an incomplete sub-run that doesn't discard its output should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("subrun")
+        self.D11_21.custom_outwires.all().delete()
+        self.assertFalse(self.D11_21_ROC.keeps_output())
+
+    def test_ROC_keeps_output_incomplete_subrun_custom_true(self):
+        """
+        A custom cable of an incomplete sub-run that doesn't discard its output should have keeps_output() return True.
+        """
+        self.step_through_roc_creation("subrun")
+        self.assertTrue(self.D11_21_ROC.keeps_output())
+
+    def test_ROC_keeps_output_incomplete_subrun_custom_false(self):
+        """
+        A custom cable of an incomplete sub-run that does discard its output should have keeps_output() return False.
+        """
+        self.step_through_roc_creation("subrun")
+        self.step_E2.add_deletion(self.D1_out)
+        self.assertFalse(self.D11_21_ROC.keeps_output())
+
 
 class DatasetTests(librarian.tests.LibrarianTestSetup):
 
