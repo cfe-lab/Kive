@@ -6,6 +6,7 @@ All such classes should extend Stopwatch.
 """
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 class Stopwatch(models.Model):
