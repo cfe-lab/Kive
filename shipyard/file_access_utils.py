@@ -84,13 +84,13 @@ def set_up_directory(directory_to_use, tolerate=False):
         paths = glob.glob(directory_to_use + "/*")
         paths += glob.glob(directory_to_use + "/.*")
 
-        if tolerate:
-            for path in paths:
+        for path in paths:
+            if tolerate:
                 if (path == os.path.join(directory_to_use, dirnames.IN_DIR) or
                             path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
                             path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
                     continue
-                raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
+            raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
 def compute_md5(file_to_checksum):
     """Computes MD5 checksum of specified file.

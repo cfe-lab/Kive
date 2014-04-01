@@ -46,32 +46,30 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         execlog.save()
         if record_type == "RunStep":
             MethodOutput(execlog=execlog, return_code=0).save()
-        execrecord = ExecRecord(generator=execlog)
-        execrecord.save()
-    
-        # TODO: This needs a helper get_pipeline_component or something.
-        if record_type == "RunStep":
-            inputs = list(record.pipelinestep.transformation.inputs.all())
-            outputs = list(record.pipelinestep.transformation.outputs.all())
-        elif record_type == "RunOutputCable":
-            inputs = [record.pipelineoutputcable.source]
-            transf = record.run.pipeline
-            outputs = [transf.outputs.get(dataset_idx=record.pipelineoutputcable.output_idx)]
-        else:
-            inputs = [record.PSIC.source]
-            outputs = [record.PSIC.dest]
-    
-        for i, inp in enumerate(inputs):
-            execrecord.execrecordins.create(generic_input=inp, symbolicdataset=input_SDs[i])
-        for i, outp in enumerate(outputs):
-            execrecord.execrecordouts.create(generic_output=outp, symbolicdataset=output_SDs[i])
-            if record_type == "RunOutputCable" and not record.pipelineoutputcable.is_trivial():
-                record.output.add(output_SDs[i].dataset)
-            elif record_type == "RunStep":
-                record.outputs.add(output_SDs[i].dataset)
-    
+        execrecord = ExecRecord.create_complete(execlog, record.component, input_SDs, output_SDs)
         record.execrecord = execrecord
-        record.clean()
+        record.reused = False
+        record.save()
+
+    def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
+        """
+        Helper function to do everything necessary to make a RunStep, 
+        RunOutputCable, or RunStepInputCable complete, when it _has_
+        reused an ExecRecord (ie. make an ExecRecord for it to resue).
+        """
+        record_type = record.__class__.__name__
+
+        new_record = record.__class__.create(record.component, other_parent)
+    
+        execlog = ExecLog(record=new_record, invoking_record=new_record, start_time=timezone.now(), 
+                          end_time=timezone.now())
+        execlog.save()
+        if record_type == "RunStep":
+            MethodOutput(execlog=execlog, return_code=0).save()
+        execrecord = ExecRecord.create_complete(execlog, record.component, input_SDs, output_SDs)
+
+        record.execrecord = execrecord
+        record.reused = True
         record.save()
     
     def complete_RSICs(self, runstep, input_SDs, output_SDs):
@@ -927,8 +925,11 @@ class RunSICTests(ArchiveTestSetup):
         """
         A RunSIC whose ExecRecord is not clean, is not itself clean.
         """
-        self.step_through_runsic_creation("rsic_completed")
-        self.E11_32_RSIC.reused = True
+        self.step_through_runsic_creation("rsic_created")
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
+
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.C1_in.execrecordouts_referencing.add(ero)
         self.assertRaisesRegexp(ValidationError,
@@ -941,13 +942,16 @@ class RunSICTests(ArchiveTestSetup):
         A RunSIC which is reusing an ExecRecord for an incompatible
         PipelineStepInputCable is not clean.
         """
-        self.step_through_runsic_creation("rsic_complete")
-        self.E11_32_RSIC.reused = True
+        self.step_through_runsic_creation("rsic_created")
 
         # Create an incompatible RunSIC.
-        runstep = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        runsic = self.E02_22.psic_instances.create(runstep=runstep)
-        self.make_complete_non_reused(runsic, [self.singlet_symDS], [self.singlet_symDS])
+        runsic = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        self.make_complete_non_reused(runsic, [self.C1_in_symDS], [self.C1_in_symDS])
+
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        runstep = self.step_E3.pipelinestep_instances.create(run=run)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
+
         self.E11_32_RSIC.execrecord = runsic.execrecord
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'
@@ -959,8 +963,15 @@ class RunSICTests(ArchiveTestSetup):
         A RunSIC's ExecRecord must be for a PipelineStepInputCable and
         not some other pipeline component (reused case).
         """
-        self.step_through_runsic_creation("runstep_completed")
-        self.E11_32_RSIC.reused = True
+        self.step_through_runsic_creation("rsic_created")
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
+
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
+        self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
+                                                  [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
 
         self.E11_32_RSIC.execrecord = self.step_E3_RS.execrecord
         self.assertRaisesRegexp(ValidationError,
@@ -976,12 +987,19 @@ class RunSICTests(ArchiveTestSetup):
     def test_RunSIC_clean_reused_psic_keeps_output_no_data(self):
         """
         A RunSIC reusing an ExecRecord, whose PipelineStepInputCable
-        keeps its output should, have data in its ExecRecordOut.
+        keeps its output, should have data in its ExecRecordOut.
         """
-        self.step_through_runsic_creation("rsic_completed")
-        self.E11_32_RSIC.reused = True
+        self.step_through_runsic_creation("rsic_created")
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        runstep = self.step_E3.pipelinestep_instances.create(run=run)
         self.E11_32.keep_output = True
+        self.E11_32.save()
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
+
+        self.assertTrue(self.E11_32_RSIC.keeps_output())
+        self.assertListEqual(self.E11_32_RSIC.log.first().missing_outputs(), [])
+        self.assertFalse(ero.has_data())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
                                           'data'.format(self.E11_32_RSIC, ero)),
@@ -1006,12 +1024,16 @@ class RunSICTests(ArchiveTestSetup):
         keeps its output, having data in its ExecRecordOut, is complete
         and clean.
         """
-        self.step_through_runsic_creation("rsic_completed")
-        self.E11_32_RSIC.reused = True
+        self.step_through_runsic_creation("rsic_created")
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
+
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
         self.E11_32_output_DS.save()
+
         self.assertTrue(self.E11_32_RSIC.is_complete())
         self.assertIsNone(self.E11_32_RSIC.complete_clean())
 
@@ -1253,13 +1275,16 @@ class RunOutputCableTests(ArchiveTestSetup):
 
         self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
         self.doublet_DS.created_by = self.E21_41_ROC
+        self.doublet_DS.save()
         if bp == "custom_roc_completed": return
 
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E2_RS.start()
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
         self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
+        self.D11_21_ROC.start()
         # Define some custom wiring for D11_21: swap the first two columns.
         pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
         self.D11_21.custom_outwires.create(source_pin=pin1, dest_pin=pin2)
@@ -1267,6 +1292,11 @@ class RunOutputCableTests(ArchiveTestSetup):
         if bp == "subrun": return
 
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.C1_in_DS.created_by = self.D11_21_ROC
+        self.C1_in_DS.save()
+        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log.first(), start_time=timezone.now(),
+                                               end_time=timezone.now())
+        self.D11_21_ROC.stop()
         if bp == "subrun_complete": return
 
     def test_ROC_clean_correct_parent_run(self):
@@ -1399,6 +1429,9 @@ class RunOutputCableTests(ArchiveTestSetup):
         old_checksum = self.doublet_DS.symbolicdataset.MD5_checksum
         self.doublet_DS.symbolicdataset.MD5_checksum = "foo"
         self.doublet_DS.symbolicdataset.save()
+
+        self.assertFalse(self.E21_41_ROC.reused)
+        self.assertFalse(self.E21_41_ROC.component.is_trivial())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
                                           'checksum "{}"'.format(self.doublet_DS, old_checksum, "foo")),
@@ -1465,6 +1498,9 @@ class RunOutputCableTests(ArchiveTestSetup):
 
         self.step_through_roc_creation("subrun_complete")
         self.step_E2.outputs_to_delete.add(self.pD.outputs.get(dataset_name="D1_out"))
+
+        self.assertFalse(self.D11_21_ROC.keeps_output())
+        self.assertTrue(self.D11_21_ROC.output.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" does not keep its output but a dataset was registered'
                                           .format("RunOutputCable", self.D11_21_ROC)),
@@ -1518,7 +1554,11 @@ class RunOutputCableTests(ArchiveTestSetup):
         an ExecRecord, where the PipelineStep has not marked the output
         for deletion, should produce data.
         """
-        self.step_through_roc_creation("subrun_complete")
+        self.step_through_roc_creation("subrun")
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+
+        self.assertTrue(self.D11_21_ROC.keeps_output())
+        self.assertListEqual(self.D11_21_ROC.log.first().missing_outputs(), [])
         self.assertFalse(self.D11_21_ROC.output.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
@@ -1532,7 +1572,14 @@ class RunOutputCableTests(ArchiveTestSetup):
         ExecRecordOut is not clean.
         """
         self.step_through_roc_creation("subrun")
-        self.D11_21_ROC.output.add(self.triplet_3_rows_DS)
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.triplet_3_rows_DS.created_by = self.D11_21_ROC
+        self.triplet_3_rows_DS.save()
+
+        self.assertFalse(self.D11_21_ROC.component.is_trivial())
+        self.assertFalse(self.D11_21_ROC.reused)
+        self.assertNotEqual(self.triplet_3_rows_DS, self.D11_21_ROC.execrecord.execrecordouts.first().symbolicdataset)
+
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Dataset "{}" was produced by RunOutputCable "{}" but is not in an ERO of '
                                           'ExecRecord "{}"'.format(self.triplet_3_rows_DS, self.D11_21_ROC, 
@@ -1614,9 +1661,14 @@ class RunOutputCableTests(ArchiveTestSetup):
         sub-pipeline kept, which has the correct associated Dataset,
         is clean and complete.
         """
-        self.step_through_roc_creation("subrun")
-        self.D11_21_ROC.output.add(self.C1_in_DS)
-        self.assertTrue(self.D11_21_ROC.output.exists())
+        self.step_through_roc_creation("subrun_complete")
+        self.C1_in_DS.created_by = self.D11_21_ROC
+        self.C1_in_DS.save()
+
+        self.assertIsNone(self.D11_21_ROC.clean())
+        self.assertIsNotNone(self.D11_21_ROC.execrecord)
+        self.assertFalse(self.D11_21_ROC.reused)
+
         self.assertTrue(self.D11_21_ROC.is_complete())
         self.assertIsNone(self.D11_21_ROC.complete_clean())
 
