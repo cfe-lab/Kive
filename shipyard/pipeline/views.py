@@ -34,7 +34,6 @@ def pipeline_add(request):
     c.update(csrf(request))
 
     if request.method == 'POST':
-        print request
         query = request.POST.dict()
         print query
         response_data = {'foo': 'bar'}

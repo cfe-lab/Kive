@@ -15,9 +15,12 @@
 
 <a href="pipelines">Back to pipeline summary</a>
 
-<h2>Pipeline assembler</h2>
+<h2>Drydock</h2>
+    <p>
+    An interface for assembling pipelines.
+    </p>
     <!-- Method selector -->
-    <form action="" method="post" enctype="multipart/form-data">
+    <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
         <tr>
             <th>Name:</th>
@@ -69,7 +72,7 @@
                 <input type="button" id="id_delete_button" value="Delete">
                 <input type="button" id="id_reset_button" value="Clear">
             </td>
-            <td><input type="button" id="id_submit_button" value="Submit"></td>
+            <td><input type="submit" id="id_submit_button" value="Submit"></td>
         </tr>
     </table>
     </form>

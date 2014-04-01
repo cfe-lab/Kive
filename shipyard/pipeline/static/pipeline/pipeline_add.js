@@ -161,8 +161,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         canvasState.deleteObject();
     })
 
-    $('#id_submit_button').on('click', function() {
-        canvasState.submitForm();
+    $('form').submit(function(e) {
+        var input = $("<input>")
+               .attr("type", "hidden")
+               .attr("name", "mydata").val("blah");
+        $(this).append($(input));
     })
 });
 
@@ -865,24 +868,24 @@ CanvasState.prototype.deleteObject = function() {
     }
 };
 
+/*
 CanvasState.prototype.submitForm = function() {
-    var shapes = this.shapes;
-    var data = { 'revision_name': $('#id_revision_name').val() };
+    var form_str = $('form').serialize();
 
+    var shapes = this.shapes;
     for (var i = 0; i < shapes.length; i++) {
 
     }
-
-    console.log("line 876: " + JSON.stringify(data));
 
     $.ajax({
         type: "POST",
         url: "pipeline_add",
         contentType: 'text/javascript; charset=UTF-8',
-        data: JSON.stringify(data),
+        data: form_str,
         dataType: "json",
         success: function(result) {
             console.log(result);
         }
     })
 };
+*/
