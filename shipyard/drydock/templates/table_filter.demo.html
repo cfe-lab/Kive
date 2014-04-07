@@ -27,10 +27,12 @@
 
 $(function() {
     var o_r = $('table#table_results'),
+        o_rData = o_r.data(),
         cpanel = $('#filter_ctrl'),
         filters_html = $('#active_filters'),
-        filters_js = [];// Each element will be an object with the members "key" and "val". Key corresponds to the column headers and val is the search query.
-        o_rCols = [];
+        filters_js = [],// Each element will be an object with the members "key" and "val". Key corresponds to the column headers and val is the search query.
+        o_rCols = [],
+        selected = [];
     
     if (o_r.length + filters_html.length == 0) return;
     if (cpanel.length == 0) o_r.before('<div>', { id: 'filter_ctrl' });
@@ -38,6 +40,7 @@ $(function() {
     $('thead th, thead td', o_r).each(function() {
         o_rCols.push(this.innerHTML);
     });
+    o_rData.pkey = o_rCols.indexOf(o_rData.pkey);
     
     // After filters_js is populated, call this function to apply them to the table.
     var filterTable = function(tab) { 
@@ -103,6 +106,30 @@ $(function() {
         }
         filterTable(o_r);
     });
+    
+    o_r.on('click', 'tbody tr', function() {
+        var $this = $(this),
+            row_key = parseInt( $('td', this).eq(o_rData.pkey).html() );
+        
+        if ($this.hasClass('selected')) {
+            $this.removeClass('selected');
+            selected.splice(selected.indexOf(row_key), 1);
+        } else {
+            $this.addClass('selected');
+            selected.push( row_key );
+        }
+    });
+    
+    if (typeof o_rData.displaycols != 'undefined') {
+        o_rData.displaycols = o_rData.displaycols.split(',');
+        var display_cells = $();
+    
+        for (var i=0; i < o_rData.displaycols.length; i++)
+            display_cells = display_cells.add( $('td,th', o_r).filter(':nth-child('+ o_rData.displaycols[i] + ')') );
+        
+        $('td, th', o_r).not(display_cells).hide();
+    }
+    
 });
 </script>
 <style type="text/css">
@@ -158,6 +185,10 @@ a.remove {
 a.remove:hover {
     color: #00f;
 }
+
+tr.selected td {
+    background-color: #ffd;
+}
 </style>
 </head>
 <body>
@@ -170,21 +201,8 @@ a.remove:hover {
 <label>Year</label>
 <select data-link="Year">
 <option value="">Select a year</option>
-<option value="1996">1996</option>
-<option value="1997">1997</option>
-<option value="1998">1998</option>
-<option value="1999">1999</option>
-<option value="2000">2000</option>
-<option value="2001">2001</option>
-<option value="2002">2002</option>
-<option value="2003">2003</option>
-<option value="2004">2004</option>
-<option value="2005">2005</option>
-<option value="2006">2006</option>
-<option value="2007">2007</option>
-<option value="2008">2008</option>
-<option value="2009">2009</option>
 <option value="2010">2010</option>
+<option value="2011">2011</option>
 </select>
 <input type="submit" value="Filter">
 </form>
@@ -194,7 +212,7 @@ a.remove:hover {
 <div id="no_results">
 <strong>No results were found.</strong>
 </div>
-<table id="table_results">
+<table id="table_results" data-pkey="pID" data-displaycols="2,4,5,13">
 <thead>
 <tr>
 <th>pID</th>
