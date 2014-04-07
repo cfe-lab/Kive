@@ -1,0 +1,1117 @@
+\documentclass[12pt]{article}
+\usepackage{mathptmx}
+\usepackage{tikz}
+\usepackage{parskip}
+\usepackage{fullpage}
+\usepackage{MnSymbol}
+\usepackage{fourier-orns}
+\usepackage{color}
+\usepackage{multirow}
+\usepackage{array}
+
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{shapes}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\alert}[1]{\color{red}#1\color{black}}
+\newcommand{\sd}{\bigcap} % symbolic dataset
+\newcommand{\sdd}{\bigcapdot} % symbolic dataset with data
+\newcommand{\ntcable}[2]{
+  \draw [double distance=2pt, thick] (#1) -- node [diamond, draw, fill=white, inner sep=2pt] { } (#2);
+}
+
+% http://tex.stackexchange.com/questions/12703/how-to-create-fixed-width-table-columns-with-text-raggedright-centered-raggedlef
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\begin{document}
+
+\def\nodedist{1}
+\def\sep{0.2}
+\tikzset{csv/.style={rectangle, draw, inner sep=2pt}}
+\tikzset{raw/.style={circle, draw, inner sep=2pt}}
+
+\section*{Pipeline}
+
+At the top level, a Pipeline is composed of a sequence of PipelineSteps,
+numbered from 1, along with a sequence of PipelineOutputCables, also numbered
+from 1. PipelineStepInputCables do not have the same direct relationship to
+Pipelines. Instead, the cables feeding into a step are associated to that step,
+which means they are only indirectly associated to their parent Pipeline. When
+Pipelines are executed, PipelineStep execution is responsible for executing all
+the relevant PipelineStepInputCables.
+
+This design encapsulates the fact that cables are extremely quick to run, as
+they involve (at most) a single pass through the data. They are also unlikely
+to fail, as they do not involve any user-defined code. Thus, making input cable
+execution a part of step execution does not add significant computational time
+or difficulty. The steps themselves, however, may be computationally intensive,
+and so should be run as soon as possible without having to wait on their input
+cables being executed in some global order.
+
+\section*{SymbolicDataset}
+
+When we say a SymbolicDataset $S$ ``has data'', or ``has real data'' or ``has
+existent data'', we mean that some Dataset $D$ has been saved in the database
+with its \code{symbolicdataset} attribute pointing to $S$. Alternatively, if a
+SymbolicDataset has no real data, we sometimes say that it is ``empty'' or
+``symbolic only''.
+
+In diagrams, we represent SymbolicDatasets by ``ghosts'', because they tell us
+the form of the data (eg. its MD5 checksum) without having any of the contents.
+Empty SymbolicDatasets (without real data) are represented by empty ghosts
+$\sd$, and those with real data are represented by filled ghosts $\sdd$.
+
+\section*{ExecRecord}
+
+\subsection*{Reuse}
+
+Shipyard provides the option to not store Datasets produced by steps of a
+Pipeline. This means that ExecRecords in the Database will sometimes
+contain only a record of the data that was produced, rather than the actual
+data itself. That is, their ExecRecordIns and ExecRecordOuts may point to
+SymbolicDatasets without Datasets attached to them. 
+
+This design is useful because Datasets may become very large, and keeping every
+intermediate file around may use a lot of disk space if the files are not
+needed. On the other hand, we still want to keep around a record of having run
+the Pipeline on the data. In fact, these ``empty'' records have a use beyond
+bookkeeping: depending on the context, it may be possible to \emph{reuse} an
+ExecRecord even when the data is not there.
+
+Consider the following use case. Jim creates a Pipeline with three Methods,
+called $A$, $B$, and $C$. The Pipeline has one input and two outputs. He
+selects a SymbolicDataset $I$ (for ``input''), with data he has uploaded, to
+run through the Pipeline. Jim is not interested in intermediate files, only in
+results, so he marks step $A$'s two outputs as deleted. Data coming out of
+these outputs will not be saved to the databaase.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}
+    [node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step2in1.east) -- node {$B$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (out1) { };
+    \node [csv, right=of step3out1] (out2) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{Jim's Pipeline, before it has ever been executed. The input
+  SymbolicDataset $I$ is shown on the left, beside the Pipeline input.}
+\end{figure}
+
+Now, Jim executes the Pipeline. Assuming everything went well, SymbolicDatasets
+with associated Datasets have been created for the Pipeline's two outputs.
+We'll call these $R_1$ and $R_2$ ($R$ for ``result''). Also, empty
+SymbolicDatasets, say $A_1$ and $A_2$, have been created for Method $A$'s
+outputs. They are empty because Jim did not want to keep that data, so it was
+not saved.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, anchor=south west, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of step1out2, anchor=south west, inner sep=0] {$\sd_{A_2}$};
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step2in1.east) -- node {$B$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (out1) { };
+    \node [csv, right=of step3out1] (out2) { };
+    \node [right=\sep of out1, anchor=south west, inner sep=0] {$\sdd_{R_1}$};
+    \node [right=\sep of out2, anchor=south west, inner sep=0] {$\sdd_{R_2}$};
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{Jim's Pipeline, after it was executed for the first time.}
+\end{figure}
+
+Since this execution was totally new to Shipyard, new ExecRecords were created
+for each Pipeline component that was run. There were eight of these components
+in total: three PipelineSteps, three PipelineStepInputCables, and two
+PipelineOutputCables.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (cable1in) { };
+    \node [csv, right=of cable1in] (cable1out) { };
+    \draw (cable1in) -- (cable1out);
+    \node [left=\sep of cable1in, inner sep=0] {$\sdd_I$};
+    \node [right=\sep of cable1out, inner sep=0] {$\sdd_I$};
+    \node [text width=5cm, align=center] at ($(cable1in)!0.5!(cable1out) + (0, -\nodedist)$) 
+          {\small cable from pipeline input to step $A$};
+
+    \node [csv, right=5*\nodedist of cable1in] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of step1out2, inner sep=0] {$\sd_{A_2}$};
+    \node [left=\sep of step1in1, inner sep=0] {$\sdd_{I}$};
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \node at ($(step1in1)!0.5!(step1out2) + (0, -\nodedist-\sep)$) {\small step $A$};
+
+    \node [csv, right=4*\nodedist of step1in1] (cable2in) { };
+    \node [csv, right=of cable2in] (cable2out) { };
+    \draw (cable2in) -- (cable2out);
+    \node [left=\sep of cable2in, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of cable2out, inner sep=0] {$\sd_{A_1}$};
+    \node [text width=5cm, align=center] at ($(cable2in)!0.5!(cable2out) + (0, -\nodedist)$) 
+          {\small cable from first output of step $A$ to input of step $B$};
+
+    \node [csv, below=3*\nodedist of cable1in] (cable3in) { };
+    \node [csv, right=of cable3in] (cable3out) { };
+    \draw (cable3in) -- (cable3out);
+    \node [left=\sep of cable3in, inner sep=0] {$\sd_{A_2}$};
+    \node [right=\sep of cable3out, inner sep=0] {$\sd_{A_2}$};
+    \node [text width=5cm, align=center] at ($(cable3in)!0.5!(cable3out) + (0, -\nodedist)$) 
+          {\small cable from second output of step $A$ to input of step $C$};
+
+    \node [csv, right=5*\nodedist of cable3in] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step2in1.east) -- node {$B$} (step2out1.west);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \node [right=\sep of step2out1, inner sep=0] {$\sdd_{R_1}$};
+    \node [left=\sep of step2in1, inner sep=0] {$\sd_{A_1}$};
+    \node [text width=5cm, align=center] at ($(step2in1)!0.5!(step2out1) + (0, -\nodedist+\sep)$) 
+          {\small step $B$};
+
+    \node [csv, right=4*\nodedist of step2in1] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \node [right=\sep of step3out1, inner sep=0] {$\sdd_{R_2}$};
+    \node [left=\sep of step3in1, inner sep=0] {$\sd_{A_2}$};
+    \node [text width=5cm, align=center] at ($(step3in1)!0.5!(step3out1) + (0, -\nodedist+\sep)$) 
+          {\small step $C$};
+
+    \node [csv, below=2.5*\nodedist of cable3out] (cable4in) { };
+    \node [csv, right=of cable4in] (cable4out) { };
+    \draw (cable4in) -- (cable4out);
+    \node [left=\sep of cable4in, inner sep=0] {$\sdd_{R_1}$};
+    \node [right=\sep of cable4out, inner sep=0] {$\sdd_{R_1}$};
+    \node [text width=5cm, align=center] at ($(cable4in)!0.5!(cable4out) + (0, -\nodedist+\sep)$) 
+          {\small output cable from step $B$};
+
+    \node [csv, right=5*\nodedist of cable4out] (cable5in) { };
+    \node [csv, right=of cable5in] (cable5out) { };
+    \draw (cable5in) -- (cable5out);
+    \node [left=\sep of cable5in, inner sep=0] {$\sdd_{R_2}$};
+    \node [right=\sep of cable5out, inner sep=0] {$\sdd_{R_2}$};
+    \node [text width=5cm, align=center] at ($(cable5in)!0.5!(cable5out) + (0, -\nodedist+\sep)$) 
+          {\small output cable from step $C$};
+
+  \end{tikzpicture}
+  \caption{New ExecRecords created by first execution of Jim's Pipeline.}
+\end{figure}
+
+Some time later, Jim decides that the first output of his Pipeline wasn't quite
+what he wanted. He creates a new Pipeline with an additional step, $D$, to do
+some more processing to the first output (Figure~\ref{fig:newpipeline}).
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step2in1.east) -- node {$B$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (step4in1) { };
+    \node [csv, right=of step4in1] (step4out1) { };
+    \path (step4in1.east) -- node {$D$} (step4out1.west);
+
+    \node [csv, right=of step4out1] (out1) { };
+    \path (step3out1) -| node [csv] (out2) { } (out1);
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (step4in1);
+    \draw (step4out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(step4in1.north west) + (-\sep, \sep)$) rectangle ($(step4out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{The new version of Jim's Pipeline, with an additional step $D$.}
+  \label{fig:newpipeline}
+\end{figure}
+
+When Jim goes to execute this version of the Pipeline on the same input,
+Shipyard will realize that most of the execution has already been done before.
+Instead of running steps $A$, $B$, and $C$ again, ExecRecords matching those
+steps will simply be found and reused. After reusing these ExecRecords, the
+only components left to actually run will be step $D$ and its associated
+cables (Figure~\ref{fig:newmidexec}).
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, anchor=south west, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of step1out2, anchor=south west, inner sep=0] {$\sd_{A_2}$};
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step2in1.east) -- node {$B$} (step2out1.west);
+    \node [right=\sep of step2out1, anchor=south west, inner sep=0] {$\sdd_{R_1}$};
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (step4in1) { };
+    \node [csv, right=of step4in1] (step4out1) { };
+    \path (step4in1.east) -- node {$D$} (step4out1.west);
+
+    \node [csv, right=of step4out1] (out1) { };
+    \path (step3out1) -| node [csv] (out2) { } (out1);
+    \node [right=\sep of out2, anchor=south west, inner sep=0] {$\sdd_{R_2}$};
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (step4in1);
+    \draw (step4out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(step4in1.north west) + (-\sep, \sep)$) rectangle ($(step4out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{The second version of Jim's Pipeline, in mid-execution, after reusing ExecRecords.}
+  \label{fig:newmidexec}
+\end{figure}
+
+Shipyard was able to reuse the ExecRecord for running step $B$ on input $A_1$
+to produce output $R_1$, even though $A_1$ does not have real data. Moreover,
+because $R_1$ \emph{does} have data, Shipyard is able to use that data to
+execute step $D$.
+
+\subsection*{Recovery}
+
+Of course, not every ExecRecord Shipyard might reuse has real data in its
+ExecRecordOuts. After reusing such an ExecRecord, a step further on in
+the Pipeline execution may actually need the data from its outputs. Recovery is
+the procedure used to retrieve that needed data.
+
+Continuing the previous use case, suppose Jim decides to simplify his Pipeline
+by combining steps $B$ and $D$ into one, which he calls step $E$. He creates a
+new Pipeline with step $E$ in place of steps $B$ and $D$, and prepares to run
+it on the same input as before.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step2in1.east) -- node {$E$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (out1) { };
+    \node [csv, right=of step3out1] (out2) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{The third version of Jim's Pipeline, with step $E$ in place of steps $B$ and $D$.}
+\end{figure}
+
+Since Jim is still not interested in the outputs of step $A$, the ExecRecords
+already available for step $A$, and the cable feeding it, will be reused. An
+ExecRecord for step $C$ can also be reused to produce the second Pipeline
+output, $R_2$.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, anchor=south west, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of step1out2, anchor=south west, inner sep=0] {$\sd_{A_2}$};
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step2in1.east) -- node {$E$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (out1) { };
+    \node [csv, right=of step3out1] (out2) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+    \node [right=\sep of out2, anchor=south west, inner sep=0] {$\sdd_{R_2}$};
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{The third version of Jim's Pipeline, mid-execution, after reusing an
+  ExecRecord for steps $A$ and $C$.} 
+\end{figure}
+
+At this point, execution of the Pipeline cannot continue. Step $E$ has never
+been run on SymbolicDataset $A_1$ before, so there is no ExecRecord to reuse.
+Actually running step $E$ on $A_1$ requires the data associated with $A_1$, 
+which is not in the Database. The only solution is to backtrack in the
+execution and run whatever is necessary to recover $A_1$. 
+
+Because the cable linking steps $A$ and $E$ is trivial (it does not alter the
+data which passes through it), $A_1$ was output from two different components
+of Jim's Pipeline - step $A$, and the aforementioned cable. It clearly would
+not make sense to try and recover $A_1$ by re-running the cable, since the
+cable also needs $A_1$ as input. Rather, recovery is always commenced by
+finding the first time the relevant SymbolicDataset was created in the course
+of execution. In this case, the first time $A_1$ was created was as the output
+of step $A$, so it is step $A$ which will be re-run.
+
+Step $A$ is executed in recovery mode (which implies a few differences in the
+details of the execution algorithm). Jim still does not want to keep the output
+of step $A$, so it does not get saved to the Database, but files containing the
+data created by step $A$ will be placed in the Sandbox and can be used as input
+to the next step. This type of file is represented in the below diagram as a
+time bomb \bomb, because it is only guaranteed to exist as long as the Pipeline
+is executing. After execution finishes, this intermediate data is no longer
+accessible (and $A_1$ and $A_2$ will go back to being empty ghosts $\sd$). If
+Jim wanted persistent access to this data, he would not have marked these
+outputs as deleted.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture} [node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [left=\sep of in1, anchor=south east] {$\sdd_I$};
+
+    \node [csv, right=of in1] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [csv, right=of step2in1] (step2out1) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, anchor=south west, inner sep=0] {\bomb$_{A_1}$};
+    \node [right=\sep of step1out2, anchor=south west, inner sep=0] {\bomb$_{A_2}$};
+
+    \node [csv, right=2*\nodedist of step1out2] (step3in1) { };
+    \node [csv, right=of step3in1] (step3out1) { };
+    \path (step2in1.east) -- node {$E$} (step2out1.west);
+
+    \node [csv, right=2*\nodedist of step2out1] (out1) { };
+    \node [csv, right=of step3out1] (out2) { };
+    \path (step3in1.east) -- node {$C$} (step3out1.west);
+    \node [right=\sep of out2, anchor=south west, inner sep=0] {$\sdd_{R_2}$};
+  
+    \draw (in1) -- (step1in1);
+    \draw (step1out1) -- (step2in1);
+    \draw (step1out2) -- (step3in1);
+    \draw (step2out1) -- (out1);
+    \draw (step3out1) -- (out2);
+
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in1.south east) + (\sep, -\sep)$);
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+    \draw ($(step2in1.north west) + (-\sep, \sep)$) rectangle ($(step2out1.south east) + (\sep, -\sep)$);
+    \draw ($(step3in1.north west) + (-\sep, \sep)$) rectangle ($(step3out1.south east) + (\sep, -\sep)$);
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out2.south east) + (\sep, -\sep)$);
+  \end{tikzpicture}
+  \caption{The third version of Jim's Pipeline, after recovering the data from $A_1$.}
+\end{figure}
+
+Step $E$ can now be executed on the file in the Sandbox, and the output
+produced as usual.
+
+\subsection*{Filling in}
+
+An ExecRecord is not intended to document a \emph{particular} execution of
+code, by a specific user at a given time. That information is stored in the
+archive module, in RunAtomics and ExecLogs. Rather, an ExecRecord can be
+thought of as a \emph{symbolic} execution, which may be realized by different
+users at different times. 
+
+%To illustrate this, consider step $E$ of Jim's Pipeline above. Suppose the
+%input to this step has a CompoundDatatype called ``site\_probability'', which
+%he has defined as (integer: position, float: probability). In other words, the
+%site\_probability CompoundDatatype has two columns: an integer column called
+%``position'', and a float column called ``probability''. Because the cable
+%linking steps $A$ and $E$ is trivial, we may infer that the SymbolicDataset
+%$A_1$ also has the same CompoundDatatype.
+
+\section*{ExecRecordIn/ExecRecordOut}
+
+If an ExecRecord is a description of a Pipeline component being executed,
+ExecRecordIns and ExecRecordOuts are associated descriptions of the inputs that
+were fed in and the outputs that came out. An ExecRecordIn has an associated
+\code{generic\_input}, and ExecRecordOuts have an analogous
+\code{generic\_output}. Each of these parameters may be either a
+TransformationOutput or a TransformationInput, depending on what component the
+ExecRecord is for. 
+
+\begin{itemize}
+  \item PipelineStepInputCables may originate from a Pipeline input, a Method
+    output, or a Pipeline output, so their ExecRecordIns may reference either a
+    TransformationInput or a TransformationOutput. They always terminate in
+    either a Method input or a Pipeline input, so their ExecRecordOuts will
+    always reference a TransformationInput. 
+  \item PipelineOutputCables always start at the output of a step (either a
+    Method or a Pipeline) and end at a Pipeline output, so both their
+    ExecRecordOuts and ExecRecordIns will always reference
+    TransformationOutputs.
+  \item PipelineSteps' inputs are always TransformationInputs, and their
+    outputs are TransformationOutputs. An ExecRecord for a PipelineStep will
+    always have ExecRecordIns referencing TransformationInputs, and
+    ExecRecordOuts referencing TransformationOutputs.
+\end{itemize}
+
+To be considered complete, an ExecRecord for a particular component must have
+an ExecRecordOut for each of the component's outputs. For cables, this means
+exactly one ExecRecordOut, whose \code{generic\_output} is the cable's
+destination. For steps, there must be an ExecRecordOut for each of the step's
+outputs.
+
+Note that ``output'' is \emph{not} a synonym for TransformationOutput. A
+TransformationOutput is a database object, which represents the output of a
+Transformation (that is, a Method or a Pipeline). They are the holes on the
+right-hand side of the boxes in our diagrams. Similarly, a TransformationInput
+is a hole on the right-hand side. An ``output'' has a more general meaning,
+particularly in the case of cables. The ``output'' of a cable may in fact be a
+TransformationInput. This distinction is illustrated in the diagram below,
+where we have labelled the cables $c_1$ and $c_2$, and the step $A$.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture} [node distance=\nodedist]
+
+    \node [csv] (step1in) { };
+    \node [csv, right=of step1in] (step1out) { };
+    \path (step1in) -- node {$A$} (step1out);
+    \node [left=of step1in] {$\cdots$};
+    \node [right=of step1out] {$\cdots$};
+
+    \draw (step1in) -- node [auto, swap] {\small $c_1$} ++ (-\nodedist, 0);
+    \draw (step1out) -- node [auto] {\small $c_2$} ++ (\nodedist, 0);
+    \draw ($(step1in.north west) + (-\sep, \sep)$) rectangle ($(step1out.south east) + (\sep, -\sep)$);
+
+    \node [below left=of step1in, text width=3cm] (inlabel) {TransformationInput \\ output from $c_1$ \\ input to $A$};
+    \node [below right=of step1out, text width=3cm] (outlabel) {TransformationOutput \\ output from $A$ \\ input to $c_1$};
+
+    \draw [dotted] (step1in) -- (inlabel);
+    \draw [dotted] (step1out) -- (outlabel);
+  \end{tikzpicture}
+  \caption{Part of a Pipeline, showing the difference between ``output'' and TransformationOutput.}
+\end{figure}
+
+In the context of ExecRecord reuse, we talk about ExecRecords which ``provide''
+a certain output. What we mean is, the ExecRecord's associated ExecRecordOut
+whose \code{generic\_output} is the ``output'' in question, has a
+SymbolicDataset with real data. If we wanted the data from the execution
+described by the ExecRecord, we could get it from the database. Alternatively,
+if an ExecRecord \emph{does not} provide an output, it means that the relevant
+ExecRecordOut's SymbolicDataset is symbolic only - no real data is associated
+to it.
+
+\section*{ExecLog}
+
+An ExecLog is a record of code having been run during the execution of
+one of the component parts of a Pipeline (ie. a PipelineStep,
+PipelineStepInputCable, or PipelineOutputCable).
+
+A single execution of a Pipeline in Shipyard is called a Run. When a Run
+is created (that is, a Pipeline is executed), each of its steps and
+cables are executed sequentially, creating the component RunSteps,
+RunOutputCables, and RunStepInputCables of the Run (see the Archive and
+Pipeline documentation for more details). Whenever one of these
+components (a step or cable) is executed, it is possible (but not
+necessary) that some code will have to be run on the system. When it
+\emph{is} necessary, and code is run, a record of the code being
+executed is created in an ExecLog. 
+
+ExecLogs are only created for components of a Pipeline which are
+\emph{atomic}, meaning at most one code execution is needed to carry
+them out. This includes steps which invoke individual Methods, and all
+non-trivial cables which perform some transformation on the data they
+are carrying. ExecLogs are not created for steps which invoke a whole
+sub-Pipeline instead of a Method, as these steps are composed of many
+components and are not atomic. Neither are they created for trivial
+cables (which simply shunt data as-is from one step to another), because
+these kinds of cables never require the execution of code.
+
+\section*{Sandbox}
+
+The Sandbox class handles the actual setup, execution, and logging of Pipelines
+on the file system. 
+
+To illustrate the Sandbox's operation, we will use the following example
+Pipeline for sequence alignment. The names and (in the case of structured,
+non-raw data) CompoundDatatypes of each input and output of the Pipeline are
+shown attached to the inputs by dotted lines. Note that, for trivial cables,
+the input and output annotation is the same, since these cables do not alter
+the data passing through them. In our examples, this Pipeline will be run by a
+user named Will.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=\nodedist]
+    \node [csv] (in1) { };
+    \node [raw, below=of in1] (in2) { };
+    \draw ($(in1.north west) + (-\sep, \sep)$) rectangle ($(in2.south east) + (\sep, -\sep)$);
+
+    \node [csv] (step1in1) [right=of in1] { };
+    \node [csv, right=of step1in1] (step1out1) { };
+    \draw ($(step1in1.north west) + (-\sep, \sep)$) rectangle ($(step1out1.south east) + (\sep, -\sep)$);
+    \path (step1in1) -- node {\small clean} (step1out1);
+
+    \node [csv, right=of step1out1] (step2in1) { };
+    \node [raw, below=of step2in1] (step2in2) { };
+    \node [csv] at ($(step2in1)!0.5!(step2in2) + (\nodedist, 0)$) (step2out1) { };
+    \draw ($(step2out1.east) + (\sep, 0)$) |- ($(step2in1.north west) + (-\sep, \sep)$)
+                                           |- ($(step2in2.south west) + (-\sep, -\sep)$)
+                                           -| ($(step2out1.east) + (\sep, 0)$);
+    \path (step2in1) |- node [anchor=west, inner sep=0pt] {\small align} (step2out1);
+
+    \node [csv, right=of step2out1] (out1) { };
+    \draw ($(out1.north west) + (-\sep, \sep)$) rectangle ($(out1.south east) + (\sep, -\sep)$);
+
+    \draw [thick] (in1) -- (step1in1);
+    \draw [thick] (in2) -- (step2in2);
+    \ntcable{step1out1}{step2in1}
+    \ntcable{step2out1}{out1}
+
+    \node [above=of in1, align=center, anchor=south east] (in1d) {\small unaligned seqs \\ \small (string: id, DNA: seq)};
+    \node [above=3*\nodedist of step1out1, align=center, anchor=south east] (step1out1d) {\small cleaned seqs \\ \small (string: id, DNA: seq, Boolean: changed)};
+    \node [above=1.5*\nodedist of step2in1, align=center] (step2in1d) {\small seqs to align \\ \small (string: id, DNA: seq)};
+    \node [above=of step2out1, align=center, anchor=south west] (step2out1d) {\small scored aligned seqs\\ \small (string: id, DNA: seq, integer: score)};
+    \node [below right=of out1, align=center] (out1d) {\small aligned seqs \\ \small (string: id, DNA: seq)};
+    \node [below=of in2, align=center, anchor=north west] (in2d) {\small scoring matrix \\ \small (raw)};
+
+    \draw [dotted, thick] (in1) -- (in1d);
+    \draw [dotted, thick] (step1in1) -- (in1d);
+    \draw [dotted, thick] (step2in1) -- (step2in1d);
+    \draw [dotted, thick] (step1out1) -- (step1out1d);
+    \draw [dotted, thick] (step2out1) -- (step2out1d);
+    \draw [dotted, thick] (out1) -- (out1d);
+    \draw [dotted, thick] (in2) -- (in2d);
+    \draw [dotted, thick] (step2in2) -- (in2d);
+  \end{tikzpicture}
+  \caption{A two step Pipeline to align sequences, annotated with dataset names and data types.}
+\end{figure}
+
+Unaligned sequences and an scoring matrix are passed as input. The sequences
+are subjected to a cleaning step, which produces new sequences, along with a
+Boolean column indicating whether or not any changes were made to each
+sequence. This Boolean column is stripped out by the trivial cable connecting
+the two steps. The cleaned sequences and scoring matrix are passed to the
+alignment step, which outputs aligned sequences and scores. The scores are
+removed by the final non-trivial output cable.
+
+It is important to distinguish between the names of inputs and outputs (which
+are shown in the diagram), and the names of Datasets (which are not shown). The
+input and output holes in this diagram correspond to the TransformationXputs of
+the Transformations underlying each PipelineStep. These xputs have fixed names,
+which are constant across all the Pipelines the particular Transformation is
+used in. They are fixtures of the Transformation, not of a particular execution
+of a particular Pipeline. In contrast, a Dataset with any name can be fed into
+any Pipeline, provided it has a compatible CompoundDatatype and number of rows.
+The names of Datasets fed through a given Pipeline can (and likely will) vary
+from execution to execution.
+
+Every time a Sandbox is instantiated to run a Pipeline, it
+creates a new directory on the file system where it will put all data, code,
+and log files for that Pipeline. This directory is created in \code{\$TMPDIR}
+(on Linux, this is usually \code{/tmp}), and has a name like
+\code{userWill\_run47\_c2DW92}, where Will is the user running the Pipeline, 47
+is the primary key of the Run, and c2DW92 is a random string appended to avoid
+possible name clashing. When this directory is set up, two other
+sub-directories called \code{input\_data} and \code{output\_data} are created
+as sub-directories, so that before any steps are run, the Sandbox path looks
+like
+\begin{verbatim}
+  userWill_run47_c2DW92/
+    input_data/
+    output_data/
+\end{verbatim}
+
+The top-level Sandbox directory (here, \code{userWill\_run47\_c2DW92}) is also
+referred to as the Sandbox. When we say that a file is ``in the Sandbox'', we
+mean that the file is in some sub-directory of this path. Similarly, a
+SymbolicDataset is in the Sandbox if a file containing its data is present. It
+is not enough for the SymbolicDataset to be in \code{sd\_fs\_map}, since that
+map keeps only track of where SymbolicDatasets \emph{should} go. If an
+ExecRecord is completely reused, the data will not be written to the file
+system. Therefore, a SymbolicDataset is known to be in the sandbox only if it
+is in \code{sd\_fs\_map} \emph{and} the file indicated by the map actually
+exists. The function \code{find\_symbolicdataset} returns a file path only when
+the provided SymbolicDataset is in the Sandbox; otherwise, it returns None.
+
+\subsection*{Step Execution}
+
+PipelineStep execution is carried out by the \code{execute\_step} function of
+the Sandbox. The algorithm proceeds in nine steps.
+
+\begin{enumerate}
+  \item{} [Prepare] Set up the directories and paths where the step will run, and
+    the RunStep providing a record of step execution.
+  \item{} [Run cables] Run step's input cables, and retrieve their outputs to feed
+    into the step.
+  \item{} [Look for ExecRecord] Search for a compatible ExecRecord to either
+    completely reuse or fill in$^1$.
+  \item{} [Gather inputs] Put data from post-cable SymbolicDatasets to feed the
+    step into the Sandbox.
+  \item{} [Run code] Execute the step's Transformation$^2$.
+  \item{} [Create outputs] Set up SymbolicDatasets for step outputs, along with
+    Datasets where output is to be saved.
+  \item{} [Link ExecRecord] Create a new ExecRecord, if necessary, and link it to
+    the RunStep.
+  \item{} [Check outputs] Do ContentChecks on newly created output, and
+    IntegrityChecks on output we've seen before.
+  \item{} [Clean up] Record the file system location of all newly created
+    SymbolicDatasets.
+\end{enumerate}
+
+\small
+$^1$If a compatible ExecRecord to completely reuse is found in step 3, we
+short-circuit steps 4, 5, and 6, and go straight to linking the ExecRecord.
+This is the advantage of ExecRecord reuse - we potentially save a lot of
+computation time by recognizing that the same code has already been run before.
+
+$^2$If if the PipelineStep to execute contains a sub-Pipeline, the Pipeline
+execution algorithm is recursively called, and we skip straight to step 9.
+\normalsize
+
+We will start by describing the parameters to the \code{execute\_step}
+function, then proceed to describe each step of the execution algorithm. To be
+clear, we still refer to it as ``executing'' a step even if an ExecRecord is
+available to completely reuse, and no code is run.
+
+\subsubsection*{Parameters}
+
+\paragraph*{pipelinestep}
+
+The PipelineStep to execute.
+
+\paragraph*{parent\_record}
+
+The second parameter has a slightly different meaning depending on whether or
+not we are executing the step in recovery mode (see below). If not, and this is
+the first time this particular Run has gotten to the step to be executed, then
+\code{parent\_record} is the Run whose execution is currently in progress, and
+which is invoking the step. This is not always the top-level Run in the
+Sandbox; if the step is part of a sub-Pipeline, then \code{parent\_run} will be
+the Run corresponding to that sub-Pipeline.
+
+In Recovery mode, this parameter refers to the RunAtomic (either a RunStep,
+RunInputCable, or RunOutputCable) which called \code{recover} on one of its
+input SymbolicDatasets. That recovery eventually called \code{execute\_step},
+either directly, or after one or more additional recursive calls to
+\code{recover}. 
+
+\paragraph*{recover}
+
+This parameter is a flag indicating whether or not the step is being executed
+in recovery mode. If so, the remaining parameters are ignored.
+
+\paragraph*{inputs}
+
+In order to execute a step, we must know what data we want to run it on. The
+input SymbolicDatasets to feed into the step are passed as the \code{inputs}
+parameter. This parameter is an ordered list, where the first element will be
+fed to the step's first input, and so on. Each SymbolicDataset in the list must
+never have failed any ContentChecks or IntegrityChecks, and, if it is not raw,
+must have been subjected to at least one ContentCheck. Because the cables
+feeding into a step are executed as part of that step, these inputs are
+actually the inputs to the cables feeding the step. 
+
+To understand this distinction, consider the example Pipeline. The clean step
+has only one input, which is called ``unaligned seqs'' and has a
+CompoundDatatype (string: id, DNA: seq). The input to the cable feeding this
+step is identical.  To execute this step, we would pass a SymbolicDataset with
+the CompoundDatatype (string: id, DNA: seq). On the other hand, consider the
+alignment step. It has two inputs: one called ``seqs to align'' of
+CompoundDatatype (string: id, DNA: seq), and a second raw input ``scoring
+matrix''. However, the cable leading in to the first input is non-trivial,
+because it removes one column. Since this cable is run as part of executing the
+alignment step, the input passed in must be a SymbolicDataset of
+CompoundDatatype (string: ID, DNA: seq, Boolean: changed), like what is coming
+out of the cleaning step.
+
+In recovery mode, the inputs which were passed into the step the first time it
+was encountered are looked up, rather than being passed in. To recover, the
+step is re-run on these same inputs, and anything passed in the \code{inputs}
+parameter is ignored.
+
+\paragraph*{step\_run\_dir}
+
+A step is run in its own individual directory in the Sandbox. This directory
+must exist and be empty, and Shipyard must have both read and write access to
+it. In the recovery case, we look up the directory where the step was executed
+the first time, and this parameter is ignored.
+
+\subsubsection*{Prepare}
+
+The first step of PipelineStep execution is to set up directories on the file
+system for input data, output data, and logs. Typically, steps are run in a
+directory called stepN, where N is the step's number within its parent
+Pipeline. When executing the first step in the example Pipeline, the directory
+structure will look like this.
+
+\begin{verbatim}
+  userWill_run47_c2DW92/
+    input_data/
+    output_data/
+    step1/
+      input_data/
+      output_data/
+      logs/
+\end{verbatim}
+
+The directory \code{step1} in the above schematic should already have been
+created before calling \code{execute\_step}, and is passed in as the
+\code{step\_run\_dir} parameter. In recovery mode, the top-level directory is
+looked up in \code{ps\_map}. In both cases, this directory is checked for
+existence. In the non-recovery case, the step directory must be empty, and the
+sub-directories are created. When recovering, we check that these directories
+are already there, and that no other files or folders are present.
+
+If code must be run to execute the step, it will be placed inside the step
+directory (above, \code{step1}). This means that, after a step has been run,
+there may be other files in the step's directory - code and dependencies.
+However, when executing a step in recovery mode, we may still insist that the
+directory have only the three mentoned subdirectories in it. If the code for a
+step was actually run in the Sandbox, \code{recover} should never return to
+that step, because its output data is already in the Sandbox. 
+
+A record of the step execution is now required. If this step has never been
+reached before in this particular Run (that is, we are not recovering), a new
+RunStep is created and started. Otherwise, for recovery, the original RunStep
+is retrieved from \code{ps\_map}, and is not re-started. 
+
+\alert{We already did something by creating the directories. Should the RunStep
+have been started before that?}
+
+The final step of preparation is to define where the step's outputs will go. If 
+not recovering, the output paths will look like
+
+\begin{verbatim}
+  userWill_run47_c2DW92/step1/output_data/step1_cleaned seqs.csv
+\end{verbatim}
+
+where \code{cleaned seqs} is the name of the output, and \code{csv} indicates
+that the file has a CompoundDatatype (raw data is given the suffix \code{raw}
+instead). If recovering, the output SymbolicDatasets from the first time the
+step was executed are retrieved from the RunStep's ExecRecord, and the output
+paths are looked up in \code{sd\_fs\_map}. Note that, because recovery entails
+that the step was already executed succesfully, the SymbolicDatasets in
+question are guaranteed to be in \code{sd\_fs\_map}.
+
+\alert{Why do we look up the output paths here? The earliest we need them is
+when we completely reuse an ExecRecord.}
+
+In the non-recovery case, the only database transaction taking place during
+this phase is the creation of a RunStep. Before this part of the algorithm,
+there was no evidence in the database that step execution had started.
+Afterward, there is a RunStep in the following state.
+\begin{center}
+  \begin{tabular}{|c|c|c|}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{2}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    & \code{RSICs} & unset \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & None \\
+    & \code{reused} & None \\
+    & \code{log} & None \\
+    & \code{invoked\_logs} & None \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    & \code{end\_time} & None \\
+    \hline
+  \end{tabular}
+\end{center}
+
+In the recovery case, no database transactions have been performed yet.
+
+\subsubsection*{Run cables}
+
+The next step is to execute all the PipelineStepInputCables feeding into the
+PipelineStep. This part of the algorithm is skipped entirely when recovering,
+since in that case, the cables will already have been executed the first time
+we executed the step.
+
+The input cables are listed in the PipelineStep's \code{cables\_in} variable.
+Each cable is instructed to write its output to the relevant input path for the
+step, since the cable's output becomes the step's input. In the example
+Pipeline, to execute step 1 ``clean'', the cable feeding this step will be
+instructed to write its output to
+
+\begin{verbatim}
+  userWill_run47_c2DW92/step1/input_data/step1_unaligned seqs.csv
+\end{verbatim}
+
+\renewcommand{\nin}{n_{\mathrm{in}}} 
+
+The cable execution algorithm is called on each cable, which returns a RunSIC
+pointing to the currently executing RunStep.  During the execution of cables,
+the RunStep may be in one of two intermediate states. First, one of the cables
+may be in the middle of execution, and some number of others are succesful and
+complete. Second, one of the cables may just have finished executing, but the
+next one has not started yet. 
+
+These possible intermediate states are summarized below. Here, $\nin$ is the
+number of inputs to the step. In the example Pipeline, $\nin=1$ for step 1
+``clean'' and $\nin=2$ for step 2 ``align''. We use the variable $k$ to
+indicate the number of complete RunSIC's associated to the RunStep.
+
+\begin{center}
+  \begin{tabular}{|c|c|C{8cm}|}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    \cline{2-3}
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{6}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    \cline{2-3}
+    & \code{RSICs} & 1 in progress, $0 \leq k \leq \nin-1$ succesful and complete, 
+                     $\nin - k - 1$ not yet created
+                     \newline \textit{or} \newline 
+                     0 in progress, $1 \leq k \leq \nin-1$ succesful and complete, 
+                     $\nin - k$ not yet created \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & None \\
+    & \code{reused} & None \\
+    \cline{2-3}
+    & \code{log} & None \\
+    \cline{2-3}
+    & \code{invoked\_logs} & None \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    \cline{2-3}
+    & \code{end\_time} & None \\
+    \hline
+  \end{tabular}
+\end{center}
+
+If any of the cables fails, indicated by the \code{succesful\_execution}
+function of the RunSIC returning False, step execution is considered to have
+failed. The newly created RunStep is stopped, and returned in the following
+incomplete state.
+
+\begin{center}
+  \begin{tabular}{|c|c| C{8cm} |}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    \cline{2-3}
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{3}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    \cline{2-3}
+    & \code{RSICs} & 1 unsuccesful, $0 \leq k \leq \nin-1$ succesful and complete, 
+                     $\nin-k-1$ not yet created \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & None \\
+    \cline{2-3}
+    & \code{reused} & None \\
+    \cline{2-3}
+    & \code{log} & None \\
+    \cline{2-3}
+    & \code{invoked\_logs} & None \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    \cline{2-3}
+    & \code{end\_time} & time when it became known that a cable failed \\
+    \hline
+  \end{tabular}
+\end{center}
+
+If all the cables executed succesfully, the RunStep now has the following state.
+
+\begin{center}
+  \begin{tabular}{|c|c|C{8cm}|}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    \cline{2-3}
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{2}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    \cline{2-3}
+    & \code{RSICs} & $\nin$ succesful and complete \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & None \\
+    \cline{2-3}
+    & \code{reused} & None \\
+    \cline{2-3}
+    & \code{log} & None \\
+    \cline{2-3}
+    & \code{invoked\_logs} & None \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    \cline{2-3}
+    & \code{end\_time} & None \\
+    \hline
+  \end{tabular}
+\end{center}
+
+Note that the step execution algorithm does not actually perform any database
+transactions here, except for stopping the RunStep in the case of cable
+failure. All other database activity is done by the cable execution algorithm.
+
+\subsubsection*{Look for ExecRecord}
+
+Recall that ExecRecords are only created for atomic Pipeline components, not
+for sub-Pipelines. Therefore, if the step to be executed represents a
+sub-Pipeline, this phase of execution is skipped entirely.
+
+If this execution is a recovery, the RunStep from the original step execution
+has already been retrieved from the maps. The relevant ExecRecord is already
+attached to that RunStep, so no searching has to be done. 
+
+The only non-trivial work done during this part of the algorithm occurs during
+ordinary execution (that is, not recovery) if the step is a Method (not a
+sub-Pipeline). In that case, the Method's \code{find\_compatible\_ER} method is
+called to search for an ExecRecord which may be either reused or filled in for
+this step. 
+
+Such a compatible ExecRecord must be for the same Method as that of the
+currently executing PipelineStep. That is, the ExecRecord must have been
+generated by an ExecLog corresponding to a RunStep for the same PipelineStep.
+It also must have the same SymbolicDatasets in its ExecRecordOuts as the inputs 
+currently being fed to the step.
+
+If such an ExecRecord is found, the next step is to check if it provides the
+outputs this execution requires. Suppose that Will feeds the SymbolicDataset
+$D$ into the alignment Pipeline, and he does not want to keep the output of the
+``clean'' step. If the ExecRecord depicted below exists in the database, it may
+be reused
+
+\end{document}
