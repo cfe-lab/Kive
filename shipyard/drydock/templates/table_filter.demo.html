@@ -59,9 +59,11 @@ $(function() {
             // Search terms are contained within zero-width word boundary delimeters.
             // Special regexp characters are escaped. Then, wildcards (*) and logical ORs (|) are interpreted.
             regex_search = new RegExp('\\b(' + val.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&").replace(/\\\*/g, '.*').replace(/([\w\*])\\\|([\w\*])/g, '$1|$2')  + ')\\b', 'i');
-            $('tbody td:nth-child(' + nth_cell + '):visible', o_r).each(function() {
+            $('tbody tr:visible td:nth-child(' + nth_cell + ')', o_r).each(function() {
                 if (this.innerHTML.search(regex_search) == -1) {
-                    $(this).closest('tr').hide();
+                    var $tr = $(this).closest('tr').hide();
+                    if ($tr.hasClass('selected'))
+                        $tr.trigger('click');
                     num_results--;
                 }
             });
@@ -89,6 +91,8 @@ $(function() {
             if (this.value.length > 0)
                 filters_js.push({ key: $(this).data('link'), val: this.value });
         }).val('');
+        
+        console.log(filters_js);
         
         filterTable(o_r);
         return false;
@@ -121,13 +125,10 @@ $(function() {
     });
     
     if (typeof o_rData.displaycols != 'undefined') {
-        o_rData.displaycols = o_rData.displaycols.split(',');
-        var display_cells = $();
-    
-        for (var i=0; i < o_rData.displaycols.length; i++)
-            display_cells = display_cells.add( $('td,th', o_r).filter(':nth-child('+ o_rData.displaycols[i] + ')') );
+        for (var i = 0, cells = $('td,th', o_r), cols = o_rData.displaycols.split(','); i < cols.length; i++)
+            cells = cells.not(':nth-child('+ cols[i] + ')');
         
-        $('td, th', o_r).not(display_cells).hide();
+        cells.hide();
     }
     
 });
@@ -144,10 +145,21 @@ table {
 }
 td {
     border: 1px solid #eee;
+    background-color: #fff;
     border-width: 1px 0;
     padding: .25em .5em;
     vertical-align: top;
     font-size: 9pt;
+    max-width: 30em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+td:hover {
+    position: absolute;
+    max-width: none;
+    overflow: visible;
+    border-bottom: 1px solid #000;
 }
 #no_results {
     border: 1px solid red;
@@ -244,7 +256,7 @@ tr.selected td {
 </tr>
             
 <tr><td>2</td>
-<td>IDU perspectives on the design and operation of North America&amp;apos;s first medically supervised injection facility</td><td><i>NULL</i></td><td>Substance Use &amp;amp; Misuse</td><td>2011</td>
+<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
 <td>2011-01-01</td>
 <td>2011</td>
 <td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
@@ -358,7 +370,7 @@ tr.selected td {
 </tr>
             
 <tr><td>15</td>
-<td>Injection drug use cessation and use of North America&amp;apos;s first medically supervised safer injecting facility</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 15</td>
+<td>Injection drug use cessation and use of North America&apos;s first medically supervised safer injecting facility</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 15</td>
 <td>2011-01-15</td>
 <td>2011</td>
 <td>1</td>
@@ -491,7 +503,7 @@ tr.selected td {
 </tr>
             
 <tr><td>30</td>
-<td>A Comparison of Drug Use and Risk Behavior Profiles Among Younger and Older Street Youth</td><td><i>NULL</i></td><td>Substance Use &amp;amp; Misuse</td><td>2011</td>
+<td>A Comparison of Drug Use and Risk Behavior Profiles Among Younger and Older Street Youth</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
 <td>2011-01-01</td>
 <td>2011</td>
 <td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
@@ -555,7 +567,7 @@ tr.selected td {
 </tr>
             
 <tr><td>36</td>
-<td>In vitro selection of clinically relevant bevirimat resistance mutations revealed by &amp;quot;deep&amp;quot; sequencing of serially passaged, quasispecies-containing recombinant HIV-1</td><td><i>NULL</i></td><td>J Clin Microbiol</td><td>2011 Jan</td>
+<td>In vitro selection of clinically relevant bevirimat resistance mutations revealed by &quot;deep&quot; sequencing of serially passaged, quasispecies-containing recombinant HIV-1</td><td><i>NULL</i></td><td>J Clin Microbiol</td><td>2011 Jan</td>
 <td>2011-01-01</td>
 <td>2011</td>
 <td>1</td>
@@ -594,7 +606,7 @@ tr.selected td {
 </tr>
             
 <tr><td>40</td>
-<td>Risky health environments: Women sex workers&amp;apos; struggles to find safe, secure and non-exploitative housing in Canada&amp;apos;s poorest postal code</td><td><i>NULL</i></td><td>Soc Sci Med</td><td>2011 Dec</td>
+<td>Risky health environments: Women sex workers&apos; struggles to find safe, secure and non-exploitative housing in Canada&apos;s poorest postal code</td><td><i>NULL</i></td><td>Soc Sci Med</td><td>2011 Dec</td>
 <td>2011-12-01</td>
 <td>2011</td>
 <td>12</td>
@@ -645,7 +657,7 @@ tr.selected td {
 </tr>
             
 <tr><td>45</td>
-<td>Reduction in overdose mortality after the opening of North America&amp;apos;s first medically supervised safer injecting facility: a retrospective population-based study</td><td><i>NULL</i></td><td>Lancet</td><td>2011 Apr 23</td>
+<td>Reduction in overdose mortality after the opening of North America&apos;s first medically supervised safer injecting facility: a retrospective population-based study</td><td><i>NULL</i></td><td>Lancet</td><td>2011 Apr 23</td>
 <td>2011-04-23</td>
 <td>2011</td>
 <td>4</td>
@@ -799,7 +811,7 @@ tr.selected td {
 </tr>
             
 <tr><td>60</td>
-<td>&amp;quot;The way I see it&amp;quot;: the effect of stigma and depression on self-perceived body image among HIV positive individuals on treatment in British Columbia, Canada</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Nov</td>
+<td>&quot;The way I see it&quot;: the effect of stigma and depression on self-perceived body image among HIV positive individuals on treatment in British Columbia, Canada</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Nov</td>
 <td>2011-11-01</td>
 <td>2011</td>
 <td>11</td>
@@ -821,7 +833,7 @@ tr.selected td {
 </tr>
             
 <tr><td>62</td>
-<td>Use of North America&amp;apos;s First Medically Supervised Safer Injecting Facility Among HIV Positive Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Educ Prev</td><td>2011 Oct</td>
+<td>Use of North America&apos;s First Medically Supervised Safer Injecting Facility Among HIV Positive Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Educ Prev</td><td>2011 Oct</td>
 <td>2011-10-01</td>
 <td>2011</td>
 <td>10</td>
@@ -877,7 +889,7 @@ tr.selected td {
 </tr>
             
 <tr><td>68</td>
-<td>Injection drug users&amp;apos; access to a supervised injection facility in Vancouver, Canada: the influence of operating policies and local drug culture</td><td><i>NULL</i></td><td>Qualitative Health Research</td><td>2011</td>
+<td>Injection drug users&apos; access to a supervised injection facility in Vancouver, Canada: the influence of operating policies and local drug culture</td><td><i>NULL</i></td><td>Qualitative Health Research</td><td>2011</td>
 <td>2011-01-01</td>
 <td>2011</td>
 <td><i>NULL</i></td><td><i>NULL</i></td><td>21</td>
@@ -899,7 +911,7 @@ tr.selected td {
 </tr>
             
 <tr><td>70</td>
-<td>&amp;quot;Dynamic Range&amp;quot; of Inferred Phenotypic HIV Drug Resistance Values in Clinical Practice</td><td><i>NULL</i></td><td>PLoS One</td><td>2011 Feb 24</td>
+<td>&quot;Dynamic Range&quot; of Inferred Phenotypic HIV Drug Resistance Values in Clinical Practice</td><td><i>NULL</i></td><td>PLoS One</td><td>2011 Feb 24</td>
 <td>2011-02-24</td>
 <td>2011</td>
 <td>2</td>
@@ -1060,7 +1072,7 @@ tr.selected td {
 </tr>
             
 <tr><td>85</td>
-<td>An assessment of global Internet-based HIV/AIDS media coverage: implications for United Nations Programme on HIV/AIDS&amp;apos; Global Media HIV/AIDS initiative</td><td><i>NULL</i></td><td>Int J STD AIDS</td><td>2010 Jan</td>
+<td>An assessment of global Internet-based HIV/AIDS media coverage: implications for United Nations Programme on HIV/AIDS&apos; Global Media HIV/AIDS initiative</td><td><i>NULL</i></td><td>Int J STD AIDS</td><td>2010 Jan</td>
 <td>2010-01-01</td>
 <td>2010</td>
 <td>1</td>
@@ -1071,7 +1083,7 @@ tr.selected td {
 </tr>
             
 <tr><td>86</td>
-<td>Physician&amp;apos;s manual reporting underestimates mortality: evidence from a population-based HIV/AIDS treatment program</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010 Oct 25</td>
+<td>Physician&apos;s manual reporting underestimates mortality: evidence from a population-based HIV/AIDS treatment program</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010 Oct 25</td>
 <td>2010-10-25</td>
 <td>2010</td>
 <td>10</td>
