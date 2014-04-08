@@ -6,11 +6,26 @@
 {% block title %}Datatypes{% endblock %}
 
 {% block javascript %}
+<!-- I'd like to put this into base.html, but when I did that, it stopped showing up. —JN -->
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script type="text/javascript">
+
+$(function() {
+    // For table rows that start with a link, clicking the row should click the link.
+    var links = $('td:first-child > a:first-child:last-child');
+    links.closest('tr').css('cursor', 'pointer').on('click', function() {
+        $('td > a', this)[0].click();
+    }).on('mouseover mouseout', function() {
+        $(this).toggleClass('hover');
+    });
+});
+
+</script>
 {% endblock %}
 
 {% block content %}
 
-<a href="/dev.html">Back to developer's portal</a>
+<a href="/dev.html" rel="prev">Back to developer's portal</a>
 
 <h2>Datatypes</h2>
 

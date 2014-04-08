@@ -125,10 +125,16 @@ $(function() {
     });
     
     if (typeof o_rData.displaycols != 'undefined') {
-        for (var i = 0, cells = $('td,th', o_r), cols = o_rData.displaycols.split(','); i < cols.length; i++)
+        for (var i = 0, cells = $('td,th', o_r), cols = o_rData.displaycols.toString().split(','); i < cols.length; i++)
             cells = cells.not(':nth-child('+ cols[i] + ')');
         
         cells.hide();
+    }
+    if (typeof o_rData.truncatecols != 'undefined') {
+        for (var i = 0, cells = $(), cols = o_rData.truncatecols.toString().split(','); i < cols.length; i++)
+            cells = cells.add('tbody td:nth-child('+ cols[i] + ')', o_r);
+        console.log(cols);
+        cells.addClass('truncate');
     }
     
 });
@@ -150,12 +156,14 @@ td {
     padding: .25em .5em;
     vertical-align: top;
     font-size: 9pt;
+}
+td.truncate {
     max-width: 30em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-td:hover {
+td.truncate:hover {
     position: absolute;
     max-width: none;
     overflow: visible;
@@ -224,7 +232,7 @@ tr.selected td {
 <div id="no_results">
 <strong>No results were found.</strong>
 </div>
-<table id="table_results" data-pkey="pID" data-displaycols="2,4,5,13">
+<table id="table_results" data-pkey="pID" data-displaycols="2,4,5,13" data-truncatecols="2">
 <thead>
 <tr>
 <th>pID</th>
