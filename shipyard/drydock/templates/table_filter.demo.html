@@ -127,13 +127,11 @@ $(function() {
     if (typeof o_rData.displaycols != 'undefined') {
         for (var i = 0, cells = $('td,th', o_r), cols = o_rData.displaycols.toString().split(','); i < cols.length; i++)
             cells = cells.not(':nth-child('+ cols[i] + ')');
-        
         cells.hide();
     }
     if (typeof o_rData.truncatecols != 'undefined') {
         for (var i = 0, cells = $(), cols = o_rData.truncatecols.toString().split(','); i < cols.length; i++)
             cells = cells.add('tbody td:nth-child('+ cols[i] + ')', o_r);
-        console.log(cols);
         cells.addClass('truncate');
     }
     

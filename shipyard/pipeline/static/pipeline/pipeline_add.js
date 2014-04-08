@@ -71,12 +71,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $.each(arr, function(index,value) {
                             options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
                         });
-                        $("#id_select_method").html(options.join(''));
+                        $("#id_select_method").show().html(options.join(''));
                     }
                 })
             }
             else {
-                $("#id_select_method").html('<option value="">--- select Method Family first ---</option>');
+                $("#id_select_method").hide();
             }
         }
     ).change() // trigger on load
@@ -160,6 +160,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
         canvasState.deleteObject();
     })
+    
+    $('#id_revision_desc').on('keydown', function() {
+        var $this = $(this),
+            happy = -Math.min(15, Math.floor($this.val().length / 19)) * 32;
+    
+        $('.happy_indicator').css('background-position', happy + 'px 0px');
+    })
+        .trigger('keydown')
+        .wrap('<div id="description_wrap">')
+        .after('<div class="happy_indicator">')
+        .after('<div class="happy_indicator_label">Write a great description to keep everyone happy!</div>')
+        .on('focus', function() {
+            $('.happy_indicator, .happy_indicator_label').show();
+        }).on('blur', function() {
+            $('.happy_indicator, .happy_indicator_label').hide();
+        }).blur();
 
     $('form').submit(function(e) {
         var input = $("<input>")

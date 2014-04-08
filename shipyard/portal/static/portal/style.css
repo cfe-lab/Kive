@@ -96,25 +96,30 @@ p {
 a[rel="prev"] {
     display: block;
     margin-left: -4em;
-    margin-top: -.4em;
+    margin-top: -4.5em;
     float: left;
-    padding: 1.1em 1.4em;
+    padding: 0.8em 1.4em;
     background-color: #888;
     line-height: 0;
-    opacity: 0.2;
-    width: 0; overflow: hidden;
+    opacity: 0.4;
+    color: #fff;
+    font-style: italic;
+    width: 0; overflow:hidden;
     color: rgba(0,0,0,0);
 }
 a[rel="prev"]:hover {
     background-color: #4ae;
     opacity: 0.3;
     outline: none;
+    width: auto;
+    color: #fff;
 }
 a[rel="prev"]:before {
     content: "\25C2";
-    font-size: 3em;
-    margin-left: -.35em;
-    color: rgba(255,255,255,1);
+    margin-left: -.3em;
+    margin-right: 2em;
+    color: #fff;
+    font-style: normal;
 }
 
 
@@ -194,17 +199,32 @@ form select {
 #xputForms td {
     padding: 0;
 }
-#xputForms td:first-child {
+input, select, textarea {
+    outline: none; /* Annoying WebKit feature */
+}
+#xputForms td:first-child,
+input[type="text"],
+input[type="number"],
+select {
     padding: .25em;
 }
-#xputForms input,
-#xputForms select {
+#xputForms input {
     margin: -1px 0 0 -1px;
-    padding: .25em;
 }
 #xputForms select {
-    margin-bottom: -2px;
-    background-color: #fff;
+    margin: -1px 0 -2px -1px;
+}
+select:not([multiple]) {
+    padding-right: 1.55em;
+    /* Disable FF/WebKit user agent styles */
+    -webkit-appearance: none;
+    border-radius: 0;
+    -moz-appearance: none;
+    text-indent: 0.01px;
+    text-overflow: '';
+    
+    /* Create a drop-down button to replace the one we just removed. */
+    background: url('data:image/gif;base64,R0lGODlhDwAOAJEAAN/f3////8DAwAAAACH5BAAAAAAALAAAAAAPAA4AAAIgjANwyyCi2HIPSkOrbVrHC4biSEpZ9x3nk06eSLVXEhYAOw==') #fff right center no-repeat;
 }
 #xputForms tr:first-child input,
 #xputForms tr:first-child select {
@@ -217,9 +237,74 @@ form select {
     border-bottom: 0;
 }
 
+input[type="button"], 
+input[type="submit"], 
+input[type="reset"] {
+    box-shadow: inset -.2em -.4em .4em -.2em #ccc, 
+                inset .2em .8em 1em -.2em #fff;
+    border-radius: 1em;
+    padding: 0 1em;
+    color: #444;
+    background-color: #ddd;
+}
+input[type="button"]:active, 
+input[type="submit"]:active, 
+input[type="reset"]:active {
+    box-shadow: inset .2em .4em .4em -.2em #ccc, inset -.2em -.8em 1em -.2em #fff;
+}
+input.add {
+    border-radius: 1em 0 0 1em;
+    border-right: 0;
+    font-weight: bold;
+}
+input.remove {
+    border-radius: 0 1em 1em 0;
+    border-left: 0;
+    font-weight: bold;
+}
+
 .shortIntField{
     width: 80px;
 }
+
+#pipeline_canvas {
+    border: 1px dotted;
+    padding: .25em;
+}
+.happy_indicator {
+    background: url('/static/portal/smiley.png');
+    width: 32px;
+    height: 32px;
+    margin-top: -40px;
+    margin-right: 25px;
+    float: right;
+    z-index: 2;
+    position: relative;
+}
+.happy_indicator_label {
+    margin-top: -3em;
+    line-height: 1.1em;
+    margin-right: 70px;
+    float: right;
+    z-index: 2;
+    position: relative;
+    font-size: 0.7em;
+    font-style: italic;
+    width: 40%;
+    color: #aaa;
+}
+#description_wrap {
+    width: 300px;
+    text-align: right;
+}
+#id_revision_desc {
+    position: relative;
+    z-index: 1;
+    width: 280px;
+    height: 150px;
+    padding: 10px;
+}
+
 
 @font-face {
     font-family: 'Lato';
