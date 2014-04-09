@@ -154,13 +154,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     $(document).on('keydown', function(e) {
         // backspace key also removes selected object
-        if (e.which === 8) {
-            if (!$(e.target).is("input, textarea")) {
-                // prevent backspace from triggering browser to navigate back one page
-                e.preventDefault();
-            } else {
-                canvasState.deleteObject();
-            }
+        if (e.which === 8 && !$(e.target).is("input, textarea")) {
+            // prevent backspace from triggering browser to navigate back one page
+            e.preventDefault();
+            canvasState.deleteObject();
         }
     })
     
