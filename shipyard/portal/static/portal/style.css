@@ -70,16 +70,13 @@ tr.inputs input {
 }
 h1 {
     font-size: 3em;
-    background: #333;
-    text-transform: uppercase;
-    color: #3d3d3d;
     margin: 0 0 1.5em;
-    padding: 0 1.333em;
     line-height: .9em;
-    letter-spacing: .2em;
+    background: url('/static/portal/h1.png') #333 .7em top no-repeat;
+    text-indent: -999em;
 }
 h1:hover {
-    color: #666;
+    background-position: .7em -43px;
     cursor: default;
 }
 h2 {
@@ -174,6 +171,7 @@ form textarea,
 form select {
     font: inherit;
     border: 1px solid #ccc;
+    outline: none; /* Annoying WebKit feature */
 }
 
 .helptext {
@@ -196,23 +194,50 @@ form select {
     max-width: 20em;
 }
 
-#xputForms td {
+table.formtable {
+    border-collapse: collapse;
+}
+.formtable td {
     padding: 0;
+    border: 1px solid #ccc;
+    line-height: 1.6em;
+    padding-left: .5em;
 }
-input, select, textarea {
-    outline: none; /* Annoying WebKit feature */
-}
-#xputForms td:first-child,
 input[type="text"],
 input[type="number"],
 select {
     padding: .25em;
 }
-#xputForms input {
-    margin: -1px 0 0 -1px;
+.formtable input,
+.formtable select {
+    border: 0;
+    margin-left: -.5em;
 }
-#xputForms select {
-    margin: -1px 0 -2px -1px;
+.formtable tr:first-child input,
+.formtable tr:first-child select {
+    margin-top: 0;
+    border-top: 0;
+}
+.formtable tr:last-child input,
+.formtable tr:last-child select {
+    margin-bottom: 0;
+    border-bottom: 0;
+}
+
+input[type="button"], 
+input[type="submit"], 
+input[type="reset"] {
+    box-shadow: inset -.2em -.4em .4em -.2em #ccc, 
+                inset  .2em  .8em  1em -.2em #fff;
+    border-radius: 1em;
+    padding: 0 1em;
+    color: #444;
+    background-color: #ddd;
+}
+input[type="button"]:active, 
+input[type="submit"]:active, 
+input[type="reset"]:active {
+    box-shadow: inset .2em .4em .4em -.2em #ccc, inset -.2em -.8em 1em -.2em #fff;
 }
 select:not([multiple]) {
     padding-right: 1.55em;
@@ -225,32 +250,6 @@ select:not([multiple]) {
     
     /* Create a drop-down button to replace the one we just removed. */
     background: url('data:image/gif;base64,R0lGODlhDwAOAJEAAN/f3////8DAwAAAACH5BAAAAAAALAAAAAAPAA4AAAIgjANwyyCi2HIPSkOrbVrHC4biSEpZ9x3nk06eSLVXEhYAOw==') #fff right center no-repeat;
-}
-#xputForms tr:first-child input,
-#xputForms tr:first-child select {
-    margin-top: 0;
-    border-top: 0;
-}
-#xputForms tr:last-child input,
-#xputForms tr:last-child select {
-    margin-bottom: 0;
-    border-bottom: 0;
-}
-
-input[type="button"], 
-input[type="submit"], 
-input[type="reset"] {
-    box-shadow: inset -.2em -.4em .4em -.2em #ccc, 
-                inset .2em .8em 1em -.2em #fff;
-    border-radius: 1em;
-    padding: 0 1em;
-    color: #444;
-    background-color: #ddd;
-}
-input[type="button"]:active, 
-input[type="submit"]:active, 
-input[type="reset"]:active {
-    box-shadow: inset .2em .4em .4em -.2em #ccc, inset -.2em -.8em 1em -.2em #fff;
 }
 input.add {
     border-radius: 1em 0 0 1em;

@@ -110,7 +110,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             x = 100,
             y = 200 + 50 * Math.random(),
             r = 20,
-            fill = '#33FF33',
+            fill = '#88DD88',
             inset = 10,
             offset = 30,
             pk = cdt,
@@ -134,7 +134,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 success: function(result) {
                     inputs = result['inputs'];
                     outputs = result['outputs'];
-                    canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
+                    
+                    // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
+                    canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC', node_label, 0, inputs, outputs));
                 }
             });
         }
@@ -153,8 +155,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     $(document).on('keydown', function(e) {
-        // backspace key also removes selected object
-        if (e.which === 8 && !$(e.target).is("input, textarea")) {
+        // backspace or delete key also removes selected object
+        if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
             // prevent backspace from triggering browser to navigate back one page
             e.preventDefault();
             canvasState.deleteObject();
@@ -218,8 +220,8 @@ CDT_Node.prototype.draw = function(ctx) {
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
-    ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y + this.offset);
+    ctx.font = '10pt Lato, sans-serif';
+    ctx.fillText(this.label, this.x, this.y - this.offset);
 
     // draw magnet
     out_magnet = this.out_magnets[0];
@@ -259,7 +261,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
 
     this.spacing = spacing || 10; // vertical separation between pins
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
-    this.fill = fill || "#AAAAAA";
+    this.fill = fill || "#DDDDDD";
     this.label = label || '';
 
     this.in_magnets = [];
@@ -268,13 +270,18 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
         var magnet = new Magnet(
             parent = this,
             x = this.x + this.inset,
-            y = this.y + this.spacing * (this.in_magnets.length + .5),
+            y = this.y + this.h/2 + this.spacing * (this.in_magnets.length - this.n_inputs/2 + .5),
             r = 5,
             attract = 2,
             fill = '#FFFFFF',
             cdt = this_input['cdt_pk'],
             label = this_input['cdt_label']
         );
+        
+        if (this.n_inputs == 1) {
+            magnet.x -= this.h/3
+        }
+        
         this.in_magnets.push(magnet);
     }
 
@@ -284,13 +291,18 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
         magnet = new Magnet(
             parent = this,
             x = this.x + this.w - this.inset,
-            y = this.y + this.spacing * (this.out_magnets.length + .5),
+            y = this.y + this.h/2 + this.spacing * (this.out_magnets.length - this.n_outputs/2 + .5),
             r = 5,
             attract = 2,
             fill = '#FFFFFF',
             cdt = this_output['cdt_pk'],
             label = this_output['cdt_label']
         );
+        
+        if (this.n_inputs == 1) {
+            magnet.x += this.h/3
+        }
+        
         this.out_magnets.push(magnet);
     }
 }
@@ -298,23 +310,47 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
 MethodNode.prototype.draw = function(ctx) {
     // draw rectangle
     ctx.fillStyle = this.fill;
-    ctx.fillRect(this.x, this.y, this.w, this.h);
+//    ctx.fillRect(this.x, this.y, this.w, this.h);
+    
+    // draw a hexagon
+    var hx, hy;
+    ctx.beginPath();
+    ctx.moveTo(hx = this.x, hy = this.y);
+    ctx.lineTo(hx += this.w, hy);
+    ctx.lineTo(hx += this.h/3, hy += this.h/2);
+    ctx.lineTo(hx -= this.h/3, hy += this.h/2);
+    ctx.lineTo(hx = this.x, hy);
+    ctx.lineTo(hx - this.h/3, hy - this.h/2);
+    ctx.closePath();
+    ctx.fill();
 
     // draw magnets
-    for (var i = 0; i < this.in_magnets.length; i++) {
+    for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
-        magnet.draw(ctx, this.x + this.inset, this.y + this.spacing * (i + .5));
+        magnet.x = this.x + this.inset;
+        if (len == 1) {
+            // Special case if there's only 1 input (or output).
+            // I may rethink this later. —JN
+            magnet.x -= this.h * .1;
+        }
+        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        magnet.draw(ctx);
     }
-    for (i = 0; i < this.out_magnets.length; i++) {
+    for (i = 0, len = this.out_magnets.length; i < len; i++) {
         magnet = this.out_magnets[i];
-        magnet.draw(ctx, this.x + this.w - this.inset, this.y + this.spacing * (i + .5));
+        magnet.x = this.x + this.w - this.inset;
+        if (len == 1) {
+            magnet.x += this.h * .1;
+        }
+        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        magnet.draw(ctx);
     }
 
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
-    ctx.font = '12pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w / 2, this.y + this.h + this.offset);
+    ctx.font = '10pt Lato, sans-serif';
+    ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
 };
 
 MethodNode.prototype.contains = function(mx, my) {
@@ -339,10 +375,11 @@ function Magnet (parent, x, y, r, attract, fill, cdt, label) {
     this.connected = null; // linked to a Connector
 }
 
-Magnet.prototype.draw = function(ctx, x, y) {
+Magnet.prototype.draw = function(ctx) {
     // update values passed from shape
-    this.x = x;
-    this.y = y;
+    // ** Update magnet.x and magnet.y and then call draw(). —JN
+//    this.x = x;
+//    this.y = y;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
     ctx.fillStyle = this.fill;
@@ -501,8 +538,8 @@ function CanvasState (canvas) {
     }, true);
 
     // options
-    this.selectionColor = '#9999FF';
-    this.selectionWidth = 3;
+    this.selectionColor = '#88AAFF';
+    this.selectionWidth = 2.5;
     setInterval(function() { myState.draw(); }, 30); // 30 ms between redraws
 }
 
@@ -765,9 +802,18 @@ CanvasState.prototype.draw = function() {
             ctx.lineWidth = this.selectionWidth;
             var mySel = this.selection;
             
+            // Is it possible to move these drawing instructions into the objects themselves? —JN
             ctx.beginPath();
             if (mySel.constructor == MethodNode) {
-                ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
+//                ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
+                var hx, hy;
+                ctx.beginPath();
+                ctx.moveTo(hx = mySel.x, hy = mySel.y);
+                ctx.lineTo(hx += mySel.w, hy);
+                ctx.lineTo(hx += mySel.h/3, hy += mySel.h/2);
+                ctx.lineTo(hx -= mySel.h/3, hy += mySel.h/2);
+                ctx.lineTo(hx = mySel.x, hy);
+                ctx.lineTo(hx - mySel.h/3, hy - mySel.h/2);
             } else if (mySel.constructor == CDT_Node) {
                 ctx.arc(mySel.x, mySel.y, mySel.r, 0, 2*Math.PI, false);
             } else if (mySel.constructor == Connector && this.dragging == false) {

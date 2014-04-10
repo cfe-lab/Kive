@@ -42,5 +42,10 @@ def pipeline_add(request):
         return HttpResponse(t.render(c))
 
 
-
-
+def pipeline_exec(request):
+    t = loader.get_template('pipeline/pipeline_exec.html')
+    method_families = MethodFamily.objects.all()
+    compound_datatypes = CompoundDatatype.objects.all()
+    c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
