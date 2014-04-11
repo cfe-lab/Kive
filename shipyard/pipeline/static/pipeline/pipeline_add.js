@@ -197,7 +197,7 @@ function CDT_Node (x, y, r, fill, inset, offset, pk, label) {
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
     this.r = r || 10; // radius
-    this.fill = fill || "#AAAAAA";
+    this.fill = fill || "#aaa";
     this.inset = inset || 5; // distance of magnet from center
     this.offset = offset || 12; // distance of label from center
     this.pk = pk;
@@ -225,7 +225,9 @@ CDT_Node.prototype.draw = function(ctx) {
 
     // draw magnet
     out_magnet = this.out_magnets[0];
-    out_magnet.draw(ctx, this.x + this.inset, this.y);
+    out_magnet.x = this.x + this.inset;
+    out_magnet.y = this.y;
+    out_magnet.draw(ctx);
 };
 
 CDT_Node.prototype.contains = function(mx, my) {
@@ -261,7 +263,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
 
     this.spacing = spacing || 10; // vertical separation between pins
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
-    this.fill = fill || "#DDDDDD";
+    this.fill = fill || "#ddd";
     this.label = label || '';
 
     this.in_magnets = [];
@@ -273,7 +275,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
             y = this.y + this.h/2 + this.spacing * (this.in_magnets.length - this.n_inputs/2 + .5),
             r = 5,
             attract = 2,
-            fill = '#FFFFFF',
+            fill = '#fff',
             cdt = this_input['cdt_pk'],
             label = this_input['cdt_label']
         );
@@ -294,7 +296,7 @@ function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outpu
             y = this.y + this.h/2 + this.spacing * (this.out_magnets.length - this.n_outputs/2 + .5),
             r = 5,
             attract = 2,
-            fill = '#FFFFFF',
+            fill = '#fff',
             cdt = this_output['cdt_pk'],
             label = this_output['cdt_label']
         );
@@ -347,7 +349,7 @@ MethodNode.prototype.draw = function(ctx) {
     }
 
     // draw label
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = '#000';
     ctx.textAlign = 'center';
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
@@ -369,7 +371,7 @@ function Magnet (parent, x, y, r, attract, fill, cdt, label) {
     this.y = y;
     this.r = r; // radius
     this.attract = attract; // radius of Connector attraction
-    this.fill = fill || "#FFFFFF";
+    this.fill = fill || "#fff";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
     this.connected = null; // linked to a Connector
@@ -429,7 +431,7 @@ Connector.prototype.draw = function(ctx) {
     /*
     Draw a line to represent a Connector originating from a Magnet.
      */
-    ctx.strokeStyle = '#AAAAAA';
+    ctx.strokeStyle = '#aaa';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
 
@@ -461,23 +463,21 @@ Connector.prototype.contains = function(mx, my, pad) {
     (3) the distance of x,y to the line is below cutoff,
         see http://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
      */
+    var dx = this.x - this.fromX,
+        dy = this.y - this.fromY;
+    
     return (
-        ((this.x < mx) !== (this.fromX < mx))
-        &&
-        ((this.y < my) !== (this.fromY < my))
-        &&
-        (Math.abs(
-                (
-                    (this.y-this.fromY)*mx
-                    - (this.x-this.fromX)*my
-                    + this.x*this.fromY
-                    - this.y*this.fromX
-                ) / Math.sqrt(
-                            (this.x-this.fromX)*(this.x-this.fromX) +
-                            (this.y-this.fromY)*(this.y-this.fromY)
-                    )
-            ) < pad
-        )
+        (this.x < mx) !== (this.fromX < mx)
+        && (this.y < my) !== (this.fromY < my)
+        && Math.abs(
+            (
+                dy * mx
+                - dx * my
+                + this.x * this.fromY
+                - this.y * this.fromX
+            )
+            / Math.sqrt(dx * dx + dy * dy)
+        ) < pad
     )
 };
 
@@ -538,7 +538,7 @@ function CanvasState (canvas) {
     }, true);
 
     // options
-    this.selectionColor = '#88AAFF';
+    this.selectionColor = '#8af';
     this.selectionWidth = 2.5;
     setInterval(function() { myState.draw(); }, 30); // 30 ms between redraws
 }
@@ -552,7 +552,7 @@ CanvasState.prototype.doDown = function(e) {
     var connectors = this.connectors;
 
     // are we in raw data end-zone?
-    if (mx < 0.1*this.width) {
+    if (mx < .1 * this.width) {
         // create Connector from raw data end-zone
         conn = new Connector(from_x = mx, from_y = my);
         connectors.push(conn);
@@ -760,13 +760,13 @@ CanvasState.prototype.clear = function() {
     this.ctx.font = '12pt Lato, sans-serif';
 
     // draw raw data end-zone
-    this.ctx.fillStyle = '#AAFFAA';
+    this.ctx.fillStyle = '#afa';
     this.ctx.fillRect(0, 0, this.width * 0.1, this.height);
     this.ctx.fillStyle = 'black';
     this.ctx.fillText('Raw data', this.width * 0.05, 20);
 
     // draw output end-zone
-    this.ctx.fillStyle = '#FFAAAA';
+    this.ctx.fillStyle = '#faa';
     this.ctx.fillRect(this.width * 0.9, 0, this.width, this.height);
     this.ctx.fillStyle = 'black';
     this.ctx.fillText('Output', this.width * 0.95, 20);
@@ -780,8 +780,7 @@ CanvasState.prototype.draw = function() {
         this.clear();
 
         // draw all shapes and magnets
-        var l = shapes.length;
-        for (var i = 0; i < l; i++) {
+        for (var i = 0; i < shapes.length; i++) {
             var shape = shapes[i];
             // skip shapes moved off the screen
             if (shape.x > this.width || shape.y > this.height || shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
@@ -791,8 +790,7 @@ CanvasState.prototype.draw = function() {
         }
 
         // draw all connectors
-        var l = connectors.length;
-        for (var i = 0; i < l; i++) {
+        for (i = 0; i < connectors.length; i++) {
             connectors[i].draw(ctx);
         }
 
@@ -806,6 +804,7 @@ CanvasState.prototype.draw = function() {
             ctx.beginPath();
             if (mySel.constructor == MethodNode) {
 //                ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
+                // Draw a hexagon.
                 var hx, hy;
                 ctx.beginPath();
                 ctx.moveTo(hx = mySel.x, hy = mySel.y);

@@ -31,8 +31,8 @@ $(function() {
             filters_html = $this.siblings('.active_filters');
         
         if (filters_html.length == 0)
-            $this.before('<div>', { class: 'active_filters' });
-        
+            $this.before('<div class="active_filters">');
+            
         $('thead tr > *', this).each(function() {
             cols.push(this.innerHTML);
         });
@@ -72,40 +72,59 @@ $(function() {
         for (var i=0; i < filters.length; i++) {
             key = filters[i].key;
             val = filters[i].val;
+            
+            // Until we have real data, this behaviour with simulate something resembling inputs/pipeline filtering.
+            if (key == 'crossfilter') {
+                key = 'PMID';
+                val = '*' + val.replace(/,/g, "*|*") + '*';
+            }
             nth_cell = tab.data('cols').indexOf(key) + 1;
             
-            console.log(nth_cell);
             // Search terms are contained within zero-width word boundary delimeters.
-            // Special regexp characters are escaped. Then, wildcards (*) and logical ORs (|) are interpreted.
-            regex_search = new RegExp('\\b(' + val.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&").replace(/\\\*/g, '.*').replace(/([\w\*])\\\|([\w\*])/g, '$1|$2')  + ')\\b', 'i');
+            // Special regexp characters are escaped. Then, wildcards (*) and logical ORs (|) are interpreted
+            regex_search = new RegExp(
+                '\\b(' + 
+                val.replace(/[-[\]{}()+?.,\\^$#\s]/g, "\\$&") // escape regex special chars
+                   .replace(/(.)\|+(.)/g, '$1)\\b|\\b($2') // interpret logical OR
+                   .replace(/\*/g, '.*') // interpret wildcards
+                + ')\\b',
+            'i');
+            
             $('tbody tr:visible td:nth-child(' + nth_cell + ')', tab).each(function() {
-                console.log(1);
                 if (this.innerHTML.search(regex_search) == -1) {
                     var $tr = $(this).closest('tr').hide();
                     if ($tr.hasClass('selected'))
-                        $tr.trigger('click');
+                        $tr.trigger('click'); // de-select rows if they are filtered out
                     numResults--;
                 }
             });
             
-            // Write the UI element for this filter.
-            activeFilters.append('\
-                <div class="filter" data-key="' + key + '" data-val="' + val.replace(/"/g, "\\$&") + '">\
-                    <span class="field">' + key + ': </span>\
-                    <span class="value">' + val.replace(/([\w\*])\|([\w\*])/g, '$1 <span class="logic_gate">OR</span> $2') + '</span> \
-                    <a class="remove">&times;</a>\
-                </div>\
-            ');
+            if (numResults < 1) {
+                tab.hide();
+                noResults.show();
+                return;
+            }
+            
+            if (typeof filters[i].invisible === 'undefined' || !filters[i].invisible) {
+                // Write the UI element for this filter.
+                activeFilters.append('\
+                    <div class="filter" data-key="' + key + '" data-val="' + val.replace(/"/g, "\\$&") + '">\
+                        <span class="field">' + key + ': </span>\
+                        <span class="value">' + val.replace(/(.)\|+(.)/g, '$1 <span class="logic_gate">OR</span> $2') + '</span> \
+                        <a class="remove">&times;</a>\
+                    </div>\
+                ');
+            }
         }
         
-        if (numResults < 1) {
-            tab.hide();
-            noResults.show();
-        }
+        if (numResults <= 10)
+            tab.addClass('long-form');
+        else
+            tab.removeClass('long-form');
     }
     
     $('form', cpanels).on('submit',function() {
-        var fields = $('input[type="text"], select', this),
+        var fields = $('input[type="text"], input[type="hidden"], select', this),
             filters_html = $(this).closest('.panel').find('.active_filters');
             filters_js = filters_html.data('filters_js');
             
@@ -144,6 +163,7 @@ $(function() {
         else 
             $('#panel_3 p').html('No combinations of rows are currently selected.');
     };
+    
     $('.results').on('click', 'tbody tr', function() {
         var $this = $(this),
             tab = $this.closest('.results'),
@@ -158,9 +178,31 @@ $(function() {
         this.classList.toggle('selected');
         tab.data('selected', selected);
         
+        var crossfilter_panel = false;
+        if ($.contains(document.getElementById('panel_1'), this))
+            cx_panel = $('#panel_2');
+        else if ($.contains(document.getElementById('panel_2'), this))
+            cx_panel = $('#panel_1');
+        
+        if (crossfilter_panel) {
+            var filters = $('.active_filters', cx_panel).data('filters_js');
+            
+            for (var i = 0; i < filters.length; i++) {
+                if (filters[i].key == 'crossfilter') {
+                    filters.splice(i, 1); // THERE CAN BE ONLY 1!!
+                    break;
+                }
+            }
+    
+            filters.push({ key: 'crossfilter', val: selected.toString(), invisible: true });
+            
+            $('.active_filters', cx_panel).data('filters_js', filters);
+            filterTable($('.results', cx_panel));
+        }
         updateOutput();
     });
     
+    // Workaround is necessary since td.truncate gets "position: absolute" on hover and scrolling functionality is all wonky.
     $('td.truncate', tables).on('wheel', function (e) {
         var scrollWindow = $(this).trigger('mouseout').closest('.results').get(0);
         if (typeof scrollWindow.scrollByLines !== 'undefined')
