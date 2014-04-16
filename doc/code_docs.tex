@@ -615,7 +615,7 @@ where we have labelled the cables $c_1$ and $c_2$, and the step $A$.
     \draw ($(step1in.north west) + (-\sep, \sep)$) rectangle ($(step1out.south east) + (\sep, -\sep)$);
 
     \node [below left=of step1in, text width=3cm] (inlabel) {TransformationInput \\ output from $c_1$ \\ input to $A$};
-    \node [below right=of step1out, text width=3cm] (outlabel) {TransformationOutput \\ output from $A$ \\ input to $c_1$};
+    \node [below right=of step1out, text width=3cm] (outlabel) {TransformationOutput \\ output from $A$ \\ input to $c_2$};
 
     \draw [dotted] (step1in) -- (inlabel);
     \draw [dotted] (step1out) -- (outlabel);
@@ -718,7 +718,7 @@ user named Will.
   \caption{A two step Pipeline to align sequences, annotated with dataset names and data types.}
 \end{figure}
 
-Unaligned sequences and an scoring matrix are passed as input. The sequences
+Unaligned sequences and a scoring matrix are passed as input. The sequences
 are subjected to a cleaning step, which produces new sequences, along with a
 Boolean column indicating whether or not any changes were made to each
 sequence. This Boolean column is stripped out by the trivial cable connecting
@@ -758,7 +758,7 @@ referred to as the Sandbox. When we say that a file is ``in the Sandbox'', we
 mean that the file is in some sub-directory of this path. Similarly, a
 SymbolicDataset is in the Sandbox if a file containing its data is present. It
 is not enough for the SymbolicDataset to be in \code{sd\_fs\_map}, since that
-map keeps only track of where SymbolicDatasets \emph{should} go. If an
+map only keeps track of where SymbolicDatasets \emph{should} go. If an
 ExecRecord is completely reused, the data will not be written to the file
 system. Therefore, a SymbolicDataset is known to be in the sandbox only if it
 is in \code{sd\_fs\_map} \emph{and} the file indicated by the map actually
