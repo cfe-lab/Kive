@@ -48,7 +48,7 @@ def can_create_new_file(file_to_create):
         # be written to it - but only if there are sufficient
         # permissions.
         if not os.access(output_dir, os.W_OK or os.X_OK):
-            reason = "insufficient permissions on run path \"{}\"".format(run_path)
+            reason = "insufficient permissions on run path \"{}\"".format(output_dir)
             is_okay = False
 
     return (is_okay, reason)

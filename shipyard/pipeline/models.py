@@ -1216,10 +1216,10 @@ class PipelineOutputCable(models.Model):
                     dest_pin__column_idx=wire.dest_pin.column_idx)
 
             if not corresponding_wire.exists():
-                return false
+                return False
 
             if wire.source_pin != corresponding_wire.first().source_pin:
-                return false
+                return False
 
         return True
         
