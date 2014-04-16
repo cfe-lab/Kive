@@ -28,7 +28,7 @@ The root directory of **shipyard** should contain the following subdirectories:
 Settings
 --------
 
-Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, if you are using sqlite3 as your database engine, you would enter `'sqlite3'` under the key `ENGINE`, and the absolute path to the sqlite3 database file under the key `NAME`.  Note that this file does not have to exist - it will be created later.
+Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, if you are using sqlite3 as your database engine, you would enter `'sqlite3'` under the key `ENGINE`, and the absolute path to the sqlite3 database file under the key `NAME`.  Note that this file does not have to exist - it will be created later, as long as the directory exists.
 
 You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
 
@@ -48,7 +48,13 @@ Finally, execute this *expect* script using the bash script `./nukeDB.bash`.  (N
 
 You are now ready to run a local Django webserver - you just need to type `python manage.py runserver` and navigate to `localhost:8000` in your web browser!
 
+Building the documentation
+--------------------------
 
+The project uses LaTeX for some of its documentation, so you might want to install LaTeX to build it.
+On Ubuntu, you need to install the following packages:
+
+    sudo apt-get install texlive texlive-latex-extra texlive-fonts-extra
 
 
 
