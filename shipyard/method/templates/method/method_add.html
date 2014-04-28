@@ -12,7 +12,7 @@
 
 {% block content %}
 
-<a href="/methods">return to Methods summary</a>
+<a href="/methods" rel="prev">return to Methods summary</a>
 
 <h2>Add a new method</h2>
 
@@ -46,12 +46,11 @@
         other format) into a CodeResource.
     </p>
     <p>
-    <input type="button" id="addXputForm" value="+"/>
-    <input type="button" id="removeXputForm" value="-"/>
+    <input type="button" id="addXputForm" class="add" value="+"/><input type="button" id="removeXputForm" class="remove" value="&minus;"/>
     <small>Add/subtract input or output forms</small>
     </p>
 
-    <table id="xputForms">
+    <table id="xputForms" class="formtable">
     <thead>
         <tr><th>Index</th><th>In/Out</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
     </thead>

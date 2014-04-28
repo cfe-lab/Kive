@@ -1,0 +1,2402 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Mobilize Pipelines{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/pipeline/pipeline_exec.js"></script>
+<style type="text/css">
+.active_filters {
+    margin: 1em 0;
+    padding: 0 1em;
+    min-height: 2.5em;
+}
+.panel {
+    margin: 1em 0;
+    border: 1px solid #eee;
+    float: left;
+}
+#panel_1 {
+    width: calc(25% - 2px);
+    border-right: 1px solid #888;
+}
+#panel_2 {
+    width: calc(50% - 2px);
+    border-left: 0;
+    border-right: 0;
+}
+#panel_3 {
+    width: calc(25% - 2px);
+}
+#panel_3 p {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin: 1em;
+}
+.results {
+    width: 100%;
+    height: 30em;
+    overflow-y: auto;
+    border-top: 1px solid #888;
+    padding: 0 0 1em;
+    position: relative;
+}
+.results table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.results th {
+    padding: .25em .5em;
+    font-size: .75em;
+    text-align: center;
+}
+.results td {
+    border: 1px solid #eee;
+    background-color: #fff;
+    border-width: 1px 0;
+    padding: .25em .5em;
+    vertical-align: top;
+    font-size: .75em;
+    white-space: nowrap;
+}
+.results td.truncate {
+    max-width: 20em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.results td.truncate:hover {
+    position: absolute;
+    max-width: 100%;
+    white-space: normal;
+    border-bottom: 1px solid #000;
+    margin-top: -1px;
+}
+.results.long-form td,
+.results.long-form td.truncate {
+    white-space: normal;
+    max-width: 20em;
+    overflow: initial;
+    text-overflow: initial;
+    position: static;
+    border-bottom: 1px solid #eee;
+    margin-top: 0;
+}
+.results tr:hover td {
+    background-color: #fff;
+}
+.results tr.selected td,
+.results tr.selected:hover td {
+    background-color: #c7e6fa;
+}
+.no_results {
+    border: 1px solid red;
+    color: red;
+    display: none;
+    padding: 1em;
+}
+.filter_ctrl {
+    margin: .5em 0 .5em .5em;
+}
+.filter_ctrl input[type='text'] {
+    margin-top: -1px;
+    width: calc(100% - 5.5em - 2px);
+}
+.filter_ctrl select {
+    margin-top: -1px;
+    width: calc(100% - 5em);
+}
+.filter_ctrl input[type='submit'] {
+    float: right;
+    margin-right: 1em;
+    margin-top: .25em;
+}
+.filter_ctrl label {
+    display: block;
+    float: left; clear: left;
+    height: 28px;
+    line-height: 28px;
+    width: 4.5em;
+}
+.filter_ctrl label:after {
+    content: ":";
+}
+
+.filter {
+    display: inline;
+    white-space: nowrap;
+    background-color: #eef4f4;
+    border-radius: 15px;
+    padding: .5em .8em;
+    margin-right: 1em;
+    line-height: 2.5em;
+    font-size: .8em;
+}
+.field, .logic_gate {
+    font-size: .8em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.field {
+    color: rgba(0,0,0,.7);
+}
+a.remove {
+    padding: .5em 0 .5em .5em;
+    font-weight: bold;
+    cursor: pointer;
+}
+a.remove:hover {
+    color: #00f;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="pipelines" rel="prev">Back to pipeline summary</a>
+
+<h2>Mobilize Pipelines</h2>
+
+<p>In case it's not obvious, this is a work-in-progress.</p>
+
+<div id="panel_1" class="panel">
+<div class="filter_ctrl">
+<form>
+<label>Title</label>
+<input type="text" data-link="Title">
+<label>Journal</label>
+<input type="text" data-link="Journal">
+<label>Year</label>
+<select data-link="Year">
+<option value="">Select a year</option>
+<option value="2010">2010</option>
+<option value="2011">2011</option>
+</select>
+<input type="submit" value="Filter">
+</form>
+</div>
+<div class="active_filters">
+</div>
+<div class="no_results">
+<strong>No results were found.</strong>
+</div>
+
+<div class="results" data-pkey="pID" data-displaycols="2,13" data-truncatecols="2">
+<table>
+<thead>
+<tr>
+<th>pID</th>
+<th>Title</th>
+<th>Group</th>
+<th>Journal</th>
+<th>Date</th>
+<th>Date_</th>
+<th>Year</th>
+<th>Month</th>
+<th>Day</th>
+<th>Volume</th>
+<th>Issue</th>
+<th>Pages</th>
+<th>PMID</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td>
+<td>Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America</td><td>North American AIDS Cohort Collaboration on Research and Design of the International Epidemiologic Databases to Evaluate AIDS</td><td>Am J Epidemiol</td><td>2011 Sep 15</td>
+<td>2011-09-15</td>
+<td>2011</td>
+<td>9</td>
+<td>15</td>
+<td>174</td>
+<td>6</td>
+<td>727-735</td>
+<td>21813792</td>
+</tr>
+            
+<tr><td>2</td>
+<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
+<td>5</td>
+<td>561-568</td>
+<td>20874006</td>
+</tr>
+            
+<tr><td>3</td>
+<td>Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries</td><td><i>NULL</i></td><td>Public Health Nutr</td><td>2011 Aug 2</td>
+<td>2011-08-02</td>
+<td>2011</td>
+<td>8</td>
+<td>2</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>1-10</td>
+<td>21806867</td>
+</tr>
+            
+<tr><td>5</td>
+<td>Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2011 Mar 7</td>
+<td>2011-03-07</td>
+<td>2011</td>
+<td>3</td>
+<td>7</td>
+<td>8</td>
+<td><i>NULL</i></td><td>13</td>
+<td>21385370</td>
+</tr>
+            
+<tr><td>6</td>
+<td>High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>23</td>
+<td>2</td>
+<td>221-230</td>
+<td>21259135</td>
+</tr>
+            
+<tr><td>7</td>
+<td>Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment</td><td><i>NULL</i></td><td>Clin Epidemiol</td><td>2011 Jan 19</td>
+<td>2011-01-19</td>
+<td>2011</td>
+<td>1</td>
+<td>19</td>
+<td>3</td>
+<td><i>NULL</i></td><td>21-29</td>
+<td>21326656</td>
+</tr>
+            
+<tr><td>8</td>
+<td>Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda</td><td><i>NULL</i></td><td>AIDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>5</td>
+<td>701-705</td>
+<td>21160412</td>
+</tr>
+            
+<tr><td>9</td>
+<td>Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort</td><td>CANOC Collaboration</td><td>HIV Medicine</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>12</td>
+<td>6</td>
+<td>352-360</td>
+<td>21059167</td>
+</tr>
+            
+<tr><td>11</td>
+<td>Compulsory drug detention center experiences among a community-based sample of injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>BMC Internat</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td>1</td>
+<td>12</td>
+<td>22014093</td>
+</tr>
+            
+<tr><td>12</td>
+<td>Burkitt lymphoma presenting as cardiac tamponade in a patient infected with HIV: a case report</td><td><i>NULL</i></td><td>Grand Rounds</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td>1</td>
+<td>34-36</td>
+<td><i>NULL</i></td>
+</tr>
+            
+<tr><td>13</td>
+<td>A dose-dependent relationship between exposure to a street-based drug scene and health-related harms among people who use injection drugs</td><td><i>NULL</i></td><td>J Urban Health</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>88</td>
+<td>4</td>
+<td>724-735</td>
+<td>21533961</td>
+</tr>
+            
+<tr><td>14</td>
+<td>Interest in low-threshold employment among people who inject illicit drugs: implications for street disorder</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>5</td>
+<td>376-384</td>
+<td>21684142</td>
+</tr>
+            
+<tr><td>15</td>
+<td>Injection drug use cessation and use of North America&apos;s first medically supervised safer injecting facility</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 15</td>
+<td>2011-01-15</td>
+<td>2011</td>
+<td>1</td>
+<td>15</td>
+<td>113</td>
+<td>2-3</td>
+<td>172-176</td>
+<td>20800976</td>
+</tr>
+            
+<tr><td>16</td>
+<td>Public crack cocaine smoking and willingness to use a supervised inhalation facility: implications for street disorder</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2011 Feb 23</td>
+<td>2011-02-23</td>
+<td>2011</td>
+<td>2</td>
+<td>23</td>
+<td>6</td>
+<td><i>NULL</i></td><td>4</td>
+<td>21345231</td>
+</tr>
+            
+<tr><td>17</td>
+<td>The street cost of drugs and drug use patterns: relationships with sex work income in an urban Canadian setting</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Nov 1</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td>1</td>
+<td>118</td>
+<td>2-3</td>
+<td>430-436</td>
+<td>21704461</td>
+</tr>
+            
+<tr><td>18</td>
+<td>Interpersonal factors and inconsistent condom use within longer-term partnerships of female sex workers in four districts in Karnataka, south India</td><td><i>NULL</i></td><td>STI, Special Issue</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td>Invited Submission</td>
+<td><i>NULL</i></td><td><i>NULL</i></td>
+</tr>
+            
+<tr><td>20</td>
+<td>A peer led mobile outreach program and increased utilization of detoxification and residential drug treatment among female sex workers who use drugs in a Canadian setting</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 1</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td>1</td>
+<td>113</td>
+<td>1</td>
+<td>46-54</td>
+<td>20727683</td>
+</tr>
+            
+<tr><td>21</td>
+<td>Mortality among cocaine users: A systematic review of cohort studies</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>113</td>
+<td>2-3</td>
+<td>88-95</td>
+<td>20828942</td>
+</tr>
+            
+<tr><td>22</td>
+<td>High Lifetime Pregnancy and Low Contraceptive Usage Among Sex Workers Who Use Drugs - An Unmet Reproductive Health Need</td><td><i>NULL</i></td><td>BMC Pregnancy Childbirth</td><td>2011 Aug 18</td>
+<td>2011-08-18</td>
+<td>2011</td>
+<td>8</td>
+<td>18</td>
+<td>11</td>
+<td>1</td>
+<td>61</td>
+<td>21851622</td>
+</tr>
+            
+<tr><td>24</td>
+<td>Homelessness Among A Cohort of Women in Street-Based Sex Work: The Need for Safer Environment Interventions</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2011 Aug 12</td>
+<td>2011-08-12</td>
+<td>2011</td>
+<td>8</td>
+<td>12</td>
+<td>11</td>
+<td>1</td>
+<td>643</td>
+<td>21838894</td>
+</tr>
+            
+<tr><td>25</td>
+<td>HIV incidence and prevalence among aboriginal peoples in Canada</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>15</td>
+<td>1</td>
+<td>214-227</td>
+<td>20799061</td>
+</tr>
+            
+<tr><td>26</td>
+<td>Suboptimal use of HIV drug resistance testing in a universal health-care setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>23</td>
+<td>1</td>
+<td>42-51</td>
+<td>21218275</td>
+</tr>
+            
+<tr><td>28</td>
+<td>Crystal methamphetamine injection predicts slower HIV RNA suppression among injection drug users</td><td><i>NULL</i></td><td>Addict Behav</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>36</td>
+<td>7</td>
+<td>762-763</td>
+<td>21396784</td>
+</tr>
+            
+<tr><td>29</td>
+<td>Impact of hepatitis C virus infection on all cause and liver-related mortality in a large community-based cohort of inner city residents</td><td><i>NULL</i></td><td>J Viral Hepat</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>18</td>
+<td>1</td>
+<td>32-41</td>
+<td>20196806</td>
+</tr>
+            
+<tr><td>30</td>
+<td>A Comparison of Drug Use and Risk Behavior Profiles Among Younger and Older Street Youth</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
+<td>12</td>
+<td>1486-1494</td>
+<td>21417557</td>
+</tr>
+            
+<tr><td>31</td>
+<td>Depressive symptoms and patterns of drug use among street youth</td><td><i>NULL</i></td><td>J Adolesc Health</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>48</td>
+<td>6</td>
+<td>585-590</td>
+<td>21575818</td>
+</tr>
+            
+<tr><td>32</td>
+<td>Methamphetamine injection and syringe sharing among a community-recruited sample of injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>115</td>
+<td>1-2</td>
+<td>145-149</td>
+<td>21130584</td>
+</tr>
+            
+<tr><td>33</td>
+<td>Trends in reported AIDS defining illnesses (AIDs) among participants in a universal antiretroviral therapy program: an observational study</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2011 Sep 5</td>
+<td>2011-09-05</td>
+<td>2011</td>
+<td>9</td>
+<td>5</td>
+<td>8</td>
+<td><i>NULL</i></td><td>31</td>
+<td>21892955</td>
+</tr>
+            
+<tr><td>34</td>
+<td>Harm Reduction, Illicit Drugs Childbearing intentions of HIV-positive women of reproductive age in Soweto, South Africa</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>101</td>
+<td>2</td>
+<td>350-358</td>
+<td>20403884</td>
+</tr>
+            
+<tr><td>35</td>
+<td>Should we move from syringe exchange to distribution? (author reply)</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Mar</td>
+<td>2011-03-01</td>
+<td>2011</td>
+<td>3</td>
+<td><i>NULL</i></td><td>101</td>
+<td>3</td>
+<td>390</td>
+<td><i>NULL</i></td>
+</tr>
+            
+<tr><td>36</td>
+<td>In vitro selection of clinically relevant bevirimat resistance mutations revealed by &quot;deep&quot; sequencing of serially passaged, quasispecies-containing recombinant HIV-1</td><td><i>NULL</i></td><td>J Clin Microbiol</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>49</td>
+<td>1</td>
+<td>201-208</td>
+<td>21084518</td>
+</tr>
+            
+<tr><td>37</td>
+<td>Does initiation of HIV antiretroviral therapy influence patterns of syringe lending among injection drug users?</td><td><i>NULL</i></td><td>Addict Behav</td><td>2011 May</td>
+<td>2011-05-01</td>
+<td>2011</td>
+<td>5</td>
+<td><i>NULL</i></td><td>36</td>
+<td>5</td>
+<td>560-563</td>
+<td>21320757</td>
+</tr>
+            
+<tr><td>38</td>
+<td>Conversations With Mothers: Exploring Reasons for Prevention of Mother-to-Child Transmission (PMTCT) Failures in the Era of Programmatic Scale-Up in Soweto, South Africa</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td>21197599</td>
+</tr>
+            
+<tr><td>39</td>
+<td>Clinical evaluation of the potential utility of computational modeling as an HIV treatment selection tool by physicians with considerable HIV experience</td><td><i>NULL</i></td><td>AIDS Patient Care STDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>1</td>
+<td>29-36</td>
+<td>21214377</td>
+</tr>
+            
+<tr><td>40</td>
+<td>Risky health environments: Women sex workers&apos; struggles to find safe, secure and non-exploitative housing in Canada&apos;s poorest postal code</td><td><i>NULL</i></td><td>Soc Sci Med</td><td>2011 Dec</td>
+<td>2011-12-01</td>
+<td>2011</td>
+<td>12</td>
+<td><i>NULL</i></td><td>73</td>
+<td>11</td>
+<td>1600-1607</td>
+<td>22018526</td>
+</tr>
+            
+<tr><td>41</td>
+<td>Fundamentals of evidence-based medicine: absolute risk, relative risk, and number needed to treat</td><td><i>NULL</i></td><td>Student BMJ</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td>
+</tr>
+            
+<tr><td>42</td>
+<td>Difficulty Accessing Syringes Mediates the Relationship Between Methamphetamine Use and Syringe Sharing Among Young Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>15</td>
+<td>7</td>
+<td>1546-1553</td>
+<td>21197598</td>
+</tr>
+            
+<tr><td>43</td>
+<td>Individual, Social, and Environmental Factors Associated with Initiating Methamphetamine Injection: Implications for Drug Use and HIV Prevention Strategies</td><td><i>NULL</i></td><td>Prev Sci</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>12</td>
+<td>2</td>
+<td>173-180</td>
+<td>21274628</td>
+</tr>
+            
+<tr><td>44</td>
+<td>Pathways to HIV risk and vulnerability among lesbian, gay, bisexual, and transgendered methamphetamine users: a multi-cohort gender-based analysis</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2011 Jan 7</td>
+<td>2010-01-07</td>
+<td>2010</td>
+<td>1</td>
+<td>7</td>
+<td>11</td>
+<td><i>NULL</i></td><td>20</td>
+<td>21214930</td>
+</tr>
+            
+<tr><td>45</td>
+<td>Reduction in overdose mortality after the opening of North America&apos;s first medically supervised safer injecting facility: a retrospective population-based study</td><td><i>NULL</i></td><td>Lancet</td><td>2011 Apr 23</td>
+<td>2011-04-23</td>
+<td>2011</td>
+<td>4</td>
+<td>23</td>
+<td>377</td>
+<td>9775</td>
+<td>1429-1437</td>
+<td>21497898</td>
+</tr>
+            
+<tr><td>46</td>
+<td>Injection methamphetamine use is associated with an increased risk of attempted suicide: a prospective cohort study</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>119</td>
+<td>1-2</td>
+<td>134-137</td>
+<td>21676557</td>
+</tr>
+            
+<tr><td>48</td>
+<td>Individual and structural vulnerability among female youth who exchange sex for survival</td><td><i>NULL</i></td><td>J Adolesc Health</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>49</td>
+<td>1</td>
+<td>36-41</td>
+<td>21700154</td>
+</tr>
+            
+<tr><td>49</td>
+<td>Dose-response effect of incarceration events on nonadherence to HIV antiretroviral therapy among injection drug users</td><td><i>NULL</i></td><td>J Infect Dis</td><td>2011 May 1</td>
+<td>2011-05-01</td>
+<td>2011</td>
+<td>5</td>
+<td>1</td>
+<td>203</td>
+<td>9</td>
+<td>1215-1221</td>
+<td>21459814</td>
+</tr>
+            
+<tr><td>50</td>
+<td>The financial cost of doctors emigrating from sub-Saharan Africa: human capital analysis</td><td><i>NULL</i></td><td>BMJ</td><td>2011 Nov 23</td>
+<td>2011-11-23</td>
+<td>2011</td>
+<td>11</td>
+<td>23</td>
+<td>343</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22117056</td>
+</tr>
+            
+<tr><td>51</td>
+<td>Male gender predicts mortality in a large cohort of patients receiving antiretroviral therapy in Uganda</td><td><i>NULL</i></td><td>J Int AIDS Soc</td><td>2011 Nov 3</td>
+<td>2011-11-03</td>
+<td>2011</td>
+<td>11</td>
+<td>3</td>
+<td>14</td>
+<td><i>NULL</i></td><td>52</td>
+<td>22050673</td>
+</tr>
+            
+<tr><td>52</td>
+<td>Life Expectancy of Persons Receiving Combination Antiretroviral Therapy in Low-Income Countries: A Cohort Analysis From Uganda</td><td><i>NULL</i></td><td>Ann Intern Med</td><td>2011 Aug 16</td>
+<td>2011-08-16</td>
+<td>2011</td>
+<td>8</td>
+<td>16</td>
+<td>155</td>
+<td>4</td>
+<td>209-216</td>
+<td>21768555</td>
+</tr>
+            
+<tr><td>53</td>
+<td>Mortality by baseline CD4 Cell count among HIV patients initiating antiretroviral therapy: evidence from a large cohort in Uganda</td><td><i>NULL</i></td><td>AIDS</td><td>2011 Mar 27</td>
+<td>2011-03-27</td>
+<td>2011</td>
+<td>3</td>
+<td>27</td>
+<td>25</td>
+<td>6</td>
+<td>851-855</td>
+<td>21330903</td>
+</tr>
+            
+<tr><td>54</td>
+<td>Comparative Effectiveness of Initial Antiretroviral Therapy Regimens: ACTG 5095 and 5142 Clinical Trials Relative to ARTCC</td><td>AIDS Clinical Trial Group DACS 241 Team; AIDS Clinical Trial Group Study 5095 Team; AIDS Clinical Trial Group Study 5142 team; Antiretroviral Cohort Collaboration</td><td>J Acquir Immune Defic Syndr</td><td>2011 Nov 1</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td>1</td>
+<td>58</td>
+<td>3</td>
+<td>253-260</td>
+<td>21857357</td>
+</tr>
+            
+<tr><td>55</td>
+<td>Health system determinants of infant, child and maternal mortality: A cross-sectional study of UN member countries</td><td><i>NULL</i></td><td>Global Health</td><td>2011 Oct 24</td>
+<td>2011-10-24</td>
+<td>2011</td>
+<td>10</td>
+<td>24</td>
+<td>7</td>
+<td><i>NULL</i></td><td>42</td>
+<td>22023970</td>
+</tr>
+            
+<tr><td>56</td>
+<td>Gendered HIV risk patterns among polygynous sero-discordant couples in Uganda</td><td><i>NULL</i></td><td>Cult Health Sex</td><td>2011 Sep</td>
+<td>2011-09-01</td>
+<td>2011</td>
+<td>9</td>
+<td><i>NULL</i></td><td>13</td>
+<td>8</td>
+<td>933-944</td>
+<td>21787255</td>
+</tr>
+            
+<tr><td>57</td>
+<td>Hepatitis C virus treatment rates and outcomes in HIV/hepatitis C virus co-infected individuals at an urban HIV clinic</td><td><i>NULL</i></td><td>Eur J Gastroenterol Hepatol</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>1</td>
+<td>45-50</td>
+<td>21139470</td>
+</tr>
+            
+<tr><td>58</td>
+<td>Adherence and plasma HIV RNA response to antiretroviral therapy among HIV-seropositive injection drug users in a Canadian setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>8</td>
+<td>980-987</td>
+<td>21480010</td>
+</tr>
+            
+<tr><td>59</td>
+<td>Homelessness and adherence to antiretroviral therapy among a cohort of HIV-infected injection drug users</td><td><i>NULL</i></td><td>J Urban Health</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>88</td>
+<td>3</td>
+<td>545-555</td>
+<td>21409604</td>
+</tr>
+            
+<tr><td>60</td>
+<td>&quot;The way I see it&quot;: the effect of stigma and depression on self-perceived body image among HIV positive individuals on treatment in British Columbia, Canada</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Nov</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td><i>NULL</i></td><td>23</td>
+<td>11</td>
+<td>1456-1466</td>
+<td>21767109</td>
+</tr>
+            
+<tr><td>61</td>
+<td>Sticking to It: The Effect of Maximally Assisted Therapy on Antiretroviral Treatment Adherence Among Individuals Living with HIV Who are Unstably Housed</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Nov</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td><i>NULL</i></td><td>15</td>
+<td>8</td>
+<td>1612-1622</td>
+<td>21850442</td>
+</tr>
+            
+<tr><td>62</td>
+<td>Use of North America&apos;s First Medically Supervised Safer Injecting Facility Among HIV Positive Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Educ Prev</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>23</td>
+<td>5</td>
+<td>412-422</td>
+<td>22010805</td>
+</tr>
+            
+<tr><td>63</td>
+<td>The development of an expert system to predict virological response to HIV therapy as part of an online treatment support tool</td><td>RDI Study Group</td><td>AIDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>15</td>
+<td>1855-1863</td>
+<td>21785323</td>
+</tr>
+            
+<tr><td>64</td>
+<td>Evaluation of an Emergency Prevention Program for Mother to Child Transmission of HIV in British Columbia</td><td><i>NULL</i></td><td>J Obstet Gynaecol Can</td><td>2011 Apr</td>
+<td>2011-04-01</td>
+<td>2011</td>
+<td>4</td>
+<td><i>NULL</i></td><td>33</td>
+<td>4</td>
+<td>338-343</td>
+<td>21501538</td>
+</tr>
+            
+<tr><td>65</td>
+<td>Severe food insecurity is associated with elevated unprotected sex among HIV-seropositive injection drug users independent of HAART use</td><td><i>NULL</i></td><td>AIDS</td><td>2011 Oct 23</td>
+<td>2011-10-23</td>
+<td>2011</td>
+<td>10</td>
+<td>23</td>
+<td>25</td>
+<td>16</td>
+<td>2037-2042</td>
+<td>21811140</td>
+</tr>
+            
+<tr><td>66</td>
+<td>Crystal methamphetamine use among female street-based sex workers: Moving beyond individual-focused interventions</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 1</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td>1</td>
+<td>113</td>
+<td>1</td>
+<td>76-81</td>
+<td>20810223</td>
+</tr>
+            
+<tr><td>68</td>
+<td>Injection drug users&apos; access to a supervised injection facility in Vancouver, Canada: the influence of operating policies and local drug culture</td><td><i>NULL</i></td><td>Qualitative Health Research</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>21</td>
+<td>6</td>
+<td>743-756</td>
+<td>21378259</td>
+</tr>
+            
+<tr><td>69</td>
+<td>Risk Factors for Tuberculosis After Highly Active Antiretroviral Therapy Initiation in the United States and Canada: Implications for Tuberculosis Screening</td><td>North American AIDS Cohort Collaboration on Research and Design (NA-ACCORD) of the International Epidemiologic Databases to Evaluate AIDS (IeDEA)</td><td>J Infect Dis</td><td>2011 Sep 15</td>
+<td>2011-09-15</td>
+<td>2011</td>
+<td>9</td>
+<td>15</td>
+<td>204</td>
+<td>6</td>
+<td>893-901</td>
+<td>21849286</td>
+</tr>
+            
+<tr><td>70</td>
+<td>&quot;Dynamic Range&quot; of Inferred Phenotypic HIV Drug Resistance Values in Clinical Practice</td><td><i>NULL</i></td><td>PLoS One</td><td>2011 Feb 24</td>
+<td>2011-02-24</td>
+<td>2011</td>
+<td>2</td>
+<td>24</td>
+<td>6</td>
+<td>2</td>
+<td><i>NULL</i></td><td>21390218</td>
+</tr>
+            
+<tr><td>71</td>
+<td>Deep sequencing to infer HIV-1 co-receptor usage: application to three clinical trials of maraviroc in treatment-experienced patients</td><td><i>NULL</i></td><td>J Infect Dis</td><td>2011 Jan 15</td>
+<td>2011-01-15</td>
+<td>2011</td>
+<td>1</td>
+<td>15</td>
+<td>203</td>
+<td>2</td>
+<td>237-245</td>
+<td>21288824</td>
+</tr>
+            
+<tr><td>72</td>
+<td>Comparison of Abacavir/Lamivudine and Tenofovir/Emtricitabine Among Treatment-Naive HIV-Infected Patients Initiating Therapy</td><td>CANOC Collaboration</td><td>J Acquir Immune Defic Syndr</td><td>2011 Sep 1</td>
+<td>2011-09-01</td>
+<td>2011</td>
+<td>9</td>
+<td>1</td>
+<td>58</td>
+<td>1</td>
+<td>38-46</td>
+<td>21709570</td>
+</tr>
+            
+<tr><td>73</td>
+<td>Female gender predicts lower access and adherence to antiretroviral therapy in a setting of free healthcare</td><td><i>NULL</i></td><td>BMC Infect Dis</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td><i>NULL</i></td><td>86</td>
+<td>21466704</td>
+</tr>
+            
+<tr><td>74</td>
+<td>Difficulty accessing crack pipes and crack pipe sharing among people who use drugs in Vancouver, Canada</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>6</td>
+<td>1</td>
+<td>34</td>
+<td>22208877</td>
+</tr>
+            
+<tr><td>75</td>
+<td>Prevalence of sexual violence against women in Swaziland and Botswana</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>101</td>
+<td>6</td>
+<td>1068-1074</td>
+<td>21493950</td>
+</tr>
+            
+<tr><td>76</td>
+<td>Home is where the HAART is: an examination of factors affecting neighbourhood perceptions among people with HIV/AIDS on antiretroviral therapy</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>23</td>
+<td>2</td>
+<td>245-251</td>
+<td>21259138</td>
+</tr>
+            
+<tr><td>77</td>
+<td>The urgency of providing comprehensive and integrated treatment for substance abusers with HIV</td><td><i>NULL</i></td><td>Health Affairs</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>30</td>
+<td>8</td>
+<td>1411-1419</td>
+<td>21821558</td>
+</tr>
+            
+<tr><td>78</td>
+<td>High prevalence of childhood emotional, physical and sexual trauma among a Canadian cohort of HIV-seropositive illicit drug users</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>6</td>
+<td>714-721</td>
+<td>21390877</td>
+</tr>
+            
+<tr><td>79</td>
+<td>The effectiveness of anti-illicit-drug public-service announcements: a systematic review and meta-analysis</td><td><i>NULL</i></td><td>J Epidemiol Community Health</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>65</td>
+<td>10</td>
+<td>834-840</td>
+<td>21558482</td>
+</tr>
+            
+<tr><td>80</td>
+<td>Effect of drug law enforcement on drug market violence: a systematic review</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>2</td>
+<td>87-94</td>
+<td>21392957</td>
+</tr>
+            
+<tr><td>81</td>
+<td>Treatment costs of hepatitis C infection among injection drug users in Canada, 2006-2026</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>1</td>
+<td>70-76</td>
+<td>21051212</td>
+</tr>
+            
+<tr><td>82</td>
+<td>CD4 count at presentation for HIV care in the United States and Canada: Are those over 50 years more likely to have a delayed presentation?</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2010 Dec 15</td>
+<td>2010-12-15</td>
+<td>2010</td>
+<td>12</td>
+<td>15</td>
+<td>7</td>
+<td>1</td>
+<td>45</td>
+<td>21159161</td>
+</tr>
+            
+<tr><td>83</td>
+<td>Late presentation for human immunodeficiency virus care in the United States and Canada</td><td><i>NULL</i></td><td>Clin Infect Dis</td><td>2010 Jun 1</td>
+<td>2010-06-01</td>
+<td>2010</td>
+<td>6</td>
+<td>1</td>
+<td>50</td>
+<td>11</td>
+<td>1512-1520</td>
+<td>20415573</td>
+</tr>
+            
+<tr><td>84</td>
+<td>Hunger and associated harms among injection drug users in an urban Canadian setting</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>5</td>
+<td>1</td>
+<td>20</td>
+<td>20796313</td>
+</tr>
+            
+<tr><td>85</td>
+<td>An assessment of global Internet-based HIV/AIDS media coverage: implications for United Nations Programme on HIV/AIDS&apos; Global Media HIV/AIDS initiative</td><td><i>NULL</i></td><td>Int J STD AIDS</td><td>2010 Jan</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td><i>NULL</i></td><td>21</td>
+<td>1</td>
+<td>26-29</td>
+<td>19833689</td>
+</tr>
+            
+<tr><td>86</td>
+<td>Physician&apos;s manual reporting underestimates mortality: evidence from a population-based HIV/AIDS treatment program</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010 Oct 25</td>
+<td>2010-10-25</td>
+<td>2010</td>
+<td>10</td>
+<td>25</td>
+<td>10</td>
+<td><i>NULL</i></td><td>642</td>
+<td>20973962</td>
+</tr>
+            
+<tr><td>87</td>
+<td>Survival sex work involvement among street-involved youth who use drugs in a Canadian setting</td><td><i>NULL</i></td><td>J Public Health (Oxf)</td><td>2010 Sep</td>
+<td>2010-09-01</td>
+<td>2010</td>
+<td>9</td>
+<td><i>NULL</i></td><td>32</td>
+<td>3</td>
+<td>322-327</td>
+<td>20061578</td>
+</tr>
+            
+<tr><td>88</td>
+<td>The use of knowledge translation and legal proceedings to support evidence-based drug policy in Canada: opportunities and ongoing challenges</td><td><i>NULL</i></td><td>Open Medicine</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>4</td>
+<td>3</td>
+<td>167-170</td>
+<td>21687336</td>
+</tr>
+            
+<tr><td>89</td>
+<td>Meth/amphetamine use and associated HIV: implications for global policy and public health</td><td>Reference Group to the United Nations on HIV and injecting drug use</td><td>Int J Drug Policy</td><td>2010 Sep</td>
+<td>2010-09-01</td>
+<td>2010</td>
+<td>9</td>
+<td><i>NULL</i></td><td>21</td>
+<td>5</td>
+<td>347-358</td>
+<td>20117923</td>
+</tr>
+            
+<tr><td>90</td>
+<td>Cognitive factors and willingness to participate in an HIV vaccine trial among HIV-negative injection drug users</td><td><i>NULL</i></td><td>Vaccine</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>28</td>
+<td>7</td>
+<td>1663-1667</td>
+<td>20044049</td>
+</tr>
+            
+<tr><td>91</td>
+<td>Social structural factors that shape assisted injecting practices among injection drug users in Vancouver, Canada: a qualitative study</td><td><i>NULL</i></td><td>Harm Reduction Journal</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>7</td>
+<td>1</td>
+<td>20</td>
+<td>20807442</td>
+</tr>
+            
+<tr><td>92</td>
+<td>I guess my own fancy screwed me over: transitions in drug use and the context of choice among young people entrenched in an open drug scene</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>10</td>
+<td>1</td>
+<td>126</td>
+<td>20222984</td>
+</tr>
+            
+<tr><td>93</td>
+<td>Safety and danger in downtown Vancouver: understandings of place among young people entrenched in an urban drug scene</td><td><i>NULL</i></td><td>Health Place</td><td>2010 Jan</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td><i>NULL</i></td><td>16</td>
+<td>1</td>
+<td>51-60</td>
+<td>19733496</td>
+</tr>
+            
+<tr><td>94</td>
+<td>Improved virological outcomes in British Columbia concomitant with decreasing incidence of HIV type 1 drug resistance detection</td><td><i>NULL</i></td><td>Clin Infect Dis</td><td>2010 Jan 1</td>
+<td>2009-01-01</td>
+<td>2009</td>
+<td>1</td>
+<td>1</td>
+<td>50</td>
+<td>1</td>
+<td>98-105</td>
+<td>19951169</td>
+</tr>
+            
+<tr><td>95</td>
+<td>HIV/AIDS. Universal access in the fight against HIV/AIDS</td><td><i>NULL</i></td><td>Science</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>329</td>
+<td>5988</td>
+<td>147-149</td>
+<td>20616254</td>
+</tr>
+            
+<tr><td>96</td>
+<td>Prevalence of bone mineral density abnormalities and related risk factors in an ambulatory HIV clinic population</td><td><i>NULL</i></td><td>J Clinic Densitometry</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>13</td>
+<td>4</td>
+<td>456-461</td>
+<td>20663695</td>
+</tr>
+            
+<tr><td>97</td>
+<td>Non-injection drug use patterns and history of injection among street youth</td><td><i>NULL</i></td><td>Eur Addict Res</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>16</td>
+<td>2</td>
+<td>91-98</td>
+<td>20130409</td>
+</tr>
+            
+<tr><td>98</td>
+<td>An external evaluation of a peer-run outreach-based syringe exchange in Vancouver, Canada</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>21</td>
+<td>5</td>
+<td>418-421</td>
+<td>20359877</td>
+</tr>
+            
+<tr><td>99</td>
+<td>Reduction of HIV incidence in men who have sex with men</td><td><i>NULL</i></td><td>Lancet Infect Dis</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>10</td>
+<td>10</td>
+<td>655-656</td>
+<td>20832365</td>
+</tr>
+            
+<tr><td>100</td>
+<td>Etravirine in combination with darunavir/ritonavir and optimized background regimen results in suppression of HIV replication in treatment-experienced patients</td><td><i>NULL</i></td><td>Expert Opin Pharmacother</td><td>2010 Jun</td>
+<td>2010-06-01</td>
+<td>2010</td>
+<td>6</td>
+<td><i>NULL</i></td><td>11</td>
+<td>8</td>
+<td>1433-1437</td>
+<td>20367279</td>
+</tr>
+            
+<tr><td>101</td>
+<td>Offer of financial incentives for unprotected sex in the context of sex work</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>29</td>
+<td>2</td>
+<td>144-149</td>
+<td>20447221</td>
+</tr>
+            
+<tr><td>102</td>
+<td>Expanding access to HAART: a cost-effective approach for treating and preventing HIV</td><td><i>NULL</i></td><td>AIDS</td><td>2010 Jul 31</td>
+<td>2010-07-31</td>
+<td>2010</td>
+<td>7</td>
+<td>31</td>
+<td>24</td>
+<td>12</td>
+<td>1929-1935</td>
+<td>20588171</td>
+</tr>
+            
+<tr><td>103</td>
+<td>Contraceptive use and method preference among women in Soweto, South Africa: the influence of expanding access to HIV care and treatment services</td><td><i>NULL</i></td><td>PLoS One</td><td>2010 Nov 5</td>
+<td>2010-11-05</td>
+<td>2010</td>
+<td>11</td>
+<td>5</td>
+<td>5</td>
+<td>11</td>
+<td><i>NULL</i></td><td>21079770</td>
+</tr>
+            
+<tr><td>104</td>
+<td>Syringe sharing and HIV incidence among injection drug users and increased access to sterile syringes</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2010 Aug</td>
+<td>2010-08-01</td>
+<td>2010</td>
+<td>8</td>
+<td><i>NULL</i></td><td>100</td>
+<td>8</td>
+<td>1449-1453</td>
+<td>20558797</td>
+</tr>
+
+<tr><td>105</td>
+<td>The science and politics of heroin prescription</td><td><i>NULL</i></td><td>Lancet</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>375</td>
+<td>9729</td>
+<td>1849-1850</td>
+<td>20511000</td>
+</tr>
+
+<tr><td>106</td>
+<td>Difficulty accessing syringes and syringe borrowing among injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>Drug Alcohol Rev</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>29</td>
+<td>2</td>
+<td>157-161</td>
+<td>20447223</td>
+</tr>
+
+<tr><td>108</td>
+<td>Expanding the reach of harm reduction in Thailand: experiences with a drug user-run drop-in centre</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2010 May</td>
+<td>2010-05-01</td>
+<td>2010</td>
+<td>5</td>
+<td><i>NULL</i></td><td>21</td>
+<td>3</td>
+<td>255-258</td>
+<td>19766474</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="panel_2" class="panel">
+<div class="filter_ctrl">
+<form>
+<label>Title</label>
+<input type="text" data-link="Title">
+<label>Journal</label>
+<input type="text" data-link="Journal">
+<label>Year</label>
+<select data-link="Year">
+<option value="">Select a year</option>
+<option value="2010">2010</option>
+<option value="2011">2011</option>
+</select>
+<input type="submit" value="Filter">
+</form>
+</div>
+<div class="active_filters">
+</div>
+<div class="no_results">
+<strong>No results were found.</strong>
+</div>
+<div class="results" data-pkey="pID" data-displaycols="2,4,5,13" data-truncatecols="2">
+<table>
+<thead>
+<tr>
+<th>pID</th>
+<th>Title</th>
+<th>Group</th>
+<th>Journal</th>
+<th>Date</th>
+<th>Date_</th>
+<th>Year</th>
+<th>Month</th>
+<th>Day</th>
+<th>Volume</th>
+<th>Issue</th>
+<th>Pages</th>
+<th>PMID</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td>
+<td>Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America</td><td>North American AIDS Cohort Collaboration on Research and Design of the International Epidemiologic Databases to Evaluate AIDS</td><td>Am J Epidemiol</td><td>2011 Sep 15</td>
+<td>2011-09-15</td>
+<td>2011</td>
+<td>9</td>
+<td>15</td>
+<td>174</td>
+<td>6</td>
+<td>727-735</td>
+<td>21813792</td>
+</tr>
+            
+<tr><td>2</td>
+<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
+<td>5</td>
+<td>561-568</td>
+<td>20874006</td>
+</tr>
+            
+<tr><td>3</td>
+<td>Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries</td><td><i>NULL</i></td><td>Public Health Nutr</td><td>2011 Aug 2</td>
+<td>2011-08-02</td>
+<td>2011</td>
+<td>8</td>
+<td>2</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>1-10</td>
+<td>21806867</td>
+</tr>
+            
+<tr><td>5</td>
+<td>Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2011 Mar 7</td>
+<td>2011-03-07</td>
+<td>2011</td>
+<td>3</td>
+<td>7</td>
+<td>8</td>
+<td><i>NULL</i></td><td>13</td>
+<td>21385370</td>
+</tr>
+            
+<tr><td>6</td>
+<td>High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>23</td>
+<td>2</td>
+<td>221-230</td>
+<td>21259135</td>
+</tr>
+            
+<tr><td>7</td>
+<td>Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment</td><td><i>NULL</i></td><td>Clin Epidemiol</td><td>2011 Jan 19</td>
+<td>2011-01-19</td>
+<td>2011</td>
+<td>1</td>
+<td>19</td>
+<td>3</td>
+<td><i>NULL</i></td><td>21-29</td>
+<td>21326656</td>
+</tr>
+            
+<tr><td>8</td>
+<td>Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda</td><td><i>NULL</i></td><td>AIDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>5</td>
+<td>701-705</td>
+<td>21160412</td>
+</tr>
+            
+<tr><td>9</td>
+<td>Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort</td><td>CANOC Collaboration</td><td>HIV Medicine</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>12</td>
+<td>6</td>
+<td>352-360</td>
+<td>21059167</td>
+</tr>
+            
+<tr><td>11</td>
+<td>Compulsory drug detention center experiences among a community-based sample of injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>BMC Internat</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td>1</td>
+<td>12</td>
+<td>22014093</td>
+</tr>
+            
+<tr><td>12</td>
+<td>Burkitt lymphoma presenting as cardiac tamponade in a patient infected with HIV: a case report</td><td><i>NULL</i></td><td>Grand Rounds</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td>1</td>
+<td>34-36</td>
+<td><i>NULL</i></td>
+</tr>
+            
+<tr><td>13</td>
+<td>A dose-dependent relationship between exposure to a street-based drug scene and health-related harms among people who use injection drugs</td><td><i>NULL</i></td><td>J Urban Health</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>88</td>
+<td>4</td>
+<td>724-735</td>
+<td>21533961</td>
+</tr>
+            
+<tr><td>14</td>
+<td>Interest in low-threshold employment among people who inject illicit drugs: implications for street disorder</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>5</td>
+<td>376-384</td>
+<td>21684142</td>
+</tr>
+            
+<tr><td>15</td>
+<td>Injection drug use cessation and use of North America&apos;s first medically supervised safer injecting facility</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 15</td>
+<td>2011-01-15</td>
+<td>2011</td>
+<td>1</td>
+<td>15</td>
+<td>113</td>
+<td>2-3</td>
+<td>172-176</td>
+<td>20800976</td>
+</tr>
+            
+<tr><td>16</td>
+<td>Public crack cocaine smoking and willingness to use a supervised inhalation facility: implications for street disorder</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2011 Feb 23</td>
+<td>2011-02-23</td>
+<td>2011</td>
+<td>2</td>
+<td>23</td>
+<td>6</td>
+<td><i>NULL</i></td><td>4</td>
+<td>21345231</td>
+</tr>
+            
+<tr><td>17</td>
+<td>The street cost of drugs and drug use patterns: relationships with sex work income in an urban Canadian setting</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Nov 1</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td>1</td>
+<td>118</td>
+<td>2-3</td>
+<td>430-436</td>
+<td>21704461</td>
+</tr>
+            
+<tr><td>18</td>
+<td>Interpersonal factors and inconsistent condom use within longer-term partnerships of female sex workers in four districts in Karnataka, south India</td><td><i>NULL</i></td><td>STI, Special Issue</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td>Invited Submission</td>
+<td><i>NULL</i></td><td><i>NULL</i></td>
+</tr>
+            
+<tr><td>20</td>
+<td>A peer led mobile outreach program and increased utilization of detoxification and residential drug treatment among female sex workers who use drugs in a Canadian setting</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 1</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td>1</td>
+<td>113</td>
+<td>1</td>
+<td>46-54</td>
+<td>20727683</td>
+</tr>
+            
+<tr><td>21</td>
+<td>Mortality among cocaine users: A systematic review of cohort studies</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>113</td>
+<td>2-3</td>
+<td>88-95</td>
+<td>20828942</td>
+</tr>
+            
+<tr><td>22</td>
+<td>High Lifetime Pregnancy and Low Contraceptive Usage Among Sex Workers Who Use Drugs - An Unmet Reproductive Health Need</td><td><i>NULL</i></td><td>BMC Pregnancy Childbirth</td><td>2011 Aug 18</td>
+<td>2011-08-18</td>
+<td>2011</td>
+<td>8</td>
+<td>18</td>
+<td>11</td>
+<td>1</td>
+<td>61</td>
+<td>21851622</td>
+</tr>
+            
+<tr><td>24</td>
+<td>Homelessness Among A Cohort of Women in Street-Based Sex Work: The Need for Safer Environment Interventions</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2011 Aug 12</td>
+<td>2011-08-12</td>
+<td>2011</td>
+<td>8</td>
+<td>12</td>
+<td>11</td>
+<td>1</td>
+<td>643</td>
+<td>21838894</td>
+</tr>
+            
+<tr><td>25</td>
+<td>HIV incidence and prevalence among aboriginal peoples in Canada</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>15</td>
+<td>1</td>
+<td>214-227</td>
+<td>20799061</td>
+</tr>
+            
+<tr><td>26</td>
+<td>Suboptimal use of HIV drug resistance testing in a universal health-care setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>23</td>
+<td>1</td>
+<td>42-51</td>
+<td>21218275</td>
+</tr>
+            
+<tr><td>28</td>
+<td>Crystal methamphetamine injection predicts slower HIV RNA suppression among injection drug users</td><td><i>NULL</i></td><td>Addict Behav</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>36</td>
+<td>7</td>
+<td>762-763</td>
+<td>21396784</td>
+</tr>
+            
+<tr><td>29</td>
+<td>Impact of hepatitis C virus infection on all cause and liver-related mortality in a large community-based cohort of inner city residents</td><td><i>NULL</i></td><td>J Viral Hepat</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>18</td>
+<td>1</td>
+<td>32-41</td>
+<td>20196806</td>
+</tr>
+            
+<tr><td>30</td>
+<td>A Comparison of Drug Use and Risk Behavior Profiles Among Younger and Older Street Youth</td><td><i>NULL</i></td><td>Substance Use &amp; Misuse</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>46</td>
+<td>12</td>
+<td>1486-1494</td>
+<td>21417557</td>
+</tr>
+            
+<tr><td>31</td>
+<td>Depressive symptoms and patterns of drug use among street youth</td><td><i>NULL</i></td><td>J Adolesc Health</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>48</td>
+<td>6</td>
+<td>585-590</td>
+<td>21575818</td>
+</tr>
+            
+<tr><td>32</td>
+<td>Methamphetamine injection and syringe sharing among a community-recruited sample of injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>115</td>
+<td>1-2</td>
+<td>145-149</td>
+<td>21130584</td>
+</tr>
+            
+<tr><td>33</td>
+<td>Trends in reported AIDS defining illnesses (AIDs) among participants in a universal antiretroviral therapy program: an observational study</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2011 Sep 5</td>
+<td>2011-09-05</td>
+<td>2011</td>
+<td>9</td>
+<td>5</td>
+<td>8</td>
+<td><i>NULL</i></td><td>31</td>
+<td>21892955</td>
+</tr>
+            
+<tr><td>34</td>
+<td>Harm Reduction, Illicit Drugs Childbearing intentions of HIV-positive women of reproductive age in Soweto, South Africa</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>101</td>
+<td>2</td>
+<td>350-358</td>
+<td>20403884</td>
+</tr>
+            
+<tr><td>35</td>
+<td>Should we move from syringe exchange to distribution? (author reply)</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Mar</td>
+<td>2011-03-01</td>
+<td>2011</td>
+<td>3</td>
+<td><i>NULL</i></td><td>101</td>
+<td>3</td>
+<td>390</td>
+<td><i>NULL</i></td>
+</tr>
+            
+<tr><td>36</td>
+<td>In vitro selection of clinically relevant bevirimat resistance mutations revealed by &quot;deep&quot; sequencing of serially passaged, quasispecies-containing recombinant HIV-1</td><td><i>NULL</i></td><td>J Clin Microbiol</td><td>2011 Jan</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td>1</td>
+<td><i>NULL</i></td><td>49</td>
+<td>1</td>
+<td>201-208</td>
+<td>21084518</td>
+</tr>
+            
+<tr><td>37</td>
+<td>Does initiation of HIV antiretroviral therapy influence patterns of syringe lending among injection drug users?</td><td><i>NULL</i></td><td>Addict Behav</td><td>2011 May</td>
+<td>2011-05-01</td>
+<td>2011</td>
+<td>5</td>
+<td><i>NULL</i></td><td>36</td>
+<td>5</td>
+<td>560-563</td>
+<td>21320757</td>
+</tr>
+            
+<tr><td>38</td>
+<td>Conversations With Mothers: Exploring Reasons for Prevention of Mother-to-Child Transmission (PMTCT) Failures in the Era of Programmatic Scale-Up in Soweto, South Africa</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td>21197599</td>
+</tr>
+            
+<tr><td>39</td>
+<td>Clinical evaluation of the potential utility of computational modeling as an HIV treatment selection tool by physicians with considerable HIV experience</td><td><i>NULL</i></td><td>AIDS Patient Care STDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>1</td>
+<td>29-36</td>
+<td>21214377</td>
+</tr>
+            
+<tr><td>40</td>
+<td>Risky health environments: Women sex workers&apos; struggles to find safe, secure and non-exploitative housing in Canada&apos;s poorest postal code</td><td><i>NULL</i></td><td>Soc Sci Med</td><td>2011 Dec</td>
+<td>2011-12-01</td>
+<td>2011</td>
+<td>12</td>
+<td><i>NULL</i></td><td>73</td>
+<td>11</td>
+<td>1600-1607</td>
+<td>22018526</td>
+</tr>
+            
+<tr><td>41</td>
+<td>Fundamentals of evidence-based medicine: absolute risk, relative risk, and number needed to treat</td><td><i>NULL</i></td><td>Student BMJ</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td><td><i>NULL</i></td>
+</tr>
+            
+<tr><td>42</td>
+<td>Difficulty Accessing Syringes Mediates the Relationship Between Methamphetamine Use and Syringe Sharing Among Young Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>15</td>
+<td>7</td>
+<td>1546-1553</td>
+<td>21197598</td>
+</tr>
+            
+<tr><td>43</td>
+<td>Individual, Social, and Environmental Factors Associated with Initiating Methamphetamine Injection: Implications for Drug Use and HIV Prevention Strategies</td><td><i>NULL</i></td><td>Prev Sci</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>12</td>
+<td>2</td>
+<td>173-180</td>
+<td>21274628</td>
+</tr>
+            
+<tr><td>44</td>
+<td>Pathways to HIV risk and vulnerability among lesbian, gay, bisexual, and transgendered methamphetamine users: a multi-cohort gender-based analysis</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2011 Jan 7</td>
+<td>2010-01-07</td>
+<td>2010</td>
+<td>1</td>
+<td>7</td>
+<td>11</td>
+<td><i>NULL</i></td><td>20</td>
+<td>21214930</td>
+</tr>
+            
+<tr><td>45</td>
+<td>Reduction in overdose mortality after the opening of North America&apos;s first medically supervised safer injecting facility: a retrospective population-based study</td><td><i>NULL</i></td><td>Lancet</td><td>2011 Apr 23</td>
+<td>2011-04-23</td>
+<td>2011</td>
+<td>4</td>
+<td>23</td>
+<td>377</td>
+<td>9775</td>
+<td>1429-1437</td>
+<td>21497898</td>
+</tr>
+            
+<tr><td>46</td>
+<td>Injection methamphetamine use is associated with an increased risk of attempted suicide: a prospective cohort study</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>119</td>
+<td>1-2</td>
+<td>134-137</td>
+<td>21676557</td>
+</tr>
+            
+<tr><td>48</td>
+<td>Individual and structural vulnerability among female youth who exchange sex for survival</td><td><i>NULL</i></td><td>J Adolesc Health</td><td>2011 Jul</td>
+<td>2011-07-01</td>
+<td>2011</td>
+<td>7</td>
+<td><i>NULL</i></td><td>49</td>
+<td>1</td>
+<td>36-41</td>
+<td>21700154</td>
+</tr>
+            
+<tr><td>49</td>
+<td>Dose-response effect of incarceration events on nonadherence to HIV antiretroviral therapy among injection drug users</td><td><i>NULL</i></td><td>J Infect Dis</td><td>2011 May 1</td>
+<td>2011-05-01</td>
+<td>2011</td>
+<td>5</td>
+<td>1</td>
+<td>203</td>
+<td>9</td>
+<td>1215-1221</td>
+<td>21459814</td>
+</tr>
+            
+<tr><td>50</td>
+<td>The financial cost of doctors emigrating from sub-Saharan Africa: human capital analysis</td><td><i>NULL</i></td><td>BMJ</td><td>2011 Nov 23</td>
+<td>2011-11-23</td>
+<td>2011</td>
+<td>11</td>
+<td>23</td>
+<td>343</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22117056</td>
+</tr>
+            
+<tr><td>51</td>
+<td>Male gender predicts mortality in a large cohort of patients receiving antiretroviral therapy in Uganda</td><td><i>NULL</i></td><td>J Int AIDS Soc</td><td>2011 Nov 3</td>
+<td>2011-11-03</td>
+<td>2011</td>
+<td>11</td>
+<td>3</td>
+<td>14</td>
+<td><i>NULL</i></td><td>52</td>
+<td>22050673</td>
+</tr>
+            
+<tr><td>52</td>
+<td>Life Expectancy of Persons Receiving Combination Antiretroviral Therapy in Low-Income Countries: A Cohort Analysis From Uganda</td><td><i>NULL</i></td><td>Ann Intern Med</td><td>2011 Aug 16</td>
+<td>2011-08-16</td>
+<td>2011</td>
+<td>8</td>
+<td>16</td>
+<td>155</td>
+<td>4</td>
+<td>209-216</td>
+<td>21768555</td>
+</tr>
+            
+<tr><td>53</td>
+<td>Mortality by baseline CD4 Cell count among HIV patients initiating antiretroviral therapy: evidence from a large cohort in Uganda</td><td><i>NULL</i></td><td>AIDS</td><td>2011 Mar 27</td>
+<td>2011-03-27</td>
+<td>2011</td>
+<td>3</td>
+<td>27</td>
+<td>25</td>
+<td>6</td>
+<td>851-855</td>
+<td>21330903</td>
+</tr>
+            
+<tr><td>54</td>
+<td>Comparative Effectiveness of Initial Antiretroviral Therapy Regimens: ACTG 5095 and 5142 Clinical Trials Relative to ARTCC</td><td>AIDS Clinical Trial Group DACS 241 Team; AIDS Clinical Trial Group Study 5095 Team; AIDS Clinical Trial Group Study 5142 team; Antiretroviral Cohort Collaboration</td><td>J Acquir Immune Defic Syndr</td><td>2011 Nov 1</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td>1</td>
+<td>58</td>
+<td>3</td>
+<td>253-260</td>
+<td>21857357</td>
+</tr>
+            
+<tr><td>55</td>
+<td>Health system determinants of infant, child and maternal mortality: A cross-sectional study of UN member countries</td><td><i>NULL</i></td><td>Global Health</td><td>2011 Oct 24</td>
+<td>2011-10-24</td>
+<td>2011</td>
+<td>10</td>
+<td>24</td>
+<td>7</td>
+<td><i>NULL</i></td><td>42</td>
+<td>22023970</td>
+</tr>
+            
+<tr><td>56</td>
+<td>Gendered HIV risk patterns among polygynous sero-discordant couples in Uganda</td><td><i>NULL</i></td><td>Cult Health Sex</td><td>2011 Sep</td>
+<td>2011-09-01</td>
+<td>2011</td>
+<td>9</td>
+<td><i>NULL</i></td><td>13</td>
+<td>8</td>
+<td>933-944</td>
+<td>21787255</td>
+</tr>
+            
+<tr><td>57</td>
+<td>Hepatitis C virus treatment rates and outcomes in HIV/hepatitis C virus co-infected individuals at an urban HIV clinic</td><td><i>NULL</i></td><td>Eur J Gastroenterol Hepatol</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>1</td>
+<td>45-50</td>
+<td>21139470</td>
+</tr>
+            
+<tr><td>58</td>
+<td>Adherence and plasma HIV RNA response to antiretroviral therapy among HIV-seropositive injection drug users in a Canadian setting</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>8</td>
+<td>980-987</td>
+<td>21480010</td>
+</tr>
+            
+<tr><td>59</td>
+<td>Homelessness and adherence to antiretroviral therapy among a cohort of HIV-infected injection drug users</td><td><i>NULL</i></td><td>J Urban Health</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>88</td>
+<td>3</td>
+<td>545-555</td>
+<td>21409604</td>
+</tr>
+            
+<tr><td>60</td>
+<td>&quot;The way I see it&quot;: the effect of stigma and depression on self-perceived body image among HIV positive individuals on treatment in British Columbia, Canada</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Nov</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td><i>NULL</i></td><td>23</td>
+<td>11</td>
+<td>1456-1466</td>
+<td>21767109</td>
+</tr>
+            
+<tr><td>61</td>
+<td>Sticking to It: The Effect of Maximally Assisted Therapy on Antiretroviral Treatment Adherence Among Individuals Living with HIV Who are Unstably Housed</td><td><i>NULL</i></td><td>AIDS Behav</td><td>2011 Nov</td>
+<td>2011-11-01</td>
+<td>2011</td>
+<td>11</td>
+<td><i>NULL</i></td><td>15</td>
+<td>8</td>
+<td>1612-1622</td>
+<td>21850442</td>
+</tr>
+            
+<tr><td>62</td>
+<td>Use of North America&apos;s First Medically Supervised Safer Injecting Facility Among HIV Positive Injection Drug Users</td><td><i>NULL</i></td><td>AIDS Educ Prev</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>23</td>
+<td>5</td>
+<td>412-422</td>
+<td>22010805</td>
+</tr>
+            
+<tr><td>63</td>
+<td>The development of an expert system to predict virological response to HIV therapy as part of an online treatment support tool</td><td>RDI Study Group</td><td>AIDS</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>25</td>
+<td>15</td>
+<td>1855-1863</td>
+<td>21785323</td>
+</tr>
+            
+<tr><td>64</td>
+<td>Evaluation of an Emergency Prevention Program for Mother to Child Transmission of HIV in British Columbia</td><td><i>NULL</i></td><td>J Obstet Gynaecol Can</td><td>2011 Apr</td>
+<td>2011-04-01</td>
+<td>2011</td>
+<td>4</td>
+<td><i>NULL</i></td><td>33</td>
+<td>4</td>
+<td>338-343</td>
+<td>21501538</td>
+</tr>
+            
+<tr><td>65</td>
+<td>Severe food insecurity is associated with elevated unprotected sex among HIV-seropositive injection drug users independent of HAART use</td><td><i>NULL</i></td><td>AIDS</td><td>2011 Oct 23</td>
+<td>2011-10-23</td>
+<td>2011</td>
+<td>10</td>
+<td>23</td>
+<td>25</td>
+<td>16</td>
+<td>2037-2042</td>
+<td>21811140</td>
+</tr>
+            
+<tr><td>66</td>
+<td>Crystal methamphetamine use among female street-based sex workers: Moving beyond individual-focused interventions</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2011 Jan 1</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td>1</td>
+<td>113</td>
+<td>1</td>
+<td>76-81</td>
+<td>20810223</td>
+</tr>
+            
+<tr><td>68</td>
+<td>Injection drug users&apos; access to a supervised injection facility in Vancouver, Canada: the influence of operating policies and local drug culture</td><td><i>NULL</i></td><td>Qualitative Health Research</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>21</td>
+<td>6</td>
+<td>743-756</td>
+<td>21378259</td>
+</tr>
+            
+<tr><td>69</td>
+<td>Risk Factors for Tuberculosis After Highly Active Antiretroviral Therapy Initiation in the United States and Canada: Implications for Tuberculosis Screening</td><td>North American AIDS Cohort Collaboration on Research and Design (NA-ACCORD) of the International Epidemiologic Databases to Evaluate AIDS (IeDEA)</td><td>J Infect Dis</td><td>2011 Sep 15</td>
+<td>2011-09-15</td>
+<td>2011</td>
+<td>9</td>
+<td>15</td>
+<td>204</td>
+<td>6</td>
+<td>893-901</td>
+<td>21849286</td>
+</tr>
+            
+<tr><td>70</td>
+<td>&quot;Dynamic Range&quot; of Inferred Phenotypic HIV Drug Resistance Values in Clinical Practice</td><td><i>NULL</i></td><td>PLoS One</td><td>2011 Feb 24</td>
+<td>2011-02-24</td>
+<td>2011</td>
+<td>2</td>
+<td>24</td>
+<td>6</td>
+<td>2</td>
+<td><i>NULL</i></td><td>21390218</td>
+</tr>
+            
+<tr><td>71</td>
+<td>Deep sequencing to infer HIV-1 co-receptor usage: application to three clinical trials of maraviroc in treatment-experienced patients</td><td><i>NULL</i></td><td>J Infect Dis</td><td>2011 Jan 15</td>
+<td>2011-01-15</td>
+<td>2011</td>
+<td>1</td>
+<td>15</td>
+<td>203</td>
+<td>2</td>
+<td>237-245</td>
+<td>21288824</td>
+</tr>
+            
+<tr><td>72</td>
+<td>Comparison of Abacavir/Lamivudine and Tenofovir/Emtricitabine Among Treatment-Naive HIV-Infected Patients Initiating Therapy</td><td>CANOC Collaboration</td><td>J Acquir Immune Defic Syndr</td><td>2011 Sep 1</td>
+<td>2011-09-01</td>
+<td>2011</td>
+<td>9</td>
+<td>1</td>
+<td>58</td>
+<td>1</td>
+<td>38-46</td>
+<td>21709570</td>
+</tr>
+            
+<tr><td>73</td>
+<td>Female gender predicts lower access and adherence to antiretroviral therapy in a setting of free healthcare</td><td><i>NULL</i></td><td>BMC Infect Dis</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>11</td>
+<td><i>NULL</i></td><td>86</td>
+<td>21466704</td>
+</tr>
+            
+<tr><td>74</td>
+<td>Difficulty accessing crack pipes and crack pipe sharing among people who use drugs in Vancouver, Canada</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>6</td>
+<td>1</td>
+<td>34</td>
+<td>22208877</td>
+</tr>
+            
+<tr><td>75</td>
+<td>Prevalence of sexual violence against women in Swaziland and Botswana</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2011 Jun</td>
+<td>2011-06-01</td>
+<td>2011</td>
+<td>6</td>
+<td><i>NULL</i></td><td>101</td>
+<td>6</td>
+<td>1068-1074</td>
+<td>21493950</td>
+</tr>
+            
+<tr><td>76</td>
+<td>Home is where the HAART is: an examination of factors affecting neighbourhood perceptions among people with HIV/AIDS on antiretroviral therapy</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011 Feb</td>
+<td>2011-02-01</td>
+<td>2011</td>
+<td>2</td>
+<td><i>NULL</i></td><td>23</td>
+<td>2</td>
+<td>245-251</td>
+<td>21259138</td>
+</tr>
+            
+<tr><td>77</td>
+<td>The urgency of providing comprehensive and integrated treatment for substance abusers with HIV</td><td><i>NULL</i></td><td>Health Affairs</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>30</td>
+<td>8</td>
+<td>1411-1419</td>
+<td>21821558</td>
+</tr>
+            
+<tr><td>78</td>
+<td>High prevalence of childhood emotional, physical and sexual trauma among a Canadian cohort of HIV-seropositive illicit drug users</td><td><i>NULL</i></td><td>AIDS Care</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>23</td>
+<td>6</td>
+<td>714-721</td>
+<td>21390877</td>
+</tr>
+            
+<tr><td>79</td>
+<td>The effectiveness of anti-illicit-drug public-service announcements: a systematic review and meta-analysis</td><td><i>NULL</i></td><td>J Epidemiol Community Health</td><td>2011 Oct</td>
+<td>2011-10-01</td>
+<td>2011</td>
+<td>10</td>
+<td><i>NULL</i></td><td>65</td>
+<td>10</td>
+<td>834-840</td>
+<td>21558482</td>
+</tr>
+            
+<tr><td>80</td>
+<td>Effect of drug law enforcement on drug market violence: a systematic review</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>2</td>
+<td>87-94</td>
+<td>21392957</td>
+</tr>
+            
+<tr><td>81</td>
+<td>Treatment costs of hepatitis C infection among injection drug users in Canada, 2006-2026</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2011</td>
+<td>2011-01-01</td>
+<td>2011</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>22</td>
+<td>1</td>
+<td>70-76</td>
+<td>21051212</td>
+</tr>
+            
+<tr><td>82</td>
+<td>CD4 count at presentation for HIV care in the United States and Canada: Are those over 50 years more likely to have a delayed presentation?</td><td><i>NULL</i></td><td>AIDS Res Ther</td><td>2010 Dec 15</td>
+<td>2010-12-15</td>
+<td>2010</td>
+<td>12</td>
+<td>15</td>
+<td>7</td>
+<td>1</td>
+<td>45</td>
+<td>21159161</td>
+</tr>
+            
+<tr><td>83</td>
+<td>Late presentation for human immunodeficiency virus care in the United States and Canada</td><td><i>NULL</i></td><td>Clin Infect Dis</td><td>2010 Jun 1</td>
+<td>2010-06-01</td>
+<td>2010</td>
+<td>6</td>
+<td>1</td>
+<td>50</td>
+<td>11</td>
+<td>1512-1520</td>
+<td>20415573</td>
+</tr>
+            
+<tr><td>84</td>
+<td>Hunger and associated harms among injection drug users in an urban Canadian setting</td><td><i>NULL</i></td><td>Subst Abuse Treat Prev Policy</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>5</td>
+<td>1</td>
+<td>20</td>
+<td>20796313</td>
+</tr>
+            
+<tr><td>85</td>
+<td>An assessment of global Internet-based HIV/AIDS media coverage: implications for United Nations Programme on HIV/AIDS&apos; Global Media HIV/AIDS initiative</td><td><i>NULL</i></td><td>Int J STD AIDS</td><td>2010 Jan</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td><i>NULL</i></td><td>21</td>
+<td>1</td>
+<td>26-29</td>
+<td>19833689</td>
+</tr>
+            
+<tr><td>86</td>
+<td>Physician&apos;s manual reporting underestimates mortality: evidence from a population-based HIV/AIDS treatment program</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010 Oct 25</td>
+<td>2010-10-25</td>
+<td>2010</td>
+<td>10</td>
+<td>25</td>
+<td>10</td>
+<td><i>NULL</i></td><td>642</td>
+<td>20973962</td>
+</tr>
+            
+<tr><td>87</td>
+<td>Survival sex work involvement among street-involved youth who use drugs in a Canadian setting</td><td><i>NULL</i></td><td>J Public Health (Oxf)</td><td>2010 Sep</td>
+<td>2010-09-01</td>
+<td>2010</td>
+<td>9</td>
+<td><i>NULL</i></td><td>32</td>
+<td>3</td>
+<td>322-327</td>
+<td>20061578</td>
+</tr>
+            
+<tr><td>88</td>
+<td>The use of knowledge translation and legal proceedings to support evidence-based drug policy in Canada: opportunities and ongoing challenges</td><td><i>NULL</i></td><td>Open Medicine</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>4</td>
+<td>3</td>
+<td>167-170</td>
+<td>21687336</td>
+</tr>
+            
+<tr><td>89</td>
+<td>Meth/amphetamine use and associated HIV: implications for global policy and public health</td><td>Reference Group to the United Nations on HIV and injecting drug use</td><td>Int J Drug Policy</td><td>2010 Sep</td>
+<td>2010-09-01</td>
+<td>2010</td>
+<td>9</td>
+<td><i>NULL</i></td><td>21</td>
+<td>5</td>
+<td>347-358</td>
+<td>20117923</td>
+</tr>
+            
+<tr><td>90</td>
+<td>Cognitive factors and willingness to participate in an HIV vaccine trial among HIV-negative injection drug users</td><td><i>NULL</i></td><td>Vaccine</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>28</td>
+<td>7</td>
+<td>1663-1667</td>
+<td>20044049</td>
+</tr>
+            
+<tr><td>91</td>
+<td>Social structural factors that shape assisted injecting practices among injection drug users in Vancouver, Canada: a qualitative study</td><td><i>NULL</i></td><td>Harm Reduction Journal</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>7</td>
+<td>1</td>
+<td>20</td>
+<td>20807442</td>
+</tr>
+            
+<tr><td>92</td>
+<td>I guess my own fancy screwed me over: transitions in drug use and the context of choice among young people entrenched in an open drug scene</td><td><i>NULL</i></td><td>BMC Public Health</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>10</td>
+<td>1</td>
+<td>126</td>
+<td>20222984</td>
+</tr>
+            
+<tr><td>93</td>
+<td>Safety and danger in downtown Vancouver: understandings of place among young people entrenched in an urban drug scene</td><td><i>NULL</i></td><td>Health Place</td><td>2010 Jan</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td>1</td>
+<td><i>NULL</i></td><td>16</td>
+<td>1</td>
+<td>51-60</td>
+<td>19733496</td>
+</tr>
+            
+<tr><td>94</td>
+<td>Improved virological outcomes in British Columbia concomitant with decreasing incidence of HIV type 1 drug resistance detection</td><td><i>NULL</i></td><td>Clin Infect Dis</td><td>2010 Jan 1</td>
+<td>2009-01-01</td>
+<td>2009</td>
+<td>1</td>
+<td>1</td>
+<td>50</td>
+<td>1</td>
+<td>98-105</td>
+<td>19951169</td>
+</tr>
+            
+<tr><td>95</td>
+<td>HIV/AIDS. Universal access in the fight against HIV/AIDS</td><td><i>NULL</i></td><td>Science</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>329</td>
+<td>5988</td>
+<td>147-149</td>
+<td>20616254</td>
+</tr>
+            
+<tr><td>96</td>
+<td>Prevalence of bone mineral density abnormalities and related risk factors in an ambulatory HIV clinic population</td><td><i>NULL</i></td><td>J Clinic Densitometry</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>13</td>
+<td>4</td>
+<td>456-461</td>
+<td>20663695</td>
+</tr>
+            
+<tr><td>97</td>
+<td>Non-injection drug use patterns and history of injection among street youth</td><td><i>NULL</i></td><td>Eur Addict Res</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>16</td>
+<td>2</td>
+<td>91-98</td>
+<td>20130409</td>
+</tr>
+            
+<tr><td>98</td>
+<td>An external evaluation of a peer-run outreach-based syringe exchange in Vancouver, Canada</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>21</td>
+<td>5</td>
+<td>418-421</td>
+<td>20359877</td>
+</tr>
+            
+<tr><td>99</td>
+<td>Reduction of HIV incidence in men who have sex with men</td><td><i>NULL</i></td><td>Lancet Infect Dis</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>10</td>
+<td>10</td>
+<td>655-656</td>
+<td>20832365</td>
+</tr>
+            
+<tr><td>100</td>
+<td>Etravirine in combination with darunavir/ritonavir and optimized background regimen results in suppression of HIV replication in treatment-experienced patients</td><td><i>NULL</i></td><td>Expert Opin Pharmacother</td><td>2010 Jun</td>
+<td>2010-06-01</td>
+<td>2010</td>
+<td>6</td>
+<td><i>NULL</i></td><td>11</td>
+<td>8</td>
+<td>1433-1437</td>
+<td>20367279</td>
+</tr>
+            
+<tr><td>101</td>
+<td>Offer of financial incentives for unprotected sex in the context of sex work</td><td><i>NULL</i></td><td>Drug Alcohol Depend</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>29</td>
+<td>2</td>
+<td>144-149</td>
+<td>20447221</td>
+</tr>
+            
+<tr><td>102</td>
+<td>Expanding access to HAART: a cost-effective approach for treating and preventing HIV</td><td><i>NULL</i></td><td>AIDS</td><td>2010 Jul 31</td>
+<td>2010-07-31</td>
+<td>2010</td>
+<td>7</td>
+<td>31</td>
+<td>24</td>
+<td>12</td>
+<td>1929-1935</td>
+<td>20588171</td>
+</tr>
+            
+<tr><td>103</td>
+<td>Contraceptive use and method preference among women in Soweto, South Africa: the influence of expanding access to HIV care and treatment services</td><td><i>NULL</i></td><td>PLoS One</td><td>2010 Nov 5</td>
+<td>2010-11-05</td>
+<td>2010</td>
+<td>11</td>
+<td>5</td>
+<td>5</td>
+<td>11</td>
+<td><i>NULL</i></td><td>21079770</td>
+</tr>
+            
+<tr><td>104</td>
+<td>Syringe sharing and HIV incidence among injection drug users and increased access to sterile syringes</td><td><i>NULL</i></td><td>Am J Public Health</td><td>2010 Aug</td>
+<td>2010-08-01</td>
+<td>2010</td>
+<td>8</td>
+<td><i>NULL</i></td><td>100</td>
+<td>8</td>
+<td>1449-1453</td>
+<td>20558797</td>
+</tr>
+
+<tr><td>105</td>
+<td>The science and politics of heroin prescription</td><td><i>NULL</i></td><td>Lancet</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>375</td>
+<td>9729</td>
+<td>1849-1850</td>
+<td>20511000</td>
+</tr>
+
+<tr><td>106</td>
+<td>Difficulty accessing syringes and syringe borrowing among injection drug users in Bangkok, Thailand</td><td><i>NULL</i></td><td>Drug Alcohol Rev</td><td>2010</td>
+<td>2010-01-01</td>
+<td>2010</td>
+<td><i>NULL</i></td><td><i>NULL</i></td><td>29</td>
+<td>2</td>
+<td>157-161</td>
+<td>20447223</td>
+</tr>
+
+<tr><td>108</td>
+<td>Expanding the reach of harm reduction in Thailand: experiences with a drug user-run drop-in centre</td><td><i>NULL</i></td><td>Int J Drug Policy</td><td>2010 May</td>
+<td>2010-05-01</td>
+<td>2010</td>
+<td>5</td>
+<td><i>NULL</i></td><td>21</td>
+<td>3</td>
+<td>255-258</td>
+<td>19766474</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="panel_3" class="panel">
+<p>No combinations of rows are currently selected.</p>
+</div>
+
+{% endblock %}

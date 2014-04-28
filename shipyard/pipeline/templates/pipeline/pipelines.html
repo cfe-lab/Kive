@@ -8,7 +8,7 @@
 
 {% block content %}
 
-<a href="dev.html">Back to developer's portal</a>
+<a href="dev.html" rel="prev">Back to developer's portal</a>
 
 <h2>Pipelines</h2>
 
@@ -36,6 +36,7 @@ data.
 {% endfor %}
 </table>
 
-<a href="pipeline_add">Add a new pipeline</a>
+<a href="pipeline_add">Add a new pipeline</a><br>
+<a href="pipeline_exec">Run a pipeline</a>
 
 {% endblock %}
