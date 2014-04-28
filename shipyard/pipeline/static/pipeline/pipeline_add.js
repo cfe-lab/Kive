@@ -120,7 +120,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     $('#id_method_button').on('click', function() {
         var selected = $('#id_select_method option:selected');
-        var mid = selected.val();
+        var mid = selected.val(); // pk of method
 
         if (mid != "") {
             var n_inputs = null;
@@ -134,7 +134,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 success: function(result) {
                     inputs = result['inputs'];
                     outputs = result['outputs'];
-                    canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
+                    canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
                 }
             });
         }
@@ -161,11 +161,85 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         canvasState.deleteObject();
     })
 
+
     $('form').submit(function(e) {
-        var input = $("<input>")
-               .attr("type", "hidden")
-               .attr("name", "mydata").val("blah");
-        $(this).append($(input));
+        e.preventDefault(); // override form submit action
+
+        var form_data = {};
+
+        // Pipeline (Transformation) variables
+        form_data['revision_name'] = $('#id_revision_name').val();
+        form_data['revision_desc'] = $('#id_revision_desc').val();
+        // inputs (at start of pipeline)
+        // outputs (at end of pipeline)
+
+        // Pipeline derived class-specific variables
+        // family - undefined, for pipeline_add this is first member of a new family
+        // parent - undefined, similarly
+
+        // PipelineStep [requires Pipeline]
+        /*
+            content_type (method or pipeline)
+            object_id (pk to method/pipeline)
+            transformation (foreign key to the method/pipeline)
+            step_num (must be integer x > 0)
+        */
+
+        // TODO: sort methods into pipeline steps - start from terminal Connectors
+        var sorted_elements = [];
+        var seeds = []; // nodes without incoming edges
+        var shape;
+        for (var si = 0; si < shapes.length; si++) {
+            shape = shapes[si];
+            if (shape.constructor == CDT_Node) {
+                seeds.push(shape);
+            }
+        }
+
+
+
+        var connectors = this.connectors;
+        var connector;
+
+        // seed array with MethodNodes that feed into final output
+        for (var ci = 0; ci < connectors.length; ci++) {
+            connector = connectors[ci];
+            if (connector.in_magnet == '__output__') {
+                // Connector terminates in final output
+                // note only MethodNodes are permited to connect to final output
+                method_ranks.push(connector.out_magnet.parent);
+            }
+        }
+
+        while (method_ranks.length < shapes.length) {
+
+        }
+
+        var shapes = this.shapes;
+        var shape;
+        for (var i= 0; i < shapes.length; i++) {
+            shape = shapes[i];
+            if (shape.constructor == MethodNode) {
+
+            }
+        }
+
+        // PipelineInputCable [requires PipelineStep]
+        /*
+            source - output hole (magnet) of Transformation
+
+            dest - input hole (magnet) of Transformation
+         */
+
+        $.ajax({
+            type: 'POST',
+            url: 'pipeline_add',
+            data: form_data,
+            datatype: 'json',
+            success: function(result) {
+                console.log(result);
+            }
+        })
     })
 });
 
@@ -174,24 +248,23 @@ $(document).ready(function(){ // wait for page to finish loading before executin
  The following code is based on canvas interactivity example by Simon Sarris.
  HTML5 Unleashed (2014) Pearson Education Inc.
  */
-function CDT_Node (x, y, r, fill, inset, offset, pk, label) {
-    // CDT node constructor with default values
+function RawNode (x, y, r, fill, inset, offset, label) {
+    // node constructor with default values
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
     this.r = r || 10; // radius
     this.fill = fill || "#AAAAAA";
     this.inset = inset || 5; // distance of magnet from center
     this.offset = offset || 12; // distance of label from center
-    this.pk = pk;
     this.label = label || '';
     this.in_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    var magnet = new Magnet(this, this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
+    var magnet = new Magnet(this, this.x + this.inset, this.y, 5, 2, "white", null, this.label);
     this.out_magnets = [ magnet ];
 }
 
-CDT_Node.prototype.draw = function(ctx) {
+RawNode.prototype.draw = function(ctx) {
     // draw circle
     ctx.fillStyle = this.fill;
     ctx.beginPath();
@@ -210,7 +283,7 @@ CDT_Node.prototype.draw = function(ctx) {
     out_magnet.draw(ctx, this.x + this.inset, this.y);
 };
 
-CDT_Node.prototype.contains = function(mx, my) {
+RawNode.prototype.contains = function(mx, my) {
     // determine if mouse pointer coordinates (mx, my) are
     // within this shape's bounds - compare length of hypotenuse
     // to radius
@@ -220,7 +293,30 @@ CDT_Node.prototype.contains = function(mx, my) {
 };
 
 
-function MethodNode (x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
+function CDTNode (pk, x, y, w, fill, inset, offset, label) {
+    this.pk = pk;
+    this.x = x || 0;
+    this.y = y || 0;
+    this.w = w || 20;
+    this.fill = fill || "#AAAAAA";
+    this.inset = inset || 5;
+    this.offset = offset || 12;
+    this.label = label || '';
+    this.in_magnets = [];
+
+    var magnet = new Magnet(this, this.x + this.inset, this.y, 5, 2, "white", this.pk, this.label);
+    this.out_magnets = [ magnet ];
+}
+
+CDTNode.prototype.draw = function(ctx) {
+    // draw square
+    ctx.fillStyle = fill;
+    ctx.fillRect(this.x, this.y, this.w, this.w);
+    // draw magnet
+    
+}
+
+function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
