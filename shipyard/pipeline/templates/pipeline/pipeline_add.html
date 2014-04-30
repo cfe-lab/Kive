@@ -7,6 +7,8 @@
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
     <style>#canvas{}</style>
 {% endblock %}
@@ -19,68 +21,82 @@
     <p>
     An interface for assembling pipelines.
     </p>
+
+    <!-- CANVAS -->
+    <div>
+    <canvas id='pipeline_canvas' style="border:1px dashed;float:left">
+        HTML5 Canvas not supported by this browser.
+    </canvas>
+    </div>
+
     <!-- Method selector -->
     <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
         <tr>
-            <th>Name:</th>
             <td>
-                <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
-            </td>
-            <td>
-
-            </td>
-        </tr>
-        <tr>
-            <th>Desc:</th>
-            <td>
-                <textarea cols="40" id="id_revision_desc" name="revision_desc" rows="3"></textarea>
-            </td>
-            <td>
-
-            </td>
-        </tr>
-        <tr>
-            <th>CDT:</th>
-            <td>
+                <b>Data node:</b><br/>
                 <select id="id_select_cdt" name="select_cdt">
+                    <option value="">Raw</option>
                     {% for cdt in compound_datatypes %}
                         <option value={{ cdt.pk }}>{{ cdt }}</option>
                     {% endfor %}
                 </select>
+                <br/>
+                <div class="errortext" id="id_cdt_error"></div>
+
             </td>
-            <td><input type="button" id="id_cdt_button" value="Add CDT"></td>
-        </tr>
-        <tr id="id_method_tr">
-            <th>Method:</th>
             <td>
-            <select id="id_select_method_family" name="select_method_family">
-                <option value="">--- select Method Family ---</option>
-                {% for family in method_families %}
-                    <option value={{ family.pk }}>{{ family.name }}</option>
-                {% endfor %}
-            </select>
-            <select id="id_select_method" name="select_method">
-                <!-- populated by ajax transaction -->
-            </select>
+                <i>Data label:</i><br/>
+                <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
+                <br/>
+                <input type="button" id="id_cdt_button" value="Add Data">
             </td>
-            <td><input type="button" id="id_method_button" value="Add method"></td>
+            <td>
+                <b>Pipeline name:</b><br/>
+                <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
+            </td>
         </tr>
+
+        <tr id="id_method_tr">
+            <td>
+                <b>Method node:</b><br/>
+                <select id="id_select_method_family" name="select_method_family">
+                    <option value="">--- select Method Family ---</option>
+                    {% for family in method_families %}
+                        <option value={{ family.pk }}>{{ family.name }}</option>
+                    {% endfor %}
+                </select>
+                <br/>
+                <select id="id_select_method" name="select_method">
+                    <!-- populated by ajax transaction -->
+                </select>
+            </td>
+            <td>
+                <i>Method label:</i><br/>
+                <input id="id_method_name" maxlength="128" name="method_name" type="text" />
+                <br/>
+                <input type="button" id="id_method_button" value="Add Method">
+            </td>
+            <td>
+                <b>Description:</b>
+                <textarea cols="40" id="id_revision_desc" name="revision_desc" rows="3"></textarea>
+            </td>
+        </tr>
+
         <tr>
             <td></td>
             <td>
                 <input type="button" id="id_delete_button" value="Delete">
                 <input type="button" id="id_reset_button" value="Clear">
             </td>
-            <td><input type="submit" id="id_submit_button" value="Submit"></td>
+            <td>
+                 <input type="submit" id="id_submit_button" value="Submit">
+            </td>
         </tr>
     </table>
+
+
     </form>
 
-    <!-- TODO: get canvas on white background -->
-    <div>
-    <canvas id='pipeline_canvas' style="border:1px dashed;float:left">
-        HTML5 Canvas not supported by this browser.
-    </canvas>
-    </div>
+
 {% endblock %}
