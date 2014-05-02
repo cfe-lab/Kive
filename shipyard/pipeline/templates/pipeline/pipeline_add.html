@@ -34,7 +34,7 @@
     <table>
         <tr>
             <td>
-                <b>Data node:</b><br/>
+                <b>Inputs:</b><br/>
                 <select id="id_select_cdt" name="select_cdt">
                     <option value="">Raw</option>
                     {% for cdt in compound_datatypes %}
@@ -42,14 +42,14 @@
                     {% endfor %}
                 </select>
                 <br/>
-                <div class="errortext" id="id_cdt_error"></div>
+                <div class="errortext" id="id_dt_error"></div>
 
             </td>
             <td>
-                <i>Data label:</i><br/>
+                <i>Input label:</i><br/>
                 <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
                 <br/>
-                <input type="button" id="id_cdt_button" value="Add Data">
+                <input type="button" id="id_cdt_button" value="Add Input">
             </td>
             <td>
                 <b>Pipeline name:</b><br/>
@@ -67,9 +67,12 @@
                     {% endfor %}
                 </select>
                 <br/>
+                <div id="id_revision_label"></div>
                 <select id="id_select_method" name="select_method">
                     <!-- populated by ajax transaction -->
                 </select>
+                <br/>
+                <div class="errortext" id="id_method_error"></div>
             </td>
             <td>
                 <i>Method label:</i><br/>
@@ -79,6 +82,7 @@
             </td>
             <td>
                 <b>Description:</b>
+                <!-- TODO: make this text box shorter (rows argument not working) -->
                 <textarea cols="40" id="id_revision_desc" name="revision_desc" rows="3"></textarea>
             </td>
         </tr>
@@ -91,6 +95,7 @@
             </td>
             <td>
                  <input type="submit" id="id_submit_button" value="Submit">
+                <div class="errortext" id="id_submit_error"></div>
             </td>
         </tr>
     </table>

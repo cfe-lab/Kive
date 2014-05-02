@@ -108,6 +108,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
     Holes for inputs and outputs are drawn at some (inset) into the left
     and right sides, respectively.  The width must be greater than 2 * inset.
     */
+    this.pk = pk;
     this.x = x || 0;
     this.y = y || 0;
     this.w = w || 10;
@@ -222,7 +223,7 @@ function Magnet (parent, r, attract, fill, cdt, label) {
     Connector.  It is always contained within a shape.
     x and y coordinates will be set by parent object draw().
      */
-    this.parent = parent;
+    this.parent = parent;  // the containing shape
     this.x = null;
     this.y = null;
     this.r = r; // radius

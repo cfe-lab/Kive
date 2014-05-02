@@ -34,8 +34,11 @@ def pipeline_add(request):
     c.update(csrf(request))
 
     if request.method == 'POST':
+        # FIXME: this is probably a lousy way to handle JSON
         query = request.POST.dict()
-        print query
+        exec('formdata=%s' % query.keys()[0])
+        print formdata
+
         response_data = {'foo': 'bar'}
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:

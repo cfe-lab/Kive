@@ -74,9 +74,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $("#id_select_method").show().html(options.join(''));
                     }
                 })
+                // label this new drop-drown
+                $('#id_revision_label')[0].innerHTML = '<i>Revision: </i>';
             }
             else {
                 $("#id_select_method").hide();
+                $('#id_revision_label')[0].innerHTML = '';
             }
         }
     ).change() // trigger on load
@@ -106,20 +109,19 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var choice = $('#id_select_cdt option:selected');
         var node_label = $('#id_datatype_name').val();
 
-        if (node_label == '') {
+        if (node_label === '') {
             // required field
-            $('#id_cdt_error')[0].innerHTML = "Label is required";
+            $('#id_dt_error')[0].innerHTML = "Label is required";
         }
         else {
-            $('#id_cdt_error')[0].innerHTML = "";
-            var pk = choice.val(); // primary key
-            if (pk == ""){
+            $('#id_dt_error')[0].innerHTML = "";
+            var this_pk = choice.val(); // primary key
+            if (this_pk == ""){
                 canvasState.addShape(new RawNode(x = 100, y = 200 + 50 * Math.random(),
                     r = 20, fill='#88DD88', inset=10, offset=25, label=node_label
                 ))
             } else {
-                var node_label = choice.text();
-                canvasState.addShape(new CDtNode(pk = pk, x = 100, y = 200 + 50 * Math.random(),
+                canvasState.addShape(new CDtNode(pk = this_pk, x = 100, y = 200 + 50 * Math.random(),
                     w = 40, fill = '#8888DD', inset = 10, offset = 10, label = node_label
                 ));
             }
@@ -131,24 +133,40 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var selected = $('#id_select_method option:selected');
         var mid = selected.val(); // pk of method
 
-        if (mid != "") {
-            var n_inputs = null;
-            var n_outputs = null;
-            var node_label = selected.text();
-            $.ajax({
-                type: "POST",
-                url: "get_method_io/",
-                data: {mid: mid}, // specify data as an object
-                datatype: "json", // type of data expected back from server
-                success: function(result) {
-                    inputs = result['inputs'];
-                    outputs = result['outputs'];
-                    canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 14, inputs, outputs));
-                    
-                    // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
-                    //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC', node_label, 0, inputs, outputs));
-                }
-            });
+        if (mid === undefined) {
+            $('#id_method_error')[0].innerHTML = "Select a Method";
+        }
+        else {
+            // user selected valid Method Revision
+            var node_label = $('#id_method_name').val();
+
+            if (node_label === '') {
+                // required field
+                $('#id_method_error')[0].innerHTML = "Label is required";
+            }
+            else {
+                $('#id_method_error')[0].innerHTML = "";
+                var n_inputs = null;
+                var n_outputs = null;
+
+                // use AJAX to retrieve Revision inputs and outputs
+                $.ajax({
+                    type: "POST",
+                    url: "get_method_io/",
+                    data: {mid: mid}, // specify data as an object
+                    datatype: "json", // type of data expected back from server
+                    success: function(result) {
+                        inputs = result['inputs'];
+                        outputs = result['outputs'];
+                        canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 10, inputs, outputs));
+
+                        // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
+                        //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC', node_label, 0, inputs, outputs));
+                    }
+                });
+
+                $('#id_method_name').val('');
+            }
         }
     });
 
@@ -192,18 +210,127 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     $('form').submit(function(e) {
         e.preventDefault(); // override form submit action
+        var submit_error = $('#id_submit_error')[0];
+
+        var shapes = canvasState.shapes;
+
+        // TODO: check graph integrity
+
+        var this_shape;
+        var magnets;
+        var this_magnet;
+        var i, j;
+        var pipeline_inputs = [];  // collect data nodes
+        var method_nodes = [];
+
+        for (i = 0; i < shapes.length; i++) {
+            this_shape = shapes[i];
+            if (this_shape.constructor !== MethodNode) {
+                pipeline_inputs.push(this_shape);
+
+                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode
+                magnets = this_shape.out_magnets;
+                this_magnet = magnets[0];  // only need one connection
+
+                // is this magnet connected?
+                if (this_magnet.connected === null) {
+                    // unconnected input in graph, exit
+                    submit_error.innerHTML = 'Unconnected input node';
+                    return;
+                }
+            }
+            else {
+                method_nodes.push(this_shape);
+
+                // all MethodNode in-magnets should have a Connector
+                magnets = this_shape.in_magnets;
+                for (j = 0; j < magnets.length; j++) {
+                    this_magnet = magnets[j];
+                    if (this_magnet.connected === null) {
+                        submit_error.innerHTML = 'MethodNode with empty input socket';
+                        return;
+                    }
+                }
+            }
+        }
+
 
         var form_data = {};
 
-        // Pipeline (Transformation) variables
-        form_data['revision_name'] = $('#id_revision_name').val();
-        form_data['revision_desc'] = $('#id_revision_desc').val();
-        // inputs (at start of pipeline)
-        // outputs (at end of pipeline)
+        // arguments to initialize new Pipeline Family
+        // TODO: Disallow blank pipeline name and description fields
+        form_data['family_name'] = $('#id_revision_name').val();
+        form_data['family_desc'] = $('#id_revision_desc').val();
 
-        // Pipeline derived class-specific variables
-        // family - undefined, for pipeline_add this is first member of a new family
-        // parent - undefined, similarly
+        // arguments to add first pipeline revision
+        form_data['revision_name'] = '1';
+        form_data['revision_desc'] = 'First version';
+
+        // sort pipeline inputs by their Y-position on canvas
+        function sortByYpos (a, b) {
+            var ay = a.y;
+            var by = b.y;
+            return ((ay < by) ? -1 : ((ay > by) ? 1 : 0));
+        }
+        pipeline_inputs.sort(sortByYpos);
+
+        // update form data with inputs
+        var this_input;
+        for (i = 0; i < pipeline_inputs.length; i++) {
+            this_input = pipeline_inputs[i];
+            form_data['create_input_'+i] = {'pk': this_input.pk,
+            'dataset_name': this_input.label, 'dataset_idx': i+1,
+            'x': this_input.x, 'y': this_input.y};
+        }
+
+        // append MethodNodes to sorted_elements Array in dependency order
+        // see http://en.wikipedia.org/wiki/Topological_sorting#Algorithms
+        var sorted_elements = [];
+        var method_node;
+        var this_parent;
+        var okay_to_add;
+        i = 0;
+        while (method_nodes.length > 0) {
+            for (j = 0; j < method_nodes.length; j++) {
+                method_node = method_nodes[j];
+                magnets = method_node.in_magnets;
+                okay_to_add = true;
+
+                for (var k = 0; k < magnets.length; k++) {
+                    this_magnet = magnets[k];
+                    // trace up the Connector
+                    this_parent = this_magnet.connected.out_magnet.parent;
+                    if (this_parent.constructor === MethodNode) {
+                        if ($.inArray(this_parent, sorted_elements) < 0) {
+                            // dependency not cleared
+                            okay_to_add = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (okay_to_add) {
+                    // either MethodNode has no dependencies
+                    // or all dependencies already in sorted_elements
+                    sorted_elements.push(method_nodes.splice(j, 1)[0]);
+                }
+            }
+            i += 1;
+            if (i > 5*shapes.length) {
+                console.log('DEBUG: topological sort routine failed')
+                return;
+            }
+        }
+
+        var this_step;
+        for (i = 0; i < sorted_elements.length; i++) {
+            this_step = sorted_elements[i];
+            // to create Method object
+            form_data['pipeline_step_'+i] = {'pk': this_step.mid};
+        }
+        // this code written on Signal Hill, St. John's, Newfoundland
+        // May 2, 2014 - afyp
+        
 
         // PipelineStep [requires Pipeline]
         /*
@@ -213,44 +340,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             step_num (must be integer x > 0)
         */
 
-        // TODO: sort methods into pipeline steps - start from terminal Connectors
-        var sorted_elements = [];
-        var seeds = []; // nodes without incoming edges
-        var shape;
-        for (var si = 0; si < shapes.length; si++) {
-            shape = shapes[si];
-            if (shape.constructor == CDtNode) {
-                seeds.push(shape);
-            }
-        }
-
-
-
-        var connectors = this.connectors;
-        var connector;
-
-        // seed array with MethodNodes that feed into final output
-        for (var ci = 0; ci < connectors.length; ci++) {
-            connector = connectors[ci];
-            if (connector.in_magnet == '__output__') {
-                // Connector terminates in final output
-                // note only MethodNodes are permited to connect to final output
-                method_ranks.push(connector.out_magnet.parent);
-            }
-        }
-
-        while (method_ranks.length < shapes.length) {
-
-        }
-
-        var shapes = this.shapes;
-        var shape;
-        for (var i= 0; i < shapes.length; i++) {
-            shape = shapes[i];
-            if (shape.constructor == MethodNode) {
-
-            }
-        }
 
         // PipelineInputCable [requires PipelineStep]
         /*
@@ -262,7 +351,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $.ajax({
             type: 'POST',
             url: 'pipeline_add',
-            data: form_data,
+            data: JSON.stringify(form_data),
             datatype: 'json',
             success: function(result) {
                 console.log(result);
