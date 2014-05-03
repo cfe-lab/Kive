@@ -322,32 +322,71 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
+        // add arguments for input cabling
         var this_step;
+        var this_source;
+        var this_connector;
         for (i = 0; i < sorted_elements.length; i++) {
             this_step = sorted_elements[i];
-            // to create Method object
-            form_data['pipeline_step_'+i] = {'pk': this_step.mid};
+
+            form_data['pipeline_step_'+(i+1)] = {
+                'transformation_pk': this_step.pk,  // to retrieve MR
+                'step_num': i,  // 1-index (pipeline inputs are index 0)
+            };
+
+            // retrieve Connectors
+            magnets = this_step.in_magnets;
+            for (j = 0; j < magnets.length; j++) {
+                this_magnet = magnets[j];
+                this_connector = this_magnet.connected;
+                this_source = this_connector.out_magnet.parent;
+
+                if (this_source.constructor === MethodNode) {
+                    form_data['step_'+i+'_input_'+j] = {
+                        'source': this_source.pk,
+                        'source_step': sorted_elements.indexOf(this_source)+1,
+                        'dest': j
+                    };
+                }
+                else {
+                    // sourced by pipeline input
+                    form_data['step_'+i+'_input_'+j] = {
+                        'source': this_source.label,
+                        'source_step': 0,
+                        'dest': j  // input hole of Transformation
+                    };
+                }
+            }
         }
         // this code written on Signal Hill, St. John's, Newfoundland
         // May 2, 2014 - afyp
-        
-
-        // PipelineStep [requires Pipeline]
-        /*
-            content_type (method or pipeline)
-            object_id (pk to method/pipeline)
-            transformation (foreign key to the method/pipeline)
-            step_num (must be integer x > 0)
-        */
 
 
-        // PipelineInputCable [requires PipelineStep]
-        /*
-            source - output hole (magnet) of Transformation
+        // sort output cables by y-position
+        var connectors = canvasState.connectors;
+        var output_cables = [];
+        for (i = 0; i < connectors.length; i++) {
+            this_connector = connectors[i];
+            if (this_connector.in_magnet === '__output__') {
+                output_cables.push(this_connector);
+            }
+        }
+        output_cables.sort(sortByYpos);
 
-            dest - input hole (magnet) of Transformation
-         */
+        for (i = 0; i < output_cables.length; i++) {
+            this_connector = output_cables[i];
+            this_source = this_connector.out_magnet.parent;
+            form_data['outcable_'+(i+1)] = {
+                'output_idx': i+1,
+                'source': this_source.pk,
+                'source_step': sorted_elements.indexOf(this_source) + 1,
+                'dataset_name': this_connector.out_magnet.label,  // magnet label
+                'output_name': this_connector.out_magnet.label  // use same for now
+            };
+        }
 
+
+        // do AJAX transaction
         $.ajax({
             type: 'POST',
             url: 'pipeline_add',

@@ -135,7 +135,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 2,
             fill = '#fff',
             cdt = this_input['cdt_pk'],
-            label = this_input['cdt_label']
+            label = this_input['dataset_name'],
         );
 
         if (this.n_inputs == 1) {
@@ -154,7 +154,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 2,
             fill = '#fff',
             cdt = this_output['cdt_pk'],
-            label = this_output['cdt_label']
+            label = this_output['dataset_name']
         );
 
         if (this.n_inputs == 1) {
