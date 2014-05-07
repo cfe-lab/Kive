@@ -44,6 +44,13 @@ RawNode.prototype.draw = function(ctx) {
     out_magnet.draw(ctx);
 };
 
+RawNode.prototype.highlight = function(ctx, dragging) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI, false);
+    ctx.closePath();
+    ctx.stroke();
+}
+
 RawNode.prototype.contains = function(mx, my) {
     // determine if mouse pointer coordinates (mx, my) are
     // within this shape's bounds - compare length of hypotenuse
@@ -89,14 +96,25 @@ CDtNode.prototype.draw = function(ctx) {
     out_magnet.x = this.x + this.w - this.inset;
     out_magnet.y = this.y + this.w/2.;
     out_magnet.draw(ctx);
-}
+};
+
+CDtNode.prototype.highlight = function(ctx, dragging) {
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x+w, this.y);
+    ctx.lineTo(this.x+w, this.y+w);
+    ctx.lineTo(this.x, this.y+w);
+    ctx.closePath();
+    ctx.stroke();
+};
+
 
 CDtNode.prototype.contains = function(mx, my) {
     /*
     Are mouse coordinates within the perimeter of this node?
      */
     return this.x <= mx && this.x + this.w >= mx && this.y <= my && this.y + this.w >= my;
-}
+};
 
 
 function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
@@ -135,7 +153,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 2,
             fill = '#fff',
             cdt = this_input['cdt_pk'],
-            label = this_input['dataset_name'],
+            label = this_input['dataset_name']
         );
 
         if (this.n_inputs == 1) {
@@ -175,10 +193,10 @@ MethodNode.prototype.draw = function(ctx) {
     ctx.beginPath();
     ctx.moveTo(hx = this.x, hy = this.y);
     ctx.lineTo(hx += this.w, hy);
-    ctx.lineTo(hx += this.h/3, hy += this.h/2);
-    ctx.lineTo(hx -= this.h/3, hy += this.h/2);
+    ctx.lineTo(hx += this.h/4, hy += this.h/2);
+    ctx.lineTo(hx -= this.h/4, hy += this.h/2);
     ctx.lineTo(hx = this.x, hy);
-    ctx.lineTo(hx - this.h/3, hy - this.h/2);
+    //ctx.lineTo(hx - this.h/3, hy - this.h/2);
     ctx.closePath();
     ctx.fill();
 
@@ -210,6 +228,19 @@ MethodNode.prototype.draw = function(ctx) {
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
 };
+
+MethodNode.prototype.highlight = function(ctx, dragging) {
+    // highlight this node shape
+    var hx, hy;
+    ctx.beginPath();
+    ctx.moveTo(hx = this.x, hy = this.y);
+    ctx.lineTo(hx += this.w, hy);
+    ctx.lineTo(hx += this.h/4, hy += this.h/2);
+    ctx.lineTo(hx -= this.h/4, hy += this.h/2);
+    ctx.lineTo(hx = this.x, hy);
+    ctx.closePath();
+    ctx.stroke();
+}
 
 MethodNode.prototype.contains = function(mx, my) {
     return this.x <= mx && this.x + this.w >= mx && this.y <= my && this.y + this.h >= my;
@@ -309,6 +340,17 @@ Connector.prototype.draw = function(ctx) {
 
     ctx.stroke();
 };
+
+Connector.prototype.highlight = function(ctx, dragging) {
+    // require this.dragging == false ?
+    if (dragging === false) {
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.fromX, this.fromY);
+        ctx.closePath();
+        ctx.stroke();
+    }
+}
 
 Connector.prototype.contains = function(mx, my, pad) {
     /*

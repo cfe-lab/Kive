@@ -306,27 +306,7 @@ CanvasState.prototype.draw = function() {
             ctx.lineWidth = this.selectionWidth;
             var mySel = this.selection;
 
-            // Is it possible to move these drawing instructions into the objects themselves? —JN
-            ctx.beginPath();
-            if (mySel.constructor == MethodNode) {
-//                ctx.rect(mySel.x, mySel.y, mySel.w, mySel.h);
-                // Draw a hexagon.
-                var hx, hy;
-                ctx.beginPath();
-                ctx.moveTo(hx = mySel.x, hy = mySel.y);
-                ctx.lineTo(hx += mySel.w, hy);
-                ctx.lineTo(hx += mySel.h/3, hy += mySel.h/2);
-                ctx.lineTo(hx -= mySel.h/3, hy += mySel.h/2);
-                ctx.lineTo(hx = mySel.x, hy);
-                ctx.lineTo(hx - mySel.h/3, hy - mySel.h/2);
-            } else if (mySel.constructor ==CDtNode) {
-                ctx.arc(mySel.x, mySel.y, mySel.r, 0, 2*Math.PI, false);
-            } else if (mySel.constructor == Connector && this.dragging == false) {
-                ctx.moveTo(mySel.x, mySel.y);
-                ctx.lineTo(mySel.fromX, mySel.fromY);
-            }
-            ctx.closePath();
-            ctx.stroke();
+            mySel.highlight(ctx, this.dragging);
         }
 
         this.valid = true;

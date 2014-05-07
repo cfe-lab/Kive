@@ -156,8 +156,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     data: {mid: mid}, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        inputs = result['inputs'];
-                        outputs = result['outputs'];
+                        var inputs = result['inputs'];
+                        var outputs = result['outputs'];
                         canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 10, inputs, outputs));
 
                         // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
@@ -209,19 +209,23 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
 
     $('form').submit(function(e) {
+        /*
+        Trigger AJAX transaction on submitting form.
+         */
         e.preventDefault(); // override form submit action
         var submit_error = $('#id_submit_error')[0];
 
         var shapes = canvasState.shapes;
 
-        // TODO: check graph integrity
-
+        // check graph integrity
         var this_shape;
         var magnets;
         var this_magnet;
         var i, j;
         var pipeline_inputs = [];  // collect data nodes
         var method_nodes = [];
+
+        submit_error.innerHTML = '';
 
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
@@ -254,6 +258,21 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
+        // at least one Connector must terminate as pipeline output
+        var connectors = canvasState.connectors;
+        var this_connector;
+        var pipeline_has_output = false;
+        for (i = 0; i < connectors.length; i++) {
+            this_connector = connectors[i];
+            if (this_connector.in_magnet === '__output__') {
+                pipeline_has_output = true;
+            }
+        }
+
+        if (!pipeline_has_output) {
+            submit_error.innerHTML = 'Pipeline has no output';
+            return;
+        }
 
         var form_data = {};
 
@@ -276,11 +295,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // update form data with inputs
         var this_input;
+        form_data['pipeline_inputs'] = {};
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
-            form_data['create_input_'+i] = {'pk': this_input.pk,
-            'dataset_name': this_input.label, 'dataset_idx': i+1,
-            'x': this_input.x, 'y': this_input.y};
+            form_data['pipeline_inputs'][i] = {
+                'pk': (this_input.constructor===CDtNode) ? this_input.pk : -1,
+                'dataset_name': this_input.label,
+                'dataset_idx': i+1,
+                'x': this_input.x,
+                'y': this_input.y
+            }
         }
 
         // append MethodNodes to sorted_elements Array in dependency order
@@ -322,48 +346,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
-        // add arguments for input cabling
-        var this_step;
-        var this_source;
-        var this_connector;
-        for (i = 0; i < sorted_elements.length; i++) {
-            this_step = sorted_elements[i];
-
-            form_data['pipeline_step_'+(i+1)] = {
-                'transformation_pk': this_step.pk,  // to retrieve MR
-                'step_num': i,  // 1-index (pipeline inputs are index 0)
-            };
-
-            // retrieve Connectors
-            magnets = this_step.in_magnets;
-            for (j = 0; j < magnets.length; j++) {
-                this_magnet = magnets[j];
-                this_connector = this_magnet.connected;
-                this_source = this_connector.out_magnet.parent;
-
-                if (this_source.constructor === MethodNode) {
-                    form_data['step_'+i+'_input_'+j] = {
-                        'source': this_source.pk,
-                        'source_step': sorted_elements.indexOf(this_source)+1,
-                        'dest': j
-                    };
-                }
-                else {
-                    // sourced by pipeline input
-                    form_data['step_'+i+'_input_'+j] = {
-                        'source': this_source.label,
-                        'source_step': 0,
-                        'dest': j  // input hole of Transformation
-                    };
-                }
-            }
-        }
-        // this code written on Signal Hill, St. John's, Newfoundland
-        // May 2, 2014 - afyp
-
-
         // sort output cables by y-position
-        var connectors = canvasState.connectors;
         var output_cables = [];
         for (i = 0; i < connectors.length; i++) {
             this_connector = connectors[i];
@@ -373,17 +356,74 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
         output_cables.sort(sortByYpos);
 
-        for (i = 0; i < output_cables.length; i++) {
-            this_connector = output_cables[i];
-            this_source = this_connector.out_magnet.parent;
-            form_data['outcable_'+(i+1)] = {
-                'output_idx': i+1,
-                'source': this_source.pk,
-                'source_step': sorted_elements.indexOf(this_source) + 1,
-                'dataset_name': this_connector.out_magnet.label,  // magnet label
-                'output_name': this_connector.out_magnet.label  // use same for now
+        // add arguments for input cabling
+        var this_step;
+        var this_source;
+
+        form_data['pipeline_step'] = {};
+
+        for (i = 0; i < sorted_elements.length; i++) {
+            this_step = sorted_elements[i];
+
+            form_data['pipeline_step'][i] = {
+                'transformation_pk': this_step.pk,  // to retrieve MR
+                'step_num': i,  // 1-index (pipeline inputs are index 0)
+                'x': this_step.x,
+                'y': this_step.y
             };
+
+            // retrieve Connectors
+            magnets = this_step.in_magnets;
+            form_data['pipeline_step'][i]['cables_in'] = {};
+
+            for (j = 0; j < magnets.length; j++) {
+                this_magnet = magnets[j];
+                this_connector = this_magnet.connected;
+                this_source = this_connector.out_magnet.parent;
+
+                if (this_source.constructor === MethodNode) {
+                    form_data['pipeline_step'][i]['cables_in'][j] = {
+                        'source': 'Method',
+                        'source_pk': this_source.pk,
+                        'source_dataset_name': this_connector.out_magnet.label,
+                        'source_step': sorted_elements.indexOf(this_source)+1,
+                        'dest': this_step.pk,
+                        'dest_dataset_name': this_connector.in_magnet.label
+                    };
+                }
+                else {
+                    // sourced by pipeline input
+                    form_data['pipeline_step'][i]['cables_in'][j] = {
+                        'source': this_source.constructor === RawNode ? 'raw' : 'CDT',
+                        'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
+                        'source_dataset_name': this_connector.out_magnet.label,
+                        'source_step': 0,
+                        'dest': this_step.pk,
+                        'dest_dataset_name': this_connector.in_magnet.label
+                    };
+                }
+            }
+
+            form_data['pipeline_step'][i]['cables_out'] = {};
+
+            for (j = 0; j < output_cables.length; j++) {
+                this_connector = output_cables[j];
+                this_source = this_connector.out_magnet.parent;
+                if (this_source !== this_step) {
+                    continue;
+                }
+                form_data['pipeline_step'][i]['cables_out'][j] = {
+                    'output_idx': j+1,
+                    'source': this_step.pk,
+                    'source_step': sorted_elements.indexOf(this_step) + 1,
+                    'dataset_name': this_connector.out_magnet.label,  // magnet label
+                    'output_name': this_connector.out_magnet.label  // use same for now
+                };
+            }
         }
+        // this code written on Signal Hill, St. John's, Newfoundland
+        // May 2, 2014 - afyp
+
 
 
         // do AJAX transaction
