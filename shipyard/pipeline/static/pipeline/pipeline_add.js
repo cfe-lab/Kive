@@ -82,7 +82,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 $('#id_revision_label')[0].innerHTML = '';
             }
         }
-    ).change() // trigger on load
+    ).change(); // trigger on load
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
@@ -117,12 +117,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             $('#id_dt_error')[0].innerHTML = "";
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
-                canvasState.addShape(new RawNode(x = 100, y = 200 + 50 * Math.random(),
-                    r = 20, fill='#88DD88', inset=10, offset=25, label=node_label
+                canvasState.addShape(new RawNode(100, 200 + 50 * Math.random(),
+                    20, '#88DD88', 10, 25, node_label
                 ))
             } else {
-                canvasState.addShape(new CDtNode(pk = this_pk, x = 100, y = 200 + 50 * Math.random(),
-                    w = 40, fill = '#8888DD', inset = 10, offset = 10, label = node_label
+                canvasState.addShape(new CDtNode(this_pk, 100, 200 + 50 * Math.random(),
+                    40, '#8888DD', 10, 10, node_label
                 ));
             }
             $('#id_datatype_name').val("");  // reset text field
@@ -158,10 +158,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         var inputs = result['inputs'];
                         var outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999', node_label, 10, inputs, outputs));
+                        canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999',
+                            node_label, 10, inputs, outputs));
 
                         // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
-                        //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC', node_label, 0, inputs, outputs));
+                        //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC',
+                        // node_label, 0, inputs, outputs));
                     }
                 });
 
@@ -170,9 +172,26 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
+    $('#id_example_button').on('click', function () {
+        /*
+        Populate canvasState with objects for an example pipeline.
+         */
+        canvasState.clear();
+        canvasState.shapes = [];
+        canvasState.connectors = [];
+
+        canvasState.addShape(
+            new RawNode(100, 250, 20, '#88DD88', 10, 25, 'Unstructured data')
+        );
+        canvasState.addShape(
+            new CDtNode(1, 100, 150, 40, '#8888DD', 10, 10, 'Strings')
+        );
+    });
+
     $('#id_reset_button').on('click', function() {
         // remove all objects from canvas
         canvasState.clear();
+        // reset containers to reflect canvas
         canvasState.shapes = [];
         canvasState.connectors = [];
     });
@@ -277,9 +296,20 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var form_data = {};
 
         // arguments to initialize new Pipeline Family
-        // TODO: Disallow blank pipeline name and description fields
-        form_data['family_name'] = $('#id_revision_name').val();
-        form_data['family_desc'] = $('#id_revision_desc').val();
+        var revision_name = $('#id_revision_name').val();
+        var revision_desc = $('#id_revision_desc').val();
+
+        if (revision_name === '') {
+            submit_error.innerHTML = 'Pipeline must be named';
+            return;
+        }
+        if (revision_desc === '') {
+            submit_error.innerHTML = 'Pipeline must have a description';
+            return;
+        }
+
+        form_data['family_name'] = revision_name;
+        form_data['family_desc'] = revision_desc;
 
         // arguments to add first pipeline revision
         form_data['revision_name'] = '1';
@@ -367,7 +397,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
             form_data['pipeline_step'][i] = {
                 'transformation_pk': this_step.pk,  // to retrieve MR
-                'step_num': i,  // 1-index (pipeline inputs are index 0)
+                'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
                 'y': this_step.y
             };
@@ -415,7 +445,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 form_data['pipeline_step'][i]['cables_out'][j] = {
                     'output_idx': j+1,
                     'source': this_step.pk,
-                    'source_step': sorted_elements.indexOf(this_step) + 1,
+                    'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                     'dataset_name': this_connector.out_magnet.label,  // magnet label
                     'output_name': this_connector.out_magnet.label  // use same for now
                 };

@@ -44,7 +44,7 @@ RawNode.prototype.draw = function(ctx) {
     out_magnet.draw(ctx);
 };
 
-RawNode.prototype.highlight = function(ctx, dragging) {
+RawNode.prototype.highlight = function(ctx) {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI, false);
     ctx.closePath();
@@ -98,12 +98,12 @@ CDtNode.prototype.draw = function(ctx) {
     out_magnet.draw(ctx);
 };
 
-CDtNode.prototype.highlight = function(ctx, dragging) {
+CDtNode.prototype.highlight = function(ctx) {
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x+w, this.y);
-    ctx.lineTo(this.x+w, this.y+w);
-    ctx.lineTo(this.x, this.y+w);
+    ctx.lineTo(this.x+this.w, this.y);
+    ctx.lineTo(this.x+this.w, this.y+this.w);
+    ctx.lineTo(this.x, this.y+this.w);
     ctx.closePath();
     ctx.stroke();
 };
@@ -153,7 +153,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 2,
             fill = '#fff',
             cdt = this_input['cdt_pk'],
-            label = this_input['dataset_name']
+            label = this_input['datasetname']
         );
 
         if (this.n_inputs == 1) {
@@ -172,7 +172,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 2,
             fill = '#fff',
             cdt = this_output['cdt_pk'],
-            label = this_output['dataset_name']
+            label = this_output['datasetname']
         );
 
         if (this.n_inputs == 1) {
@@ -272,6 +272,7 @@ Magnet.prototype.draw = function(ctx) {
 //    this.y = y;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
+    ctx.closePath();
     ctx.fillStyle = this.fill;
     ctx.fill();
 };
@@ -334,15 +335,19 @@ Connector.prototype.draw = function(ctx) {
         this.x = this.in_magnet.x;
         this.y = this.in_magnet.y;
     }
-
+    ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
     ctx.lineTo(this.x, this.y);
-
     ctx.stroke();
 };
 
 Connector.prototype.highlight = function(ctx, dragging) {
-    // require this.dragging == false ?
+    /*
+    Highlight this Connector by drawing another line along
+    its length.  Colour and line width set by canvasState.
+    Requires [dragging] to be false so Connector is not highlighted
+    while it is being drawn.
+     */
     if (dragging === false) {
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);

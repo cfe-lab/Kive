@@ -58,54 +58,71 @@ def pipeline_add(request):
             revision_desc=formdata['revision_desc']
         )
 
-        # make pipeline inputs
-        for key, val in formdata['pipeline_inputs'].iteritems():
-            pk = int(val['pk'])
-            pipeline.create_input(
-                compounddatatype=None if pk < 0 else CompoundDatatype.objects.get(pk=pk),
-                dataset_name=val['dataset_name'],
-                dataset_idx=val['dataset_idx']
-            )
-
-        # make pipeline steps
-        for key, val in formdata['pipeline_step'].iteritems():
-            pk = val['transformation_pk']  # primary key to CodeResourceRevision
-            method = Method.objects.get(pk=pk)
-            pipeline_step = pipeline.steps.create(
-                transformation=method,
-                step_num=int(val['step_num'])
-            )
-            # add input cables
-            for k2, v2 in val['cables_in'].iteritems():
-                if v2['source'] == 'Method':
-                    source_method = Method.objects.get(pk=v2['source_pk'])
-                    pipeline_step.cables_in.create(
-                        dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
-                        source_step=int(v2['source_step']),
-                        source=source_method.outputs.get(dataset_name=
-                                                         v2['source_dataset_name']))
-                else:
-                    # data from pipeline input (raw or CDT)
-                    pipeline_step.cables_in.create(
-                        dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
-                        source_step=int(v2['source_step']),
-                        source=pl_rev.inputs.get(dataset_name=v2['source_dataset_name'])
-                    )
-
-            # add output cables
-            for k2, v2 in val['cables_out'].iteritems():
-                outcabling = pipeline.create_outcable(
-                    source_step=int(v2['source_step']),
-                    source=pipeline_step.transformation.outputs.get(dataset_name=v2['dataset_name']),
-                    output_name=v2['output_name'],
-                    output_idx=v2['output_idx']
+        try:
+            # make pipeline inputs
+            for key, val in formdata['pipeline_inputs'].iteritems():
+                pk = int(val['pk'])
+                pipeline.create_input(
+                    compounddatatype=None if pk < 0 else CompoundDatatype.objects.get(pk=pk),
+                    dataset_name=val['dataset_name'],
+                    dataset_idx=val['dataset_idx']
                 )
+        except:
+            # FIXME: delete() fails with FieldError: Cannot resolve keyword u'object_id' into
+            # FIXME: field. Choices are: RSICs, execrecordins, execrecordouts, generator, id,
+            # FIXME: runoutputcables, runsteps
+            #pl_family.delete()
+            response_data = {'status': 'failure',
+                             'error_msg': 'Invalid pipeline input'}
+            return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+        try:
+            # make pipeline steps
+            for key, val in formdata['pipeline_step'].iteritems():
+                pk = val['transformation_pk']  # primary key to CodeResourceRevision
+                method = Method.objects.get(pk=pk)
+                pipeline_step = pipeline.steps.create(
+                    transformation=method,
+                    step_num=int(val['step_num'])
+                )
+                # add input cables
+                for k2, v2 in val['cables_in'].iteritems():
+                    if v2['source'] == 'Method':
+                        source_method = Method.objects.get(pk=v2['source_pk'])
+                        pipeline_step.cables_in.create(
+                            dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
+                            source_step=int(v2['source_step']),
+                            source=source_method.outputs.get(dataset_name=
+                                                             v2['source_dataset_name']))
+                    else:
+                        # data from pipeline input (raw or CDT)
+                        pipeline_step.cables_in.create(
+                            dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
+                            source_step=int(v2['source_step']),
+                            source=pipeline.inputs.get(dataset_name=v2['source_dataset_name'])
+                        )
+
+                # add output cables
+                for k2, v2 in val['cables_out'].iteritems():
+                    outcabling = pipeline.create_outcable(
+                        source_step=int(v2['source_step']),
+                        source=pipeline_step.transformation.outputs.get(dataset_name=v2['dataset_name']),
+                        output_name=v2['output_name'],
+                        output_idx=v2['output_idx']
+                    )
+        except:
+            raise
+            #pl_family.delete()
+            response_data = {'status': 'failure',
+                             'error_msg': 'Invalid pipeline cable'}
+            return HttpResponse(json.dumps(response_data), content_type='application/json')
 
         try:
             pipeline.clean()
             pipeline.save()
             response_data = {'status': 'success'}
         except:
+            #pl_family.delete()
             response_data = {'status': 'failure'}
 
         return HttpResponse(json.dumps(response_data), content_type='application/json')
