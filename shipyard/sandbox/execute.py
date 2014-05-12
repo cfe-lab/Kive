@@ -202,11 +202,7 @@ class Sandbox:
         out_dir = os.path.join(step_run_dir, dirnames.OUT_DIR)
         in_dir = os.path.join(step_run_dir, dirnames.IN_DIR)
         for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
-            if not recover:
-                file_access_utils.set_up_directory(workdir)
-            else:
-                if not (os.path.exists(workdir) and os.path.isdir(workdir)):
-                    raise ValueError('Path {} does not exist or is not a directory')
+            file_access_utils.set_up_directory(workdir, tolerate=recover)
         return (in_dir, out_dir, log_dir)
 
     # TODO: module function of librarian?
@@ -570,10 +566,8 @@ class Sandbox:
         curr_record.complete_clean()
         return curr_record
 
-    # TODO: rename curr_run to parent_record
-    def execute_step(self, pipelinestep, curr_run, inputs, step_run_dir=None, recover=False, invoking_record=None):
-        """
-        Execute the PipelineStep on the inputs.
+    def execute_step(self, pipelinestep, parent_record, recover=True, inputs=None, step_run_dir=None):
+        """Execute the PipelineStep on the inputs.
 
         * If code is run, outputs go to paths specified in output_paths.
         * Requisite code is placed in step_run_dir.
@@ -604,13 +598,12 @@ class Sandbox:
 
             # Create new RunStep.
             self.logger.debug("Not recovering - creating new RunStep")
-            curr_RS = archive.models.RunStep.create(pipelinestep, curr_run)
+            curr_RS = archive.models.RunStep.create(pipelinestep, parent_record)
 
             # Construct output_paths from outputs of this step's transformation.
             for curr_output in pipelinestep.outputs:
                 output_paths.append(self.step_xput_path(curr_RS, curr_output, step_run_dir))
 
-            # Run cables.
             self.logger.debug("Running step's input PSICs")
             for i, curr_input in enumerate(pipelinestep.inputs):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
@@ -618,20 +611,19 @@ class Sandbox:
                 self.logger.debug("execute_cable('{}','{}','{}','{}','{}')"
                                   .format(corresp_cable, curr_RS, False, inputs[i], cable_path))
 
-                # Run execute_cable() on an input and store output symDS
-                # in inputs_after_cable.
+                # Run a cable.
                 curr_RSIC = self.execute_cable(corresp_cable, curr_RS, False, inputs[i], cable_path)
 
                 # Cable failed. Do not create ER for this step; return runstep.
                 if not curr_RSIC.successful_execution():
                     self.logger.error("PipelineStepInputCable failed.")
+                    curr_RS.stop()
                     return curr_RS
 
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
 
             curr_RS.clean()
 
-            # FIXME: SD generated from the previous step wasn't checked and so cannot be used
             self.logger.debug("Looking for ER with same transformation + input SDs")
             curr_ER = None
             if not pipelinestep.is_subpipeline:
@@ -643,14 +635,11 @@ class Sandbox:
 
                 self.logger.debug("Found ER, checking it provides outputs needed")
 
-                # Determine what TO's are not deleted, store in outputs_needed.
-                outputs_needed = pipelinestep.outputs_to_retain()
-
                 # ER is completely reusable? Yes.
-                if curr_ER.provides_outputs(outputs_needed):
+                if curr_ER.provides_outputs(pipelinestep.outputs_to_retain()):
                     self.logger.debug("Completely reusing ER {} - updating maps".format(curr_ER))
 
-                    # Set curr_RS as reused.
+                    # Set curr_RS as reused and link ExecRecord.
                     curr_RS.link_execrecord(curr_ER, True)
 
                     # Update maps.
@@ -677,7 +666,7 @@ class Sandbox:
 
             # Retrieve output_paths and inputs_after_cable from maps.
             for curr_output in pipelinestep.outputs:
-                corresp_SD = self.socket_map[(curr_run, pipelinestep, curr_output)]
+                corresp_SD = self.socket_map[(parent_record.parent_run, pipelinestep, curr_output)]
                 output_paths.append(self.sd_fs_map[corresp_SD])
 
             for curr_input in pipelinestep.inputs:
@@ -685,6 +674,7 @@ class Sandbox:
                                                         object_id=curr_input.pk)
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
+        invoking_record = parent_record if recover else curr_RS
         self.logger.debug("Checking required datasets are on the FS for running code")
         for curr_in_SD in inputs_after_cable:
 
@@ -695,7 +685,7 @@ class Sandbox:
                 self.logger.debug("Dataset {} not on FS: recovering".format(curr_in_SD))
 
                 # Success? No.
-                if not self.recover(curr_in_SD, curr_RS):
+                if not self.recover(curr_in_SD, invoking_record):
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
                     self.logger.debug("Failed to recover: quitting without creating ER")
@@ -721,13 +711,7 @@ class Sandbox:
             return curr_RS
 
         # Step is a method or a pipeline? Method.
-        # Create ExecLog and MethodOutput, invoked by...
-        if recover:
-            # ...recovering RunAtomic.
-            invoking_record = curr_run
-        else:
-            # ... this RunStep.
-            invoking_record = curr_RS
+        # Create ExecLog and MethodOutput.
         curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
         self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
 
@@ -750,7 +734,6 @@ class Sandbox:
         if not (recover or had_ER_at_beginning):
             self.logger.debug("Creating new SymbolicDatasets for PipelineStep outputs")
 
-        # TODO: update the LucidChart
         for i, curr_output in enumerate(pipelinestep.outputs):
             output_path = output_paths[i]
             output_CDT = curr_output.get_cdt()
@@ -873,12 +856,14 @@ class Sandbox:
         if parent_runstep is not None:
             self.logger.debug("executing a sub-pipeline with input_SD {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
-
-        self.logger.debug("Setting up input and output directories")
+    
         in_dir = os.path.join(sandbox_path, dirnames.IN_DIR)
         out_dir = os.path.join(sandbox_path, dirnames.OUT_DIR)
-        file_access_utils.set_up_directory(in_dir)
-        file_access_utils.set_up_directory(out_dir)
+
+        if parent_runstep is None:
+            self.logger.debug("Setting up input and output directories")
+            file_access_utils.set_up_directory(in_dir)
+            file_access_utils.set_up_directory(out_dir)
 
         for step in pipeline.steps.all().order_by("step_num"):
             self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
@@ -927,7 +912,7 @@ class Sandbox:
 
                 step_inputs.append(self.socket_map[(run_to_query, generator, socket)])
 
-            curr_RS = self.execute_step(step, curr_run, step_inputs, step_run_dir=run_dir)
+            curr_RS = self.execute_step(step, curr_run, False, step_inputs, run_dir)
             self.logger.debug("DONE EXECUTING STEP {}".format(step))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
@@ -1090,11 +1075,11 @@ class Sandbox:
 
         self.logger.debug('Executing {} "{}" in recovery mode'.format(generator.__class__.__name__, generator))
         if type(generator) == pipeline.models.PipelineStep:
-            curr_record = self.execute_step(generator, curr_run, None,recover=True,invoking_record=invoking_record)
+            curr_record = self.execute_step(generator, invoking_record)
         elif type(generator) == pipeline.models.PipelineOutputCable:
-            curr_record = self.execute_cable(generator, invoking_record, recover=True)
+            curr_record = self.execute_cable(generator, invoking_record)
         elif type(generator) == pipeline.models.PipelineStepInputCable:
             parent_record = curr_run.runsteps.get(pipelinestep=generator.pipelinestep)
-            curr_record = self.execute_cable(generator, invoking_record, recover=True)
+            curr_record = self.execute_cable(generator, invoking_record)
 
         return curr_record.is_complete() and curr_record.successful_execution()

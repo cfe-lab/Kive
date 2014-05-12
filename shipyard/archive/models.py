@@ -524,10 +524,16 @@ class RunStep(RunAtomic):
     def pipeline(self):
         return self.pipelinestep.pipeline
 
+    @property
+    def parent(self):
+        return self.run
+
     @classmethod
+    @transaction.atomic
     def create(cls, pipelinestep, run):
         """Create a new RunStep from a PipelineStep."""
-        runstep = cls(pipelinestep=pipelinestep, run=run, start_time=timezone.now())
+        runstep = cls(pipelinestep=pipelinestep, run=run)
+        runstep.start()
         runstep.clean()
         runstep.save()
         return runstep
@@ -981,20 +987,14 @@ class RunCable(RunAtomic):
         abstract = True
 
     @classmethod
-    def create(cls, cable, parent):
-        """Create a RunCable from a Pipeline*Cable.
-        
-        INPUTS
-        cable       a PipelineStepInputCable or PipelineOutputCable
-        parent      the parent RunStep (for an incable) or Run (for an
-                    outcable) for the new RunCable
-        """
+    def create(cls, cable, parent_record):
         if cable.is_incable:
-            runcable = RunSIC(start_time=timezone.now(), PSIC=cable, runstep=parent)
+            runcable = RunSIC.create(cable, parent_record)
         else:
-            runcable = RunOutputCable(start_time=timezone.now(), pipelineoutputcable=cable, run=parent)
+            runcable = RunOutputCable.create(cable, parent_record)
         runcable.clean()
         runcable.save()
+        runcable.start()
         return runcable
 
     def has_data(self):
@@ -1274,6 +1274,14 @@ class RunSIC(RunCable):
         # within a run step.
         unique_together = ("runstep", "PSIC")
 
+    @classmethod
+    def create(cls, PSIC, runstep):
+        runsic = cls(PSIC=PSIC, runstep=runstep)
+        runsic.start()
+        runsic.clean()
+        runsic.save()
+        return runsic
+
     def _pipeline_cable(self):
         """
         Retrieves the PSIC of this RunSIC.
@@ -1291,6 +1299,10 @@ class RunSIC(RunCable):
     @property
     def pipeline(self):
         return self.PSIC.pipelinestep.pipeline
+
+    @property
+    def parent(self):
+        return self.runstep
 
     # TODO: fix for sub-pipelines
     def output_name(self):
@@ -1390,6 +1402,14 @@ class RunOutputCable(RunCable):
     #     super(self.__class__, self).__init__(*args, **kwargs)
     #     self.logger = logging.getLogger(self.__class__.__name__)
 
+    @classmethod
+    def create(cls, pipelineoutputcable, run):
+        runoutputcable = cls(pipelineoutputcable=pipelineoutputcable, run=run)
+        runoutputcable.start()
+        runoutputcable.clean()
+        runoutputcable.save()
+        return runoutputcable
+
     def _pipeline_cable(self):
         """
         Retrieves the POC of this RunOutputCable.
@@ -1407,6 +1427,10 @@ class RunOutputCable(RunCable):
     @property
     def pipeline(self):
         return self.pipelineoutputcable.pipeline
+
+    @property
+    def parent(self):
+        return self.run
 
     # TODO: fix for sub-pipelines
     def output_name(self):
@@ -1666,7 +1690,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         if not self.has_ended():
             return False
 
-        if (self.record.__class__.__name__ == "RunStep" and
+        if (isinstance(self.record, RunStep) and
                 self.record.pipelinestep.transformation.__class__.__name__ == "Method"):
             if not hasattr(self, "methodoutput"):
                 return False
