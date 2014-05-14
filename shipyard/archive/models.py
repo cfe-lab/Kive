@@ -439,6 +439,7 @@ class RunAtomic(stopwatch.models.Stopwatch):
 
         # Check that either every output has been successfully checked
         # or one+ has failed and the rest are complete.
+
         if self.log.first().all_checks_passed():
             return True
 
@@ -869,6 +870,9 @@ class RunStep(RunAtomic):
                 self._clean_has_execlog_no_execrecord_yet()
                 return
 
+        if self.execrecord is None:
+            return
+
         # From here on, the appropriate ER is known to be set.
         self._clean_execrecord()
         self._clean_outputs()
@@ -1093,12 +1097,6 @@ class RunCable(RunAtomic):
          - if this RunCable does not keep its output or its output is
            missing, there should be no existent data associated.
 
-         - else:
-           - the corresponding ERO should have existent data associated
-
-           - if the PSIC/POC is not trivial and this RunCable does not reuse an ER,
-             then there should be existent data associated and it should also
-             be associated to the corresponding ERO.
 
         This is a helper function for clean.
 
@@ -1183,6 +1181,14 @@ class RunCable(RunAtomic):
 
         This is an abstract function that must be overridden by
         RunSIC and RunOutputCable, as most of this is case-specific.
+
+        If the output of the cable is kept and either the record is reused or
+        it isn't reused and no missing outputs are noted:
+           - the corresponding ERO should have existent data associated
+
+           - if the PSIC/POC is not trivial and this RunCable does not reuse an ER,
+             then there should be existent data associated and it should also
+             be associated to the corresponding ERO.
 
         PRE
         This RunCable has an ExecRecord.
@@ -1793,28 +1799,35 @@ class ExecLog(stopwatch.models.Stopwatch):
         # else:
         #     record_outs = self.record.output.all()
 
-        for ero in self.record.execrecord.execrecordouts.all():
+        # Is this log the generator of the execrecord?  That is, is this
+        # the very first time this execution was ever performed, and this
+        # isn't either a "filling-in" or a recovery?
+        if self.record.execrecord.generator == self.record.log.first():
 
-            # Was this ERO's SD originally created by the log's Run*?
-            # That is, is the generator of the execrecord this log?
-            if self.record.execrecord.generator == self.record.log.first():
-                # If so, and if it is not raw, and if this ExecLog is for
-                # a non-trivial cable, look for a CCL.
-                if not ero.symbolicdataset.is_raw():
-                    record_is_trivial_cable = False
-                    if type(self.record) == RunOutputCable and self.record.pipelineoutputcable.is_trivial():
-                        record_is_trivial_cable = True
-                    elif type(self.record) == RunSIC and self.record.PSIC.is_trivial():
-                        record_is_trivial_cable = True
+            for ero in self.record.execrecord.execrecordouts.all():
 
-                    if not record_is_trivial_cable:
-                        corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
-                        if not corresp_ccls.exists():
-                            print("\nFuuuuudge\n")
-                            return False
+                # If this was a trivial cable, then this didn't create the SD,
+                # so just look for an ICL.  Otherwise, if the SD isn't raw, look
+                # for a CCL.
+                record_is_trivial_cable = False
+                if type(self.record) == RunOutputCable and self.record.pipelineoutputcable.is_trivial():
+                    record_is_trivial_cable = True
+                elif type(self.record) == RunSIC and self.record.PSIC.is_trivial():
+                    record_is_trivial_cable = True
 
-            else:
-                # If not, look for an ICL.
+                if record_is_trivial_cable:
+                    corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+                    if not corresp_icls.exists():
+                        return False
+
+                elif not ero.symbolicdataset.is_raw():
+                    corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
+                    if not corresp_ccls.exists():
+                        return False
+
+        else:
+            # This is either a filling-in or a recovery, so just look for ICLs.
+            for ero in self.record.execrecord.execrecordouts.all():
                 corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
                 if not corresp_icls.exists():
                     return False
