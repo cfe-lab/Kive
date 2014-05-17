@@ -15,6 +15,7 @@ from metadata.models import *
 from method.models import *
 from pipeline.models import *
 from librarian.models import *
+from archive.models import *
 import method.tests
 
 from constants import datatypes
@@ -22,6 +23,7 @@ from constants import datatypes
 samplecode_path = "../samplecode"
 
 # All classes that inherit TestCase are evaluated by the TestUtility
+
 
 class PipelineTestSetup(method.tests.MethodTestSetup):
     """
@@ -100,6 +102,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
     def tearDown(self):
         shutil.rmtree(self.workdir)
 
+
 class PipelineFamilyTests(PipelineTestSetup):
 
     def test_unicode(self):
@@ -108,7 +111,8 @@ class PipelineFamilyTests(PipelineTestSetup):
         """
         self.assertEqual(unicode(self.DNAcomp_pf),
                          "DNAcomplement")
-    
+
+
 class PipelineTests(PipelineTestSetup):
     
     def test_pipeline_one_valid_input_clean(self):
@@ -2384,7 +2388,8 @@ dataset_name="pipe_input_1_a_b_c",
         self.assertEquals(curr_out_new.get_cdt(), self.DNAinput_cdt)
         self.assertEquals(curr_out_new.get_min_row(), None)
         self.assertEquals(curr_out_new.get_max_row(), None)
- 
+
+
 class PipelineStepTests(PipelineTestSetup):
 
     def test_pipelineStep_without_pipeline_set_unicode(self):
@@ -2686,6 +2691,7 @@ class PipelineStepTests(PipelineTestSetup):
         self.assertEqual(len(step.outputs_to_retain()), 1)
         self.assertEqual(step.outputs_to_delete.count(), 0)
 
+
 class PipelineStepRawDeleteTests(PipelineTestSetup):
 
     def test_PipelineStep_clean_raw_output_to_be_deleted_good(self):
@@ -2900,6 +2906,7 @@ class RawOutputCableTests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError, error_msg,
                                 self.pipeline_1.complete_clean)
 
+
 class RawInputCableTests(PipelineTestSetup):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
         """
@@ -3044,6 +3051,7 @@ class RawInputCableTests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError,
             "Cable \"Pipeline test pipeline family v1 step 1:a_b_c\(raw\)\" is raw and should not have custom wiring defined",
             rawcable1.clean)
+
 
 class RawSaveTests(PipelineTestSetup):
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
@@ -3387,7 +3395,6 @@ class SingleRawOutputTests(PipelineTestSetup):
             self.script_4_1_M.clean)
 
 
-
 class SeveralRawOutputsTests(PipelineTestSetup):
 
     def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_clean_good(self):
@@ -3684,6 +3691,7 @@ class PipelineOutputCableRawTests(PipelineTestSetup):
 
         self.assertEquals(self.pipeline_1.clean(), None)
 
+
 class CustomRawOutputCablingTests(PipelineTestSetup):
 
     def test_Pipeline_create_multiple_raw_outputs_with_raw_outmap(self):
@@ -3756,7 +3764,6 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertEquals(pipelineStep.clean(), None)
         self.assertEquals(pipelineStep.complete_clean(), None)
 
-
     def test_PSIC_clean_and_completely_wired_CDT_not_equal_wires_exist_shuffled_wiring_good(self):
         # Wire from a triplet into a double:
         # A -> z
@@ -3795,7 +3802,6 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertEquals(pipeline_cable.clean_and_completely_wired(), None)
         self.assertEquals(pipelineStep.clean(), None)
         self.assertEquals(pipelineStep.complete_clean(), None)
-
 
     def test_PSIC_clean_and_completely_wired_CDT_not_equal_wires_exist_compatible_wiring_good(self):
         # A -> x
@@ -3873,7 +3879,9 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         runstep = pipelinestep.pipelinestep_instances.create(run=run)
         psic = pipelinestep.cables_in.first()
         rsic = psic.psic_instances.create(runstep=runstep)
-        log = psic.run_cable(source, output_file, rsic)
+        log = ExecLog(record=rsic, invoking_record=rsic)
+        log.save()
+        psic.run_cable(source, output_file, rsic, log)
         return log, rsic
 
     def _setup_dirs(self):
@@ -3899,16 +3907,18 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertEqual(len(log.missing_outputs()), 0)
         self.assertEqual(log.is_successful(), True)
 
-    def test_execlog_psic_run_cable_dataset(self):
-        """
-        Check the coherence of an ExecLog created by running a cable with a Dataset.
-        """
-        import time
-
-        scratch_dir, output_file = self._setup_dirs()
-        log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.DNAinput_symDS.dataset)
-        self._log_checks(log, rsic)
-        shutil.rmtree(scratch_dir)
+    # May 14, 2014: this is now deprecated.  run_cable is now only meant to be
+    # run on filenames.
+    # def test_execlog_psic_run_cable_dataset(self):
+    #     """
+    #     Check the coherence of an ExecLog created by running a cable with a Dataset.
+    #     """
+    #     import time
+    #
+    #     scratch_dir, output_file = self._setup_dirs()
+    #     log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.DNAinput_symDS.dataset)
+    #     self._log_checks(log, rsic)
+    #     shutil.rmtree(scratch_dir)
 
     def test_execlog_psic_run_cable_file(self):
         """
@@ -3920,6 +3930,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.datafile.name)
         self._log_checks(log, rsic)
         shutil.rmtree(scratch_dir)
+
 
 # August 29, 2013: reworked to handle new design for outcables.
 class CustomOutputWiringTests(PipelineTestSetup):

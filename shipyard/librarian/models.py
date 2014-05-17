@@ -308,7 +308,7 @@ class SymbolicDataset(models.Model):
             for row, col in csv_summary["failing_cells"]:
                 fails = csv_summary["failing_cells"][(row,col)]
                 for failed_constr in fails:
-                    new_cell_error = csv_baddata.cell_errors.create(row_num=row,
+                    new_cell_error = ccl.baddata.cell_errors.create(row_num=row,
                                                                     column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.

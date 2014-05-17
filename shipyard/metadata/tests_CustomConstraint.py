@@ -42,7 +42,8 @@ class CustomConstraintTests(UtilityMethods):
             row_num=0
             for row in $(cat "$1"); do
               if [[ $row_num -gt 0 ]]; then
-                 if [[ "x$(echo $row | aspell list)" != "x" ]]; then
+                 grep $row /usr/share/dict/words > /dev/null
+                 if [[ $? -eq 1 ]]; then
                     echo $row_num >> "$2"
                  fi  
               fi  
@@ -62,7 +63,7 @@ class CustomConstraintTests(UtilityMethods):
 
         # A file not conforming to the compound datatype.
         self.bad_datafile = self._setup_datafile(self.cdt_constraints,
-                [["hello", "Spock"], ["live", "long"], ["and", "porsper"]])
+                [["hello", "there"], ["live", "long"], ["and", "porsper"]])
 
         # A pipeline to process the constraint CDT.
         self.pipeline_noop = self._setup_onestep_pipeline("noop",

@@ -667,7 +667,7 @@ class Datatype(models.Model):
 
         try:
             failing_cells = summary["failing_cells"].keys()
-        except IndexError:
+        except KeyError:
             failing_cells = []
 
         with open(self.prototype.dataset_file.name) as f:
@@ -839,8 +839,8 @@ class Datatype(models.Model):
         stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
 
         with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
-            verif_method.run_code_with_streams(summary_path, [input_path], [output_path], 
-                    [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
+            verif_method.run_code(summary_path, [input_path], [output_path],
+                    out, err, verif_log, verif_log)
 
         return self._check_verification_output(summary_path, output_path)
 

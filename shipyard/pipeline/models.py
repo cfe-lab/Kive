@@ -19,6 +19,7 @@ import shutil
 import logging
 import archive.models, librarian.models, metadata.models, method.models, transformation.models
 
+
 class PipelineFamily(transformation.models.TransformationFamily):
     """
     PipelineFamily groups revisions of Pipelines together.
@@ -185,6 +186,7 @@ class Pipeline(transformation.models.Transformation):
         new_outcable.full_clean()
 
         return new_outcable
+
 
 class PipelineStep(models.Model):
     """
@@ -372,6 +374,7 @@ class PipelineStep(models.Model):
                 
         return outputs_needed
 
+
 # A helper function that will be called both by PSICs and
 # POCs to tell whether they are trivial.
 def cable_trivial_h(cable, cable_wires):
@@ -399,6 +402,7 @@ def cable_trivial_h(cable, cable_wires):
             return False
 
     return True
+
 
 # Helper that will be called by both PSIC and POC.
 def run_cable_h(cable, source, output_path):
@@ -452,6 +456,7 @@ def run_cable_h(cable, source, output_path):
                     dest_row[out_col_name] = source_row[source_of[out_col_name]]
 
                 output_csv.writerow(dest_row)
+
 
 class PipelineStepInputCable(models.Model):
     """
@@ -863,6 +868,7 @@ class PipelineStepInputCable(models.Model):
         curr_log.complete_clean()
         curr_log.save()
 
+
 class CustomCableWire(models.Model):
     """
     Defines a customized connection within a pipeline.
@@ -949,7 +955,8 @@ class CustomCableWire(models.Model):
         at least be a restriction of the destination DT).
         """
         return self.source_pin.datatype != self.dest_pin.datatype
-        
+
+
 class PipelineOutputCable(models.Model):
     """
     Defines which outputs of internal PipelineSteps are mapped to

@@ -12,15 +12,14 @@ from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.core.files import File
-from django.utils import timezone
 
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
 
 import traceback
-import threading
 import logging
 import shutil
+
 
 class CodeResource(models.Model):
     """
@@ -280,6 +279,7 @@ class CodeResourceRevision(models.Model):
             
             dep.requirement.install_h(path_for_deps, dep_fn)
 
+
 class CodeResourceDependency(models.Model):
     """
     Dependencies of a CodeResourceRevision - themselves also CRRs.
@@ -342,6 +342,7 @@ class CodeResourceDependency(models.Model):
                 unicode(self.coderesourcerevision),
                 unicode(self.requirement),
                 os.path.join(self.depPath, self.depFileName));
+
 
 class Method(transformation.models.Transformation):
     """
@@ -481,40 +482,42 @@ class Method(transformation.models.Transformation):
         self.logger.debug("No compatible ERs found")
         return None
 
-    def _poll_stream(self, proc, in_stream, out_streams):
+    # May 16, 2014: we can't use this anymore because of the issues we're
+    # having with subprocess and threading.
+    # def _poll_stream(self, proc, in_stream, out_streams):
+    #     """
+    #     SYNOPSIS
+    #     Helper function for run_code_with_streams, which polls a Popen'ed procedure
+    #     for output on in_stream until it terminates, and prints the output to
+    #     all the out_streams (like the Unix tee command).
+    #     TODO: instead of in_stream, pass a flag which controls whether to read stdout
+    #     or stderr.
+    #
+    #     INPUTS
+    #     proc            subprocess.Popen object to poll for output
+    #     in_stream       which of proc's streams to poll - must be either
+    #                     proc.stdout or proc.stderr
+    #     out_streams     streams to redirect output to
+    #     """
+    #     while True:
+    #         line = in_stream.readline()
+    #         if line:
+    #             for stream in out_streams:
+    #                 stream.write(line)
+    #         if proc.poll() is not None:
+    #             break
+
+    def run_code(self, run_path, input_paths, output_paths, output_handle,
+            error_handle, log=None, details_to_fill=None):
         """
         SYNOPSIS
-        Helper function for run_code_with_streams, which polls a Popen'ed procedure
-        for output on in_stream until it terminates, and prints the output to
-        all the out_streams (like the Unix tee command).
-        TODO: instead of in_stream, pass a flag which controls whether to read stdout
-        or stderr.
-
-        INPUTS
-        proc            subprocess.Popen object to poll for output
-        in_stream       which of proc's streams to poll - must be either
-                        proc.stdout or proc.stderr
-        out_streams     streams to redirect output to
-        """
-        while True:
-            line = in_stream.readline()
-            if line:
-                for stream in out_streams:
-                    stream.write(line)
-            if proc.poll() is not None:
-                break
-
-    def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams,
-            error_streams, stopwatch=None, log_to_fill=None):
-        """
-        SYNOPSIS
-        Run the method, passing each line in its stdout and stderr to
-        any number of streams. Return the Method's return code, or -1 if
+        Run the method with the specified inputs, outputs, and stdout/stderr-
+        capturing file handles. Return the Method's return code, or -1 if
         the Method suffers an OS-level error (ie. is not executable). If
-        log_to_fill is not None, fill it in with the return code, and
-        set its output and error logs to the _first_ provided streams
+        details_to_fill is not None, fill it in with the return code, and
+        set its output and error logs to the provided handles
         (meaning these should be files, not standard streams, and they
-        must be open for reading AND writing). If timer_to_fill is not
+        must be open for reading AND writing). If log is not
         None, set its start_time and end_time immediately before and
         after calling run_code.
 
@@ -524,66 +527,57 @@ class Method(transformation.models.Transformation):
         output_paths    see run_code
         output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
-        stopwatch       object with start_time and end_time fields to fill in (either
+        log             object with start_time and end_time fields to fill in (either
                         VerificationLog, or ExecLog)
-        log_to_fill     object with return_code, output_log, and error_log to fill in
+        details_to_fill object with return_code, output_log, and error_log to fill in
                         (either VerificationLog, or MethodOutput)
 
         ASSUMPTIONS
-        1) if log_to_fill is provided, the first entry in output_streams and error_streams
+        1) if details_to_fill is provided, the first entry in output_streams and error_streams
         are handles to regular files, open for reading and writing.
         """
-        if stopwatch:
-            stopwatch.start()
-            stopwatch.clean()
-            stopwatch.save()
+        if log:
+            log.start()
+            log.clean()
+            log.save()
 
         returncode = None
         try:
-            method_popen = self.run_code(run_path, input_paths, output_paths)
+            method_popen = self.invoke_code(run_path, input_paths, output_paths, output_handle, error_handle)
         except OSError:
-            for stream in error_streams:
-                traceback.print_exc(file=stream)
+            traceback.print_exc(file=error_handle)
             returncode = -1
 
         # Succesful execution.
         if returncode is None:
-            self.logger.debug("Polling Popen + displaying stdout/stderr to console")
+            self.logger.debug("Polling Popen, watching for completion")
 
-            out_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stdout, output_streams))
-            err_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stderr, error_streams))
-            out_thread.start()
-            err_thread.start()
-            out_thread.join()
-            err_thread.join()
+            while True:
+                returncode = method_popen.poll()
+                if returncode is not None:
+                    break
 
-            returncode = method_popen.returncode
+        if log:
+            log.stop()
+            log.clean()
+            log.save()
 
-        if stopwatch:
-            stopwatch.stop()
-            stopwatch.clean()
-            stopwatch.save()
-
-        for stream in output_streams + error_streams:
+        for stream in (output_handle, error_handle):
             stream.flush()
 
         # TODO: I'm not sure how this is going to handle huge output, 
         # it would be better to update the logs as we go.
-        if log_to_fill:
-            log_to_fill.return_code = returncode
-            outlog = output_streams[0]
-            errlog = error_streams[0]
-            outlog.seek(0)
-            errlog.seek(0)
+        if details_to_fill:
+            details_to_fill.return_code = returncode
+            output_handle.seek(0)
+            error_handle.seek(0)
 
-            log_to_fill.error_log.save(errlog.name, File(errlog))
-            log_to_fill.output_log.save(outlog.name, File(outlog))
-            log_to_fill.clean()
-            log_to_fill.save()
+            details_to_fill.error_log.save(error_handle.name, File(error_handle))
+            details_to_fill.output_log.save(output_handle.name, File(output_handle))
+            details_to_fill.clean()
+            details_to_fill.save()
 
-    def run_code(self, run_path, input_paths, output_paths):
+    def invoke_code(self, run_path, input_paths, output_paths, output_handle, error_handle):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.
@@ -593,9 +587,15 @@ class Method(transformation.models.Transformation):
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
+        output_handle   File handle to capture stdout
+        error_handle    File handle to capture stderr
 
         OUTPUTS
         A running subprocess.Popen object which is asynchronous
+
+        SIDE EFFECTS
+        output_handle and error_handle will have had stdout and stderr
+        written to them (but not closed)
 
         ASSUMPTIONS
         1) The CRR of this Method can interface with Shipyard.
@@ -641,9 +641,10 @@ class Method(transformation.models.Transformation):
         command = [code_to_run] + input_paths + output_paths
         self.logger.debug("subprocess.Popen({})".format(command))
         code_popen = subprocess.Popen(command, shell=False,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout=output_handle, stderr=error_handle)
 
         return code_popen
+
 
 class MethodFamily(transformation.models.TransformationFamily):
     """

@@ -10,6 +10,7 @@ import os.path
 import logging
 import shutil
 import tempfile
+import subprocess
 
 from method.models import *
 from metadata.models import *
@@ -20,6 +21,7 @@ logging.getLogger().setLevel(10) # Debug messages
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
+
 
 class MethodTestSetup(metadata.tests.MetadataTestSetup):
     """
@@ -1833,7 +1835,6 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_out.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_out.get_min_row(), None)
         self.assertEqual(curr_out.get_max_row(), None)
-        
 
     def test_with_copied_parent_parameters_save(self):
         """Test save when revision parent is specified."""
@@ -1993,26 +1994,28 @@ class MethodTests(MethodTestSetup):
                                           'has no content file.'.format(m, rev)),
                                 m.clean)
 
-    def test_run_code_nooutput(self):
+    def test_invoke_code_nooutput(self):
         """
-        Run a no-output method (which just prints to stdout).
+        Invoke a no-output method (which just prints to stdout).
         """
         empty_dir = tempfile.mkdtemp()
 
-        proc = self.noop_method.run_code(empty_dir, [self.noop_infile], [])
+        proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [], subprocess.PIPE,
+                                            subprocess.PIPE)
         proc_out, proc_err = proc.communicate()
 
         self.assertEqual(proc_out, self.noop_indata)
 
         shutil.rmtree(empty_dir)
 
-    def test_run_code_dir_not_empty(self):
+    def test_invoke_code_dir_not_empty(self):
         """
-        Trying to run code in a non-empty directory should fail.
+        Trying to invoke code in a non-empty directory should fail.
         """
         self.assertRaisesRegexp(ValueError,
             "Directory .* nonempty; contains file .*",
-            lambda : self.noop_method.run_code(self.scratch_dir, [self.noop_infile], []))
+            lambda : self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], [], sys.stdout, sys.stderr))
+
 
 class MethodFamilyTests(MethodTestSetup):
 

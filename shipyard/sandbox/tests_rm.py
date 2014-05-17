@@ -26,11 +26,13 @@ import file_access_utils
 
 from constants import datatypes, CDTs
 
+
 def rmf(path):
     try:
         os.remove(path)
     except OSError:
         pass
+
 
 def clean_files():
     for dataset in Dataset.objects.all():
@@ -41,6 +43,7 @@ def clean_files():
         for output in cls.objects.all():
             rmf(output.output_log.name)
             rmf(output.error_log.name)
+
 
 class UtilityMethods(TestCase):
 
@@ -192,6 +195,7 @@ class UtilityMethods(TestCase):
         family.clean()
         return pipeline
 
+
 class ExecuteTestsRM(UtilityMethods):
 
     def setUp(self):
@@ -328,7 +332,7 @@ class ExecuteTestsRM(UtilityMethods):
         # is run on Alice's data, so we can check it later.
         tmpdir = tempfile.mkdtemp()
         outfile = os.path.join(tmpdir, "output")
-        self.method_complement.run_code(tmpdir, [self.datafile.name], [outfile])
+        self.method_complement.invoke_code(tmpdir, [self.datafile.name], [outfile], sys.stdout, sys.stderr)
         time.sleep(1)
         self.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
@@ -662,6 +666,7 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox2 = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
         sandbox2.execute_pipeline()
 
+
 class BadRunTests(UtilityMethods):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -670,6 +675,7 @@ class BadRunTests(UtilityMethods):
         super(BadRunTests, self).setUp()
 
         # A guy who doesn't know what he is doing.
+        # May 14, 2014: dag, yo -- RL
         self.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
         self.user_grandpa.save()
 
@@ -745,9 +751,15 @@ class BadRunTests(UtilityMethods):
         self.assertFalse(runstep2.successful_execution())
 
         log = runstep2.log.first()
+
+        print("\n")
+        print(log.methodoutput.return_code)
+        print(log.missing_outputs())
+        print("\n")
         self.assertFalse(log.is_successful())
         self.assertEqual(log.methodoutput.return_code, 1)
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
+
 
 class FindSDTests(UtilityMethods):
     """
