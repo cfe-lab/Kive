@@ -2000,8 +2000,7 @@ class MethodTests(MethodTestSetup):
         """
         empty_dir = tempfile.mkdtemp()
 
-        proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [], subprocess.PIPE,
-                                            subprocess.PIPE)
+        proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [])
         proc_out, proc_err = proc.communicate()
 
         self.assertEqual(proc_out, self.noop_indata)
@@ -2014,7 +2013,7 @@ class MethodTests(MethodTestSetup):
         """
         self.assertRaisesRegexp(ValueError,
             "Directory .* nonempty; contains file .*",
-            lambda : self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], [], sys.stdout, sys.stderr))
+            lambda : self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], []))
 
 
 class MethodFamilyTests(MethodTestSetup):

@@ -17,6 +17,7 @@ import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
 
 import traceback
+import threading
 import logging
 import shutil
 
@@ -482,44 +483,50 @@ class Method(transformation.models.Transformation):
         self.logger.debug("No compatible ERs found")
         return None
 
-    # May 16, 2014: we can't use this anymore because of the issues we're
-    # having with subprocess and threading.
-    # def _poll_stream(self, proc, in_stream, out_streams):
-    #     """
-    #     SYNOPSIS
-    #     Helper function for run_code_with_streams, which polls a Popen'ed procedure
-    #     for output on in_stream until it terminates, and prints the output to
-    #     all the out_streams (like the Unix tee command).
-    #     TODO: instead of in_stream, pass a flag which controls whether to read stdout
-    #     or stderr.
-    #
-    #     INPUTS
-    #     proc            subprocess.Popen object to poll for output
-    #     in_stream       which of proc's streams to poll - must be either
-    #                     proc.stdout or proc.stderr
-    #     out_streams     streams to redirect output to
-    #     """
-    #     while True:
-    #         line = in_stream.readline()
-    #         if line:
-    #             for stream in out_streams:
-    #                 stream.write(line)
-    #         if proc.poll() is not None:
-    #             break
-
-    def run_code(self, run_path, input_paths, output_paths, output_handle,
-            error_handle, log=None, details_to_fill=None):
+    # May 20, 2014: we restore this now that we have protected the popen
+    # object with a lock.
+    def _poll_stream(self, proc, source_stream, dest_streams, lock):
         """
         SYNOPSIS
-        Run the method with the specified inputs, outputs, and stdout/stderr-
-        capturing file handles. Return the Method's return code, or -1 if
-        the Method suffers an OS-level error (ie. is not executable). If
-        details_to_fill is not None, fill it in with the return code, and
-        set its output and error logs to the provided handles
-        (meaning these should be files, not standard streams, and they
-        must be open for reading AND writing). If log is not
-        None, set its start_time and end_time immediately before and
-        after calling run_code.
+        Helper function for run_code, which polls a Popen'ed procedure
+        for output on source_stream until it terminates, and prints the output to
+        all the dest_streams (like the Unix tee command).
+        TODO: instead of source_stream, pass a flag which controls whether to read stdout
+        or stderr.
+
+        INPUTS
+        proc            subprocess.Popen object to poll for output
+        source_stream   which of proc's streams to poll - must be either
+                        proc.stdout or proc.stderr
+        dest_streams     streams to redirect output to
+        lock            Lock object that protects proc from concurrency issues
+        """
+        while True:
+            lock.acquire()
+            line = source_stream.readline()
+            poll_result = proc.poll()
+            lock.release()
+
+            if line:
+                for stream in dest_streams:
+                    stream.write(line)
+
+            if poll_result is not None:
+                break
+
+    def run_code(self, run_path, input_paths, output_paths, output_streams,
+            error_streams, log=None, details_to_fill=None):
+        """
+        SYNOPSIS
+        Run the method with the specified inputs and outputs, writing each
+        line of its stdout/stderr to all of the specified streams.  Return
+        the Method's return code, or -1 if the Method suffers an OS-level
+        error (ie. is not executable). If details_to_fill is not None,
+        fill it in with the return code, and set its output and error logs
+        to the provided handles (meaning these should be files, not
+        standard streams, and they must be open for reading AND writing).
+        If log is not None, set its start_time and end_time immediately
+        before and after calling run_code.
 
         INPUTS
         run_path        see run_code
@@ -543,59 +550,66 @@ class Method(transformation.models.Transformation):
 
         returncode = None
         try:
-            method_popen = self.invoke_code(run_path, input_paths, output_paths, output_handle, error_handle)
+            method_popen = self.invoke_code(run_path, input_paths, output_paths)
         except OSError:
-            traceback.print_exc(file=error_handle)
+            for stream in error_streams:
+                traceback.print_exc(file=stream)
             returncode = -1
 
         # Succesful execution.
         if returncode is None:
-            self.logger.debug("Polling Popen, watching for completion")
 
-            while True:
-                returncode = method_popen.poll()
-                if returncode is not None:
-                    break
+            self.logger.debug("Polling Popen + displaying stdout/stderr to console")
+
+            popen_lock = threading.Lock()
+
+            out_thread = threading.Thread(target=self._poll_stream,
+                    args=(method_popen, method_popen.stdout, output_streams, popen_lock))
+            err_thread = threading.Thread(target=self._poll_stream,
+                    args=(method_popen, method_popen.stderr, error_streams, popen_lock))
+            out_thread.start()
+            err_thread.start()
+            out_thread.join()
+            err_thread.join()
+
+            returncode = method_popen.poll()
 
         if log:
             log.stop()
             log.clean()
             log.save()
 
-        for stream in (output_handle, error_handle):
+        for stream in output_streams + error_streams:
             stream.flush()
 
         # TODO: I'm not sure how this is going to handle huge output, 
         # it would be better to update the logs as we go.
         if details_to_fill:
             details_to_fill.return_code = returncode
-            output_handle.seek(0)
-            error_handle.seek(0)
+            outlog = output_streams[0]
+            errlog = error_streams[0]
+            outlog.seek(0)
+            errlog.seek(0)
 
-            details_to_fill.error_log.save(error_handle.name, File(error_handle))
-            details_to_fill.output_log.save(output_handle.name, File(output_handle))
+            details_to_fill.error_log.save(errlog.name, File(errlog))
+            details_to_fill.output_log.save(outlog.name, File(outlog))
             details_to_fill.clean()
             details_to_fill.save()
 
-    def invoke_code(self, run_path, input_paths, output_paths, output_handle, error_handle):
+    def invoke_code(self, run_path, input_paths, output_paths):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.
-        Leaves responsibility of DB annotation up to execute()
+        Leaves responsibility of DB annotation up to execute().
+        Leaves routing of output/error streams to run_code.
 
         INPUTS
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
-        output_handle   File handle to capture stdout
-        error_handle    File handle to capture stderr
 
         OUTPUTS
         A running subprocess.Popen object which is asynchronous
-
-        SIDE EFFECTS
-        output_handle and error_handle will have had stdout and stderr
-        written to them (but not closed)
 
         ASSUMPTIONS
         1) The CRR of this Method can interface with Shipyard.
@@ -641,7 +655,7 @@ class Method(transformation.models.Transformation):
         command = [code_to_run] + input_paths + output_paths
         self.logger.debug("subprocess.Popen({})".format(command))
         code_popen = subprocess.Popen(command, shell=False,
-            stdout=output_handle, stderr=error_handle)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         return code_popen
 

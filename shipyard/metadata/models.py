@@ -840,7 +840,7 @@ class Datatype(models.Model):
 
         with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
             verif_method.run_code(summary_path, [input_path], [output_path],
-                    out, err, verif_log, verif_log)
+                    [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
 
         return self._check_verification_output(summary_path, output_path)
 
