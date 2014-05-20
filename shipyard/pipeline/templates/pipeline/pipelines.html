@@ -1,61 +1,42 @@
-<!-- Django template -->
-<!-- Display contents of Methods as a HTML table -->
-
 {% extends "portal/base.html" %}
 
 {% block title %}Pipelines{% endblock %}
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/pipeline/pipelines.js"></script>
-    <style>#canvas{}</style>
 {% endblock %}
 
 {% block content %}
 
-<a href="dev.html">Back to developer's portal</a>
+<a href="dev.html" rel="prev">Back to developer's portal</a>
 
 <h2>Pipelines</h2>
-    <!-- Method selector -->
-    <form action="" method="post" enctype="multipart/form-data">
-    <table>
-        <tr>
-            <th>CDT:</th>
-            <td>
-                <select id="id_select_cdt" name="select_cdt">
-                    {% for cdt in compound_datatypes %}
-                        <option value={{ cdt.pk }}>{{ cdt }}</option>
-                    {% endfor %}
-                </select>
-            </td>
-            <td><input type="button" id="id_cdt_button" value="Add CDT"></td>
-        </tr>
-        <tr id="id_method_tr">
-            <th>Method:</th>
-            <td>
-            <select id="id_select_method_family" name="select_method_family">
-                <option value="">--- select Method Family ---</option>
-                {% for family in method_families %}
-                    <option value={{ family.pk }}>{{ family.name }}</option>
-                {% endfor %}
-            </select>
-            <select id="id_select_method" name="select_method">
-                <!-- populated by ajax transaction -->
-            </select>
-            </td>
-            <td><input type="button" id="id_method_button" value="Add method"></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td>
-                <input type="button" id="id_delete_button" value="Delete">
-                <input type="button" id="id_reset_button" value="Clear">
-            </td>
-            <td><input type="button" id="id_submit_button" value="Submit"></td>
-        </tr>
-    </table>
-    </form>
-    <canvas id='pipeline_canvas' style="border:1px dashed;float:left">
-        HTML5 Canvas not supported by this browser.
-    </canvas>
+
+<p>
+A pipeline is the deployment of one or more Methods to process
+data.
+</p>
+
+<table>
+<thead>
+	<tr>
+    <th>Family</th>
+    <th># revisions</th>
+    <th>Name</th>
+    <th>Description</th>
+	</tr>
+</thead>
+{% for pipeline in pipelines %}
+<tr>
+	<td><a href="{{ pipeline.get_absolute_url }}">{{ pipeline.family }}</a></td>
+    <td>{{ pipeline.family_size }}</td>
+    <td>{{ pipeline.revision_name }}</td>
+	<td>{{ pipeline.revision_desc }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="pipeline_add">Add a new pipeline</a><br>
+<a href="pipeline_exec">Run a pipeline</a>
+
 {% endblock %}

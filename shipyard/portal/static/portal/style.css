@@ -1,5 +1,5 @@
 body {
-	font: 14pt 'Lato', sans-serif;
+	font: 12pt 'Lato', sans-serif;
 	margin: 0;
 	background: url('/static/portal/bg_tile.png');
 }
@@ -7,46 +7,58 @@ a:link {
     text-decoration: none;
     color: #4ae;
 }
-a:link:hover {
-    background-color: #fdd;
+a:link:hover,
+tr.hover {
+    outline: 1px dotted #000;
+}
+tr.hover a:link:hover {
+    outline: none;
 }
 a:visited {
     color: #38c;
 }
 #wrapper {
-    width: 80%;
-    max-width: 55em;
-    min-width: 35em;
-    background-color: #fff;
-    border-left: 3px solid #06a;
-    padding: 0 0 1em 0;
+    width: 100%;
     position: static;
     top: 0; bottom: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 #inner_wrap {
-    margin: .5em 2em .5em 4em;
+    margin: .5em 3em 1.5em 4em;
 }
 table {
     border: 0;
     border-collapse: collapse;
     padding: 0px;
     border-spacing: 12px 12px;
-    border-top: 1pt solid black;
-    border-bottom: 1pt solid black;
     margin-bottom: 1.5em;
 }
-thead {
-    border-bottom: 1pt solid black;
+tbody {
+    border: 1pt solid black;
+    border-width: 1pt 0;
 }
 th, td {
     padding: .5em;
     text-align: left;
     vertical-align: top;
 }
-tr:hover td,
-tr:hover th {
-    background-color: #f0f0f0;
+td:first-child,
+th:first-child {
+    padding-left: 0;
+}
+td:last-child,
+th:last-child {
+    padding-right: 0;
+}
+tr:hover td {
+    background-color: rgba(0,0,0,0.02);
+}
+tr.inputs td {
+    border: 1px solid #eee;
+    padding: 0;
+}
+tr.inputs input {
+    border: 0;
 }
 #wrapper > a {
     font-size: .8em;
@@ -57,37 +69,81 @@ tr:hover th {
     margin-left: 3em;
 }
 h1 {
-    font-size: 2em;
-    text-transform: uppercase;
-    background: #444;
-    color: #fff;
+    font-size: 3em;
     margin: 0 0 1.5em;
-    padding: 1em 2em 0;
-    line-height: .8em;
+    line-height: .9em;
+    background: url('/static/portal/h1.png') #333 .7em top no-repeat;
+    text-indent: -999em;
+}
+h1:hover {
+    background-position: .7em -43px;
+    cursor: default;
+}
+h2 {
+    font-size: 1.5em;
+    line-height: .4em;
+    padding-top: .5em;
 }
 h3 {
     font-size: 1em;
 }
+p {
+    max-width: 55em;
+}
+a[rel="prev"] {
+    display: block;
+    margin-left: -4em;
+    margin-top: -4.5em;
+    float: left;
+    padding: 0.8em 1.4em;
+    background-color: #888;
+    line-height: 0;
+    opacity: 0.4;
+    color: #fff;
+    font-style: italic;
+    width: 0; overflow:hidden;
+    color: rgba(0,0,0,0);
+}
+a[rel="prev"]:hover {
+    background-color: #4ae;
+    opacity: 0.3;
+    outline: none;
+    width: auto;
+    color: #fff;
+}
+a[rel="prev"]:before {
+    content: "\25C2";
+    margin-left: -.3em;
+    margin-right: 2em;
+    color: #fff;
+    font-style: normal;
+}
+
 
 /* Navigation menu styles */
+nav {
+    width: 25em;
+}
 nav ul {
     list-style: none;
     display: block;
     padding: 0;
+    margin-left: -4em;
 }
 nav a:link {
     display: block;
-    background: #f8f8f8;
+    background-color: rgba(0,0,0,0.02);
     text-decoration: inherit;
     color: inherit;
     padding: 1em 2em 1em 4em;
-    border-bottom: 1px solid #fff;
+    border-bottom: 1px solid #000;
 }
 nav a:visited {
     color: inherit;
 }
 nav a:link:hover {
-    background: #f8fcff;
+    background-color: rgba(68,170,238,0.2);
+    outline: none;
 }
 nav a:link:hover:before {
     content: "\25B8";
@@ -97,6 +153,9 @@ nav a:link:hover:before {
 }
 nav li:first-child a {
     border-top: 1px solid #fff;
+}
+nav li:last-child a {
+    border-bottom: 1px solid #fff;
 }
 nav h4 {
     font-size: 1.2em;
@@ -112,6 +171,7 @@ form textarea,
 form select {
     font: inherit;
     border: 1px solid #ccc;
+    outline: none; /* Annoying WebKit feature */
 }
 
 .helptext {
@@ -134,9 +194,116 @@ form select {
     max-width: 20em;
 }
 
-.shortIntField{
-    width: 60px;
+table.formtable {
+    border-collapse: collapse;
 }
+.formtable td {
+    padding: 0;
+    border: 1px solid #ccc;
+    line-height: 1.6em;
+    padding-left: .5em;
+}
+input[type="text"],
+input[type="number"],
+select {
+    padding: .25em;
+}
+.formtable input,
+.formtable select {
+    border: 0;
+    margin-left: -.5em;
+}
+.formtable tr:first-child input,
+.formtable tr:first-child select {
+    margin-top: 0;
+    border-top: 0;
+}
+.formtable tr:last-child input,
+.formtable tr:last-child select {
+    margin-bottom: 0;
+    border-bottom: 0;
+}
+
+input[type="button"], 
+input[type="submit"], 
+input[type="reset"] {
+    box-shadow: inset -.2em -.4em .4em -.2em #ccc, 
+                inset  .2em  .8em  1em -.2em #fff;
+    border-radius: 1em;
+    padding: 0 1em;
+    color: #444;
+    background-color: #ddd;
+}
+input[type="button"]:active, 
+input[type="submit"]:active, 
+input[type="reset"]:active {
+    box-shadow: inset .2em .4em .4em -.2em #ccc, inset -.2em -.8em 1em -.2em #fff;
+}
+select:not([multiple]) {
+    padding-right: 1.55em;
+    /* Disable FF/WebKit user agent styles */
+    -webkit-appearance: none;
+    border-radius: 0;
+    -moz-appearance: none;
+    text-indent: 0.01px;
+    text-overflow: '';
+    
+    /* Create a drop-down button to replace the one we just removed. */
+    background: url('data:image/gif;base64,R0lGODlhDwAOAJEAAN/f3////8DAwAAAACH5BAAAAAAALAAAAAAPAA4AAAIgjANwyyCi2HIPSkOrbVrHC4biSEpZ9x3nk06eSLVXEhYAOw==') #fff right center no-repeat;
+}
+input.add {
+    border-radius: 1em 0 0 1em;
+    border-right: 0;
+    font-weight: bold;
+}
+input.remove {
+    border-radius: 0 1em 1em 0;
+    border-left: 0;
+    font-weight: bold;
+}
+
+.shortIntField{
+    width: 80px;
+}
+
+#pipeline_canvas {
+    border: 1px dotted;
+    padding: .25em;
+}
+.happy_indicator {
+    background: url('/static/portal/smiley.png');
+    width: 32px;
+    height: 32px;
+    margin-top: -40px;
+    margin-right: 25px;
+    float: right;
+    z-index: 2;
+    position: relative;
+}
+.happy_indicator_label {
+    margin-top: -3em;
+    line-height: 1.1em;
+    margin-right: 70px;
+    float: right;
+    z-index: 2;
+    position: relative;
+    font-size: 0.7em;
+    font-style: italic;
+    width: 40%;
+    color: #aaa;
+}
+#description_wrap {
+    width: 300px;
+    text-align: right;
+}
+#id_revision_desc {
+    position: relative;
+    z-index: 1;
+    width: 280px;
+    height: 150px;
+    padding: 10px;
+}
+
 
 @font-face {
     font-family: 'Lato';
@@ -147,4 +314,13 @@ form select {
     src: local('Lato-Bold'), url('/static/portal/Lato/Lato-Bold.ttf') format('truetype');
     font-weight: bold;
 }
+@font-face {
+    font-family: 'Lato';
+    src: local('Lato-Italic'), url('/static/portal/Lato/Lato-Italic.ttf') format('truetype');
+    font-style: italic;
+}
 /* TODO: get italic fonts to load */
+
+.errortext {
+    color: #FF0000;
+}

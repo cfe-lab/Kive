@@ -1,0 +1,109 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Pipelines{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
+    <script src="/static/pipeline/pipeline_add.js"></script>
+    <style>#canvas{}</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="pipelines" rel="prev">Back to pipeline summary</a>
+
+<h2>Drydock</h2>
+    <p>
+    An interface for assembling pipelines.
+    </p>
+
+    <!-- CANVAS -->
+    <div>
+    <canvas id='pipeline_canvas' style="border:1px dashed;float:left">
+        HTML5 Canvas not supported by this browser.
+    </canvas>
+    </div>
+
+    <!-- Method selector -->
+    <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <table>
+        <tr>
+            <td>
+                <b>Inputs:</b><br/>
+                <select id="id_select_cdt" name="select_cdt">
+                    <option value="">Raw</option>
+                    {% for cdt in compound_datatypes %}
+                        <option value={{ cdt.pk }}>{{ cdt }}</option>
+                    {% endfor %}
+                </select>
+                <br/>
+                <div class="errortext" id="id_dt_error"></div>
+
+            </td>
+            <td>
+                <i>Input label:</i><br/>
+                <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
+                <br/>
+                <input type="button" id="id_cdt_button" value="Add Input">
+            </td>
+            <td>
+                <b>Pipeline name:</b><br/>
+                <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
+            </td>
+        </tr>
+
+        <tr id="id_method_tr">
+            <td>
+                <b>Method node:</b><br/>
+                <select id="id_select_method_family" name="select_method_family">
+                    <option value="">--- select Method Family ---</option>
+                    {% for family in method_families %}
+                        <option value={{ family.pk }}>{{ family.name }}</option>
+                    {% endfor %}
+                </select>
+                <br/>
+                <div id="id_revision_label"></div>
+                <select id="id_select_method" name="select_method">
+                    <!-- populated by ajax transaction -->
+                </select>
+                <br/>
+                <div class="errortext" id="id_method_error"></div>
+            </td>
+            <td>
+                <i>Method label:</i><br/>
+                <input id="id_method_name" maxlength="128" name="method_name" type="text" />
+                <br/>
+                <input type="button" id="id_method_button" value="Add Method">
+            </td>
+            <td>
+                <b>Description:</b>
+                <!-- TODO: make this text box shorter (rows argument not working) -->
+                <textarea cols="40" id="id_revision_desc" name="revision_desc" rows="3"></textarea>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <input type="button" id="id_example_button" value="Example">
+            </td>
+            <td>
+                <input type="button" id="id_delete_button" value="Delete">
+                <input type="button" id="id_reset_button" value="Clear">
+            </td>
+            <td>
+                 <input type="submit" id="id_submit_button" value="Submit">
+                <div class="errortext" id="id_submit_error"></div>
+            </td>
+        </tr>
+    </table>
+
+
+    </form>
+
+
+{% endblock %}

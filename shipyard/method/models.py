@@ -60,7 +60,10 @@ class CodeResource(models.Model):
         return revision_dates[0]
 
     def get_absolute_url(self):
-        return '/resources/%i' % self.id
+        """
+        A page that displays all revisions of this CodeResource
+        """
+        return '/resource_revisions/%i' % self.id
 
     def __unicode__(self):
         return self.name
@@ -225,6 +228,8 @@ class CodeResourceRevision(models.Model):
         except ValueError as e:
             self.MD5_checksum = "";
 
+        # TODO: duplicate coderesourcerevision based on MD5 should not be permitted - Art.
+
         # Check for a circular dependency.
         if self.has_circular_dependence():
             raise ValidationError("Self-referential dependency"); 
@@ -279,6 +284,12 @@ class CodeResourceRevision(models.Model):
                 dep_fn = dep.requirement.coderesource.filename;
             
             dep.requirement.install_h(path_for_deps, dep_fn)
+
+    def get_absolute_url(self):
+        """
+        A page that displays all revisions of this CodeResource
+        """
+        return '/resource_revision_add/%i' % self.id
 
 
 class CodeResourceDependency(models.Model):
@@ -395,6 +406,11 @@ class Method(transformation.models.Transformation):
         """Returns number of outputs."""
         return len(self.outputs.all())
 
+    @property
+    def family_size(self):
+        """Returns size of this Method's family"""
+        return len(Method.objects.filter(family=self.family))
+
     def clean(self):
         """
         Check coherence of this Method. The checks we perform are:
@@ -424,6 +440,7 @@ class Method(transformation.models.Transformation):
 
         # If parent revision exists, and inputs/outputs haven't been registered,
         # copy all inputs/outputs (Including raws) from parent revision to this revision
+        """
         if (self.inputs.count() + self.outputs.count() == 0):
             for parent_input in self.revision_parent.inputs.all():
                 new_input = self.inputs.create(
@@ -444,6 +461,7 @@ class Method(transformation.models.Transformation):
                         compounddatatype = parent_output.get_cdt(),
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
+        """
 
     def find_compatible_ER(self, input_SDs):
         """

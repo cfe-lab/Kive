@@ -27,13 +27,15 @@ urlpatterns = patterns('',
     url(r'^datatypes$', 'metadata.views.datatypes', name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', 'metadata.views.datatype_detail', name='datatype_detail'),
     url(r'^datatype_add$', 'metadata.views.datatype_add', name='datatype_add'),
+    url(r'get_python_type/$', 'metadata.ajax.get_python_type', name='get_python_type'),
 
     url(r'compound_datatypes$', 'metadata.views.compound_datatypes', name='compound_datatypes'),
     url(r'compound_datatype_add$', 'metadata.views.compound_datatype_add', name='compound_datatype_add'),
 
     url(r'resources$', 'method.views.resources', name='resources'),
     url(r'resource_add$', 'method.views.resource_add', name='resource_add'),
-    url(r'^resources/(?P<id>\d+)/$', 'method.views.resource_revise', name='resource_revise'),
+    url(r'^resource_revisions/(?P<id>\d+)/$', 'method.views.resource_revisions', name='resource_revisions'),
+    url(r'^resource_revision_add/(?P<id>\d+)/$', 'method.views.resource_revision_add', name='resource_revision_add'),
 
     url(r'get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 
@@ -45,6 +47,8 @@ urlpatterns = patterns('',
     url(r'get_method_io/$', 'pipeline.ajax.get_method_io', name='get_method_io'),
 
     url(r'pipelines$', 'pipeline.views.pipelines', name='pipelines'),
+    url(r'pipeline_add$', 'pipeline.views.pipeline_add', name='pipeline_add'),
+    url(r'pipeline_exec$', 'pipeline.views.pipeline_exec', name='pipeline_exec'),
 
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
 

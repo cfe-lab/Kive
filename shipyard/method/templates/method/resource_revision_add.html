@@ -1,0 +1,76 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Add code resource revision{% endblock %}
+
+{% block javascript %}
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script src="/static/method/resource_add.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<a href="/resources" rel="prev">return to Code Resource summary</a>
+
+<h2>Add code resource revision</h2>
+
+
+<!-- Form for inserting new Datatypes -->
+<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <table>
+        <!-- this form is pre-populated with the data of the last revision -->
+        <tr>
+            <td></td>
+            <th>Previous</th>
+            <th>Current</th>
+        </tr>
+        <tr>
+            <th>{{ resource_form.content_file.label }} <div class="helptext">{{ resource_form.content_file.help_text }}</div></th>
+            <td style="font-style:italic">{{ coderesource.filename }}</td>
+            <td>{{ resource_form.content_file }}<br>
+                <div style="color:red">{{ resource_form.content_file.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_name.label }} <div class="helptext">{{ resource_form.revision_name.help_text }}</div></th>
+            <td></td>
+            <td>{{ coderesource.num_revisions|add:"1" }} ({{ resource_form.revision_name }})
+                <div style="color:red">{{ resource_form.revision_name.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_desc.label }} <div class="helptext">{{ resource_form.revision_desc.help_text }}</div></th>
+            <td style="font-style:italic">{{ parent_revision.revision_desc }}</td>
+            <td>{{ resource_form.revision_desc }}<br>
+                <div style="color:red">{{ resource_form.revision_desc.errors }}</div>
+            </td>
+        </tr>
+    </table>
+    <h3>Dependencies</h3>
+    <p>
+       Dependencies are other code resource that this code resource requires to execute.  For example, a Python module
+        comprised of classes in a single file considered to be a CR dependency (e.g., "import antigravity").
+    </p>
+
+    <input type="button" id="addDependencyForm" value="+" class="add" /><input type="button" id="removeDependencyForm" value="&minus;" class="remove"/> <small>Add/subtract dependency form fields</small><br/>
+     <table class="formtable">
+        <thead>
+            <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr>
+        </thead>
+        <tbody id="dependencyForms">
+            {% for dep_form in dep_forms %}
+            <tr>
+                <td>{{ dep_form.coderesource }}</td>
+                <td>{{ dep_form.revisions }}</td>
+                <td>{{ dep_form.depPath }}</td>
+                <td>{{ dep_form.depFileName }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <input type="submit" value="Upload" />
+</form>
+
+
+{% endblock %}

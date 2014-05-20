@@ -12,7 +12,7 @@
 
 {% block content %}
 
-<a href="/datatypes">return to Datatypes summary</a>
+<a href="/datatypes" rel="prev">return to Datatypes summary</a>
 
 <h2>Add a new datatype</h2>
 
@@ -20,17 +20,31 @@
 <h3>New datatype</h3>
 <form action="" method="post">{% csrf_token %}
     <table>
-    {% for field in datatype_form %}
         <tr>
-        <th>{{ field.label_tag }}</th>
-        <td>
-            {{ field.errors }}
-            {{ field }} 
-            <div class="helptext">{{ field.help_text }}</div>
-        </td>
+            <th>{{ datatype_form.name.label_tag }}</th>
+            <td><div class="helptext">{{ datatype_form.name.help_text }}</div></td>
+            <td>{{ datatype_form.name }}</td>
+            <td class="errortext">{{ datatype_form.name.errors }}</td>
         </tr>
-    {% endfor %}
+        <tr>
+            <th>{{ datatype_form.description.label_tag }}</th>
+            <td><div class="helptext">{{ datatype_form.description.help_text }}</div></td>
+            <td>{{ datatype_form.description }}</td>
+            <td class="errortext">{{ datatype_form.description.errors }}</td>
+        </tr>
+        <tr>
+            <th>{{ datatype_form.restricts.label_tag }}</th>
+            <td><div class="helptext">{{ datatype_form.restricts.help_text }}</div></td>
+            <td>{{ datatype_form.restricts }}</td>
+            <td class="errortext">
+                <div id="bad_restrictions" class="errortext"></div>
+                {{ datatype_form.restricts.errors }}
+            </td>
+        </tr>
     </table>
+
+    <div id='id_to_hide'>{{ datatype_form.Python_type }}</div>
+
 
     <h3>Basic constraints</h3>
 
@@ -40,11 +54,9 @@
     {% for field in int_con_form %}
         <tr>
         <th>{{ field.label_tag }}</th>
-        <td>
-            {{ field.errors }}
-            {{ field }} 
-            <div class="helptext">{{ field.help_text }}</div>
-        </td>
+        <td><div class="helptext">{{ field.help_text }}</div></td>
+        <td>{{ field }} </td>
+        <td class="errortext">{{ field.errors }}</td>
         </tr>
     {% endfor %}
     </table>
@@ -56,11 +68,9 @@
     {% for field in str_con_form %}
         <tr>
         <th>{{ field.label_tag }}</th>
-        <td>
-            {{ field.errors }}
-            {{ field }} 
-            <div class="helptext">{{ field.help_text }}</div>
-        </td>
+        <td><div class="helptext">{{ field.help_text }}</div></th>
+        <td>{{ field }}</td>
+        <td class="errortext">{{ field.errors }}</td>
         </tr>
     {% endfor %}
     </table>

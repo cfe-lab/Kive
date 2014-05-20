@@ -67,6 +67,14 @@ class Pipeline(transformation.models.Transformation):
 
         return string_rep
 
+    def get_absolute_url(self):
+        return '/pipelines/%i' % self.id
+
+    @property
+    def family_size(self):
+        """Returns size of this Pipeline's family"""
+        return len(Pipeline.objects.filter(family=self.family))
+
     def clean(self):
         """
         Validate pipeline revision inputs/outputs
@@ -1231,10 +1239,10 @@ class PipelineOutputCable(models.Model):
                     dest_pin__column_idx=wire.dest_pin.column_idx)
 
             if not corresponding_wire.exists():
-                return false
+                return False
 
             if wire.source_pin != corresponding_wire.first().source_pin:
-                return false
+                return False
 
         return True
         

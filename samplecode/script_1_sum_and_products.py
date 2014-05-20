@@ -10,7 +10,7 @@ import argparse;
 import sys;
 
 # In order to work with shipyard, scripts which having a inputs
-# and b inputs must have a+b command line arguments, the first a
+# and b outputs must have a+b command line arguments, the first a
 # arguments specifying paths of input files, the subsequent b
 # arguments specifying the paths of where outputs are written]
 

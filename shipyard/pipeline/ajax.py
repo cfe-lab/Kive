@@ -31,17 +31,27 @@ def get_method_io (request):
 
         inputs = {}
         for input in method.inputs.all():
-            structure = input.structure.all()[0]
-            cdt_pk = structure.compounddatatype.pk
-            cdt_label = structure.compounddatatype.__unicode__()
+            if input.structure.count() == 0:
+                # input is unstructured
+                cdt_pk = '__raw__'
+                cdt_label = 'raw'
+            else:
+                structure = input.structure.all()[0]
+                cdt_pk = structure.compounddatatype.pk
+                cdt_label = structure.compounddatatype.__unicode__()
             inputs.update({input.dataset_idx: {'datasetname': input.dataset_name,
                                                'cdt_pk': cdt_pk,
                                                'cdt_label': cdt_label}})
         outputs = {}
         for output in method.outputs.all():
-            structure = output.structure.all()[0]
-            cdt_pk = structure.compounddatatype.pk
-            cdt_label = structure.compounddatatype.__unicode__()
+            if output.structure.count() == 0:
+                # output is unstructured
+                cdt_pk = '__raw__'
+                cdt_label = 'raw'
+            else:
+                structure = output.structure.all()[0]
+                cdt_pk = structure.compounddatatype.pk
+                cdt_label = structure.compounddatatype.__unicode__()
             outputs.update({output.dataset_idx: {'datasetname': output.dataset_name,
                                                  'cdt_pk': cdt_pk,
                                                  'cdt_label': cdt_label}})

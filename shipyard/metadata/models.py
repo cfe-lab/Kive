@@ -229,7 +229,7 @@ class Datatype(models.Model):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`copperfish.CompoundDatatype`
     """
-    name = models.CharField( "Datatype name", max_length=64, help_text="The name for this Datatype")
+    name = models.CharField( "Datatype name", max_length=64, help_text="The name for this Datatype", unique=True)
     description = models.TextField("Datatype description", help_text="A description for this Datatype")
 
     # auto_now_add: set to now on instantiation (editable=False)

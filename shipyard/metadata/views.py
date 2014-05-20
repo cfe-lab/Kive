@@ -38,12 +38,13 @@ def datatype_add(request):
             new_datatype = dform.save() # this has to be saved to database to be passed to BasicConstraint()
             minlen, maxlen, regexp, minval, maxval = None, None, None, None, None
 
-            if new_datatype.Python_type == 'str':
+            if query['Python_type'] in ['string', 'boolean']:
                 # manually create and validate BasicConstraint objects
                 if query['minlen']:
                     minlen = BasicConstraint(datatype=new_datatype, ruletype='minlen', rule=query['minlen'])
                     try:
                         minlen.full_clean()
+                        minlen.save()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
@@ -52,6 +53,7 @@ def datatype_add(request):
                     maxlen = BasicConstraint(datatype=new_datatype, ruletype='maxlen', rule=query['maxlen'])
                     try:
                         maxlen.full_clean()
+                        maxlen.save()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
@@ -64,15 +66,17 @@ def datatype_add(request):
                         for quoted, group in groups:
                             regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=group)
                             regexp.full_clean()
+                            regexp.save()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
 
-            elif new_datatype.Python_type in ['int', 'float']:
+            elif query['Python_type'] in ['integer', 'float']:
                 if query['minval']:
                     minval = BasicConstraint(datatype=new_datatype, ruletype='minval', rule=query['minval'])
                     try:
                         minval.full_clean()
+                        minval.save()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
@@ -81,6 +85,7 @@ def datatype_add(request):
                     maxval = BasicConstraint(datatype=new_datatype, ruletype='maxval', rule=query['maxval'])
                     try:
                         maxval.full_clean()
+                        maxval.save()
                     except ValidationError as e:
                         exceptions.extend(e.messages)
                         pass
@@ -88,13 +93,6 @@ def datatype_add(request):
             if exceptions:
                 new_datatype.delete() # delete object from database
             else:
-                # save basic constraint objects if they are defined
-                if minlen: minlen.save()
-                if maxlen: maxlen.save()
-                if regexp: regexp.save()
-                if minval: minval.save()
-                if maxval: maxval.save()
-
                 # re-check Datatype object
                 new_datatype.full_clean()
                 new_datatype.save()

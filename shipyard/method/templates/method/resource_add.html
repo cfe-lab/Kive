@@ -12,31 +12,55 @@
 
 {% block content %}
 
-<a href="/resources">return to Code Resource summary</a>
+<a href="/resources" rel="prev">return to Code Resource summary</a>
 
 <h2>Add a new code resource</h2>
 
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
-        {% for field in resource_form %}
-            <tr>
-            <th>{{ field.label_tag }}</th>
-            <td>{{ field }}<div class="helptext">{{ field.help_text }}</div></td>
-            <td>{{ field.errors }}</td>
-            </tr>
-        {% endfor %}
+        <tr>
+            <th>File:</th>
+            <td><div class="helptext">{{ resource_form.content_file.help_text }}</div></td>
+            <td>{{ resource_form.content_file }}</td>
+            <td><div class="errortext">{{ resource_form.content_file.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.resource_name.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.resource_name.help_text }}</div></td>
+            <td>{{ resource_form.resource_name }}</td>
+            <td><div class="errortext">{{ resource_form.resource_name.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.resource_desc.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.resource_desc.help_text }}</div></td>
+            <td>{{ resource_form.resource_desc }}</td>
+            <td><div class="errortext">{{ resource_form.resource_desc.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_name.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.revision_name.help_text }}</div></td>
+            <td>{{ resource_form.revision_name }}</td>
+            <td><div class="errortext">{{ resource_form.revision_name.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.revision_desc.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.revision_desc.help_text }}</div></td>
+            <td>{{ resource_form.revision_desc }}</td>
+            <td><div class="errortext">{{ resource_form.revision_desc.errors }}</div></td>
+        </tr>
     </table>
+
+
     <h3>Dependencies</h3>
     <p>
        Dependencies are other code resource that this code resource requires to execute.  For example, a Python module
         comprised of classes in a single file considered to be a CR dependency (e.g., "import antigravity").
     </p>
     <p>
-    <input type="button" id="addDependencyForm" value="+"/>
-    <input type="button" id="removeDependencyForm" value="-"/><small>Add/subtract dependency form fields</small></p>
+    <input type="button" id="addDependencyForm" class="add" value="+"/><input type="button" id="removeDependencyForm" class="remove" value="&minus;"/><small>Add/subtract dependency form fields</small></p>
     
-    <table>
+    <table class="formtable">
         <thead>
             <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr>
         </thead>
