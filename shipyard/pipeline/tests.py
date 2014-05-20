@@ -3090,6 +3090,7 @@ class RawSaveTests(PipelineTestSetup):
                 revision_name="s4",revision_desc="s4",family = self.test_MF,
                 driver = self.script_4_1_CRR) 
         self.script_4_2_M.save()
+        self.script_4_2_M.copy_io_from_parent()
 
         # The input should have been copied over (SUBOPTIMAL TEST)
         self.assertEqual(self.script_4_1_M.inputs.all()[0].dataset_name,

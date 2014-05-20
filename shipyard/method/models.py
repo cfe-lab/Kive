@@ -422,26 +422,19 @@ class Method(transformation.models.Transformation):
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
 
-    def save(self, *args, **kwargs):
+    def copy_io_from_parent(self):
         """
-        Create or update a method revision.
-
-        If a method revision being created is derived from a parental
-        method revision, copy the parent input/outputs.
+        Copy inputs and outputs from parent revision.
         """
-
-        # Inputs/outputs cannot be stored in the database unless this
-        # method revision has itself first been saved to the database
-        super(Method, self).save(*args, **kwargs)
-
         # If no parent revision exists, there are no input/outputs to copy
         if self.revision_parent == None:
             return None
 
-        # If parent revision exists, and inputs/outputs haven't been registered,
-        # copy all inputs/outputs (Including raws) from parent revision to this revision
-        """
-        if (self.inputs.count() + self.outputs.count() == 0):
+        # If inputs/outputs already exist, do nothing.
+        if (self.inputs.count() + self.outputs.count() != 0):
+            return None
+        # Copy all inputs/outputs (Including raws) from parent revision to this revision
+        else:
             for parent_input in self.revision_parent.inputs.all():
                 new_input = self.inputs.create(
                     dataset_name = parent_input.dataset_name,
@@ -461,7 +454,7 @@ class Method(transformation.models.Transformation):
                         compounddatatype = parent_output.get_cdt(),
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
-        """
+
 
     def find_compatible_ER(self, input_SDs):
         """

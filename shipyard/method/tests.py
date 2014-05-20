@@ -145,7 +145,9 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.DNAoutput_to.save()
 
         # Define DNAcompv2_m for DNAcomp_mf with driver compv2_crRev
-        # Input/output should be copied from DNAcompv1_m
+        # May 20, 2014: where previously the inputs/outputs would be
+        # automatically copied over from the parent using save(), now
+        # we explicitly call copy_io_from_parent.
         self.DNAcompv2_m = self.DNAcomp_mf.members.create(
                 revision_name="v2",
                 revision_desc="Second version",
@@ -153,6 +155,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 driver=self.compv2_crRev)
         self.DNAcompv2_m.full_clean()
         self.DNAcompv2_m.save()
+        self.DNAcompv2_m.copy_io_from_parent()
 
         # Define second family, RNAcomp_mf
         self.RNAcomp_mf = MethodFamily(
@@ -184,7 +187,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.RNAoutput_to.save()
 
         # Define RNAcompv2_m for RNAcompv1_mf with driver compv2_crRev
-        # Input/outputs should be copied from RNAcompv1_m
+        # May 20, 2014: again, we now explicitly copy over the inputs/outputs.
         self.RNAcompv2_m = self.RNAcomp_mf.members.create(
                 revision_name="v2",
                 revision_desc="Second version",
@@ -192,6 +195,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 driver=self.compv2_crRev)
         self.RNAcompv2_m.full_clean()
         self.RNAcompv2_m.save()
+        self.RNAcompv2_m.copy_io_from_parent()
 
         # Create method family for script_1_method / script_2_method / script_3_method
         self.test_mf = MethodFamily(name="Test method family",
@@ -1836,7 +1840,10 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_out.get_min_row(), None)
         self.assertEqual(curr_out.get_max_row(), None)
 
-    def test_with_copied_parent_parameters_save(self):
+    # May 20, 2014: this was previously a test of save(), but now the
+    # functionality has been moved to a helper function, which we
+    # now test.
+    def test_copy_io_from_parent(self):
         """Test save when revision parent is specified."""
 
         # DNAcompv2_m should have 1 input, copied from DNAcompv1
@@ -1848,7 +1855,7 @@ class MethodTests(MethodTestSetup):
                          self.DNAinput_ti.dataset_idx)
         self.assertEqual(curr_in.get_cdt(),
                          self.DNAinput_ti.get_cdt())
-         
+
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
         curr_out = self.DNAcompv2_m.outputs.all()[0]
         self.assertEqual(curr_out.dataset_name,
@@ -1862,6 +1869,7 @@ class MethodTests(MethodTestSetup):
         foo = Method(family=self.test_mf, driver=self.script_2_crRev,
                      revision_parent=self.script_2_method)
         foo.save()
+        foo.copy_io_from_parent()
         # Check that it has the same input as script_2_method:
         # self.triplet_cdt, "a_b_c", 1
         curr_in = foo.inputs.all()[0]
@@ -1890,6 +1898,7 @@ class MethodTests(MethodTestSetup):
         bar = Method(family=self.test_mf, driver=self.script_3_crRev,
                      revision_parent=self.script_3_method)
         bar.save()
+        bar.copy_io_from_parent()
         # Check that the outputs match script_3_method:
         # self.singlet_cdt, "k", 1
         # self.singlet_cdt, "r", 2, min_row = max_row = 1
@@ -1913,27 +1922,28 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_out.dataset_idx, 1)
         self.assertEqual(curr_out.get_min_row(), None)
         self.assertEqual(curr_out.get_max_row(), None)
-        
-        
+
+
         # If there are already inputs and outputs specified, then
         # they should not be overwritten.
 
         old_cdt = self.DNAinput_ti.get_cdt()
         old_name = self.DNAinput_ti.dataset_name
         old_idx = self.DNAinput_ti.dataset_idx
-        
+
         self.DNAcompv1_m.revision_parent = self.RNAcompv2_m
         self.DNAcompv1_m.save()
+        self.DNAcompv1_m.copy_io_from_parent()
         self.assertEqual(self.DNAcompv1_m.inputs.count(), 1)
         curr_in = self.DNAcompv1_m.inputs.all()[0]
         self.assertEqual(curr_in.get_cdt(), old_cdt)
         self.assertEqual(curr_in.dataset_name, old_name)
         self.assertEqual(curr_in.dataset_idx, old_idx)
-         
+
         old_cdt = self.DNAoutput_to.get_cdt()
         old_name = self.DNAoutput_to.dataset_name
         old_idx = self.DNAoutput_to.dataset_idx
-        
+
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
         curr_out = self.DNAcompv2_m.outputs.all()[0]
         self.assertEqual(curr_out.get_cdt(), old_cdt)
@@ -1943,6 +1953,7 @@ class MethodTests(MethodTestSetup):
         # Only inputs specified.
         bar.outputs.all().delete()
         bar.save()
+        bar.copy_io_from_parent()
         self.assertEqual(bar.inputs.count(), 2)
         self.assertEqual(bar.outputs.count(), 0)
         curr_in_1 = bar.inputs.all()[0]
@@ -1957,10 +1968,11 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_in_2.dataset_idx, 2)
         self.assertEqual(curr_in_2.get_min_row(), 1)
         self.assertEqual(curr_in_2.get_max_row(), 1)
-        
+
         # Only outputs specified.
         foo.inputs.all().delete()
         foo.save()
+        foo.copy_io_from_parent()
         self.assertEqual(foo.inputs.count(), 0)
         self.assertEqual(foo.outputs.count(), 2)
         curr_out_1 = foo.outputs.all()[0]

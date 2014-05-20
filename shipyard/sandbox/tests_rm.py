@@ -52,7 +52,7 @@ class UtilityMethods(TestCase):
         self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
         # Predefined datatypes.
-        self.datatype_str = self.new_datatype("string", "sequences of ASCII characters", self.STR)
+        self.datatype_str = self.new_datatype("my_string", "sequences of ASCII characters", self.STR)
 
         # A CDT composed of only one column, strings.
         self.cdt_string = CompoundDatatype()
