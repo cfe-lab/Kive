@@ -1654,6 +1654,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @classmethod
+    @transaction.atomic
     def create(cls, record, invoking_record):
         execlog = cls(record=record, invoking_record=invoking_record)
         execlog.clean()

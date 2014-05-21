@@ -3,6 +3,7 @@
 from django.core.files import File
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from django.db import transaction
 
 import archive.models
 import librarian.models
@@ -605,120 +606,86 @@ class Sandbox:
             else:
                 output_paths.append(self.step_xput_path(curr_RS, curr_output, step_run_dir))
 
+        # Run step's input cables, or retrieve inputs_after_cable from maps.
         inputs_after_cable = []
-        if not recover:
-            self.logger.debug("Running step's input PSICs")
-            for i, curr_input in enumerate(pipelinestep.inputs):
+        for i, curr_input in enumerate(pipelinestep.inputs):
+            if not recover:
+                # Run a cable.
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_path = self.step_xput_path(curr_RS, curr_input, step_run_dir)
-                self.logger.debug("execute_cable('{}','{}','{}','{}','{}')"
-                                  .format(corresp_cable, curr_RS, False, inputs[i], cable_path))
-
-                # Run a cable.
                 curr_RSIC = self.execute_cable(corresp_cable, curr_RS, False, inputs[i], cable_path)
 
-                # Cable failed. Do not create ER for this step; return runstep.
+                # Cable failed, return incomplete RunStep.
                 if not curr_RSIC.successful_execution():
-                    self.logger.error("PipelineStepInputCable failed.")
+                    self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
                     curr_RS.stop()
                     return curr_RS
 
+                # Cable succeeded.
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
+            else:
+                input_content_type = ContentType.objects.get_for_model(curr_input)
+                corresp_ERI = curr_RS.execrecord.execrecordins.get(content_type=input_content_type, 
+                                                                   object_id=curr_input.pk)
+                inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
-            self.logger.debug("Looking for ER with same transformation + input SDs")
+        # Look for ExecRecord.
+        if recover:
+            curr_ER = curr_RS.execrecord
+        elif pipelinestep.is_subpipeline:
             curr_ER = None
-            if not pipelinestep.is_subpipeline:
-                curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
+            self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
+        else:
+            curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
 
-            # Use existing ER.
             if curr_ER is not None:
                 had_ER_at_beginning = True
 
-                self.logger.debug("Found ER, checking it provides outputs needed")
-
                 # ER is completely reusable? Yes.
                 if curr_ER.provides_outputs(pipelinestep.outputs_to_retain()):
-                    self.logger.debug("Completely reusing ER {} - updating maps".format(curr_ER))
+                    self.logger.debug("Completely reusing ExecRecord {}".format(curr_ER))
 
-                    # Set curr_RS as reused and link ExecRecord.
-                    curr_RS.link_execrecord(curr_ER, True)
-
-                    # Update maps.
+                    # Set RunStep as reused and link ExecRecord; update maps; return RunStep.
+                    with transaction.atomic():
+                        curr_RS.link_execrecord(curr_ER, True)
+                        curr_RS.stop()
                     self._update_step_maps(curr_RS, step_run_dir, output_paths)
-
-                    # End. Return curr_RS.
-                    self.logger.debug("Finished completely reusing ER")
-                    curr_RS.stop()
-                    curr_RS.complete_clean()
                     return curr_RS
 
-                self.logger.debug("Found ER, but need to perform computation to fill it in")
+                self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
             else:
-                if pipelinestep.is_subpipeline:
-                    self.logger.debug("Step is a sub-pipeline, so no ER is applicable")
-                else:
-                    self.logger.debug("No compatible ER found - will create fresh ER")
+                self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
                 had_ER_at_beginning = False
-            
-        # Recovering? Yes.
-        else:
-            self.logger.debug("Recovering step")
-
-            # Retrieve appropriate RunStep and ExecRecord.
-            curr_ER = curr_RS.execrecord
-
-            # Retrieve output_paths and inputs_after_cable from maps.
-
-            for curr_input in pipelinestep.inputs:
-                corresp_ERI = curr_ER.execrecordins.get(content_type=ContentType.objects.get_for_model(curr_input), 
-                                                        object_id=curr_input.pk)
-                inputs_after_cable.append(corresp_ERI.symbolicdataset)
-
         invoking_record = parent_record if recover else curr_RS
-        self.logger.debug("Checking required datasets are on the FS for running code")
+
+        # Gather inputs.
         for curr_in_SD in inputs_after_cable:
 
-            # Are required datasets on the file system? No.
+            # Check if required SymbolicDatasets are on the file system for running code.
             if self.find_symbolicdataset(curr_in_SD) is None:
+                self.logger.debug("Dataset {} not on file system: recovering".format(curr_in_SD))
 
                 # Run recover() on missing datasets.
-                self.logger.debug("Dataset {} not on FS: recovering".format(curr_in_SD))
-
-                # Success? No.
                 if not self.recover(curr_in_SD, invoking_record):
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
-                    self.logger.debug("Failed to recover: quitting without creating ER")
+                    self.logger.warn("Recovery of SymbolicDataset {} failed".format(curr_in_SD))
                     curr_RS.stop()
-                    curr_RS.clean()
                     return curr_RS
-                
-                # Success? Yes.
-                else:
-                    self.logger.debug("Dataset {} was successfully recovered".format(curr_in_SD))
-
-        # Are required datasets on the file system? Yes.
-        self.logger.debug("Finished putting datasets into place: running code for this step")
-
-        # Step is a method or a pipeline? Pipeline.
-        if pipelinestep.is_subpipeline:
-            self.logger.debug("EXECUTING SUB-PIPELINE STEP")
-            self.execute_pipeline(pipeline=pipelinestep.transformation, input_SDs=inputs_after_cable,
-                                  sandbox_path=step_run_dir, parent_runstep=curr_RS)
-            self.logger.debug("FINISHED EXECUTING SUB-PIPELINE STEP")
-            curr_RS.stop()
-            curr_RS.complete_clean()
-            return curr_RS
-
-        # Step is a method or a pipeline? Method.
-        # Create ExecLog and MethodOutput.
-        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
-        self.logger.debug("Created ExecLog for method execution at {}".format(curr_log))
 
         # Run code.
+        # If the step is a sub-Pipeline, execute it and return the RunStep.
+        if pipelinestep.is_subpipeline:
+            self.execute_pipeline(pipeline=pipelinestep.transformation, input_SDs=inputs_after_cable,
+                                  sandbox_path=step_run_dir, parent_runstep=curr_RS)
+            curr_RS.stop()
+            return curr_RS
+
+        # Create ExecLog and MethodOutput; run code.
+        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
-        self.logger.debug("Running code")
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
         with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
             pipelinestep.transformation.run_code(step_run_dir, input_paths,
@@ -916,8 +883,7 @@ class Sandbox:
             self.logger.debug("DONE EXECUTING STEP {}".format(step))
 
             if not curr_RS.is_complete() or not curr_RS.successful_execution():
-                self.logger.debug("Step failed to execute: returning the run")
-                curr_run.clean()
+                self.logger.warn("Step failed to execute: returning the run")
                 return curr_run
 
         self.logger.debug("Finished executing steps, executing POCs")

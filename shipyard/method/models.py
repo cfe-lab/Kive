@@ -7,7 +7,7 @@ do with CodeResources.
 FIXME get all the models pointing at each other correctly!
 """
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -556,8 +556,6 @@ class Method(transformation.models.Transformation):
         """
         if log:
             log.start()
-            log.clean()
-            log.save()
 
         returncode = None
         try:
@@ -585,27 +583,26 @@ class Method(transformation.models.Transformation):
 
             returncode = method_popen.poll()
 
-        if log:
-            log.stop()
-            log.clean()
-            log.save()
-
         for stream in output_streams + error_streams:
             stream.flush()
 
-        # TODO: I'm not sure how this is going to handle huge output, 
-        # it would be better to update the logs as we go.
-        if details_to_fill:
-            details_to_fill.return_code = returncode
-            outlog = output_streams[0]
-            errlog = error_streams[0]
-            outlog.seek(0)
-            errlog.seek(0)
+        with transaction.atomic():
+            if log:
+                log.stop()
 
-            details_to_fill.error_log.save(errlog.name, File(errlog))
-            details_to_fill.output_log.save(outlog.name, File(outlog))
-            details_to_fill.clean()
-            details_to_fill.save()
+            # TODO: I'm not sure how this is going to handle huge output, 
+            # it would be better to update the logs as we go.
+            if details_to_fill:
+                details_to_fill.return_code = returncode
+                outlog = output_streams[0]
+                errlog = error_streams[0]
+                outlog.seek(0)
+                errlog.seek(0)
+
+                details_to_fill.error_log.save(errlog.name, File(errlog))
+                details_to_fill.output_log.save(outlog.name, File(outlog))
+                details_to_fill.clean()
+                details_to_fill.save()
 
     def invoke_code(self, run_path, input_paths, output_paths):
         """
