@@ -23,6 +23,7 @@ import time
 import tempfile
 import errno
 
+
 class Sandbox:
     """
     A Sandbox is the environment in which a Pipeline is run. It contains
@@ -650,7 +651,10 @@ class Sandbox:
 
                 self.logger.debug("Found ER, but need to perform computation to fill it in")
             else:
-                self.logger.debug("No compatible ER found - will create fresh ER")
+                if pipelinestep.is_subpipeline:
+                    self.logger.debug("Step is a sub-pipeline, so no ER is applicable")
+                else:
+                    self.logger.debug("No compatible ER found - will create fresh ER")
                 had_ER_at_beginning = False
             
         # Recovering? Yes.
