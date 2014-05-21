@@ -848,7 +848,7 @@ class Sandbox:
         Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
         """
 
-        is_set = (pipeline != None,input_SDs != None,sandbox_path != None,parent_runstep != None)
+        is_set = (pipeline is not None, input_SDs is not None, sandbox_path is not None, parent_runstep is not None)
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
 
@@ -1084,10 +1084,7 @@ class Sandbox:
         self.logger.debug('Executing {} "{}" in recovery mode'.format(generator.__class__.__name__, generator))
         if type(generator) == pipeline.models.PipelineStep:
             curr_record = self.execute_step(generator, invoking_record)
-        elif type(generator) == pipeline.models.PipelineOutputCable:
-            curr_record = self.execute_cable(generator, invoking_record)
-        elif type(generator) == pipeline.models.PipelineStepInputCable:
-            parent_record = curr_run.runsteps.get(pipelinestep=generator.pipelinestep)
+        else:
             curr_record = self.execute_cable(generator, invoking_record)
 
         return curr_record.is_complete() and curr_record.successful_execution()
