@@ -425,8 +425,8 @@ class Sandbox:
                 # ER is completely reusable? Yes.
                 if not curr_record.keeps_output() or output_SD.has_data():
                     self.logger.debug("Reusing ER {}".format(curr_ER))
-                    self._update_cable_maps(curr_record, output_SD, output_path)
                     curr_record.link_execrecord(curr_ER, True)
+                    self._update_cable_maps(curr_record, output_SD, output_path)
                     curr_record.stop()
                     curr_record.complete_clean()
                     return curr_record
@@ -494,6 +494,11 @@ class Sandbox:
         start_time = timezone.now()
         if not file_access_utils.file_exists(output_path):
             end_time = timezone.now()
+            # May 21, 2014: it's conceivable that the linking could fail in the
+            # trivial case; in which case we should associate a "missing data"
+            # check to input_SD == output_SD.
+            if cable.is_trivial():
+                output_SD = input_SD
             if curr_ER is None:
                 output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
             else:
@@ -502,7 +507,6 @@ class Sandbox:
             missing_output = True
 
         elif cable.is_trivial():
-            self.logger.debug("Cable is trivial: not creating a dataset")
             output_SD = input_SD
 
         else:
@@ -538,26 +542,30 @@ class Sandbox:
         else:
             self.logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
 
-        # Did ER already exist, or is cable trivial, or recovering? Yes.
-        if had_ER_at_beginning or cable.is_trivial() or recover:
-            self.logger.debug("Performing integrity check of trivial or previously generated output")
+        ####
+        # Check outputs
+        ####
 
-            # Perform integrity check.
-            output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
+        if not missing_output:
+            # Did ER already exist, or is cable trivial, or recovering? Yes.
+            if had_ER_at_beginning or cable.is_trivial() or recover:
+                self.logger.debug("Performing integrity check of trivial or previously generated output")
 
-        # Did ER already exist, or is cable trivial, or recovering? No.
-        elif not missing_output:
-            self.logger.debug("Performing content check for output generated for the first time")
-            summary_path = "{}_summary".format(output_path)
+                # Perform integrity check.
+                output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
 
-            # Perform content check.
-            output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out, cable.max_rows_out, curr_log)
+            # Did ER already exist, or is cable trivial, or recovering? No.
+            else:
+                self.logger.debug("Performing content check for output generated for the first time")
+                summary_path = "{}_summary".format(output_path)
+                # Perform content check.
+                output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                              cable.max_rows_out, curr_log)
 
-        # Check OK, and not recovering? Yes.
-        if output_SD.is_OK() and not recover:
-
-            # Success! Update sd_fs/socket/cable_map.
-            self._update_cable_maps(curr_record, output_SD, output_path)
+            # Check OK, and not recovering? Yes.
+            if output_SD.is_OK() and not recover:
+                # Success! Update sd_fs/socket/cable_map.
+                self._update_cable_maps(curr_record, output_SD, output_path)
 
         self.logger.debug("DONE EXECUTING {} '{}'".format(type(cable).__name__, cable))
 
