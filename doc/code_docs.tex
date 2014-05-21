@@ -30,7 +30,7 @@
 
 \def\nodedist{1}
 \def\sep{0.2}
-\tikzset{csv/.style={rectangle, draw, inner sep=2pt}}
+\tikzset{csv/.style={circle, draw, inner sep=2pt}}
 \tikzset{raw/.style={circle, draw, inner sep=2pt}}
 
 \section*{Pipeline}
@@ -658,6 +658,18 @@ if an ExecRecord \emph{does not} provide an output, it means that the relevant
 ExecRecordOut's SymbolicDataset is symbolic only - no real data is associated
 to it.
 
+\section*{RunAtomic}
+
+In contrast to an ExecRecord, which represents a symbolic execution, a
+RunAtomic is a temporal record of a \emph{particular} execution of a Pipeline
+component. RunAtomic is the parent class to two subclasses: RunStep, which
+records a PipelineStep execution, and RunCable, which records a
+PipelineStepInputCable or PipelineOutputCable execution. RunAtomics themselves
+inherit from the Stopwatch class, meaning they record the start and end time of
+the execution. When we refer to ``starting'' or ``stopping'' a RunAtomic, we
+mean setting the \code{start\_time} or \code{end\_time} of the underlying
+Stopwatch.
+
 \section*{ExecLog}
 
 An ExecLog is a record of code having been run during the execution of
@@ -693,9 +705,9 @@ To illustrate the Sandbox's operation, we will use the following example
 Pipeline for sequence alignment. The names and (in the case of structured,
 non-raw data) CompoundDatatypes of each input and output of the Pipeline are
 shown attached to the inputs by dotted lines. Note that, for trivial cables,
-the input and output annotation is the same, since these cables do not alter
-the data passing through them. In our examples, this Pipeline will be run by a
-user named Will.
+the input is the same as the output, since these cables do not alter the data
+passing through them. In our examples, this Pipeline will be run by a user
+named Will.
 
 \begin{figure}[ht]
   \centering
@@ -747,10 +759,10 @@ user named Will.
 Unaligned sequences and an scoring matrix are passed as input. The sequences
 are subjected to a cleaning step, which produces new sequences, along with a
 Boolean column indicating whether or not any changes were made to each
-sequence. This Boolean column is stripped out by the trivial cable connecting
-the two steps. The cleaned sequences and scoring matrix are passed to the
-alignment step, which outputs aligned sequences and scores. The scores are
-removed by the final non-trivial output cable.
+sequence. This Boolean column is stripped out by the non-trivial cable
+connecting the two steps. The cleaned sequences and scoring matrix are passed
+to the alignment step, which outputs aligned sequences and scores. The scores
+are removed by the final non-trivial output cable.
 
 It is important to distinguish between the names of inputs and outputs (which
 are shown in the diagram), and the names of Datasets (which are not shown). The
@@ -896,11 +908,16 @@ the first time, and this parameter is ignored.
 
 \subsubsection*{Prepare}
 
-The first step of PipelineStep execution is to set up directories on the file
-system for input data, output data, and logs. Typically, steps are run in a
-directory called stepN, where N is the step's number within its parent
-Pipeline. When executing the first step in the example Pipeline, the directory
-structure will look like this.
+Before doing anything toward executing the step, a record the execution is
+required. If this step has never been reached before in this particular Run
+(that is, we are not recovering), a new RunStep is created and started.
+Otherwise, for recovery, the original RunStep is retrieved from \code{ps\_map},
+and is not re-started. 
+
+Next, directories on the file system are set up for input data, output data,
+and logs. Typically, steps are run in a directory called stepN, where N is the
+step's number within its parent Pipeline. When executing the first step in the
+example Pipeline, the directory structure will look like this.
 
 \begin{verbatim}
   userWill_run47_c2DW92/
@@ -916,25 +933,17 @@ The directory \code{step1} in the above schematic should already have been
 created before calling \code{execute\_step}, and is passed in as the
 \code{step\_run\_dir} parameter. In recovery mode, the top-level directory is
 looked up in \code{ps\_map}. In both cases, this directory is checked for
-existence. In the non-recovery case, the step directory must be empty, and the
-sub-directories are created. When recovering, we check that these directories
-are already there, and that no other files or folders are present.
+existence. In the non-recovery case, the step directory must be empty, and we
+create the necessary sub-directories (here, \code{input\_data},
+\code{output\_data}, and \code{logs}). When recovering, we check that these
+sub-directories are already there, that they are empty, and that no other files
+or folders are present in the \code{step\_run\_dir}.
 
-If code must be run to execute the step, it will be placed inside the step
-directory (above, \code{step1}). This means that, after a step has been run,
-there may be other files in the step's directory - code and dependencies.
-However, when executing a step in recovery mode, we may still insist that the
-directory have only the three mentoned subdirectories in it. If the code for a
-step was actually run in the Sandbox, \code{recover} should never return to
-that step, because its output data is already in the Sandbox. 
-
-A record of the step execution is now required. If this step has never been
-reached before in this particular Run (that is, we are not recovering), a new
-RunStep is created and started. Otherwise, for recovery, the original RunStep
-is retrieved from \code{ps\_map}, and is not re-started. 
-
-\alert{We already did something by creating the directories. Should the RunStep
-have been started before that?}
+Even though we are re-visiting a step when we execute it in recovery mode, we
+still insist that the \code{step\_run\_dir} have only the three empty
+sub-directories in it, and no other files. This is because \code{recover}
+never returns to a step which has actually run code, only to one for which an
+ExecRecord was completely reused and nothing was placed on the file system.
 
 The final step of preparation is to define where the step's outputs will go. If 
 not recovering, the output paths will look like
@@ -948,11 +957,8 @@ that the file has a CompoundDatatype (raw data is given the suffix \code{raw}
 instead). If recovering, the output SymbolicDatasets from the first time the
 step was executed are retrieved from the RunStep's ExecRecord, and the output
 paths are looked up in \code{sd\_fs\_map}. Note that, because recovery entails
-that the step was already executed succesfully, the SymbolicDatasets in
-question are guaranteed to be in \code{sd\_fs\_map}.
-
-\alert{Why do we look up the output paths here? The earliest we need them is
-when we completely reuse an ExecRecord.}
+that the step was already executed succesfully (through ExecRecord reuse), the
+SymbolicDatasets in question are guaranteed to be in \code{sd\_fs\_map}.
 
 In the non-recovery case, the only database transaction taking place during
 this phase is the creation of a RunStep. Before this part of the algorithm,
@@ -980,7 +986,7 @@ Afterward, there is a RunStep in the following state.
   \end{tabular}
 \end{center}
 
-In the recovery case, no database transactions have been performed yet.
+In the recovery case, no interaction with the database has happened yet.
 
 \subsubsection*{Run cables}
 

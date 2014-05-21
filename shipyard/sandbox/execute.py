@@ -578,30 +578,35 @@ class Sandbox:
         Outputs written to: [step run dir]/output_data/step[step num]_[output name]
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
-        assert inputs is None or all([i.is_OK() for i in inputs])
+        assert recover or (inputs and all([i.is_OK() for i in inputs]))
         assert recover or step_run_dir 
-        self.logger.debug("STARTING EXECUTION OF STEP")
 
-        output_paths = []
-        inputs_after_cable = []
+        # Create or retrieve RunStep.
+        if recover:
+            step_run_dir, curr_RS = self.ps_map[pipelinestep]
+            self.logger.debug("Recovering step {} in directory {}".format(pipelinestep, step_run_dir))
+        else:
+            curr_RS = archive.models.RunStep.create(pipelinestep, parent_record)
+            input_names = ", ".join(str(i) for i in inputs)
+            self.logger.debug("Executing step {} in directory {} on inputs {}"
+                              .format(pipelinestep, step_run_dir, input_names))
 
         # Set up run/input/output/log directories.
-        self.logger.debug("Preparing file system for sandbox")
         if recover:
             step_run_dir, curr_RS = self.ps_map[pipelinestep]
         in_dir, out_dir, log_dir = self._setup_step_paths(step_run_dir, recover)
 
-        # Recovering? No.
-        if not recover:
-
-            # Create new RunStep.
-            self.logger.debug("Not recovering - creating new RunStep")
-            curr_RS = archive.models.RunStep.create(pipelinestep, parent_record)
-
-            # Construct output_paths from outputs of this step's transformation.
-            for curr_output in pipelinestep.outputs:
+        # Construct or retrieve output_paths.
+        output_paths = []
+        for curr_output in pipelinestep.outputs:
+            if recover:
+                corresp_SD = self.socket_map[(parent_record.parent_run, pipelinestep, curr_output)]
+                output_paths.append(self.sd_fs_map[corresp_SD])
+            else:
                 output_paths.append(self.step_xput_path(curr_RS, curr_output, step_run_dir))
 
+        inputs_after_cable = []
+        if not recover:
             self.logger.debug("Running step's input PSICs")
             for i, curr_input in enumerate(pipelinestep.inputs):
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
@@ -619,8 +624,6 @@ class Sandbox:
                     return curr_RS
 
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
-
-            curr_RS.clean()
 
             self.logger.debug("Looking for ER with same transformation + input SDs")
             curr_ER = None
@@ -662,13 +665,9 @@ class Sandbox:
             self.logger.debug("Recovering step")
 
             # Retrieve appropriate RunStep and ExecRecord.
-            step_run_dir, curr_RS = self.ps_map[pipelinestep]
             curr_ER = curr_RS.execrecord
 
             # Retrieve output_paths and inputs_after_cable from maps.
-            for curr_output in pipelinestep.outputs:
-                corresp_SD = self.socket_map[(parent_record.parent_run, pipelinestep, curr_output)]
-                output_paths.append(self.sd_fs_map[corresp_SD])
 
             for curr_input in pipelinestep.inputs:
                 corresp_ERI = curr_ER.execrecordins.get(content_type=ContentType.objects.get_for_model(curr_input), 
@@ -784,10 +783,11 @@ class Sandbox:
             # Link ExecRecord to RunStep.
             curr_RS.link_execrecord(curr_ER, False)
 
-        self.logger.debug("Proceeding to check outputs")
+        # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
             output_path = output_paths[i]
             output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
+            check = None
         
             # Recovering or filling in old ER? Yes.
             if recover or had_ER_at_beginning:
@@ -805,19 +805,18 @@ class Sandbox:
                 check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
                                                       curr_output.get_max_row(), curr_log)
 
-            if bad_output_found:
+            else:
                 self.logger.debug("Bad output found; no check on {} was done".format(output_path))
 
             # Check OK? No.
-            elif check.is_fail():
+            if check and check.is_fail():
                 self.logger.warn("{} failed for {}".format(check.__class__.__name__, output_path))
                 bad_output_found = True
 
             # Check OK? Yes.
-            else:
+            elif check:
                 self.logger.debug("{} passed for {}".format(check.__class__.__name__, output_path))
                     
-        self.logger.debug("Finished checking outputs")
         curr_ER.complete_clean()
 
         if not recover:
