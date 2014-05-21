@@ -66,20 +66,7 @@ $\sd$, and those with real data are represented by filled ghosts $\sdd$.
 
 \section*{ExecRecord}
 
-\subsection*{Reuse}
-
-Shipyard provides the option to not store Datasets produced by steps of a
-Pipeline. This means that ExecRecords in the Database will sometimes
-contain only a record of the data that was produced, rather than the actual
-data itself. That is, their ExecRecordIns and ExecRecordOuts may point to
-SymbolicDatasets without Datasets attached to them. 
-
-This design is useful because Datasets may become very large, and keeping every
-intermediate file around may use a lot of disk space if the files are not
-needed. On the other hand, we still want to keep around a record of having run
-the Pipeline on the data. In fact, these ``empty'' records have a use beyond
-bookkeeping: depending on the context, it may be possible to \emph{reuse} an
-ExecRecord even when the data is not there.
+\subsection*{Creation}
 
 Consider the following use case. Jim creates a Pipeline with three Methods,
 called $A$, $B$, and $C$. The Pipeline has one input and two outputs. He
@@ -261,9 +248,24 @@ PipelineOutputCables.
   \caption{New ExecRecords created by first execution of Jim's Pipeline.}
 \end{figure}
 
-Some time later, Jim decides that the first output of his Pipeline wasn't quite
-what he wanted. He creates a new Pipeline with an additional step, $D$, to do
-some more processing to the first output (Figure~\ref{fig:newpipeline}).
+\subsection*{Reuse}
+
+Shipyard provides the option to not store Datasets produced by steps of a
+Pipeline. This means that ExecRecords in the Database will sometimes
+contain only a record of the data that was produced, rather than the actual
+data itself. That is, their ExecRecordIns and ExecRecordOuts may point to
+SymbolicDatasets without Datasets attached to them. 
+
+This design is useful because Datasets may become very large, and keeping every
+intermediate file around may use a lot of disk space if the files are not
+needed. On the other hand, we still want to keep around a record of having run
+the Pipeline on the data. In fact, these ``empty'' records have a use beyond
+bookkeeping: depending on the context, it may be possible to \emph{reuse} an
+ExecRecord even when the data is not there.
+
+Suppose Jim decides that the first output of his Pipeline wasn't quite what he
+wanted. He creates a new Pipeline with an additional step, $D$, to do some more
+processing to the first output (Figure~\ref{fig:newpipeline}).
 
 \begin{figure}[ht]
   \centering
@@ -549,15 +551,39 @@ An ExecRecord is not intended to document a \emph{particular} execution of
 code, by a specific user at a given time. That information is stored in the
 archive module, in RunAtomics and ExecLogs. Rather, an ExecRecord can be
 thought of as a \emph{symbolic} execution, which may be realized by different
-users at different times. 
+users at different times. There is exactly one ExecRecord in the database for
+each unique combination of Pipeline component (step or cable) and input
+SymbolicDatasets which have ever been run. Each time the same step or cable is
+run with the same inputs, the same ExecRecord is used.
 
-%To illustrate this, consider step $E$ of Jim's Pipeline above. Suppose the
-%input to this step has a CompoundDatatype called ``site\_probability'', which
-%he has defined as (integer: position, float: probability). In other words, the
-%site\_probability CompoundDatatype has two columns: an integer column called
-%``position'', and a float column called ``probability''. Because the cable
-%linking steps $A$ and $E$ is trivial, we may infer that the SymbolicDataset
-%$A_1$ also has the same CompoundDatatype.
+To illustrate this, suppose Jim decides he wants the output of step $A$ after
+all. He marks the outputs of step $A$ as retained, instead of missing, and
+tries to run the Pipeline again. Shipyard will find a compatible ExecRecord for
+step $A$, as shown below. Unfortunately, this ExecRecord does not provide all
+the outputs which are now required, namely $A_1$ and $A_2$. The code for step
+$A$ must be executed to \emph{fill in} these missing outputs.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture} [node distance=\nodedist]
+    \node [csv] (step1in1) { };
+    \node [csv, above right=of step1in1] (step1out1) { };
+    \node [csv, below right=of step1in1] (step1out2) { };
+    \path (step1in1.east) -| node [auto, swap] {$A$} (step1out2.west);
+    \node [right=\sep of step1out1, anchor=south west, inner sep=0] {$\sd_{A_1}$};
+    \node [right=\sep of step1out2, anchor=south west, inner sep=0] {$\sd_{A_2}$};
+    \node [left=\sep of step1in1, anchor=south east, inner sep=0] {$\sdd_{I}$};
+
+    \draw ($(step1in1.west) + (-\sep, 0)$) |- ($(step1out1.north east) + (\sep, \sep)$)
+                                           |- ($(step1out2.south east) + (\sep, -\sep)$)
+                                           -| ($(step1in1.west) + (-\sep, 0)$);
+  \end{tikzpicture}
+  \caption{A compatible ExecRecord for step $A$, which does not provide the outputs $A_1$ or $A_2$.}
+\end{figure}
+
+Once they have been filled in, by associating Datasets to the SymbolicDatasets
+$A_1$ and $A_2$, this ExecRecord in the database can now provide $A_1$ and
+$A_2$. 
 
 \section*{ExecRecordIn/ExecRecordOut}
 
@@ -615,7 +641,7 @@ where we have labelled the cables $c_1$ and $c_2$, and the step $A$.
     \draw ($(step1in.north west) + (-\sep, \sep)$) rectangle ($(step1out.south east) + (\sep, -\sep)$);
 
     \node [below left=of step1in, text width=3cm] (inlabel) {TransformationInput \\ output from $c_1$ \\ input to $A$};
-    \node [below right=of step1out, text width=3cm] (outlabel) {TransformationOutput \\ output from $A$ \\ input to $c_2$};
+    \node [below right=of step1out, text width=3cm] (outlabel) {TransformationOutput \\ output from $A$ \\ input to $c_1$};
 
     \draw [dotted] (step1in) -- (inlabel);
     \draw [dotted] (step1out) -- (outlabel);
@@ -718,7 +744,7 @@ user named Will.
   \caption{A two step Pipeline to align sequences, annotated with dataset names and data types.}
 \end{figure}
 
-Unaligned sequences and a scoring matrix are passed as input. The sequences
+Unaligned sequences and an scoring matrix are passed as input. The sequences
 are subjected to a cleaning step, which produces new sequences, along with a
 Boolean column indicating whether or not any changes were made to each
 sequence. This Boolean column is stripped out by the trivial cable connecting
@@ -758,7 +784,7 @@ referred to as the Sandbox. When we say that a file is ``in the Sandbox'', we
 mean that the file is in some sub-directory of this path. Similarly, a
 SymbolicDataset is in the Sandbox if a file containing its data is present. It
 is not enough for the SymbolicDataset to be in \code{sd\_fs\_map}, since that
-map only keeps track of where SymbolicDatasets \emph{should} go. If an
+map keeps only track of where SymbolicDatasets \emph{should} go. If an
 ExecRecord is completely reused, the data will not be written to the file
 system. Therefore, a SymbolicDataset is known to be in the sandbox only if it
 is in \code{sd\_fs\_map} \emph{and} the file indicated by the map actually
@@ -1109,9 +1135,92 @@ It also must have the same SymbolicDatasets in its ExecRecordOuts as the inputs
 currently being fed to the step.
 
 If such an ExecRecord is found, the next step is to check if it provides the
-outputs this execution requires. Suppose that Will feeds the SymbolicDataset
-$D$ into the alignment Pipeline, and he does not want to keep the output of the
-``clean'' step. If the ExecRecord depicted below exists in the database, it may
-be reused
+outputs this execution requires. If so, that means it's possible to completely
+reuse the ExecRecord. In a transaction, we set the RunStep as reused, link the
+ExecRecord to it, and stop the RunStep. Step execution skips straight to the
+final step of updating the maps, and the RunStep is returned in the following
+state.
+
+\alert{I'm not sure if we should stop the RunStep before or after updating the
+maps.}
+
+\begin{center}
+  \begin{tabular}{|c|c|C{8cm}|}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    \cline{2-3}
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{2}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    \cline{2-3}
+    & \code{RSICs} & $\nin$ succesful and complete \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & ExecRecord which was found to reuse \\
+    \cline{2-3}
+    & \code{reused} & True \\
+    \cline{2-3}
+    & \code{log} & None \\
+    \cline{2-3}
+    & \code{invoked\_logs} & None \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    \cline{2-3}
+    & \code{end\_time} & time when compatible ExecRecord was linked \\
+    \hline
+  \end{tabular}
+\end{center}
+
+If no compatible ExecRecord was found, we will have to run code for the step.
+No additional database transactions are performed in that case.
+
+\alert{Should we set the RunStep.reused to False at this point?}
+
+\subsubsection*{Gather inputs}
+
+This section of the algorithm is only relevant if we are actually running code
+for this step. When completely reusing an ExecRecord, we don't need the inputs,
+and when the step is a sub-Pipeline, gathering the inputs is handled by the
+Pipeline execution code.
+
+For each input SymbolicDataset, we check if it is already in the Sandbox by
+using the Sandbox's \code{find\_symbolicdataset} function. If not, it means one
+of the cables feeding this step completely reused an ExecRecord, and did not
+actually write its output to the file system. In that case, \code{recover} is
+called on the missing SymbolicDataset, passing the current RunStep as the
+invoking record. If the recovery succeeds, then the SymbolicDataset has been
+succesfully written to the file system. If not, execution cannot continue, so
+we stop the RunStep and return it in the following state.
+
+\alert{Should we update the maps?}
+
+\begin{center}
+  \begin{tabular}{|c|c|C{8cm}|}
+    \hline
+    & \textbf{parameter} & \textbf{value} \\
+    \hline
+    \multirow{2}{*}{RunStep parameters} & \code{pipelinestep} & \code{pipelinestep} parameter to \code{execute\_step} \\
+    \cline{2-3}
+    & \code{run} & \code{parent\_record} parameter to \code{execute\_step} \\
+    \hline
+    \multirow{2}{*}{implicit RunStep parameters} & \code{child\_run} & unset \\
+    \cline{2-3}
+    & \code{RSICs} & $\nin$ succesful and complete \\
+    \hline
+    \multirow{4}{*}{inherited from RunAtomic} & \code{execrecord} & ExecRecord which was found to reuse \\
+    \cline{2-3}
+    & \code{reused} & None \\
+    \cline{2-3}
+    & \code{log} & None \\
+    \cline{2-3}
+    & \code{invoked\_logs} & one failed, zero or more succesful \\
+    \hline
+    \multirow{2}{*}{inherited from Stopwatch} & \code{start\_time} & time when RunStep was created \\
+    \cline{2-3}
+    & \code{end\_time} & time when recovery was known to have failed \\
+    \hline
+  \end{tabular}
+\end{center}
 
 \end{document}

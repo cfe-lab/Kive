@@ -190,8 +190,7 @@ class Sandbox:
         INPUTS
         step_run_dir    root directory where step will be run
         recover         are we recovering? (if so, test if the 
-                        directories are there instead of creating
-                        them)
+                        directories are there instead of creating them)
 
         OUTPUTS
         in_dir          directory to put step's inputs
@@ -570,8 +569,7 @@ class Sandbox:
         """Execute the PipelineStep on the inputs.
 
         * If code is run, outputs go to paths specified in output_paths.
-        * Requisite code is placed in step_run_dir.
-        * If step_run_dir is None, default is [sandbox path]/step[stepnum].
+        * Requisite code is placed in step_run_dir (must be specified if not recovering).
         * If recovering, doesn't create new RS/ER; fills in old RS with a new EL
           In this case, step_run_dir is ignored and retrieved using the maps.
 
@@ -580,6 +578,7 @@ class Sandbox:
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
         assert inputs is None or all([i.is_OK() for i in inputs])
+        assert recover or step_run_dir 
         self.logger.debug("STARTING EXECUTION OF STEP")
 
         output_paths = []
@@ -587,9 +586,7 @@ class Sandbox:
 
         # Set up run/input/output/log directories.
         self.logger.debug("Preparing file system for sandbox")
-        if not recover and step_run_dir is None:
-            step_run_dir = os.path.join(self.sandbox_path, "step{}".format(pipelinestep.step_num))
-        elif recover:
+        if recover:
             step_run_dir, curr_RS = self.ps_map[pipelinestep]
         in_dir, out_dir, log_dir = self._setup_step_paths(step_run_dir, recover)
 
