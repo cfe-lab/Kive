@@ -2027,6 +2027,9 @@ class MethodTests(MethodTestSetup):
             "Directory .* nonempty; contains file .*",
             lambda : self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], []))
 
+    def test_delete_method(self):
+        """Deleting a method is possible."""
+        self.assertIsNone(Method.objects.first().delete())
 
 class MethodFamilyTests(MethodTestSetup):
 

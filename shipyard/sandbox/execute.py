@@ -535,7 +535,8 @@ class Sandbox:
                 self.logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
 
                 # Make ExecRecord, linking it to the ExecLog.
-                curr_ER = librarian.models.ExecRecord.create_complete(curr_log, cable, [input_SD], [output_SD])
+                curr_ER = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
+
             # Link ER to RunCable.
             curr_record.link_execrecord(curr_ER, False)
 
@@ -702,6 +703,7 @@ class Sandbox:
         self.logger.debug("Method execution complete, ExecLog saved (started = {}, ended = {})".
                 format(curr_log.start_time, curr_log.end_time))
 
+        # Create outputs.
         # bad_output_found indicates we have detected problems with the output.
         bad_output_found = not curr_log.is_successful()
         output_SDs = []
@@ -745,16 +747,13 @@ class Sandbox:
                         output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_RS)
             output_SDs.append(output_SD)
 
-        # Recovering? No.
+        # Link ExecRecord.
         if not recover:
-
-            # Creating a new ER, or filling one in? Creating new.
             if not had_ER_at_beginning:
 
                 # Make new ExecRecord, linking it to the ExecLog
                 self.logger.debug("Creating fresh ExecRecord")
-                curr_ER = librarian.models.ExecRecord.create_complete(curr_log, pipelinestep, inputs_after_cable,
-                                                                      output_SDs)
+                curr_ER = librarian.models.ExecRecord.create(curr_log, pipelinestep, inputs_after_cable, output_SDs)
             # Link ExecRecord to RunStep.
             curr_RS.link_execrecord(curr_ER, False)
 
@@ -775,7 +774,7 @@ class Sandbox:
             elif not bad_output_found:
 
                 # Perform content check.
-                self.logger.debug("New data - performing content check")
+                self.logger.debug("{} is new data - performing content check".format(output_SD))
                 summary_path = "{}_summary".format(output_path)
                 check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
                                                       curr_output.get_max_row(), curr_log)
@@ -795,7 +794,6 @@ class Sandbox:
         curr_ER.complete_clean()
 
         if not recover:
-            self.logger.debug("Not recovering: finishing bookkeeping and updating maps")
             # Since reused=False, step_run_dir represents where the step *actually is*
             self._update_step_maps(curr_RS, step_run_dir, output_paths)
 

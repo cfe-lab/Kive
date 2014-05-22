@@ -379,6 +379,9 @@ class Method(transformation.models.Transformation):
 
     pipelinesteps = generic.GenericRelation("pipeline.PipelineStep")
 
+    # automatically set when an ExecRecord object points to this Method.
+    # execrecords = generic.GenericRelation("librarian.ExecRecord")
+
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)

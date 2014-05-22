@@ -44,15 +44,8 @@ class Pipeline(transformation.models.Transformation):
     Related to :model:`pipeline.models.PipelineOutputCable`
     """
 
-    family = models.ForeignKey(
-        PipelineFamily,
-        related_name="members")
-
-    revision_parent = models.ForeignKey(
-        "self",
-        related_name = "descendants",
-        null=True,
-        blank=True)
+    family = models.ForeignKey(PipelineFamily, related_name="members")
+    revision_parent = models.ForeignKey("self", related_name = "descendants", null=True, blank=True)
 
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
@@ -89,36 +82,19 @@ class Pipeline(transformation.models.Transformation):
         super(self.__class__, self).clean()
 
         # Internal pipeline STEP numbers must be consecutive from 1 to n
-        all_steps = self.steps.all()
-        step_nums = []
-
-        for step in all_steps:
-            step_nums += [step.step_num]
-
-        if sorted(step_nums) != range(1, len(all_steps)+1):
-            raise ValidationError(
-                "Steps are not consecutively numbered starting from 1")
-
         # Check that steps are clean; this also checks the cabling between steps.
         # Note: we don't call *complete_clean* because this may refer to a
         # "transient" state of the Pipeline whereby it is not complete yet.
-        for step in all_steps:
+        for i, step in enumerate(self.steps.order_by("step_num"), start=1):
             step.clean()
-
-        # Check pipeline output wiring for coherence
-        output_indices = []
-        output_names = []
+            if step.step_num != i:
+                raise ValidationError("Steps are not consecutively numbered starting from 1")
 
         # Validate each PipelineOutput(Raw)Cable
-        for outcable in self.outcables.all():
+        for i, outcable in enumerate(self.outcables.order_by("output_idx"), start=1):
             outcable.clean()
-            output_indices += [outcable.output_idx]
-            output_names += [outcable.output_name]
-
-        # PipelineOutputCables must be numbered consecutively
-        if sorted(output_indices) != range(1, self.outcables.count()+1):
-            raise ValidationError(
-                "Outputs are not consecutively numbered starting from 1")
+            if outcable.output_idx != i:
+                raise ValidationError("Outputs are not consecutively numbered starting from 1")
 
     def complete_clean(self):
         """

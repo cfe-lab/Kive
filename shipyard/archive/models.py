@@ -1629,7 +1629,7 @@ class ExecLog(stopwatch.models.Stopwatch):
     Records the start/end times of execution.
     Records *attempts* to run a computation, whether or not it succeeded.
 
-    ELs for methods will also link to a MethodOutput.
+    ExecLogs for methods will also link to a MethodOutput.
     """
     content_type = models.ForeignKey(
         ContentType,

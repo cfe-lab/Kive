@@ -22,9 +22,6 @@ from constants import datatypes
 
 samplecode_path = "../samplecode"
 
-# All classes that inherit TestCase are evaluated by the TestUtility
-
-
 class PipelineTestSetup(method.tests.MethodTestSetup):
     """
     Set up a database state for unit testing Pipeline.
@@ -42,9 +39,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         self.user.save()
         
         # Define DNAcomp_pf
-        self.DNAcomp_pf = PipelineFamily(
-            name="DNAcomplement",
-            description="DNA complement pipeline.")
+        self.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.")
         self.DNAcomp_pf.save()
 
         # Define DNAcompv1_p (pipeline revision)
@@ -102,16 +97,17 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
     def tearDown(self):
         shutil.rmtree(self.workdir)
 
-
 class PipelineFamilyTests(PipelineTestSetup):
 
     def test_unicode(self):
         """
         unicode() for PipelineFamily should display it's name
         """
-        self.assertEqual(unicode(self.DNAcomp_pf),
-                         "DNAcomplement")
+        self.assertEqual(unicode(self.DNAcomp_pf), "DNAcomplement")
 
+    def test_delete_pipeline_family(self):
+        """Can I delete a PipelineFamily?"""
+        self.assertIsNone(PipelineFamily.objects.first().delete())
 
 class PipelineTests(PipelineTestSetup):
     
@@ -127,7 +123,6 @@ class PipelineTests(PipelineTestSetup):
             ValidationError,
             "Pipeline foo has no steps",
             foo.complete_clean())
-
 
     def test_pipeline_one_invalid_input_clean(self):
         """Test input index check, one badly-indexed input case."""
@@ -2240,10 +2235,7 @@ class PipelineTests(PipelineTestSetup):
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
-        foo.create_input(
-            compounddatatype=self.triplet_cdt,
-dataset_name="pipe_input_1_a_b_c",
-            dataset_idx=1)
+        foo.create_input(compounddatatype=self.triplet_cdt, dataset_name="pipe_input_1_a_b_c", dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2389,6 +2381,11 @@ dataset_name="pipe_input_1_a_b_c",
         self.assertEquals(curr_out_new.get_min_row(), None)
         self.assertEquals(curr_out_new.get_max_row(), None)
 
+    def test_delete_pipeline(self):
+        """Deleting a Pipeline is possible."""
+        family = PipelineFamily(); family.save()
+        pipeline = Pipeline(family=family); pipeline.save()
+        self.assertIsNone(pipeline.delete())
 
 class PipelineStepTests(PipelineTestSetup):
 
@@ -2691,6 +2688,19 @@ class PipelineStepTests(PipelineTestSetup):
         self.assertEqual(len(step.outputs_to_retain()), 1)
         self.assertEqual(step.outputs_to_delete.count(), 0)
 
+    def test_delete_pipeline_step(self):
+        """Deleting a PipelineStep is possible."""
+        PipelineStep.objects.first().delete()
+
+class PipelineStepInputCableTests(PipelineTestSetup):
+    def test_delete_pipeline_step_input_cable(self):
+        """Deleting a PipelineStepInputCable is possible."""
+        self.assertIsNone(PipelineStepInputCable.objects.first().delete())
+
+class PipelineOutputCableTests(PipelineTestSetup):
+    def test_delete_pipeline_output_cable(self):
+        """Deleting a PipelineOutputCable is possible."""
+        self.assertIsNone(PipelineOutputCable.objects.first().delete())
 
 class PipelineStepRawDeleteTests(PipelineTestSetup):
 

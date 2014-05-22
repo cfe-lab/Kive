@@ -5,7 +5,7 @@ Shipyard data models pertaining to the lookup of the past: ExecRecord,
 SymbolicDataset, etc.
 """
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
@@ -463,8 +463,9 @@ class ExecRecord(models.Model):
         return string_rep
 
     @classmethod
-    def create_complete(cls, generator, component, input_SDs, output_SDs):
-        """Create a complete ExecRecord.
+    @transaction.atomic
+    def create(cls, generator, component, input_SDs, output_SDs):
+        """Create a complete ExecRecord, including inputs and outputs.
         
         INPUTS
         generator       ExecLog generating this ExecRecord

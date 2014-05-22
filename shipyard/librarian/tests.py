@@ -50,8 +50,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
             coderesource=self.generic_cr, revision_name="v1",
             revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.generic_crRev.content_file.save("generic_script.py",
-                                                 File(f))
+            self.generic_crRev.content_file.save("generic_script.py", File(f))
         self.generic_crRev.save()
         
         # Method family, methods, and their input/outputs
@@ -428,6 +427,16 @@ class DatasetStructureTests(LibrarianTestSetup):
         self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
 
 class ExecRecordTests(LibrarianTestSetup):
+    def test_delete_execrecord(self):
+        """Delete an ExecRecord."""
+        runstep = RunStep(pipelinestep=self.step_D1, run=self.pD_run)
+        runstep.save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep)
+        execlog.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
+
+        self.assertIsNone(ExecRecord.objects.first().delete())
 
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from

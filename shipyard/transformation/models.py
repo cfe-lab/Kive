@@ -64,9 +64,6 @@ class Transformation(models.Model):
     inputs = generic.GenericRelation("transformation.TransformationInput")
     outputs = generic.GenericRelation("transformation.TransformationOutput")
 
-    # automatically set when an ExecRecord object points to this Transformation object
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
-
     class Meta:
         abstract = True
 
