@@ -67,6 +67,11 @@ class SymbolicDataset(models.Model):
         """Is this SymbolicDataset missing data?"""
         return 
 
+    @property
+    def compounddatatype(self):
+        if self.is_raw(): return None
+        return self.structure.first().compounddatatype
+
     def clean(self):
         """
         Checks coherence of this SymbolicDataset.
@@ -397,6 +402,7 @@ class SymbolicDataset(models.Model):
         self.logger.debug("Has a content check completed on SD '{}'?  {}".format(self, content_check_completed))
         return content_check_completed
     
+
 class DatasetStructure(models.Model):
     """
     Data with a Shipyard-compliant structure: a CSV file with a header.
@@ -421,19 +427,7 @@ class DatasetStructure(models.Model):
     # A value of -1 means the file is missing or num rows has never been counted
     num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
 
-    # October 31, 2013: we now think that it's too onerous to have 
-    # a clean() function here that opens up the CSV file and checks it.
-    # Instead we will make it a precondition that any SymbolicDataset
-    # that represents a CSV file has to have confirmed using
-    # summarize_CSV() that the CSV file is coherent.
 
-    # At a later date, we might want to put in some kind of
-    # "force_check()" which actually opens the file and makes sure its
-    # contents are OK.
-
-
-# November 15, 2013: changed to not refer to Pipelines anymore.
-# Now the ExecRecord only captures *atomic* transformations.
 class ExecRecord(models.Model):
     """
     Record of a previous execution of a Method/PSIC/POC
@@ -634,11 +628,14 @@ class ExecRecord(models.Model):
         return True
 
     def outputs_OK(self):
-        """
-        Checks whether all of the EROs of this ER are OK.
-        """
+        """Checks whether all of the EROs of this ER are OK."""
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
+
+    def has_ever_failed(self):
+        """Has any execution of this ExecRecord ever failed?"""
+        return any(not runstep.successful_execution() for runstep in self.archive_runstep_related.all())
         
+
 class ExecRecordIn(models.Model):
     """
     Denotes a symbolic input fed to the Method/POC/PSIC in the parent ExecRecord.
@@ -781,6 +778,7 @@ class ExecRecordIn(models.Model):
     def is_OK(self):
         """Checks if the associated SymbolicDataset is OK."""
         return self.symbolicdataset.is_OK()
+
 
 class ExecRecordOut(models.Model):
     """
@@ -974,4 +972,3 @@ class ExecRecordOut(models.Model):
     def is_OK(self):
         """Checks if the associated SymbolicDataset is OK."""
         return self.symbolicdataset.is_OK()
-
