@@ -24,6 +24,7 @@ import file_access_utils, logging_utils
 
 LOGGER = logging.getLogger(__name__)
 
+
 class SymbolicDataset(models.Model):
     """
     Symbolic representation of a (possibly temporary) data file.
@@ -396,7 +397,8 @@ class SymbolicDataset(models.Model):
         # none of the checks are complete yet.
         self.logger.debug("Has a content check completed on SD '{}'?  {}".format(self, content_check_completed))
         return content_check_completed
-    
+
+
 class DatasetStructure(models.Model):
     """
     Data with a Shipyard-compliant structure: a CSV file with a header.
@@ -637,7 +639,8 @@ class ExecRecord(models.Model):
         Checks whether all of the EROs of this ER are OK.
         """
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
-        
+
+
 class ExecRecordIn(models.Model):
     """
     Denotes a symbolic input fed to the Method/POC/PSIC in the parent ExecRecord.
@@ -780,6 +783,7 @@ class ExecRecordIn(models.Model):
     def is_OK(self):
         """Checks if the associated SymbolicDataset is OK."""
         return self.symbolicdataset.is_OK()
+
 
 class ExecRecordOut(models.Model):
     """
