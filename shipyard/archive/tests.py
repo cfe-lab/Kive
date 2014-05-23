@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 import os, sys
 import tempfile, shutil
@@ -48,7 +49,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         execlog.save()
         if record_type == "RunStep":
             MethodOutput(execlog=execlog, return_code=0).save()
-        execrecord = ExecRecord.create_complete(execlog, record.component, input_SDs, output_SDs)
+        execrecord = ExecRecord.create(execlog, record.component, input_SDs, output_SDs)
         record.execrecord = execrecord
         record.reused = False
         record.save()
@@ -68,7 +69,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         execlog.save()
         if record_type == "RunStep":
             MethodOutput(execlog=execlog, return_code=0).save()
-        execrecord = ExecRecord.create_complete(execlog, record.component, input_SDs, output_SDs)
+        execrecord = ExecRecord.create(execlog, record.component, input_SDs, output_SDs)
 
         record.execrecord = execrecord
         record.reused = True
@@ -2108,3 +2109,10 @@ class StopwatchTests(ArchiveTestSetup):
         self.assertFalse(self.pE_run.has_ended())
         self.pE_run.stop()
         self.assertTrue(self.pE_run.has_ended())
+
+class ExecLogTests(ArchiveTestSetup):
+    def test_delete_exec_log(self):
+        """Can delete an ExecLog."""
+        step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        execlog = step_E1_RS.log.create(invoking_record=step_E1_RS)
+        self.assertIsNone(execlog.delete())

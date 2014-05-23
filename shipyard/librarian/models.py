@@ -5,7 +5,7 @@ Shipyard data models pertaining to the lookup of the past: ExecRecord,
 SymbolicDataset, etc.
 """
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
@@ -209,8 +209,8 @@ class SymbolicDataset(models.Model):
         make_dataset creates a Dataset from the given file path to go
         with the SD. created_by can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if 
-        make_dataset=False). If check_dataset is True, do a ContentCheck
-        on the file.
+        make_dataset=False). If check is True, do a ContentCheck on the
+        file.
     
         Returns the SymbolicDataset created.
         """
@@ -465,8 +465,9 @@ class ExecRecord(models.Model):
         return string_rep
 
     @classmethod
-    def create_complete(cls, generator, component, input_SDs, output_SDs):
-        """Create a complete ExecRecord.
+    @transaction.atomic
+    def create(cls, generator, component, input_SDs, output_SDs):
+        """Create a complete ExecRecord, including inputs and outputs.
         
         INPUTS
         generator       ExecLog generating this ExecRecord
