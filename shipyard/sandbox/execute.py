@@ -80,7 +80,7 @@ class Sandbox:
         self.socket_map = {}
         self.cable_map = {}
         self.ps_map = {}
-        self.check_inputs()
+        self.check_inputs(self.pipeline, self.inputs)
 
         # Determine a sandbox path, and input/output directories for 
         # top-level Pipeline.
@@ -110,7 +110,8 @@ class Sandbox:
             xput_dir = dirnames.OUT_DIR
         return os.path.join(step_run_dir, xput_dir, file_name)
 
-    def check_inputs(self):
+    # TODO: make this a member function of Pipeline.
+    def check_inputs(self, pipeline, inputs):
         """
         Are the supplied inputs are appropriate for the supplied pipeline?
 
@@ -119,22 +120,29 @@ class Sandbox:
         expects. We don't rearrange inputs that are in the wrong order.
         """
         # First quick check that the number of inputs are the same.
-        if len(self.inputs) != self.pipeline.inputs.count():
+        if len(inputs) != pipeline.inputs.count():
             raise ValueError('Pipeline "{}" expects {} inputs, but {} were supplied'
-                             .format(self.pipeline, self.pipeline.inputs.count(), len(self.inputs)))
+                             .format(pipeline, pipeline.inputs.count(), len(inputs)))
         
         # Check each individual input.
-        for i, supplied_input in enumerate(self.inputs, start=1):
-            pipeline_input = self.pipeline.inputs.get(dataset_idx=i)
+        for i, supplied_input in enumerate(inputs, start=1):
+            if not supplied_input.is_OK():
+                raise ValueError('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                                 .format(supplied_input, i, pipeline))
+
+            pipeline_input = pipeline.inputs.get(dataset_idx=i)
             pipeline_raw = pipeline_input.is_raw()
             supplied_raw = supplied_input.is_raw()
 
             if pipeline_raw != supplied_raw:
                 if pipeline_raw:
                     raise ValueError('Pipeline "{}" expected input {} to be raw, but got one with CompoundDatatype '
-                                     '"{}"'.format(self.pipeline, i, supplied_input.get_cdt()))
+                                     '"{}"'.format(pipeline, i, supplied_input.get_cdt()))
                 raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
-                                 .format(self.pipeline, i, pipeline_input.get_cdt()))
+                                 .format(pipeline, i, pipeline_input.get_cdt()))
+            
+            # Both are raw.
+            elif pipeline_raw: continue
 
             # Neither is raw.
             supplied_cdt = supplied_input.get_cdt()
@@ -142,7 +150,7 @@ class Sandbox:
 
             if not supplied_cdt.is_restriction(pipeline_cdt):
                 raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one with '
-                                 'CompoundDatatype "{}"'.format(self.pipeline, i, pipeline_cdt, supplied_cdt))
+                                 'CompoundDatatype "{}"'.format(pipeline, i, pipeline_cdt, supplied_cdt))
 
             # The CDT's match. Is the number of rows okay?
             minrows = pipeline_input.get_min_row() or 0
@@ -151,7 +159,7 @@ class Sandbox:
 
             if not minrows <= supplied_input.num_rows() <= maxrows:
                 raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
-                                 .format(self.pipeline, i, minrows, maxrows, supplied_input.num_rows()))
+                                 .format(pipeline, i, minrows, maxrows, supplied_input.num_rows()))
 
     def register_symbolicdataset(self, symbolicdataset, location):
         """Set the location of a SymbolicDataset on the file system.
@@ -812,12 +820,14 @@ class Sandbox:
 
         Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
         """
-
         is_set = (pipeline is not None, input_SDs is not None, sandbox_path is not None, parent_runstep is not None)
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
 
-        pipeline = pipeline or self.pipeline
+        if pipeline:
+            self.check_inputs(pipeline, input_SDs)
+        else:
+            pipeline = self.pipeline
         sandbox_path = sandbox_path or self.sandbox_path
 
         curr_run = self.run
@@ -834,7 +844,6 @@ class Sandbox:
         out_dir = os.path.join(sandbox_path, dirnames.OUT_DIR)
 
         if parent_runstep is None:
-            self.logger.debug("Setting up input and output directories")
             file_access_utils.set_up_directory(in_dir)
             file_access_utils.set_up_directory(out_dir)
 

@@ -208,8 +208,8 @@ class SymbolicDataset(models.Model):
         make_dataset creates a Dataset from the given file path to go
         with the SD. created_by can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if 
-        make_dataset=False). If check_dataset is True, do a ContentCheck
-        on the file.
+        make_dataset=False). If check is True, do a ContentCheck on the
+        file.
     
         Returns the SymbolicDataset created.
         """
