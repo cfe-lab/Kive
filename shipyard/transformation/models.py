@@ -221,6 +221,11 @@ class TransformationXput(models.Model):
                     self.get_cdt())
         return unicode_rep
 
+    @property
+    def compounddatatype(self):
+        if self.is_raw(): return None
+        return self.structure.first().compounddatatype
+
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
         return not self.structure.all().exists()

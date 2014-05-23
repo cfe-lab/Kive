@@ -206,7 +206,7 @@ class RunStepTests(ArchiveTestSetup):
         self.step_through_runstep_creation("first_rsic")
 
         # Make this RunSIC incomplete by removing the ICL.
-        icl_to_remove = self.raw_symDS.integrity_checks.filter(execlog=self.E03_11_RSIC).first()
+        icl_to_remove = self.raw_symDS.integrity_checks.filter(execlog=self.E03_11_RSIC.log.first()).first()
         icl_to_remove.execlog = None
         icl_to_remove.save()
 

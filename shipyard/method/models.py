@@ -458,31 +458,22 @@ class Method(transformation.models.Transformation):
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
 
-
     def find_compatible_ER(self, input_SDs):
         """
         Given a set of input SDs, find an ER that can be reused given these inputs.
         A compatible ER may have to be filled in.
         """
-        self.logger.debug("Considering all pipeline steps featuring this method...")
-
         # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
-            self.logger.debug("Considering pipeline step '{}'".format(possible_PS))
 
             # For linked runsteps which did not *completely* reuse an ER
             for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
-                self.logger.debug("Considering non-reused runstep '{}'".format(possible_RS))
-
                 candidate_ER = possible_RS.execrecord
 
-                if not candidate_ER.outputs_OK():
-                    self.logger.debug("Rejecting runstep, outputs not OK")
-                    continue
+                # Reject RunStep if its outputs are not OK.
+                if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
 
-
-                self.logger.debug("Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match")
-
+                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.dataset_idx
@@ -491,10 +482,10 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    self.logger.debug("All ERIs match input SDs - comitting to candidate ER {}".format(candidate_ER))
+                    # All ERIs match input SDs, so commit to candidate ER
                     return candidate_ER
     
-        self.logger.debug("No compatible ERs found")
+        # No compatible ExecRecords found.
         return None
 
     # May 20, 2014: we restore this now that we have protected the popen
