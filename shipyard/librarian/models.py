@@ -635,7 +635,7 @@ class ExecRecord(models.Model):
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
         return any(not runstep.successful_execution() for runstep in self.archive_runstep_related.all())
-        
+
 
 class ExecRecordIn(models.Model):
     """

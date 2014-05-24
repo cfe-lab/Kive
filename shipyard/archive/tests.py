@@ -35,6 +35,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         super(ArchiveTestSetup, self).setUp()
         self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
 
+    def tearDown(self):
+        super(ArchiveTestSetup, self).tearDown()
+        clean_files()
+
     def make_complete_non_reused(self, record, input_SDs, output_SDs):
         """
         Helper function to do everything necessary to make a RunStep, 
@@ -85,26 +89,6 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
             rsic = cable.psic_instances.create(runstep=runstep)
             self.make_complete_non_reused(rsic, [input_SDs[i]], [output_SDs[i]])
 
-    def tearDown(self):
-        super(ArchiveTestSetup, self).tearDown()
-        clean_files()
-
-
-class RunStepTests(ArchiveTestSetup):
-
-    def test_runstep_many_execlogs(self):
-        run = self.pE.pipeline_instances.create(user=self.myUser)
-        run_step = self.step_E1.pipelinestep_instances.create(run=run)
-        run_step.reused = False
-        for i in range(2):
-            run_step.log.create(invoking_record=run_step,
-                                start_time=timezone.now(),
-                                end_time=timezone.now())
-        self.assertRaisesRegexp(ValidationError,
-                re.escape('RunStep "{}" has {} ExecLogs but should have only one'.
-                          format(run_step, 2)),
-                run_step.clean)
-
     def step_through_runstep_creation(self, bp):
         """
         Helper function to step through creation of a RunStep, breaking
@@ -118,7 +102,7 @@ class RunStepTests(ArchiveTestSetup):
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
         self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log.first())
-        if bp == "first_rsic": return 
+        if bp == "first_rsic": return
 
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         step1_in_ccl = self.doublet_symDS.content_checks.first()
@@ -131,7 +115,7 @@ class RunStepTests(ArchiveTestSetup):
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
         if bp == "second_runstep": return
 
-        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS], 
+        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS],
                                         [self.D1_in_symDS, self.singlet_symDS])
         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
@@ -142,12 +126,12 @@ class RunStepTests(ArchiveTestSetup):
 
         self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
         if bp == "second_runstep_complete": return
-        
+
         # Associate and complete sub-Pipeline.
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], 
+        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
                                         [self.D1_in_symDS, self.singlet_symDS])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
@@ -166,6 +150,213 @@ class RunStepTests(ArchiveTestSetup):
         self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
 
         if bp == "sub_pipeline": return
+
+    def step_through_run_creation(self, bp):
+        """
+        Helper function to step through creation of a Run. bp is a
+        breakpoint - these are defined throughout (see the code).
+        """
+        # Changed May 14, 2014 to add CCLs/ICLs where appropriate.
+        # Empty Runs.
+        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        if bp == "empty_runs": return
+
+        # First RunStep associated.
+        self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "first_step": return
+
+        # First RunSIC associated and completed.
+        step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+        self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
+        if bp == "first_cable": return
+
+        # First RunStep completed.
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
+        step1_in_ccl = self.doublet_symDS.content_checks.first()
+        step1_in_ccl.execlog = self.step_E1_RS.log.first()
+        step1_in_ccl.save()
+        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.save()
+        if bp == "first_step_complete": return
+
+        # Second RunStep associated.
+        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "second_step": return
+
+        # Sub-pipeline for step 2 - reset step_E2_RS.
+        self.step_E2_RS.delete()
+        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
+        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS],
+                                             [self.D1_in_symDS, self.singlet_symDS])
+
+        self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
+        self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
+
+        D1_in_ccl = self.D1_in_symDS.content_checks.first()
+        D1_in_ccl.execlog = self.E01_21_RSIC.log.first()
+        D1_in_ccl.save()
+
+        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
+
+        self.pD_run.parent_runstep = self.step_E2_RS
+        self.pD_run.save()
+        if bp == "sub_pipeline": return
+
+        # Complete sub-Pipeline.
+        self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
+        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
+                                             [self.D1_in_symDS, self.singlet_symDS])
+
+        self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
+        self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
+        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
+        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+
+        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
+        C1_ccl = self.C1_in_symDS.content_checks.first()
+        C1_ccl.execlog = self.step_D1_RS.log.first()
+        C1_ccl.save()
+        self.C1_in_DS.created_by = self.step_D1_RS
+        self.C1_in_DS.save()
+
+        pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
+        self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
+        if bp == "sub_pipeline_complete": return
+
+        # Third RunStep associated.
+        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "third_step": return
+
+        # Third RunStep completed.
+        self.complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS],
+                                             [self.C1_in_symDS, self.C2_in_symDS])
+
+        self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
+        self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
+        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+
+        # C2_in_symDS was created here so we associate its CCL with cable
+        # E11_32.
+        C2_in_ccl = self.C2_in_symDS.content_checks.first()
+        C2_in_ccl.execlog = self.E11_32_RSIC.log.first()
+        C2_in_ccl.save()
+
+        step3_outs = [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS]
+        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS], step3_outs)
+        # All of these were first created here, so associate the CCL of C1_out_symDS to step_E3_RS.
+        # The others are raw and don't have CCLs.
+        C1_out_ccl = self.C1_out_symDS.content_checks.first()
+        C1_out_ccl.execlog = self.step_E3_RS.log.first()
+        C1_out_ccl.save()
+
+        if bp == "third_step_complete": return
+
+        # Outcables associated.
+        roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        # This was first created here, so associate the CCL appropriately.
+        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.save()
+        self.E1_out_DS.created_by = roc1
+        self.E1_out_DS.save()
+
+        if bp == "first_outcable": return
+
+        roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc2, [self.C1_out_symDS], [self.C1_out_symDS])
+        roc3 = self.pE.outcables.get(output_idx=3).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc3, [self.C3_out_symDS], [self.C3_out_symDS])
+
+        # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
+        # and C3_out_symDS.
+        self.C1_out_symDS.integrity_checks.create(execlog=roc2.log.first())
+        self.C3_out_symDS.integrity_checks.create(execlog=roc3.log.first())
+
+        if bp == "outcables_done": return
+
+    def step_through_runsic_creation(self, bp):
+        """
+        Helper function to step through creating an RSIC, breaking at a
+        certain point (see the code).
+        """
+        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
+        if bp == "runstep": return
+
+        self.E11_32_RSIC = self.E11_32.psic_instances.create(runstep=self.step_E3_RS)
+        if bp == "rsic_created": return
+
+        self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS])
+        # C2_in_symDS is created by this cable so associate a CCL appropriately.
+        C2_ccl = self.C2_in_symDS.content_checks.first()
+        C2_ccl.execlog = self.E11_32_RSIC.log.first()
+        C2_ccl.save()
+        if bp == "rsic_completed": return
+
+        self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
+        # C1_in_symDS is not created by this RSIC, so associate an ICL.
+        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
+                                                  [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
+        # Associate the CCL of C1_out_symDS with step_E3_RS.
+        C1_out_ccl = self.C1_out_symDS.content_checks.first()
+        C1_out_ccl.execlog = self.step_E3_RS.log.first()
+        C1_out_ccl.save()
+        if bp == "runstep_completed": return
+
+    def step_through_roc_creation(self, bp):
+        """Break at an intermediate stage of ROC creation."""
+        self.E31_42_ROC = self.E31_42.poc_instances.create(run=self.pE_run)
+        self.E21_41_ROC = self.E21_41.poc_instances.create(run=self.pE_run)
+        if bp == "roc_created": return
+
+        self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_symDS], [self.singlet_symDS])
+        if bp == "trivial_roc_completed": return
+
+        self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
+        self.doublet_DS.created_by = self.E21_41_ROC
+        self.doublet_DS.save()
+        if bp == "custom_roc_completed": return
+
+        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E2_RS.start()
+        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        self.pD_run.parent_runstep = self.step_E2_RS
+        self.pD_run.save()
+        self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
+        self.D11_21_ROC.start()
+        # Define some custom wiring for D11_21: swap the first two columns.
+        pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
+        self.D11_21.custom_outwires.create(source_pin=pin1, dest_pin=pin2)
+        self.D11_21.custom_outwires.create(source_pin=pin2, dest_pin=pin1)
+        if bp == "subrun": return
+
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.C1_in_DS.created_by = self.D11_21_ROC
+        self.C1_in_DS.save()
+        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log.first(), start_time=timezone.now(),
+                                               end_time=timezone.now())
+        self.D11_21_ROC.stop()
+        if bp == "subrun_complete": return
+
+
+class RunStepTests(ArchiveTestSetup):
+
+    def test_runstep_many_execlogs(self):
+        run = self.pE.pipeline_instances.create(user=self.myUser)
+        run_step = self.step_E1.pipelinestep_instances.create(run=run)
+        run_step.reused = False
+        for i in range(2):
+            run_step.log.create(invoking_record=run_step,
+                                start_time=timezone.now(),
+                                end_time=timezone.now())
+        self.assertRaisesRegexp(ValidationError,
+                re.escape('RunStep "{}" has {} ExecLogs but should have only one'.
+                          format(run_step, 2)),
+                run_step.clean)
 
     def test_RunStep_clean_wrong_pipeline(self):
         """
@@ -648,132 +839,6 @@ class RunStepTests(ArchiveTestSetup):
 
 class RunTests(ArchiveTestSetup):
 
-    def step_through_run_creation(self, bp):
-        """
-        Helper function to step through creation of a Run. bp is a
-        breakpoint - these are defined throughout (see the code).
-        """
-        # Changed May 14, 2014 to add CCLs/ICLs where appropriate.
-        # Empty Runs.
-        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
-        if bp == "empty_runs": return
-
-        # First RunStep associated.
-        self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "first_step": return
-
-        # First RunSIC associated and completed.
-        step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
-        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
-        if bp == "first_cable": return
-
-        # First RunStep completed.
-        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
-        step1_in_ccl = self.doublet_symDS.content_checks.first()
-        step1_in_ccl.execlog = self.step_E1_RS.log.first()
-        step1_in_ccl.save()
-        self.doublet_DS.created_by = self.step_E1_RS
-        self.doublet_DS.save()
-        if bp == "first_step_complete": return
-
-        # Second RunStep associated.
-        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "second_step": return
-
-        # Sub-pipeline for step 2 - reset step_E2_RS.
-        self.step_E2_RS.delete()
-        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
-        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS], 
-                                             [self.D1_in_symDS, self.singlet_symDS])
-
-        self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
-        self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
-
-        D1_in_ccl = self.D1_in_symDS.content_checks.first()
-        D1_in_ccl.execlog = self.E01_21_RSIC.log.first()
-        D1_in_ccl.save()
-
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
-
-        self.pD_run.parent_runstep = self.step_E2_RS
-        self.pD_run.save()
-        if bp == "sub_pipeline": return
-
-        # Complete sub-Pipeline.
-        self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], 
-                                             [self.D1_in_symDS, self.singlet_symDS])
-
-        self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
-        self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
-
-        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
-        C1_ccl = self.C1_in_symDS.content_checks.first()
-        C1_ccl.execlog = self.step_D1_RS.log.first()
-        C1_ccl.save()
-        self.C1_in_DS.created_by = self.step_D1_RS
-        self.C1_in_DS.save()
-
-        pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
-        self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
-        if bp == "sub_pipeline_complete": return
-
-        # Third RunStep associated.
-        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "third_step": return
-
-        # Third RunStep completed.
-        self.complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS], 
-                                             [self.C1_in_symDS, self.C2_in_symDS])
-
-        self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
-        self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
-
-        # C2_in_symDS was created here so we associate its CCL with cable
-        # E11_32.
-        C2_in_ccl = self.C2_in_symDS.content_checks.first()
-        C2_in_ccl.execlog = self.E11_32_RSIC.log.first()
-        C2_in_ccl.save()
-
-        step3_outs = [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS]
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS], step3_outs)
-        # All of these were first created here, so associate the CCL of C1_out_symDS to step_E3_RS.
-        # The others are raw and don't have CCLs.
-        C1_out_ccl = self.C1_out_symDS.content_checks.first()
-        C1_out_ccl.execlog = self.step_E3_RS.log.first()
-        C1_out_ccl.save()
-
-        if bp == "third_step_complete": return
-
-        # Outcables associated.
-        roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
-        # This was first created here, so associate the CCL appropriately.
-        E1_out_ccl = self.E1_out_symDS.content_checks.first()
-        E1_out_ccl.execlog = roc1.log.first()
-        E1_out_ccl.save()
-        self.E1_out_DS.created_by = roc1
-        self.E1_out_DS.save()
-
-        if bp == "first_outcable": return
-
-        roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc2, [self.C1_out_symDS], [self.C1_out_symDS])
-        roc3 = self.pE.outcables.get(output_idx=3).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc3, [self.C3_out_symDS], [self.C3_out_symDS])
-
-        # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
-        # and C3_out_symDS.
-        self.C1_out_symDS.integrity_checks.create(execlog=roc2.log.first())
-        self.C3_out_symDS.integrity_checks.create(execlog=roc3.log.first())
-
-        if bp == "outcables_done": return
-
     def test_Run_is_subrun_True(self):
         """
         A Run which has a parent RunStep should register as being a subrun.
@@ -985,36 +1050,6 @@ class RunSICTests(ArchiveTestSetup):
                 'RunSIC "{}" has {} ExecLogs but should have only one'.
                         format(rsic, 2),
                 rsic.clean)
-
-    def step_through_runsic_creation(self, bp):
-        """
-        Helper function to step through creating an RSIC, breaking at a
-        certain point (see the code).
-        """
-        self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "runstep": return 
-        
-        self.E11_32_RSIC = self.E11_32.psic_instances.create(runstep=self.step_E3_RS)
-        if bp == "rsic_created": return
-
-        self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS])
-        # C2_in_symDS is created by this cable so associate a CCL appropriately.
-        C2_ccl = self.C2_in_symDS.content_checks.first()
-        C2_ccl.execlog = self.E11_32_RSIC.log.first()
-        C2_ccl.save()
-        if bp == "rsic_completed": return
-
-        self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
-        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
-        # C1_in_symDS is not created by this RSIC, so associate an ICL.
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
-                                                  [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
-        # Associate the CCL of C1_out_symDS with step_E3_RS.
-        C1_out_ccl = self.C1_out_symDS.content_checks.first()
-        C1_out_ccl.execlog = self.step_E3_RS.log.first()
-        C1_out_ccl.save()
-        if bp == "runstep_completed": return
 
     def test_RunSIC_clean_wrong_pipelinestep(self):
         """
@@ -1440,7 +1475,6 @@ class RunSICTests(ArchiveTestSetup):
                                 re.escape('{} "{}" is not complete'.format("RunSIC", self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
-
     ####
     # keeps_output tests added March 26, 2014 -- RL.
     def test_RunSIC_keeps_output_trivial(self):
@@ -1484,41 +1518,6 @@ class RunOutputCableTests(ArchiveTestSetup):
                 'RunOutputCable "{}" has {} ExecLogs but should have only one'.
                         format(run_output_cable, 2),
                 run_output_cable.clean)
-
-    def step_through_roc_creation(self, bp):
-        """Break at an intermediate stage of ROC creation."""
-        self.E31_42_ROC = self.E31_42.poc_instances.create(run=self.pE_run)
-        self.E21_41_ROC = self.E21_41.poc_instances.create(run=self.pE_run)
-        if bp == "roc_created": return
-
-        self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_symDS], [self.singlet_symDS])
-        if bp == "trivial_roc_completed": return
-
-        self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
-        self.doublet_DS.created_by = self.E21_41_ROC
-        self.doublet_DS.save()
-        if bp == "custom_roc_completed": return
-
-        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        self.step_E2_RS.start()
-        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
-        self.pD_run.parent_runstep = self.step_E2_RS
-        self.pD_run.save()
-        self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
-        self.D11_21_ROC.start()
-        # Define some custom wiring for D11_21: swap the first two columns.
-        pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
-        self.D11_21.custom_outwires.create(source_pin=pin1, dest_pin=pin2)
-        self.D11_21.custom_outwires.create(source_pin=pin2, dest_pin=pin1)
-        if bp == "subrun": return
-
-        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_DS.created_by = self.D11_21_ROC
-        self.C1_in_DS.save()
-        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log.first(), start_time=timezone.now(),
-                                               end_time=timezone.now())
-        self.D11_21_ROC.stop()
-        if bp == "subrun_complete": return
 
     def test_ROC_clean_correct_parent_run(self):
         """PipelineOutputCable belongs to parent Run's Pipeline.
@@ -2110,9 +2109,85 @@ class StopwatchTests(ArchiveTestSetup):
         self.pE_run.stop()
         self.assertTrue(self.pE_run.has_ended())
 
+
 class ExecLogTests(ArchiveTestSetup):
     def test_delete_exec_log(self):
         """Can delete an ExecLog."""
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
         execlog = step_E1_RS.log.create(invoking_record=step_E1_RS)
         self.assertIsNone(execlog.delete())
+
+
+class GetCoordinatesTests(ArchiveTestSetup):
+    """Tests of the get_coordinates functions of all Run and RunAtomic classes."""
+
+    def test_get_coordinates_top_level_run(self):
+        """Coordinates of a top-level run should be an empty tuple."""
+        self.step_through_run_creation("outcables_done")
+        top_level_runs = Run.objects.filter(parent_runstep=None)
+        for run in top_level_runs:
+            self.assertEquals(run.get_coordinates(), ())
+
+    def test_get_coordinates_subrun(self):
+        """Coordinates of a sub-run should match that of their parent runstep."""
+        self.step_through_run_creation("outcables_done")
+        # pD_run is the second step of its containing top-level run.
+        self.assertEquals(self.pD_run.get_coordinates(), (2,))
+        self.assertEquals(self.pD_run.get_coordinates(), self.step_E2_RS.get_coordinates())
+
+    def test_get_coordinates_top_level_step(self):
+        """Coordinates of a top-level step should be a one-entry tuple with its step number as the entry."""
+        self.step_through_run_creation("outcables_done")
+
+        top_level_steps = []
+        for runstep in RunStep.objects.all():
+            if runstep.run.parent_runstep == None:
+                top_level_steps.append(runstep)
+
+        for top_level_step in top_level_steps:
+            self.assertEquals(top_level_step.get_coordinates(),
+                              (top_level_step.pipelinestep.step_num,))
+
+    def test_get_coordinates_subrun_step(self):
+        """Coordinates of a subrun step should be a tuple lexicographically giving its location."""
+        self.step_through_run_creation("outcables_done")
+
+        # step_D1_RS (as defined by Eric) is at position (2,1).
+        self.assertEquals(self.step_D1_RS.get_coordinates(), (2,1))
+
+    def test_get_coordinates_top_level_rsic(self):
+        """Coordinates of top-level RSICs should be one-entry tuples matching their parent RSs."""
+        self.step_through_run_creation("outcables_done")
+
+        for runstep in RunStep.objects.all():
+            if runstep.run.parent_runstep == None:
+                # Examine the input cables.
+                for rsic in runstep.RSICs.all():
+                    self.assertEquals(rsic.get_coordinates(), (runstep.pipelinestep.step_num,))
+                    self.assertEquals(rsic.get_coordinates(), runstep.get_coordinates())
+
+    def test_get_coordinates_subrun_rsic(self):
+        """Coordinates of sub-run RSICs should match that of their parent runstep."""
+        self.step_through_run_creation("outcables_done")
+
+        # step_D1_RS (as defined by Eric) is at position (2,1).
+        for rsic in self.step_D1_RS.RSICs.all():
+            self.assertEquals(rsic.get_coordinates(), (2,1))
+            self.assertEquals(rsic.get_coordinates(), self.step_D1_RS.get_coordinates())
+
+    def test_get_coordinates_top_level_roc(self):
+        """Coordinates of top-level ROCs should be empty tuples."""
+        self.step_through_run_creation("outcables_done")
+
+        for roc in RunOutputCable.objects.all():
+            if roc.run.parent_runstep == None:
+                # Examine the cable.
+                self.assertEquals(roc.get_coordinates(), ())
+
+    def test_get_coordinates_subrun_roc(self):
+        """Coordinates of a subrun ROC should be the same as its parent run."""
+        self.step_through_run_creation("outcables_done")
+
+        # The second step is a sub-run.
+        for roc in self.pD_run.runoutputcables.all():
+            self.assertEquals(roc.get_coordinates(), (2,))
