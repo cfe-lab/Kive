@@ -14,6 +14,7 @@ from constants import datatypes, CDTs
 
 samplecode_path = "../samplecode"
 
+
 class MetadataTestSetup(TestCase):
     """
     Set up a database state for unit testing.
@@ -182,7 +183,6 @@ class MetadataTestSetup(TestCase):
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
 
-
     def tearDown(self):
         """Delete any files that have been put into the database."""
         for crr in CodeResourceRevision.objects.all():
@@ -202,7 +202,9 @@ class MetadataTestSetup(TestCase):
             dataset.dataset_file.close()
             dataset.dataset_file.delete()
 
+
 class DatatypeTests(MetadataTestSetup):
+
     def setUp(self):
         """Add some DTs used to check circular restrictions."""
         super(DatatypeTests, self).setUp()
@@ -237,7 +239,6 @@ class DatatypeTests(MetadataTestSetup):
             description="A string (5)")
         self.dt_5.save()
         self.dt_5.restricts.add(self.string_dt)
-
 
     def test_datatype_unicode(self):
         """
@@ -356,7 +357,6 @@ class DatatypeTests(MetadataTestSetup):
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
                                 self.dt_1.clean)
-
 
     def test_datatype_circular_recursive_clean_good1(self):
         """
@@ -570,7 +570,6 @@ class DatatypeTests(MetadataTestSetup):
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
                                 self.dt_1.clean)
-
 
     def test_datatype_direct_circular_restriction_clean_bad(self):
         """
@@ -1126,7 +1125,7 @@ class DatatypeTests(MetadataTestSetup):
         super_DT, second_DT, constr_DT = self._setup_inheriting_datatype2(
                 "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
                 "OverwritingDateTimeDT", "Second string with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
-                "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %b %d")
+                "OverwritingDateTimeChildDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %b %d")
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
@@ -1178,9 +1177,10 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on an int Datatype with conflicting MIN|MAX_VAL defined on its supertypes.
         """
-        _, _, constr_DT = self._setup_inheriting_datatype2("BoundedDT", "Float with a MIN_VAL", BasicConstraint.MIN_VAL,
-                "20", self.FLOAT, "BoundedDT", "Int with a MAX_VAL", BasicConstraint.MAX_VAL, "18.2", self.INT,
-                "InheritingBadBoundsDT", "Datatype inheriting conflicting MIN|MAX_VAL", None, None)
+        _, _, constr_DT = self._setup_inheriting_datatype2(
+            "BoundedFloatDT", "Float with a MIN_VAL", BasicConstraint.MIN_VAL, "20", self.FLOAT,
+            "BoundedIntDT", "Int with a MAX_VAL", BasicConstraint.MAX_VAL, "18.2", self.INT,
+            "InheritingBadBoundsDT", "Datatype inheriting conflicting MIN|MAX_VAL", None, None)
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
@@ -1232,13 +1232,13 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on an integer Datatype whose inherited MIN|MAX_VAL do not admit any integers.
         """
-        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL")
+        super_DT = Datatype(name="BoundedFloatDT", description="Float with a MIN_VAL")
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="20.2")
 
-        second_DT = Datatype(name="BoundedDT", description="Int with a MAX_VAL")
+        second_DT = Datatype(name="BoundedIntDT", description="Int with a MAX_VAL")
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.INT)
@@ -1303,13 +1303,13 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing clean() on a string Datatype with conflicting MIN|MAX_LENGTH defined on its supertypes.
         """
-        super_DT = Datatype(name="BoundedDT", description="String with a MIN_LENGTH")
+        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH")
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="44")
 
-        second_DT = Datatype(name="BoundedDT", description="String with a MAX_LENGTH")
+        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH")
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.STR)
@@ -1473,13 +1473,13 @@ class DatatypeTests(MetadataTestSetup):
         """
         Testing complete_clean() on a string Datatype with conflicting MIN|MAX_LENGTH defined on its supertypes.
         """
-        super_DT = Datatype(name="BoundedDT", description="String with a MIN_LENGTH")
+        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH")
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="44")
 
-        second_DT = Datatype(name="BoundedDT", description="String with a MAX_LENGTH")
+        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH")
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.STR)
@@ -1496,6 +1496,7 @@ class DatatypeTests(MetadataTestSetup):
                                 re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective '
                                           'MAX_LENGTH {}').format(constr_DT, 44, 22)),
                                 constr_DT.complete_clean)
+
 
 class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
     """
@@ -1658,6 +1659,7 @@ class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
 
         self.assertEquals(my_DT.get_builtin_type(), self.BOOL)
 
+
 class DatatypeCheckBasicConstraints(MetadataTestSetup):
     """
     Tests of Datatype.check_basic_constraints().
@@ -1674,6 +1676,8 @@ class DatatypeCheckBasicConstraints(MetadataTestSetup):
         # Check builtin type too.
         self.assertEquals(builtin_type.check_basic_constraints(string_to_check), [])
         self.assertEquals(my_DT.check_basic_constraints(string_to_check), [])
+
+        my_DT.delete()
 
     def test_str_good(self):
         """
@@ -1787,7 +1791,6 @@ class DatatypeCheckBasicConstraints(MetadataTestSetup):
         Testing case where string cannot be cast to an integer and the Datatype has a constraint.
         """
         self.__test_builtin_type_with_constraint_bad_h(self.BOOL, BasicConstraint.REGEXP, ".*", "what")
-
 
     ########
     def __test_numerical_constraint_h(self, builtin_type, BC_type, constr_val, string_to_check,
@@ -2309,6 +2312,7 @@ class CompoundDatatypeMemberTests(MetadataTestSetup):
                 "DNANucSeq: PBMCseq")
         self.assertEqual(unicode(self.test_cdt.members.all()[2]),
                 "RNANucSeq: PLAseq")
+
 
 class CompoundDatatypeTests(MetadataTestSetup):
 

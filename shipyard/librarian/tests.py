@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 import random
 import tempfile
@@ -50,8 +51,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
             coderesource=self.generic_cr, revision_name="v1",
             revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.generic_crRev.content_file.save("generic_script.py",
-                                                 File(f))
+            self.generic_crRev.content_file.save("generic_script.py", File(f))
         self.generic_crRev.save()
         
         # Method family, methods, and their input/outputs
@@ -248,12 +248,27 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.E21_41_DNA_doublet_symDS_structure = self.E21_41_DNA_doublet_symDS.structure
         self.E21_41_DNA_doublet_DS = self.E21_41_DNA_doublet_symDS.dataset
 
+        # Some ExecRecords, some failed, others not.
+        i = 0
+        for step in PipelineStep.objects.all():
+            if step.is_subpipeline: continue
+            run = step.pipeline.pipeline_instances.create(user=self.myUser); run.save()
+            runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
+            execlog = ExecLog.create(runstep, runstep)
+            execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
+            execrecord = ExecRecord(generator=execlog); execrecord.save()
+            for step_input in step.transformation.inputs.all():
+                sd = SymbolicDataset.objects.filter(structure__compounddatatype=step_input.compounddatatype)[0]
+                execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
+            runstep.execrecord = execrecord; runstep.save()
+            i += 1
+
     def ER_from_record(self, record):
         """
         Helper function to create an ExecRecord from an Run, RunStep, or 
         RunOutputCable (record), by creating a throwaway ExecLog.
         """
-        myEL = ExecLog(record=record)
+        myEL = ExecLog(record=record, invoking_record=record)
         myEL.start_time = timezone.now()
         time.sleep(1)
         myEL.end_time = timezone.now()
@@ -428,6 +443,16 @@ class DatasetStructureTests(LibrarianTestSetup):
         self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
 
 class ExecRecordTests(LibrarianTestSetup):
+    def test_delete_execrecord(self):
+        """Delete an ExecRecord."""
+        runstep = RunStep(pipelinestep=self.step_D1, run=self.pD_run)
+        runstep.save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep)
+        execlog.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
+
+        self.assertIsNone(ExecRecord.objects.first().delete())
 
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
@@ -943,3 +968,119 @@ class ExecRecordTests(LibrarianTestSetup):
                                           'column, "{}", does not match the Datatype of its source column, "{}"'
                                           .format(cable_ER, dest_datatype, source_datatype)),
             cable_ER.clean)
+
+    def test_execrecord_new_never_failed(self):
+        """An ExecRecord with one good RunStep has never failed."""
+        pipeline = Pipeline.objects.first()
+        user = User.objects.first()
+        self.assertIsNotNone(pipeline)
+        for run in pipeline.pipeline_instances.all():
+            run.delete()
+        run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+        execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+        execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+        runstep.execrecord = execrecord
+        runstep.save()
+
+        self.assertEqual(execrecord.archive_runstep_related.count(), 1)
+        self.assertFalse(execrecord.has_ever_failed())
+
+    def test_execrecord_multiple_runsteps_never_failed(self):
+        """An ExecRecord with >1 good RunStep has never failed."""
+        pipeline = Pipeline.objects.first()
+        user = User.objects.first()
+        self.assertIsNotNone(pipeline)
+        self.assertIsNotNone(user)
+
+        for run in pipeline.pipeline_instances.all():
+            run.delete()
+
+        for i in range(2):
+            run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+            runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+            execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            if i == 0:
+                execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+            runstep.execrecord = execrecord
+            runstep.save()
+
+        self.assertEqual(execrecord.archive_runstep_related.count(), 2)
+        self.assertFalse(execrecord.has_ever_failed())
+
+    def test_execrecord_one_failed_runstep(self):
+        """An ExecRecord with one bad RunStep has failed."""
+        pipeline = Pipeline.objects.first()
+        user = User.objects.first()
+        self.assertIsNotNone(pipeline)
+        for run in pipeline.pipeline_instances.all():
+            run.delete()
+        run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+        execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+        archive.models.MethodOutput(execlog=execlog, return_code=1).save()
+        execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+        runstep.execrecord = execrecord
+        runstep.save()
+
+        self.assertFalse(runstep.successful_execution())
+        self.assertEqual(execrecord.archive_runstep_related.count(), 1)
+        self.assertTrue(execrecord.has_ever_failed())
+
+    def test_execrecord_multiple_good_one_failed_runstep(self):
+        """An ExecRecord with one bad RunStep, and some good ones, has failed."""
+        pipeline = Pipeline.objects.first()
+        user = User.objects.first()
+        self.assertIsNotNone(pipeline)
+        for run in pipeline.pipeline_instances.all():
+            run.delete()
+
+        for i in range(2):
+            run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+            runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+            execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            if i == 1:
+                archive.models.MethodOutput(execlog=execlog, return_code=1).save()
+            else:
+                execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+            runstep.execrecord = execrecord
+            runstep.save()
+
+        self.assertEqual(execrecord.archive_runstep_related.count(), 2)
+        self.assertEqual(execrecord.archive_runstep_related.first().successful_execution(), True)
+        self.assertEqual(execrecord.archive_runstep_related.last().successful_execution(), False)
+        self.assertTrue(execrecord.has_ever_failed())
+
+class FindCompatibleERTests(LibrarianTestSetup):
+
+    def test_find_compatible_ER_never_failed(self):
+        """Should be able to find a compatible ExecRecord which never failed."""
+        execrecord = None
+        for e in librarian.models.ExecRecord.objects.all():
+            if not e.has_ever_failed():
+                execrecord = e
+                break
+        self.assertIsNotNone(execrecord)
+        input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
+        runstep = execrecord.archive_runstep_related.first()
+        runstep.reused = False
+        runstep.save()
+        method = runstep.pipelinestep.transformation
+        self.assertFalse(execrecord.has_ever_failed())
+        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
+
+    def test_find_compatible_ER_failed(self):
+        """Should not find a compatible ExecRecord which failed."""
+        execrecord = None
+        for e in librarian.models.ExecRecord.objects.all():
+            if e.has_ever_failed():
+                execrecord = e
+                break
+        self.assertIsNotNone(execrecord)
+        input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
+        runstep = execrecord.archive_runstep_related.first()
+        runstep.reused = False
+        runstep.save()
+        method = runstep.pipelinestep.transformation
+        self.assertTrue(execrecord.has_ever_failed())
+        self.assertIsNone(method.find_compatible_ER(input_SDs))

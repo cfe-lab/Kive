@@ -70,8 +70,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
                         may be any of the following:
 
     - num_rows: number of rows
-    - failing_cells: dict of non-conforming cells in the file.
-      Entries keyed by (rownum, colnum) contain list of tests failed.
+    - failing_cells: dict of non-conforming cells in the file,
+      entries keyed by (rownum, colnum) contain list of tests failed.
 
     ASSUMPTIONS
     1) content_check_log may only be None if this function is being called
@@ -79,15 +79,10 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     2) the file has the correct number of columns (ie. the same number as
     the length of the columns parameter).
     """
-    # A CSV reader which we will use to check individual cells in the
-    # file, as well as creating external CSVs for columns whose DT has a
-    # CustomConstraint.
     summary = {}
-
-    # If the header was malformed, just return the summary. We don't
-    # keep Check if any columns have CustomConstraints. We will use this
-    # lookup table while we're reading through the CSV file to see which
-    # columns need to be copied out into their own file.
+    # We will use this lookup table while we're reading through the CSV
+    # file to see which columns need to be copied out into their own
+    # file.
     cols_with_cc = [i for i, c in enumerate(columns, start=1) if c.has_custom_constraint()]
     column_files = dict.fromkeys(cols_with_cc) # files to write columns to
     column_paths = dict.fromkeys(cols_with_cc) # working directories to do checks in
@@ -100,8 +95,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
             LOGGER.debug("Setting up verification path for column {}".format(column))
             column_test_path = os.path.join(summary_path, "col{}".format(column))
             input_file_path = _setup_verification_path(column_test_path)
-            LOGGER.debug("Verification path was set up, column {} will be written to {}".
-                    format(column, input_file_path))
+            LOGGER.debug("Verification path was set up, column {} will be written to {}"
+                         .format(column, input_file_path))
             column_paths[column] = column_test_path
             column_files[column] = open(input_file_path, "a")
 
@@ -115,15 +110,14 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
             if column_files[col]:
                 column_files[col].close()
 
-    # Check custom constraints. Any column that had a CustomConstraint must be
-    # checked using the specified verification method. The handles in
-    # column_files are all closed after the previous block.
+    # Check custom constraints. Any column that had a CustomConstraint
+    # must be checked using the specified verification method. The
+    # handles in column_files are all closed after the previous block.
     for col in cols_with_cc:
         # If this is called with Datatypes, content_check_log will be None,
         # so it's OK to pass it to Datatype.check_custom_constraint.
         LOGGER.debug("Checking custom constraints on column {}".format(col))
-        result = columns[col-1].check_custom_constraint(column_paths[col],
-                column_files[col].name, content_check_log)
+        result = columns[col-1].check_custom_constraint(column_paths[col], column_files[col].name, content_check_log)
         for row, error in result.items():
             if row > num_rows:
                 if columns[col-1].__class__.__name__ == "Datatype":
@@ -193,7 +187,8 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     each column to the file handle indicated in out_handles. Return the
     number of rows processed, and a dictionary of cells where a
     BasicConstraint was not satisfied. Outputs a tuple (num_rows,
-    failing_cells).
+    failing_cells). Also generate an MD5 checksum for the file by updating
+    the supplied MD5 generator.
     TODO: Make out_handles CSV writers or DictWriters, not file handles.
 
     INPUTS
@@ -672,7 +667,7 @@ class Datatype(models.Model):
 
         try:
             failing_cells = summary["failing_cells"].keys()
-        except IndexError:
+        except KeyError:
             failing_cells = []
 
         with open(self.prototype.dataset_file.name) as f:
@@ -844,7 +839,7 @@ class Datatype(models.Model):
         stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
 
         with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
-            verif_method.run_code_with_streams(summary_path, [input_path], [output_path], 
+            verif_method.run_code(summary_path, [input_path], [output_path],
                     [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
 
         return self._check_verification_output(summary_path, output_path)
@@ -1317,7 +1312,7 @@ class CompoundDatatype(models.Model):
           if so, returns number of columns in the header.
         - bad_col_indices: set if header has improperly named columns;
           if so, returns list of indices of bad columns
-        - num_rows: number of rows
+        - num_rows: number of rows in the CSV
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
 
@@ -1326,6 +1321,10 @@ class CompoundDatatype(models.Model):
         to check the output of a verification method (ie. we are verifying that
         file_to_check matches VERIF_OUT). 
         """
+        summary = {}
+        empty = False # file is empty?
+        bad_header = False # header is ok?
+
         # A CSV reader which we will use to check individual 
         # cells in the file, as well as creating external CSVs
         # for columns whose DT has a CustomConstraint.
@@ -1334,27 +1333,27 @@ class CompoundDatatype(models.Model):
             header = next(data_csv)
         except StopIteration:
             self.logger.warning("File {} is empty".format(file_to_check))
-            return {"bad_num_cols": 0}
-    
+            summary["bad_num_cols"] = 0
+            return summary
+
         # Check the header.
         self.logger.debug("Checking header")
-        summary = self._check_header(header)
+        summary.update(self._check_header(header))
         summary["header"] = header
 
-        # If the header was malformed, just return the summary. We don't keep
-        # checking constraints.
+        # If the header was malformed, we don't keep checking
+        # constraints.
         if summary.has_key("bad_num_cols") or summary.has_key("bad_col_indices"):
             return summary
 
-        # Now we check the constraints using the global helper function.
+        # Check the constraints using the module helper.
         summary.update(summarize_CSV(self.members.all(), data_csv, summary_path, content_check_log))
         return summary
 
-    def count_conforming_datasets (self):
+    @property
+    def num_conforming_datasets (self):
         """
         Returns the number of Datasets that conform to this CompoundDatatype.
         Is this even possible?
         """
         return 0
-
-    num_conforming_datasets = property(count_conforming_datasets)

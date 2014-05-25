@@ -26,18 +26,18 @@ class TransformationFamily(models.Model):
     name = models.CharField(
         "Transformation family name",
 		max_length=128,
-		help_text="The name given to a group of methods/pipelines");
+		help_text="The name given to a group of methods/pipelines")
 
     description = models.TextField(
         "Transformation family description",
-		help_text="A description for this collection of methods/pipelines");
+		help_text="A description for this collection of methods/pipelines")
 
     def __unicode__(self):
         """ Describe transformation family by it's name """
-        return self.name;
+        return self.name
 
     class Meta:
-        abstract = True;
+        abstract = True
 
 class Transformation(models.Model):
     """
@@ -50,58 +50,50 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationOutput`
     """
 
-    revision_name = models.CharField(
-		"Transformation revision name",
-		max_length=128,
-		help_text="The name of this transformation revision");
+    revision_name = models.CharField("Transformation revision name", max_length=128,
+		                             help_text="The name of this transformation revision")
 
-    revision_DateTime = models.DateTimeField(
-		"Revision creation date",
-		auto_now_add = True);
+    revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add = True)
 
     revision_desc = models.TextField(
 		"Transformation revision description",
-		help_text="Description of this transformation revision");
+		help_text="Description of this transformation revision")
 
     # inputs/outputs associated with transformations via GenericForeignKey
     # And can be accessed from within Transformations via GenericRelation
-    inputs = generic.GenericRelation("transformation.TransformationInput");
-    outputs = generic.GenericRelation("transformation.TransformationOutput");
-
-    # automatically set when an ExecRecord object points to this Transformation object
-    execrecords = generic.GenericRelation("librarian.ExecRecord")
+    inputs = generic.GenericRelation("transformation.TransformationInput")
+    outputs = generic.GenericRelation("transformation.TransformationOutput")
 
     class Meta:
-        abstract = True;
+        abstract = True
+
+    @property
+    def is_pipeline(self):
+        """Is this a Pipeline, as opposed to a Method?"""
+        return self.__class__.__name__ == "Pipeline"
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
-        # Append each input index (hole number) to a list
-        input_nums = []
-        for curr_input in self.inputs.all():
-            input_nums += [curr_input.dataset_idx]
-
-        # Indices must be consecutively numbered from 1 to n
-        if sorted(input_nums) != list(range(1, self.inputs.count()+1)):
-            raise ValidationError(
-                "Inputs are not consecutively numbered starting from 1")
+        for i, curr_input in enumerate(self.inputs.order_by("dataset_idx"), start=1):
+            if i != curr_input.dataset_idx:
+                raise ValidationError("Inputs are not consecutively numbered starting from 1")
         
     def check_output_indices(self):
         """Check that output indices are numbered consecutively from 1."""
         # Append each output index (hole number) to a list
-        output_nums = [];
+        output_nums = []
         for curr_output in self.outputs.all():
-            output_nums += [curr_output.dataset_idx];
+            output_nums += [curr_output.dataset_idx]
 
         # Indices must be consecutively numbered from 1 to n
         if sorted(output_nums) != range(1, self.outputs.count()+1):
             raise ValidationError(
-                "Outputs are not consecutively numbered starting from 1");
+                "Outputs are not consecutively numbered starting from 1")
 
     def clean(self):
         """Validate transformation inputs and outputs."""
-        self.check_input_indices();
-        self.check_output_indices();
+        self.check_input_indices()
+        self.check_output_indices()
 
     # Helper to create inputs, which is now a 2-step operation if the input
     # is not raw.
@@ -208,11 +200,11 @@ class TransformationXput(models.Model):
     execrecordouts_referencing = generic.GenericRelation("librarian.ExecRecordOut")
 
     class Meta:
-        abstract = True;
+        abstract = True
 
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("content_type", "object_id", "dataset_name"),
-                           ("content_type", "object_id", "dataset_idx"));
+                           ("content_type", "object_id", "dataset_idx"))
 
     def __unicode__(self):
         unicode_rep = u"";
@@ -229,6 +221,11 @@ class TransformationXput(models.Model):
                     self.get_cdt())
         return unicode_rep
 
+    @property
+    def compounddatatype(self):
+        if self.is_raw(): return None
+        return self.structure.first().compounddatatype
+
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
         return not self.structure.all().exists()
@@ -242,17 +239,11 @@ class TransformationXput(models.Model):
 
     def get_min_row(self):
         """Accessor that returns min_row for this xput (and None if it is raw)."""
-        my_min_row = None
-        if not self.is_raw():
-            my_min_row = self.structure.all()[0].min_row
-        return my_min_row
+        return (None if self.is_raw() else self.structure.first().min_row)
 
     def get_max_row(self):
         """Accessor that returns max_row for this xput (and None if it is raw)."""
-        my_max_row = None
-        if not self.is_raw():
-            my_max_row = self.structure.all()[0].max_row
-        return my_max_row
+        return (None if self.is_raw() else self.structure.first().max_row)
 
 class XputStructure(models.Model):
     """
@@ -263,12 +254,12 @@ class XputStructure(models.Model):
     """
     content_type = models.ForeignKey(
         ContentType,
-        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")});
-    object_id = models.PositiveIntegerField();
+        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")})
+    object_id = models.PositiveIntegerField()
     transf_xput = generic.GenericForeignKey("content_type", "object_id")
 
     # The expected compounddatatype of the input/output
-    compounddatatype = models.ForeignKey("metadata.CompoundDatatype");
+    compounddatatype = models.ForeignKey("metadata.CompoundDatatype")
     
     # Nullable fields indicating that this dataset has
     # restrictions on how many rows it can have
@@ -276,13 +267,13 @@ class XputStructure(models.Model):
         "Minimum row",
         help_text="Minimum number of rows this input/output returns",
         null=True,
-        blank=True);
+        blank=True)
 
     max_row = models.PositiveIntegerField(
         "Maximum row",
         help_text="Maximum number of rows this input/output returns",
         null=True,
-        blank=True);
+        blank=True)
 
     class Meta:
         unique_together = ("content_type", "object_id")
@@ -291,10 +282,14 @@ class TransformationInput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    pass
+    @property
+    def is_input(self):
+        return True
 
 class TransformationOutput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    pass
+    @property
+    def is_input(self):
+        return False

@@ -7,12 +7,11 @@ do with CodeResources.
 FIXME get all the models pointing at each other correctly!
 """
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.core.files import File
-from django.utils import timezone
 
 import hashlib, os, re, string, stat, subprocess
 import file_access_utils, transformation.models
@@ -21,6 +20,7 @@ import traceback
 import threading
 import logging
 import shutil
+
 
 class CodeResource(models.Model):
     """
@@ -355,6 +355,7 @@ class CodeResourceDependency(models.Model):
                 unicode(self.requirement),
                 os.path.join(self.depPath, self.depFileName));
 
+
 class Method(transformation.models.Transformation):
     """
     Methods are atomic transformations.
@@ -377,6 +378,9 @@ class Method(transformation.models.Transformation):
         help_text="Is this Method broken?")
 
     pipelinesteps = generic.GenericRelation("pipeline.PipelineStep")
+
+    # automatically set when an ExecRecord object points to this Method.
+    # execrecords = generic.GenericRelation("librarian.ExecRecord")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -421,26 +425,19 @@ class Method(transformation.models.Transformation):
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
 
-    def save(self, *args, **kwargs):
+    def copy_io_from_parent(self):
         """
-        Create or update a method revision.
-
-        If a method revision being created is derived from a parental
-        method revision, copy the parent input/outputs.
+        Copy inputs and outputs from parent revision.
         """
-
-        # Inputs/outputs cannot be stored in the database unless this
-        # method revision has itself first been saved to the database
-        super(Method, self).save(*args, **kwargs)
-
         # If no parent revision exists, there are no input/outputs to copy
         if self.revision_parent == None:
             return None
 
-        # If parent revision exists, and inputs/outputs haven't been registered,
-        # copy all inputs/outputs (Including raws) from parent revision to this revision
-        """
-        if (self.inputs.count() + self.outputs.count() == 0):
+        # If inputs/outputs already exist, do nothing.
+        if (self.inputs.count() + self.outputs.count() != 0):
+            return None
+        # Copy all inputs/outputs (Including raws) from parent revision to this revision
+        else:
             for parent_input in self.revision_parent.inputs.all():
                 new_input = self.inputs.create(
                     dataset_name = parent_input.dataset_name,
@@ -460,32 +457,23 @@ class Method(transformation.models.Transformation):
                         compounddatatype = parent_output.get_cdt(),
                         min_row = parent_output.get_min_row(),
                         max_row = parent_output.get_max_row())
-        """
 
     def find_compatible_ER(self, input_SDs):
         """
         Given a set of input SDs, find an ER that can be reused given these inputs.
         A compatible ER may have to be filled in.
         """
-        self.logger.debug("Considering all pipeline steps featuring this method...")
-
         # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
-            self.logger.debug("Considering pipeline step '{}'".format(possible_PS))
 
             # For linked runsteps which did not *completely* reuse an ER
             for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
-                self.logger.debug("Considering non-reused runstep '{}'".format(possible_RS))
-
                 candidate_ER = possible_RS.execrecord
 
-                if not candidate_ER.outputs_OK():
-                    self.logger.debug("Rejecting runstep, outputs not OK")
-                    continue
+                # Reject RunStep if its outputs are not OK.
+                if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
 
-
-                self.logger.debug("Candidate ER is OK (no bad CCLs or ICLs): checking if inputs match")
-
+                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.dataset_idx
@@ -494,48 +482,56 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    self.logger.debug("All ERIs match input SDs - comitting to candidate ER {}".format(candidate_ER))
+                    # All ERIs match input SDs, so commit to candidate ER
                     return candidate_ER
     
-        self.logger.debug("No compatible ERs found")
+        # No compatible ExecRecords found.
         return None
 
-    def _poll_stream(self, proc, in_stream, out_streams):
+    # May 20, 2014: we restore this now that we have protected the popen
+    # object with a lock.
+    def _poll_stream(self, proc, source_stream, dest_streams, lock):
         """
         SYNOPSIS
-        Helper function for run_code_with_streams, which polls a Popen'ed procedure
-        for output on in_stream until it terminates, and prints the output to
-        all the out_streams (like the Unix tee command).
-        TODO: instead of in_stream, pass a flag which controls whether to read stdout
+        Helper function for run_code, which polls a Popen'ed procedure
+        for output on source_stream until it terminates, and prints the output to
+        all the dest_streams (like the Unix tee command).
+        TODO: instead of source_stream, pass a flag which controls whether to read stdout
         or stderr.
 
         INPUTS
         proc            subprocess.Popen object to poll for output
-        in_stream       which of proc's streams to poll - must be either
+        source_stream   which of proc's streams to poll - must be either
                         proc.stdout or proc.stderr
-        out_streams     streams to redirect output to
+        dest_streams     streams to redirect output to
+        lock            Lock object that protects proc from concurrency issues
         """
         while True:
-            line = in_stream.readline()
+            lock.acquire()
+            line = source_stream.readline()
+            poll_result = proc.poll()
+            lock.release()
+
             if line:
-                for stream in out_streams:
+                for stream in dest_streams:
                     stream.write(line)
-            if proc.poll() is not None:
+
+            if poll_result is not None:
                 break
 
-    def run_code_with_streams(self, run_path, input_paths, output_paths, output_streams,
-            error_streams, timer_to_fill=None, log_to_fill=None):
+    def run_code(self, run_path, input_paths, output_paths, output_streams,
+            error_streams, log=None, details_to_fill=None):
         """
         SYNOPSIS
-        Run the method, passing each line in its stdout and stderr to
-        any number of streams. Return the Method's return code, or -1 if
-        the Method suffers an OS-level error (ie. is not executable). If
-        log_to_fill is not None, fill it in with the return code, and
-        set its output and error logs to the _first_ provided streams
-        (meaning these should be files, not standard streams, and they
-        must be open for reading AND writing). If timer_to_fill is not
-        None, set its start_time and end_time immediately before and
-        after calling run_code.
+        Run the method with the specified inputs and outputs, writing each
+        line of its stdout/stderr to all of the specified streams.  Return
+        the Method's return code, or -1 if the Method suffers an OS-level
+        error (ie. is not executable). If details_to_fill is not None,
+        fill it in with the return code, and set its output and error logs
+        to the provided handles (meaning these should be files, not
+        standard streams, and they must be open for reading AND writing).
+        If log is not None, set its start_time and end_time immediately
+        before and after calling run_code.
 
         INPUTS
         run_path        see run_code
@@ -543,23 +539,21 @@ class Method(transformation.models.Transformation):
         output_paths    see run_code
         output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
-        timer_to_fill   object with start_time and end_time fields to fill in (either
+        log             object with start_time and end_time fields to fill in (either
                         VerificationLog, or ExecLog)
-        log_to_fill     object with return_code, output_log, and error_log to fill in
+        details_to_fill object with return_code, output_log, and error_log to fill in
                         (either VerificationLog, or MethodOutput)
 
         ASSUMPTIONS
-        1) if log_to_fill is provided, the first entry in output_streams and error_streams
+        1) if details_to_fill is provided, the first entry in output_streams and error_streams
         are handles to regular files, open for reading and writing.
         """
-        if timer_to_fill:
-            timer_to_fill.start_time = timezone.now()
-            timer_to_fill.clean()
-            timer_to_fill.save()
+        if log:
+            log.start()
 
         returncode = None
         try:
-            method_popen = self.run_code(run_path, input_paths, output_paths)
+            method_popen = self.invoke_code(run_path, input_paths, output_paths)
         except OSError:
             for stream in error_streams:
                 traceback.print_exc(file=stream)
@@ -567,44 +561,49 @@ class Method(transformation.models.Transformation):
 
         # Succesful execution.
         if returncode is None:
+
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
-            out_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stdout, output_streams))
-            err_thread = threading.Thread(target=self._poll_stream, 
-                    args=(method_popen, method_popen.stderr, error_streams))
+            popen_lock = threading.Lock()
+
+            out_thread = threading.Thread(target=self._poll_stream,
+                    args=(method_popen, method_popen.stdout, output_streams, popen_lock))
+            err_thread = threading.Thread(target=self._poll_stream,
+                    args=(method_popen, method_popen.stderr, error_streams, popen_lock))
             out_thread.start()
             err_thread.start()
             out_thread.join()
             err_thread.join()
 
-            returncode = method_popen.returncode
-
-        if timer_to_fill:
-            timer_to_fill.end_time = timezone.now()
-            timer_to_fill.clean()
-            timer_to_fill.save()
+            returncode = method_popen.poll()
 
         for stream in output_streams + error_streams:
             stream.flush()
 
-        if log_to_fill:
-            log_to_fill.return_code = returncode
-            outlog = output_streams[0]
-            errlog = error_streams[0]
-            outlog.seek(0)
-            errlog.seek(0)
+        with transaction.atomic():
+            if log:
+                log.stop()
 
-            log_to_fill.error_log.save(errlog.name, File(errlog))
-            log_to_fill.output_log.save(outlog.name, File(outlog))
-            log_to_fill.clean()
-            log_to_fill.save()
+            # TODO: I'm not sure how this is going to handle huge output, 
+            # it would be better to update the logs as we go.
+            if details_to_fill:
+                details_to_fill.return_code = returncode
+                outlog = output_streams[0]
+                errlog = error_streams[0]
+                outlog.seek(0)
+                errlog.seek(0)
 
-    def run_code(self, run_path, input_paths, output_paths):
+                details_to_fill.error_log.save(errlog.name, File(errlog))
+                details_to_fill.output_log.save(outlog.name, File(outlog))
+                details_to_fill.clean()
+                details_to_fill.save()
+
+    def invoke_code(self, run_path, input_paths, output_paths):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.
-        Leaves responsibility of DB annotation up to execute()
+        Leaves responsibility of DB annotation up to execute().
+        Leaves routing of output/error streams to run_code.
 
         INPUTS
         run_path        Directory where code will be run
@@ -661,6 +660,7 @@ class Method(transformation.models.Transformation):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         return code_popen
+
 
 class MethodFamily(transformation.models.TransformationFamily):
     """

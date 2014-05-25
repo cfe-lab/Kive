@@ -9,7 +9,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 
-class ContentCheckLog(models.Model):
+import stopwatch.models
+
+
+class ContentCheckLog(stopwatch.models.Stopwatch):
     """
     Denotes a check performed on a SymbolicDataset's contents.
 
@@ -18,23 +21,30 @@ class ContentCheckLog(models.Model):
     execution of a Pipeline (i.e. a Run), on the uploading of data,
     or on a manually-specified check.
     """
-    symbolicdataset = models.ForeignKey(
-        "librarian.SymbolicDataset",
-        related_name="content_checks")
+    symbolicdataset = models.ForeignKey("librarian.SymbolicDataset", related_name="content_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey(
-        "archive.ExecLog", null=True,
-        related_name="content_checks")
+    execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
 
-    start_time = models.DateTimeField("start time",
-                                      auto_now_add=True,
-                                      help_text="Time at start of content check")
+    # Implicit through inheritance: start_time, end_time.
 
-    end_time = models.DateTimeField("end time",
-                                    null=True,
-                                    blank=True,
-                                    help_text="Time at end of content check")
+    def add_missing_output(self):
+        """Add a BadData for missing output."""
+        baddata = BadData(contentchecklog=self, missing_output=True)
+        baddata.clean()
+        baddata.save()
+
+    def add_bad_num_rows(self):
+        """Add a BadData for bad number of rows."""
+        baddata = BadData(contentchecklog=self, bad_num_rows=True)
+        baddata.clean()
+        baddata.save()
+
+    def add_bad_header(self):
+        """Add a BadData for bad number of rows."""
+        baddata = BadData(contentchecklog=self, bad_header=True)
+        baddata.clean()
+        baddata.save()
 
     def clean(self):
         """
@@ -46,9 +56,7 @@ class ContentCheckLog(models.Model):
         if self.is_fail():
             self.baddata.clean()
 
-        if self.end_time is not None and self.start_time > self.end_time:
-            raise ValidationError(
-                error_messages["ccl_swapped_times"].format(self))
+        stopwatch.models.Stopwatch.clean(self)
 
     def is_complete(self):
         """
@@ -61,6 +69,7 @@ class ContentCheckLog(models.Model):
         True if this content check is a failure.
         """
         return hasattr(self, "baddata")
+
 
 class BadData(models.Model):
     """
@@ -106,6 +115,7 @@ class BadData(models.Model):
                     format(self))
 
         [c.clean() for c in self.cell_errors.all()]
+
 
 class CellError(models.Model):
     """
@@ -189,8 +199,7 @@ class CellError(models.Model):
                 raise ValidationError(error_messages["CellError_bad_CC"].format(self))
 
 
-
-class IntegrityCheckLog(models.Model):
+class IntegrityCheckLog(stopwatch.models.Stopwatch):
     """
     Denotes an integrity check performed on a SymbolicDataset.
 
@@ -206,14 +215,7 @@ class IntegrityCheckLog(models.Model):
     execlog = models.ForeignKey("archive.ExecLog", null=True,
                                 related_name="integrity_checks")
 
-    start_time = models.DateTimeField("start time",
-                                      auto_now_add=True,
-                                      help_text="Time at start of integrity check")
-
-    end_time = models.DateTimeField("end time",
-                                    null=True,
-                                    blank=True,
-                                    help_text="Time at end of integrity check")
+    # Implicit through inheritance: start_time, end_time.
 
     def clean(self):
         """
@@ -225,9 +227,7 @@ class IntegrityCheckLog(models.Model):
         if self.is_fail():
             self.usurper.clean()
 
-        if self.end_time is not None and self.start_time > self.end_time:
-            raise ValidationError(
-                error_messages["ccl_swapped_times"].format(self))
+        stopwatch.models.Stopwatch.clean(self)
 
     def is_complete(self):
         """
@@ -239,7 +239,8 @@ class IntegrityCheckLog(models.Model):
         """True if this integrity check is a failure."""
         return hasattr(self, "usurper")
 
-class VerificationLog(models.Model):
+
+class VerificationLog(stopwatch.models.Stopwatch):
     """
     A record of running a verification Method to check CustomConstraints
     on a Dataset.
@@ -250,10 +251,6 @@ class VerificationLog(models.Model):
         related_name="verification_logs")
     # The compound datatype member which was verified.
     CDTM = models.ForeignKey("metadata.CompoundDatatypeMember")
-    # When the verification began.
-    start_time = models.DateTimeField(auto_now_add=True)
-    # When the verification was completed.
-    end_time = models.DateTimeField(null=True)
     # The return code from the Method's driver. Null indicates it hasn't
     # completed yet.
     return_code = models.IntegerField(null=True)
@@ -261,21 +258,22 @@ class VerificationLog(models.Model):
     output_log = models.FileField(upload_to="VerificationLogs")
     error_log = models.FileField(upload_to="VerificationLogs")
 
+    # Implicit through inheritance: start_time, end_time.
+
     def clean(self):
         """
         Checks coherence of this VerificationLog.
 
         The start time must be before the end time.
         """
-        if self.end_time is not None and self.start_time > self.end_time:
-            raise ValidationError(error_messages["verificationlog_swapped_times"])
+        stopwatch.models.Stopwatch.clean(self)
 
     def is_complete(self):
         """
         Check if this VerificationLog has completed yet (end_time and return_code
         are set).
         """
-        return not (self.end_time is None or self.return_code is None)
+        return self.has_ended() and self.return_code is not None
 
     def complete_clean(self):
         """

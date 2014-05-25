@@ -2,6 +2,9 @@
 Basic file-checking functionality used by Shipyard.
 """
 import hashlib, glob, os
+import errno
+from constants import dirnames
+from cStringIO import StringIO
 
 def can_create_new_file(file_to_create):
     """
@@ -81,28 +84,33 @@ def set_up_directory(directory_to_use, tolerate=False):
         paths = glob.glob(directory_to_use + "/*")
         paths += glob.glob(directory_to_use + "/.*")
 
-        if tolerate:
-            for path in paths:
-                if (path == os.path.join(directory_to_use, "input_data") or
-                            path == os.path.join(directory_to_use, "logs") or
-                            path == os.path.join(directory_to_use, "output_data")):
+        for path in paths:
+            if tolerate:
+                if (path == os.path.join(directory_to_use, dirnames.IN_DIR) or
+                            path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
+                            path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
                     continue
-                raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
+            raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
 def compute_md5(file_to_checksum):
-    """
-    Computes MD5 checksum of specified file.
+    """Computes MD5 checksum of specified file.
 
     file_to_checksum should be an open, readable, file handle, with
     its position at the beginning, i.e. so that .read() gets the
     entire contents of the file.
     """
     md5gen = hashlib.md5()
-    md5gen.update(file_to_checksum.read())
+    for line in file_to_checksum:
+        md5gen.update(line)
     return md5gen.hexdigest()
 
-def count_rows(file_to_count):
-    """
-    Count the number of rows in a CSV file, excluding the header.
-    """
-    return sum([1 for line in file_to_count]) - 1
+def file_exists(path):
+    """Does the given file exist?"""
+    try:
+        h = open(path, "rb")
+        h.close()
+        return True
+    except IOError as e:
+        if e.errno == errno.ENOENT:
+            return False
+        raise

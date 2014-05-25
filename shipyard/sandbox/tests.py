@@ -1,20 +1,23 @@
 import os
 import re
 import sys
+import tempfile
 
 from django.core.files import File
 from django.contrib.auth.models import User
 from django.test import TestCase
 
 from archive.models import MethodOutput
-from librarian.models import SymbolicDataset
+from librarian.models import SymbolicDataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
+from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 
 from method.tests import samplecode_path
 from constants import datatypes
+
 
 class ExecuteTests(TestCase):
 
@@ -58,28 +61,14 @@ class ExecuteTests(TestCase):
         self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
             "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
             description="input to pipeline pX", cdt=self.pX_in_cdt)
+        self.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
+            description="input to pipeline pX", cdt=None)
 
         # Method + input/outputs
         self.mA = Method(revision_name="mA",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr); self.mA.save()
         self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
         self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
-
-
-    def tearDown(self):
-
-        for crr in CodeResourceRevision.objects.all():
-            crr.content_file.close()
-            crr.content_file.delete()
-
-        for method_out in MethodOutput.objects.all():
-            method_out.output_log.close()
-            method_out.output_log.delete()
-            method_out.error_log.close()
-            method_out.error_log.delete()
-
-
-    def test_pipeline_execute_A_simple_onestep_pipeline(self):
-        """Execution of a one-step pipeline."""
 
         # Define pipeline containing the method, and its input + outcables
         self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
@@ -94,6 +83,61 @@ class ExecuteTests(TestCase):
         # Pipeline outcables
         self.X1_outcable = self.pX.create_outcable(output_name="pX_out",output_idx=1,source_step=1,source=self.mA_out)
         self.pX.create_outputs()
+
+        # Pipeline with raw input.
+        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw",revision_desc="X"); pX_raw.save()
+        mA_raw = Method(revision_name="mA_raw",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr)
+        mA_raw.save()
+        mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
+        mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
+        X1_in_raw = pX_raw.create_input(compounddatatype=None, dataset_name="pX_in",dataset_idx=1)
+        step_X1_raw = pX_raw.steps.create(transformation=mA_raw,step_num=1)
+        step_X1_raw.cables_in.create(dest=mA_in_raw, source_step=0, source=X1_in_raw)
+        pX_raw.create_outcable(output_name="pX_out",output_idx=1,source_step=1,source=mA_out_raw)
+        pX_raw.create_outputs()
+
+    def tearDown(self):
+
+        for crr in CodeResourceRevision.objects.all():
+            crr.content_file.close()
+            crr.content_file.delete()
+
+        for method_out in MethodOutput.objects.all():
+            method_out.output_log.close()
+            method_out.output_log.delete()
+            method_out.error_log.close()
+            method_out.error_log.delete()
+
+    def find_raw_pipeline(self):
+        """Find a Pipeline with a raw input."""
+        for p in Pipeline.objects.all():
+            for step in p.steps.all():
+                for incable in step.cables_in.all():
+                    if incable.source_step == 0 and incable.source.is_raw():
+                        return p
+
+    def find_inputs_for_pipeline(self, pipeline):
+        """Find appropriate input SymbolicDatasets for a Pipeline."""
+        inputs = []
+        for step in pipeline.steps.all():
+            for incable in step.cables_in.all():
+                if incable.source_step == 0:
+                    source = incable.source
+                    dataset = None
+                    if source.is_raw():
+                        for sd in SymbolicDataset.objects.all():
+                            if sd.is_raw():
+                                dataset = sd
+                                break
+                    else:
+                        datatype = incable.source.structure.first().compounddatatype
+                        structure = DatasetStructure.objects.filter(compounddatatype=datatype)[0]
+                        dataset = structure.symbolicdataset
+                    inputs.append(dataset)
+        return inputs
+
+    def test_pipeline_execute_A_simple_onestep_pipeline(self):
+        """Execution of a one-step pipeline."""
 
         # Execute pipeline
         pipeline = self.pX
@@ -222,6 +266,88 @@ class ExecuteTests(TestCase):
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
 
+    def test_pipeline_all_inputs_OK_nonraw(self):
+        """Execute a Pipeline with OK non-raw inputs."""
+        pipeline = Pipeline.objects.first()
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertFalse(all(i.is_raw() for i in inputs))
+        user = User.objects.first()
+        run = Sandbox(user, pipeline, inputs).execute_pipeline()
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.successful_execution())
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
+
+    def test_pipeline_all_inputs_OK_raw(self):
+        """Execute a Pipeline with OK raw inputs."""
+        # Find a Pipeline with a raw input.
+        pipeline = self.find_raw_pipeline()
+        self.assertIsNotNone(pipeline)
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertTrue(any(i.is_raw() for i in inputs))
+        user = User.objects.first()
+        run = Sandbox(user, pipeline, inputs).execute_pipeline()
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.successful_execution())
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
+
+    def test_pipeline_inputs_not_OK_nonraw(self):
+        """Can't execute a Pipeline with non-OK non-raw inputs."""
+        user = User.objects.first()
+        pipeline = Pipeline.objects.first()
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertFalse(all(i.is_raw() for i in inputs))
+        sandbox = Sandbox(user, pipeline, inputs)
+
+        for i, sd in enumerate(inputs, start=1):
+            if not sd.is_raw():
+                bad_input, bad_index = sd, i
+                bad_ccl = ContentCheckLog(symbolicdataset=sd)
+                bad_ccl.save()
+                bad_ccl.add_missing_output()
+                break
+
+        run = pipeline.pipeline_instances.create(user=user); run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
+
+        self.assertFalse(all(i.is_OK() for i in inputs))
+        self.assertRaisesRegexp(ValueError,
+                                ('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                                 .format(bad_input, bad_index, pipeline)),
+                                lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+
+    def test_pipeline_inputs_not_OK_raw(self):
+        """Can't execute a Pipeline with non-OK raw inputs."""
+        user = User.objects.first()
+        pipeline = self.find_raw_pipeline()
+        self.assertIsNotNone(pipeline)
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertTrue(any(i.is_raw() for i in inputs))
+        sandbox = Sandbox(user, pipeline, inputs)
+
+        for i, sd in enumerate(inputs, start=1):
+            if sd.is_raw():
+                bad_input, bad_index = sd, i
+                bad_icl = IntegrityCheckLog(symbolicdataset=sd)
+                bad_icl.save()
+                MD5Conflict(integritychecklog=bad_icl, conflicting_SD=sd).save()
+                break
+
+        run = pipeline.pipeline_instances.create(user=user); run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
+
+        self.assertFalse(all(i.is_OK() for i in inputs))
+        self.assertRaisesRegexp(ValueError,
+                                ('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                                 .format(bad_input, bad_index, pipeline)),
+                                lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+
+
 class SandboxTests(ExecuteTests):
 
     def test_sandbox_no_input(self):
@@ -275,12 +401,15 @@ class SandboxTests(ExecuteTests):
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
-        raw_symDS = SymbolicDataset()
-        raw_symDS.save()
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf.write("foo")
+        tf.close()
+        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo", description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
                                 lambda: Sandbox(self.myUser, p, [raw_symDS]))
+        os.remove(tf.name)
 
     def test_sandbox_cdt_mismatch(self):
         """

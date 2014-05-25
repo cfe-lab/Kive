@@ -26,11 +26,13 @@ import file_access_utils
 
 from constants import datatypes, CDTs
 
+
 def rmf(path):
     try:
         os.remove(path)
     except OSError:
         pass
+
 
 def clean_files():
     for dataset in Dataset.objects.all():
@@ -42,6 +44,7 @@ def clean_files():
             rmf(output.output_log.name)
             rmf(output.error_log.name)
 
+
 class UtilityMethods(TestCase):
 
     def setUp(self):
@@ -49,7 +52,7 @@ class UtilityMethods(TestCase):
         self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
         # Predefined datatypes.
-        self.datatype_str = self.new_datatype("string", "sequences of ASCII characters", self.STR)
+        self.datatype_str = self.new_datatype("my_string", "sequences of ASCII characters", self.STR)
 
         # A CDT composed of only one column, strings.
         self.cdt_string = CompoundDatatype()
@@ -192,6 +195,7 @@ class UtilityMethods(TestCase):
         family.clean()
         return pipeline
 
+
 class ExecuteTestsRM(UtilityMethods):
 
     def setUp(self):
@@ -328,7 +332,7 @@ class ExecuteTestsRM(UtilityMethods):
         # is run on Alice's data, so we can check it later.
         tmpdir = tempfile.mkdtemp()
         outfile = os.path.join(tmpdir, "output")
-        self.method_complement.run_code(tmpdir, [self.datafile.name], [outfile])
+        self.method_complement.invoke_code(tmpdir, [self.datafile.name], [outfile])
         time.sleep(1)
         self.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
@@ -465,7 +469,7 @@ class ExecuteTestsRM(UtilityMethods):
         outputs = self.method_complement.outputs.all()
 
         self.assertEqual(execrecord.generator, execlog)
-        self.assertEqual(execrecord.runsteps.first(), runstep)
+        #self.assertEqual(execrecord.runsteps.first(), runstep)
         #self.assertEqual(execrecord.runs.first(), run)
         self.assertEqual(execrecord.complete_clean(), None)
         self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation)
@@ -478,7 +482,7 @@ class ExecuteTestsRM(UtilityMethods):
         """
         run1 = self.sandbox_complement.execute_pipeline()
         run2 = self.sandbox_complement.execute_pipeline()
-        self.assertEqual(run1 is run2, True)
+        self.assertEqual(run1 is run2, True) 
 
     def test_execute_pipeline_reuse(self):
         """
@@ -662,6 +666,7 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox2 = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
         sandbox2.execute_pipeline()
 
+
 class BadRunTests(UtilityMethods):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -670,6 +675,8 @@ class BadRunTests(UtilityMethods):
         super(BadRunTests, self).setUp()
 
         # A guy who doesn't know what he is doing.
+        # May 14, 2014: dag, yo -- RL
+        # May 20, 2014: he's doing his best, man -- RL
         self.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
         self.user_grandpa.save()
 
@@ -689,7 +696,18 @@ class BadRunTests(UtilityMethods):
             [self.method_faulty, self.method_noop], "data", "the abyss")
         self.pipeline_faulty.create_outputs()
 
-        # Some data to run through the faulty pipeline.
+        # A code resource, method, and pipeline which fail.
+        self.coderev_fubar = self.make_first_revision("fubar", "a script which always fails",
+            "fubar.sh", "#!/bin/bash\nexit 1")
+        self.method_fubar = self.make_first_method("fubar", "a method which always fails", self.coderev_fubar)
+        self.method_fubar.clean()
+        self.simple_method_io(self.method_fubar, self.cdt_string, "strings", "broken strings")
+        self.pipeline_fubar = self.make_first_pipeline("fubar pipeline", "a pipeline which always fails")
+        self.create_linear_pipeline(self.pipeline_fubar,
+            [self.method_noop, self.method_fubar, self.method_noop], "indata", "outdata")
+        self.pipeline_fubar.create_outputs()
+
+        # Some data to run through the faulty pipelines.
         self.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
         self.grandpa_datafile.write("word\n")
         for line in range(20):
@@ -717,6 +735,28 @@ class BadRunTests(UtilityMethods):
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
         self.assertEqual(log.missing_outputs(), [interm_SD])
+
+    def test_method_fails(self):
+        """Properly handle a failed method in a pipeline."""
+        sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.symds_grandpa])
+        sandbox.execute_pipeline()
+        self.assertIsNone(sandbox.run.complete_clean())
+        self.assertFalse(sandbox.run.successful_execution())
+
+        runstep1 = sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        self.assertIsNone(runstep1.complete_clean())
+        self.assertTrue(runstep1.successful_execution())
+
+        runstep2 = sandbox.run.runsteps.get(pipelinestep__step_num=2)
+        self.assertIsNone(runstep2.complete_clean())
+        self.assertFalse(runstep2.successful_execution())
+
+        log = runstep2.log.first()
+
+        self.assertFalse(log.is_successful())
+        self.assertEqual(log.methodoutput.return_code, 1)
+        self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
+
 
 class FindSDTests(UtilityMethods):
     """
