@@ -10,14 +10,17 @@ def populate_revision_dropdown (request):
      drop-down.  The 'change' event triggers an Ajax request that this function will handle
      and return a JSON object with the revision info.
     """
-    #from metadata.models import CodeResourceRevision
-    json = {}
     if request.is_ajax():
         response = HttpResponse()
         coderesource_id = request.POST.get('cr_id')
         if coderesource_id != '':
             coderesource = CodeResource.objects.get(pk=coderesource_id) # pk (primary key) implies id__exact
-            response.write(serializers.serialize("json", CodeResourceRevision.objects.filter(coderesource=coderesource), fields=('pk', 'revision_name')))
+            response.write(
+                serializers.serialize("json",
+                                      CodeResourceRevision.objects
+                                      .filter(coderesource=coderesource)
+                                      .order_by('-revision_number'),
+                                      fields=('pk', 'revision_number', 'revision_name')))
         return response
     else:
         raise Http404

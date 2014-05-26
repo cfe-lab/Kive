@@ -311,8 +311,8 @@ def return_method_forms (request, exceptions):
     Send HttpResponse Context with forms filled out with previous values including error messages
     """
     query = request.POST.dict()
-    family_form = MethodFamilyForm(initial={'name': query['name'],
-                                            'description': query['description']})
+    #family_form = MethodFamilyForm(initial={'name': query['revision_name'],
+    #                                        'description': query['revision_description']})
 
     method_form = MethodForm(initial={'revision_name': query['revision_name'],
                                       'revision_desc': query['revision_desc'],
@@ -332,11 +332,11 @@ def return_method_forms (request, exceptions):
         xs_form.errors['Errors'] = exceptions.get(i, '')
         xput_forms.append((t_form, xs_form))
 
-    return family_form, method_form, xput_forms
+    return method_form, xput_forms
 
 
 
-def method_add (request):
+def method_add(request):
     """
     Generate forms for adding Methods, and validate and process POST data returned
     by the user.  Allows for an arbitrary number of input and output forms.
@@ -352,30 +352,41 @@ def method_add (request):
         try:
             coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
         except:
-            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
         # use this prototype Method's name and description to initialize the MethodFamily
-        method_family = MethodFamily(name = query['revision_name'], description = query['revision_desc'])
+        try:
+            method_family = MethodFamily(name=query['revision_name'],
+                                         description=query['revision_desc'])
+        except KeyError as e:
+            print e
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            method_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
         try:
             method_family.full_clean()
             method_family.save()
         except ValidationError as e:
-            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
-            family_form.errors['Errors'] = ErrorList(e.messages)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
+            print e
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            method_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
         # attempt to make Method object
-        new_method = Method(family = method_family,
+        try:
+            new_method = Method(family = method_family,
                             revision_name=query['revision_name'],
                             revision_desc=query['revision_desc'],
                             driver=coderesource_revision,
                             random=query.has_key('random'))
-        try:
             new_method.full_clean()
             new_method.save()
         except ValidationError as e:

@@ -58,7 +58,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         var options = [];
                         var arr = JSON.parse(result)
                         $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
+                            options.push('<option value="', value.pk, '">', value.fields.revision_number, ': ', value.fields.revision_name, '</option>');
                         });
                         $("#id_revisions").html(options.join(''));
                     }
