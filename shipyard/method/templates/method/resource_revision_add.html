@@ -23,19 +23,19 @@
         <!-- this form is pre-populated with the data of the last revision -->
         <tr>
             <td></td>
-            <th>Previous</th>
-            <th>Current</th>
+            <th>Parent ({{ parent_revision.revision_number }})</th>
+            <th>Revision ({{ coderesource.num_revisions|add:"1" }})</th>
         </tr>
         <tr>
             <th>{{ resource_form.content_file.label }} <div class="helptext">{{ resource_form.content_file.help_text }}</div></th>
-            <td style="font-style:italic">{{ coderesource.filename }}</td>
+            <td style="font-style:italic">{{ parent_revision.filename }}</td>
             <td>{{ resource_form.content_file }}<br>
                 <div style="color:red">{{ resource_form.content_file.errors }}</div></td>
         </tr>
         <tr>
             <th>{{ resource_form.revision_name.label }} <div class="helptext">{{ resource_form.revision_name.help_text }}</div></th>
             <td></td>
-            <td>{{ coderesource.num_revisions|add:"1" }} ({{ resource_form.revision_name }})
+            <td>{{ resource_form.revision_name }}
                 <div style="color:red">{{ resource_form.revision_name.errors }}</div></td>
         </tr>
         <tr>

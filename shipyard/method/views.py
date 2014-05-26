@@ -32,7 +32,7 @@ def resource_revisions(request, id):
     Display a list of all revisions of a specific Code Resource in database.
     """
     coderesource = CodeResource.objects.get(pk=id)
-    revisions = CodeResourceRevision.objects.filter(coderesource=coderesource)
+    revisions = CodeResourceRevision.objects.filter(coderesource=coderesource).order_by('-revision_number')
     t = loader.get_template('method/resource_revisions.html')
     c = Context({'coderesource': coderesource, 'revisions': revisions})
     c.update(csrf(request))
@@ -117,11 +117,12 @@ def resource_add(request):
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
-        prototype = CodeResourceRevision(revision_name=query['revision_name'],
-                                         revision_desc=query['revision_desc'],
+        try:
+            prototype = CodeResourceRevision(revision_number=1,
+                                         revision_name='Prototype',
+                                         revision_desc=query['resource_desc'],
                                          coderesource=new_code_resource,
                                          content_file=file_in_memory)
-        try:
             prototype.full_clean()
             prototype.save()
         except ValidationError as e:
@@ -208,15 +209,10 @@ def resource_revision_add(request, id):
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
-
-        # revision name is always a integer, with optional "codename"
-        revision_name = str(coderesource.num_revisions + 1)
-        if query['revision_name'] != '':
-            revision_name += ' (%s)' % query['revision_name']
-
         # create CRv object
-        revision = CodeResourceRevision(revision_parent=parent_revision,
-                                        revision_name=revision_name,
+        revision = CodeResourceRevision(revision_number=coderesource.num_revisions+1,
+                                        revision_parent=parent_revision,
+                                        revision_name=query['revision_name'],
                                         revision_desc=query['revision_desc'],
                                         coderesource=coderesource,
                                         content_file=file_in_memory)
