@@ -27,7 +27,8 @@ class CodeResource(models.Model):
     A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
-    name = models.CharField( "Resource name", max_length=255, help_text="The name for this resource")
+    name = models.CharField( "Resource name", max_length=255, help_text="The name for this resource and all "
+                                                                        "subsequent revisions.")
 
     # File names must either be empty, or be 1 or more of any from
     # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
@@ -87,10 +88,13 @@ class CodeResourceRevision(models.Model):
     coderesource = models.ForeignKey(
             CodeResource,
             related_name="revisions")
-        
+
+    revision_number = models.IntegerField('Revision number', help_text="Revision number of code resource")
+
     revision_name = models.CharField(
             max_length=128,
-            help_text="A name to differentiate revisions of a CodeResource")
+            help_text="A name to differentiate revisions of a CodeResource",
+            blank=True)
 
     revision_DateTime = models.DateTimeField(
             auto_now_add=True,
@@ -112,6 +116,13 @@ class CodeResourceRevision(models.Model):
             null=True,
             blank=True,
             help_text="File contents of this code resource revision")
+
+    @property
+    def filename(self):
+        """
+        Return original file name (without path to CodeResources, timestamp).
+        """
+        return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
 
     MD5_checksum = models.CharField(
             max_length=64,

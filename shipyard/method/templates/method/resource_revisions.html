@@ -28,12 +28,14 @@
 <h3>Revisions:</h3>
 <table>
 <tr>
+    <th>#</th>
     <th>Name</th>
     <th>Description</th>
     <th>Date</th>
 </tr>
 {% for revision in revisions %}
 <tr>
+    <td>{{ revision.revision_number }}</td>
     <td><a href="{{ revision.get_absolute_url }}">{{ revision.revision_name }}</a></td>
     <td>{{ revision.revision_desc }}</td>
     <td>{{ revision.revision_DateTime }}</td>

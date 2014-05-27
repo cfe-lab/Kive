@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import argparse, sys
+import argparse, sys, csv
 
 # In order to work with shipyard, scripts which having a inputs
 # and b inputs must have a+b command line arguments, the first a
@@ -15,29 +15,30 @@ parser.add_argument("output_csv",help="CSV containing (str header, str sequence)
 args = parser.parse_args()
 
 try:
+    csvfile = open(args.output_csv, 'wb')
+    output = csv.writer(csvfile)
+    output.writerow(['string', 'DNA/RNA'])
+    
     with open(args.input_fasta, "rb") as f:
-        output = open(args.output_csv, "wb");
-        output.write('string,DNA/RNA\n')
-        
         try:            
             sequence = ''
             for line in f:
                 if line.startswith('>'):
                     if len(sequence) > 0:
-                        output.write('%s,%s\n' % (header, sequence))
+                        output.writerow([header, sequence])
                         sequence = ''
                     header = line.lstrip('>').rstrip('\n')
                 else:
                     sequence += line.strip('\n').upper()
             
-            output.write('%s,%s\n' % (header, sequence))
+            output.writerow([header, sequence])
                 
         except:
             print('Error parsing FASTA file')
+            raise
             sys.exit(1)
-            
-        output.close()
-
+    
+    csvfile.close()
     # If no errors, return with code 0 (success)
     sys.exit(0)
 

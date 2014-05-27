@@ -32,7 +32,7 @@ def resource_revisions(request, id):
     Display a list of all revisions of a specific Code Resource in database.
     """
     coderesource = CodeResource.objects.get(pk=id)
-    revisions = CodeResourceRevision.objects.filter(coderesource=coderesource)
+    revisions = CodeResourceRevision.objects.filter(coderesource=coderesource).order_by('-revision_number')
     t = loader.get_template('method/resource_revisions.html')
     c = Context({'coderesource': coderesource, 'revisions': revisions})
     c.update(csrf(request))
@@ -117,11 +117,12 @@ def resource_add(request):
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
-        prototype = CodeResourceRevision(revision_name=query['revision_name'],
-                                         revision_desc=query['revision_desc'],
+        try:
+            prototype = CodeResourceRevision(revision_number=1,
+                                         revision_name='Prototype',
+                                         revision_desc=query['resource_desc'],
                                          coderesource=new_code_resource,
                                          content_file=file_in_memory)
-        try:
             prototype.full_clean()
             prototype.save()
         except ValidationError as e:
@@ -208,15 +209,10 @@ def resource_revision_add(request, id):
         # modify actual filename prior to saving revision object
         file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
-
-        # revision name is always a integer, with optional "codename"
-        revision_name = str(coderesource.num_revisions + 1)
-        if query['revision_name'] != '':
-            revision_name += ' (%s)' % query['revision_name']
-
         # create CRv object
-        revision = CodeResourceRevision(revision_parent=parent_revision,
-                                        revision_name=revision_name,
+        revision = CodeResourceRevision(revision_number=coderesource.num_revisions+1,
+                                        revision_parent=parent_revision,
+                                        revision_name=query['revision_name'],
                                         revision_desc=query['revision_desc'],
                                         coderesource=coderesource,
                                         content_file=file_in_memory)
@@ -315,8 +311,8 @@ def return_method_forms (request, exceptions):
     Send HttpResponse Context with forms filled out with previous values including error messages
     """
     query = request.POST.dict()
-    family_form = MethodFamilyForm(initial={'name': query['name'],
-                                            'description': query['description']})
+    #family_form = MethodFamilyForm(initial={'name': query['revision_name'],
+    #                                        'description': query['revision_description']})
 
     method_form = MethodForm(initial={'revision_name': query['revision_name'],
                                       'revision_desc': query['revision_desc'],
@@ -336,11 +332,11 @@ def return_method_forms (request, exceptions):
         xs_form.errors['Errors'] = exceptions.get(i, '')
         xput_forms.append((t_form, xs_form))
 
-    return family_form, method_form, xput_forms
+    return method_form, xput_forms
 
 
 
-def method_add (request):
+def method_add(request):
     """
     Generate forms for adding Methods, and validate and process POST data returned
     by the user.  Allows for an arbitrary number of input and output forms.
@@ -356,30 +352,41 @@ def method_add (request):
         try:
             coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
         except:
-            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
         # use this prototype Method's name and description to initialize the MethodFamily
-        method_family = MethodFamily(name = query['revision_name'], description = query['revision_desc'])
+        try:
+            method_family = MethodFamily(name=query['revision_name'],
+                                         description=query['revision_desc'])
+        except KeyError as e:
+            print e
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            method_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
+            c.update(csrf(request))
+            return HttpResponse(t.render(c))
+
         try:
             method_family.full_clean()
             method_family.save()
         except ValidationError as e:
-            family_form, method_form, xput_forms = return_method_forms(request, exceptions)
-            family_form.errors['Errors'] = ErrorList(e.messages)
-            c = Context({'family_form': family_form, 'method_form': method_form, 'xput_forms': xput_forms})
+            print e
+            method_form, xput_forms = return_method_forms(request, exceptions)
+            method_form.errors['Errors'] = ErrorList(e.messages)
+            c = Context({'method_form': method_form, 'xput_forms': xput_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
         # attempt to make Method object
-        new_method = Method(family = method_family,
+        try:
+            new_method = Method(family = method_family,
                             revision_name=query['revision_name'],
                             revision_desc=query['revision_desc'],
                             driver=coderesource_revision,
                             random=query.has_key('random'))
-        try:
             new_method.full_clean()
             new_method.save()
         except ValidationError as e:
