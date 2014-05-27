@@ -20,12 +20,14 @@ from method.models import *
 from metadata.models import *
 from pipeline.models import *
 from datachecking.models import ContentCheckLog, BadData
+import sandbox.execute
+
 from method.tests import samplecode_path
 import librarian.tests
+# TODO: Put this someplace better, maybe shipyard/testing_utils.py?
+import sandbox.tests_rm
 from file_access_utils import compute_md5
 
-# TODO: Put this someplace better, maybe shipyard/testing_utils.py?
-from sandbox.tests_rm import clean_files
 
 # Note that these tests use the exact same setup as librarian.
 
@@ -37,7 +39,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
     def tearDown(self):
         super(ArchiveTestSetup, self).tearDown()
-        clean_files()
+        sandbox.tests_rm.clean_files()
 
     def make_complete_non_reused(self, record, input_SDs, output_SDs):
         """
@@ -2118,8 +2120,39 @@ class ExecLogTests(ArchiveTestSetup):
         self.assertIsNone(execlog.delete())
 
 
-class GetCoordinatesTests(ArchiveTestSetup):
+class GetCoordinatesTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
     """Tests of the get_coordinates functions of all Run and RunAtomic classes."""
+
+    def setUp(self):
+        """Set up our testing environment."""
+        ArchiveTestSetup.setUp(self)
+        # These are Rosemary's methods for defining pipelines.
+        sandbox.tests_rm.UtilityMethods.setUp(self)
+
+    def _setup_deep_nested_run(self):
+        """Set up a pipeline with sub-sub-pipelines to test recursion."""
+        # Everything in this pipeline will be a no-op, so all can be linked together
+        # without remorse.
+        p_basic = self.make_first_pipeline("p_basic", "innermost pipeline")
+        self.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+        p_basic.create_outputs()
+        p_basic.save()
+
+        p_sub = self.make_first_pipeline("p_sub", "second-level pipeline")
+        self.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
+        p_sub.create_outputs()
+        p_sub.save()
+
+        p_top = self.make_first_pipeline("p_top", "top-level pipeline")
+        self.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
+        p_top.create_outputs()
+        p_top.save()
+
+        # Set up a dataset with words in it called self.symds_words.
+        self.make_words_symDS()
+
+        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words])
+        run_sandbox.execute_pipeline()
 
     def test_get_coordinates_top_level_run(self):
         """Coordinates of a top-level run should be an empty tuple."""
@@ -2134,6 +2167,26 @@ class GetCoordinatesTests(ArchiveTestSetup):
         # pD_run is the second step of its containing top-level run.
         self.assertEquals(self.pD_run.get_coordinates(), (2,))
         self.assertEquals(self.pD_run.get_coordinates(), self.step_E2_RS.get_coordinates())
+
+    def test_get_coordinates_nested_runs(self):
+        """Test get_coordinates for a deeper-nested sub-run."""
+        self._setup_deep_nested_run()
+
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        self.assertEquals(top_level_run.get_coordinates(), ())
+
+        # Check all second-level and third-level runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+            subrun = step.child_run
+
+            self.assertEquals(subrun.get_coordinates(), (first_lvl_step_num,))
+
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+                basic_run = substep.child_run
+                self.assertEqual(basic_run.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
     def test_get_coordinates_top_level_step(self):
         """Coordinates of a top-level step should be a one-entry tuple with its step number as the entry."""
@@ -2155,6 +2208,28 @@ class GetCoordinatesTests(ArchiveTestSetup):
         # step_D1_RS (as defined by Eric) is at position (2,1).
         self.assertEquals(self.step_D1_RS.get_coordinates(), (2,1))
 
+    def test_get_coordinates_nested_runstep(self):
+        """Test get_coordinates for deeper-nested RunSteps."""
+        self._setup_deep_nested_run()
+
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        # Check all RunSteps of the top-level run and also their child and grandchild runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+            self.assertEquals(step.get_coordinates(), (first_lvl_step_num,))
+
+            subrun = step.child_run
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+                self.assertEqual(substep.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
+
+                basic_run = substep.child_run
+                for basic_step in basic_run.runsteps.all():
+                    third_lvl_step_num = basic_step.pipelinestep.step_num
+                    self.assertEqual(basic_step.get_coordinates(),
+                                     (first_lvl_step_num, second_lvl_step_num, third_lvl_step_num))
+
     def test_get_coordinates_top_level_rsic(self):
         """Coordinates of top-level RSICs should be one-entry tuples matching their parent RSs."""
         self.step_through_run_creation("outcables_done")
@@ -2175,6 +2250,34 @@ class GetCoordinatesTests(ArchiveTestSetup):
             self.assertEquals(rsic.get_coordinates(), (2,1))
             self.assertEquals(rsic.get_coordinates(), self.step_D1_RS.get_coordinates())
 
+    def test_get_coordinates_nested_rsic(self):
+        """Test get_coordinates for deeper-nested RSICs."""
+        self._setup_deep_nested_run()
+
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        # Check all RunSteps of the top-level run and also their child and grandchild runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+
+            for rsic in step.RSICs.all():
+                self.assertEquals(rsic.get_coordinates(), (first_lvl_step_num,))
+
+            subrun = step.child_run
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+
+                for subrsic in substep.RSICs.all():
+                    self.assertEqual(subrsic.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
+
+                basic_run = substep.child_run
+                for basic_step in basic_run.runsteps.all():
+                    third_lvl_step_num = basic_step.pipelinestep.step_num
+
+                    for basic_rsic in basic_step.RSICs.all():
+                        self.assertEqual(basic_rsic.get_coordinates(),
+                                         (first_lvl_step_num, second_lvl_step_num, third_lvl_step_num))
+
     def test_get_coordinates_top_level_roc(self):
         """Coordinates of top-level ROCs should be empty tuples."""
         self.step_through_run_creation("outcables_done")
@@ -2191,3 +2294,27 @@ class GetCoordinatesTests(ArchiveTestSetup):
         # The second step is a sub-run.
         for roc in self.pD_run.runoutputcables.all():
             self.assertEquals(roc.get_coordinates(), (2,))
+
+    def test_get_coordinates_nested_roc(self):
+        """Test get_coordinates for deeper-nested sub-ROCs."""
+        self._setup_deep_nested_run()
+
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        for roc in top_level_run.runoutputcables.all():
+            self.assertEquals(roc.get_coordinates(), ())
+
+        # Check all second-level and third-level runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+            subrun = step.child_run
+
+            for subroc in subrun.runoutputcables.all():
+                self.assertEquals(subroc.get_coordinates(), (first_lvl_step_num,))
+
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+                basic_run = substep.child_run
+
+                for basic_roc in basic_run.runoutputcables.all():
+                    self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))

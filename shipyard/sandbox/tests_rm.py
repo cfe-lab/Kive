@@ -67,6 +67,10 @@ class UtilityMethods(TestCase):
         self.method_noop = self.make_first_method("string noop", "a method to do nothing to strings", self.coderev_noop)
         self.simple_method_io(self.method_noop, self.cdt_string, "strings", "same_strings")
 
+        # An ordinary user.
+        self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
+        self.user_bob.save()
+
     def tearDown(self):
         clean_files()
 
@@ -194,6 +198,18 @@ class UtilityMethods(TestCase):
         pipeline.save()
         family.clean()
         return pipeline
+
+    def make_words_symDS(self):
+        """Set up a data file of words."""
+        self.string_datafile = tempfile.NamedTemporaryFile(delete=False)
+        self.string_datafile.write("word\n")
+        self.string_datafile.close()
+        # Aw heck.
+        os.system("cat /usr/share/dict/words >> {}".
+                  format(self.string_datafile.name))
+        self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
+            name="blahblah", cdt=self.cdt_string, user=self.user_bob,
+            description="blahblahblah", make_dataset=True)
 
 
 class ExecuteTestsRM(UtilityMethods):
@@ -765,8 +781,6 @@ class FindSDTests(UtilityMethods):
     def setUp(self):
         super(FindSDTests, self).setUp()
 
-        self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
-        self.user_bob.save()
         self.setup_simple_pipeline()
         self.setup_twostep_pipeline()
         self.setup_nested_pipeline()
@@ -889,15 +903,7 @@ class FindSDTests(UtilityMethods):
         self.pipeline_noop.create_outputs()
 
         # Some data to run through the simple pipeline.
-        self.string_datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.string_datafile.write("word\n")
-        self.string_datafile.close()
-        # Aw heck.
-        os.system("cat /usr/share/dict/words >> {}".
-                format(self.string_datafile.name))
-        self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
-            name="blahblah", cdt=self.cdt_string, user=self.user_bob,
-            description="blahblahblah", make_dataset=True)
+        self.make_words_symDS()
 
     def test_find_symds_pipeline_input(self):
         """
