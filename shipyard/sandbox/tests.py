@@ -32,7 +32,8 @@ class ExecuteTests(TestCase):
 		# Code on file system
         self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py")
         self.mA_cr.save()
-        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc")
+        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_number=1,
+                                           revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.mA_crr.content_file.save("generic_script.py",File(f))
         self.mA_crr.save()

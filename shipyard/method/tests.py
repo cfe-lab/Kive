@@ -47,6 +47,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.compv1_crRev = CodeResourceRevision(
                     coderesource=self.comp_cr,
                     revision_name="v1",
+                    revision_number=1,
                     revision_desc="First version",
                     content_file=File(f))
             self.compv1_crRev.full_clean()
@@ -57,6 +58,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.compv2_crRev = CodeResourceRevision(
                 coderesource=self.comp_cr,
                 revision_name="v2",
+                revision_number=2,
                 revision_desc="Second version: better docstring",
                 revision_parent=self.compv1_crRev,
                 content_file=File(f))
@@ -71,6 +73,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             test_cr_1.save()
             test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
                                                   revision_name="v1",
+                                                  revision_number=1,
                                                   revision_desc="CR1-rev1",
                                                   content_file=File(f))
             test_cr_1_rev1.save()
@@ -82,7 +85,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                                      description="CR2")
             test_cr_2.save()
             test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
-                                                  revision_name="v2",
+                                                  revision_name="v1",
+                                                  revision_number=1,
                                                   revision_desc="CR2-rev1",
                                                   content_file=File(f))
             test_cr_2_rev1.save()
@@ -94,7 +98,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                                      description="CR3")
             test_cr_3.save()
             test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
-                                                  revision_name="v3",
+                                                  revision_name="v1",
+                                                  revision_number=1,
                                                   revision_desc="CR3-rev1",
                                                   content_file=File(f))
             test_cr_3_rev1.save()
@@ -106,7 +111,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                                      description="CR4")
             test_cr_4.save()
             test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
-                                                  revision_name="v4",
+                                                  revision_name="v1",
+                                                  revision_number=1,
                                                   revision_desc="CR4-rev1",
                                                   content_file=File(f))
             test_cr_4_rev1.save()
@@ -216,6 +222,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.script_1_crRev = CodeResourceRevision(
                 coderesource=self.script_1_cr,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="First version",
                 content_file=File(f))
             self.script_1_crRev.save()
@@ -251,6 +258,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.script_2_crRev = CodeResourceRevision(
                 coderesource=self.script_2_cr,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="First version",
                 content_file=File(f))
             self.script_2_crRev.save()
@@ -292,6 +300,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.script_3_crRev = CodeResourceRevision(
                 coderesource=self.script_3_cr,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="First version",
                 content_file=File(f))
             self.script_3_crRev.save()
@@ -367,6 +376,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             self.script_4_1_CRR = CodeResourceRevision(
                 coderesource=self.script_4_CR,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="v1",
                 content_file=File(f))
             self.script_4_1_CRR.save()
@@ -399,7 +409,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             f.write("#!/bin/bash\ncat $1")
             self.noop_data_file = f.name
             revision = CodeResourceRevision(coderesource = resource,
-                content_file = File(f))
+                content_file = File(f),
+                revision_number=1,)
             revision.clean()
             revision.save()
 
@@ -1250,6 +1261,7 @@ class CodeResourceRevisionTests(MethodTestSetup):
         # The revision has no content_file because it's a metapackage
         test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
                                               revision_name="v1_metapackage",
+                                              revision_number=1,
                                               revision_desc="CR6-rev1")
         test_cr_6_rev1.save()
 
@@ -1422,6 +1434,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
             cr_rev_v1 = CodeResourceRevision(
                     coderesource=cr,
                     revision_name="v1",
+                    revision_number=1,
                     revision_desc="First version",
                     content_file=File(f))
             cr_rev_v1.full_clean()
@@ -1432,6 +1445,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
             cr_rev_v2 = CodeResourceRevision(
                     coderesource=cr,
                     revision_name="v2",
+                    revision_number=2,
                     revision_desc="Second version",
                     content_file=File(f))
             cr_rev_v2.full_clean()
@@ -1459,6 +1473,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
             cr_rev_v1 = CodeResourceRevision(
                 coderesource=cr,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="First version",
                 content_file=File(f))
             cr_rev_v1.full_clean()
@@ -1475,6 +1490,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr_meta_rev_v1 = CodeResourceRevision(
             coderesource=cr_meta,
             revision_name="v1",
+            revision_number=1,
             revision_desc="First version")
         cr_meta_rev_v1.full_clean()
         cr_meta_rev_v1.save()
@@ -1504,6 +1520,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
             cr_rev_v1 = CodeResourceRevision(
                 coderesource=cr,
                 revision_name="v1",
+                revision_number=1,
                 revision_desc="First version",
                 content_file=File(f))
             cr_rev_v1.full_clean()
@@ -1520,6 +1537,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr_meta_rev_v1 = CodeResourceRevision(
             coderesource=cr_meta,
             revision_name="v1",
+            revision_number=1,
             revision_desc="First version")
         cr_meta_rev_v1.full_clean()
         cr_meta_rev_v1.save()
@@ -1994,7 +2012,7 @@ class MethodTests(MethodTestSetup):
         """
         # Create a CodeResourceRevision with no content file (ie. a Metapackage).
         res = CodeResource(); res.save()
-        rev = CodeResourceRevision(coderesource=res, content_file=None); rev.clean(); rev.save()
+        rev = CodeResourceRevision(coderesource=res, content_file=None, revision_number=1); rev.clean(); rev.save()
         f = MethodFamily(); f.save()
         m = Method(family=f, driver=rev)
         m.save()
@@ -2030,6 +2048,7 @@ class MethodTests(MethodTestSetup):
     def test_delete_method(self):
         """Deleting a method is possible."""
         self.assertIsNone(Method.objects.first().delete())
+
 
 class MethodFamilyTests(MethodTestSetup):
 
