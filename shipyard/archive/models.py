@@ -264,9 +264,9 @@ class RunAtomic(stopwatch.models.Stopwatch):
         """
         general_error = '{} "{}" has not decided whether or not to reuse an ExecRecord'.format(
             self.__class__.__name__, self)
-        if self.log.all().exists():
+        if self.log.exists():
             raise ValidationError("{}; no log should have been generated".format(general_error))
-        if self.invoked_logs.all().exists():
+        if self.invoked_logs.exists():
             raise ValidationError("{}; no steps or cables should have been invoked".format(general_error))
         if self.has_data():
             raise ValidationError("{}; no Datasets should be associated".format(general_error))
@@ -294,8 +294,40 @@ class RunAtomic(stopwatch.models.Stopwatch):
                                   .format(self.__class__.__name__, self))
 
     # Note: what clean() does in the not-reused case is specific to
-    # the class, so the _clean_not_reused() method is overridden
+    # the class, so the _clean_not_reused() method is extended
     # in RunStep and RunCable.
+    def _clean_not_reused(self):
+        """
+        Check coherence of a RunAtomic which has decided not to reuse an
+        ExecRecord:
+
+         - if the log is incomplete, there should be no Datasets or ExecRecord
+         - if ExecRecord is in place then it must have invoked logs, and its own log must be complete
+           (_clean_execlogs makes sure that all other logs are complete).
+
+        This is a helper for clean().  Returns False if clean() should terminate at this step
+        and True if it should continue.
+
+        PRE
+        This RunAtomic has reused = False (has decided not to reuse an ExecRecord).
+        """
+        if not self.log.exists() or not self.log.first().is_complete():
+            general_error = '{} "{}" is not reused and does not have a complete log'.format(
+                self.__class__.__name__, self)
+            if self.has_data():
+                raise ValidationError("{} so should not have generated any Datasets".format(general_error))
+            if self.execrecord:
+                raise ValidationError("{}; execrecord should not be set".format(general_error))
+            return False
+
+        # On the flipside....
+        if (self.execrecord is not None and
+                (not self.invoked_logs.exists() or self.log.exists() and not self.log.first().is_complete())):
+            raise ValidationError(
+                '{} "{}" is not reused and has not completed its own ExecLog but does have an ExecRecord'.format(
+                    self.__class__.__name__, self))
+
+        return True
 
     def _clean_execlogs(self):
         """Count and clean ExecLogs of Run(Step|SIC|OutputCable).
@@ -611,17 +643,18 @@ class RunStep(RunAtomic):
         for rsic in self.RSICs.all():
             rsic.complete_clean()
 
-        if (self.pipelinestep.cables_in.count() != self.RSICs.count()):
+        if self.pipelinestep.cables_in.count() != self.RSICs.count():
+
             general_error = 'RunStep "{}" inputs not quenched'.format(self)
             if self.reused is not None or self.execrecord is not None:
                 raise ValidationError("{}; reused and execrecord should not be set".format(general_error))
             if self.pipelinestep.transformation.__class__.__name__ == "Pipeline" and self.has_subrun():
                 raise ValidationError("{}; child_run should not be set".format(general_error))
-            if self.log.all().exists():
+            if self.log.exists():
                 raise ValidationError("{}; no log should have been generated".format(general_error))
-            if self.invoked_logs.all().exists():
+            if self.invoked_logs.exists():
                 raise ValidationError("{}; no other steps or cables should have been invoked".format(general_error))
-            if self.outputs.all().exists():
+            if self.outputs.exists():
                 raise ValidationError("{}; no data should have been generated".format(general_error))
             return False
         return True
@@ -646,8 +679,7 @@ class RunStep(RunAtomic):
 
          - else if we are not reusing an ER and this is a Method:
 
-           - if there is no ExecLog or if it isn't complete, there
-             should be no Datasets associated and ER should not be set
+           - call RunAtomic._clean_reused()
 
            (from here on ExecLog is assumed to be complete and clean)
 
@@ -670,13 +702,7 @@ class RunStep(RunAtomic):
             self._clean_reused()
 
         else: # self.reused is False.
-            if (not self.log.all().exists() or not self.log.first().is_complete()):
-                general_error = 'RunStep "{}" does not have a complete log'.format(self)
-                if self.outputs.all().exists():
-                    raise ValidationError("{} so should not have generated any Datasets".format(general_error))
-
-                if self.execrecord:
-                    raise ValidationError("{}; execrecord should not be set".format(self))
+            if not RunAtomic._clean_not_reused(self):
                 return False
  
             for out_data in self.outputs.all():
@@ -832,7 +858,6 @@ class RunStep(RunAtomic):
         if not self._clean_cables_in(): return
 
         # From here on, RSICs are assumed to be quenched.
-
         # Perform tests specific to the Method and Pipeline cases.
         if self.pipelinestep.transformation.__class__.__name__ == "Method":
             if not self._clean_with_method(): return
@@ -1015,10 +1040,7 @@ class RunCable(RunAtomic):
 
          - if reused is False:
 
-           - if no ExecLog is attached yet or it is not complete,
-             there should be no associated Dataset
-
-           (from here on ExecLog is known to be attached and complete)
+           - call RunAtomic._clean_reused
 
            - if the cable is trivial, there should be no associated Dataset
            - otherwise, make sure there is at most one Dataset, and clean it
@@ -1034,10 +1056,7 @@ class RunCable(RunAtomic):
         True if there are more checks to do within clean, False if clean
         should return right away.
         """
-        if not self.log.exists() or not self.log.first().is_complete():
-            if self.has_data():
-                raise ValidationError('{} "{}" does not have a complete log so should not have generated any '
-                                      'Datasets'.format(self._cable_type_str(), self))
+        if not RunAtomic._clean_not_reused(self):
             return False
 
         # From here on, the ExecLog is known to be complete.
@@ -1656,7 +1675,7 @@ class ExecLog(stopwatch.models.Stopwatch):
                 (type(self.record.pipelinestep.transformation) !=
                  method.models.Method)):
             raise ValidationError(
-                "ExecLog \"{}\" does not correspond to a Method or cable".
+                'ExecLog "{}" does not correspond to a Method or cable'.
                 format(self))
 
         if self.record.get_top_level_run() != self.invoking_record.get_top_level_run():

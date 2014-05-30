@@ -159,7 +159,8 @@ class CustomConstraintTests(UtilityMethods):
 
         coderesource = CodeResource(name=name, filename="{}.sh".format(name), description=desc)
         coderesource.save()
-        revision = coderesource.revisions.create(revision_name="1", revision_desc="first version",
+        revision = coderesource.revisions.create(revision_name="1", revision_number=1,
+                                                 revision_desc="first version",
                                                  content_file=scriptfile.name)
         revision.save()
         methodfamily = MethodFamily()

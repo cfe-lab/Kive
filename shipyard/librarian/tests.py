@@ -48,7 +48,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
             filename="generic_script.py")
         self.generic_cr.save()
         self.generic_crRev = CodeResourceRevision(
-            coderesource=self.generic_cr, revision_name="v1",
+            coderesource=self.generic_cr, revision_name="v1", revision_number=1,
             revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.generic_crRev.content_file.save("generic_script.py", File(f))
