@@ -14,6 +14,7 @@ from django.utils import timezone
 
 import hashlib
 import logging
+import itertools
 
 import file_access_utils
 
@@ -359,12 +360,13 @@ class RunAtomic(stopwatch.models.Stopwatch):
             # Clean all content/integrity checks, and make sure at most
             # one has been done for each output SymbolicDataset.
             outputs_checked = set([])
-            for check in invoked_log.content_checks.all() + invoked_log.intergity_checks.all():
+            for check in itertools.chain(invoked_log.content_checks.all(), 
+                                         invoked_log.integrity_checks.all()):
                 if check.symbolicdataset.pk in outputs_checked:
                     raise ValidationError('{} "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'
                                           .format(self.__class__.__name__, self, check.symbolicdataset, invoked_log))
-                outputs_checked.add(check.symbolidataset.pk)
+                outputs_checked.add(check.symbolicdataset.pk)
                 check.clean()
 
         # If log exists and there are invoked_logs, log should be among
@@ -1281,6 +1283,7 @@ class RunCable(RunAtomic):
 
         # Now, we know there to be an ExecRecord.
         self._clean_execrecord()
+
 
 class RunSIC(RunCable):
     """
