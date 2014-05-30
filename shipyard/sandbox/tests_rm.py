@@ -67,6 +67,13 @@ class UtilityMethods(TestCase):
         self.method_noop = self.make_first_method("string noop", "a method to do nothing to strings", self.coderev_noop)
         self.simple_method_io(self.method_noop, self.cdt_string, "strings", "same_strings")
 
+        # Another totally different Method that uses the same CodeRevision and yes it does the same thing.
+        self.method_trivial = self.make_first_method(
+            "string trivial",
+            "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone",
+            self.coderev_noop)
+        self.simple_method_io(self.method_trivial, self.cdt_string, "strings", "untouched_strings")
+
         # An ordinary user.
         self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
         self.user_bob.save()
@@ -161,6 +168,7 @@ class UtilityMethods(TestCase):
             revision = CodeResourceRevision(
                 coderesource=resource,
                 revision_name="1",
+                revision_number=1,
                 revision_desc="first version",
                 content_file=File(f))
             revision.clean()
@@ -192,7 +200,7 @@ class UtilityMethods(TestCase):
         family = PipelineFamily(name=pname, description=pdesc)
         family.clean()
         family.save()
-        pipeline = Pipeline(family=family, revision_name="1", 
+        pipeline = Pipeline(family=family, revision_name="1",
             revision_desc="first version")
         pipeline.complete_clean()
         pipeline.save()

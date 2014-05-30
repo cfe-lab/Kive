@@ -7,6 +7,7 @@ from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 
 import os, sys
 import tempfile, shutil
@@ -170,7 +171,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         # First RunSIC associated and completed.
         step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
+        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
         if bp == "first_cable": return
 
         # First RunStep completed.
@@ -199,7 +203,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         D1_in_ccl.execlog = self.E01_21_RSIC.log.first()
         D1_in_ccl.save()
 
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
 
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
@@ -212,8 +219,14 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         C1_ccl = self.C1_in_symDS.content_checks.first()
@@ -224,7 +237,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
         if bp == "sub_pipeline_complete": return
 
         # Third RunStep associated.
@@ -237,13 +253,18 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
 
         # C2_in_symDS was created here so we associate its CCL with cable
         # E11_32.
         C2_in_ccl = self.C2_in_symDS.content_checks.first()
         C2_in_ccl.execlog = self.E11_32_RSIC.log.first()
         C2_in_ccl.save()
+
+        if bp == "third_step_cables_done": return
 
         step3_outs = [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS]
         self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS], step3_outs)
@@ -274,8 +295,14 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
         # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
         # and C3_out_symDS.
-        self.C1_out_symDS.integrity_checks.create(execlog=roc2.log.first())
-        self.C3_out_symDS.integrity_checks.create(execlog=roc3.log.first())
+        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
 
         if bp == "outcables_done": return
 
@@ -345,9 +372,228 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         if bp == "subrun_complete": return
 
 
+class RunAtomicTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
+    """Tests of functionality shared by all RunAtomics."""
+
+    def setUp(self):
+        ArchiveTestSetup.setUp(self)
+        sandbox.tests_rm.UtilityMethods.setUp(self)
+
+    def test_clean_execlogs_invoked_logs_cleaned(self):
+        """Test that _clean_execlogs properly calls clean on its invoked logs."""
+        self.step_through_run_creation("outcables_done")
+
+        # For every RunAtomic invoked during this run, break each of its invoked_logs and see if it appears.
+        runatomics = (list(RunStep.objects.filter(
+            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
+                      list(RunSIC.objects.all()) +
+                      list(RunOutputCable.objects.all()))
+
+        for runatomic in runatomics:
+            # Skip RunAtomics that are not part of this Run.
+            if runatomic.get_top_level_run() != self.pE_run:
+                continue
+
+            for invoked_log in runatomic.invoked_logs.all():
+                original_el_start_time = invoked_log.start_time
+                invoked_log.start_time = None
+                invoked_log.save()
+                self.assertRaisesRegexp(
+                    ValidationError,
+                    'Stopwatch "{}" does not have a start time but it has an end time'.format(invoked_log),
+                    runatomic.clean)
+                invoked_log.start_time = original_el_start_time
+                invoked_log.save()
+
+    def test_clean_execlogs_invoked_logs_ICLs_CCLs_cleaned(self):
+        """Test that ICLs and CCLs are appropriately cleaned in _clean_execlogs."""
+        self.step_through_run_creation("outcables_done")
+
+        # For every RunAtomic invoked during this run, break each of its ICLs/CCLs and see if it appears.
+        runatomics = (list(RunStep.objects.filter(
+            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
+                      list(RunSIC.objects.all()) +
+                      list(RunOutputCable.objects.all()))
+
+        for runatomic in runatomics:
+            # Skip RunAtomics that are not part of this Run.
+            if runatomic.get_top_level_run() != self.pE_run:
+                continue
+
+            for invoked_log in runatomic.invoked_logs.all():
+                for checklog in (list(invoked_log.integrity_checks.all()) + list(invoked_log.content_checks.all())):
+                    original_checklog_start_time = checklog.start_time
+                    checklog.start_time = None
+                    checklog.save()
+                    self.assertRaisesRegexp(
+                        ValidationError,
+                        'Stopwatch "{}" does not have a start time but it has an end time'.format(checklog),
+                        runatomic.clean)
+                    checklog.start_time = original_checklog_start_time
+                    checklog.save()
+
+    def test_clean_execlogs_log_not_among_invoked_logs(self):
+        """A RunAtomic's log should be among its invoked_logs if any invoked_logs exist."""
+        self.step_through_run_creation("outcables_done")
+
+        # Imagine that step 3 invokes step 1 but not itself.  Note that this would break the Run overall
+        # but we're only looking to check for errors local to a single RunAtomic.
+        step_3_el = self.step_E3_RS.log.first()
+        step_1_el = self.step_E1_RS.log.first()
+
+        step_1_el.invoking_record = self.step_E3_RS
+        step_1_el.save()
+
+        step_3_el.invoking_record = self.pE_run.runoutputcables.get(pipelineoutputcable=self.E21_41)
+        step_3_el.save()
+
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecLog of {} "{}" is not included with its invoked ExecLogs'.format(
+                                    self.step_E3_RS.__class__.__name__, self.step_E3_RS
+                                )),
+                                self.step_E3_RS.clean)
+
+    def test_clean_execlogs_log_set_before_invoked_ExecLogs_complete(self):
+        """A RunAtomic's log should not be set before all invoked_logs are complete."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
+        # but we're only looking to check for errors local to a single RunAtomic.
+        step_1_el = self.step_E1_RS.log.first()
+        step_1_el.invoking_record = self.step_E3_RS
+        step_1_el.save()
+
+        # Make step_1_el incomplete.
+        step_1_el.end_time = None
+        step_1_el.save()
+
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
+                                    self.step_E3_RS.__class__.__name__, self.step_E3_RS
+                                )),
+                                self.step_E3_RS.clean)
+
+    def test_clean_execlogs_log_set_before_invoked_ExecLogs_finish_checks(self):
+        """A RunAtomic's log should not be set before all invoked_logs finish their checks."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
+        # but we're only looking to check for errors local to a single RunAtomic.
+        step_1_el = self.step_E1_RS.log.first()
+        step_1_el.invoking_record = self.step_E3_RS
+        step_1_el.save()
+
+        # Remove step_1_el's ContentCheckLog.
+        step_1_el.content_checks.first().delete()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+                self.step_E3_RS.__class__.__name__, self.step_E3_RS
+            )),
+            self.step_E3_RS.clean)
+
+    def test_clean_execlogs_runatomic_invokes_previous_runatomic(self):
+        """Testing clean on a RunAtomic which invoked a previous RunAtomic in the correct fashion."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
+        # but we're only looking to check for errors local to a single RunAtomic.
+        step_1_el = self.step_E1_RS.log.first()
+        step_1_el.invoking_record = self.step_E3_RS
+        step_1_el.save()
+
+        self.assertIsNone(self.step_E3_RS.clean())
+
+    def test_clean_execlogs_runatomic_invoked_by_subsequent_runatomic(self):
+        """
+        Testing clean on a RunAtomic whose ExecLog was invoked by a subsequent RunAtomic.
+        """
+        p_one = self.make_first_pipeline("p_one", "two no-ops")
+        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one.create_outputs()
+        p_one.save()
+        # Mark the output of step 1 as not retained.
+        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
+        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two.create_outputs()
+        p_two.save()
+        # We also delete the output of step 1 so that it reuses the existing ER we'll have
+        # create for p_one.
+        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        sandbox_one.execute_pipeline()
+
+        sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        sandbox_two.execute_pipeline()
+
+        # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
+        # the cable feeding step 2.
+        run_two_step_one = sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
+        run_two_step_two = sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run_two_step_two_input_cable = run_two_step_two.RSICs.first()
+
+        self.assertEquals(run_two_step_one.log.first().invoking_record, run_two_step_two_input_cable)
+        self.assertIsNone(run_two_step_one.clean())
+        self.assertIsNone(run_two_step_two.clean())
+
+    def test_clean_undecided_reused_invoked_logs_exist(self):
+        """A RunAtomic that has not decided on reuse should not have any invoked logs."""
+        self.step_through_run_creation("third_step_cables_done")
+        step_one_el = self.step_E1_RS.log.first()
+        step_one_el.invoking_record = self.step_E3_RS
+        step_one_el.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('{} "{}" has not decided whether or not to reuse an ExecRecord'
+                      "; no steps or cables should have been invoked".format("RunStep", self.step_E3_RS)),
+            self.step_E3_RS.clean
+        )
+
+    def test_clean_reused_invoked_logs_exist(self):
+        """A RunAtomic that reuses an ExecRecord should not have any invoked logs."""
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.step_E1_RS.reused = True
+        for curr_output in self.step_E1_RS.outputs.all():
+            curr_output.created_by = None
+            curr_output.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('{} "{}" reused an ExecRecord; no steps or cables should have been invoked'.format(
+                "RunStep", self.step_E1_RS)),
+            self.step_E1_RS.clean
+        )
+
+    # May 28, 2014: just introduced _clean_not_reused to RunAtomic.
+    def test_clean_not_reused_runatomic_log_invoked_elsewhere(self):
+        """Testing clean on a RunAtomic whose log was invoked elsewhere by a subsequent RunAtomic."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
+        # but we're only looking to check for errors local to a single RunAtomic.
+        step_1_el = self.step_E1_RS.log.first()
+        step_1_el.invoking_record = self.step_E3_RS
+        step_1_el.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('{} "{}" is not reused and has not completed its own ExecLog but does have an ExecRecord'.format(
+                "RunStep", self.step_E1_RS
+            )),
+            self.step_E1_RS.clean)
+
+
 class RunStepTests(ArchiveTestSetup):
 
-    def test_runstep_many_execlogs(self):
+    def test_RunStep_many_execlogs(self):
         run = self.pE.pipeline_instances.create(user=self.myUser)
         run_step = self.step_E1.pipelinestep_instances.create(run=run)
         run_step.reused = False
@@ -450,6 +696,38 @@ class RunStepTests(ArchiveTestSetup):
                                 re.escape('RunStep "{}" inputs not quenched; reused and execrecord should not be set'
                                           .format(self.step_E1_RS)),
                                 self.step_E1_RS.clean)
+
+    def test_RunStep_input_unquenched_with_log(self):
+        """
+        A RunStep with unquenched input cables, but which has an
+        associated ExecLog, is not clean.
+        """
+        self.step_through_runstep_creation("first_runstep_complete")
+        self.E03_11_RSIC.delete()
+        self.step_E1_RS.execrecord = None
+        self.step_E1_RS.reused = None
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('RunStep "{}" inputs not quenched; no log should have been generated'
+                                          .format(self.step_E1_RS)),
+                                self.step_E1_RS.clean)
+
+    def test_RunStep_input_unquenched_invokes_other_RunAtomics(self):
+        """
+        A RunStep with unquenched input cables should not have any invoked_logs.
+        """
+        # This is a broken setup: step 1 can't have been invoked by step 3.
+        # Still, we're just checking step 3 here.
+        self.step_through_run_creation("third_step")
+
+        step_one_el = self.step_E1_RS.log.first()
+        step_one_el.invoking_record = self.step_E3_RS
+        step_one_el.save()
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('RunStep "{}" inputs not quenched; no other steps or cables should have been invoked'
+                      .format(self.step_E3_RS)),
+            self.step_E3_RS.clean)
 
     def test_RunStep_input_unquenched_with_child_run(self):
         """
@@ -656,9 +934,9 @@ class RunStepTests(ArchiveTestSetup):
         A RunStep with a child_run which is clean, is also clean.
         """
         self.step_through_runstep_creation("sub_pipeline")
-        self.assertIsNone(self.step_E3_RS.clean())
+        self.assertIsNone(self.step_E2_RS.clean())
 
-    def test_RunStep_clean_good_child_run(self):
+    def test_RunStep_clean_bad_child_run(self):
         """
         A RunStep with a child_run which is not clean, is also not
         clean. Note: this isn't quite the same as the original test,
@@ -2118,6 +2396,136 @@ class ExecLogTests(ArchiveTestSetup):
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
         execlog = step_E1_RS.log.create(invoking_record=step_E1_RS)
         self.assertIsNone(execlog.delete())
+
+    def test_clean_record_not_RunAtomic(self):
+        """record of ExecLog should be a RunAtomic."""
+        self.step_through_run_creation("outcables_done")
+        # Retrieve an ExecLog and point it at a subrun.
+
+        for el in ExecLog.objects.all():
+            original_record = el.record
+            el.record = self.step_E2_RS
+            self.assertRaisesRegexp(ValidationError,
+                                    'ExecLog "{}" does not correspond to a Method or cable'.format(el),
+                                    el.clean)
+            el.record = original_record
+            el.save()
+
+    def test_clean_record_and_invoked_records_different_Run(self):
+        """ExecLog's record and invoked_records should belong to the same top-level Run."""
+        self.step_through_runstep_creation("first_rsic")
+
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
+
+        # Now step_E1_RS is marked as reused, and there is a dummy record of a RunStep belonging to
+        # other_run.  Let's retrieve that ExecLog and mis-wire it so that its record belongs to self.pE_run
+        # while its invoking record remains other_run and that should trigger an error in ExecLog.clean().
+        el_to_mess_up = other_run.runsteps.get(pipelinestep__step_num=1).log.first()
+
+        el_to_mess_up.record = self.step_E1_RS
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.format(el_to_mess_up),
+            el_to_mess_up.clean)
+
+    def test_clean_invoking_record_precedes_record_different_coords(self):
+        """An ExecLog should not have been invoked before its own record."""
+        self.step_through_run_creation("outcables_done")
+        # Get all ExecLogs and change their invoking record to things preceding it in the run.
+
+        for el in ExecLog.objects.all():
+            # Skip if this ExecLog doesn't have top-level run pE_run.
+            if el.record.get_top_level_run() is not self.pE_run:
+                continue
+
+            # Skip if this ExecLog has coordinates (1,).
+            if el.record.get_coordinates() == (1,):
+                continue
+
+            # Change invoking_record to step 1.
+            original_invoking_record = el.invoking_record
+            el.invoking_record = self.step_E1_RS
+            self.assertRaisesRegexp(
+                ValidationError,
+                'ExecLog "{}" is invoked earlier than the RunStep/RSIC/ROC it belongs to'.format(el),
+                el.clean)
+            el.invoking_record = original_invoking_record
+            el.save()
+
+    def test_clean_invoking_record_precedes_record_RSIC_of_RS(self):
+        """The ExecLog of a RunStep should not be invoked by its own RSICs."""
+        self.step_through_run_creation("outcables_done")
+
+        # Retrieve all ExecLogs of steps.
+        step_ELs = ExecLog.objects.filter(content_type=ContentType.objects.get_for_model(RunStep))
+
+        for el in step_ELs:
+            original_invoking_record = el.invoking_record
+            for rsic in el.record.RSICs.all():
+                el.invoking_record = rsic
+                self.assertRaisesRegexp(
+                    ValidationError,
+                    'ExecLog "{}" is invoked earlier than the RunStep it belongs to'.format(el),
+                    el.clean)
+            el.invoking_record = original_invoking_record
+            el.save()
+
+    def test_clean_invoking_record_precedes_record_anything_precedes_ROC(self):
+        """The ExecLog of a RunOutputCable should not be invoked by anything before it in its run."""
+        self.step_through_run_creation("outcables_done")
+
+        # Retrieve all ExecLogs of ROCs.
+        ROC_ELs = ExecLog.objects.filter(content_type=ContentType.objects.get_for_model(RunOutputCable))
+
+        for el in ROC_ELs:
+            # Get its containing run.
+            containing_run = el.record.run
+
+            original_invoking_record = el.invoking_record
+
+            # Change its invoking record to all steps and RSICs prior to it.
+            for step in containing_run.runsteps.all():
+
+                # Only use this step if it isn't a sub-pipeline.
+                if not step.has_subrun():
+                    el.invoking_record = step
+                    self.assertRaisesRegexp(
+                        ValidationError,
+                        'ExecLog "{}" is invoked earlier than the ROC it belongs to'.format(el),
+                        el.clean)
+
+                for rsic in step.RSICs.all():
+                    el.invoking_record = rsic
+                    self.assertRaisesRegexp(
+                        ValidationError,
+                        'ExecLog "{}" is invoked earlier than the ROC it belongs to'.format(el),
+                        el.clean)
+            el.invoking_record = original_invoking_record
+            el.save()
+
+    def test_clean_good_ExecLog(self):
+        """
+        Test that clean doesn't barf on good ExecLogs.
+        """
+        self.step_through_run_creation("outcables_done")
+        for el in ExecLog.objects.all():
+            self.assertIsNone(el.clean())
+
+    def test_clean_good_ExecLog_invoked_later(self):
+        """
+        ExecLogs can be invoked later in the same pipeline than their own record.
+
+        Note that this case causes the containing Run and such to be inconsistent,
+        but we're only checking ExecLog right now.
+        """
+        self.step_through_run_creation("outcables_done")
+        el_to_mess_with = self.step_E1_RS.log.first()
+
+        el_to_mess_with.invoking_record = self.step_E3_RS
+
+        self.assertIsNone(el_to_mess_with.clean())
 
 
 class GetCoordinatesTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
