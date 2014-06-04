@@ -353,9 +353,11 @@ class SymbolicDataset(models.Model):
         if newly_computed_MD5 != self.MD5_checksum:
             self.logger.warn("md5s do not agree")
 
+            # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
+            # just that it conflicted with the existing one.
             evil_twin = SymbolicDataset.create_SD(
                     new_file_path,
-                    cdt=self.get_cdt(),
+                    cdt=None,
                     user=checking_user,
                     name="{}eviltwin".format(self),
                     description="MD5 conflictor of {}".format(self))

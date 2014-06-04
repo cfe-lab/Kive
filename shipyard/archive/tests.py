@@ -409,12 +409,8 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.sandbox_two.execute_pipeline()
 
 
-class RunAtomicTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
+class RunAtomicTests(ArchiveTestSetup):
     """Tests of functionality shared by all RunAtomics."""
-
-    def setUp(self):
-        ArchiveTestSetup.setUp(self)
-        sandbox.tests_rm.UtilityMethods.setUp(self)
 
     def test_clean_execlogs_invoked_logs_cleaned(self):
         """Test that _clean_execlogs properly calls clean on its invoked logs."""
@@ -2544,14 +2540,8 @@ class ExecLogTests(ArchiveTestSetup):
         self.assertIsNone(el_to_mess_with.clean())
 
 
-class GetCoordinatesTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
+class GetCoordinatesTests(ArchiveTestSetup):
     """Tests of the get_coordinates functions of all Run and RunAtomic classes."""
-
-    def setUp(self):
-        """Set up our testing environment."""
-        ArchiveTestSetup.setUp(self)
-        # These are Rosemary's methods for defining pipelines.
-        sandbox.tests_rm.UtilityMethods.setUp(self)
 
     def _setup_deep_nested_run(self):
         """Set up a pipeline with sub-sub-pipelines to test recursion."""
@@ -2935,7 +2925,7 @@ class IsCompleteTests(ArchiveTestSetup):
 
         # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
         # failed.
-        run2_step1 = self.sandbox_one.run.runsteps.get(pipelinestep__step_num=1)
+        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
         run2_step2_cable = run2_step2.RSICs.first()
 
@@ -2943,5 +2933,53 @@ class IsCompleteTests(ArchiveTestSetup):
         self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
         self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
 
-        self.assertFalse(run2_step1.log.is_successful())
+        self.assertFalse(run2_step1.log.first().is_successful())
+        self.assertTrue(run2_step2_cable.is_complete())
+
+    def test_runatomic_unsuccessful_failed_integrity_check_during_recovery(self):
+        """Testing of a RunAtomic which has a failed integrity check during recovery."""
+        # Run two pipelines, the second of which reuses parts of the first, but the method has been
+        # changed and the output is different now.
+        p_one = self.make_first_pipeline("p_one", "two no-ops")
+        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one.create_outputs()
+        p_one.save()
+        # Mark the output of step 1 as not retained.
+        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one.execute_pipeline()
+
+        # Oops!  Between runs, self.method_noop gets screwed with.
+        with tempfile.TemporaryFile() as f:
+            f.write("#!/bin/bash\n echo; echo; echo 'This CRR has been tampered with'; echo; echo; echo \"This is not what's supposed to be output here\" > $2")
+            self.coderev_noop.content_file=File(f)
+            self.coderev_noop.save()
+
+        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
+        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two.create_outputs()
+        p_two.save()
+        # We also delete the output of step 1 so that it reuses the existing ER we'll have
+        # create for p_one.
+        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two.execute_pipeline()
+
+        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
+        # failed.
+        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
+        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run2_step2_cable = run2_step2.RSICs.first()
+
+        self.assertIsNone(run2_step2_cable.log.first())
+        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+
+        self.assertTrue(run2_step1.log.first().is_successful())
+        self.assertFalse(run2_step1.log.first().all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())

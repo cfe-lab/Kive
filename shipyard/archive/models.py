@@ -904,12 +904,8 @@ class RunStep(RunAtomic):
             return
 
         # From here on, the appropriate ER is known to be set.
-        # FIXME remove debugging prints
-        print("\nSqueeeeps\n")
         self._clean_execrecord()
-        print("\nTyroil Smoochie-Wallace\n")
         self._clean_outputs()
-        print("\nL'Carpetron Dookmarriot\n")
 
         # Check whether the CCLs/ICLs are overquenching the outputs.
         if self.log.exists():

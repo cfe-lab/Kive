@@ -145,13 +145,13 @@ class UtilityMethods(TestCase):
         method.clean()
         return minput, moutput
 
-    def new_datatype(self, dtname, dtdesc, pytype):
+    def new_datatype(self, dtname, dtdesc, shipyardtype):
         """
         Helper function to create a new datatype.
         """
         datatype = Datatype(name=dtname, description=dtdesc)
         datatype.save()
-        datatype.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
+        datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
         datatype.complete_clean()
         return datatype
 
