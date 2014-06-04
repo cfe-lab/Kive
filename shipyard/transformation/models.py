@@ -26,7 +26,8 @@ class TransformationFamily(models.Model):
     name = models.CharField(
         "Transformation family name",
 		max_length=128,
-		help_text="The name given to a group of methods/pipelines")
+		help_text="The name given to a group of methods/pipelines",
+        unique=True)
 
     description = models.TextField(
         "Transformation family description",

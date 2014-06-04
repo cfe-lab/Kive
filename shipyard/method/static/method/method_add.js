@@ -71,49 +71,86 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     ).change(); // trigger on load
 
     // add or subtract input forms
-    var numberOfXputForms = $('#extraXputForms > tr').length;
-    var options = document.getElementById("id_compounddatatype_0").options;
+    var numberOfInputForms = $('#extraInputForms > tr').length;
+    var options = document.getElementById("id_compounddatatype_in_0").options;
 
     // modify name attributes for extra input forms received from server
-    for (var i = 0; i < numberOfXputForms; i++) {
-        $('#id_input_output_'+i).attr('name', 'input_output_'+i);
-        $('#id_dataset_name_'+i).attr('name', 'dataset_name_'+i);
-        $('#id_compounddatatype_'+i).attr('name', 'compounddatatype_'+i);
-        $('#id_min_row_'+i).attr('name', 'min_row_'+i);
-        $('#id_max_row_'+i).attr('name', 'max_row_'+i);
+    for (var i = 0; i < numberOfInputForms; i++) {
+        $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
+        $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
+        $('#id_min_row_in_'+i).attr('name', 'min_row_in_'+i);
+        $('#id_max_row_in_'+i).attr('name', 'max_row_in_'+i);
     }
 
     // append row to table
-    $("#addXputForm").click(
+    $("#addInputForm").click(
         function () {
-            numberOfXputForms += 1;
-            i = numberOfXputForms - 1; // 0-indexing
+            numberOfInputForms += 1;
+            i = numberOfInputForms - 1; // 0-indexing
             htmlStr = "<tr>"
-            htmlStr += "<td>"+numberOfXputForms+"</td>";
+            htmlStr += "<td>"+numberOfInputForms+"</td>";
 
-            htmlStr += "<td><select id=\"id_input_output_"+i+"\" name=\"input_output_"+i+"\">";
-            htmlStr += "<option value=\"input\">IN</option>";
-            htmlStr += "<option value=\"output\">OUT</option>";
-            htmlStr += "</select>";
-
-            htmlStr += "<td><input id=\"id_dataset_name_" + i + "\" maxlength=\"128\" name=\"dataset_name_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_" + i + "\" name=\"compounddatatype_" + i + "\">";
+            htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
             for (var j = 0; j < options.length; j++) {
                 htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
             }
             htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_" + i + "\" class=\"shortIntField\" name=\"min_row_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_" + i + "\" class=\"shortIntField\" name=\"max_row_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
             htmlStr += "</tr>"
 
-            $('#extraXputForms').find('tr:last').after(htmlStr);
+            $('#extraInputForms').find('tr:last').after(htmlStr);
         }
     );
-    $("#removeXputForm").click(
+    $("#removeInputForm").click(
         function() {
-            if (numberOfXputForms > 2) {
-                numberOfXputForms -= 1;
-                $('#extraXputForms').find('tr:last').remove();
+            if (numberOfInputForms > 1) {
+                numberOfInputForms -= 1;
+                $('#extraInputForms').find('tr:last').remove();
+            }
+        }
+    );
+
+
+    // add or subtract output forms
+    var numberOfOutputForms = $('#extraOutputForms > tr').length;
+    // we can reuse options
+
+    // modify name attributes for extra input forms received from server
+    for (var i = 0; i < numberOfOutputForms; i++) {
+        $('#id_dataset_name_out_'+i).attr('name', 'dataset_name_out_'+i);
+        $('#id_compounddatatype_out_'+i).attr('name', 'compounddatatype_out_'+i);
+        $('#id_min_row_out_'+i).attr('name', 'min_row_out_'+i);
+        $('#id_max_row_out_'+i).attr('name', 'max_row_out_'+i);
+    }
+
+    // append row to table
+    $("#addOutputForm").click(
+        function () {
+            numberOfOutputForms += 1;
+            i = numberOfOutputForms - 1; // 0-indexing
+            htmlStr = "<tr>"
+            htmlStr += "<td>"+numberOfOutputForms+"</td>";
+
+            htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
+            htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
+            for (var j = 0; j < options.length; j++) {
+                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
+            }
+            htmlStr += "</select></td>";
+            htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
+            htmlStr += "</tr>"
+
+            $('#extraOutputForms').find('tr:last').after(htmlStr);
+        }
+    );
+    $("#removeOutputForm").click(
+        function() {
+            if (numberOfOutputForms > 1) {
+                numberOfOutputForms -= 1;
+                $('#extraOutputForms').find('tr:last').remove();
             }
         }
     );

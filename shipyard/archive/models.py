@@ -14,6 +14,7 @@ from django.utils import timezone
 
 import hashlib
 import logging
+import itertools
 
 import file_access_utils
 
@@ -356,10 +357,17 @@ class RunAtomic(stopwatch.models.Stopwatch):
         for invoked_log in self.invoked_logs.all():
             invoked_log.clean()
 
-            for ccl in invoked_log.content_checks.all():
-                ccl.clean()
-            for icl in invoked_log.integrity_checks.all():
-                icl.clean()
+            # Clean all content/integrity checks, and make sure at most
+            # one has been done for each output SymbolicDataset.
+            outputs_checked = set([])
+            for check in itertools.chain(invoked_log.content_checks.all(), 
+                                         invoked_log.integrity_checks.all()):
+                if check.symbolicdataset.pk in outputs_checked:
+                    raise ValidationError('{} "{}" has multiple Integrity/ContentCheckLogs for output '
+                                          'SymbolicDataset {} of ExecLog "{}"'
+                                          .format(self.__class__.__name__, self, check.symbolicdataset, invoked_log))
+                outputs_checked.add(check.symbolicdataset.pk)
+                check.clean()
 
         # If log exists and there are invoked_logs, log should be among
         # the invoked logs.  If log exists, any preceding logs should
@@ -400,28 +408,6 @@ class RunAtomic(stopwatch.models.Stopwatch):
                 '{} "{}" does not have an ExecRecord so should not have any data checks'.format(
                     self.__class__.__name__, self)
             )
-
-    def _clean_outputs_overchecked(self):
-        """
-        Check that outputs are not overquenched with CCLs/ICLs.
-
-        This is a helper called during the course of clean().
-
-        PRE: log is set and complete, execrecord is set and complete.
-        """
-        for ero in self.execrecord.execrecordouts.all():
-            curr_SD = ero.symbolicdataset
-
-            total_checks = (
-                self.log.first().integrity_checks.filter(symbolicdataset=curr_SD).count() +
-                self.log.first().content_checks.filter(symbolicdataset=curr_SD).count()
-            )
-
-            if total_checks > 1:
-                raise ValidationError(
-                    '{} "{}" has multiple Integrity/ContentCheckLogs for output SymbolicDataset {} '
-                    'of ExecLog "{}"'.format(self.__class__.__name__, self, curr_SD, self.log.first())
-                )
 
     def is_complete(self):
         """
@@ -471,7 +457,6 @@ class RunAtomic(stopwatch.models.Stopwatch):
 
         # Check that either every output has been successfully checked
         # or one+ has failed and the rest are complete.
-
         if self.log.first().all_checks_passed():
             return True
 
@@ -907,10 +892,6 @@ class RunStep(RunAtomic):
         self._clean_execrecord()
         self._clean_outputs()
 
-        # Check whether the CCLs/ICLs are overquenching the outputs.
-        if self.log.exists():
-            self._clean_outputs_overchecked()
-
     def is_complete(self):
         """
         True if RunStep is complete; False otherwise.
@@ -1307,9 +1288,6 @@ class RunCable(RunAtomic):
 
         # Now, we know there to be an ExecRecord.
         self._clean_execrecord()
-        # Check whether the CCLs/ICLs are overquenching the outputs.
-        if self.log.exists():
-            self._clean_outputs_overchecked()
 
 
 class RunSIC(RunCable):
