@@ -26,39 +26,57 @@
     revisions of this specific Method.
 </p>
     <table>
-    {% for field in method_form %}
         <tr>
-        <th>{{ field.label_tag }}</th>
-        <td>
-            {{ field }}
-            <div class="helptext">{{ field.help_text }}</div>
-        </td>
-        <td>{{ field.errors }}</td>
+            <th>{{ method_form.coderesource.label }}</th>
+            <td>
+                {{ method_form.coderesource }}
+                <div class="helptext">{{ method_form.coderesource.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_form.coderesource.errors }}</div>
+            </td>
+
+            <th>Family name</th>
+            <td>
+                {{ method_form.revision_name }}
+                <div class="helptext">{{ method_form.revision_name.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_form.errors.name }}</div>
+            </td>
         </tr>
-    {% endfor %}
+        <tr>
+            <th>{{ method_form.revisions.label }}</th>
+            <td>
+                {{ method_form.revisions }}
+                <div class="helptext">{{ method_form.revisions.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_form.revisions.errors }}</div>
+            </td>
+
+            <th>{{ method_form.revision_desc.label }}</th>
+            <td>
+                {{ method_form.revision_desc }}
+                <div class="helptext">{{ method_form.revision_desc.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_form.errors.description }}</div>
+            </td>
+        </tr>
     </table>
 
 
 
-<h3>Inputs/Outputs</h3>
-    <p>
-        An input/output is how we plug <i>structured</i> (comma-separated values, CSV) or <i>unstructured</i> data (any
-        other format) into a CodeResource.
-    </p>
-    <p>
-    <input type="button" id="addXputForm" class="add" value="+"/><input type="button" id="removeXputForm" class="remove" value="&minus;"/>
+<h3>Inputs</h3>
+    <input type="button" id="addInputForm" class="add" value="+"/><input type="button" id="removeInputForm" class="remove" value="&minus;"/>
     <small>Add/subtract input or output forms</small>
-    </p>
 
-    <table id="xputForms" class="formtable">
+
+    <table id="inputForms" class="formtable">
     <thead>
-        <tr><th>Index</th><th>In/Out</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
     </thead>
-    <tbody id="extraXputForms">
-    {% for xput_form, struct_form in xput_forms %}
+    <tbody id="extraInputForms">
+    {% for xput_form, struct_form in input_forms %}
         <tr>
         <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.input_output }}</td>
         <td>{{ xput_form.dataset_name }}</td>
         <td>{{ struct_form.compounddatatype }}</td>
         <td>{{ struct_form.min_row }}</td>
@@ -68,6 +86,26 @@
     </tbody>
     </table>
 
+<h3>Outputs</h3>
+    <input type="button" id="addOutputForm" class="add" value="+"/><input type="button" id="removeOutputForm" class="remove" value="&minus;"/>
+    <small>Add/subtract input or output forms</small>
+
+    <table id="outputForms" class="formtable">
+    <thead>
+        <tr><th>Index</th><th>Name</th><th>Compound datatype</th><th>Min. rows</th><th>Max. rows</th></tr>
+    </thead>
+    <tbody id="extraOutputForms">
+    {% for xput_form, struct_form in output_forms %}
+        <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ xput_form.dataset_name }}</td>
+        <td>{{ struct_form.compounddatatype }}</td>
+        <td>{{ struct_form.min_row }}</td>
+        <td>{{ struct_form.max_row }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+    </table>
 
     <input type="submit" value="Submit" />
 </form>

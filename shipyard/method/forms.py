@@ -99,6 +99,11 @@ class MethodForm (forms.ModelForm):
     class Meta:
         model = Method
         fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'random')
+        widgets = {
+            'revision_desc': forms.Textarea(attrs={'rows': 5,
+                                                   'cols': 30,
+                                                   'style': 'height: 3em;'}),
+        }
 
 
 class MethodReviseForm (forms.ModelForm):

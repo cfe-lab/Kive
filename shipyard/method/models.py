@@ -376,8 +376,8 @@ class Method(transformation.models.Transformation):
     Related to :model:`copperfish.MethodFamily`
     """
 
-    family = models.ForeignKey("MethodFamily",related_name="members")
-    revision_parent = models.ForeignKey("self",related_name = "descendants",null=True,blank=True)
+    family = models.ForeignKey("MethodFamily", related_name="members")
+    revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
