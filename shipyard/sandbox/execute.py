@@ -560,7 +560,7 @@ class Sandbox:
                 self.logger.debug("Performing integrity check of trivial or previously generated output")
 
                 # Perform integrity check.
-                output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
+                output_SD.check_integrity(output_path, self.user, curr_log, output_SD.MD5_checksum)
 
             # Did ER already exist, or is cable trivial, or recovering? No.
             else:
@@ -720,6 +720,8 @@ class Sandbox:
         bad_output_found = not curr_log.is_successful()
         output_SDs = []
 
+        self.logger.debug("ExecLog.is_successful() == {}".format(curr_log.is_successful()))
+
         if not (recover or had_ER_at_beginning):
             self.logger.debug("Creating new SymbolicDatasets for PipelineStep outputs")
 
@@ -736,6 +738,10 @@ class Sandbox:
                 else:
                     output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
                 output_SD.mark_missing(start_time, end_time, curr_log)
+
+                # FIXME continue from here -- for whatever reason an integrity check is still
+                # happening after this!
+                print("\nFoooooo\n")
                 bad_output_found = True
 
             else:
@@ -780,7 +786,7 @@ class Sandbox:
 
                 # Perform integrity check.
                 self.logger.debug("SD has been computed before, checking integrity of {}".format(output_SD))
-                check = output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
+                check = output_SD.check_integrity(output_path, self.user, curr_log, output_SD.MD5_checksum)
 
             # Recovering or filling in old ER? No.
             elif not bad_output_found:

@@ -33,9 +33,10 @@ from file_access_utils import compute_md5
 # Note that these tests use the exact same setup as librarian.
 
 
-class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
+class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.UtilityMethods):
     def setUp(self):
-        super(ArchiveTestSetup, self).setUp()
+        librarian.tests.LibrarianTestSetup.setUp(self)
+        sandbox.tests_rm.UtilityMethods.setUp(self)
         self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
 
     def tearDown(self):
@@ -49,17 +50,23 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         reused an ExecRecord (ie. make a new ExecRecord).
 
         """
+        self.make_execlog_and_mark_non_reused_runatomic(record)
+
+        curr_execlog = record.log.first()
+        execrecord = ExecRecord.create(curr_execlog, record.component, input_SDs, output_SDs)
+        record.execrecord = execrecord
+        record.save()
+
+    def make_execlog_and_mark_non_reused_runatomic(self, record):
+        """Attaches a good ExecLog to a RunAtomic."""
         record_type = record.__class__.__name__
         record.reused = False
-    
+        record.save()
+
         execlog = ExecLog(record=record, invoking_record=record, start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
         if record_type == "RunStep":
             MethodOutput(execlog=execlog, return_code=0).save()
-        execrecord = ExecRecord.create(execlog, record.component, input_SDs, output_SDs)
-        record.execrecord = execrecord
-        record.reused = False
-        record.save()
 
     def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
         """
@@ -170,6 +177,8 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
 
         # First RunSIC associated and completed.
         step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
+        if bp == "first_cable_created": return
+
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
         icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
         icl.start()
@@ -371,6 +380,34 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup):
         self.D11_21_ROC.stop()
         if bp == "subrun_complete": return
 
+    def run_pipelines_recovering_reused_step(self):
+        """
+        Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
+        """
+        p_one = self.make_first_pipeline("p_one", "two no-ops")
+        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one.create_outputs()
+        p_one.save()
+        # Mark the output of step 1 as not retained.
+        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
+        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two.create_outputs()
+        p_two.save()
+        # We also delete the output of step 1 so that it reuses the existing ER we'll have
+        # create for p_one.
+        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one.execute_pipeline()
+
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two.execute_pipeline()
+
 
 class RunAtomicTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
     """Tests of functionality shared by all RunAtomics."""
@@ -509,34 +546,13 @@ class RunAtomicTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
         """
         Testing clean on a RunAtomic whose ExecLog was invoked by a subsequent RunAtomic.
         """
-        p_one = self.make_first_pipeline("p_one", "two no-ops")
-        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
-        p_one.create_outputs()
-        p_one.save()
-        # Mark the output of step 1 as not retained.
-        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
-        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
-        p_two.create_outputs()
-        p_two.save()
-        # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # create for p_one.
-        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        # Set up a words dataset.
-        self.make_words_symDS()
-
-        sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
-        sandbox_one.execute_pipeline()
-
-        sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
-        sandbox_two.execute_pipeline()
+        # Run two pipelines, where the second reuses parts from the first.
+        self.run_pipelines_recovering_reused_step()
 
         # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
         # the cable feeding step 2.
-        run_two_step_one = sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
-        run_two_step_two = sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run_two_step_one = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
+        run_two_step_two = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
         run_two_step_two_input_cable = run_two_step_two.RSICs.first()
 
         self.assertEquals(run_two_step_one.log.first().invoking_record, run_two_step_two_input_cable)
@@ -2726,3 +2742,206 @@ class GetCoordinatesTests(ArchiveTestSetup, sandbox.tests_rm.UtilityMethods):
 
                 for basic_roc in basic_run.runoutputcables.all():
                     self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
+
+
+class IsCompleteTests(ArchiveTestSetup):
+    """Tests the is_complete functions of Run, RunAtomic, ExecLog."""
+
+    def test_execlog_good_cases(self):
+        """
+        Testing that all ExecLogs are clean after a (simulated) good run.
+        """
+        self.step_through_run_creation("outcables_done")
+
+        for el in ExecLog.objects.all():
+            if el.record.get_top_level_run == self.pE_run:
+                self.assertTrue(el.is_complete())
+
+    def test_execlog_has_not_ended_yet(self):
+        """
+        Test on ExecLogs where has_ended() is False.
+        """
+        self.step_through_run_creation("outcables_done")
+
+        # Artificially change the logs' end_time to None.
+        for el in ExecLog.objects.all():
+            if el.record.get_top_level_run == self.pE_run:
+                orig_end_time = el.end_time
+                el.end_time = None
+                self.assertFalse(el.is_complete())
+                el.end_time = orig_end_time
+
+    def test_execlog_of_runstep_has_no_methodoutput(self):
+        """Test on ExecLogs for RunSteps that have no MethodOutput."""
+        self.step_through_run_creation("outcables_done")
+
+        for el in ExecLog.objects.all():
+            # Skip any RunCables.
+            if type(el.record) != RunStep:
+                continue
+
+            if el.record.get_top_level_run == self.pE_run:
+                orig_methodoutput = el.methodoutput
+                el.methodoutput = None
+                self.assertFalse(el.is_complete())
+                el.methodoutput = orig_methodoutput
+
+    def test_runatomic_successful_run(self):
+        """
+        Quick test of good cases coming out of a (simulated) good run.
+        """
+        self.step_through_run_creation("outcables_done")
+
+        runatomics = (list(RunStep.objects.filter(
+            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
+                      list(RunSIC.objects.all()) +
+                      list(RunOutputCable.objects.all()))
+
+        for runatomic in runatomics:
+            # Skip RunAtomics that are not part of this Run.
+            if runatomic.get_top_level_run() != self.pE_run:
+                continue
+
+            self.assertTrue(runatomic.is_complete())
+
+    def test_runatomic_successful_no_execrecord(self):
+        """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
+        self.step_through_run_creation("first_cable_created")
+
+        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
+
+        self.make_execlog_and_mark_non_reused_runatomic(incomplete_cable)
+        self.assertFalse(incomplete_cable.is_complete())
+
+    def test_runatomic_successful_has_execrecord_reused(self):
+        """Testing of a RunAtomic which has an ExecRecord and is reused (so is done)"""
+        self.step_through_run_creation("first_cable_created")
+
+        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
+
+        # Create another run.
+        other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
+        self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
+        other_cable = other_step1.RSICs.first()
+        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+
+        self.assertTrue(incomplete_cable.is_complete())
+
+    def test_runatomic_successful_checks_not_passed(self):
+        """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
+        self.step_through_run_creation("first_cable_created")
+
+        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
+        self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
+
+        self.assertFalse(incomplete_cable.is_complete())
+
+    def test_runatomic_successful_checks_passed(self):
+        """Testing of a RunAtomic (RunSIC) that is successful and all checks pass."""
+        self.step_through_run_creation("first_cable_created")
+
+        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
+        self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
+
+        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+
+        self.assertTrue(incomplete_cable.is_complete())
+
+    # FIXME continue from here.  Need some tests of RunAtomics that fail at
+    # - recovery (one of the invoked_logs failed or has a failed data check)
+
+    def test_runatomic_unsuccessful_failed_execlog(self):
+        """Testing of a RunAtomic (RunStep) which fails at the ExecLog stage."""
+        self.step_through_run_creation("first_step_complete")
+
+        step_1_log = self.step_E1_RS.log.first()
+
+        ccl_to_wipe = step_1_log.content_checks.first()
+        ccl_to_wipe.execlog = None
+        ccl_to_wipe.save()
+
+        mo_to_change = step_1_log.methodoutput
+        mo_to_change.return_code = 1
+        mo_to_change.save()
+
+        self.assertTrue(self.step_E1_RS.is_complete())
+
+    def test_runatomic_unsuccessful_failed_content_check(self):
+        """Testing of a RunAtomic (RunStep) which failed at the content check stage."""
+        self.step_through_run_creation("first_step_complete")
+
+        step_1_log = self.step_E1_RS.log.first()
+
+        ccl_to_fail = step_1_log.content_checks.first()
+        ccl_to_fail.add_bad_header()
+
+        self.assertTrue(self.step_E1_RS.is_complete())
+
+    def test_runatomic_unsuccessful_failed_integrity_check(self):
+        """Testing of a RunAtomic (RunSIC) which failed at the integrity check stage."""
+        self.step_through_run_creation("first_cable_created")
+        step_E1_RSIC = self.step_E1_RS.RSICs.first()
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+
+        # Make a bad ICL.
+        conflicting_datafile = tempfile.NamedTemporaryFile(delete=False)
+        conflicting_datafile.write("THIS IS A FAILURE")
+        conflicting_datafile.close()
+
+        # The output of this first cable is self.raw_symDS.  This creates a bad ICL.
+        self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log.first())
+        self.assertTrue(step_E1_RSIC.is_complete())
+
+    def test_runatomic_unsuccessful_failed_invoked_log(self):
+        """Testing of a RunAtomic which has a failed invoked_log and never gets to its own execution."""
+        # Run two pipelines, the second of which reuses parts of the first, but the method has been
+        # screwed with in between.
+        p_one = self.make_first_pipeline("p_one", "two no-ops")
+        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one.create_outputs()
+        p_one.save()
+        # Mark the output of step 1 as not retained.
+        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one.execute_pipeline()
+
+        # Oops!  Between runs, self.method_noop gets screwed with.
+        with tempfile.TemporaryFile() as f:
+            f.write("#!/bin/bash\n exit 1")
+            self.coderev_noop.content_file=File(f)
+            self.coderev_noop.save()
+
+        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
+        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two.create_outputs()
+        p_two.save()
+        # We also delete the output of step 1 so that it reuses the existing ER we'll have
+        # create for p_one.
+        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two.execute_pipeline()
+
+        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
+        # failed.
+        run2_step1 = self.sandbox_one.run.runsteps.get(pipelinestep__step_num=1)
+        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run2_step2_cable = run2_step2.RSICs.first()
+
+        self.assertIsNone(run2_step2_cable.log.first())
+        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+
+        self.assertFalse(run2_step1.log.is_successful())
+        self.assertTrue(run2_step2_cable.is_complete())
