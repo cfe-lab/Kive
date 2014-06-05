@@ -1231,6 +1231,7 @@ class RunStepTests(ArchiveTestSetup):
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
                                 runstep.clean)
 
+
 class RunTests(ArchiveTestSetup):
 
     def test_Run_is_subrun_True(self):
@@ -3149,9 +3150,6 @@ class IsCompleteTests(ArchiveTestSetup):
 
         self.assertTrue(incomplete_cable.is_complete())
 
-    # FIXME continue from here.  Need some tests of RunAtomics that fail at
-    # - recovery (one of the invoked_logs failed or has a failed data check)
-
     def test_runatomic_unsuccessful_failed_execlog(self):
         """Testing of a RunAtomic (RunStep) which fails at the ExecLog stage."""
         self.step_through_run_creation("first_step_complete")
@@ -3258,9 +3256,17 @@ class IsCompleteTests(ArchiveTestSetup):
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
         self.sandbox_one.execute_pipeline()
 
+        tampered_script = """#!/bin/bash
+echo
+echo
+echo 'This CRR has been tampered with and outputs bad data while returning code 0'
+echo
+echo
+echo "This is not what's supposed to be output here" > $2
+        """
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
-            f.write("#!/bin/bash\n echo; echo; echo 'This CRR has been tampered with'; echo; echo; echo \"This is not what's supposed to be output here\" > $2")
+            f.write(tampered_script)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3288,3 +3294,200 @@ class IsCompleteTests(ArchiveTestSetup):
         self.assertTrue(run2_step1.log.first().is_successful())
         self.assertFalse(run2_step1.log.first().all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
+
+    def test_runatomic_unsuccessful_failed_content_check_during_recovery(self):
+        """Testing of a RunAtomic which has a failed content check (missing data) during recovery."""
+        # Run two pipelines, the second of which reuses parts of the first, but the method has been
+        # changed and the output is different now.
+        p_one = self.make_first_pipeline("p_one", "two no-ops")
+        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one.create_outputs()
+        p_one.save()
+        # Mark the output of step 1 as not retained.
+        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one.execute_pipeline()
+
+        # Between runs, self.method_noop gets screwed with so that no data comes out, but still returns code 0.
+        tampered_script = """#!/bin/bash
+echo
+echo
+echo 'This CRR has been tampered with and produces no data but returns code 0'
+echo
+echo
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(tampered_script)
+            self.coderev_noop.content_file=File(f)
+            self.coderev_noop.save()
+
+        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
+        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two.create_outputs()
+        p_two.save()
+        # We also delete the output of step 1 so that it reuses the existing ER we'll have
+        # create for p_one.
+        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two.execute_pipeline()
+
+        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
+        # failed.
+        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
+        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run2_step2_cable = run2_step2.RSICs.first()
+
+        self.assertIsNone(run2_step2_cable.log.first())
+        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+
+        self.assertTrue(run2_step1.log.first().is_successful())
+        self.assertFalse(run2_step1.log.first().all_checks_passed())
+        self.assertTrue(run2_step2_cable.is_complete())
+
+    def test_runstep_subpipeline_not_complete(self):
+        """Testing on a RunStep containing a sub-pipeline that is not complete."""
+        self.step_through_run_creation("sub_pipeline")
+        self.assertFalse(self.step_E2_RS.is_complete())
+
+    def test_runstep_subpipeline_complete(self):
+        """Testing on a RunStep containing a sub-pipeline that is complete."""
+        self.step_through_run_creation("sub_pipeline_complete")
+        self.assertTrue(self.step_E2_RS.is_complete())
+
+    def test_runstep_no_cables_yet(self):
+        """Testing on a RunStep with no RSICs yet."""
+        self.step_through_run_creation("first_step")
+        self.assertFalse(self.step_E1_RS.is_complete())
+
+    def test_runstep_cable_just_started(self):
+        """Testing on a RunStep with a just-started RSIC."""
+        self.step_through_run_creation("first_cable_created")
+        self.assertFalse(self.step_E1_RS.is_complete())
+
+    def test_runstep_cable_complete(self):
+        """Testing on a RunStep with a RSIC that has run but has not done data checking yet."""
+        self.step_through_run_creation("first_cable")
+        self.assertFalse(self.step_E1_RS.is_complete())
+
+    def test_runstep_cable_failed(self):
+        """Testing on a RunStep with a RSIC that has run and failed in data checking."""
+        self.step_through_run_creation("first_cable")
+        step_E1_RSIC = self.step_E1_RS.RSICs.first()
+
+        # Let's tamper with self.raw_symDS.
+        with tempfile.NamedTemporaryFile() as f:
+            f.write("This is a tampered-with file.")
+            self.raw_symDS.dataset.dataset_file=File(f)
+            self.raw_symDS.dataset.save()
+
+            self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+
+            # Check the integrity of self.raw_symDS -- this should fail.
+            self.raw_symDS.check_integrity(f.name, self.myUser, step_E1_RSIC.log.first())
+
+        self.assertTrue(self.step_E1_RS.is_complete())
+
+    def test_run_no_steps_yet(self):
+        """Test on a Run with nothing started yet."""
+        self.step_through_run_creation("empty_runs")
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_incomplete_step(self):
+        """Test on a Run with nothing started yet."""
+        self.step_through_run_creation("third_step_cables_done")
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_step_failed(self):
+        """Test on a Run with a failed and complete step."""
+        # Setup copied from test_runatomic_unsuccessful_failed_execlog.
+        self.step_through_run_creation("first_step_complete")
+
+        step_1_log = self.step_E1_RS.log.first()
+
+        ccl_to_wipe = step_1_log.content_checks.first()
+        ccl_to_wipe.execlog = None
+        ccl_to_wipe.save()
+
+        mo_to_change = step_1_log.methodoutput
+        mo_to_change.return_code = 1
+        mo_to_change.save()
+
+        self.assertTrue(self.pE_run.is_complete())
+
+    def test_run_one_failed_step_one_incomplete_step(self):
+        """Test on a Run with one failed and one incomplete step."""
+        self.step_through_run_creation("second_step")
+
+        # Make the first step a failure by making self.doublet_symDS (its output) fail its check.
+        step1_out_ccl = self.doublet_symDS.content_checks.first()
+        step1_out_ccl.add_bad_header()
+        step1_out_ccl.save()
+
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_no_output_cables(self):
+        """Test on a Run with no output cables yet."""
+        self.step_through_run_creation("third_step_complete")
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_incomplete_output_cable(self):
+        """Test on a Run having an incomplete output cable."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Add but do not complete an output cable.
+        roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        # Note that this isn't actually complete -- it doesn't have data checks yet.
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_failed_output_cable(self):
+        """Test on a Run having a failed output cable."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Add but do not complete an output cable.
+        roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+
+        # Break the data.
+        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.add_bad_header()
+        E1_out_ccl.save()
+        self.E1_out_DS.created_by = roc1
+        self.E1_out_DS.save()
+
+        self.assertTrue(self.pE_run.is_complete())
+
+    def test_run_one_failed_output_cable_one_incomplete_output_cable(self):
+        """Test on a Run having one failed output cable and one incomplete one."""
+        self.step_through_run_creation("third_step_complete")
+
+        # Add but do not complete an output cable.
+        roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
+        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+
+        # Break the data.
+        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.add_bad_header()
+        E1_out_ccl.save()
+
+        roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
+
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_missing_output_cables(self):
+        """Test on a Run having missing output cables."""
+        self.step_through_run_creation("first_outcable")
+        self.assertFalse(self.pE_run.is_complete())
+
+    def test_run_all_steps_and_cables_done(self):
+        """Test on a Run that's completely done."""
+        self.step_through_run_creation("outcables_done")
+        self.assertTrue(self.pE_run.is_complete())

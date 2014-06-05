@@ -36,7 +36,9 @@ class CustomConstraintTests(UtilityMethods):
                 "correctly spelled words", [], [self.dt_basic])
 
         # Set up the custom constraint, a spell checker.
-        self._setup_custom_constraint("spellcheck", "a spell checker",
+        self._setup_custom_constraint(
+            "spellcheck", "methods to perform spell-checking",
+            "spellcheck", "a spell checker",
             """#!/bin/bash
             echo failed_row > "$2"
             row_num=0
@@ -143,7 +145,7 @@ class CustomConstraintTests(UtilityMethods):
         compounddatatype.save()
         return compounddatatype
 
-    def _setup_custom_constraint(self, name, desc, script, datatype):
+    def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype):
         """
         Helper function to set up a custom constraint on a datatype.
         
@@ -157,13 +159,13 @@ class CustomConstraintTests(UtilityMethods):
         scriptfile.write(script)
         scriptfile.close()
 
-        coderesource = CodeResource(name=name, filename="{}.sh".format(name), description=desc)
+        coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc)
         coderesource.save()
         revision = coderesource.revisions.create(revision_name="1", revision_number=1,
                                                  revision_desc="first version",
                                                  content_file=scriptfile.name)
         revision.save()
-        methodfamily = MethodFamily()
+        methodfamily = MethodFamily(name=famname, description=famdesc)
         methodfamily.save()
         method = methodfamily.members.create(driver=revision)
         method.create_input("to_test", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
@@ -198,7 +200,9 @@ class CustomConstraintTests(UtilityMethods):
         dt_no_output = self._setup_datatype("numerics", "strings of digits",
                 [("regexp", "^[0-9]+$")],
                 [Datatype.objects.get(pk=datatypes.INT_PK)])
-        self._setup_custom_constraint("empty", "a script producing no output", "#!/bin/bash", dt_no_output)
+        self._setup_custom_constraint(
+            "empty", "Methods producing no output",
+            "empty", "a script producing no output", "#!/bin/bash", dt_no_output)
         cdt_no_output = self._setup_compounddatatype( 
                 [dt_no_output, self.dt_basic],
                 ["numerics", "letter strings"])
@@ -221,10 +225,13 @@ class CustomConstraintTests(UtilityMethods):
                 "strings of upper case alphanumerics of length between 10 and 12", 
                 [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
                 [Datatype.objects.get(pk=datatypes.STR_PK)])
-        self._setup_custom_constraint("bigrow", 
-                "a script outputting a big row number",
-                '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
-                dt_big_row)
+        self._setup_custom_constraint(
+            "bigrow",
+            "methods outputting a big row number",
+            "bigrow",
+            "a script outputting a big row number",
+            '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
+            dt_big_row)
         cdt_big_row = self._setup_compounddatatype(
                 [dt_big_row, self.dt_custom], ["barcodes", "words"])
         big_row_datafile = self._setup_datafile(cdt_big_row,

@@ -528,6 +528,9 @@ class Method(transformation.models.Transformation):
                     stream.write(line)
 
             if poll_result is not None:
+                remaining = source_stream.read()
+                for stream in dest_streams:
+                    stream.write(remaining)
                 break
 
     def run_code(self, run_path, input_paths, output_paths, output_streams,
