@@ -39,7 +39,8 @@ def run_pipeline(request):
         response = HttpResponse()
         pipeline_pk = request.POST.get("pipeline_pk")
         dataset_pks = request.POST.get("dataset_pks")
-        user = User.objects.get(name="shipyard")
+        user = User.objects.get(first_name="shipyard")
+        response.write(serializers.serialize("json", user))
         return response
     else:
         raise Http404

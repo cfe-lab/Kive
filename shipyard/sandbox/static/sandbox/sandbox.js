@@ -82,11 +82,11 @@ function run_pipeline() {
     pipeline_pk = row.find(":selected").first().attr("id");
 
     dataset_pks = [];
-    /*
     $("#data_panel").children("table").each(function (index, table) {
-        dataset_pks.push(get_selected_row(table).attr("id"));
+        dataset_pks.push(get_selected_row($(table)).attr("id"));
     });
-    */
+
+    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, null);
 }
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
