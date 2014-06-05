@@ -104,12 +104,12 @@ class Run(stopwatch.models.Stopwatch):
             elif not corresp_rs.first().successful_execution():
                 anything_failed = True
         for outcable in self.pipeline.outcables.all():
-            corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable)
-            if not corresp_roc.exists():
+            corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()
+            if corresp_roc is None:
                 all_exist = False
-            elif not corresp_roc.first().is_complete():
+            elif not corresp_roc.is_complete():
                 return False
-            elif not corresp_rs.first().successful_execution():
+            elif not corresp_roc.successful_execution():
                 anything_failed = True
 
         # At this point, all RunSteps and ROCs that exist are complete.
@@ -921,12 +921,12 @@ class RunStep(RunAtomic):
         all_cables_exist = True
         any_cables_failed = False
         for curr_cable in self.pipelinestep.cables_in.all():
-            corresp_RSIC = self.RSICs.filter(PSIC=curr_cable)
-            if not corresp_RSIC.exists():
+            corresp_RSIC = self.RSICs.filter(PSIC=curr_cable).first()
+            if corresp_RSIC is None:
                 all_cables_exist = False
-            elif not corresp_RSIC.first().is_complete():
+            elif not corresp_RSIC.is_complete():
                 return False
-            elif not corresp_RSIC.first().successful_execution():
+            elif not corresp_RSIC.successful_execution():
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
