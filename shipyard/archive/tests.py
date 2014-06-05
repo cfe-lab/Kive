@@ -425,7 +425,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
-            if runatomic.get_top_level_run() != self.pE_run:
+            if runatomic.top_level_run != self.pE_run:
                 continue
 
             for invoked_log in runatomic.invoked_logs.all():
@@ -451,7 +451,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
-            if runatomic.get_top_level_run() != self.pE_run:
+            if runatomic.top_level_run != self.pE_run:
                 continue
 
             for invoked_log in runatomic.invoked_logs.all():
@@ -2755,7 +2755,7 @@ class ExecLogTests(ArchiveTestSetup):
 
         for el in ExecLog.objects.all():
             # Skip if this ExecLog doesn't have top-level run pE_run.
-            if el.record.get_top_level_run() is not self.pE_run:
+            if el.record.top_level_run is not self.pE_run:
                 continue
 
             # Skip if this ExecLog has coordinates (1,).
@@ -3040,18 +3040,24 @@ class GetCoordinatesTests(ArchiveTestSetup):
                     self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
 
-class IsCompleteTests(ArchiveTestSetup):
-    """Tests the is_complete functions of Run, RunAtomic, ExecLog."""
+class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
+    """
+    Tests the is_complete/successful_execution functions of Run, RunAtomic, RunStep, ExecLog.
+
+    These functions are heavily dependent on each other, so we share the setups and test
+    both functions at the same time.
+    """
 
     def test_execlog_good_cases(self):
         """
-        Testing that all ExecLogs are clean after a (simulated) good run.
+        Testing that all ExecLogs are complete and successful after a (simulated) good run.
         """
         self.step_through_run_creation("outcables_done")
 
         for el in ExecLog.objects.all():
-            if el.record.get_top_level_run == self.pE_run:
+            if el.record.top_level_run == self.pE_run:
                 self.assertTrue(el.is_complete())
+                self.assertTrue(el.is_successful())
 
     def test_execlog_has_not_ended_yet(self):
         """
@@ -3061,26 +3067,48 @@ class IsCompleteTests(ArchiveTestSetup):
 
         # Artificially change the logs' end_time to None.
         for el in ExecLog.objects.all():
-            if el.record.get_top_level_run == self.pE_run:
+            if el.record.top_level_run == self.pE_run:
                 orig_end_time = el.end_time
                 el.end_time = None
                 self.assertFalse(el.is_complete())
+                self.assertTrue(el.is_successful())
                 el.end_time = orig_end_time
 
+    def test_execlog_cable_incomplete_successful(self):
+        """
+        An incomplete cable's ExecLog should still be successful.
+        """
+        self.step_through_run_creation("first_cable_created")
+        # No checks have been done yet, so the ExecLog is done but the RSIC is not.
+        step_E1_RSIC = self.step_E1_RS.RSICs.first()
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+
+        self.assertTrue(step_E1_RSIC.log.first().is_complete())
+        self.assertTrue(step_E1_RSIC.log.first().is_successful())
+
     def test_execlog_of_runstep_has_no_methodoutput(self):
-        """Test on ExecLogs for RunSteps that have no MethodOutput."""
-        self.step_through_run_creation("outcables_done")
+        """Test on ExecLogs for a RunStep that has no MethodOutput."""
+        self.step_through_run_creation("first_cable")
 
-        for el in ExecLog.objects.all():
-            # Skip any RunCables.
-            if type(el.record) != RunStep:
-                continue
+        execlog = ExecLog(record=self.step_E1_RS, invoking_record=self.step_E1_RS,
+                          start_time=timezone.now(), end_time=timezone.now())
+        execlog.save()
+        # There is no MethodOutput defined.
 
-            if el.record.get_top_level_run == self.pE_run:
-                orig_methodoutput = el.methodoutput
-                el.methodoutput = None
-                self.assertFalse(el.is_complete())
-                el.methodoutput = orig_methodoutput
+        self.assertFalse(execlog.is_complete())
+        self.assertTrue(execlog.is_successful())
+
+    def test_execlog_step_returncode_not_zero(self):
+        """Testing on an ExecLog of a RunStep whose Method has returned with code != 0."""
+        self.step_through_run_creation("first_cable")
+        # Complete the RunStep...
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
+        # ... and break it.
+        el_to_break = self.step_E1_RS.log.first()
+        el_to_break.methodoutput.return_code = 1
+        el_to_break.methodoutput.save()
+        self.assertTrue(self.step_E1_RS.log.first().is_complete())
+        self.assertFalse(self.step_E1_RS.log.first().is_successful())
 
     def test_runatomic_successful_run(self):
         """
@@ -3095,10 +3123,11 @@ class IsCompleteTests(ArchiveTestSetup):
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
-            if runatomic.get_top_level_run() != self.pE_run:
+            if runatomic.top_level_run != self.pE_run:
                 continue
 
             self.assertTrue(runatomic.is_complete())
+            self.assertTrue(runatomic.successful_execution())
 
     def test_runatomic_successful_no_execrecord(self):
         """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
@@ -3108,6 +3137,7 @@ class IsCompleteTests(ArchiveTestSetup):
 
         self.make_execlog_and_mark_non_reused_runatomic(incomplete_cable)
         self.assertFalse(incomplete_cable.is_complete())
+        self.assertTrue(incomplete_cable.successful_execution())
 
     def test_runatomic_successful_has_execrecord_reused(self):
         """Testing of a RunAtomic which has an ExecRecord and is reused (so is done)"""
@@ -3126,6 +3156,7 @@ class IsCompleteTests(ArchiveTestSetup):
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
+        self.assertTrue(incomplete_cable.successful_execution())
 
     def test_runatomic_successful_checks_not_passed(self):
         """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
@@ -3135,6 +3166,7 @@ class IsCompleteTests(ArchiveTestSetup):
         self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
 
         self.assertFalse(incomplete_cable.is_complete())
+        self.assertTrue(incomplete_cable.successful_execution())
 
     def test_runatomic_successful_checks_passed(self):
         """Testing of a RunAtomic (RunSIC) that is successful and all checks pass."""
@@ -3149,6 +3181,7 @@ class IsCompleteTests(ArchiveTestSetup):
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
+        self.assertTrue(incomplete_cable.successful_execution())
 
     def test_runatomic_unsuccessful_failed_execlog(self):
         """Testing of a RunAtomic (RunStep) which fails at the ExecLog stage."""
@@ -3165,6 +3198,7 @@ class IsCompleteTests(ArchiveTestSetup):
         mo_to_change.save()
 
         self.assertTrue(self.step_E1_RS.is_complete())
+        self.assertFalse(self.step_E1_RS.successful_execution())
 
     def test_runatomic_unsuccessful_failed_content_check(self):
         """Testing of a RunAtomic (RunStep) which failed at the content check stage."""
@@ -3176,6 +3210,7 @@ class IsCompleteTests(ArchiveTestSetup):
         ccl_to_fail.add_bad_header()
 
         self.assertTrue(self.step_E1_RS.is_complete())
+        self.assertFalse(self.step_E1_RS.successful_execution())
 
     def test_runatomic_unsuccessful_failed_integrity_check(self):
         """Testing of a RunAtomic (RunSIC) which failed at the integrity check stage."""
@@ -3191,6 +3226,7 @@ class IsCompleteTests(ArchiveTestSetup):
         # The output of this first cable is self.raw_symDS.  This creates a bad ICL.
         self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log.first())
         self.assertTrue(step_E1_RSIC.is_complete())
+        self.assertFalse(step_E1_RSIC.successful_execution())
 
     def test_runatomic_unsuccessful_failed_invoked_log(self):
         """Testing of a RunAtomic which has a failed invoked_log and never gets to its own execution."""
@@ -3238,6 +3274,7 @@ class IsCompleteTests(ArchiveTestSetup):
 
         self.assertFalse(run2_step1.log.first().is_successful())
         self.assertTrue(run2_step2_cable.is_complete())
+        self.assertFalse(run2_step2_cable.successful_execution())
 
     def test_runatomic_unsuccessful_failed_integrity_check_during_recovery(self):
         """Testing of a RunAtomic which has a failed integrity check during recovery."""
@@ -3294,6 +3331,7 @@ echo "This is not what's supposed to be output here" > $2
         self.assertTrue(run2_step1.log.first().is_successful())
         self.assertFalse(run2_step1.log.first().all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
+        self.assertFalse(run2_step2_cable.successful_execution())
 
     def test_runatomic_unsuccessful_failed_content_check_during_recovery(self):
         """Testing of a RunAtomic which has a failed content check (missing data) during recovery."""
@@ -3349,31 +3387,37 @@ echo
         self.assertTrue(run2_step1.log.first().is_successful())
         self.assertFalse(run2_step1.log.first().all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
+        self.assertFalse(run2_step2_cable.successful_execution())
 
     def test_runstep_subpipeline_not_complete(self):
         """Testing on a RunStep containing a sub-pipeline that is not complete."""
         self.step_through_run_creation("sub_pipeline")
         self.assertFalse(self.step_E2_RS.is_complete())
+        self.assertTrue(self.step_E2_RS.successful_execution())
 
     def test_runstep_subpipeline_complete(self):
         """Testing on a RunStep containing a sub-pipeline that is complete."""
         self.step_through_run_creation("sub_pipeline_complete")
         self.assertTrue(self.step_E2_RS.is_complete())
+        self.assertTrue(self.step_E2_RS.successful_execution())
 
     def test_runstep_no_cables_yet(self):
         """Testing on a RunStep with no RSICs yet."""
         self.step_through_run_creation("first_step")
         self.assertFalse(self.step_E1_RS.is_complete())
+        self.assertTrue(self.step_E1_RS.successful_execution())
 
     def test_runstep_cable_just_started(self):
         """Testing on a RunStep with a just-started RSIC."""
         self.step_through_run_creation("first_cable_created")
         self.assertFalse(self.step_E1_RS.is_complete())
+        self.assertTrue(self.step_E1_RS.successful_execution())
 
     def test_runstep_cable_complete(self):
         """Testing on a RunStep with a RSIC that has run but has not done data checking yet."""
         self.step_through_run_creation("first_cable")
         self.assertFalse(self.step_E1_RS.is_complete())
+        self.assertTrue(self.step_E1_RS.successful_execution())
 
     def test_runstep_cable_failed(self):
         """Testing on a RunStep with a RSIC that has run and failed in data checking."""
@@ -3392,16 +3436,50 @@ echo
             self.raw_symDS.check_integrity(f.name, self.myUser, step_E1_RSIC.log.first())
 
         self.assertTrue(self.step_E1_RS.is_complete())
+        self.assertFalse(self.step_E1_RS.successful_execution())
+
+    def test_runstep_failed_subrun(self):
+        """Testing on a RunStep with a child_run that fails."""
+        self.step_through_run_creation("sub_pipeline")
+        # Fail the sub-pipeline.
+        self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
+        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
+                                             [self.D1_in_symDS, self.singlet_symDS])
+
+        self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
+        self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        icl.start()
+        icl.stop()
+        icl.save()
+
+        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
+        # Mark step_D1_RS as having failed on execution.
+        step_D1_mo = self.step_D1_RS.log.first().methodoutput
+        step_D1_mo.return_code = 1
+        step_D1_mo.save()
+
+        self.assertTrue(self.step_D1_RS.is_complete())
+        self.assertFalse(self.step_D1_RS.successful_execution())
+
+        self.assertTrue(self.step_E2_RS.is_complete())
+        self.assertFalse(self.step_E2_RS.successful_execution())
 
     def test_run_no_steps_yet(self):
         """Test on a Run with nothing started yet."""
         self.step_through_run_creation("empty_runs")
         self.assertFalse(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
 
     def test_run_incomplete_step(self):
         """Test on a Run with nothing started yet."""
         self.step_through_run_creation("third_step_cables_done")
         self.assertFalse(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
 
     def test_run_step_failed(self):
         """Test on a Run with a failed and complete step."""
@@ -3419,6 +3497,7 @@ echo
         mo_to_change.save()
 
         self.assertTrue(self.pE_run.is_complete())
+        self.assertFalse(self.pE_run.successful_execution())
 
     def test_run_one_failed_step_one_incomplete_step(self):
         """Test on a Run with one failed and one incomplete step."""
@@ -3430,11 +3509,13 @@ echo
         step1_out_ccl.save()
 
         self.assertFalse(self.pE_run.is_complete())
+        self.assertFalse(self.pE_run.successful_execution())
 
     def test_run_no_output_cables(self):
         """Test on a Run with no output cables yet."""
         self.step_through_run_creation("third_step_complete")
         self.assertFalse(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
 
     def test_run_incomplete_output_cable(self):
         """Test on a Run having an incomplete output cable."""
@@ -3445,6 +3526,7 @@ echo
         self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
         # Note that this isn't actually complete -- it doesn't have data checks yet.
         self.assertFalse(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
 
     def test_run_failed_output_cable(self):
         """Test on a Run having a failed output cable."""
@@ -3463,6 +3545,7 @@ echo
         self.E1_out_DS.save()
 
         self.assertTrue(self.pE_run.is_complete())
+        self.assertFalse(self.pE_run.successful_execution())
 
     def test_run_one_failed_output_cable_one_incomplete_output_cable(self):
         """Test on a Run having one failed output cable and one incomplete one."""
@@ -3481,13 +3564,16 @@ echo
         roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
 
         self.assertFalse(self.pE_run.is_complete())
+        self.assertFalse(self.pE_run.successful_execution())
 
     def test_run_missing_output_cables(self):
         """Test on a Run having missing output cables."""
         self.step_through_run_creation("first_outcable")
         self.assertFalse(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
 
     def test_run_all_steps_and_cables_done(self):
         """Test on a Run that's completely done."""
         self.step_through_run_creation("outcables_done")
         self.assertTrue(self.pE_run.is_complete())
+        self.assertTrue(self.pE_run.successful_execution())
