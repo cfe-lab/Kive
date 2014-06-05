@@ -14,7 +14,7 @@
 
 <a href="/resources" rel="prev">return to Code Resource summary</a>
 
-<h2>Add code resource revision</h2>
+<h2>Add revision of {{ coderesource }}</h2>
 
 
 <!-- Form for inserting new Datatypes -->
@@ -23,8 +23,8 @@
         <!-- this form is pre-populated with the data of the last revision -->
         <tr>
             <td></td>
-            <th>Parent ({{ parent_revision.revision_number }})</th>
-            <th>Revision ({{ coderesource.num_revisions|add:"1" }})</th>
+            <th>{{ parent_revision.revision_name }} ({{ parent_revision.revision_number }})</th>
+            <th><i>Revision</i> ({{ coderesource.num_revisions|add:"1" }})</th>
         </tr>
         <tr>
             <th>{{ resource_form.content_file.label }} <div class="helptext">{{ resource_form.content_file.help_text }}</div></th>

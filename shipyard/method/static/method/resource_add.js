@@ -45,6 +45,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
         }
     });
+
+    // populate CR revision dropdown on selection of CodeResource
     $("[id^='id_coderesource_']").on('change',
         function() {
             var suffix = $(this).attr('id').split('_')[2];
