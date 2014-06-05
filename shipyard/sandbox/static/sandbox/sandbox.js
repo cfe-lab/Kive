@@ -72,6 +72,11 @@ function make_data_tables(pipeline_pk) {
             table.append($("<tbody></tbody>"));
             fill_table(datasets, ["name"], table);
             table.children("tbody").find("tr").on("click", function () { select ($(this)); });
+
+            if (datasets.length == 0) {
+                row = $('<tr><td class="greyedout">no compatible datasets</td></tr>');
+                table.children("tbody").append(row);
+            }
             $("#data_panel").append(table);
         });
     });
