@@ -33,9 +33,9 @@ table {
     border-spacing: 12px 12px;
     margin-bottom: 1.5em;
 }
-tbody {
+thead {
     border: 1pt solid black;
-    border-width: 1pt 0;
+    border-width: 0 0 1pt 0;
 }
 th, td {
     padding: .5em;
