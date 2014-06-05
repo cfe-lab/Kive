@@ -77,8 +77,8 @@
     {% for xput_form, struct_form in input_forms %}
         <tr>
         <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}</td>
-        <td>{{ struct_form.compounddatatype }}</td>
+        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
+        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
         <td>{{ struct_form.min_row }}</td>
         <td>{{ struct_form.max_row }}</td>
         </tr>
@@ -98,8 +98,8 @@
     {% for xput_form, struct_form in output_forms %}
         <tr>
         <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}</td>
-        <td>{{ struct_form.compounddatatype }}</td>
+        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
+        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
         <td>{{ struct_form.min_row }}</td>
         <td>{{ struct_form.max_row }}</td>
         </tr>
