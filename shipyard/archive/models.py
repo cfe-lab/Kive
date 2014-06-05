@@ -45,6 +45,18 @@ class Run(stopwatch.models.Stopwatch):
 
     # Implicitly, this also has start_time and end_time through inheritance.
 
+    @property
+    def top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        # Base case: this is the top-level Run.
+        if self.parent_runstep is None:
+            return self
+
+        # Otherwise, return the top-level run of the parent RunStep.
+        return self.parent_runstep.top_level_run
+
     def clean(self):
         """
         Checks coherence of the Run (possibly in an incomplete state).
@@ -177,17 +189,6 @@ class Run(stopwatch.models.Stopwatch):
             return ()
         # Otherwise, return the coordinates of the parent RunStep.
         return self.parent_runstep.get_coordinates()
-
-    def get_top_level_run(self):
-        """
-        Returns the top-level Run this belongs to.
-        """
-        # Base case: this is the top-level Run.
-        if self.parent_runstep is None:
-            return self
-
-        # Otherwise, return the top-level run of the parent RunStep.
-        return self.parent_runstep.get_top_level_run()
 
 
 class RunAtomic(stopwatch.models.Stopwatch):
@@ -535,6 +536,13 @@ class RunStep(RunAtomic):
     @property
     def parent_run(self):
         return self.run
+
+    @property
+    def top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.run.top_level_run
 
     @property
     def step_num(self):
@@ -978,11 +986,11 @@ class RunStep(RunAtomic):
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
 
-    def get_top_level_run(self):
-        """
-        Returns the top-level Run this belongs to.
-        """
-        return self.run.get_top_level_run()
+    # def get_top_level_run(self):
+    #     """
+    #     Returns the top-level Run this belongs to.
+    #     """
+    #     return self.run.get_top_level_run()
 
 
 class RunCable(RunAtomic):
@@ -1331,6 +1339,13 @@ class RunSIC(RunCable):
         return self.runstep.run
 
     @property
+    def top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.runstep.top_level_run
+
+    @property
     def pipeline(self):
         return self.PSIC.pipelinestep.pipeline
 
@@ -1343,7 +1358,7 @@ class RunSIC(RunCable):
         return "run{}_step{}_input{}".format(self.parent_run.pk, self.runstep.step_num, self.PSIC.dest.dataset_idx)
 
     def output_description(self):
-        run = self.get_top_level_run()
+        run = self.top_level_run
         desc = ('Generated data from a run of pipeline "{}" started at {} by {}\n'
                 .format(self.pipeline, run.start_time, run.user))
         desc += "run: {}\n".format(run.pk)
@@ -1407,11 +1422,11 @@ class RunSIC(RunCable):
         """
         return self.runstep.get_coordinates()
 
-    def get_top_level_run(self):
-        """
-        Returns the top-level Run this belongs to.
-        """
-        return self.runstep.get_top_level_run()
+    # def get_top_level_run(self):
+    #     """
+    #     Returns the top-level Run this belongs to.
+    #     """
+    #     return self.runstep.get_top_level_run()
 
 
 class RunOutputCable(RunCable):
@@ -1460,6 +1475,13 @@ class RunOutputCable(RunCable):
         return self.run
 
     @property
+    def top_level_run(self):
+        """
+        Returns the top-level Run this belongs to.
+        """
+        return self.run.top_level_run
+
+    @property
     def pipeline(self):
         return self.pipelineoutputcable.pipeline
 
@@ -1472,7 +1494,7 @@ class RunOutputCable(RunCable):
         return "run{}_output{}".format(self.run.pk, self.pipelineoutputcable.output_idx)
 
     def output_description(self):
-        run = self.get_top_level_run()
+        run = self.top_level_run
         desc = ('Generated data from a run of pipeline "{}" started at {} by {}\n'
                 .format(self.pipeline, run.start_time, run.user))
         desc += "run: {}\n".format(run.pk)
@@ -1538,11 +1560,11 @@ class RunOutputCable(RunCable):
         """
         return self.run.get_coordinates()
 
-    def get_top_level_run(self):
-        """
-        Returns the top-level Run this belongs to.
-        """
-        return self.run.get_top_level_run()
+    # def get_top_level_run(self):
+    #     """
+    #     Returns the top-level Run this belongs to.
+    #     """
+    #     return self.run.get_top_level_run()
 
 
 class Dataset(models.Model):
@@ -1686,7 +1708,7 @@ class ExecLog(stopwatch.models.Stopwatch):
                 'ExecLog "{}" does not correspond to a Method or cable'.
                 format(self))
 
-        if self.record.get_top_level_run() != self.invoking_record.get_top_level_run():
+        if self.record.top_level_run != self.invoking_record.top_level_run:
             raise ValidationError(
                 'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.
                 format(self)
@@ -1729,7 +1751,7 @@ class ExecLog(stopwatch.models.Stopwatch):
 
         if (isinstance(self.record, RunStep) and
                 self.record.pipelinestep.transformation.__class__.__name__ == "Method"):
-            if not hasattr(self, "methodoutput"):
+            if not hasattr(self, "methodoutput") or self.methodoutput is None:
                 return False
 
         return True
