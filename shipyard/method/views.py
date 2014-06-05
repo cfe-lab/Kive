@@ -380,6 +380,8 @@ def method_add(request):
         exceptions = {'inputs': {}, 'outputs': {}}
         method_family = None
         new_method = None
+        new_inputs = []
+        new_outputs = []
 
         try:
             # retrieve CodeResource revision as driver
@@ -398,7 +400,7 @@ def method_add(request):
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})
-                raise
+                raise  # we cannot continue with a broken MethodFamily
 
             # attempt to make Method object
             try:
@@ -412,7 +414,7 @@ def method_add(request):
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})
-                raise
+                raise  # we can't continue with a broken Method
 
             # attempt to make inputs
             for i in range(num_input_forms):
@@ -437,6 +439,7 @@ def method_add(request):
                                                             compounddatatype=my_compound_datatype,
                                                             min_row=(min_row if min_row else None),
                                                             max_row=(max_row if max_row else None))
+                    new_inputs.append(new_input)
                 except ValidationError as e:
                     exceptions['inputs'].update({i: {}})
                     for key, msg in e.message_dict.iteritems():
@@ -470,6 +473,7 @@ def method_add(request):
                                                               compounddatatype=my_compound_datatype,
                                                               min_row=(min_row if min_row else None),
                                                               max_row=(max_row if max_row else None))
+                    new_outputs.append(new_output)
                 except ValidationError as e:
                     exceptions['outputs'].update({i: {}})
                     for key, msg in e.message_dict.iteritems():
@@ -479,9 +483,17 @@ def method_add(request):
                         exceptions['outputs'].update({i: {}})
                     exceptions['outputs'][i].update({'compounddatatype': 'You must select a Compound Datatype.'})
 
-            if exceptions:
+            if len(new_inputs) == 0:
+                exceptions['inputs'].update({0: {'dataset_name': 'You must specify at least one input.'}})
+            if len(new_outputs) == 0:
+                exceptions['outputs'].update({0: {'dataset_name': 'You must specify at least one output.'}})
+            if len(exceptions) > 2:
+                # if there are more keys than 'inputs' and 'outputs' then
                 # one or more input/output form exceptions have been raised
                 raise
+
+            # success!
+            return HttpResponseRedirect('/methods')
 
         except:
             # clean up after ourselves
@@ -496,9 +508,6 @@ def method_add(request):
                          'output_forms': output_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
-
-        # success!
-        return HttpResponseRedirect('/methods')
 
     else:
         # first set of forms
