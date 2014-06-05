@@ -62,14 +62,21 @@ class CodeResourceRevisionForm (forms.ModelForm):
 
 
 class CodeResourceDependencyForm (forms.ModelForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, parent=None, *args, **kwargs):
         super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
-        self.fields['coderesource'].choices = self.get_code_resource_list()
+        self.fields['coderesource'].choices = self.get_code_resource_list(parent)
 
-    def get_code_resource_list(self):
-        return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+    def get_code_resource_list(self, parent):
+        # required to refresh list on addition of a new CodeResource
+        if parent is None:
+            queryset = CodeResource.objects.all()
+        else:
+            queryset = CodeResource.objects.exclude(pk=parent)
+        print queryset
+        return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
-    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    coderesource = forms.ChoiceField(choices=[('', '--- CodeResource ---')] +
+                                             [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
     class Meta:

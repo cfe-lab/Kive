@@ -14,7 +14,8 @@ def populate_revision_dropdown (request):
         response = HttpResponse()
         coderesource_id = request.POST.get('cr_id')
         if coderesource_id != '':
-            coderesource = CodeResource.objects.get(pk=coderesource_id) # pk (primary key) implies id__exact
+            # pk (primary key) implies id__exact
+            coderesource = CodeResource.objects.get(pk=coderesource_id)
             response.write(
                 serializers.serialize("json",
                                       CodeResourceRevision.objects
