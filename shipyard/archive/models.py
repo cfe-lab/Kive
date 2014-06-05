@@ -453,15 +453,20 @@ class RunAtomic(stopwatch.models.Stopwatch):
             return True
 
         # From here on we know we are not reusing and ExecRecord is
-        # set -- therefore log is set.
+        # set -- therefore log is set and complete.
 
         # Check that either every output has been successfully checked
         # or one+ has failed and the rest are complete.
         if self.log.first().all_checks_passed():
             return True
 
-        # From here on we know that at least one of the checks failed.
+        # From here on we know that one of the following happened:
+        # - the log was a failure
+        # - at least one of the checks failed or was not performed.
         my_log = self.log.first()
+        if not my_log.is_successful():
+            return True
+
         if (any([x.is_fail() for x in my_log.integrity_checks.all()]) or
                 any([x.is_fail() for x in my_log.content_checks.all()])):
             if (all([x.is_complete() for x in my_log.integrity_checks.all()]) and

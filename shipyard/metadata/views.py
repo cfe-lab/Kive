@@ -200,7 +200,7 @@ def compound_datatype_add (request):
         if exceptions:
             # one or more problems with CompoundDatatypeMember forms
             compound_datatype.delete()
-            cdm_forms = return_cdm_forms(request, query, num_forms, exceptions)
+            cdm_forms = return_cdm_forms(request, exceptions)
         else:
             for member in to_save:
                 member.save()

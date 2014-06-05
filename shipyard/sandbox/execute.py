@@ -471,12 +471,16 @@ class Sandbox:
             # Recover dataset.
             self.logger.debug("Symbolic only: running recover({})".format(input_SD))
 
+            successful_recovery = self.recover(input_SD, curr_record)
+            successful_str = "successful" if successful_recovery else "unsuccessful"
+            self.logger.debug("Recovery was {}".format(successful_str))
             # Success? No.
-            if not self.recover(input_SD, curr_record):
+            if not successful_recovery:
 
                 # End. Return incomplete curr_record.
-                self.logger.warn("Recovery failed - returning incomplete RSIC/ROC (missing ExecLog)")
-                curr_record.stop()
+                self.logger.warn("Recovery failed - returning RSIC/ROC without ExecLog")
+                if not recover:
+                    curr_record.stop()
                 curr_record.clean()
                 return curr_record
 
@@ -560,7 +564,7 @@ class Sandbox:
                 self.logger.debug("Performing integrity check of trivial or previously generated output")
 
                 # Perform integrity check.
-                output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
+                output_SD.check_integrity(output_path, self.user, curr_log, output_SD.MD5_checksum)
 
             # Did ER already exist, or is cable trivial, or recovering? No.
             else:
@@ -719,6 +723,7 @@ class Sandbox:
         # bad_output_found indicates we have detected problems with the output.
         bad_output_found = not curr_log.is_successful()
         output_SDs = []
+        self.logger.debug("ExecLog.is_successful() == {}".format(curr_log.is_successful()))
 
         if not (recover or had_ER_at_beginning):
             self.logger.debug("Creating new SymbolicDatasets for PipelineStep outputs")
@@ -736,6 +741,9 @@ class Sandbox:
                 else:
                     output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
                 output_SD.mark_missing(start_time, end_time, curr_log)
+
+                # FIXME continue from here -- for whatever reason an integrity check is still
+                # happening after this!
                 bad_output_found = True
 
             else:
@@ -774,25 +782,23 @@ class Sandbox:
             output_path = output_paths[i]
             output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
             check = None
-        
-            # Recovering or filling in old ER? Yes.
-            if recover or had_ER_at_beginning:
 
+            if bad_output_found:
+                self.logger.debug("Bad output found; no check on {} was done".format(output_path))
+
+            # Recovering or filling in old ER? Yes.
+            elif recover or had_ER_at_beginning:
                 # Perform integrity check.
                 self.logger.debug("SD has been computed before, checking integrity of {}".format(output_SD))
-                check = output_SD.check_integrity(output_path, curr_log, output_SD.MD5_checksum)
+                check = output_SD.check_integrity(output_path, self.user, curr_log)
 
             # Recovering or filling in old ER? No.
-            elif not bad_output_found:
-
+            else:
                 # Perform content check.
                 self.logger.debug("{} is new data - performing content check".format(output_SD))
                 summary_path = "{}_summary".format(output_path)
                 check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
                                                       curr_output.get_max_row(), curr_log)
-
-            else:
-                self.logger.debug("Bad output found; no check on {} was done".format(output_path))
 
             # Check OK? No.
             if check and check.is_fail():
@@ -1073,4 +1079,11 @@ class Sandbox:
         else:
             curr_record = self.execute_cable(generator, curr_run, recovering_record=invoking_record)
 
-        return curr_record.is_complete() and curr_record.successful_execution()
+        # Determine whether recovery was successful:
+        # - if there is no ExecLog in curr_record, then it was unsuccessful (failed on a deeper recovery)
+        # - if there is an ExecLog and it is unsuccessful, then it was unsuccessful (failed on this recovery)
+        log_of_recovery = curr_record.log.first()
+        if log_of_recovery is None:
+            return False
+        return (log_of_recovery.is_complete() and log_of_recovery.is_successful() and
+                log_of_recovery.all_checks_passed())

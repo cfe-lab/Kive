@@ -330,7 +330,7 @@ class SymbolicDataset(models.Model):
         ccl.stop()
         return ccl
 
-    def check_integrity(self, new_file_path, execlog, newly_computed_MD5=None):
+    def check_integrity(self, new_file_path, checking_user, execlog, newly_computed_MD5=None):
         """
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
         or in it's absence, the MD5 computed from new_file_path.
@@ -353,17 +353,21 @@ class SymbolicDataset(models.Model):
         if newly_computed_MD5 != self.MD5_checksum:
             self.logger.warn("md5s do not agree")
 
+            # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
+            # just that it conflicted with the existing one.
             evil_twin = SymbolicDataset.create_SD(
                     new_file_path,
-                    cdt=self.get_cdt(),
-                    user=self.user,
+                    cdt=None,
+                    user=checking_user,
                     name="{}eviltwin".format(self),
                     description="MD5 conflictor of {}".format(self))
 
-            icl.usurper.create(conflicting_SD=evil_twin)
+            note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
+            note_of_usurping.save()
 
         icl.end_time = timezone.now()
         icl.clean()
+        icl.save()
         return icl
     
     def is_OK(self):
