@@ -266,7 +266,7 @@ def resource_revision_add(request, id):
         # this CR is being revised
         form = CodeResourceRevisionForm()
 
-        # TODO: populate this with values from last revision's dependencies
+        # TODO: do not allow CR to depend on itself
         dependencies = parent_revision.dependencies.all()
         dep_forms = []
         for i, dependency in enumerate(dependencies):
@@ -276,12 +276,14 @@ def resource_revision_add(request, id):
                                                   initial={'coderesource': its_cr.pk,
                                                            'revisions': its_crv.pk,
                                                            'depPath': dependency.depPath,
-                                                           'depFileName': dependency.depFileName})
+                                                           'depFileName': dependency.depFileName},
+                                                  parent=coderesource.id)
             dep_forms.append(dep_form)
 
         # in case the parent revision has no CR dependencies, add a blank form
         if len(dep_forms) == 0:
-            dep_forms.append(CodeResourceDependencyForm(auto_id='id_%s_0'))
+            dep_forms.append(CodeResourceDependencyForm(auto_id='id_%s_0',
+                                                        parent=coderesource.id))
 
     c = Context({'resource_form': form, 'parent_revision': parent_revision,
                  'coderesource': coderesource, 'dep_forms': dep_forms})
