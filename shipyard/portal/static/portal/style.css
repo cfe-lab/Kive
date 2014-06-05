@@ -194,6 +194,16 @@ form select {
     max-width: 20em;
 }
 
+/* override default settings */
+table.blank {
+    border-specing: 0px 0px;
+    margin-bottom: 0em;
+}
+.blank tbody{
+    border: 0pt;
+    border-width: 0pt;
+}
+
 table.formtable {
     border-collapse: collapse;
 }
