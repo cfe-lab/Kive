@@ -28,6 +28,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
+
 def get_builtin_types(DTs):
     """
     Retrieves the built-in types of all DTs passed as input.
@@ -48,6 +49,7 @@ def get_builtin_types(DTs):
     for curr_DT in DTs:
         all_builtin_types.append(curr_DT.get_builtin_type())
     return set(all_builtin_types)
+
 
 def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     """
@@ -140,6 +142,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
 
     return summary
 
+
 def _setup_verification_path(column_test_path):
     """
     Set up a path on the file system where we will run the verification
@@ -180,6 +183,7 @@ def _setup_verification_path(column_test_path):
         writer.writeheader()
 
     return input_file_path
+
 
 def _check_basic_constraints(columns, data_reader, out_handles={}):
     """
@@ -223,6 +227,7 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
                 out_handles[colnum].write(curr_cell_value + "\n")
 
     return (rownum, failing_cells)
+
 
 class Datatype(models.Model):
     """
@@ -910,6 +915,7 @@ class Datatype(models.Model):
 
         return failing_cells
 
+
 class BasicConstraint(models.Model):
     """
     Basic (level 1) constraint on a Datatype.
@@ -1081,7 +1087,6 @@ class CustomConstraint(models.Model):
                 format(self))
 
 
-
 class CompoundDatatypeMember(models.Model):
     """
     A data type member of a particular CompoundDatatype.
@@ -1133,6 +1138,7 @@ class CompoundDatatypeMember(models.Model):
         BasicConstraints.
         """
         return self.datatype.check_basic_constraints(value)
+
 
 class CompoundDatatype(models.Model):
     """
