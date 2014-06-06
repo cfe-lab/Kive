@@ -26,6 +26,11 @@ function fetch_inputs(pipeline_pk, callback) {
     do_ajax("get_pipeline_inputs/", {"pk": pipeline_pk}, callback);
 }
 
+// Get TransformationOutputs for a pipeline.
+function fetch_outputs(pipeline_pk, callback) {
+    do_ajax("get_pipeline_outputs/", {"pk": pipeline_pk}, callback);
+}
+
 // Make a table header.
 function make_thead(header_fields) {
     thead = $("<thead><tr></tr></thead>");
@@ -82,6 +87,32 @@ function make_data_tables(pipeline_pk) {
     });
 }
 
+// Make tables for displaying output data.
+function make_results_tables(pipeline_pk) {
+    $("#results_panel").empty();
+    fetch_outputs(pipeline_pk, function (objs) {
+        objs.forEach(function (obj) {
+            outcable = obj[0];
+            datasets = obj[1];
+
+            table = $("<table width=100%></table>");
+            idx = outcable.fields.dataset_idx.toString()
+            name = outcable.fields.dataset_name
+            output_name = idx.concat(": ").concat(name)
+            table.append(make_thead([output_name]));
+            table.append($("<tbody></tbody>"));
+            fill_table(datasets, ["date_created"], table);
+            table.children("tbody").find("tr").on("click", function () { select ($(this)); });
+
+            if (datasets.length == 0) {
+                row = $('<tr><td class="greyedout">no results yet</td></tr>');
+                table.children("tbody").append(row);
+            }
+            $("#results_panel").append(table);
+        });
+    });
+}
+
 function run_pipeline() {
     row = get_selected_row($("#pipeline_table"));
     pipeline_pk = row.find(":selected").first().attr("id");
@@ -90,8 +121,10 @@ function run_pipeline() {
     $("#data_panel").children("table").each(function (index, table) {
         dataset_pks.push(get_selected_row($(table)).attr("id"));
     });
-
-    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, null);
+    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function () {
+        $("#run_button").html("Run");
+        $("#run_button").prop("disabled", false);
+    });
 }
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
@@ -143,7 +176,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         select($(this));
         pipeline_pk = $(this).find("select").children(":selected").first().attr("id");
         make_data_tables(pipeline_pk);
+        make_results_tables(pipeline_pk);
     });
 
-    $("#run_button").on("click", run_pipeline);
+    $("#run_button").on("click", function () {
+        $(this).html("running...");
+        $(this).prop("disabled", true);
+        run_pipeline();
+        pipeline_pk = $("#pipeline_table").find("select").children(":selected").first().attr("id");
+        make_results_tables(pipeline_pk);
+    });
 });
