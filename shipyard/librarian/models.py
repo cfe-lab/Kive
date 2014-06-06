@@ -546,7 +546,7 @@ class ExecRecord(models.Model):
                     if type(self.general_transf()) == pipeline.models.PipelineStepInputCable:
                         cable_wires = self.general_transf().custom_wires.all()
                     else:
-                        cable_wires = self.general_transf().custom_outwires.all()
+                        cable_wires = self.general_transf().custom_wires.all()
 
                     source_CDT = eris[0].symbolicdataset.structure.compounddatatype
                     dest_CDT = eros[0].symbolicdataset.structure.compounddatatype

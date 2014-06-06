@@ -359,6 +359,41 @@ class PipelineStep(models.Model):
         return outputs_needed
 
 
+class PipelineCable(models.Model):
+    """A cable feeding into a step or out of a pipeline."""
+
+    def is_compatible(self, other_cable):
+        """
+        Cables are compatible if both are trivial, or the wiring
+        matches.
+        
+        For two cables' wires to match, any wire connecting column
+        indices (source_idx, dest_idx) must appear in both cables.
+
+        PRE: self, other_cable are clean.
+        """
+        trivial = [self.is_trivial(), other_cable.is_trivial()]
+        if all(trivial):
+            return True
+        elif any(trivial):
+            return False
+
+        # Both cables are non-raw and non-trivial, so check the wiring.
+        for wire in self.custom_wires.all():
+            corresponding_wire = other_cable.custom_wires.filter(
+                    dest_pin__column_name=wire.dest_pin.column_name,
+                    dest_pin__column_idx=wire.dest_pin.column_idx)
+
+            if not corresponding_wire.exists():
+                return False
+            
+            # I'm not 100% sure which direction the restrictions need to go...
+            if not wire.source_pin.datatype.is_restriction(corresponding_wire.first().source_pin.datatype):
+                return False
+            if not corresponding_wire.first().dest_pin.datatype.is_restriction(wire.dest_pin.datatype):
+                return False
+        return True
+
 # A helper function that will be called both by PSICs and
 # POCs to tell whether they are trivial.
 def cable_trivial_h(cable, cable_wires):
@@ -396,11 +431,7 @@ def run_cable_h(cable, source, output_path):
     wires is the QuerySet containing wires for this cable.
     """
     logger = cable.logger
-
-    if cable.is_incable:
-        wires = cable.custom_wires.all()
-    else:
-        wires = cable.custom_outwires.all()
+    wires = cable.custom_wires.all()
 
     if cable.is_trivial():
         logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
@@ -442,7 +473,7 @@ def run_cable_h(cable, source, output_path):
                 output_csv.writerow(dest_row)
 
 
-class PipelineStepInputCable(models.Model):
+class PipelineStepInputCable(PipelineCable):
     """
     Represents the "cables" feeding into the transformation of a
     particular pipeline step, specifically:
@@ -769,64 +800,6 @@ class PipelineStepInputCable(models.Model):
         # Having reached this point, we know that the wiring matches.
         return True
 
-    def is_compatible(self, other_cable, source_CDT):
-        """
-        Checks if a cable is compatible wrt specified CDT.
-        
-        Cables are compatible if:
-         - Both can be fed by source_CDT
-         - Both feed the same TransformationInput
-         - Both are trivial, or the wiring matches
-        
-        For two cables' wires to match, any wire connecting column
-        indices (source_idx, dest_idx) must appear in both cables.
-
-        PRE: self, other_cable are clean.
-        """
-        # Both cables can be fed by source_CDT if source_CDT is a restriction of their CDTs
-        other_CDT = other_cable.source.get_cdt()
-
-        if not source_CDT.is_restriction(source_CDT) or not source_CDT.is_restriction(other_CDT):
-            return False
-        
-        # After this point, all checks are the same as for is_compatible_given_input
-        return self.is_compatible_given_input(other_cable)
-
-    def is_compatible_given_input(self, other_cable):
-        """
-        Check compatibility of two cables having the same input.
-
-        Given that both had the same input, they are compatible if:
-         - both feed the same TransformationInput
-         - both are trivial, or the wiring matches
-        
-        For two cables' wires to match, any wire connecting column
-        indices (source_idx, dest_idx) must appear in both cables.
-
-        PRE: self, other_cable are clean, and both can be fed the
-        same input SymbolicDataset.
-        """
-        # Both cables can be fed by source_CDT if source_CDT is
-        # a restriction of their sources' CDTs.
-        if self.dest != other_cable.dest:
-            return False
-
-        if self.is_trivial() and other_cable.is_trivial():
-            return True
-
-        # We know they aren't trivial at this point, so check wiring.
-        for wire in self.custom_wires.all():
-            # Get the corresponding wire in other_cable.
-            corresp_wire = other_cable.custom_wires.get(dest_pin=wire.dest_pin)
-
-            if (wire.source_pin.column_idx != corresp_wire.source_pin.column_idx):
-                return False
-
-        # By the fact that self and other_cable are clean, we know
-        # that we have checked all the wires.  Having made sure all of
-        # the wiring matches, we can....
-        return True
-
     def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform cable transformation on the input.
@@ -941,7 +914,7 @@ class CustomCableWire(models.Model):
         return self.source_pin.datatype != self.dest_pin.datatype
 
 
-class PipelineOutputCable(models.Model):
+class PipelineOutputCable(PipelineCable):
     """
     Defines which outputs of internal PipelineSteps are mapped to
     end-point Pipeline outputs once internal execution is complete.
@@ -972,7 +945,7 @@ class PipelineOutputCable(models.Model):
 
     source = models.ForeignKey("transformation.TransformationOutput", help_text="Source output hole")
 
-    custom_outwires = generic.GenericRelation("CustomCableWire")
+    custom_wires = generic.GenericRelation("CustomCableWire")
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
@@ -1049,7 +1022,7 @@ class PipelineOutputCable(models.Model):
                 "Transformation at step {} does not produce output \"{}\"".
                 format(self.source_step, self.source))
 
-        outwires = self.custom_outwires.all()
+        outwires = self.custom_wires.all()
 
         # The cable and destination must both be raw (or non-raw)
         if self.output_cdt == None and not self.is_raw():
@@ -1097,10 +1070,10 @@ class PipelineOutputCable(models.Model):
         """
         self.clean()
 
-        if not self.is_raw() and self.custom_outwires.all().exists():
+        if not self.is_raw() and self.custom_wires.all().exists():
             # Check that each CDT member has a wire leading to it
             for dest_member in self.output_cdt.members.all():
-                if not self.custom_outwires.filter(dest_pin=dest_member).exists():
+                if not self.custom_wires.filter(dest_pin=dest_member).exists():
                     raise ValidationError(
                         "Destination member \"{}\" has no outwires leading to it".
                         format(dest_member))
@@ -1119,7 +1092,7 @@ class PipelineOutputCable(models.Model):
 
         PRE: cable is clean.
         """
-        return cable_trivial_h(self, self.custom_outwires.all())
+        return cable_trivial_h(self, self.custom_wires.all())
     
     def is_restriction(self, other_outcable):
         """
@@ -1161,8 +1134,8 @@ class PipelineOutputCable(models.Model):
         # cables' wires and see if they connect corresponding pins.
         # (We already know they feed the same TransformationInput,
         # so we only have to check the indices.)
-        for wire in self.custom_outwires.all():
-            corresp_wire = other_outcable.custom_outwires.get(
+        for wire in self.custom_wires.all():
+            corresp_wire = other_outcable.custom_wires.get(
                 dest_pin=wire.dest_pin)
             if (wire.source_pin.column_idx !=
                     corresp_wire.source_pin.column_idx):
@@ -1171,57 +1144,6 @@ class PipelineOutputCable(models.Model):
         # Having reached this point, we know that the wiring matches.
         return True
 
-    def is_compatible(self, other_outcable):
-        """
-        Checks if other_outcable is compatible with this POC.
-        
-        Definition of compatible:
-         - Both are fed by the same TransformationOutput
-         - POCs transform the data in the same way (wires match)
-        
-        NOTES
-        Although both restricted by the source CDT, destination
-        CDTs of POCs are not necessarily the same: we cannot
-        use destination CDTMs meaningfully.
-
-        Furthermore, multiple wires can leave one source CDTM,
-        while only one wire can lead to a destination: it makes
-        more sense to query each wire on matching destination.
-
-        ALGORITHM
-        1) For each wire in cable 1, look at it's dest name/idx.
-        2) Find a wire in cable 2 with the same dest name/idx.
-        3A) If no such wire exists, cables are not compatible.
-        3B) If a wire exists, they must have matching source CDTM:
-        if not, cables are not compatible.
-        4) If we reach the end, cables are compatible.
-
-        PRE: Both cables are clean.
-        """
-
-        # TOs must be the same
-        if self.source != other_outcable.source:
-            return False
-
-        # Trivial cables don't change column names or idx
-        if self.is_trivial() and other_outcable.is_trivial():
-            return True
-        elif self.is_trivial() != other_outcable.is_trivial():
-            return False
-
-        for wire in self.custom_outwires.all():
-            corresponding_wire = other_outcable.custom_outwires.filter(
-                    dest_pin__column_name=wire.dest_pin.column_name,
-                    dest_pin__column_idx=wire.dest_pin.column_idx)
-
-            if not corresponding_wire.exists():
-                return False
-
-            if wire.source_pin != corresponding_wire.first().source_pin:
-                return False
-
-        return True
-        
     def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform the cable-specified transformation on the input.

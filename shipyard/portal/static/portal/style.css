@@ -76,7 +76,6 @@ h1 {
     text-indent: -999em;
 }
 h1:hover {
-    background-position: .7em -43px;
     cursor: default;
 }
 h2 {
