@@ -110,6 +110,7 @@ def pipeline_add(request):
                         output_name=v2['output_name'],
                         output_idx=v2['output_idx']
                     )
+            pipeline.create_outputs()
         except:
             raise
             #pl_family.delete()
