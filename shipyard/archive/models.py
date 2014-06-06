@@ -1401,7 +1401,7 @@ class RunSIC(RunCable):
         if self.execrecord.general_transf().__class__.__name__ != "PipelineStepInputCable":
             raise ValidationError('ExecRecord of RunSIC "{}" does not represent a PSIC'.format(self))
 
-        elif not self.PSIC.is_compatible_given_input(self.execrecord.general_transf()):
+        elif not self.PSIC.is_compatible(self.execrecord.general_transf()):
             raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
 
     def _clean_cable_coherent(self):

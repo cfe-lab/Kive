@@ -74,6 +74,10 @@ class UtilityMethods(TestCase):
             self.coderev_noop)
         self.simple_method_io(self.method_trivial, self.cdt_string, "strings", "untouched_strings")
 
+        # A third one, only this one takes raw input.
+        self.method_noop_raw = self.make_first_method("raw noop", "do nothing to raw data", self.coderev_noop)
+        self.simple_method_io(self.method_noop_raw, None, "raw", "same raw")
+
         # An ordinary user.
         self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
         self.user_bob.save()
@@ -108,7 +112,10 @@ class UtilityMethods(TestCase):
         indata and outdata are the names of the input and output datasets.
         """
         # Create pipeline input.
-        cdt_in = methods[0].inputs.first().structure.first().compounddatatype
+        if methods[0].inputs.first().is_raw():
+            cdt_in = None
+        else:
+            cdt_in = methods[0].inputs.first().structure.first().compounddatatype
         pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name = indata, dataset_idx = 1)
 
         # Create steps.
@@ -1019,3 +1026,31 @@ class FindSDTests(UtilityMethods):
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
         self.assertEqual(run, subrun)
         self.assertEqual(gen, cable.PSIC)
+
+
+class RawTests(UtilityMethods):
+
+    def setUp(self):
+        super(RawTests, self).setUp()
+
+        self.pipeline_raw = self.make_first_pipeline("raw noop", "a pipeline to do nothing to raw data")
+        self.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
+        self.pipeline_raw.create_outputs()
+
+        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words",
+            name="raw", cdt=None, user=self.user_bob,
+            description="some raw data", make_dataset=True)
+
+    def test_execute_pipeline_raw(self):
+        """Execute a raw Pipeline."""
+        sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw])
+        sandbox.execute_pipeline()
+
+    def test_execute_pipeline_raw(self):
+        """Execute a raw Pipeline and reuse an ExecRecord."""
+        Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
+        Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
+
+    def tearDown(self):
+        super(RawTests, self).tearDown()
+
