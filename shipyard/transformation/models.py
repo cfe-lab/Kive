@@ -14,6 +14,7 @@ from django.db import transaction
 
 import metadata.models
 
+
 class TransformationFamily(models.Model):
     """
     TransformationFamily is abstract and describes common
@@ -40,6 +41,7 @@ class TransformationFamily(models.Model):
     class Meta:
         abstract = True
 
+
 class Transformation(models.Model):
     """
     Abstract class that defines common parameters
@@ -60,18 +62,28 @@ class Transformation(models.Model):
 		"Transformation revision description",
 		help_text="Description of this transformation revision")
 
-    # inputs/outputs associated with transformations via GenericForeignKey
-    # And can be accessed from within Transformations via GenericRelation
-    inputs = generic.GenericRelation("transformation.TransformationInput")
-    outputs = generic.GenericRelation("transformation.TransformationOutput")
-
-    class Meta:
-        abstract = True
+    # Implicitly defined:
+    # - inputs (via FK of TransformationInput)
+    # - outputs (via FK of TransformationOutput)
+    # - pipelinesteps (via FK of PipelineStep)
 
     @property
     def is_pipeline(self):
         """Is this a Pipeline, as opposed to a Method?"""
-        return self.__class__.__name__ == "Pipeline"
+        try:
+            self.pipeline
+        except DoesNotExist:
+            return False
+        return True
+
+    @property
+    def is_method(self):
+        """Is this a method, as opposed to a Pipeline?"""
+        try:
+            self.method
+        except DoesNotExist:
+            return False
+        return True
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
@@ -92,7 +104,9 @@ class Transformation(models.Model):
                 "Outputs are not consecutively numbered starting from 1")
 
     def clean(self):
-        """Validate transformation inputs and outputs."""
+        """Validate transformation inputs and outputs, and reject if it is neither Method nor Pipeline."""
+        if not self.is_pipeline and not self.is_method:
+            raise ValidationError("Transformation with pk={} is neither Method nor Pipeline".format(self.pk))
         self.check_input_indices()
         self.check_output_indices()
 
@@ -131,7 +145,6 @@ class Transformation(models.Model):
 
         return new_input
 
-    
     # Same thing to create outputs.
     @transaction.atomic
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
@@ -161,8 +174,8 @@ class Transformation(models.Model):
             new_output_structure.clean()
             new_output_structure.validate_unique()
 
-
         return new_output
+
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -173,13 +186,8 @@ class TransformationXput(models.Model):
 
     Related to :models:`transformation.Transformation`
     """
-    # TransformationXput describes the input/outputs of transformations,
-    # so this class can only be associated with method and pipeline.
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {"model__in": ("method", "pipeline")})
-    object_id = models.PositiveIntegerField()
-    transformation = generic.GenericForeignKey("content_type", "object_id")
+    # June 6, 2014: this is now simply a ForeignKey.
+    transformation = models.ForeignKey(Transformation)
 
     # The name of the "input/output" hole.
     dataset_name = models.CharField(
@@ -196,16 +204,29 @@ class TransformationXput(models.Model):
             validators=[MinValueValidator(1)],
             help_text="Index defining the relative order of this input/output")
 
-    structure = generic.GenericRelation("XputStructure")
+    # June 6, 2014: structure is now simply be implicitly defined via a OneToOneField on the
+    # XputStructure, as is execrecordouts_referencing (via FK from librarian.ExecRecordOut).
 
-    execrecordouts_referencing = generic.GenericRelation("librarian.ExecRecordOut")
+    @property
+    def is_input(self):
+        try:
+            self.transformationinput
+        except DoesNotExist:
+            return False
+        return True
 
-    class Meta:
-        abstract = True
+    @property
+    def is_output(self):
+        try:
+            self.transformationoutput
+        except DoesNotExist:
+            return False
+        return True
 
-        # A transformation cannot have multiple definitions for column name or column index
-        unique_together = (("content_type", "object_id", "dataset_name"),
-                           ("content_type", "object_id", "dataset_idx"))
+    def clean(self):
+        """Make sure this is either a TransformationInput or TransformationOutput."""
+        if not self.is_input and not self.is_output:
+            return ValidationError("TransformationXput with pk={} is neither an input nor an output".format(self.pk))
 
     def __unicode__(self):
         unicode_rep = u"";
@@ -225,26 +246,27 @@ class TransformationXput(models.Model):
     @property
     def compounddatatype(self):
         if self.is_raw(): return None
-        return self.structure.first().compounddatatype
+        return self.structure.compounddatatype
 
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
-        return not self.structure.all().exists()
+        return not hasattr(self, "structure")
 
     def get_cdt(self):
         """Accessor that returns the CDT of this xput (and None if it is raw)."""
         my_cdt = None
         if not self.is_raw():
-            my_cdt = self.structure.all()[0].compounddatatype
+            my_cdt = self.structure.compounddatatype
         return my_cdt
 
     def get_min_row(self):
         """Accessor that returns min_row for this xput (and None if it is raw)."""
-        return (None if self.is_raw() else self.structure.first().min_row)
+        return (None if self.is_raw() else self.structure.min_row)
 
     def get_max_row(self):
         """Accessor that returns max_row for this xput (and None if it is raw)."""
-        return (None if self.is_raw() else self.structure.first().max_row)
+        return (None if self.is_raw() else self.structure.max_row)
+
 
 class XputStructure(models.Model):
     """
@@ -253,11 +275,8 @@ class XputStructure(models.Model):
 
     Related to :model:`transformation.TransformationXput`
     """
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {"model__in": ("TransformationInput", "TransformationOutput")})
-    object_id = models.PositiveIntegerField()
-    transf_xput = generic.GenericForeignKey("content_type", "object_id")
+    # June 6, 2014: turned into regular FK.
+    transf_xput = models.OneToOneField(TransformationXput, related_name="structure")
 
     # The expected compounddatatype of the input/output
     compounddatatype = models.ForeignKey("metadata.CompoundDatatype")
@@ -276,21 +295,22 @@ class XputStructure(models.Model):
         null=True,
         blank=True)
 
-    class Meta:
-        unique_together = ("content_type", "object_id")
 
 class TransformationInput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    @property
-    def is_input(self):
-        return True
+    class Meta:
+        # A transformation cannot have multiple definitions for column name or column index
+        unique_together = (("transformation", "dataset_name"),
+                           ("transformation", "dataset_idx"))
+
 
 class TransformationOutput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    @property
-    def is_input(self):
-        return False
+    class Meta:
+        # A transformation cannot have multiple definitions for column name or column index
+        unique_together = (("transformation", "dataset_name"),
+                           ("transformation", "dataset_idx"))
