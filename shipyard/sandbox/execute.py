@@ -213,9 +213,6 @@ class Sandbox:
     def _find_cable_execrecord(self, runcable, input_SD):
         """Find an ExecRecord which may be reused by a RunCable
 
-        If an ExecRecord with real data exists, it will be returned
-        preferentially over those without data.
-
         INPUTS
         runcable        RunCable trying to reuse an ExecRecord
         input_SD        SymbolicDataset to feed the cable
@@ -224,7 +221,6 @@ class Sandbox:
         execrecord      ExecRecord which may be reused, or None if no
                         ExecRecord exists
         """
-        execrecord = None
         cable = runcable.component
 
         # Get the content type (RSIC/ROC) of the ExecRecord's ExecLog
@@ -241,20 +237,9 @@ class Sandbox:
             candidate_execrecord = candidate_ERI.execrecord
             candidate_cable = candidate_execrecord.general_transf()
 
-            if type(cable).__name__ == "PipelineOutputCable":
-                compatible = cable.is_compatible(candidate_cable)
-            else:
-                compatible = cable.is_compatible(candidate_cable, input_SD.structure.compounddatatype)
-
-            if compatible:
+            if cable.is_compatible(candidate_cable):
                 self.logger.debug("Compatible ER found")
-                if candidate_execrecord.execrecordouts.first().has_data():
-                    return candidate_execrecord
-
-                # No data, so we keep it in mind and continue searching.
-                execrecord = candidate_execrecord
-
-        return execrecord
+                return candidate_execrecord
 
     # TODO: this needs testing
     # TODO: member function of Pipeline*Cable?
@@ -271,10 +256,7 @@ class Sandbox:
         PRE
         cable is neither raw nor trivial
         """
-        if cable.is_incable:
-            wires = cable.custom_wires.all()
-        else:
-            wires = cable.custom_outwires.all()
+        wires = cable.custom_wires.all()
 
         # Use wires to determine the CDT of the output of this cable
         all_members = metadata.models.CompoundDatatypeMember.objects # shorthand
@@ -313,10 +295,7 @@ class Sandbox:
         """
 
         output_CDT = metadata.models.CompoundDatatype()
-        if type(cable) == pipeline.models.PipelineStepInputCable:
-            wires = cable.custom_wires.all()
-        else:
-            wires = cable.custom_outwires.all()
+        wires = cable.custom_wires.all()
 
         # Use wires to determine the CDT of the output of this cable
         for wire in wires:
@@ -682,6 +661,10 @@ class Sandbox:
             else:
                 self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
                 had_ER_at_beginning = False
+
+            curr_RS.reused = False
+            curr_RS.save()
+
         invoking_record = recovering_record if recover else curr_RS
 
         # Gather inputs.

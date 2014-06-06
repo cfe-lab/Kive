@@ -466,7 +466,7 @@ class CustomOutputWiring_obsolete_tests(Copperfish_Raw_Setup):
             provider_output=method_out)
         
         # Add 3 wires that with dest_idx that do not consecutively increment by 1
-        wire1 = outcable1.custom_outwires.create(
+        wire1 = outcable1.custom_wires.create(
             source_pin=self.triplet_cdt.members.all()[0],
             dest_idx=2,
             dest_name="bad_destination")
@@ -476,12 +476,12 @@ class CustomOutputWiring_obsolete_tests(Copperfish_Raw_Setup):
             "Columns defined by custom wiring on output cable \"Pipeline test pipeline family foo:1 \(blah\)\" are not consecutively indexed from 1",
             outcable1.clean)
 
-        wire2 = outcable1.custom_outwires.create(
+        wire2 = outcable1.custom_wires.create(
             source_pin=self.triplet_cdt.members.all()[0],
             dest_idx=3,
             dest_name="bad_destination2")
 
-        wire3 = outcable1.custom_outwires.create(
+        wire3 = outcable1.custom_wires.create(
             source_pin=self.triplet_cdt.members.all()[2],
             dest_idx=4,
             dest_name="bad_destination3")

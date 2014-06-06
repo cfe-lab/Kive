@@ -3964,7 +3964,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
         outcable1 = self.my_pipeline.create_outcable(output_name="blah", output_idx=1, source_step=1, source=method_out)
 
         # Add custom wiring from an irrelevent CDTM
-        badwire = outcable1.custom_outwires.create(source_pin=self.doublet_cdt.members.first(),
+        badwire = outcable1.custom_wires.create(source_pin=self.doublet_cdt.members.first(),
                                                    dest_pin=self.triplet_cdt.members.first())
 
         errorMessage = re.escape('Source pin "string: x" does not come from compounddatatype '
@@ -4017,19 +4017,19 @@ class CustomOutputWiringTests(PipelineTestSetup):
             output_cdt=new_cdt)
         
         # Add wiring
-        wire1 = outcable1.custom_outwires.create(
+        wire1 = outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[0],
             dest_pin=pin1)
 
-        wire2 = outcable1.custom_outwires.create(
+        wire2 = outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[1],
             dest_pin=pin2)
 
-        wire3 = outcable1.custom_outwires.create(
+        wire3 = outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[0],
             dest_pin=pin3)
 
-        wire4 = outcable1.custom_outwires.create(
+        wire4 = outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[2],
             dest_pin=pin4)
 

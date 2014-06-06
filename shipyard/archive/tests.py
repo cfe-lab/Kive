@@ -369,8 +369,8 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.D11_21_ROC.start()
         # Define some custom wiring for D11_21: swap the first two columns.
         pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
-        self.D11_21.custom_outwires.create(source_pin=pin1, dest_pin=pin2)
-        self.D11_21.custom_outwires.create(source_pin=pin2, dest_pin=pin1)
+        self.D11_21.custom_wires.create(source_pin=pin1, dest_pin=pin2)
+        self.D11_21.custom_wires.create(source_pin=pin2, dest_pin=pin1)
         if bp == "subrun": return
 
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
@@ -2264,7 +2264,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         it is a trivial cable.
         """
         self.step_through_roc_creation("subrun")
-        self.D11_21.custom_outwires.all().delete()
+        self.D11_21.custom_wires.all().delete()
         self.assertFalse(self.D11_21_ROC.output.exists())
         self.assertIsNone(self.D11_21_ROC.clean())
 
@@ -2441,7 +2441,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         A trivial POC of a sub-run that doesn't discard its output should have keeps_output() return False.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.D11_21.custom_outwires.all().delete()
+        self.D11_21.custom_wires.all().delete()
         self.assertFalse(self.D11_21_ROC.keeps_output())
 
     def test_ROC_keeps_output_subrun_custom_true(self):
@@ -2464,7 +2464,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         A trivial POC of an incomplete sub-run that doesn't discard its output should have keeps_output() return False.
         """
         self.step_through_roc_creation("subrun")
-        self.D11_21.custom_outwires.all().delete()
+        self.D11_21.custom_wires.all().delete()
         self.assertFalse(self.D11_21_ROC.keeps_output())
 
     def test_ROC_keeps_output_incomplete_subrun_custom_true(self):
@@ -3380,14 +3380,19 @@ echo
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
         run2_step2_cable = run2_step2.RSICs.first()
 
-        self.assertIsNone(run2_step2_cable.log.first())
-        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
-        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+        #self.assertIsNone(run2_step2_cable.log.first())
+        #self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
+        #self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+        self.assertIsNone(run2_step2.log.first())
+        self.assertEquals(run2_step2.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log.first())
 
         self.assertTrue(run2_step1.log.first().is_successful())
         self.assertFalse(run2_step1.log.first().all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
-        self.assertFalse(run2_step2_cable.successful_execution())
+        #self.assertFalse(run2_step2_cable.successful_execution())
+        self.assertTrue(run2_step2_cable.successful_execution())
+        self.assertFalse(run2_step2.successful_execution())
 
     def test_runstep_subpipeline_not_complete(self):
         """Testing on a RunStep containing a sub-pipeline that is not complete."""
