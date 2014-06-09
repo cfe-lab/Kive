@@ -9,6 +9,8 @@ Prerequisites
 1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
 2. Django (version 1.6 or higher)
 
+It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
+
 Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
 
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
@@ -48,6 +50,41 @@ Finally, execute this *expect* script using the bash script `./nukeDB.bash`.  (N
 
 You are now ready to run a local Django webserver - you just need to type `python manage.py runserver` and navigate to `localhost:8000` in your web browser!
 
+Running a pipeline
+------------------
+
+This process still requires some manual steps. To create and run your first pipeline, do the following:
+
+1. Create a raw data set.
+
+    cd ~/git/Shipyard/shipyard
+    python manage.py shell
+    from librarian.models import SymbolicDataset
+    from django.contrib.auth.models import User
+    u = User.objects.get(username='shipyard')
+    SymbolicDataset.create_SD('../samplecode/script_1_sum_and_products_input.csv', user=u, name='2cols', description='two columns of numbers')
+    exit()
+
+2. Go to the Shipyard web interface, and navigate to Developer portal: Code resources.
+3. Click Add new code resource.
+4. Choose a code resource file. For example, `samplecode/script_1_sum_and_products.py`.
+5. Give the resource a name and description, then submit it.
+6. Navigate back up to the Developer portal, then to the Methods page.
+7. Click Add a new method.
+8. Select the code resource you just created, type a family name and description.
+9. Type a name for the input and choose the unstructured datatype. Do the same for the output.
+10. Submit the method.
+11. Navigate back up to the Developer portal, then to the Pipeline assembly page.
+12. Click Add a new pipeline.
+13. Type a label for the input, and click Add Input.
+14. Select the method, type a label for it, and click Add Method.
+15. Wire the input and output for your method.
+16. Type a name and description for the pipeline, then click Submit.
+17. Don't worry if there is no response, just go back to the list of pipelines and check that yours appears.
+18. Navigate up to the home page, and then down to Users portal: Analysis.
+19. Select your pipeline in the middle section, and then your input in the left section.
+20. Click the Run button.
+
 Building the documentation
 --------------------------
 
@@ -56,6 +93,5 @@ On Ubuntu, you need to install the following packages:
 
     sudo apt-get install texlive texlive-latex-extra texlive-fonts-extra
 
-
-
+To build a LaTeX file into PDF format, use the `pdflatex` command.
 
