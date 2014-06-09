@@ -40,9 +40,7 @@ def pipeline_add(request):
         # Try this instead: formdata = json.loads(request.body)
         query = request.POST.dict()
         exec('formdata=%s' % query.keys()[0])
-#         print formdata
         logger.debug(formdata)
-        logger.warn('Here is an extra warning.')
 
         # does Pipeline family with this name already exist?
         if PipelineFamily.objects.filter(name=formdata['family_name']).exists():
