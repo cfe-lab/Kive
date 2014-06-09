@@ -17,90 +17,78 @@
 
 <a href="pipelines" rel="prev">Back to pipeline summary</a>
 
-<h2>Drydock</h2>
-    <p>
-    An interface for assembling pipelines.
-    </p>
-
     <!-- CANVAS -->
     <div>
-    <canvas id='pipeline_canvas' style="border:1px dashed;float:left">
+    <canvas id="pipeline_canvas">
         HTML5 Canvas not supported by this browser.
     </canvas>
     </div>
 
     <!-- Method selector -->
-    <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-    <table>
-        <tr>
-            <td>
-                <b>Inputs:</b><br/>
-                <select id="id_select_cdt" name="select_cdt">
-                    <option value="">Raw</option>
-                    {% for cdt in compound_datatypes %}
-                        <option value={{ cdt.pk }}>{{ cdt }}</option>
-                    {% endfor %}
-                </select>
-                <br/>
-                <div class="errortext" id="id_dt_error"></div>
+    <form id="pipeline_ctrl" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <ul id="id_ctrl_nav">
+            <li data-rel="#id_input_ctrl">Inputs</li>
+            <li data-rel="#id_method_ctrl">Methods</li>
+            <li data-rel="#id_meta_ctrl">Pipeline Revision</li>
+        </ul>
+        
+        <div id="form_ctrl">
+            <input type="button" id="id_example_button" value="Example">
+            <input type="button" id="id_delete_button" value="Delete">
+            <input type="button" id="id_reset_button" value="Clear">
+            <input type="submit" id="id_submit_button" value="Submit">
+            <div class="errortext" id="id_submit_error"></div>
+        </div>
+        
+        <div id="id_input_ctrl">
+            <h3>Inputs</h3>
+            
+            <label for="#id_datatype_name" class="text-field-label">Label</label>
+            <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
+            
+            <select id="id_select_cdt" name="select_cdt" class="select-label">
+                <option value="">Raw</option>
+                {% for cdt in compound_datatypes %}
+                    <option value={{ cdt.pk }}>{{ cdt }}</option>
+                {% endfor %}
+            </select>
+            <div class="errortext" id="id_dt_error"></div>
+        
+            <input type="button" id="id_cdt_button" value="Add Input">
+        </div>
 
-            </td>
-            <td>
-                <i>Input label:</i><br/>
-                <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
-                <br/>
-                <input type="button" id="id_cdt_button" value="Add Input">
-            </td>
-            <td>
-                <b>Pipeline name:</b><br/>
-                <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
-            </td>
-        </tr>
+        <div id="id_method_ctrl">
+            <h3>Methods</h3>
 
-        <tr id="id_method_tr">
-            <td>
-                <b>Method node:</b><br/>
-                <select id="id_select_method_family" name="select_method_family">
-                    <option value="">--- select Method Family ---</option>
-                    {% for family in method_families %}
-                        <option value={{ family.pk }}>{{ family.name }}</option>
-                    {% endfor %}
-                </select>
-                <br/>
-                <div id="id_revision_label"></div>
-                <select id="id_select_method" name="select_method">
-                    <!-- populated by ajax transaction -->
-                </select>
-                <br/>
-                <div class="errortext" id="id_method_error"></div>
-            </td>
-            <td>
-                <i>Method label:</i><br/>
-                <input id="id_method_name" maxlength="128" name="method_name" type="text" />
-                <br/>
-                <input type="button" id="id_method_button" value="Add Method">
-            </td>
-            <td>
-                <b>Description:</b>
-                <!-- TODO: make this text box shorter (rows argument not working) -->
-                <textarea cols="40" id="id_revision_desc" name="revision_desc" rows="3"></textarea>
-            </td>
-        </tr>
+            <label for="#id_method_name" class="text-field-label">Label</label>
+            <input id="id_method_name" maxlength="128" name="method_name" type="text" />
+            
+            <select id="id_select_method_family" name="select_method_family">
+                <option value="" class="label">Select method family</option>
+                {% for family in method_families %}
+                    <option value={{ family.pk }}>{{ family.name }}</option>
+                {% endfor %}
+            </select>
+            
+            <div id="id_method_revision_field">
+            <select id="id_select_method" name="select_method">
+                <!-- populated by ajax transaction -->
+            </select>
+            </div>
+            
+            <div class="errortext" id="id_method_error"></div>
+            <input type="button" id="id_method_button" value="Add Method">
+        </div>
 
-        <tr>
-            <td>
-                <input type="button" id="id_example_button" value="Example">
-            </td>
-            <td>
-                <input type="button" id="id_delete_button" value="Delete">
-                <input type="button" id="id_reset_button" value="Clear">
-            </td>
-            <td>
-                 <input type="submit" id="id_submit_button" value="Submit">
-                <div class="errortext" id="id_submit_error"></div>
-            </td>
-        </tr>
-    </table>
+        <div id="id_meta_ctrl">
+            <h3>Pipeline Revision</h3>
+            
+            <label for="#id_revision_name" class="text-field-label">Pipeline name</label>
+            <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
+            
+            <label for="#id_revision_desc" class="text-field-label">Description</label>
+            <textarea id="id_revision_desc" name="revision_desc"></textarea>
+        </div>
 
 
     </form>

@@ -55,11 +55,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // update method drop-down
-//    $("[id^='id_select_method_family']").on('change', // Are these still being generated dynamically in quantity? —JN
     $("#id_select_method_family").on('change',
         function() {
             mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
-            if (mf_id != "") {
+            if (mf_id != "" && mf_id != "Label") {
                 $.ajax({
                     type: "POST",
                     url: "get_method_revisions/",
@@ -74,12 +73,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $("#id_select_method").show().html(options.join(''));
                     }
                 })
-                // label this new drop-drown
-                $('#id_revision_label')[0].innerHTML = '<i>Revision: </i>';
+                
+                $('#id_method_revision_field').show();
             }
             else {
-                $("#id_select_method").hide();
-                $('#id_revision_label')[0].innerHTML = '';
+                $("#id_method_revision_field").hide();
             }
         }
     ).change(); // trigger on load
@@ -88,6 +86,26 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $('.helptext', 'form').each(function() {
         var $this = $(this);
         $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+    });
+    
+    $('input, textarea', '#pipeline_ctrl').each(function() {
+        var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
+        if (lbl.length) {
+            $(this).on('focus', function() {
+                if ($(this).val() == lbl.html())
+                    $(this).removeClass('input-label').val('');
+            }).on('blur', function() {
+                if ($(this).val() === '')
+                    $(this).addClass('input-label').val(lbl.html());
+            }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
+            lbl.remove();
+        }
+    });
+    
+    $('li', 'ul#id_ctrl_nav').on('click', function() {
+        var $this = $(this);
+        $('#pipeline_ctrl > div').not('#form_ctrl').hide();
+        $($this.data('rel')).show().css('left', $this.offset().left);
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
@@ -98,10 +116,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // initialize animated canvas
     var canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth = 800;
-    var canvasHeight= 400;
+    var canvasWidth = window.innerWidth;
+    var canvasHeight= window.innerHeight - 180;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
+
+    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
+//    $(window).resize(function() {    });
+
 
     var canvasState = new CanvasState(canvas);
 
@@ -109,7 +131,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var choice = $('#id_select_cdt option:selected');
         var node_label = $('#id_datatype_name').val();
 
-        if (node_label === '') {
+        if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error')[0].innerHTML = "Label is required";
         }
@@ -212,26 +234,45 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     
     $('#id_revision_desc').on('keydown', function() {
         var $this = $(this),
-            happy = -Math.min(15, Math.floor($this.val().length / 19)) * 32;
+            happy = -Math.min(15, Math.floor($this.val().length / 9)) * 32;
     
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
         .trigger('keydown')
         .wrap('<div id="description_wrap">')
         .after('<div class="happy_indicator">')
-        .after('<div class="happy_indicator_label">Write a great description to keep everyone happy!</div>')
-        .on('focus', function() {
-            $('.happy_indicator, .happy_indicator_label').show();
+        .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
+        .on('focus keyup', function() {
+            var desc_length = $(this).val().length;
+            
+            if (desc_length > 20) {
+                $('.happy_indicator').show();
+                $('.happy_indicator_label').hide();
+            }
+            else if (desc_length > 0) {
+                $('.happy_indicator, .happy_indicator_label').show();
+            }
+            else {
+                $('.happy_indicator, .happy_indicator_label').hide();
+            }
         }).on('blur', function() {
             $('.happy_indicator, .happy_indicator_label').hide();
         }).blur();
 
 
-    $('form').submit(function(e) {
+    $('form#pipeline_ctrl').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
         e.preventDefault(); // override form submit action
+        
+        // Since a field contains its label on pageload, a field's label as its value is treated as blank
+        $('input, textarea', this).each(function() {
+            var $this = $(this);
+            if ($this.val() == $this.data('label'))
+                $this.val('');
+        });
+        
         var submit_error = $('#id_submit_error')[0];
 
         var shapes = canvasState.shapes;

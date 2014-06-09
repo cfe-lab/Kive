@@ -72,7 +72,7 @@ h1 {
     font-size: 3em;
     margin: 0 0 1.5em;
     line-height: .9em;
-    background: url('/static/portal/h1.png') #333 .7em top no-repeat;
+    background: url('/static/portal/h1.png') #4fc4f1 1.4em top no-repeat;
     text-indent: -999em;
 }
 h1:hover {
@@ -275,16 +275,67 @@ input.remove {
     width: 80px;
 }
 
+
+/* Pipeline-specific formatting. */
 #pipeline_canvas {
-    border: 1px dotted;
-    padding: .25em;
+    margin-left: -4em;
+    margin-top: -4.5em;
 }
+#pipeline_ctrl {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1.5em;
+}
+#pipeline_ctrl input,
+#pipeline_ctrl textarea,
+#pipeline_ctrl select {
+    display: block;
+    margin-bottom: -1px;
+}
+#pipeline_ctrl select { padding: .18em .25em; }
+#pipeline_ctrl #id_method_button, 
+#pipeline_ctrl #id_cdt_button {
+    border-radius: 0 0 1em 0;
+    padding: .18em 1em;
+}
+#pipeline_ctrl h3 { display: none; }
+ul#id_ctrl_nav { padding: 0; margin: 0; }
+ul#id_ctrl_nav li {
+    display: inline;
+    border-left: 4px solid #caec2c;
+    padding: 0 1.5em .1em .5em;
+    cursor: pointer;
+}
+#pipeline_ctrl #id_input_ctrl,
+#pipeline_ctrl #id_method_ctrl,
+#pipeline_ctrl #id_meta_ctrl {
+    height: calc(200px - 1em);
+    width: 100%;
+    top: -200px;
+    position: absolute;
+    padding: .5em;
+    border-left: 4px solid #caec2c;
+    display: none;
+}
+.input-label { color: #ccc; }
+
+#id_datatype_name, #id_method_name { width: 250px; }
+#id_select_cdt { width: 152px; float: left; margin-right: -1px; }
+
+#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.5em; margin-right: 1em; }
+#pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
+#pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; }
+#pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
+#pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
+
 .happy_indicator {
     background: url('/static/portal/smiley.png');
     width: 32px;
     height: 32px;
     margin-top: -40px;
-    margin-right: 25px;
+    margin-right: 12px;
     float: right;
     z-index: 2;
     position: relative;
@@ -292,14 +343,14 @@ input.remove {
 .happy_indicator_label {
     margin-top: -3em;
     line-height: 1.1em;
-    margin-right: 70px;
+    margin-right: 55px;
     float: right;
     z-index: 2;
     position: relative;
-    font-size: 0.7em;
+    font-size: 0.8em;
     font-style: italic;
     width: 40%;
-    color: #aaa;
+    color: #bbb;
 }
 #description_wrap {
     width: 300px;
@@ -309,8 +360,8 @@ input.remove {
     position: relative;
     z-index: 1;
     width: 280px;
-    height: 150px;
-    padding: 10px;
+    height: 70px;
+    padding: .5em;
 }
 
 
