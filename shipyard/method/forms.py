@@ -7,6 +7,10 @@ from method.models import CodeResource, CodeResourceRevision, CodeResourceDepend
 from metadata.models import CompoundDatatype
 from transformation.models import TransformationInput, TransformationOutput, XputStructure
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # code resource forms
 class CodeResourceMinimalForm (forms.Form):
     """
@@ -72,7 +76,7 @@ class CodeResourceDependencyForm (forms.ModelForm):
             queryset = CodeResource.objects.all()
         else:
             queryset = CodeResource.objects.exclude(pk=parent)
-        print queryset
+        logger.debug(queryset.query)
         return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
     coderesource = forms.ChoiceField(choices=[('', '--- CodeResource ---')] +

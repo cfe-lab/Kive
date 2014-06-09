@@ -14,6 +14,9 @@ from datetime import datetime
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def resources(request):
     """
@@ -83,7 +86,7 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
-        print query
+        logger.debug(query)
         exceptions = {}
         new_code_resource = None
         prototype = None
