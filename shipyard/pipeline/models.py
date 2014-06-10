@@ -6,8 +6,6 @@ Pipeline.
 """
 
 from django.db import models
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
@@ -15,9 +13,8 @@ from django.utils import timezone
 
 import os
 import csv
-import shutil
 import logging
-import archive.models, librarian.models, metadata.models, method.models, transformation.models
+import transformation.models
 
 
 class PipelineFamily(transformation.models.TransformationFamily):
@@ -62,6 +59,14 @@ class Pipeline(transformation.models.Transformation):
 
     def get_absolute_url(self):
         return '/pipelines/%i' % self.id
+
+    @property
+    def is_method(self):
+        return False
+
+    @property
+    def is_pipeline(self):
+        return True
 
     @property
     def family_size(self):
@@ -134,10 +139,13 @@ class Pipeline(transformation.models.Transformation):
 
             if not outcable.is_raw():
                 # Define an XputStructure for new_pipeline_output.
-                new_pipeline_output.structure.create(
+                new_structure = transformation.models.XputStructure(
+                    transf_xput=new_pipeline_output,
                     compounddatatype=outcable.output_cdt,
                     min_row=output_requested.get_min_row(),
-                    max_row=output_requested.get_max_row())
+                    max_row=output_requested.get_max_row()
+                )
+                new_structure.save()
 
     # Helper to create raw outcables.  This is just so that our unit tests
     # can be easily amended to work in our new scheme, and wouldn't really
@@ -187,11 +195,7 @@ class PipelineStep(models.Model):
     pipeline = models.ForeignKey(Pipeline, related_name="steps")
 
     # Pipeline steps are associated with a transformation
-    content_type = models.ForeignKey(ContentType,
-            limit_choices_to = {"model__in": ("method", "pipeline")})
-
-    object_id = models.PositiveIntegerField()
-    transformation = generic.GenericForeignKey("content_type", "object_id")
+    transformation = models.ForeignKey(transformation.models.Transformation, related_name="pipelinesteps")
     step_num = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
     # Which outputs of this step we want to delete.
@@ -226,6 +230,10 @@ class PipelineStep(models.Model):
         """Outputs from this PipelineStep, ordered by index."""
         return self.transformation.outputs.order_by("dataset_idx")
 
+    @property
+    def is_cable(self):
+        return False
+
     def recursive_pipeline_check(self, pipeline):
         """Given a pipeline, check if this step contains it.
 
@@ -236,7 +244,7 @@ class PipelineStep(models.Model):
         contains_pipeline = False
 
         # Base case 1: the transformation is a method and can't possibly contain the pipeline.
-        if type(self.transformation) == method.models.Method:
+        if self.transformation.is_method:
             contains_pipeline = False
 
         # Base case 2: this step's transformation exactly equals the pipeline specified
@@ -246,7 +254,7 @@ class PipelineStep(models.Model):
         # Recursive case: go through all of the target pipeline steps and check if
         # any substeps exactly equal the transformation: if it does, we have circular pipeline references
         else:
-            transf_steps = self.transformation.steps.all()
+            transf_steps = self.transformation.definite.steps.all()
             for step in transf_steps:
                 step_contains_pipeline = step.recursive_pipeline_check(pipeline)
                 if step_contains_pipeline:
@@ -327,14 +335,12 @@ class PipelineStep(models.Model):
             dest=dest,
             source_step=0,
             source=source)
-        # FIXME August 23, 2013:
-        # Django is barfing on clean_fields.  Seems like this is a problem
-        # with GenericForeignKeys, as this affected Transformation.create_input
-        # and Transformation.create_output.
-        # new_cable.full_clean()
+        # June 6, 2014: now that we've eliminated the GFK, we go back to using new_cable.full_clean().
+        # Previously when GFKs were being used, clean_fields() was barfing.
+        new_cable.full_clean()
         # new_cable.clean_fields()
-        new_cable.clean()
-        new_cable.validate_unique()
+        # new_cable.clean()
+        # new_cable.validate_unique()
         return new_cable
 
     # Same for deletes.
@@ -361,6 +367,30 @@ class PipelineStep(models.Model):
 
 class PipelineCable(models.Model):
     """A cable feeding into a step or out of a pipeline."""
+    # Implicitly defined:
+    # - custom_wires: from a FK in CustomCableWire
+
+    @property
+    def is_incable(self):
+        """Is this an input cable, as opposed to an output cable?"""
+        try:
+            self.pipelinestepinputcable
+        except PipelineStepInputCable.DoesNotExist:
+            return False
+        return True
+
+    @property
+    def is_outcable(self):
+        """Is this an output cable, as opposed to an input cable?"""
+        try:
+            self.pipelineoutputcable
+        except PipelineOutputCable.DoesNotExist:
+            return False
+        return True
+
+    @property
+    def is_cable(self):
+        return True
 
     def is_compatible(self, other_cable):
         """
@@ -394,83 +424,147 @@ class PipelineCable(models.Model):
                 return False
         return True
 
-# A helper function that will be called both by PSICs and
-# POCs to tell whether they are trivial.
-def cable_trivial_h(cable, cable_wires):
-    """
-    Helper called by PSICs and POCs to check triviality.
+    def is_trivial(self):
+        """
+        True if this cable is trivial; False otherwise.
 
-    INPUTS: cable_wires is a QuerySet containing cable's custom wires.
+        Definition of trivial:
+        1) All raw cables
+        2) Cables without wiring
+        3) Cables with wiring that doesn't change name/idx
 
-    Definition of trivial:
-    1) All raw cables
-    2) Cables without wiring
-    3) Cables with wiring that doesn't change name/idx
+        PRE: cable is clean.
+        """
+        if self.is_raw():
+            return True
 
-    PRE: cable is clean
-    """
-    if cable.is_raw():
+        if not self.custom_wires.exists():
+            return True
+
+        for wire in self.custom_wires.all():
+            if (wire.source_pin.column_idx != wire.dest_pin.column_idx or
+                    wire.source_pin.column_name != wire.dest_pin.column_name):
+                return False
+
         return True
-        
-    if not cable_wires.exists():
-        return True
 
-    for wire in cable_wires:
-        if (wire.source_pin.column_idx != wire.dest_pin.column_idx or
-                wire.source_pin.column_name != wire.dest_pin.column_name):
+    @property
+    def definite(self):
+        if self.is_incable:
+            return self.pipelinestepinputcable
+        else:
+            return self.pipelineoutputcable
+
+    def run_cable(self, source, output_path, cable_record, curr_log):
+        """
+        Perform cable transformation on the input.
+        Creates an ExecLog, associating it to cable_record.
+        Source can either be a Dataset or a path to a file.
+
+        INPUTS
+        source          Either the Dataset to run through the cable, or a file path containing the data.
+        output_path     where the cable should put its output
+        cable_record    RSIC/ROC for this step.
+        curr_log        ExecLog to fill in for execution
+        """
+        # Set the ExecLog's start time.
+        self.logger.debug("Filling in ExecLog of record {} and running cable (source='{}', output_path='{}')"
+                          .format(cable_record, source, output_path))
+        curr_log.start()
+        curr_log.save()
+
+        if self.is_trivial():
+            self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
+            link_result = os.link(source, output_path)
+            curr_log.stop()
+            return link_result
+
+        # Make a dict encapsulating the mapping required: keyed by the output column name, with value
+        # being the input column name.
+        source_of = {}
+        column_names_by_idx = {}
+
+        mappings = ""
+        for wire in self.custom_wires.all():
+            mappings += "{} wires to {}   ".format(wire.source_pin, wire.dest_pin)
+            source_of[wire.dest_pin.column_name] = wire.source_pin.column_name
+            column_names_by_idx[wire.dest_pin.column_idx] = wire.dest_pin.column_name
+
+        self.logger.debug("Nontrivial cable. {}".format(mappings))
+
+        # Construct a list with the column names in the appropriate order.
+        output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
+
+        with open(source, "rb") as infile:
+            infile = open(source, "rb")
+
+            input_csv = csv.DictReader(infile)
+
+            with open(output_path, "wb") as outfile:
+                output_csv = csv.DictWriter(outfile,fieldnames=output_fields)
+                output_csv.writeheader()
+
+                for source_row in input_csv:
+                    # row = {col1name: col1val, col2name: col2val, ...}
+                    dest_row = {}
+
+                    # source_of = {outcol1: sourcecol5, outcol2: sourcecol1, ...}
+                    for out_col_name in source_of:
+                        dest_row[out_col_name] = source_row[source_of[out_col_name]]
+
+                    output_csv.writerow(dest_row)
+
+        # Now give it the correct end_time
+        curr_log.stop()
+        curr_log.complete_clean()
+        curr_log.save()
+
+    def _wires_match(self, other_cable):
+        """
+        Helper used by is_restriction for both PSIC and POC.
+
+        PRE: when this is called, we know that both cables:
+         - feed the same TI if they are PSICs
+         - fed by the same TO if they are POCs
+        """
+        # If there is non-trivial custom wiring on either, then
+        # the wiring must match.
+        if self.is_trivial() and other_cable.is_trivial():
+            return True
+        elif self.is_trivial() != other_cable.is_trivial():
             return False
 
-    return True
+        # Now we know that both have non-trivial wiring.  Check both
+        # cables' wires and see if they connect corresponding pins.
+        # (We already know they feed the same TransformationInput,
+        # so we only have to check the indices.)
+        for wire in self.custom_wires.all():
+            corresp_wire = other_cable.custom_wires.get(
+                dest_pin=wire.dest_pin)
+            if (wire.source_pin.column_idx !=
+                    corresp_wire.source_pin.column_idx):
+                return False
 
+        # Having reached this point, we know that the wiring matches.
+        return True
 
-# Helper that will be called by both PSIC and POC.
-def run_cable_h(cable, source, output_path):
-    """
-    Perform cable transformation on the input.
+    def _raw_clean(self):
+        """
+        Helper function called by clean() of both PSIC and POC on raw cables.
 
-    wires is the QuerySet containing wires for this cable.
-    """
-    logger = cable.logger
-    wires = cable.custom_wires.all()
+        PRE: cable is raw (i.e. the source and destination are both
+        raw); this is enforced by clean().
+        """
+        # Are there any wires defined?
+        if self.custom_wires.all().exists():
+            raise ValidationError(
+                "Cable \"{}\" is raw and should not have custom wiring defined".
+                format(self))
 
-    if cable.is_trivial():
-        logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
-        return os.link(source, output_path)
-
-    # Make a dict encapsulating the mapping required: keyed by the output column name, with value
-    # being the input column name.
-    source_of = {}
-    column_names_by_idx = {}
-
-    mappings = ""
-    for wire in wires:
-        mappings += "{} wires to {}   ".format(wire.source_pin, wire.dest_pin)
-        source_of[wire.dest_pin.column_name] = wire.source_pin.column_name
-        column_names_by_idx[wire.dest_pin.column_idx] = wire.dest_pin.column_name
-
-    logger.debug("Nontrivial cable. {}".format(mappings))
-
-    # Construct a list with the column names in the appropriate order.
-    output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
-
-    with open(source, "rb") as infile:
-        infile = open(source, "rb")
-
-        input_csv = csv.DictReader(infile)
-
-        with open(output_path, "wb") as outfile:
-            output_csv = csv.DictWriter(outfile,fieldnames=output_fields)
-            output_csv.writeheader()
-            
-            for source_row in input_csv:
-                # row = {col1name: col1val, col2name: col2val, ...}
-                dest_row = {}
-
-                # source_of = {outcol1: sourcecol5, outcol2: sourcecol1, ...}
-                for out_col_name in source_of:
-                    dest_row[out_col_name] = source_row[source_of[out_col_name]]
-
-                output_csv.writerow(dest_row)
+    def clean(self):
+        """This must be either a PSIC or POC."""
+        if not self.is_incable and not self.is_outcable:
+            raise ValidationError("PipelineCable with pk={} is neither a PSIC nor a POC".format(self.pk))
 
 
 class PipelineStepInputCable(PipelineCable):
@@ -489,20 +583,18 @@ class PipelineStepInputCable(PipelineCable):
     # Input hole (TransformationInput) of the transformation
     # at this step to which the cable leads
     dest = models.ForeignKey("transformation.TransformationInput",
-                             help_text="Wiring destination input hole")
+                             help_text="Wiring destination input hole",
+                             related_name="cables_leading_in")
     
     # (source_step, source) unambiguously defines
     # the source of the cable.  source_step can't refer to a PipelineStep
     # as it might also refer to the pipeline's inputs (i.e. step 0).
     source_step = models.PositiveIntegerField("Step providing the input source", help_text="Cabling source step")
-
-    content_type = models.ForeignKey(ContentType,
-                                     limit_choices_to = {"model__in": ("TransformationOutput", "TransformationInput")})
-    object_id = models.PositiveIntegerField()
     # Wiring source output hole.
-    source = generic.GenericForeignKey("content_type", "object_id")
+    source = models.ForeignKey(transformation.models.TransformationXput)
 
-    custom_wires = generic.GenericRelation("CustomCableWire")
+    # Implicitly defined:
+    # - custom_wires (through inheritance)
 
     # October 15, 2013: allow the data coming out of a PSIC to be
     # saved.  Note that this is only relevant if the PSIC is not
@@ -536,11 +628,6 @@ class PipelineStepInputCable(PipelineCable):
         if self.is_raw():
             is_raw_str = "(raw)"
         return "{}:{}{}".format(step_str, self.dest.dataset_name, is_raw_str)
-
-    @property
-    def is_incable(self):
-        """Is this an input cable, as opposed to an output cable?"""
-        return True
 
     @property
     def min_rows_out(self):
@@ -582,6 +669,8 @@ class PipelineStepInputCable(PipelineCable):
         Whether the input and output have compatible CDTs or have valid custom
         wiring is checked via clean_and_completely_wired.
         """
+        PipelineCable.clean(self)
+
         if self.source.is_raw() != self.dest.is_raw():
             raise ValidationError(
                 "Cable \"{}\" has mismatched source (\"{}\") and destination (\"{}\")".
@@ -609,7 +698,8 @@ class PipelineStepInputCable(PipelineCable):
         if self.source_step == 0:
             # Look for the desired input among the Pipeline inputs.
             pipeline_inputs = self.pipelinestep.pipeline.inputs.all()
-            if self.source not in pipeline_inputs:
+
+            if self.source.definite not in pipeline_inputs:
                 raise ValidationError(
                     "Pipeline does not have input \"{}\"".
                     format(unicode(self.source)))
@@ -621,32 +711,17 @@ class PipelineStepInputCable(PipelineCable):
                 step_num=self.source_step)
 
             source_ps_outputs = source_ps.transformation.outputs.all()
-            if self.source not in source_ps_outputs:
+            if self.source.definite not in source_ps_outputs:
                 raise ValidationError(
                     "Transformation at step {} does not produce output \"{}\"".
                     format(self.source_step,
-                           unicode(self.source)))
+                           unicode(self.source.definite)))
         
         # Propagate to more specific clean functions.
         if self.is_raw():
-            self.raw_clean()
+            self._raw_clean()
         else:
             self.non_raw_clean()
-
-    def raw_clean(self):
-        """
-        Helper function called by clean() to deal with raw cables.
-        
-        PRE: the pipeline step's transformation is not the parent
-        pipeline (this should never happen anyway).
-        PRE: cable is raw (i.e. the source and destination are both
-        raw); this is enforced by clean().
-        """
-        # Are there any wires defined?
-        if self.custom_wires.all().exists():
-            raise ValidationError(
-                "Cable \"{}\" is raw and should not have custom wiring defined".
-                format(self))
 
     def non_raw_clean(self):
         """Helper function called by clean() to deal with non-raw cables."""
@@ -679,7 +754,7 @@ class PipelineStepInputCable(PipelineCable):
                 "Data fed to input \"{}\" of step {} may have too many rows".
                 format(self.dest.dataset_name, self.pipelinestep.step_num))
 
-        # Validate whatever wires there already are
+        # Validate whatever wires there already are.
         if self.custom_wires.all().exists():
             for wire in self.custom_wires.all():
                 wire.clean()
@@ -736,19 +811,6 @@ class PipelineStepInputCable(PipelineCable):
         """True if this cable maps raw data; false otherwise."""
         return self.dest.is_raw()
 
-    def is_trivial(self):
-        """
-        True if this cable is trivial; False otherwise.
-        
-        If a cable is raw, it is trivial.  If it is not raw, then it
-        is trivial if it either has no wiring, or if the wiring is
-        trivial (i.e. mapping corresponding pin to corresponding pin
-        without changing names or anything).
-
-        PRE: cable is clean.
-        """
-        return cable_trivial_h(self, self.custom_wires.all())
-
     def is_restriction(self, other_cable):
         """
         Returns whether this cable is a restriction of the specified.
@@ -779,51 +841,9 @@ class PipelineStepInputCable(PipelineCable):
                 other_cable.source.get_cdt()):
             return False
 
-        # If there is non-trivial custom wiring on either, then
-        # the wiring must match.
-        if self.is_trivial() and other_cable.is_trivial():
-            return True
-        elif self.is_trivial() != other_cable.is_trivial():
-            return False
-
-        # Now we know that both have non-trivial wiring.  Check both
-        # cables' wires and see if they connect corresponding pins.
-        # (We already know they feed the same TransformationInput,
-        # so we only have to check the indices.)
-        for wire in self.custom_wires.all():
-            corresp_wire = other_cable.custom_wires.get(
-                dest_pin=wire.dest_pin)
-            if (wire.source_pin.column_idx !=
-                    corresp_wire.source_pin.column_idx):
-                return False
-
-        # Having reached this point, we know that the wiring matches.
-        return True
-
-    def run_cable(self, source, output_path, cable_record, curr_log):
-        """
-        Perform cable transformation on the input.
-        Creates an ExecLog, associating it to cable_record.
-        Source can either be a Dataset or a path to a file.
-
-        INPUTS
-        source          Either the Dataset to run through the cable, or a file path containing the data.
-        output_path     where the cable should put its output
-        cable_record    RSIC/ROC for this step.
-        curr_log        ExecLog to fill in for execution
-        """
-        # Set the ExecLog's start time.
-        self.logger.debug("Filling in ExecLog and calling run_cable_h(source='{}', output_path='{}'"
-                          .format(source,output_path))
-        curr_log.start_time = timezone.now()
-        curr_log.save()
-
-        run_cable_h(self, source, output_path)
-
-        # Now give it the correct end_time
-        curr_log.end_time = timezone.now()
-        curr_log.complete_clean()
-        curr_log.save()
+        # Now we know that they feed the same TransformationInput.
+        # Call _wires_match.
+        return self._wires_match(other_cable)
 
 
 class CustomCableWire(models.Model):
@@ -836,11 +856,7 @@ class CustomCableWire(models.Model):
     The analogue here is that we have customized a cable by rearranging
     the connections between the pins.
     """
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {"model__in": ("PipelineOutputCable", "PipelineStepInputCable")})
-    object_id = models.PositiveIntegerField()
-    cable = generic.GenericForeignKey("content_type", "object_id")
+    cable = models.ForeignKey(PipelineCable, related_name="custom_wires")
 
     # CDT member on the source output hole
     source_pin = models.ForeignKey(
@@ -854,7 +870,7 @@ class CustomCableWire(models.Model):
 
     # A cable cannot have multiple wires leading to the same dest_pin
     class Meta:
-        unique_together = ("content_type","object_id", "dest_pin")
+        unique_together = ("cable", "dest_pin")
 
     def clean(self):
         """
@@ -878,7 +894,7 @@ class CustomCableWire(models.Model):
         source_CDT_members = self.cable.source.get_cdt().members.all() # Duck-typing
         dest_CDT = None
         dest_CDT_members = None
-        if type(self.cable) == PipelineStepInputCable:
+        if self.cable.is_incable:
             dest_CDT = self.cable.dest.get_cdt()
             dest_CDT_members = dest_CDT.members.all()
         else:
@@ -945,7 +961,8 @@ class PipelineOutputCable(PipelineCable):
 
     source = models.ForeignKey("transformation.TransformationOutput", help_text="Source output hole")
 
-    custom_wires = generic.GenericRelation("CustomCableWire")
+    # Implicitly defined through PipelineCable and a FK from CustomCableWire:
+    # - custom_wires
     
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
@@ -969,11 +986,6 @@ class PipelineOutputCable(PipelineCable):
                 self.output_idx,
                 self.output_name,
                 pipeline_name)
-
-    @property
-    def is_incable(self):
-        """Is this an input cable, as opposed to an output cable?"""
-        return False
 
     @property
     def dest(self):
@@ -1036,12 +1048,7 @@ class PipelineOutputCable(PipelineCable):
 
         # The cable has a raw source (and output_cdt is None).
         if self.is_raw():
-
-            # Wires cannot exist.
-            if outwires.exists():
-                raise ValidationError(
-                    "Cable \"{}\" is raw and should not have wires defined" .
-                    format(self))
+            self._raw_clean()
 
         # The cable has a nonraw source (and output_cdt is specified).
         else:
@@ -1082,18 +1089,6 @@ class PipelineOutputCable(PipelineCable):
         """True if this output cable is raw; False otherwise."""
         return self.source.is_raw()
 
-
-    def is_trivial(self):
-        """
-        True if this output cable is trivial; False otherwise.
-        
-        This basically does exactly what the corresponding method for
-        PipelineStepInputCable does, by calling cable_trivial_h.
-
-        PRE: cable is clean.
-        """
-        return cable_trivial_h(self, self.custom_wires.all())
-    
     def is_restriction(self, other_outcable):
         """
         Returns whether this cable is a restriction of the specified.
@@ -1123,39 +1118,5 @@ class PipelineOutputCable(PipelineCable):
         if not self.output_cdt.is_restriction(other_outcable.output_cdt):
             return False
 
-        # If there is non-trivial custom wiring on either, then
-        # the wiring must match.
-        if self.is_trivial() and other_outcable.is_trivial():
-            return True
-        elif self.is_trivial() != other_outcable.is_trivial():
-            return False
-        
-        # Now we know that both have non-trivial wiring.  Check both
-        # cables' wires and see if they connect corresponding pins.
-        # (We already know they feed the same TransformationInput,
-        # so we only have to check the indices.)
-        for wire in self.custom_wires.all():
-            corresp_wire = other_outcable.custom_wires.get(
-                dest_pin=wire.dest_pin)
-            if (wire.source_pin.column_idx !=
-                    corresp_wire.source_pin.column_idx):
-                return False
-
-        # Having reached this point, we know that the wiring matches.
-        return True
-
-    def run_cable(self, source, output_path, cable_record, curr_log):
-        """
-        Perform the cable-specified transformation on the input.
-
-        This uses run_cable_h and creates an ExecLog, associating it
-        to cable_record.
-        """
-        self.logger.debug("Creating ExecLog for {}".format(cable_record))
-        curr_log.start_time = timezone.now()
-        curr_log.save()
-        run_cable_h(self, source, output_path)
-        curr_log.end_time = timezone.now()
-        curr_log.clean()
-        curr_log.save()
-        curr_log.complete_clean()
+        # Call _wires_match.
+        return self._wires_match(other_outcable)

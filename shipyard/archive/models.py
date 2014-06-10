@@ -7,8 +7,6 @@ Dataset, etc.
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -18,8 +16,6 @@ import itertools
 
 import file_access_utils
 
-import method.models
-import transformation.models
 import stopwatch.models
 
 
@@ -74,7 +70,7 @@ class Run(stopwatch.models.Stopwatch):
         # Check that start- and end-time are coherent.
         stopwatch.models.Stopwatch.clean(self)
 
-        if (self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation):
+        if (self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation.definite):
             raise ValidationError('Pipeline of Run "{}" is not consistent with its parent RunStep'.format(self))
 
         # Go through whatever steps are registered. All must be clean.
@@ -199,7 +195,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     of the three "atomic" Run* classes.
     """
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True,
-                                   related_name="%(app_label)s_%(class)s_related")
+                                   related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord",
                                      default=None)
 
@@ -225,11 +221,13 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     @property
     def component(self):
-        """Pipeline component represented by this RunComponent.
-
-        This is abstract and must be overridden.
-        """
-        pass
+        """Pipeline component represented by this RunComponent."""
+        if self.is_step:
+            return self.runstep.component
+        elif self.is_incable:
+            return self.runsic.component
+        elif self.is_outcable:
+            return self.runoutputcable.component
 
     @property
     def parent_run(self):
@@ -243,7 +241,9 @@ class RunComponent(stopwatch.models.Stopwatch):
     def is_step(self):
         try:
             self.runstep
-        except DoesNotExist:
+        except RunStep.DoesNotExist:
+            # Note that we use self.__class__ here because this could be called
+            # on any of RunStep, RunSIC, or RunOutputCable.
             return False
         return True
 
@@ -251,7 +251,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     def is_incable(self):
         try:
             self.runsic
-        except DoesNotExist:
+        except RunSIC.DoesNotExist:
             return False
         return True
 
@@ -259,7 +259,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     def is_outcable(self):
         try:
             self.runoutputcable
-        except DoesNotExist:
+        except RunOutputCable.DoesNotExist:
             return False
         return True
 
@@ -270,6 +270,15 @@ class RunComponent(stopwatch.models.Stopwatch):
     @property
     def has_log(self):
         return hasattr(self, "log")
+
+    @property
+    def definite(self):
+        if self.is_step:
+            return self.runstep
+        elif self.is_incable:
+            return self.runsic
+        elif self.is_outcable:
+            return self.runoutputcable
 
     def link_execrecord(self, execrecord, reused):
         """Link an ExecRecord to this RunComponent."""
@@ -343,6 +352,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         This RunComponent has reused = False (has decided not to reuse an ExecRecord).
         """
         if not self.has_log or not self.log.is_complete():
+
             general_error = '{} "{}" is not reused and does not have a complete log'.format(
                 self.__class__.__name__, self)
             if self.has_data():
@@ -375,14 +385,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         Then, it checks that if log is complete then all of the
         invoked_logs must also be complete.
         """
-        if self.log.exists():
-           if self.log.count() == 1:
-               self.log.first().clean()
-           else:
-               raise ValidationError(
-                   '{} "{}" has {} ExecLogs but should have only one'.format(
-                       self.__class__.__name__, self, self.log.count())
-               )
+        if self.has_log:
+            self.log.clean()
 
         for invoked_log in self.invoked_logs.all():
             invoked_log.clean()
@@ -404,14 +408,14 @@ class RunComponent(stopwatch.models.Stopwatch):
         # be complete and all tests should have passed (since they were
         # recoveries happening before we could carry out the execution
         # that log represents).
-        if self.invoked_logs.exists() and self.log.exists():
-            if not self.invoked_logs.filter(pk=self.log.first().pk).exists():
+        if self.invoked_logs.exists() and self.has_log:
+            if not self.invoked_logs.filter(pk=self.log.pk).exists():
                raise ValidationError(
                    'ExecLog of {} "{}" is not included with its invoked ExecLogs'.format(
                        self.__class__.__name__, self)
                )
 
-            preceding_logs = self.invoked_logs.exclude(pk=self.log.first().pk)
+            preceding_logs = self.invoked_logs.exclude(pk=self.log.pk)
             if not all([x.is_complete() for x in preceding_logs]):
                raise ValidationError(
                    'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
@@ -549,8 +553,6 @@ class RunStep(RunComponent):
     run = models.ForeignKey(Run, related_name="runsteps")
     pipelinestep = models.ForeignKey("pipeline.PipelineStep", related_name="pipelinestep_instances")
 
-    outputs = generic.GenericRelation("Dataset")
-
     # Implicit from RunComponent: start_time, end_time, execrecord,
     # reused, log, invoked_logs.
 
@@ -593,6 +595,18 @@ class RunStep(RunComponent):
     @property
     def parent(self):
         return self.run
+
+    @property
+    def is_step(self):
+        return True
+
+    @property
+    def is_incable(self):
+        return False
+
+    @property
+    def is_outcable(self):
+        return False
 
     @classmethod
     @transaction.atomic
@@ -774,7 +788,7 @@ class RunStep(RunComponent):
 
         # ExecRecord must point to the same transformation that this
         # RunStep points to.
-        if self.pipelinestep.transformation != self.execrecord.general_transf():
+        if self.pipelinestep.transformation.definite != self.execrecord.general_transf():
             raise ValidationError('RunStep "{}" points to transformation "{}" but corresponding ExecRecord does not'
                                   .format(self, self.pipelinestep))
 
@@ -799,11 +813,9 @@ class RunStep(RunComponent):
             outputs_missing = self.log.missing_outputs()
 
         # Go through all of the outputs.
-        to_type = ContentType.objects.get_for_model(transformation.models.TransformationOutput)
-
         for to in self.pipelinestep.transformation.outputs.all():
             # Get the associated ERO.
-            corresp_ero = self.execrecord.execrecordouts.get(content_type=to_type, object_id=to.id)
+            corresp_ero = self.execrecord.execrecordouts.get(generic_output=to)
 
             if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
@@ -888,8 +900,6 @@ class RunStep(RunComponent):
 
         # If the PipelineStep stores a method, it should have no
         # child_run (should not act as a parent runstep).
-        # TODO: Add a helper transformation.is_method() or
-        # transformation.is_atomic()
         if self.pipelinestep.transformation.is_method and self.has_subrun():
             raise ValidationError('PipelineStep of RunStep "{}" is not a Pipeline but a child run exists'
                                   .format(self))
@@ -949,7 +959,7 @@ class RunStep(RunComponent):
         PRE: this RunStep must be clean.
         """
         # Sub-Pipeline case:
-        if self.pipelinestep.transformation.__class__.__name__ == "Pipeline":
+        if self.pipelinestep.transformation.is_pipeline:
             if self.has_subrun():
                 return self.child_run.is_complete()
             # At this point, child_run hasn't been set yet, so we can
@@ -1055,7 +1065,7 @@ class RunCable(RunComponent):
 
     def has_data(self):
         """True if associated output exists; False if not."""
-        return self.output.all().exists()
+        return self.outputs.exists()
 
     def keeps_output(self):
         """
@@ -1214,6 +1224,10 @@ class RunCable(RunComponent):
              then there should be existent data associated and it should also
              be associated to the corresponding ERO.
 
+         - it must represent a PipelineCable
+
+         - The cable is compatible with self.execrecord.general_transf()
+
         PRE
         This RunCable has an ExecRecord.
         """
@@ -1239,10 +1253,21 @@ class RunCable(RunComponent):
                         raise ValidationError('{} "{}" was not reused, trivial, or deleted; it should have '
                                               'produced data'.format(self._cable_type_str(), self))
 
-                    if corresp_ero.symbolicdataset.dataset != self.output.first():
+                    if corresp_ero.symbolicdataset.dataset != self.outputs.first():
                         raise ValidationError('Dataset "{}" was produced by {} "{}" but is not in an ERO of '
                                               'ExecRecord "{}"'.format(self.outputs.first(), self._cable_type_str(),
                                               self, self.execrecord))
+
+        # June 9, 2014: since PSICs are now allowed to use ERs of POCs and vice versa, the functionality
+        # that was previously in RunSIC and RunOutputCable._clean_execrecord can now be folded into here.
+        if not self.execrecord.general_transf().is_cable:
+            raise ValidationError('ExecRecord of {} "{}" does not represent a PipelineCable'.format(
+                self.__class__.__name__, self))
+
+        elif not self.component.is_compatible(self.execrecord.general_transf()):
+            #raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
+            raise ValidationError('{} of {} "{}" is incompatible with the cable of its ExecRecord'.format(
+                self.component.__class__.__name__, self.__class__.__name__, self))
 
     def clean(self):
         """
@@ -1365,6 +1390,18 @@ class RunSIC(RunCable):
     def parent(self):
         return self.runstep
 
+    @property
+    def is_step(self):
+        return False
+
+    @property
+    def is_incable(self):
+        return True
+
+    @property
+    def is_outcable(self):
+        return False
+
     # TODO: fix for sub-pipelines
     def output_name(self):
         return "run{}_step{}_input{}".format(self.parent_run.pk, self.runstep.step_num, self.PSIC.dest.dataset_idx)
@@ -1386,35 +1423,6 @@ class RunSIC(RunCable):
         if self.PSIC.is_trivial():
             return False
         return self.PSIC.keep_output
-
-    def _clean_execrecord(self):
-        """
-        Check coherence of the RunSIC's associated ExecRecord:
-
-         - it must be complete and clean
-         - it must otherwise pass RunCable's _clean_execrecord
-         - it must represent a PSIC
-         - PSIC is the same as (or compatible to) self.execrecord.general_transf()
-
-        This is a helper for clean().
-
-        PRE
-        This RunSIC has an ExecRecord.
-        """
-        # At this point there must be an associated ER; check the RunCable
-        # _clean_execrecord criteria.
-        RunCable._clean_execrecord(self)
-
-        # Check that PSIC and execrecord.general_transf() are compatible
-        # given that the SymbolicDataset represented in the ERI is the
-        # input to both.  (This must be true because our Pipeline was
-        # well-defined.)
-        # TODO: Helpers for transformation
-        if self.execrecord.general_transf().__class__.__name__ != "PipelineStepInputCable":
-            raise ValidationError('ExecRecord of RunSIC "{}" does not represent a PSIC'.format(self))
-
-        elif not self.PSIC.is_compatible(self.execrecord.general_transf()):
-            raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
 
     def _clean_cable_coherent(self):
         """
@@ -1501,6 +1509,18 @@ class RunOutputCable(RunCable):
     def parent(self):
         return self.run
 
+    @property
+    def is_step(self):
+        return False
+
+    @property
+    def is_incable(self):
+        return False
+
+    @property
+    def is_outcable(self):
+        return True
+
     # TODO: fix for sub-pipelines
     def output_name(self):
         return "run{}_output{}".format(self.run.pk, self.pipelineoutputcable.output_idx)
@@ -1528,31 +1548,6 @@ class RunOutputCable(RunCable):
         # if the parent PipelineStep deletes this output.
         return not self.run.parent_runstep.pipelinestep.outputs_to_delete.filter(
                 dataset_idx=self.pipelineoutputcable.output_idx).exists()
-
-    def _clean_execrecord(self):
-        """
-        Check coherence of the RunOutputCable's associated ExecRecord:
-
-         - it must be complete and clean
-         - it must otherwise pass RunCable's _clean_execrecord criteria
-         - it must represent a POC
-         - POC is the same as (or compatible to) self.execrecord.general_transf()
-
-        This is a helper for clean().
-
-        PRE
-        This RunOutputCable has an ExecRecord.
-        """
-        # At this point there must be an associated ER; check the RunCable
-        # _clean_execrecord criteria.
-        RunCable._clean_execrecord(self)
-
-        # ER must point to a cable compatible with the one this RunOutputCable points to.
-        if self.execrecord.general_transf().__class__.__name__ != "PipelineOutputCable":
-            raise ValidationError('ExecRecord of RunOutputCable "{}" does not represent a POC'.format(self))
-
-        elif not self.pipelineoutputcable.is_compatible(self.execrecord.general_transf()):
-            raise ValidationError('POC of RunOutputCable "{}" is incompatible with that of its ExecRecord'.format(self))
 
     def _clean_cable_coherent(self):
         """
@@ -1696,20 +1691,20 @@ class ExecLog(stopwatch.models.Stopwatch):
         # First make sure the start- and end-times are coherent.
         stopwatch.models.Stopwatch.clean(self)
 
-        if self.record.is_step and self.record.pipelinestep.transformation.is_pipeline:
+        if self.record.is_step and self.record.definite.pipelinestep.transformation.is_pipeline:
             raise ValidationError(
                 'ExecLog "{}" does not correspond to a Method or cable'.
                 format(self))
 
-        if self.record.top_level_run != self.invoking_record.top_level_run:
+        if self.record.definite.top_level_run != self.invoking_record.definite.top_level_run:
             raise ValidationError(
                 'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.
                 format(self)
             )
 
         # Check that invoking_record is not earlier than record.
-        record_coords = self.record.get_coordinates()
-        invoking_record_coords = self.invoking_record.get_coordinates()
+        record_coords = self.record.definite.get_coordinates()
+        invoking_record_coords = self.invoking_record.definite.get_coordinates()
 
         # We have to respect the hierarchy that in case of ties, RSIC is earlier than RunStep,
         # and both are earlier than ROC.
@@ -1742,7 +1737,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         if not self.has_ended():
             return False
 
-        if self.record.is_step and self.record.pipelinestep.transformation.is_method:
+        if self.record.is_step and self.record.runstep.pipelinestep.transformation.is_method:
             if not hasattr(self, "methodoutput") or self.methodoutput is None:
                 return False
 
@@ -1819,7 +1814,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         # Is this log the generator of the execrecord?  That is, is this
         # the very first time this execution was ever performed, and this
         # isn't either a "filling-in" or a recovery?
-        if self.record.execrecord.generator == self.record.log.first():
+        if self.record.execrecord.generator == self:
 
             for ero in self.record.execrecord.execrecordouts.all():
 

@@ -223,21 +223,17 @@ class Sandbox:
         """
         cable = runcable.component
 
-        # Get the content type (RSIC/ROC) of the ExecRecord's ExecLog
-        record_contenttype = ContentType.objects.get_for_model(type(runcable))
-        self.logger.debug("Searching for reusable cable ER - (linked to a '{}' ExecLog)".format(record_contenttype))
-
-        # Look at ERIs linked to the same cable type, with matching input SD
-        all_ERIs = librarian.models.ExecRecordIn.objects
-        candidate_ERIs = all_ERIs.filter(execrecord__generator__content_type=record_contenttype, 
-                                         symbolicdataset=input_SD)
+        # Look at ERIs with matching input SD.
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
 
         for candidate_ERI in candidate_ERIs:
-            self.logger.debug("Considering ERI {} for ER reuse or update".format(candidate_ERI))
             candidate_execrecord = candidate_ERI.execrecord
-            candidate_cable = candidate_execrecord.general_transf()
+            candidate_component = candidate_execrecord.general_transf()
 
-            if cable.is_compatible(candidate_cable):
+            if not candidate_component.is_cable:
+                continue
+
+            if cable.is_compatible(candidate_component):
                 self.logger.debug("Compatible ER found")
                 return candidate_execrecord
 
@@ -336,8 +332,7 @@ class Sandbox:
         execrecordouts = runstep.execrecord.execrecordouts
 
         for i, step_output in enumerate(pipelinestep.transformation.outputs.order_by("dataset_idx")):
-            corresp_ero = execrecordouts.get(content_type=ContentType.objects.get_for_model(step_output), 
-                                             object_id=step_output.pk)
+            corresp_ero = execrecordouts.get(generic_output=step_output)
             corresp_SD = corresp_ero.symbolicdataset
             self.register_symbolicdataset(corresp_SD, output_paths[i])
 
@@ -479,7 +474,6 @@ class Sandbox:
         # Run cable (this completes EL).
         cable.run_cable(dataset_path, output_path, curr_record, curr_log)
 
-        self.logger.debug("Checking for file created by execute_cable")
         missing_output = False
         start_time = timezone.now()
         if not file_access_utils.file_exists(output_path):
@@ -628,9 +622,7 @@ class Sandbox:
                 # Cable succeeded.
                 inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
             else:
-                input_content_type = ContentType.objects.get_for_model(curr_input)
-                corresp_ERI = curr_RS.execrecord.execrecordins.get(content_type=input_content_type, 
-                                                                   object_id=curr_input.pk)
+                corresp_ERI = curr_RS.execrecord.execrecordins.get(generic_input=curr_input)
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
         # Look for ExecRecord.
@@ -640,7 +632,7 @@ class Sandbox:
             curr_ER = None
             self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
         else:
-            curr_ER = pipelinestep.transformation.find_compatible_ER(inputs_after_cable)
+            curr_ER = pipelinestep.transformation.definite.find_compatible_ER(inputs_after_cable)
 
             if curr_ER is not None:
                 had_ER_at_beginning = True
@@ -685,7 +677,7 @@ class Sandbox:
         # Run code.
         # If the step is a sub-Pipeline, execute it and return the RunStep.
         if pipelinestep.is_subpipeline:
-            self.execute_pipeline(pipeline=pipelinestep.transformation, input_SDs=inputs_after_cable,
+            self.execute_pipeline(pipeline=pipelinestep.transformation.pipeline, input_SDs=inputs_after_cable,
                                   sandbox_path=step_run_dir, parent_runstep=curr_RS)
             curr_RS.stop()
             return curr_RS
@@ -696,7 +688,7 @@ class Sandbox:
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
         with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
-            pipelinestep.transformation.run_code(step_run_dir, input_paths,
+            pipelinestep.transformation.definite.run_code(step_run_dir, input_paths,
                     output_paths, [outwrite, sys.stdout], [errwrite, sys.stderr],
                     curr_log, curr_log.methodoutput)
         self.logger.debug("Method execution complete, ExecLog saved (started = {}, ended = {})".
@@ -856,7 +848,7 @@ class Sandbox:
             for psic in step.cables_in.all().order_by("dest__dataset_idx"):
 
                 # The socket is upstream of that PSIC
-                socket = psic.source
+                socket = psic.source.definite
 
                 run_to_query = curr_run
 
@@ -864,9 +856,9 @@ class Sandbox:
                 # or the output cable if it's a sub-pipeline
                 if psic.source_step != 0:
                     generator = pipeline.steps.get(step_num=psic.source_step)
-                    if socket.transformation.__class__.__name__ == "Pipeline":
+                    if socket.transformation.is_pipeline:
                         run_to_query = curr_run.runsteps.get(pipelinestep=generator).child_run
-                        generator = generator.transformation.outcables.get(output_idx=socket.dataset_idx)
+                        generator = generator.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
 
                 # Otherwise, the psic comes from step 0
                 else:
@@ -909,14 +901,14 @@ class Sandbox:
             socket = outcable.source
 
             # The generator of interest is usually just the source pipeline step
-            if type(source_step.transformation).__name__ != "Pipeline":
+            if not source_step.transformation.is_pipeline:
                 generator = source_step
 
-            # But if this step contains a subpipeline
+            # But if this step contains a subpipeline...
             else:
 
                 # The generator is the subpipeline's output cable
-                generator = source_step.transformation.outcables.get(output_idx = outcable.source.dataset_idx)
+                generator = source_step.transformation.pipeline.outcables.get(output_idx = outcable.source.dataset_idx)
 
                 # And we need the subrun (Get the RS in this run linked to the PS linked by this POCs source)
                 runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
@@ -1065,7 +1057,7 @@ class Sandbox:
         # Determine whether recovery was successful:
         # - if there is no ExecLog in curr_record, then it was unsuccessful (failed on a deeper recovery)
         # - if there is an ExecLog and it is unsuccessful, then it was unsuccessful (failed on this recovery)
-        log_of_recovery = curr_record.log.first()
+        log_of_recovery = curr_record.log
         if log_of_recovery is None:
             return False
         return (log_of_recovery.is_complete() and log_of_recovery.is_successful() and

@@ -6,13 +6,9 @@ Transformation.
 """
 
 from django.db import models
-from django.contrib.contenttypes import generic
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
-
-import metadata.models
 
 
 class TransformationFamily(models.Model):
@@ -52,7 +48,6 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationInput`
     Related to :model:`transformation.TransformationOutput`
     """
-
     revision_name = models.CharField("Transformation revision name", max_length=128,
 		                             help_text="The name of this transformation revision")
 
@@ -67,12 +62,16 @@ class Transformation(models.Model):
     # - outputs (via FK of TransformationOutput)
     # - pipelinesteps (via FK of PipelineStep)
 
+    # Note that we override these in both Pipeline and Method, in case
+    # we try to invoke them directly on either.  (This code wouldn't work
+    # in that case because a Method wouldn't have a field called "pipeline"
+    # and vice versa.)
     @property
     def is_pipeline(self):
         """Is this a Pipeline, as opposed to a Method?"""
         try:
             self.pipeline
-        except DoesNotExist:
+        except Transformation.DoesNotExist:
             return False
         return True
 
@@ -81,9 +80,16 @@ class Transformation(models.Model):
         """Is this a method, as opposed to a Pipeline?"""
         try:
             self.method
-        except DoesNotExist:
+        except Transformation.DoesNotExist:
             return False
         return True
+
+    @property
+    def definite(self):
+        if self.is_pipeline:
+            return self.pipeline
+        else:
+            return self.method
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""
@@ -132,16 +138,17 @@ class Transformation(models.Model):
         new_input.full_clean()
 
         if compounddatatype != None:
-            new_input_structure = new_input.structure.create(
+            new_input_structure = XputStructure(
+                transf_xput=new_input,
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
-            # new_input_structure.full_clean()
-            # FIXME August 22, 2013: for some reason full_clean() barfs
-            # on clean_fields().  Seems like the problem is that
-            # it can't find TransformationInput or TransformationOutput
-            # in the ContentTypes table, which is dumb.
-            new_input_structure.clean()
-            new_input_structure.validate_unique()
+            # June 6, 2014: now that we aren't using GFKs anymore we go back
+            # to using full_clean() here.  Previously it was barfing on
+            # clean_fields().
+            new_input_structure.full_clean()
+            # new_input_structure.clean()
+            # new_input_structure.validate_unique()
+            new_input_structure.save()
 
         return new_input
 
@@ -166,13 +173,12 @@ class Transformation(models.Model):
         new_output.full_clean()
 
         if compounddatatype != None:
-            new_output_structure = new_output.structure.create(
+            new_output_structure = XputStructure(
+                transf_xput=new_output,
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
-            # new_output_structure.full_clean()
-            # FIXME August 22, 2013: same as for create_input
-            new_output_structure.clean()
-            new_output_structure.validate_unique()
+            new_output_structure.full_clean()
+            new_output_structure.save()
 
         return new_output
 
@@ -186,23 +192,9 @@ class TransformationXput(models.Model):
 
     Related to :models:`transformation.Transformation`
     """
-    # June 6, 2014: this is now simply a ForeignKey.
-    transformation = models.ForeignKey(Transformation)
-
-    # The name of the "input/output" hole.
-    dataset_name = models.CharField(
-        "Input/output name",
-        max_length=128,
-        help_text="Name for input/output as an alternative to index")
-
-    # Input/output index on the transformation.
-    ####### NOTE: ONLY METHODS NEED INDICES, NOT TRANSFORMATIONS....!!
-    # If we differentiate between methods/pipelines... dataset_idx would only
-    # belong to methods
-    dataset_idx = models.PositiveIntegerField(
-            "Input/output index",
-            validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this input/output")
+    # June 6, 2014: this is now a real thing, and transformation, dataset_name, and
+    # dataset_idx have been moved to the derived classes so they can have their own
+    # unique_together constraints.
 
     # June 6, 2014: structure is now simply be implicitly defined via a OneToOneField on the
     # XputStructure, as is execrecordouts_referencing (via FK from librarian.ExecRecordOut).
@@ -211,7 +203,7 @@ class TransformationXput(models.Model):
     def is_input(self):
         try:
             self.transformationinput
-        except DoesNotExist:
+        except TransformationXput.DoesNotExist:
             return False
         return True
 
@@ -219,9 +211,16 @@ class TransformationXput(models.Model):
     def is_output(self):
         try:
             self.transformationoutput
-        except DoesNotExist:
+        except TransformationXput.DoesNotExist:
             return False
         return True
+
+    @property
+    def definite(self):
+        if self.is_input:
+            return self.transformationinput
+        else:
+            return self.transformationoutput
 
     def clean(self):
         """Make sure this is either a TransformationInput or TransformationOutput."""
@@ -230,16 +229,17 @@ class TransformationXput(models.Model):
 
     def __unicode__(self):
         unicode_rep = u"";
+        definite_xput = self.definite
         if self.is_raw():
             unicode_rep = u"[{}]:raw{} {}".format(
-                    self.transformation,
-                    self.dataset_idx,
-                    self.dataset_name)
+                    definite_xput.transformation,
+                    definite_xput.dataset_idx,
+                    definite_xput.dataset_name)
         else:
             unicode_rep = u"{} name:{} idx:{} cdt:{}".format(
-                    self.transformation,
-                    self.dataset_name,
-                    self.dataset_idx,
+                    definite_xput.transformation,
+                    definite_xput.dataset_name,
+                    definite_xput.dataset_idx,
                     self.get_cdt())
         return unicode_rep
 
@@ -300,6 +300,26 @@ class TransformationInput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
+    # # Specify an explicit parent link field so that we can go from here back up to
+    # # the TransformationXput (e.g. so we can get at its structure).
+    # transformationxput = models.OneToOneField(TransformationXput, parent_link=True)
+    transformation = models.ForeignKey(Transformation, related_name="inputs")
+
+    # The name of the input "hole".
+    dataset_name = models.CharField(
+        "input name",
+        max_length=128,
+        help_text="Name for input as an alternative to index")
+
+    # Input index on the transformation.
+    ####### NOTE: ONLY METHODS NEED INDICES, NOT TRANSFORMATIONS....!!
+    # If we were to differentiate between methods/pipelines... dataset_idx would only
+    # belong to methods
+    dataset_idx = models.PositiveIntegerField(
+            "input index",
+            validators=[MinValueValidator(1)],
+            help_text="Index defining the relative order of this input")
+
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("transformation", "dataset_name"),
@@ -310,6 +330,20 @@ class TransformationOutput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
+    # Similarly to TransformationInput.
+    # transformationxput = models.OneToOneField(TransformationXput, parent_link=True)
+    transformation = models.ForeignKey(Transformation, related_name="outputs")
+
+    dataset_name = models.CharField(
+        "output name",
+        max_length=128,
+        help_text="Name for output as an alternative to index")
+
+    dataset_idx = models.PositiveIntegerField(
+            "output index",
+            validators=[MinValueValidator(1)],
+            help_text="Index defining the relative order of this output")
+
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("transformation", "dataset_name"),

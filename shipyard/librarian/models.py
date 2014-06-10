@@ -18,9 +18,13 @@ import logging
 import tempfile
 import hashlib
 
-import archive.models, metadata.models, method.models, pipeline.models, transformation.models
+import archive.models
+import method.models
+import pipeline.models
+import transformation.models
 import datachecking.models
-import file_access_utils, logging_utils
+import file_access_utils
+import logging_utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -494,7 +498,7 @@ class ExecRecord(models.Model):
         xput        TransformationXput to get ExecRecordOut for
         """
         try:
-            return self.execrecordouts.get(content_type=ContentType.objects.get_for_model(xput), object_id=xput.pk)
+            return self.execrecordouts.get(generic_output=xput)
         except ExecRecordOut.DoesNotExist:
             return None
 
@@ -542,11 +546,7 @@ class ExecRecord(models.Model):
                 # trivial, we know that both have well-defined
                 # DatasetStructures.
                 elif not self.general_transf().is_trivial():
-                    cable_wires = None
-                    if type(self.general_transf()) == pipeline.models.PipelineStepInputCable:
-                        cable_wires = self.general_transf().custom_wires.all()
-                    else:
-                        cable_wires = self.general_transf().custom_wires.all()
+                    cable_wires = self.general_transf().custom_wires.all()
 
                     source_CDT = eris[0].symbolicdataset.structure.compounddatatype
                     dest_CDT = eros[0].symbolicdataset.structure.compounddatatype
@@ -601,14 +601,11 @@ class ExecRecord(models.Model):
 
     def general_transf(self):
         """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        generating_record = self.generator.record
-        generator_type = generating_record.__class__.__name__
-        if generator_type == "RunStep":
-            return generating_record.pipelinestep.transformation
-        elif generator_type == "RunSIC":
-            return generating_record.PSIC
-        elif generator_type == "RunOutputCable":
-            return generating_record.pipelineoutputcable
+        if self.generator.record.is_cable:
+            return self.generator.record.component
+        else:
+            # This is a Method.
+            return self.generator.record.component.transformation.definite
 
     def provides_outputs(self, outputs):
         """
@@ -622,11 +619,11 @@ class ExecRecord(models.Model):
         """
         # Load each TO in outputs
         for curr_output in outputs:
-            output_type = ContentType.objects.get_for_model(curr_output)
-            corresp_ero = self.execrecordouts.get(content_type=output_type, object_id=curr_output.id)
+            corresp_ero = self.execrecordouts.get(generic_output=curr_output)
 
             if not corresp_ero.has_data():
-                self.logger.debug("corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
+                self.logger.debug(
+                    "corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
                 return False
 
         self.logger.debug("all outputs needed have corresponding EROs with data")
@@ -638,7 +635,12 @@ class ExecRecord(models.Model):
 
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
-        return any(not runstep.successful_execution() for runstep in self.archive_runstep_related.all())
+        # Go through all RunSteps using this ExecRecord.
+        runsteps_using_this = []
+        for component_using_this in self.used_by_components.all():
+            if component_using_this.is_step:
+                runsteps_using_this.append(component_using_this.runstep)
+        return any(not runstep.successful_execution() for runstep in runsteps_using_this)
 
 
 class ExecRecordIn(models.Model):
@@ -650,20 +652,13 @@ class ExecRecordIn(models.Model):
     """
     execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord", related_name="execrecordins")
     symbolicdataset = models.ForeignKey(SymbolicDataset, help_text="Symbol for the dataset fed to this input")
-    
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {
-            "model__in":
-            ("TransformationInput", "TransformationOutput")
-        })
-    object_id = models.PositiveIntegerField()
+
     # For a Method/Pipeline, this denotes the input that this ERI refers to;
     # for a cable, this denotes the thing that "feeds" it.
-    generic_input = generic.GenericForeignKey("content_type", "object_id")
+    generic_input = models.ForeignKey(transformation.models.TransformationXput)
 
     class Meta:
-        unique_together = ("execrecord", "content_type", "object_id");
+        unique_together = ("execrecord", "generic_input");
 
     def __unicode__(self):
         """
@@ -687,10 +682,9 @@ class ExecRecordIn(models.Model):
                  pipeline.models.PipelineStepInputCable)):
             return unicode(self.symbolicdataset)
         else:
-            dest_name = self.generic_input.dataset_name
+            dest_name = self.generic_input.definite.dataset_name
 
         return "{}=>{}".format(self.symbolicdataset, dest_name)
-            
 
     def clean(self):
         """
@@ -713,13 +707,13 @@ class ExecRecordIn(models.Model):
 
         # If ER links to POC, ERI must link to TO which the outcable runs from.
         if type(parent_transf) == pipeline.models.PipelineOutputCable:
-            if self.generic_input != parent_transf.source:
+            if self.generic_input.definite != parent_transf.source.definite:
                 raise ValidationError(
                     "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord POC".
                     format(self))
         # Similarly for a PSIC.
         elif type(parent_transf) == pipeline.models.PipelineStepInputCable:
-            if self.generic_input != parent_transf.source:
+            if self.generic_input.definite != parent_transf.source.definite:
                 raise ValidationError(
                     "ExecRecordIn \"{}\" does not denote the TO/TI that feeds the parent ExecRecord PSIC".
                     format(self))
@@ -727,8 +721,7 @@ class ExecRecordIn(models.Model):
         else:
             # The ER represents a Method (not a cable).  Therefore the
             # ERI must refer to a TI of the parent ER's Method.
-            if (type(self.generic_input) ==
-                    transformation.models.TransformationOutput):
+            if type(self.generic_input) == transformation.models.TransformationOutput:
                 raise ValidationError(
                     "ExecRecordIn \"{}\" must refer to a TI of the Method of the parent ExecRecord".
                     format(self))
@@ -799,20 +792,14 @@ class ExecRecordOut(models.Model):
         help_text="Symbol for the dataset coming from this output",
         related_name="execrecordouts")
 
-    content_type = models.ForeignKey(
-        ContentType,
-        limit_choices_to = {
-            "model__in":
-            ("TransformationInput", "TransformationOutput")
-        })
-    object_id = models.PositiveIntegerField()
     # For a Method/Pipeline this represents the TO that produces this output.
     # For a cable, this represents the TO (for a POC) or TI (for a PSIC) that
     # this cable feeds into.
-    generic_output = generic.GenericForeignKey("content_type", "object_id")
+    generic_output = models.ForeignKey(transformation.models.TransformationXput,
+                                       related_name="execrecordouts_referencing")
 
     class Meta:
-        unique_together = ("execrecord", "content_type", "object_id");
+        unique_together = ("execrecord", "generic_output");
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -838,7 +825,7 @@ class ExecRecordOut(models.Model):
                  pipeline.models.PipelineStepInputCable)):
             unicode_rep = unicode(self.symbolicdataset)
         else:
-            unicode_rep = u"{}=>{}".format(self.generic_output.dataset_name,
+            unicode_rep = u"{}=>{}".format(self.generic_output.definite.dataset_name,
                                            self.symbolicdataset)
         return unicode_rep
 
@@ -855,13 +842,13 @@ class ExecRecordOut(models.Model):
             parent_er_outcable = self.execrecord.general_transf()
 
             # ERO TO must belong to the same pipeline as the ER POC
-            if self.generic_output.transformation != parent_er_outcable.pipeline:
+            if self.generic_output.definite.transformation.definite != parent_er_outcable.pipeline:
                 raise ValidationError(
                     "ExecRecordOut \"{}\" does not belong to the same pipeline as its parent ExecRecord POC".
                     format(self))
 
             # And the POC defined output name must match the pipeline TO name
-            if parent_er_outcable.output_name != self.generic_output.dataset_name:
+            if parent_er_outcable.output_name != self.generic_output.definite.dataset_name:
                 raise ValidationError(
                     "ExecRecordOut \"{}\" does not represent the same output as its parent ExecRecord POC".
                     format(self))
@@ -871,16 +858,17 @@ class ExecRecordOut(models.Model):
             parent_er_psic = self.execrecord.general_transf()
 
             # This ERO must point to a TI.
-            if (type(self.generic_output) != transformation.models.TransformationInput):
+            if not self.generic_output.is_input:
                 raise ValidationError(
                     "Parent of ExecRecordOut \"{}\" represents a PSIC; ERO must be a TransformationInput".
                     format(self))
 
-            # The TI this ERO points to must be the one fed by the PSIC.
-            if parent_er_psic.dest != self.generic_output:
-                raise ValidationError(
-                    "Input \"{}\" is not the one fed by the PSIC of ExecRecord \"{}\"".
-                    format(self.generic_output, self.execrecord))
+            # June 9, 2014: this requirement has been relaxed.
+            # # The TI this ERO points to must be the one fed by the PSIC.
+            # if parent_er_psic.dest != self.generic_output:
+            #     raise ValidationError(
+            #         "Input \"{}\" is not the one fed by the PSIC of ExecRecord \"{}\"".
+            #         format(self.generic_output, self.execrecord))
 
         # Else the parent ER is linked with a method
         else:
@@ -920,10 +908,9 @@ class ExecRecordOut(models.Model):
             # generated by this Method.
 
             if type(self.execrecord.general_transf()) == method.models.Method:
-                if (input_SD.structure.compounddatatype !=
-                        self.generic_output.get_cdt()):
+                if input_SD.structure.compounddatatype != self.generic_output.get_cdt():
                     raise ValidationError(
-                        "CDT of SymbolicDataset \"{}\" is not the CDT of the TransformationOutput \"{}\" of the generating Method".
+                        'CDT of SymbolicDataset "{}" is not the CDT of the TransformationOutput "{}" of the generating Method'.
                         format(input_SD, self.generic_output))
 
             # For POCs, ERO SD's CDT must be >>identical<< to generic_output's CDT, because it was generated either

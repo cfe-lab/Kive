@@ -419,6 +419,26 @@ class Method(transformation.models.Transformation):
         return len(self.outputs.all())
 
     @property
+    def is_method(self):
+        return True
+
+    @property
+    def is_pipeline(self):
+        return False
+
+    @property
+    def is_cable(self):
+        return False
+
+    @property
+    def is_incable(self):
+        return False
+
+    @property
+    def is_outcable(self):
+        return False
+
+    @property
     def family_size(self):
         """Returns size of this Method's family"""
         return len(Method.objects.filter(family=self.family))
@@ -485,7 +505,7 @@ class Method(transformation.models.Transformation):
                 # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
-                    input_idx = ERI.generic_input.dataset_idx
+                    input_idx = ERI.generic_input.definite.dataset_idx
                     if ERI.symbolicdataset != input_SDs[input_idx-1]:
                         ER_matches = False
                         break

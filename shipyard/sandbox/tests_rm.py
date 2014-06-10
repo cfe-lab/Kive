@@ -115,7 +115,7 @@ class UtilityMethods(TestCase):
         if methods[0].inputs.first().is_raw():
             cdt_in = None
         else:
-            cdt_in = methods[0].inputs.first().structure.first().compounddatatype
+            cdt_in = methods[0].inputs.first().structure.compounddatatype
         pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name = indata, dataset_idx = 1)
 
         # Create steps.
