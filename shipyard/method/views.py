@@ -14,9 +14,6 @@ from datetime import datetime
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 
-import logging
-
-logger = logging.getLogger(__name__)
 
 def resources(request):
     """
@@ -46,20 +43,24 @@ def return_crv_forms(request, exceptions, is_new):
     """
     A helper function for resource_revise() to populate forms with user-submitted values
     and form validation errors to be returned as HttpResponse.
+    NOTE: cannot set default value of FileField due to security.
     """
     query = request.POST.dict()
+
     if is_new:
         # creating a new CodeResource
         crv_form = CodeResourcePrototypeForm(initial={'resource_name': query['resource_name'],
                                                       'resource_desc': query['resource_desc']})
+        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
+                                'resource_name': exceptions.get('name', ''),
+                                'resource_desc': exceptions.get('description', '')})
     else:
         # revising a code resource
         crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
-                                                 'revision_desc': query['revision_desc']})
-
-    # FIXME: returns ErrorList of unicode strings, e.g., [u'This field cannot be blank']
-    crv_form.errors.update({'revision_name': exceptions.get('revision_name', ''),
-                            'revision_desc': exceptions.get('revision_desc', '')})
+                                                     'revision_desc': query['revision_desc']})
+        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
+                                'revision_name': exceptions.get('name', ''),
+                                'revision_desc': exceptions.get('description', '')})
 
     num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
     dep_forms = []
@@ -86,7 +87,8 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
-        logger.debug(query)
+        print query
+
         exceptions = {}
         new_code_resource = None
         prototype = None
@@ -96,7 +98,7 @@ def resource_add(request):
                 file_in_memory = request.FILES['content_file']
             except:
                 exceptions.update({'content_file': 'You must specify a file upload.'})
-                raise
+                raise  # content_file required for next steps
 
             try:
                 new_code_resource = CodeResource(name=query['resource_name'],
@@ -107,7 +109,7 @@ def resource_add(request):
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})
-                raise
+                raise  # CodeResource object required for next steps
 
             # modify actual filename prior to saving revision object
             file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
@@ -123,13 +125,13 @@ def resource_add(request):
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})
-                raise
+                raise  # CodeResourceRevision object required for next steps
 
             # bind CR dependencies
             num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
             to_save = []
             for i in range(num_dep_forms):
-                this_cr = query['coderesource_'+str(i)]
+                this_cr = query['coderesource_'+str(i)]  # PK of CodeResource
                 if this_cr == '':
                     # ignore blank CR dependency forms
                     continue
