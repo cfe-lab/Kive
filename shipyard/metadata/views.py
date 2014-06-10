@@ -28,7 +28,7 @@ def datatype_add(request):
     """
     Render form for creating a new Datatype
     """
-    exceptions = []
+    t = loader.get_template('metadata/datatype_add.html')
 
     if request.method == 'POST':
         dform = DatatypeForm(request.POST) # create form bound to POST data
@@ -36,89 +36,98 @@ def datatype_add(request):
 
         if dform.is_valid():
             new_datatype = dform.save() # this has to be saved to database to be passed to BasicConstraint()
-            minlen, maxlen, regexp, minval, maxval = None, None, None, None, None
+            exceptions = {}
+            try:
+                if query['Python_type'] in ['string', 'boolean']:
+                    # manually create and validate BasicConstraint objects
+                    if query['minlen']:
+                        try:
+                            minlen = BasicConstraint(datatype=new_datatype, ruletype='minlen', rule=query['minlen'])
+                            minlen.full_clean()
+                            minlen.save()
+                        except ValidationError as e:
+                            exceptions.update({'minlen': str(e.message_dict['__all__'][0])})
 
-            if query['Python_type'] in ['string', 'boolean']:
-                # manually create and validate BasicConstraint objects
-                if query['minlen']:
-                    minlen = BasicConstraint(datatype=new_datatype, ruletype='minlen', rule=query['minlen'])
-                    try:
-                        minlen.full_clean()
-                        minlen.save()
-                    except ValidationError as e:
-                        exceptions.extend(e.messages)
-                        pass
+                    if query['maxlen']:
+                        try:
+                            maxlen = BasicConstraint(datatype=new_datatype, ruletype='maxlen', rule=query['maxlen'])
+                            maxlen.full_clean()
+                            maxlen.save()
+                        except ValidationError as e:
+                            exceptions.update({'maxlen': str(e.message_dict['__all__'][0])})
 
-                if query['maxlen']:
-                    maxlen = BasicConstraint(datatype=new_datatype, ruletype='maxlen', rule=query['maxlen'])
-                    try:
-                        maxlen.full_clean()
-                        maxlen.save()
-                    except ValidationError as e:
-                        exceptions.extend(e.messages)
-                        pass
+                    if query['regexp']:
+                        # check if there are multiple regexps, as in "<pattern 1>","<pattern 2>",...
+                        # using regex from http://stackoverflow.com/questions/18144431/regex-to-split-a-csv
+                        try:
+                            groups = re.findall('(?:^|,)(?=[^"]|(")?)"?((?(1)[^"]*|[^,"]*))"?(?=,|$)', query['regexp'])
+                            for quoted, group in groups:
+                                regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=group)
+                                regexp.full_clean()
+                                regexp.save()
+                        except ValidationError as e:
+                            exceptions.update({'regexp': str(e.message_dict['__all__'][0])})
 
-                if query['regexp']:
-                    # check if there are multiple regexps, as in "<pattern 1>","<pattern 2>",...
-                    # using regex from http://stackoverflow.com/questions/18144431/regex-to-split-a-csv
-                    groups = re.findall('(?:^|,)(?=[^"]|(")?)"?((?(1)[^"]*|[^,"]*))"?(?=,|$)', query['regexp'])
-                    try:
-                        for quoted, group in groups:
-                            regexp = BasicConstraint(datatype=new_datatype, ruletype='regexp', rule=group)
-                            regexp.full_clean()
-                            regexp.save()
-                    except ValidationError as e:
-                        exceptions.extend(e.messages)
-                        pass
+                elif query['Python_type'] in ['integer', 'float']:
+                    if query['minval']:
+                        try:
+                            minval = BasicConstraint(datatype=new_datatype, ruletype='minval', rule=query['minval'])
+                            minval.full_clean()
+                            minval.save()
+                        except ValidationError as e:
+                            exceptions.update({'minval': str(e.message_dict['__all__'][0])})
 
-            elif query['Python_type'] in ['integer', 'float']:
-                if query['minval']:
-                    minval = BasicConstraint(datatype=new_datatype, ruletype='minval', rule=query['minval'])
-                    try:
-                        minval.full_clean()
-                        minval.save()
-                    except ValidationError as e:
-                        exceptions.extend(e.messages)
-                        pass
+                    if query['maxval']:
+                        try:
+                            maxval = BasicConstraint(datatype=new_datatype, ruletype='maxval', rule=query['maxval'])
+                            maxval.full_clean()
+                            maxval.save()
+                        except ValidationError as e:
+                            exceptions.update({'maxval': str(e.message_dict['__all__'][0])})
 
-                if query['maxval']:
-                    maxval = BasicConstraint(datatype=new_datatype, ruletype='maxval', rule=query['maxval'])
-                    try:
-                        maxval.full_clean()
-                        maxval.save()
-                    except ValidationError as e:
-                        exceptions.extend(e.messages)
-                        pass
+                if len(exceptions) > 0:
+                    # throw exception if any BasicConstraint fields failed to validate
+                    raise
 
-            if exceptions:
-                new_datatype.delete() # delete object from database
-            else:
                 # re-check Datatype object
-                new_datatype.full_clean()
-                new_datatype.save()
+                try:
+                    new_datatype.full_clean()
+                    new_datatype.save()
+                except ValidationError as e:
+                    exceptions.update({'minval': str(e.message_dict['__all__'][0]),
+                                       'minlen': str(e.message_dict['__all__'][0])})
+                    raise
+
+                # success!
                 return HttpResponseRedirect('/datatypes')
 
+            except:
+                new_datatype.delete()
+                # populate constraint forms with submitted values
+                icform = IntegerConstraintForm({'minval': query.get('minval', None),
+                                                'maxval': query.get('maxval', None)})
+                icform.errors.update({'minval': exceptions.get('minval', ''),
+                                       'maxval': exceptions.get('maxval', '')})
 
-        # populate forms for display (one or more invalid forms)
-        icform = IntegerConstraintForm({'minval': query.get('minval', None),
-            'maxval': query.get('maxval', None)})
-        if exceptions:
-            icform.errors['Basic Constraint Errors'] = ErrorList(exceptions)
-
-        scform = StringConstraintForm({'minlen': query.get('minlen', None),
-            'maxlen': query.get('maxlen', None),
-            'regexp': query.get('regexp', None)})
-
+                scform = StringConstraintForm({'minlen': query.get('minlen', None),
+                                               'maxlen': query.get('maxlen', None),
+                                               'regexp': query.get('regexp', None)})
+                scform.errors.update({'minlen': exceptions.get('minlen', ''),
+                                      'maxlen': exceptions.get('maxlen', ''),
+                                      'regexp': exceptions.get('regexp', '')})
+        else:
+            # invalid datatype form
+            icform = IntegerConstraintForm({'minval': query.get('minval', None),
+                                            'maxval': query.get('maxval', None)})
+            scform = StringConstraintForm({'minlen': query.get('minlen', None),
+                                           'maxlen': query.get('maxlen', None),
+                                           'regexp': query.get('regexp', None)})
     else:
         dform = DatatypeForm() # unbound
-        #cform = BasicConstraintForm()
         icform = IntegerConstraintForm()
         scform = StringConstraintForm()
 
-    t = loader.get_template('metadata/datatype_add.html')
-    c = Context({'datatype_form': dform,
-                'int_con_form': icform,
-                'str_con_form': scform})
+    c = Context({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
     c.update(csrf(request))
 
     return HttpResponse(t.render(c))

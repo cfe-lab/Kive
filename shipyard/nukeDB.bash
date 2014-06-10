@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./nukeDB.expect && python manage.py loaddata initial_data && python manage.py loaddata initial_user
+./nukeDB.expect && python2.7 manage.py loaddata initial_data && python2.7 manage.py loaddata initial_user

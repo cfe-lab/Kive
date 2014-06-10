@@ -670,8 +670,7 @@ def method_revise(request, id):
         output_forms = []
         for input in most_recent.inputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_in_'+str(len(input_forms)),
-                                            initial={'input_output': 'input',
-                                                     'dataset_name': input.dataset_name,
+                                            initial={'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
             if input.structure.count() > 0:
                 structure = input.structure.all()[0]
@@ -685,10 +684,15 @@ def method_revise(request, id):
 
             input_forms.append((tx_form, xs_form))
 
+        # if previous Method has no inputs, provide blank forms
+        if len(input_forms) == 0:
+            tx_form = TransformationXputForm(auto_id='id_%s_in_0')
+            xs_form = XputStructureForm(auto_id='id_%s_in_0')
+            input_forms.append((tx_form, xs_form))
+
         for output in most_recent.outputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_out_'+str(len(output_forms)),
-                                            initial={'input_output': 'output',
-                                                     'dataset_name': output.dataset_name,
+                                            initial={'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
             if output.structure.count() > 0:
                 structure = output.structure.all()[0]
