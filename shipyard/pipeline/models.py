@@ -248,7 +248,7 @@ class PipelineStep(models.Model):
             contains_pipeline = False
 
         # Base case 2: this step's transformation exactly equals the pipeline specified
-        elif self.transformation == pipeline:
+        elif self.transformation.pipeline == pipeline:
             contains_pipeline = True
 
         # Recursive case: go through all of the target pipeline steps and check if
@@ -305,7 +305,7 @@ class PipelineStep(models.Model):
             if not self.transformation.outputs.filter(pk=otd.pk).exists():
                 raise ValidationError(
                     "Transformation at step {} does not have output \"{}\"".
-                    format(self.step_num, otd))
+                    format(self.step_num, otd.definite))
 
     def complete_clean(self):
         """Executed after the step's wiring has been fully defined, and

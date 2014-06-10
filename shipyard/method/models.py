@@ -472,20 +472,20 @@ class Method(transformation.models.Transformation):
                     dataset_name = parent_input.dataset_name,
                     dataset_idx = parent_input.dataset_idx)
                 if not parent_input.is_raw():
-                    new_input.structure.create(
-                        compounddatatype = parent_input.get_cdt(),
-                        min_row = parent_input.get_min_row(),
-                        max_row = parent_input.get_max_row())
+                    transformation.models.XputStructure(
+                        transf_xput=new_input, compounddatatype = parent_input.get_cdt(),
+                        min_row = parent_input.get_min_row(), max_row = parent_input.get_max_row()
+                    ).save()
 
             for parent_output in self.revision_parent.outputs.all():
                 new_output = self.outputs.create(
                     dataset_name = parent_output.dataset_name,
                     dataset_idx = parent_output.dataset_idx)
                 if not parent_output.is_raw():
-                    new_output.structure.create(
-                        compounddatatype = parent_output.get_cdt(),
-                        min_row = parent_output.get_min_row(),
-                        max_row = parent_output.get_max_row())
+                    transformation.models.XputStructure(
+                        transf_xput=new_output, compounddatatype = parent_output.get_cdt(),
+                        min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
+                    ).save()
 
     def find_compatible_ER(self, input_SDs):
         """

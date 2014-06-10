@@ -1976,19 +1976,6 @@ class RunSICTests(ArchiveTestSetup):
 
 class RunOutputCableTests(ArchiveTestSetup):
 
-    def test_ROC_many_execlogs(self):
-        run = self.pE.pipeline_instances.create(user=self.myUser)
-        run_output_cable = self.E31_42.poc_instances.create(run=run)
-        run_output_cable.reused = False
-        for i in range(2):
-            run_output_cable.log.create(invoking_record=run_output_cable,
-                                        start_time=timezone.now(),
-                                        end_time=timezone.now())
-        self.assertRaisesRegexp(ValidationError,
-                'RunOutputCable "{}" has {} ExecLogs but should have only one'.
-                        format(run_output_cable, 2),
-                run_output_cable.clean)
-
     def test_ROC_clean_correct_parent_run(self):
         """PipelineOutputCable belongs to parent Run's Pipeline.
 
@@ -2077,9 +2064,11 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("roc_created")
         self.E31_42_ROC.reused = False
-        self.E31_42_ROC.log.create(invoking_record=self.E31_42_ROC,
-                                   start_time=timezone.now(),
-                                   end_time=timezone.now())
+
+        cable_log = ExecLog(record=self.E31_42_ROC, invoking_record=self.E31_42_ROC,
+                            start_time=timezone.now(), end_time=timezone.now())
+        cable_log.save()
+
         self.singlet_DS.created_by = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
@@ -2148,11 +2137,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("custom_roc_completed")
         self.E31_42_ROC.execrecord = self.E21_41_ROC.execrecord
-        error_msg = "POC of RunOutputCable .* is incompatible with that of its ExecRecord"
-        self.assertRaisesRegexp(ValidationError, 
-                                re.escape('POC of RunOutputCable "{}" is incompatible with that of its ExecRecord'
-                                          .format(self.E31_42_ROC)),
-                                self.E31_42_ROC.clean)
+        err_msg = 'PipelineOutputCable of RunOutputCable "{}" is incompatible with the cable of its ExecRecord'
+        self.assertRaisesRegexp(ValidationError, re.escape(err_msg.format(self.E31_42_ROC)), self.E31_42_ROC.clean)
 
     def test_ROC_clean_wrong_object_execrecord(self):
         """RunOutputCable has ExecRecord for PipelineStep.
@@ -2165,7 +2151,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.make_complete_non_reused(runstep, [self.raw_symDS], [self.doublet_symDS])
         self.E31_42_ROC.execrecord = runstep.execrecord
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunOutputCable "{}" does not represent a POC'
+                                re.escape('ExecRecord of RunOutputCable "{}" does not represent a PipelineCable'
                                           .format(self.E31_42_ROC)),
                                 self.E31_42_ROC.clean)
 
@@ -2190,7 +2176,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.step_E2.outputs_to_delete.add(self.pD.outputs.get(dataset_name="D1_out"))
 
         self.assertFalse(self.D11_21_ROC.keeps_output())
-        self.assertTrue(self.D11_21_ROC.output.exists())
+        self.assertTrue(self.D11_21_ROC.outputs.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" does not keep its output but a dataset was registered'
                                           .format("RunOutputCable", self.D11_21_ROC)),
@@ -2225,7 +2211,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("subrun")
         self.D11_21_ROC.reused = True
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_kept_output_trivial_no_data(self):
@@ -2238,7 +2224,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("subrun")
         self.D11_21.custom_wires.all().delete()
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_kept_output_nontrivial_no_data(self):
@@ -2253,7 +2239,7 @@ class RunOutputCableTests(ArchiveTestSetup):
 
         self.assertTrue(self.D11_21_ROC.keeps_output())
         self.assertListEqual(self.D11_21_ROC.log.missing_outputs(), [])
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
                                           'produced data'.format(self.D11_21_ROC)),
@@ -2287,7 +2273,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         in its output, is clean.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.D11_21_ROC.output.add(self.C1_in_DS)
+        self.D11_21_ROC.outputs.add(self.C1_in_DS)
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_trivial_no_data(self):
@@ -2330,7 +2316,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         data matching its ExecRecordOut, is clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.E21_41_ROC.output.add(self.doublet_DS)
+        self.E21_41_ROC.outputs.add(self.doublet_DS)
         self.assertTrue(self.E21_41_ROC.has_data())
         self.assertIsNone(self.E21_41_ROC.clean())
 
@@ -2462,7 +2448,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
@@ -2496,7 +2482,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
@@ -2530,7 +2516,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset

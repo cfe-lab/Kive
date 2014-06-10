@@ -182,6 +182,15 @@ class Transformation(models.Model):
 
         return new_output
 
+    # June 10, 2014: two helpers that we use in testing.  Maybe they'll be useful elsewhere?
+    def delete_inputs(self):
+        for curr_input in self.inputs.all():
+            curr_input.delete()
+
+    def delete_outputs(self):
+        for curr_output in self.outputs.all():
+            curr_output.delete()
+
 
 # August 20, 2013: changed the structure of our Xputs so that there is no distinction
 # between raw and non-raw Xputs beyond the existence of an associated "structure"
@@ -232,12 +241,12 @@ class TransformationXput(models.Model):
         definite_xput = self.definite
         if self.is_raw():
             unicode_rep = u"[{}]:raw{} {}".format(
-                    definite_xput.transformation,
+                    definite_xput.transformation.definite,
                     definite_xput.dataset_idx,
                     definite_xput.dataset_name)
         else:
             unicode_rep = u"{} name:{} idx:{} cdt:{}".format(
-                    definite_xput.transformation,
+                    definite_xput.transformation.definite,
                     definite_xput.dataset_name,
                     definite_xput.dataset_idx,
                     self.get_cdt())
