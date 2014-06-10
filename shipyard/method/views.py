@@ -87,7 +87,6 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
-        print query
 
         exceptions = {}
         new_code_resource = None
