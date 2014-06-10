@@ -58,7 +58,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $("#id_select_method_family").on('change',
         function() {
             mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
-            if (mf_id != "" && mf_id != "Label") {
+            if (mf_id != "") {
                 $.ajax({
                     type: "POST",
                     url: "get_method_revisions/",
@@ -104,6 +104,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     
     $('li', 'ul#id_ctrl_nav').on('click', function() {
         var $this = $(this);
+        $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
+        $this.addClass('clicked');
         $('#pipeline_ctrl > div').not('#form_ctrl').hide();
         $($this.data('rel')).show().css('left', $this.offset().left);
     });
@@ -152,34 +154,44 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     $('#id_method_button').on('click', function() {
-        var selected = $('#id_select_method option:selected');
-        var mid = selected.val(); // pk of method
+        var bin = $(this).closest('div'),
+            method_name = $('#id_method_name', bin),
+            method_error = $('#id_method_error', bin),
+            method_family = $('#id_select_method_family', bin),
+            method = $('#id_select_method', bin);
+        var mid = method.val(); // pk of method
 
-        if (mid === undefined) {
-            $('#id_method_error')[0].innerHTML = "Select a Method";
-        }
-        else {
+        if (mid === undefined || method_family.val() == '') {
+            method_error[0].innerHTML = "Select a Method";
+            
+            if (method.is(':visible')) {
+                method.focus();
+            } else {
+                method_family.focus();
+            }
+        } else {
             // user selected valid Method Revision
-            var node_label = $('#id_method_name').val();
+            var node_label = method_name.val();
 
-            if (node_label === '') {
+            if (node_label === '' || node_label === 'Label') {
                 // required field
-                $('#id_method_error')[0].innerHTML = "Label is required";
+                method_error[0].innerHTML = "Label is required";
+                method_name.focus();
             }
             else {
-                $('#id_method_error')[0].innerHTML = "";
-                var n_inputs = null;
-                var n_outputs = null;
+                method_error[0].innerHTML = '';
+                var n_inputs = null,
+                    n_outputs = null;
 
                 // use AJAX to retrieve Revision inputs and outputs
                 $.ajax({
                     type: "POST",
                     url: "get_method_io/",
-                    data: {mid: mid}, // specify data as an object
+                    data: { mid: mid }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        var inputs = result['inputs'];
-                        var outputs = result['outputs'];
+                        var inputs = result['inputs'],
+                            outputs = result['outputs'];
                         canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999',
                             node_label, 10, inputs, outputs));
 
@@ -189,7 +201,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     }
                 });
 
-                $('#id_method_name').val('');
+                method_name.val('');
             }
         }
     });
