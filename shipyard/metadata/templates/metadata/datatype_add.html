@@ -50,21 +50,19 @@
     <h3>Basic constraints</h3>
 
     <div id="int_constraints" class="constraints">
-    {{ int_con_form.errors }}
     <table>
     {% for field in int_con_form %}
         <tr>
         <th>{{ field.label_tag }}</th>
         <td><div class="helptext">{{ field.help_text }}</div></td>
         <td>{{ field }} </td>
-        <td class="errortext">{{ field.errors }}</td>
+        <td style="width: 200px" class="errortext">{{ field.errors }}</td>
         </tr>
     {% endfor %}
     </table>
     </div>
 
     <div id="str_constraints" class="constraints">
-    {{ str_con_form.errors }}
     <table>
     {% for field in str_con_form %}
         <tr>

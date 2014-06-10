@@ -43,22 +43,24 @@ def return_crv_forms(request, exceptions, is_new):
     """
     A helper function for resource_revise() to populate forms with user-submitted values
     and form validation errors to be returned as HttpResponse.
+    NOTE: cannot set default value of FileField due to security.
     """
     query = request.POST.dict()
+
     if is_new:
         # creating a new CodeResource
         crv_form = CodeResourcePrototypeForm(initial={'resource_name': query['resource_name'],
-                                                      'resource_desc': query['resource_desc'],
-                                                      'revision_name': query['revision_name'],
-                                                      'revision_desc': query['revision_desc']})
+                                                      'resource_desc': query['resource_desc']})
+        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
+                                'resource_name': exceptions.get('name', ''),
+                                'resource_desc': exceptions.get('description', '')})
     else:
         # revising a code resource
         crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
-                                                 'revision_desc': query['revision_desc']})
-
-    # FIXME: returns ErrorList of unicode strings, e.g., [u'This field cannot be blank']
-    crv_form.errors.update({'revision_name': exceptions.get('revision_name', ''),
-                            'revision_desc': exceptions.get('revision_desc', '')})
+                                                     'revision_desc': query['revision_desc']})
+        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
+                                'revision_name': exceptions.get('name', ''),
+                                'revision_desc': exceptions.get('description', '')})
 
     num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
     dep_forms = []
@@ -85,78 +87,71 @@ def resource_add(request):
 
     if request.method == 'POST':
         query = request.POST.dict()
+
         exceptions = {}
-
-        # check if a file has been uploaded
-        try:
-            file_in_memory = request.FILES['content_file']
-        except:
-            # no file specified
-            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
-            crv_form.errors.update({'content_file': u'You must specify a file upload.'})
-            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
-
-        # create new CodeResource
-        new_code_resource = CodeResource(name=query['resource_name'],
-                                         description=query['resource_desc'],
-                                         filename=file_in_memory.name)
-        try:
-            new_code_resource.full_clean()
-            new_code_resource.save()
-        except ValidationError as e:
-            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
-            crv_form.errors.update({'revision_name': e.message_dict.get('name', [u''])[0],
-                                    'revision_desc': e.message_dict.get('description', [u''])[0]})
-
-            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
-
-        # modify actual filename prior to saving revision object
-        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+        new_code_resource = None
+        prototype = None
 
         try:
-            prototype = CodeResourceRevision(revision_number=1,
-                                         revision_name='Prototype',
-                                         revision_desc=query['resource_desc'],
-                                         coderesource=new_code_resource,
-                                         content_file=file_in_memory)
-            prototype.full_clean()
-            prototype.save()
-        except ValidationError as e:
-            new_code_resource.delete()
-            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
-            crv_form.errors = e.message_dict
-            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
-            return HttpResponse(t.render(c))
-
-        # bind CR dependencies
-        num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
-        to_save = []
-        for i in range(num_dep_forms):
-            this_cr = query['coderesource_'+str(i)]
-            if this_cr == '':
-                # ignore blank CR dependency forms
-                continue
-            on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
-            dependency = CodeResourceDependency(coderesourcerevision=prototype,
-                                                requirement = on_revision,
-                                                depPath=query['depPath_'+str(i)],
-                                                depFileName=query['depFileName_'+str(i)])
             try:
-                dependency.full_clean()
-                to_save.append(dependency)
+                file_in_memory = request.FILES['content_file']
+            except:
+                exceptions.update({'content_file': 'You must specify a file upload.'})
+                raise  # content_file required for next steps
+
+            try:
+                new_code_resource = CodeResource(name=query['resource_name'],
+                                                 description=query['resource_desc'],
+                                                 filename=file_in_memory.name)
+                new_code_resource.full_clean()
+                new_code_resource.save()
             except ValidationError as e:
-                exceptions.update({i: e.messages})
+                for key, msg in e.message_dict.iteritems():
+                    exceptions.update({key: str(msg[0])})
+                raise  # CodeResource object required for next steps
 
-        if exceptions:
-            new_code_resource.delete()
-            prototype.delete() # roll back CodeResourceRevision object
+            # modify actual filename prior to saving revision object
+            file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+            try:
+                prototype = CodeResourceRevision(revision_number=1,
+                                                 revision_name='Prototype',
+                                                 revision_desc=query['resource_desc'],
+                                                 coderesource=new_code_resource,
+                                                 content_file=file_in_memory)
+                prototype.full_clean()
+                prototype.save()
+            except ValidationError as e:
+                for key, msg in e.message_dict.iteritems():
+                    exceptions.update({key: str(msg[0])})
+                raise  # CodeResourceRevision object required for next steps
+
+            # bind CR dependencies
+            num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+            to_save = []
+            for i in range(num_dep_forms):
+                this_cr = query['coderesource_'+str(i)]  # PK of CodeResource
+                if this_cr == '':
+                    # ignore blank CR dependency forms
+                    continue
+                try:
+                    on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
+                    dependency = CodeResourceDependency(coderesourcerevision=prototype,
+                                                    requirement = on_revision,
+                                                    depPath=query['depPath_'+str(i)],
+                                                    depFileName=query['depFileName_'+str(i)])
+                    dependency.full_clean()
+                    to_save.append(dependency)
+                except ValidationError as e:
+                    exceptions.update({i: e.messages})
+
+        except:
+            if hasattr(new_code_resource, 'id') and new_code_resource.id is not None:
+                new_code_resource.delete()
+            if hasattr(prototype, 'id') and prototype.id is not None:
+                prototype.delete() # roll back CodeResourceRevision object
+
             crv_form, dep_forms = return_crv_forms(request, exceptions, True)
-
             c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
@@ -480,12 +475,11 @@ def method_add(request):
                     if i not in exceptions['outputs']:
                         exceptions['outputs'].update({i: {}})
                     exceptions['outputs'][i].update({'compounddatatype': 'You must select a Compound Datatype.'})
-
-            if len(new_inputs) == 0:
-                exceptions['inputs'].update({0: {'dataset_name': 'You must specify at least one input.'}})
-            if len(new_outputs) == 0:
+                
+            if len(new_outputs) == 0 and len(exceptions['outputs']) == 0:
                 exceptions['outputs'].update({0: {'dataset_name': 'You must specify at least one output.'}})
-            if len(exceptions) > 2:
+
+            if len(exceptions['inputs']) > 0 or len(exceptions['outputs']) > 0 or len(exceptions) > 2:
                 # if there are more keys than 'inputs' and 'outputs' then
                 # one or more input/output form exceptions have been raised
                 raise
@@ -677,8 +671,7 @@ def method_revise(request, id):
         output_forms = []
         for input in most_recent.inputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_in_'+str(len(input_forms)),
-                                            initial={'input_output': 'input',
-                                                     'dataset_name': input.dataset_name,
+                                            initial={'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
             if input.structure.count() > 0:
                 structure = input.structure.all()[0]
@@ -692,10 +685,15 @@ def method_revise(request, id):
 
             input_forms.append((tx_form, xs_form))
 
+        # if previous Method has no inputs, provide blank forms
+        if len(input_forms) == 0:
+            tx_form = TransformationXputForm(auto_id='id_%s_in_0')
+            xs_form = XputStructureForm(auto_id='id_%s_in_0')
+            input_forms.append((tx_form, xs_form))
+
         for output in most_recent.outputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_out_'+str(len(output_forms)),
-                                            initial={'input_output': 'output',
-                                                     'dataset_name': output.dataset_name,
+                                            initial={'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
             if output.structure.count() > 0:
                 structure = output.structure.all()[0]

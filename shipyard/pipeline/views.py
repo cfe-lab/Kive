@@ -10,6 +10,8 @@ from metadata.models import *
 from pipeline.models import *
 import json
 
+logger = logging.getLogger(__name__)
+
 def pipelines(request):
     """
     Display existing pipeline families, represented by the
@@ -35,9 +37,10 @@ def pipeline_add(request):
 
     if request.method == 'POST':
         # FIXME: this is probably a lousy way to handle JSON
+        # Try this instead: formdata = json.loads(request.body)
         query = request.POST.dict()
         exec('formdata=%s' % query.keys()[0])
-        print formdata
+        logger.debug(formdata)
 
         # does Pipeline family with this name already exist?
         if PipelineFamily.objects.filter(name=formdata['family_name']).exists():

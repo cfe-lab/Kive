@@ -144,9 +144,6 @@ INSTALLED_APPS = (
     'stopwatch'
 )
 
-# A sample logging configuration. The only tangible logging
-# performed by this configuration is to send an email to
-# the site admins on every HTTP 500 error when DEBUG=False.
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
 LOGGING = {
@@ -159,7 +156,7 @@ LOGGING = {
     },
     'formatters': {
         'debug': {
-            'format': '%(name)s.%(funcName)s(): %(message)s',
+            'format': '%(asctime)s[%(levelname)s]%(name)s.%(funcName)s(): %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
@@ -173,29 +170,26 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'debug'
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class':'logging.handlers.RotatingFileHandler',
+            'filename': 'shipyard.log',
+            'formatter': 'debug',
+            'maxBytes': 1024*1024*15, # 15MB
+            'backupCount': 10
         }
     },
     'loggers': {
+        '': {
+             # This is the default logger
+             'handlers': ['console', 'file'], 
+             'level': 'DEBUG'
+        },
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
-        },
-        'metadata.models':        {'handlers': ['console'], 'level': 'DEBUG'},
-        'librarian.models':       {'handlers': ['console'], 'level': 'DEBUG'},
-        'CodeResourceRevision':   {'handlers': ['console'], 'level': 'DEBUG'},
-        'CompoundDatatype':       {'handlers': ['console'], 'level': 'DEBUG'},
-        'Dataset':                {'handlers': ['console'], 'level': 'DEBUG'},
-        'ExecLog':                {'handlers': ['console'], 'level': 'DEBUG'},
-        'ExecRecord':             {'handlers': ['console'], 'level': 'DEBUG'},
-        'ExecRecordIn':           {'handlers': ['console'], 'level': 'DEBUG'},
-        'ExecRecordOut':          {'handlers': ['console'], 'level': 'DEBUG'},
-        'Method':                 {'handlers': ['console'], 'level': 'DEBUG'},
-        'PipelineStepInputCable': {'handlers': ['console'], 'level': 'DEBUG'},
-        'PipelineOutputCable':    {'handlers': ['console'], 'level': 'DEBUG'},
-        'RunSIC':                 {'handlers': ['console'], 'level': 'DEBUG'},
-        'RunOutputCable':         {'handlers': ['console'], 'level': 'DEBUG'},
-        'Sandbox':                {'handlers': ['console'], 'level': 'DEBUG'},
-        'SymbolicDataset':        {'handlers': ['console'], 'level': 'DEBUG'}
+        }
     }
 }

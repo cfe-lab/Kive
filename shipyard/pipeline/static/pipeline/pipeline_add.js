@@ -55,7 +55,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // update method drop-down
-//    $("[id^='id_select_method_family']").on('change', // Are these still being generated dynamically in quantity? —JN
     $("#id_select_method_family").on('change',
         function() {
             mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
@@ -74,12 +73,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $("#id_select_method").show().html(options.join(''));
                     }
                 })
-                // label this new drop-drown
-                $('#id_revision_label')[0].innerHTML = '<i>Revision: </i>';
+                
+                $('#id_method_revision_field').show();
             }
             else {
-                $("#id_select_method").hide();
-                $('#id_revision_label')[0].innerHTML = '';
+                $("#id_method_revision_field").hide();
             }
         }
     ).change(); // trigger on load
@@ -88,6 +86,28 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $('.helptext', 'form').each(function() {
         var $this = $(this);
         $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+    });
+    
+    $('input, textarea', '#pipeline_ctrl').each(function() {
+        var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
+        if (lbl.length) {
+            $(this).on('focus', function() {
+                if ($(this).val() == lbl.html())
+                    $(this).removeClass('input-label').val('');
+            }).on('blur', function() {
+                if ($(this).val() === '')
+                    $(this).addClass('input-label').val(lbl.html());
+            }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
+            lbl.remove();
+        }
+    });
+    
+    $('li', 'ul#id_ctrl_nav').on('click', function() {
+        var $this = $(this);
+        $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
+        $this.addClass('clicked');
+        $('#pipeline_ctrl > div').not('#form_ctrl').hide();
+        $($this.data('rel')).show().css('left', $this.offset().left);
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
@@ -98,10 +118,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // initialize animated canvas
     var canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth = 800;
-    var canvasHeight= 400;
+    var canvasWidth = window.innerWidth;
+    var canvasHeight= window.innerHeight - 180;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
+
+    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
+//    $(window).resize(function() {    });
+
 
     var canvasState = new CanvasState(canvas);
 
@@ -109,7 +133,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var choice = $('#id_select_cdt option:selected');
         var node_label = $('#id_datatype_name').val();
 
-        if (node_label === '') {
+        if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error')[0].innerHTML = "Label is required";
         }
@@ -130,34 +154,44 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     $('#id_method_button').on('click', function() {
-        var selected = $('#id_select_method option:selected');
-        var mid = selected.val(); // pk of method
+        var bin = $(this).closest('div'),
+            method_name = $('#id_method_name', bin),
+            method_error = $('#id_method_error', bin),
+            method_family = $('#id_select_method_family', bin),
+            method = $('#id_select_method', bin);
+        var mid = method.val(); // pk of method
 
-        if (mid === undefined) {
-            $('#id_method_error')[0].innerHTML = "Select a Method";
-        }
-        else {
+        if (mid === undefined || method_family.val() == '') {
+            method_error[0].innerHTML = "Select a Method";
+            
+            if (method.is(':visible')) {
+                method.focus();
+            } else {
+                method_family.focus();
+            }
+        } else {
             // user selected valid Method Revision
-            var node_label = $('#id_method_name').val();
+            var node_label = method_name.val();
 
-            if (node_label === '') {
+            if (node_label === '' || node_label === 'Label') {
                 // required field
-                $('#id_method_error')[0].innerHTML = "Label is required";
+                method_error[0].innerHTML = "Label is required";
+                method_name.focus();
             }
             else {
-                $('#id_method_error')[0].innerHTML = "";
-                var n_inputs = null;
-                var n_outputs = null;
+                method_error[0].innerHTML = '';
+                var n_inputs = null,
+                    n_outputs = null;
 
                 // use AJAX to retrieve Revision inputs and outputs
                 $.ajax({
                     type: "POST",
                     url: "get_method_io/",
-                    data: {mid: mid}, // specify data as an object
+                    data: { mid: mid }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        var inputs = result['inputs'];
-                        var outputs = result['outputs'];
+                        var inputs = result['inputs'],
+                            outputs = result['outputs'];
                         canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999',
                             node_label, 10, inputs, outputs));
 
@@ -167,7 +201,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     }
                 });
 
-                $('#id_method_name').val('');
+                method_name.val('');
             }
         }
     });
@@ -212,26 +246,45 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     
     $('#id_revision_desc').on('keydown', function() {
         var $this = $(this),
-            happy = -Math.min(15, Math.floor($this.val().length / 19)) * 32;
+            happy = -Math.min(15, Math.floor($this.val().length / 9)) * 32;
     
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
         .trigger('keydown')
         .wrap('<div id="description_wrap">')
         .after('<div class="happy_indicator">')
-        .after('<div class="happy_indicator_label">Write a great description to keep everyone happy!</div>')
-        .on('focus', function() {
-            $('.happy_indicator, .happy_indicator_label').show();
+        .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
+        .on('focus keyup', function() {
+            var desc_length = $(this).val().length;
+            
+            if (desc_length > 20) {
+                $('.happy_indicator').show();
+                $('.happy_indicator_label').hide();
+            }
+            else if (desc_length > 0) {
+                $('.happy_indicator, .happy_indicator_label').show();
+            }
+            else {
+                $('.happy_indicator, .happy_indicator_label').hide();
+            }
         }).on('blur', function() {
             $('.happy_indicator, .happy_indicator_label').hide();
         }).blur();
 
 
-    $('form').submit(function(e) {
+    $('form#pipeline_ctrl').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
         e.preventDefault(); // override form submit action
+        
+        // Since a field contains its label on pageload, a field's label as its value is treated as blank
+        $('input, textarea', this).each(function() {
+            var $this = $(this);
+            if ($this.val() == $this.data('label'))
+                $this.val('');
+        });
+        
         var submit_error = $('#id_submit_error')[0];
 
         var shapes = canvasState.shapes;

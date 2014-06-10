@@ -1027,6 +1027,7 @@ class FindSDTests(UtilityMethods):
         self.assertEqual(run, subrun)
         self.assertEqual(gen, cable.PSIC)
 
+
 class RawTests(UtilityMethods):
 
     def setUp(self):
@@ -1052,3 +1053,4 @@ class RawTests(UtilityMethods):
 
     def tearDown(self):
         super(RawTests, self).tearDown()
+

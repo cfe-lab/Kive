@@ -27,8 +27,9 @@ class CodeResource(models.Model):
     A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
-    name = models.CharField( "Resource name", max_length=255, help_text="The name for this resource and all "
-                                                                        "subsequent revisions.")
+    name = models.CharField( "Resource name", max_length=255,
+                             help_text="The name for this resource and all subsequent revisions.",
+                             unique=True)  # to prevent confusion in drop-down menus
 
     # File names must either be empty, or be 1 or more of any from
     # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
