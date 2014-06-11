@@ -268,7 +268,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         Trigger AJAX transaction on submitting form.
          */
         e.preventDefault(); // override form submit action
-        
+
+        console.log(canvasState);
+
         // Since a field contains its label on pageload, a field's label as its value is treated as blank
         $('input, textarea', this).each(function() {
             var $this = $(this);
@@ -319,7 +321,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     num_connections += this_magnet.connected.length;
                 }
                 if (num_connections === 0) {
-                    submit_error.innerHTML('MethodNode with unused outputs');
+                    console.log(this_magnet);
+                    submit_error.innerHTML = 'MethodNode with unused outputs';
                     return;
                 }
             }
@@ -400,9 +403,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
                 for (var k = 0; k < magnets.length; k++) {
                     this_magnet = magnets[k];
+                    if (this_magnet.connected.length == 0) {
+                        // unconnected in-magnet, still okay to add this MethodNode
+                        continue;
+                    }
                     // trace up the Connector
-                    this_parent = this_magnet.connected.out_magnet.parent;
-                    if (this_parent.constructor === MethodNode) {
+                    this_parent = this_magnet.connected[0].out_magnet.parent;  // in-magnets only have 1 connector
+                    if (this_parent.constructor === MethodNode) {  // ignore connections from data nodes
                         if ($.inArray(this_parent, sorted_elements) < 0) {
                             // dependency not cleared
                             okay_to_add = false;
@@ -457,7 +464,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
             for (j = 0; j < magnets.length; j++) {
                 this_magnet = magnets[j];
-                this_connector = this_magnet.connected;
+                if (this_magnet.connected.length == 0) {
+                    continue;
+                }
+                this_connector = this_magnet.connected[0];
                 this_source = this_connector.out_magnet.parent;
 
                 if (this_source.constructor === MethodNode) {
@@ -504,6 +514,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         // this code written on Signal Hill, St. John's, Newfoundland
         // May 2, 2014 - afyp
 
+        console.log(form_data);
 
 
         // do AJAX transaction

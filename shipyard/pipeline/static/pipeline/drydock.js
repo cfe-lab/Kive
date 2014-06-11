@@ -147,6 +147,9 @@ CanvasState.prototype.doMove = function(e) {
 
             // are we carrying a connector?
             if (typeof this.selection.fromX != 'undefined') {
+                // reset to allow mouse to disengage Connector from a magnet
+                this.selection.in_magnet = null;
+
                 // get this connector's shape
                 var own_shape = null;
                 if (this.selection.out_magnet !== null) {
@@ -188,8 +191,6 @@ CanvasState.prototype.doMove = function(e) {
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
                                 this.selection.in_magnet = in_magnet;
-                                in_magnet.connected = this.selection;
-                                this.selection.out_magnet.connected.push(this.selection);
                             }
                         }
                     }
@@ -215,14 +216,15 @@ CanvasState.prototype.doUp = function(e) {
     }
 
     var connector = this.selection;
+    var in_magnet = connector.in_magnet;
+    var out_magnet = connector.out_magnet;
 
-    if (connector.in_magnet === null) {
-        // has connector been carried into output end-zone?
+    if (in_magnet === null) {
         var mouse = this.getPos(e);
 
         if (mouse.x > 0.9 * this.canvas.width) {
             // Connector drawn into output end-zone
-            if (connector.out_magnet.parent.constructor !== MethodNode) {
+            if (out_magnet.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
                 this.connectors.pop();
                 this.selection = null;
@@ -230,16 +232,34 @@ CanvasState.prototype.doUp = function(e) {
             } else {
                 // valid Connector, assign non-null value
                 connector.in_magnet = '__output__';
-                connector.x = mouse.x;
+                connector.out_magnet.connected.push(connector);
+                connector.x = mouse.x;  // FIXME: is this necessary?
                 connector.y = mouse.y;
             }
         } else {
-            if (connector.in_magnet === null) {
+            // Connector not linked to anything - delete
+            if (in_magnet === null) {
                 // not connected
                 this.connectors.pop();
                 this.selection = null;
                 this.valid = false; // redraw canvas to remove this Connector
             }
+        }
+    } else {
+        // connector has been linked to an in-magnet
+        if (out_magnet.connected.indexOf(connector) < 0) {
+            // this is a new Connector, update source magnet
+            connector.out_magnet.connected.push(connector);
+        }
+
+        // if destination is output end-zone, then do not update
+        if (in_magnet.constructor === Magnet) {
+            if (in_magnet.connected.indexOf(connector) < 0) {
+                // this is a new Connector, update destination magnet
+                connector.in_magnet.connected.push(connector);
+            }
+        } else {
+            in_magnet = '__output__';
         }
     }
 
@@ -250,7 +270,7 @@ CanvasState.prototype.doUp = function(e) {
         if (typeof shape.in_magnets != 'undefined') {
             var in_magnets = shape.in_magnets;
             for (var j = 0; j < in_magnets.length; j++) {
-                var in_magnet = in_magnets[j];
+                in_magnet = in_magnets[j];
                 in_magnet.fill = 'white';
             }
         }
