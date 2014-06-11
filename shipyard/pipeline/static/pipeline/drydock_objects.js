@@ -150,7 +150,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
         var magnet = new Magnet(
             parent = this,
             r = 5,
-            attract = 2,
+            attract = 5,
             fill = '#fff',
             cdt = this_input['cdt_pk'],
             label = this_input['datasetname']
@@ -169,7 +169,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
         magnet = new Magnet(
             parent = this,
             r = 5,
-            attract = 2,
+            attract = 5,
             fill = '#fff',
             cdt = this_output['cdt_pk'],
             label = this_output['datasetname']

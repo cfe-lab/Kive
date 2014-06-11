@@ -8,6 +8,7 @@ from django.core.context_processors import csrf
 from method.models import *
 from metadata.models import *
 from pipeline.models import *
+from django.core.exceptions import ValidationError
 import json
 import operator
 
@@ -132,9 +133,10 @@ def pipeline_add(request):
             pipeline.clean()
             pipeline.save()
             response_data = {'status': 'success'}
-        except:
+        except ValidationError as e:
             pl_family.delete()
-            response_data = {'status': 'failure'}
+            response_data = {'status': 'failure',
+                             'error_msg': str(e.message_dict.values()[0][0])}
 
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:
