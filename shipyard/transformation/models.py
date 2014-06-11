@@ -276,6 +276,10 @@ class TransformationXput(models.Model):
         """Accessor that returns max_row for this xput (and None if it is raw)."""
         return (None if self.is_raw() else self.structure.max_row)
 
+    @property
+    def has_structure(self):
+        return hasattr(self, "structure")
+
 
 class XputStructure(models.Model):
     """
