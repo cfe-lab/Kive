@@ -6,6 +6,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
 from method.forms import *
+from transformation.models import *
 #from django.shortcuts import render, render_to_response
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
@@ -489,10 +490,10 @@ def method_add(request):
 
         except:
             # clean up after ourselves
-            if hasattr(method_family, 'id') and method_family.id is not None:
-                method_family.delete()
             if hasattr(new_method, 'id') and new_method.id is not None:
                 new_method.delete()
+            if hasattr(method_family, 'id') and method_family.id is not None:
+                method_family.delete()
 
             method_form, input_forms, output_forms = return_method_forms(request, exceptions)
             c = Context({'method_form': method_form,
