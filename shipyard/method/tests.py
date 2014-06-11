@@ -696,7 +696,7 @@ class CodeResourceRevisionTests(MethodTestSetup):
         """
 
         cr = CodeResource(
-                name="complement",
+                name="test_complement",
                 filename="",
                 description="Complement DNA/RNA nucleotide sequences")
         cr.save()
@@ -1424,7 +1424,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         """
         # cr_no_filename has name="complement" and filename="complement.py"
         cr = CodeResource(
-                name="complement",
+                name="testing_complement",
                 filename="complement.py",
                 description="Complement DNA/RNA nucleotide sequences")
         cr.save()
@@ -1463,7 +1463,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
 
         # Define a standard code resource
         cr = CodeResource(
-                name="complement",
+                name="test_complement",
                 filename="test.py",
                 description="Complement DNA/RNA nucleotide sequences")
         cr.save()
@@ -1481,7 +1481,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         
         # Define a metapackage code resource (no file name)
         cr_meta = CodeResource(
-                name="complement",
+                name="test2_complement",
                 filename="",
                 description="Complement DNA/RNA nucleotide sequences")
         cr_meta.save()
@@ -1510,7 +1510,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
 
         # Define a standard code resource
         cr = CodeResource(
-                name="complement",
+                name="test_complement",
                 filename="test.py",
                 description="Complement DNA/RNA nucleotide sequences")
         cr.save()
@@ -1528,7 +1528,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         
         # Define a metapackage code resource (no file name)
         cr_meta = CodeResource(
-                name="complement",
+                name="test2_complement",
                 filename="",
                 description="Complement DNA/RNA nucleotide sequences")
         cr_meta.save()
