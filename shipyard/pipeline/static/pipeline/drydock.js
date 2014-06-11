@@ -96,10 +96,10 @@ CanvasState.prototype.doDown = function(e) {
             for (var j = 0; j < out_magnets.length; j++) {
                 out_magnet = out_magnets[j];
                 // FIXME: actually an out-magnet should be able to have multiple connectors
-                if (out_magnet.contains(mx, my) && out_magnet.connected == null) {
+                if (out_magnet.contains(mx, my)) {
                     // create Connector from this out-magnet
                     conn = new Connector(null, null, out_magnet);
-                    out_magnet.connected = conn;
+                    //out_magnet.connected.push(conn);  // wait until mouse-up
                     connectors.push(conn);
                     this.selection = conn;
                     this.dragoffx = mx - conn.fromX;
@@ -156,32 +156,40 @@ CanvasState.prototype.doMove = function(e) {
                 // check if connector has been dragged to an in-magnet
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
-                    if (own_shape !== null && shape == own_shape) {
-                        continue;
-                    }
                     if (typeof shape.in_magnets == 'undefined') {
                         // ignore Connectors
                         continue;
                     }
+
+                    if (own_shape !== null && shape == own_shape) {
+                        // disallow self-referential connections
+                        continue;
+                    }
+
+                    // shape is a Method, check its in-magnets
                     var in_magnets = shape.in_magnets;
+                    var connector_carrying_cdt;
                     for (var j = 0; j < in_magnets.length; j++) {
                         var in_magnet = in_magnets[j];
-                        var connector_carrying_cdt;
-                        if (this.selection.out_magnet === null || own_shape.constructor === RawNode) {
+
+                        // retrieve CompoundDatatype of out-magnet
+                        if (own_shape.constructor === RawNode) {
                             connector_carrying_cdt = '__raw__';
                         } else {
                             connector_carrying_cdt = this.selection.out_magnet.cdt;
                         }
 
+                        // does this in-magnet accept this CompoundDatatype?
                         if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = 'yellow';
-                            if (in_magnet.connected == null && in_magnet.contains(this.selection.x, this.selection.y)) {
+                            if (in_magnet.connected.length == 0 && in_magnet.contains(this.selection.x, this.selection.y)) {
                                 // jump to magnet
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
                                 this.selection.in_magnet = in_magnet;
                                 in_magnet.connected = this.selection;
+                                this.selection.out_magnet.connected.push(this.selection);
                             }
                         }
                     }
@@ -200,12 +208,13 @@ CanvasState.prototype.doMove = function(e) {
 
 CanvasState.prototype.doUp = function(e) {
     this.dragging = false;
-    // check if most recent Connector is linked to a magnet
-    var l = this.connectors.length;
-    if (l == 0) {
-        return; // no Connectors!
+
+    // are we carrying a Connector?
+    if (this.selection === null || typeof this.selection.fromX === 'undefined') {
+        return;
     }
-    connector = this.connectors[ l-1 ]; // last object
+
+    var connector = this.selection;
 
     if (connector.in_magnet === null) {
         // has connector been carried into output end-zone?
@@ -213,12 +222,8 @@ CanvasState.prototype.doUp = function(e) {
 
         if (mouse.x > 0.9 * this.canvas.width) {
             // Connector drawn into output end-zone
-            if (connector.out_magnet == null || connector.out_magnet.parent.constructor == CDtNode) {
-                // disallow Connectors directly between end-zones, or from CDT node to end-zone
-                if (connector.out_magnet !== null) {
-                    // free up this magnet
-                    connector.out_magnet.connected = null;
-                }
+            if (connector.out_magnet.parent.constructor !== MethodNode) {
+                // disallow Connectors from data node directly to end-zone
                 this.connectors.pop();
                 this.selection = null;
                 this.valid = false;
@@ -229,12 +234,8 @@ CanvasState.prototype.doUp = function(e) {
                 connector.y = mouse.y;
             }
         } else {
-            if (connector.in_magnet == null) {
-                // not connected, delete Connector
-                if (connector.out_magnet !== null) {
-                    // free up out-magnet
-                    connector.out_magnet.connected = null;
-                }
+            if (connector.in_magnet === null) {
+                // not connected
                 this.connectors.pop();
                 this.selection = null;
                 this.valid = false; // redraw canvas to remove this Connector
@@ -339,48 +340,58 @@ CanvasState.prototype.deleteObject = function() {
     var index = -1;
     var i = 0; // loop counter
     var in_magnets = [];
+    var in_magnet;
     var out_magnets = [];
+    var out_magnet;
     var this_connector = null;
 
     if (mySel !== null) {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
-            mySel.in_magnet.connected = null;
-            if (mySel.out_magnet !== null) {
-                mySel.out_magnet.connected = null;
-            }
-
+            mySel.in_magnet.connected = [];
+            index = mySel.out_magnet.connected.indexOf(mySel);
+            mySel.out_magnet.connected.splice(index, 1);
             index = this.connectors.indexOf(mySel);
             this.connectors.splice(index, 1);
         }
         else if (mySel.constructor == MethodNode) {
-            // delete Connectors associated with this shape
+            // delete Connectors terminating in this shape
             in_magnets = mySel.in_magnets;
             for (i = 0; i < in_magnets.length; i++) {
-                this_connector = in_magnets[i].connected;
-                if (this_connector !== null) {
+                in_magnet = in_magnets[i];
+                if (in_magnet.connected.length > 0) {
+                    this_connector = in_magnet.connected[0];
+
+                    // remove reference from out-magnet of source node
+                    out_magnet = this_connector.out_magnet;
+                    index = out_magnet.connected.indexOf(this_connector);
+                    out_magnet.connected.splice(this_connector, 1);
+
                     // remove from list of Connectors
                     index = this.connectors.indexOf(this_connector);
                     this.connectors.splice(index, 1);
-
-                    // release magnets
-                    in_magnets[i].connected = null;
-                    if (this_connector.out_magnet !== null) {
-                        this_connector.out_magnet.connected = null;
-                    }
+                    in_magnet.connected = [];
                 }
             }
 
+            // delete Connectors from this shape to other nodes
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
+                out_magnet = out_magnets[i];
+                for (j = 0; j < out_magnets.connected.length; j++) {
+                    out_magnet = out_magnets[j];
+
+                }
+
+
                 this_connector = out_magnets[i].connected;
                 if (this_connector !== null) {
                     index = this.connectors.indexOf(this_connector);
                     this.connectors.splice(index, 1);
 
-                    out_magnets[i].connected = null;
+                    out_magnets[i].connected = [];
                     if (this_connector.in_magnet.constructor == Magnet) {
-                        this_connector.in_magnet.connected = null;
+                        this_connector.in_magnet.connected = [];
                     }
                 }
             }
@@ -389,27 +400,26 @@ CanvasState.prototype.deleteObject = function() {
             index = this.shapes.indexOf(mySel);
             this.shapes.splice(index, 1);
         }
-        else if (mySel.constructor == CDtNode) {
+        else {  // CDtNode or RawNode
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
-                this_connector = out_magnets[i].connected;
-                if (this_connector !== null) {
+                out_magnet = out_magnets[i];
+                for (j = 0; j < out_magnet.connected.length; j++) {
+                    this_connector = out_magnets[i].connected[j];
                     index = this.connectors.indexOf(this_connector);
                     this.connectors.splice(index, 1);
 
-                    out_magnets[i].connected = null;
-                    if (this_connector.in_magnet.constructor == Magnet) {
-                        // connector had terminated in a shape
-                        this_connector.in_magnet.connected = null;
+                    if (this_connector.in_magnet !== undefined && this_connector.in_magnet.constructor == Magnet) {
+                        // in-magnets can accept only one Connector
+                        this_connector.in_magnet.connected = [];
                     }
                 }
+                out_magnet.connected = [];
             }
             index = this.shapes.indexOf(mySel);
             this.shapes.splice(index, 1);
         }
-        else {
-            return;
-        }
+
         this.selection = null;
         this.valid = false; // re-draw canvas to make Connector disappear
     }

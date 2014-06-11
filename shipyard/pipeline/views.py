@@ -40,7 +40,7 @@ def pipeline_add(request):
         # Try this instead: formdata = json.loads(request.body)
         query = request.POST.dict()
         exec('formdata=%s' % query.keys()[0])
-        logger.debug(formdata)
+        print formdata
 
         # does Pipeline family with this name already exist?
         if PipelineFamily.objects.filter(name=formdata['family_name']).exists():
@@ -74,7 +74,7 @@ def pipeline_add(request):
             # FIXME: delete() fails with FieldError: Cannot resolve keyword u'object_id' into
             # FIXME: field. Choices are: RSICs, execrecordins, execrecordouts, generator, id,
             # FIXME: runoutputcables, runsteps
-            #pl_family.delete()
+            pl_family.delete()
             response_data = {'status': 'failure',
                              'error_msg': 'Invalid pipeline input'}
             return HttpResponse(json.dumps(response_data), content_type='application/json')
@@ -115,8 +115,7 @@ def pipeline_add(request):
                     )
             pipeline.create_outputs()
         except:
-            raise
-            #pl_family.delete()
+            pl_family.delete()
             response_data = {'status': 'failure',
                              'error_msg': 'Invalid pipeline cable'}
             return HttpResponse(json.dumps(response_data), content_type='application/json')
@@ -126,7 +125,7 @@ def pipeline_add(request):
             pipeline.save()
             response_data = {'status': 'success'}
         except:
-            #pl_family.delete()
+            pl_family.delete()
             response_data = {'status': 'failure'}
 
         return HttpResponse(json.dumps(response_data), content_type='application/json')

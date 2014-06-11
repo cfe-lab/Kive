@@ -262,7 +262,7 @@ function Magnet (parent, r, attract, fill, cdt, label) {
     this.fill = fill || "#fff";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
-    this.connected = null; // linked to a Connector
+    this.connected = [];  // hold references to Connectors
 }
 
 Magnet.prototype.draw = function(ctx) {

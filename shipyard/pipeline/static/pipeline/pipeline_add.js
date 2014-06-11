@@ -1,12 +1,3 @@
-
-/*
-    TODO: if shape (CDtNode, MethodNode) or Connector selected and user hits backspace, erase object
-    TODO: make Connectors selectable by mouse
-    TODO: Connector can link to output end-zone
-    TODO: submit shape and connector info as POST data
-    FIXME: figure out why extra lines are being drawn (non-closed path)?
-*/
-
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
 
     // trigger ajax on CR drop-down to populate revision select
@@ -296,20 +287,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var i, j;
         var pipeline_inputs = [];  // collect data nodes
         var method_nodes = [];
+        var num_connections;
 
         submit_error.innerHTML = '';
 
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
             if (this_shape.constructor !== MethodNode) {
+                // this is a data node
                 pipeline_inputs.push(this_shape);
 
                 // all CDtNodes or RawNodes (inputs) should feed into a MethodNode
                 magnets = this_shape.out_magnets;
-                this_magnet = magnets[0];  // only need one connection
+                this_magnet = magnets[0];  // data nodes only ever have one magnet
 
                 // is this magnet connected?
-                if (this_magnet.connected === null) {
+                if (this_magnet.connected.length == 0) {
                     // unconnected input in graph, exit
                     submit_error.innerHTML = 'Unconnected input node';
                     return;
@@ -318,14 +311,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             else {
                 method_nodes.push(this_shape);
 
-                // all MethodNode in-magnets should have a Connector
-                magnets = this_shape.in_magnets;
+                // at least one out-magnet must be occupied
+                magnets = this_shape.out_magnets;
+                num_connections = 0;
                 for (j = 0; j < magnets.length; j++) {
                     this_magnet = magnets[j];
-                    if (this_magnet.connected === null) {
-                        submit_error.innerHTML = 'MethodNode with empty input socket';
-                        return;
-                    }
+                    num_connections += this_magnet.connected.length;
+                }
+                if (num_connections === 0) {
+                    submit_error.innerHTML('MethodNode with unused outputs');
+                    return;
                 }
             }
         }
@@ -368,7 +363,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['revision_name'] = '1';
         form_data['revision_desc'] = 'First version';
 
-        // sort pipeline inputs by their Y-position on canvas
+        // sort pipeline inputs by their Y-position on canvas (top to bottom)
         function sortByYpos (a, b) {
             var ay = a.y;
             var by = b.y;
@@ -429,11 +424,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
-        // sort output cables by y-position
+        // sort output cables by y-position (top to bottom)
         var output_cables = [];
         for (i = 0; i < connectors.length; i++) {
             this_connector = connectors[i];
             if (this_connector.in_magnet === '__output__') {
+                // connector terminates in output end-zone
                 output_cables.push(this_connector);
             }
         }
@@ -449,7 +445,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             this_step = sorted_elements[i];
 
             form_data['pipeline_step'][i] = {
-                'transformation_pk': this_step.pk,  // to retrieve MR
+                'transformation_pk': this_step.pk,  // to retrieve Method
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
                 'y': this_step.y
@@ -493,6 +489,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 this_connector = output_cables[j];
                 this_source = this_connector.out_magnet.parent;
                 if (this_source !== this_step) {
+                    // Connector does not originate from this step
                     continue;
                 }
                 form_data['pipeline_step'][i]['cables_out'][j] = {
@@ -517,6 +514,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             datatype: 'json',
             success: function(result) {
                 console.log(result);
+                if (result['status'] == 'failure') {
+                    submit_error.innerHTML = result['error_msg'];
+                }
             }
         })
     })
