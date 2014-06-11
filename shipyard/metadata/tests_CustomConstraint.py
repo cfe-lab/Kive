@@ -351,7 +351,7 @@ class CustomConstraintTests(UtilityMethods):
         sandbox = Sandbox(self.user_oscar, pipeline, [symds_good])
         sandbox.execute_pipeline()
         runstep = sandbox.run.runsteps.first()
-        execlog = runstep.log.first()
+        execlog = runstep.log
         symds_out = runstep.execrecord.execrecordouts.first().symbolicdataset
         content_check = symds_out.content_checks.first()
         return (content_check, execlog, symds_out)

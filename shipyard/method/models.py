@@ -389,10 +389,8 @@ class Method(transformation.models.Transformation):
         default=False,
         help_text="Is this Method broken?")
 
-    pipelinesteps = generic.GenericRelation("pipeline.PipelineStep")
-
-    # automatically set when an ExecRecord object points to this Method.
-    # execrecords = generic.GenericRelation("librarian.ExecRecord")
+    # Implicitly defined:
+    # - execrecords: from ExecRecord
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -420,6 +418,26 @@ class Method(transformation.models.Transformation):
     def get_num_outputs(self):
         """Returns number of outputs."""
         return len(self.outputs.all())
+
+    @property
+    def is_method(self):
+        return True
+
+    @property
+    def is_pipeline(self):
+        return False
+
+    @property
+    def is_cable(self):
+        return False
+
+    @property
+    def is_incable(self):
+        return False
+
+    @property
+    def is_outcable(self):
+        return False
 
     @property
     def family_size(self):
@@ -455,20 +473,20 @@ class Method(transformation.models.Transformation):
                     dataset_name = parent_input.dataset_name,
                     dataset_idx = parent_input.dataset_idx)
                 if not parent_input.is_raw():
-                    new_input.structure.create(
-                        compounddatatype = parent_input.get_cdt(),
-                        min_row = parent_input.get_min_row(),
-                        max_row = parent_input.get_max_row())
+                    transformation.models.XputStructure(
+                        transf_xput=new_input, compounddatatype = parent_input.get_cdt(),
+                        min_row = parent_input.get_min_row(), max_row = parent_input.get_max_row()
+                    ).save()
 
             for parent_output in self.revision_parent.outputs.all():
                 new_output = self.outputs.create(
                     dataset_name = parent_output.dataset_name,
                     dataset_idx = parent_output.dataset_idx)
                 if not parent_output.is_raw():
-                    new_output.structure.create(
-                        compounddatatype = parent_output.get_cdt(),
-                        min_row = parent_output.get_min_row(),
-                        max_row = parent_output.get_max_row())
+                    transformation.models.XputStructure(
+                        transf_xput=new_output, compounddatatype = parent_output.get_cdt(),
+                        min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
+                    ).save()
 
     def find_compatible_ER(self, input_SDs):
         """
@@ -488,7 +506,7 @@ class Method(transformation.models.Transformation):
                 # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
-                    input_idx = ERI.generic_input.dataset_idx
+                    input_idx = ERI.generic_input.definite.dataset_idx
                     if ERI.symbolicdataset != input_SDs[input_idx-1]:
                         ER_matches = False
                         break

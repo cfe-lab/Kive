@@ -673,8 +673,8 @@ def method_revise(request, id):
             tx_form = TransformationXputForm(auto_id='id_%s_in_'+str(len(input_forms)),
                                             initial={'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
-            if input.structure.count() > 0:
-                structure = input.structure.all()[0]
+            if input.has_structure:
+                structure = input.structure
                 xs_form = XputStructureForm(auto_id='id_%s_in_'+str(len(input_forms)),
                                             initial={'compounddatatype': structure.compounddatatype.id,
                                                      'min_row': structure.min_row,
@@ -695,8 +695,8 @@ def method_revise(request, id):
             tx_form = TransformationXputForm(auto_id='id_%s_out_'+str(len(output_forms)),
                                             initial={'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
-            if output.structure.count() > 0:
-                structure = output.structure.all()[0]
+            if output.has_structure:
+                structure = output.structure
                 xs_form = XputStructureForm(auto_id='id_%s_out_'+str(len(output_forms)),
                                             initial={'compounddatatype': structure.compounddatatype.id,
                                                      'min_row': structure.min_row,

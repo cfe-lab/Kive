@@ -9,6 +9,7 @@ from method.models import *
 from metadata.models import *
 from pipeline.models import *
 import json
+import operator
 
 logger = logging.getLogger(__name__)
 
@@ -80,15 +81,23 @@ def pipeline_add(request):
 
         try:
             # make pipeline steps
+
+            # We need to sort the PipelineSteps by their step number so that step 1
+            # gets added before step 2, etc.
+            steps = []
             for key, val in formdata['pipeline_step'].iteritems():
-                pk = val['transformation_pk']  # primary key to CodeResourceRevision
+                steps.append(val)
+            sorted_steps = sorted(steps, key=operator.itemgetter("step_num"))
+
+            for step in sorted_steps:
+                pk = step['transformation_pk']  # primary key to CodeResourceRevision
                 method = Method.objects.get(pk=pk)
                 pipeline_step = pipeline.steps.create(
                     transformation=method,
-                    step_num=int(val['step_num'])
+                    step_num=int(step['step_num'])
                 )
                 # add input cables
-                for k2, v2 in val['cables_in'].iteritems():
+                for k2, v2 in step['cables_in'].iteritems():
                     if v2['source'] == 'Method':
                         source_method = Method.objects.get(pk=v2['source_pk'])
                         pipeline_step.cables_in.create(
@@ -105,7 +114,7 @@ def pipeline_add(request):
                         )
 
                 # add output cables
-                for k2, v2 in val['cables_out'].iteritems():
+                for k2, v2 in step['cables_out'].iteritems():
                     outcabling = pipeline.create_outcable(
                         source_step=int(v2['source_step']),
                         source=pipeline_step.transformation.outputs.get(dataset_name=v2['dataset_name']),

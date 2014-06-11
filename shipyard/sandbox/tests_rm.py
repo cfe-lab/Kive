@@ -115,7 +115,7 @@ class UtilityMethods(TestCase):
         if methods[0].inputs.first().is_raw():
             cdt_in = None
         else:
-            cdt_in = methods[0].inputs.first().structure.first().compounddatatype
+            cdt_in = methods[0].inputs.first().structure.compounddatatype
         pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name = indata, dataset_idx = 1)
 
         # Create steps.
@@ -220,7 +220,7 @@ class UtilityMethods(TestCase):
         self.string_datafile.write("word\n")
         self.string_datafile.close()
         # Aw heck.
-        os.system("cat /usr/share/dict/words >> {}".
+        os.system("head -1 /usr/share/dict/words >> {}".
                   format(self.string_datafile.name))
         self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
             name="blahblah", cdt=self.cdt_string, user=self.user_bob,
@@ -391,7 +391,7 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox = Sandbox(self.user_alice, pipeline, [self.symds_labdata])
         sandbox.execute_pipeline()
         runstep = sandbox.run.runsteps.first()
-        execlog = runstep.log.first()
+        execlog = runstep.log
         print(execlog.methodoutput.error_log.read())
         self.assertEqual(runstep.successful_execution(), True)
         self.assertEqual(execlog.missing_outputs(), [])
@@ -477,14 +477,14 @@ class ExecuteTestsRM(UtilityMethods):
         run = self.sandbox_complement.execute_pipeline()
         runstep = run.runsteps.first()
         symds_out = runstep.outputs.first().symbolicdataset
-        execlog = runstep.log.first()
+        execlog = runstep.log
         execrecord = runstep.execrecord
         execrecordout = execrecord.execrecordouts.first()
 
         self.assertEqual(execrecordout is None, False)
         self.assertEqual(execrecordout.execrecord, execrecord)
         self.assertEqual(execrecordout.symbolicdataset, symds_out)
-        self.assertEqual(execrecordout.generic_output, pipelinestep.transformation.outputs.first())
+        self.assertEqual(execrecordout.generic_output.definite, pipelinestep.transformation.outputs.first())
         self.assertEqual(execrecordout.has_data(), True)
         self.assertEqual(execrecordout.is_OK(), True)
 
@@ -495,7 +495,7 @@ class ExecuteTestsRM(UtilityMethods):
         """
         run = self.sandbox_complement.execute_pipeline()
         runstep = run.runsteps.first()
-        execlog = runstep.log.first()
+        execlog = runstep.log
         execrecord = runstep.execrecord
         outputs = self.method_complement.outputs.all()
 
@@ -503,7 +503,7 @@ class ExecuteTestsRM(UtilityMethods):
         #self.assertEqual(execrecord.runsteps.first(), runstep)
         #self.assertEqual(execrecord.runs.first(), run)
         self.assertEqual(execrecord.complete_clean(), None)
-        self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation)
+        self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation.method)
         self.assertEqual(execrecord.provides_outputs(outputs), True)
         self.assertEqual(execrecord.outputs_OK(), True)
 
@@ -529,7 +529,7 @@ class ExecuteTestsRM(UtilityMethods):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertEqual(step2.log.first(), None)
+        self.assertFalse(step2.has_log)
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_fill_in_ER(self):
@@ -548,8 +548,8 @@ class ExecuteTestsRM(UtilityMethods):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertEqual(step1.log.first() is not None, True)
-        self.assertEqual(step2.log.first() is None, True)
+        self.assertTrue(step1.has_log)
+        self.assertFalse(step2.has_log)
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_reuse_within_different_pipeline(self):
@@ -567,7 +567,7 @@ class ExecuteTestsRM(UtilityMethods):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertEqual(step2.log.first(), None)
+        self.assertFalse(step2.has_log)
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_output_symds(self):
@@ -761,7 +761,7 @@ class BadRunTests(UtilityMethods):
         sandbox = Sandbox(self.user_grandpa, self.pipeline_faulty, [self.symds_grandpa])
         sandbox.execute_pipeline()
         runstep1 = sandbox.run.runsteps.first()
-        log = runstep1.log.first()
+        log = runstep1.log
         interm_SD = runstep1.execrecord.execrecordouts.first().symbolicdataset
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
@@ -782,7 +782,7 @@ class BadRunTests(UtilityMethods):
         self.assertIsNone(runstep2.complete_clean())
         self.assertFalse(runstep2.successful_execution())
 
-        log = runstep2.log.first()
+        log = runstep2.log
 
         self.assertFalse(log.is_successful())
         self.assertEqual(log.methodoutput.return_code, 1)
@@ -807,8 +807,8 @@ class FindSDTests(UtilityMethods):
         os.remove(self.words_datafile.name)
 
     def make_custom_wire(self, cable):
-        source_cdt = cable.source.structure.first().compounddatatype
-        dest_cdt = cable.dest.structure.first().compounddatatype
+        source_cdt = cable.source.structure.compounddatatype
+        dest_cdt = cable.dest.structure.compounddatatype
         cable.custom_wires.create(source_pin=source_cdt.members.first(), 
             dest_pin=dest_cdt.members.last())
         cable.custom_wires.create(source_pin=source_cdt.members.last(), 

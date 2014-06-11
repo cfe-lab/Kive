@@ -53,20 +53,18 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         """
         self.make_execlog_and_mark_non_reused_runatomic(record)
 
-        curr_execlog = record.log.first()
-        execrecord = ExecRecord.create(curr_execlog, record.component, input_SDs, output_SDs)
+        execrecord = ExecRecord.create(record.log, record.component, input_SDs, output_SDs)
         record.execrecord = execrecord
         record.save()
 
     def make_execlog_and_mark_non_reused_runatomic(self, record):
         """Attaches a good ExecLog to a RunAtomic."""
-        record_type = record.__class__.__name__
         record.reused = False
         record.save()
 
         execlog = ExecLog(record=record, invoking_record=record, start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
-        if record_type == "RunStep":
+        if record.is_step:
             MethodOutput(execlog=execlog, return_code=0).save()
 
     def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
@@ -112,12 +110,12 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log.first())
+        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log)
         if bp == "first_rsic": return
 
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         step1_in_ccl = self.doublet_symDS.content_checks.first()
-        step1_in_ccl.execlog = self.step_E1_RS.log.first()
+        step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
         self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
@@ -132,10 +130,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
 
         D1_in_ccl = self.D1_in_symDS.content_checks.first()
-        D1_in_ccl.execlog = self.E01_21_RSIC.log.first()
+        D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
+        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
         if bp == "second_runstep_complete": return
 
         # Associate and complete sub-Pipeline.
@@ -146,19 +144,19 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
                                         [self.D1_in_symDS, self.singlet_symDS])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
+        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         C1_ccl = self.C1_in_symDS.content_checks.first()
-        C1_ccl.execlog = self.step_D1_RS.log.first()
+        C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
         self.C1_in_DS.created_by = self.step_D1_RS
         self.C1_in_DS.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
+        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
 
         if bp == "sub_pipeline": return
 
@@ -181,7 +179,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         if bp == "first_cable_created": return
 
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log.first())
+        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -190,7 +188,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         # First RunStep completed.
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         step1_in_ccl = self.doublet_symDS.content_checks.first()
-        step1_in_ccl.execlog = self.step_E1_RS.log.first()
+        step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
         self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
@@ -210,10 +208,10 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
 
         D1_in_ccl = self.D1_in_symDS.content_checks.first()
-        D1_in_ccl.execlog = self.E01_21_RSIC.log.first()
+        D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log.first())
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -229,25 +227,25 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         C1_ccl = self.C1_in_symDS.content_checks.first()
-        C1_ccl.execlog = self.step_D1_RS.log.first()
+        C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
         self.C1_in_DS.created_by = self.step_D1_RS
         self.C1_in_DS.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log.first())
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -263,7 +261,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -271,7 +269,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         # C2_in_symDS was created here so we associate its CCL with cable
         # E11_32.
         C2_in_ccl = self.C2_in_symDS.content_checks.first()
-        C2_in_ccl.execlog = self.E11_32_RSIC.log.first()
+        C2_in_ccl.execlog = self.E11_32_RSIC.log
         C2_in_ccl.save()
 
         if bp == "third_step_cables_done": return
@@ -281,7 +279,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         # All of these were first created here, so associate the CCL of C1_out_symDS to step_E3_RS.
         # The others are raw and don't have CCLs.
         C1_out_ccl = self.C1_out_symDS.content_checks.first()
-        C1_out_ccl.execlog = self.step_E3_RS.log.first()
+        C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
 
         if bp == "third_step_complete": return
@@ -291,7 +289,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
         # This was first created here, so associate the CCL appropriately.
         E1_out_ccl = self.E1_out_symDS.content_checks.first()
-        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.execlog = roc1.log
         E1_out_ccl.save()
         self.E1_out_DS.created_by = roc1
         self.E1_out_DS.save()
@@ -305,11 +303,11 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
         # and C3_out_symDS.
-        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log.first())
+        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log.first())
+        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -330,19 +328,19 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS])
         # C2_in_symDS is created by this cable so associate a CCL appropriately.
         C2_ccl = self.C2_in_symDS.content_checks.first()
-        C2_ccl.execlog = self.E11_32_RSIC.log.first()
+        C2_ccl.execlog = self.E11_32_RSIC.log
         C2_ccl.save()
         if bp == "rsic_completed": return
 
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
         # C1_in_symDS is not created by this RSIC, so associate an ICL.
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log.first())
+        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
         self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
                                                   [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
         # Associate the CCL of C1_out_symDS with step_E3_RS.
         C1_out_ccl = self.C1_out_symDS.content_checks.first()
-        C1_out_ccl.execlog = self.step_E3_RS.log.first()
+        C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
         if bp == "runstep_completed": return
 
@@ -376,7 +374,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         self.C1_in_DS.created_by = self.D11_21_ROC
         self.C1_in_DS.save()
-        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log.first(), start_time=timezone.now(),
+        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
                                                end_time=timezone.now())
         self.D11_21_ROC.stop()
         if bp == "subrun_complete": return
@@ -418,10 +416,11 @@ class RunAtomicTests(ArchiveTestSetup):
         self.step_through_run_creation("outcables_done")
 
         # For every RunAtomic invoked during this run, break each of its invoked_logs and see if it appears.
-        runatomics = (list(RunStep.objects.filter(
-            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
-                      list(RunSIC.objects.all()) +
-                      list(RunOutputCable.objects.all()))
+        atomicrunsteps = []
+        for runstep in RunStep.objects.all():
+            if runstep.transformation.is_method:
+                atomicrunsteps.append(runstep)
+        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
@@ -444,10 +443,11 @@ class RunAtomicTests(ArchiveTestSetup):
         self.step_through_run_creation("outcables_done")
 
         # For every RunAtomic invoked during this run, break each of its ICLs/CCLs and see if it appears.
-        runatomics = (list(RunStep.objects.filter(
-            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
-                      list(RunSIC.objects.all()) +
-                      list(RunOutputCable.objects.all()))
+        atomicrunsteps = []
+        for runstep in RunStep.objects.all():
+            if runstep.transformation.is_method:
+                atomicrunsteps.append(runstep)
+        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
@@ -472,8 +472,8 @@ class RunAtomicTests(ArchiveTestSetup):
 
         # Imagine that step 3 invokes step 1 but not itself.  Note that this would break the Run overall
         # but we're only looking to check for errors local to a single RunAtomic.
-        step_3_el = self.step_E3_RS.log.first()
-        step_1_el = self.step_E1_RS.log.first()
+        step_3_el = self.step_E3_RS.log
+        step_1_el = self.step_E1_RS.log
 
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
@@ -493,7 +493,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
         # but we're only looking to check for errors local to a single RunAtomic.
-        step_1_el = self.step_E1_RS.log.first()
+        step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
 
@@ -513,7 +513,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
         # but we're only looking to check for errors local to a single RunAtomic.
-        step_1_el = self.step_E1_RS.log.first()
+        step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
 
@@ -533,7 +533,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
         # but we're only looking to check for errors local to a single RunAtomic.
-        step_1_el = self.step_E1_RS.log.first()
+        step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
 
@@ -547,19 +547,18 @@ class RunAtomicTests(ArchiveTestSetup):
         self.run_pipelines_recovering_reused_step()
 
         # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
-        # the cable feeding step 2.
+        # the transformation of step 2.
         run_two_step_one = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
         run_two_step_two = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
-        run_two_step_two_input_cable = run_two_step_two.RSICs.first()
 
-        self.assertEquals(run_two_step_one.log.first().invoking_record, run_two_step_two_input_cable)
+        self.assertEquals(run_two_step_one.log.invoking_record.definite, run_two_step_two)
         self.assertIsNone(run_two_step_one.clean())
         self.assertIsNone(run_two_step_two.clean())
 
     def test_clean_undecided_reused_invoked_logs_exist(self):
         """A RunAtomic that has not decided on reuse should not have any invoked logs."""
         self.step_through_run_creation("third_step_cables_done")
-        step_one_el = self.step_E1_RS.log.first()
+        step_one_el = self.step_E1_RS.log
         step_one_el.invoking_record = self.step_E3_RS
         step_one_el.save()
 
@@ -592,7 +591,7 @@ class RunAtomicTests(ArchiveTestSetup):
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
         # but we're only looking to check for errors local to a single RunAtomic.
-        step_1_el = self.step_E1_RS.log.first()
+        step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
 
@@ -605,19 +604,6 @@ class RunAtomicTests(ArchiveTestSetup):
 
 
 class RunStepTests(ArchiveTestSetup):
-
-    def test_RunStep_many_execlogs(self):
-        run = self.pE.pipeline_instances.create(user=self.myUser)
-        run_step = self.step_E1.pipelinestep_instances.create(run=run)
-        run_step.reused = False
-        for i in range(2):
-            run_step.log.create(invoking_record=run_step,
-                                start_time=timezone.now(),
-                                end_time=timezone.now())
-        self.assertRaisesRegexp(ValidationError,
-                re.escape('RunStep "{}" has {} ExecLogs but should have only one'.
-                          format(run_step, 2)),
-                run_step.clean)
 
     def test_RunStep_clean_wrong_pipeline(self):
         """
@@ -658,7 +644,7 @@ class RunStepTests(ArchiveTestSetup):
         self.step_through_runstep_creation("first_rsic")
 
         # Make this RunSIC incomplete by removing the ICL.
-        icl_to_remove = self.raw_symDS.integrity_checks.filter(execlog=self.E03_11_RSIC.log.first()).first()
+        icl_to_remove = self.raw_symDS.integrity_checks.filter(execlog=self.E03_11_RSIC.log).first()
         icl_to_remove.execlog = None
         icl_to_remove.save()
 
@@ -732,7 +718,7 @@ class RunStepTests(ArchiveTestSetup):
         # Still, we're just checking step 3 here.
         self.step_through_run_creation("third_step")
 
-        step_one_el = self.step_E1_RS.log.first()
+        step_one_el = self.step_E1_RS.log
         step_one_el.invoking_record = self.step_E3_RS
         step_one_el.save()
 
@@ -904,10 +890,6 @@ class RunStepTests(ArchiveTestSetup):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
 
-        step1_in_ccl = self.doublet_symDS.content_checks.first()
-        step1_in_ccl.execlog = self.step_E1_RS.log.first()
-        step1_in_ccl.save()
-
         self.step_E1_RS.execrecord = None
         self.step_E1_RS.outputs.clear()
         self.assertIsNone(self.step_E1_RS.clean())
@@ -1017,7 +999,7 @@ class RunStepTests(ArchiveTestSetup):
         """
         self.step_through_runstep_creation("first_step_complete")
 
-        content_check = self.step_E1_RS.log.first().content_checks.first()
+        content_check = self.step_E1_RS.log.content_checks.first()
         BadData(contentchecklog=content_check, missing_output=True).save()
 
         output = self.step_E1.transformation.outputs.first()
@@ -1136,9 +1118,9 @@ class RunStepTests(ArchiveTestSetup):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and 
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.log.count() == 1):
+                    runstep.has_log):
                 break
-        log = runstep.log.first()
+        log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
         log.integrity_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -1170,9 +1152,9 @@ class RunStepTests(ArchiveTestSetup):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and 
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.log.count() == 1):
+                    runstep.has_log):
                 break
-        log = runstep.log.first()
+        log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.content_checks.create(symbolicdataset=sd)
@@ -1204,9 +1186,9 @@ class RunStepTests(ArchiveTestSetup):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and 
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.log.count() == 1):
+                    runstep.has_log):
                 break
-        log = runstep.log.first()
+        log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -1312,7 +1294,7 @@ class RunTests(ArchiveTestSetup):
         self.step_through_run_creation("second_step")
         self.step_E1_RS.execrecord = None
         self.step_E1_RS.reused = None
-        self.step_E1_RS.log.clear()
+        self.step_E1_RS.log.delete()
         self.step_E1_RS.save()
         self.assertIsNone(self.pE_run.clean())
 
@@ -1431,21 +1413,6 @@ class RunTests(ArchiveTestSetup):
 
 class RunSICTests(ArchiveTestSetup):
 
-    def test_RSIC_many_execlogs(self):
-        run = self.pE.pipeline_instances.create(user=self.myUser)
-        runstep = self.pE.steps.first().pipelinestep_instances.create(run=run)
-        cable = self.pE.steps.first().cables_in.first()
-        rsic = cable.psic_instances.create(runstep=runstep)
-        rsic.reused = False
-        for i in range(2):
-            rsic.log.create(invoking_record=rsic,
-                            start_time=timezone.now(),
-                            end_time=timezone.now())
-        self.assertRaisesRegexp(ValidationError,
-                'RunSIC "{}" has {} ExecLogs but should have only one'.
-                        format(rsic, 2),
-                rsic.clean)
-
     def test_RunSIC_clean_wrong_pipelinestep(self):
         """
         A RunSIC whose PipelineStepInputCable does not belong to its
@@ -1523,10 +1490,11 @@ class RunSICTests(ArchiveTestSetup):
 
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.C1_in.execrecordouts_referencing.add(ero)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('Input "{}" is not the one fed by the PSIC of ExecRecord "{}"'
-                                          .format(self.C1_in, self.E11_32_RSIC.execrecord)),
-                                self.E11_32_RSIC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'
+                      .format(ero.symbolicdataset, ero.generic_output.definite)),
+            self.E11_32_RSIC.clean)
 
     def test_RunSIC_clean_reused_incompatible_execrecord(self):
         """
@@ -1544,10 +1512,11 @@ class RunSICTests(ArchiveTestSetup):
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
 
         self.E11_32_RSIC.execrecord = runsic.execrecord
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'
-                                          .format(self.E11_32_RSIC)),
-                                self.E11_32_RSIC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('PipelineStepInputCable of RunSIC "{}" is incompatible with the cable of its ExecRecord'.format(
+                self.E11_32_RSIC)),
+            self.E11_32_RSIC.clean)
 
     def test_RunSIC_clean_reused_execrecord_wrong_object(self):
         """
@@ -1566,12 +1535,12 @@ class RunSICTests(ArchiveTestSetup):
 
         self.E11_32_RSIC.execrecord = self.step_E3_RS.execrecord
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunSIC "{}" does not represent a PSIC'
+                                re.escape('ExecRecord of RunSIC "{}" does not represent a PipelineCable'
                                           .format(self.E11_32_RSIC)),
                                 self.E11_32_RSIC.clean)
         # Check of propagation:
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunSIC "{}" does not represent a PSIC'
+                                re.escape('ExecRecord of RunSIC "{}" does not represent a PipelineCable'
                                           .format(self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
@@ -1590,7 +1559,7 @@ class RunSICTests(ArchiveTestSetup):
 
         self.assertTrue(self.E11_32_RSIC.keeps_output())
         # Removed May 12, 2014: a reused RunSIC has no log.
-        # self.assertListEqual(self.E11_32_RSIC.log.first().missing_outputs(), [])
+        # self.assertListEqual(self.E11_32_RSIC.log.missing_outputs(), [])
         self.assertFalse(ero.has_data())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
@@ -1673,10 +1642,13 @@ class RunSICTests(ArchiveTestSetup):
         self.E11_32_RSIC.reused = False
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.C1_in.execrecordouts_referencing.add(ero)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('Input "{}" is not the one fed by the PSIC of ExecRecord "{}"'
-                                          .format(self.C1_in, self.E11_32_RSIC.execrecord)),
-                                self.E11_32_RSIC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(
+                'CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'.format(
+                    ero.symbolicdataset, ero.generic_output.definite)),
+            self.E11_32_RSIC.clean)
+
 
     def test_RunSIC_clean_not_reused_incompatible_execrecord(self):
         """
@@ -1692,10 +1664,11 @@ class RunSICTests(ArchiveTestSetup):
         runsic = self.E02_22.psic_instances.create(runstep=runstep)
         self.make_complete_non_reused(runsic, [self.singlet_symDS], [self.singlet_symDS])
         self.E11_32_RSIC.execrecord = runsic.execrecord
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'
-                                          .format(self.E11_32_RSIC)),
-                                self.E11_32_RSIC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('PipelineStepInputCable of RunSIC "{}" is incompatible with the cable of its ExecRecord'.format(
+                self.E11_32_RSIC)),
+            self.E11_32_RSIC.clean)
 
     def test_RunSIC_clean_not_reused_execrecord_wrong_object(self):
         """
@@ -1707,12 +1680,12 @@ class RunSICTests(ArchiveTestSetup):
 
         self.E11_32_RSIC.execrecord = self.step_E3_RS.execrecord
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunSIC "{}" does not represent a PSIC'
+                                re.escape('ExecRecord of RunSIC "{}" does not represent a PipelineCable'
                                           .format(self.E11_32_RSIC)),
                                 self.E11_32_RSIC.clean)
         # Check of propagation:
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunSIC "{}" does not represent a PSIC'
+                                re.escape('ExecRecord of RunSIC "{}" does not represent a PipelineCable'
                                           .format(self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
@@ -1732,7 +1705,7 @@ class RunSICTests(ArchiveTestSetup):
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
-        self.E11_32_RSIC.output.add(self.E11_32_output_DS)
+        self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" does not keep its output but a dataset was registered'
                                           .format(self.E11_32_RSIC)),
@@ -1763,7 +1736,7 @@ class RunSICTests(ArchiveTestSetup):
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
         self.E11_32_output_DS.save()
-        self.E11_32_RSIC.output.add(self.E11_32_output_DS)
+        self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_clean_not_reused_nontrivial_no_data(self):
@@ -1845,7 +1818,7 @@ class RunSICTests(ArchiveTestSetup):
 
         # Point the CCL of E11_32_output_symDS to the ExecLog of E11_32_RSIC.
         ccl = self.E11_32_output_symDS.content_checks.first()
-        ccl.execlog = self.E11_32_RSIC.log.first()
+        ccl.execlog = self.E11_32_RSIC.log
         ccl.save()
 
         self.assertTrue(self.E11_32_RSIC.is_complete())
@@ -1905,9 +1878,9 @@ class RunSICTests(ArchiveTestSetup):
         for runsic in RunSIC.objects.all():
             if (runsic.execrecord is not None and 
                     runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.log.count() == 1):
+                    runsic.has_log):
                 break
-        log = runsic.log.first()
+        log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
         log.integrity_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -1939,9 +1912,9 @@ class RunSICTests(ArchiveTestSetup):
         for runsic in RunSIC.objects.all():
             if (runsic.execrecord is not None and 
                     runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.log.count() == 1):
+                    runsic.has_log):
                 break
-        log = runsic.log.first()
+        log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.content_checks.create(symbolicdataset=sd)
@@ -1973,9 +1946,9 @@ class RunSICTests(ArchiveTestSetup):
         for runsic in RunSIC.objects.all():
             if (runsic.execrecord is not None and 
                     runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.log.count() == 1):
+                    runsic.has_log):
                 break
-        log = runsic.log.first()
+        log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -2002,19 +1975,6 @@ class RunSICTests(ArchiveTestSetup):
 
 
 class RunOutputCableTests(ArchiveTestSetup):
-
-    def test_ROC_many_execlogs(self):
-        run = self.pE.pipeline_instances.create(user=self.myUser)
-        run_output_cable = self.E31_42.poc_instances.create(run=run)
-        run_output_cable.reused = False
-        for i in range(2):
-            run_output_cable.log.create(invoking_record=run_output_cable,
-                                        start_time=timezone.now(),
-                                        end_time=timezone.now())
-        self.assertRaisesRegexp(ValidationError,
-                'RunOutputCable "{}" has {} ExecLogs but should have only one'.
-                        format(run_output_cable, 2),
-                run_output_cable.clean)
 
     def test_ROC_clean_correct_parent_run(self):
         """PipelineOutputCable belongs to parent Run's Pipeline.
@@ -2104,9 +2064,11 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("roc_created")
         self.E31_42_ROC.reused = False
-        self.E31_42_ROC.log.create(invoking_record=self.E31_42_ROC,
-                                   start_time=timezone.now(),
-                                   end_time=timezone.now())
+
+        cable_log = ExecLog(record=self.E31_42_ROC, invoking_record=self.E31_42_ROC,
+                            start_time=timezone.now(), end_time=timezone.now())
+        cable_log.save()
+
         self.singlet_DS.created_by = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
@@ -2175,11 +2137,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("custom_roc_completed")
         self.E31_42_ROC.execrecord = self.E21_41_ROC.execrecord
-        error_msg = "POC of RunOutputCable .* is incompatible with that of its ExecRecord"
-        self.assertRaisesRegexp(ValidationError, 
-                                re.escape('POC of RunOutputCable "{}" is incompatible with that of its ExecRecord'
-                                          .format(self.E31_42_ROC)),
-                                self.E31_42_ROC.clean)
+        err_msg = 'PipelineOutputCable of RunOutputCable "{}" is incompatible with the cable of its ExecRecord'
+        self.assertRaisesRegexp(ValidationError, re.escape(err_msg.format(self.E31_42_ROC)), self.E31_42_ROC.clean)
 
     def test_ROC_clean_wrong_object_execrecord(self):
         """RunOutputCable has ExecRecord for PipelineStep.
@@ -2192,7 +2151,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.make_complete_non_reused(runstep, [self.raw_symDS], [self.doublet_symDS])
         self.E31_42_ROC.execrecord = runstep.execrecord
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecord of RunOutputCable "{}" does not represent a POC'
+                                re.escape('ExecRecord of RunOutputCable "{}" does not represent a PipelineCable'
                                           .format(self.E31_42_ROC)),
                                 self.E31_42_ROC.clean)
 
@@ -2217,7 +2176,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.step_E2.outputs_to_delete.add(self.pD.outputs.get(dataset_name="D1_out"))
 
         self.assertFalse(self.D11_21_ROC.keeps_output())
-        self.assertTrue(self.D11_21_ROC.output.exists())
+        self.assertTrue(self.D11_21_ROC.outputs.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" does not keep its output but a dataset was registered'
                                           .format("RunOutputCable", self.D11_21_ROC)),
@@ -2252,7 +2211,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("subrun")
         self.D11_21_ROC.reused = True
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_kept_output_trivial_no_data(self):
@@ -2265,7 +2224,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         """
         self.step_through_roc_creation("subrun")
         self.D11_21.custom_wires.all().delete()
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_kept_output_nontrivial_no_data(self):
@@ -2279,8 +2238,8 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
 
         self.assertTrue(self.D11_21_ROC.keeps_output())
-        self.assertListEqual(self.D11_21_ROC.log.first().missing_outputs(), [])
-        self.assertFalse(self.D11_21_ROC.output.exists())
+        self.assertListEqual(self.D11_21_ROC.log.missing_outputs(), [])
+        self.assertFalse(self.D11_21_ROC.outputs.exists())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
                                           'produced data'.format(self.D11_21_ROC)),
@@ -2314,7 +2273,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         in its output, is clean.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.D11_21_ROC.output.add(self.C1_in_DS)
+        self.D11_21_ROC.outputs.add(self.C1_in_DS)
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_trivial_no_data(self):
@@ -2357,7 +2316,7 @@ class RunOutputCableTests(ArchiveTestSetup):
         data matching its ExecRecordOut, is clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.E21_41_ROC.output.add(self.doublet_DS)
+        self.E21_41_ROC.outputs.add(self.doublet_DS)
         self.assertTrue(self.E21_41_ROC.has_data())
         self.assertIsNone(self.E21_41_ROC.clean())
 
@@ -2489,9 +2448,9 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
-        log = roc.log.first()
+        log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
         log.integrity_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -2523,9 +2482,9 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
-        log = roc.log.first()
+        log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.content_checks.create(symbolicdataset=sd)
@@ -2557,9 +2516,9 @@ class RunOutputCableTests(ArchiveTestSetup):
         for roc in RunOutputCable.objects.all():
             if (roc.execrecord is not None and 
                     roc.execrecord.execrecordouts.count() > 0 and
-                    roc.log.count() == 1):
+                    roc.has_log):
                 break
-        log = roc.log.first()
+        log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
@@ -2583,6 +2542,7 @@ class RunOutputCableTests(ArchiveTestSetup):
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
                                 roc.clean)
+
 
 class DatasetTests(librarian.tests.LibrarianTestSetup):
 
@@ -2712,7 +2672,8 @@ class ExecLogTests(ArchiveTestSetup):
     def test_delete_exec_log(self):
         """Can delete an ExecLog."""
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
-        execlog = step_E1_RS.log.create(invoking_record=step_E1_RS)
+        execlog = ExecLog(record=step_E1_RS, invoking_record=step_E1_RS)
+        execlog.save()
         self.assertIsNone(execlog.delete())
 
     def test_clean_record_not_RunAtomic(self):
@@ -2739,7 +2700,7 @@ class ExecLogTests(ArchiveTestSetup):
         # Now step_E1_RS is marked as reused, and there is a dummy record of a RunStep belonging to
         # other_run.  Let's retrieve that ExecLog and mis-wire it so that its record belongs to self.pE_run
         # while its invoking record remains other_run and that should trigger an error in ExecLog.clean().
-        el_to_mess_up = other_run.runsteps.get(pipelinestep__step_num=1).log.first()
+        el_to_mess_up = other_run.runsteps.get(pipelinestep__step_num=1).log
 
         el_to_mess_up.record = self.step_E1_RS
 
@@ -2755,11 +2716,11 @@ class ExecLogTests(ArchiveTestSetup):
 
         for el in ExecLog.objects.all():
             # Skip if this ExecLog doesn't have top-level run pE_run.
-            if el.record.top_level_run is not self.pE_run:
+            if el.record.definite.top_level_run is not self.pE_run:
                 continue
 
             # Skip if this ExecLog has coordinates (1,).
-            if el.record.get_coordinates() == (1,):
+            if el.record.definite.get_coordinates() == (1,):
                 continue
 
             # Change invoking_record to step 1.
@@ -2777,11 +2738,14 @@ class ExecLogTests(ArchiveTestSetup):
         self.step_through_run_creation("outcables_done")
 
         # Retrieve all ExecLogs of steps.
-        step_ELs = ExecLog.objects.filter(content_type=ContentType.objects.get_for_model(RunStep))
+        step_ELs = []
+        for candidate_EL in ExecLog.objects.all():
+            if candidate_EL.record.is_step:
+                step_ELs.append(candidate_EL)
 
         for el in step_ELs:
             original_invoking_record = el.invoking_record
-            for rsic in el.record.RSICs.all():
+            for rsic in el.record.runstep.RSICs.all():
                 el.invoking_record = rsic
                 self.assertRaisesRegexp(
                     ValidationError,
@@ -2795,11 +2759,14 @@ class ExecLogTests(ArchiveTestSetup):
         self.step_through_run_creation("outcables_done")
 
         # Retrieve all ExecLogs of ROCs.
-        ROC_ELs = ExecLog.objects.filter(content_type=ContentType.objects.get_for_model(RunOutputCable))
+        ROC_ELs = []
+        for candidate_EL in ExecLog.objects.all():
+            if candidate_EL.record.is_outcable:
+                ROC_ELs.append(candidate_EL)
 
         for el in ROC_ELs:
             # Get its containing run.
-            containing_run = el.record.run
+            containing_run = el.record.runoutputcable.run
 
             original_invoking_record = el.invoking_record
 
@@ -2839,7 +2806,7 @@ class ExecLogTests(ArchiveTestSetup):
         but we're only checking ExecLog right now.
         """
         self.step_through_run_creation("outcables_done")
-        el_to_mess_with = self.step_E1_RS.log.first()
+        el_to_mess_with = self.step_E1_RS.log
 
         el_to_mess_with.invoking_record = self.step_E3_RS
 
@@ -3055,7 +3022,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.step_through_run_creation("outcables_done")
 
         for el in ExecLog.objects.all():
-            if el.record.top_level_run == self.pE_run:
+            if el.record.definite.top_level_run == self.pE_run:
                 self.assertTrue(el.is_complete())
                 self.assertTrue(el.is_successful())
 
@@ -3067,7 +3034,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
 
         # Artificially change the logs' end_time to None.
         for el in ExecLog.objects.all():
-            if el.record.top_level_run == self.pE_run:
+            if el.record.definite.top_level_run == self.pE_run:
                 orig_end_time = el.end_time
                 el.end_time = None
                 self.assertFalse(el.is_complete())
@@ -3083,8 +3050,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
 
-        self.assertTrue(step_E1_RSIC.log.first().is_complete())
-        self.assertTrue(step_E1_RSIC.log.first().is_successful())
+        self.assertTrue(step_E1_RSIC.log.is_complete())
+        self.assertTrue(step_E1_RSIC.log.is_successful())
 
     def test_execlog_of_runstep_has_no_methodoutput(self):
         """Test on ExecLogs for a RunStep that has no MethodOutput."""
@@ -3104,11 +3071,11 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         # Complete the RunStep...
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         # ... and break it.
-        el_to_break = self.step_E1_RS.log.first()
+        el_to_break = self.step_E1_RS.log
         el_to_break.methodoutput.return_code = 1
         el_to_break.methodoutput.save()
-        self.assertTrue(self.step_E1_RS.log.first().is_complete())
-        self.assertFalse(self.step_E1_RS.log.first().is_successful())
+        self.assertTrue(self.step_E1_RS.log.is_complete())
+        self.assertFalse(self.step_E1_RS.log.is_successful())
 
     def test_runatomic_successful_run(self):
         """
@@ -3116,10 +3083,11 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         """
         self.step_through_run_creation("outcables_done")
 
-        runatomics = (list(RunStep.objects.filter(
-            pipelinestep__content_type=ContentType.objects.get_for_model(Method))) +
-                      list(RunSIC.objects.all()) +
-                      list(RunOutputCable.objects.all()))
+        atomicrunsteps = []
+        for runstep in RunStep.objects.all():
+            if runstep.transformation.is_method:
+                atomicrunsteps.append(runstep)
+        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
         for runatomic in runatomics:
             # Skip RunAtomics that are not part of this Run.
@@ -3150,7 +3118,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
         other_cable = other_step1.RSICs.first()
-        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log.first())
+        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -3175,7 +3143,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
         self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
 
-        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log.first())
+        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log)
         icl.start()
         icl.stop()
         icl.save()
@@ -3187,7 +3155,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         """Testing of a RunAtomic (RunStep) which fails at the ExecLog stage."""
         self.step_through_run_creation("first_step_complete")
 
-        step_1_log = self.step_E1_RS.log.first()
+        step_1_log = self.step_E1_RS.log
 
         ccl_to_wipe = step_1_log.content_checks.first()
         ccl_to_wipe.execlog = None
@@ -3204,7 +3172,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         """Testing of a RunAtomic (RunStep) which failed at the content check stage."""
         self.step_through_run_creation("first_step_complete")
 
-        step_1_log = self.step_E1_RS.log.first()
+        step_1_log = self.step_E1_RS.log
 
         ccl_to_fail = step_1_log.content_checks.first()
         ccl_to_fail.add_bad_header()
@@ -3224,7 +3192,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         conflicting_datafile.close()
 
         # The output of this first cable is self.raw_symDS.  This creates a bad ICL.
-        self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log.first())
+        self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
         self.assertTrue(step_E1_RSIC.is_complete())
         self.assertFalse(step_E1_RSIC.successful_execution())
 
@@ -3262,19 +3230,18 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
         self.sandbox_two.execute_pipeline()
 
-        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
+        # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
         run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
-        run2_step2_cable = run2_step2.RSICs.first()
 
-        self.assertIsNone(run2_step2_cable.log.first())
-        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
-        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+        self.assertFalse(run2_step2.has_log)
+        self.assertEquals(run2_step2.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log)
 
-        self.assertFalse(run2_step1.log.first().is_successful())
-        self.assertTrue(run2_step2_cable.is_complete())
-        self.assertFalse(run2_step2_cable.successful_execution())
+        self.assertFalse(run2_step1.log.is_successful())
+        self.assertTrue(run2_step2.is_complete())
+        self.assertFalse(run2_step2.successful_execution())
 
     def test_runatomic_unsuccessful_failed_integrity_check_during_recovery(self):
         """Testing of a RunAtomic which has a failed integrity check during recovery."""
@@ -3318,20 +3285,19 @@ echo "This is not what's supposed to be output here" > $2
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
         self.sandbox_two.execute_pipeline()
 
-        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
+        # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
         run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
-        run2_step2_cable = run2_step2.RSICs.first()
 
-        self.assertIsNone(run2_step2_cable.log.first())
-        self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
-        self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
+        self.assertFalse(run2_step2.has_log)
+        self.assertEquals(run2_step2.invoked_logs.count(), 1)
+        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log)
 
-        self.assertTrue(run2_step1.log.first().is_successful())
-        self.assertFalse(run2_step1.log.first().all_checks_passed())
-        self.assertTrue(run2_step2_cable.is_complete())
-        self.assertFalse(run2_step2_cable.successful_execution())
+        self.assertTrue(run2_step1.log.is_successful())
+        self.assertFalse(run2_step1.log.all_checks_passed())
+        self.assertTrue(run2_step2.is_complete())
+        self.assertFalse(run2_step2.successful_execution())
 
     def test_runatomic_unsuccessful_failed_content_check_during_recovery(self):
         """Testing of a RunAtomic which has a failed content check (missing data) during recovery."""
@@ -3380,15 +3346,15 @@ echo
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
         run2_step2_cable = run2_step2.RSICs.first()
 
-        #self.assertIsNone(run2_step2_cable.log.first())
+        #self.assertIsNone(run2_step2_cable.log)
         #self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
-        #self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log.first())
-        self.assertIsNone(run2_step2.log.first())
+        #self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log)
+        self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 1)
-        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log.first())
+        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log)
 
-        self.assertTrue(run2_step1.log.first().is_successful())
-        self.assertFalse(run2_step1.log.first().all_checks_passed())
+        self.assertTrue(run2_step1.log.is_successful())
+        self.assertFalse(run2_step1.log.all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
         #self.assertFalse(run2_step2_cable.successful_execution())
         self.assertTrue(run2_step2_cable.successful_execution())
@@ -3426,7 +3392,7 @@ echo
 
     def test_runstep_cable_failed(self):
         """Testing on a RunStep with a RSIC that has run and failed in data checking."""
-        self.step_through_run_creation("first_cable")
+        self.step_through_run_creation("first_cable_created")
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
 
         # Let's tamper with self.raw_symDS.
@@ -3438,7 +3404,7 @@ echo
             self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
 
             # Check the integrity of self.raw_symDS -- this should fail.
-            self.raw_symDS.check_integrity(f.name, self.myUser, step_E1_RSIC.log.first())
+            self.raw_symDS.check_integrity(f.name, self.myUser, step_E1_RSIC.log)
 
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
@@ -3453,18 +3419,18 @@ echo
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log.first())
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log.first())
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
         icl.start()
         icl.stop()
         icl.save()
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         # Mark step_D1_RS as having failed on execution.
-        step_D1_mo = self.step_D1_RS.log.first().methodoutput
+        step_D1_mo = self.step_D1_RS.log.methodoutput
         step_D1_mo.return_code = 1
         step_D1_mo.save()
 
@@ -3491,7 +3457,7 @@ echo
         # Setup copied from test_runatomic_unsuccessful_failed_execlog.
         self.step_through_run_creation("first_step_complete")
 
-        step_1_log = self.step_E1_RS.log.first()
+        step_1_log = self.step_E1_RS.log
 
         ccl_to_wipe = step_1_log.content_checks.first()
         ccl_to_wipe.execlog = None
@@ -3543,7 +3509,7 @@ echo
 
         # Break the data.
         E1_out_ccl = self.E1_out_symDS.content_checks.first()
-        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.execlog = roc1.log
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
         self.E1_out_DS.created_by = roc1
@@ -3562,7 +3528,7 @@ echo
 
         # Break the data.
         E1_out_ccl = self.E1_out_symDS.content_checks.first()
-        E1_out_ccl.execlog = roc1.log.first()
+        E1_out_ccl.execlog = roc1.log
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
 

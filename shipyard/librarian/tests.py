@@ -25,6 +25,7 @@ from metadata.models import *
 import metadata.tests
 from method.tests import samplecode_path
 
+
 class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
     """
     Set up a database state for unit testing the librarian app.
@@ -291,6 +292,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         myRSIC = PSIC.psic_instances.create(runstep=myRS)
         return self.ER_from_record(myRSIC)
 
+
 class SymbolicDatasetTests(LibrarianTestSetup):
 
     def setUp(self):
@@ -436,11 +438,13 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(self.sym_dataset.has_data(), True)
         self.assertEqual(self.sym_dataset.is_raw(), False)
 
+
 class DatasetStructureTests(LibrarianTestSetup):
 
     def test_num_rows(self):
         self.assertEqual(self.triplet_3_rows_symDS.num_rows(), 3)
         self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
+
 
 class ExecRecordTests(LibrarianTestSetup):
     def test_delete_execrecord(self):
@@ -902,8 +906,8 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertEqual(outcable_ER.clean(), None)
 
         # Good case: same as above, but with CDTs that are restrictions.
-        D1_out_structure = self.D1_out.structure.all()[0]
-        E1_out_structure = self.E1_out.structure.all()[0]
+        D1_out_structure = self.D1_out.structure
+        E1_out_structure = self.E1_out.structure
         D1_out_structure.compounddatatype = self.DNA_triplet_cdt
         D1_out_structure.save()
         E1_out_structure.compounddatatype = self.DNA_doublet_cdt
@@ -942,8 +946,8 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertEqual(cable_ER.clean(), None)
 
         # Good case: same as above, but with CDTs that are restrictions.
-        in_structure = self.E1_in.structure.all()[0]
-        out_structure = self.D1_in.structure.all()[0]
+        in_structure = self.E1_in.structure
+        out_structure = self.D1_in.structure
         in_structure.compounddatatype = self.DNA_triplet_cdt
         in_structure.save()
         out_structure.compounddatatype = self.DNA_doublet_cdt
@@ -979,11 +983,11 @@ class ExecRecordTests(LibrarianTestSetup):
         run = archive.models.Run(pipeline=pipeline, user=user); run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
         execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
-        execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+        execrecord = ExecRecord(generator=execlog); execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
 
-        self.assertEqual(execrecord.archive_runstep_related.count(), 1)
+        self.assertEqual(execrecord.used_by_components.count(), 1)
         self.assertFalse(execrecord.has_ever_failed())
 
     def test_execrecord_multiple_runsteps_never_failed(self):
@@ -1001,11 +1005,11 @@ class ExecRecordTests(LibrarianTestSetup):
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
             execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
             if i == 0:
-                execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+                execrecord = ExecRecord(generator=execlog); execrecord.save()
             runstep.execrecord = execrecord
             runstep.save()
 
-        self.assertEqual(execrecord.archive_runstep_related.count(), 2)
+        self.assertEqual(execrecord.used_by_components.count(), 2)
         self.assertFalse(execrecord.has_ever_failed())
 
     def test_execrecord_one_failed_runstep(self):
@@ -1019,12 +1023,12 @@ class ExecRecordTests(LibrarianTestSetup):
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
         execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
         archive.models.MethodOutput(execlog=execlog, return_code=1).save()
-        execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+        execrecord = ExecRecord(generator=execlog); execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
 
         self.assertFalse(runstep.successful_execution())
-        self.assertEqual(execrecord.archive_runstep_related.count(), 1)
+        self.assertEqual(execrecord.used_by_components.count(), 1)
         self.assertTrue(execrecord.has_ever_failed())
 
     def test_execrecord_multiple_good_one_failed_runstep(self):
@@ -1042,45 +1046,46 @@ class ExecRecordTests(LibrarianTestSetup):
             if i == 1:
                 archive.models.MethodOutput(execlog=execlog, return_code=1).save()
             else:
-                execrecord = librarian.models.ExecRecord(generator=execlog); execrecord.save()
+                execrecord = ExecRecord(generator=execlog); execrecord.save()
             runstep.execrecord = execrecord
             runstep.save()
 
-        self.assertEqual(execrecord.archive_runstep_related.count(), 2)
-        self.assertEqual(execrecord.archive_runstep_related.first().successful_execution(), True)
-        self.assertEqual(execrecord.archive_runstep_related.last().successful_execution(), False)
+        self.assertEqual(execrecord.used_by_components.count(), 2)
+        self.assertEqual(execrecord.used_by_components.first().definite.successful_execution(), True)
+        self.assertEqual(execrecord.used_by_components.last().definite.successful_execution(), False)
         self.assertTrue(execrecord.has_ever_failed())
+
 
 class FindCompatibleERTests(LibrarianTestSetup):
 
     def test_find_compatible_ER_never_failed(self):
         """Should be able to find a compatible ExecRecord which never failed."""
         execrecord = None
-        for e in librarian.models.ExecRecord.objects.all():
+        for e in ExecRecord.objects.all():
             if not e.has_ever_failed():
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
         input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
-        runstep = execrecord.archive_runstep_related.first()
+        runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
-        method = runstep.pipelinestep.transformation
+        method = runstep.pipelinestep.transformation.method
         self.assertFalse(execrecord.has_ever_failed())
         self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
 
     def test_find_compatible_ER_failed(self):
         """Should not find a compatible ExecRecord which failed."""
         execrecord = None
-        for e in librarian.models.ExecRecord.objects.all():
+        for e in ExecRecord.objects.all():
             if e.has_ever_failed():
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
         input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
-        runstep = execrecord.archive_runstep_related.first()
+        runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
-        method = runstep.pipelinestep.transformation
+        method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
         self.assertIsNone(method.find_compatible_ER(input_SDs))

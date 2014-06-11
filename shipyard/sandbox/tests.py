@@ -131,7 +131,7 @@ class ExecuteTests(TestCase):
                                 dataset = sd
                                 break
                     else:
-                        datatype = incable.source.structure.first().compounddatatype
+                        datatype = incable.source.structure.compounddatatype
                         structure = DatasetStructure.objects.filter(compounddatatype=datatype)[0]
                         dataset = structure.symbolicdataset
                     inputs.append(dataset)
