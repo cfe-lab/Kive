@@ -17,8 +17,6 @@ from metadata.models import *
 import metadata.tests
 from constants import datatypes
 
-logging.getLogger().setLevel(10) # Debug messages
-
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
 

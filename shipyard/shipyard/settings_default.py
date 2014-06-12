@@ -180,12 +180,16 @@ LOGGING = {
             'backupCount': 10
         }
     },
+    'root': {
+         # This is the default logger
+         'handlers': ['console', 'file'], 
+         'level': 'DEBUG'
+    },
     'loggers': {
-        '': {
-             # This is the default logger
-             'handlers': ['console', 'file'], 
-             'level': 'DEBUG'
-        },
+#         Change the logging level for an individual logger.
+#         'archive.tests': {
+#              'level': 'DEBUG'
+#         },
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
