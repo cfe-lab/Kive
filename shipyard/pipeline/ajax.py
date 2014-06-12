@@ -7,13 +7,19 @@ def populate_method_revision_dropdown (request):
     """
     copied from Method ajax.py
     """
-    json = {}
     if request.is_ajax():
         response = HttpResponse()
         method_family_id = request.POST.get('mf_id')
         if method_family_id != '':
             method_family = MethodFamily.objects.get(pk=method_family_id)
-            response.write(serializers.serialize("json", Method.objects.filter(family=method_family), fields=('pk', 'revision_name')))
+
+            # Go through all Methods with this family and retrieve their primary key and revision_name.
+            method_dicts = []
+            for curr_method in Method.objects.filter(family=method_family):
+                method_dicts.append({"pk": curr_method.pk, "model": "method.method",
+                                     "fields": {"revision_name": curr_method.revision_name}})
+
+            response.write(json.dumps(method_dicts))
         return response
     else:
         raise Http404
