@@ -66,8 +66,9 @@ def run_pipeline(request):
         pipeline_pk = request.POST.get("pipeline_pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
 
-        dataset_pks = request.POST.get("dataset_pks[]")
-        datasets = [Dataset.objects.get(pk=pk) for pk in dataset_pks]
+        dataset_pks = request.POST.getlist("dataset_pks[]")
+        print(request.POST)
+        datasets = [Dataset.objects.get(pk=int(pk)) for pk in dataset_pks]
         inputs = [d.symbolicdataset for d in datasets]
 
         user = User.objects.get(username="shipyard")
