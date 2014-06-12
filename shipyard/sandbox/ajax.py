@@ -45,7 +45,6 @@ def get_pipeline_outputs(request):
         response = HttpResponse()
         pipeline_pk = request.POST.get("pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
-        roc_ctype = ContentType.objects.get_for_model(RunOutputCable)
 
         res = [[qs2dict(to), []] for to in pipeline.outputs.order_by("dataset_idx")]
         for run in pipeline.pipeline_instances.all():
@@ -66,7 +65,8 @@ def run_pipeline(request):
         pipeline_pk = request.POST.get("pipeline_pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
 
-        dataset_pks = request.POST.get("dataset_pks[]")
+        dataset_pks = request.POST.getlist("dataset_pks[]")
+
         datasets = [Dataset.objects.get(pk=pk) for pk in dataset_pks]
         inputs = [d.symbolicdataset for d in datasets]
 
