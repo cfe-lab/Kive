@@ -263,6 +263,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }).blur();
 
 
+    /* submit form */
     $('form#pipeline_ctrl').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
