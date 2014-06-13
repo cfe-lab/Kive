@@ -407,6 +407,32 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
         self.sandbox_two.execute_pipeline()
 
+    def _setup_deep_nested_run(self):
+        """Set up a pipeline with sub-sub-pipelines to test recursion."""
+        # Everything in this pipeline will be a no-op, so all can be linked together
+        # without remorse.
+        p_basic = self.make_first_pipeline("p_basic", "innermost pipeline")
+        self.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+        p_basic.create_outputs()
+        p_basic.save()
+
+        p_sub = self.make_first_pipeline("p_sub", "second-level pipeline")
+        self.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
+        p_sub.create_outputs()
+        p_sub.save()
+
+        p_top = self.make_first_pipeline("p_top", "top-level pipeline")
+        self.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
+        p_top.create_outputs()
+        p_top.save()
+
+        # Set up a dataset with words in it called self.symds_words.
+        self.make_words_symDS()
+
+        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words])
+        run_sandbox.execute_pipeline()
+        self.deep_nested_run = run_sandbox.run
+
 
 class RunAtomicTests(ArchiveTestSetup):
     """Tests of functionality shared by all RunAtomics."""
@@ -2816,31 +2842,6 @@ class ExecLogTests(ArchiveTestSetup):
 class GetCoordinatesTests(ArchiveTestSetup):
     """Tests of the get_coordinates functions of all Run and RunAtomic classes."""
 
-    def _setup_deep_nested_run(self):
-        """Set up a pipeline with sub-sub-pipelines to test recursion."""
-        # Everything in this pipeline will be a no-op, so all can be linked together
-        # without remorse.
-        p_basic = self.make_first_pipeline("p_basic", "innermost pipeline")
-        self.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
-        p_basic.create_outputs()
-        p_basic.save()
-
-        p_sub = self.make_first_pipeline("p_sub", "second-level pipeline")
-        self.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
-        p_sub.create_outputs()
-        p_sub.save()
-
-        p_top = self.make_first_pipeline("p_top", "top-level pipeline")
-        self.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
-        p_top.create_outputs()
-        p_top.save()
-
-        # Set up a dataset with words in it called self.symds_words.
-        self.make_words_symDS()
-
-        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words])
-        run_sandbox.execute_pipeline()
-
     def test_get_coordinates_top_level_run(self):
         """Coordinates of a top-level run should be an empty tuple."""
         self.step_through_run_creation("outcables_done")
@@ -3548,3 +3549,48 @@ echo
         self.step_through_run_creation("outcables_done")
         self.assertTrue(self.pE_run.is_complete())
         self.assertTrue(self.pE_run.successful_execution())
+
+
+class TopLevelRunTests(ArchiveTestSetup):
+    def test_usual_run(self):
+        """Test on all elements of a simulated run."""
+        self.step_through_run_creation("outcables_done")
+
+        self.assertEquals(self.pE_run, self.pE_run.top_level_run)
+
+        # All elements of both pE_run and pD_run should have top_level_run equal
+        # to pE_run.
+
+        for curr_run in (self.pE_run, self.pD_run):
+            self.assertEquals(self.pE_run, curr_run.top_level_run)
+
+            for runstep in curr_run.runsteps.all():
+                self.assertEquals(self.pE_run, runstep.top_level_run)
+
+                for cable_in in runstep.RSICs.all():
+                    self.assertEquals(self.pE_run, cable_in.top_level_run)
+
+            for roc in curr_run.runoutputcables.all():
+                self.assertEquals(self.pE_run, roc.top_level_run)
+
+    def test_deep_nested_run(self):
+        """Test on all elements of a deep-nested run."""
+        self._setup_deep_nested_run()
+
+        # Recurse down all elements of this run and make sure that they all have
+        # top_level_run equal to self.deep_nested_run.
+        top_level_runs = Run.objects.filter(pipeline__family__name="p_top")
+        second_level_runs = Run.objects.filter(pipeline__family__name="p_sub")
+        third_level_runs = Run.objects.filter(pipeline__family__name="p_basic")
+
+        for curr_run in list(top_level_runs) + list(second_level_runs) + list(third_level_runs):
+            self.assertEquals(self.deep_nested_run, curr_run.top_level_run)
+
+            for runstep in curr_run.runsteps.all():
+                self.assertEquals(self.deep_nested_run, runstep.top_level_run)
+
+                for cable_in in runstep.RSICs.all():
+                    self.assertEquals(self.deep_nested_run, cable_in.top_level_run)
+
+            for roc in curr_run.runoutputcables.all():
+                self.assertEquals(self.deep_nested_run, roc.top_level_run)
