@@ -25,20 +25,32 @@
     </div>
 
     <!-- Method selector -->
-    <form id="pipeline_ctrl" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div id="pipeline_ctrl">
         <ul id="id_ctrl_nav">
+            <li data-rel="#id_meta_ctrl">Pipeline</li>
             <li data-rel="#id_input_ctrl">Inputs</li>
             <li data-rel="#id_method_ctrl">Methods</li>
-            <li data-rel="#id_meta_ctrl">Pipeline Revision</li>
         </ul>
         
-        <div id="form_ctrl">
-            <input type="button" id="id_example_button" value="Example">
-            <input type="button" id="id_delete_button" value="Delete">
-            <input type="button" id="id_reset_button" value="Clear">
-            <input type="submit" id="id_submit_button" value="Submit">
-            <div class="errortext" id="id_submit_error"></div>
-        </div>
+        <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+            <div id="form_ctrl">
+                <input type="button" id="id_example_button" value="Example">
+                <input type="button" id="id_delete_button" value="Delete">
+                <input type="button" id="id_reset_button" value="Clear">
+                <input type="submit" id="id_submit_button" value="Submit">
+                <div class="errortext" id="id_submit_error"></div>
+            </div>
+
+            <div id="id_meta_ctrl">
+                <h3>Pipeline</h3>
+            
+                <label for="#id_revision_name" class="text-field-label">Pipeline name</label>
+                <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
+            
+                <label for="#id_revision_desc" class="text-field-label">Description</label>
+                <textarea id="id_revision_desc" name="revision_desc"></textarea>
+            </div>
+        </form>
         
         <div id="id_input_ctrl">
             <h3>Inputs</h3>
@@ -80,18 +92,8 @@
             <div class="errortext" id="id_method_error"></div>
         </div>
 
-        <div id="id_meta_ctrl">
-            <h3>Pipeline Revision</h3>
-            
-            <label for="#id_revision_name" class="text-field-label">Pipeline name</label>
-            <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
-            
-            <label for="#id_revision_desc" class="text-field-label">Description</label>
-            <textarea id="id_revision_desc" name="revision_desc"></textarea>
-        </div>
 
-
-    </form>
+    </div>
 
 
 {% endblock %}
