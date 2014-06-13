@@ -84,7 +84,9 @@ function make_data_tables() {
                 table.push("<option value=" + ds.pk + ">" + ds.fields.name + "</option>");
             });
             table.push("</select></td></tr></tbody></table>");
-            $("#data_panel").append($(table.join("")));
+            table = $(table.join(""));
+            table.find("select").on("change", make_results_tables);
+            $("#data_panel").append(table);
         });
     });
 }
@@ -106,6 +108,9 @@ function make_results_tables() {
             datasets.forEach(function (ds) {
                 table.push("<tr><td>" + ds.fields.date_created + "</td></tr>");
             });
+            if (datasets.length == 0) {
+                table.push('<tr><td class="greyedout">no results yet</td></tr>');
+            }
             table.push("</tbody></table>");
             $("#results_panel").append($(table.join("")));
         });
@@ -119,6 +124,7 @@ function run_pipeline() {
     do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
         $("#run_button").prop("disabled", false);
         $("#run_button").html("run");
+        make_results_tables();
     });
 }
 
@@ -181,7 +187,4 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         run_pipeline();
         make_results_tables();
     });
-
-    // Initially populate the input and output tables.
-    $("#pipeline_table").children("tbody").find("tr").first().click();
 });
