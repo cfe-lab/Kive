@@ -1,12 +1,40 @@
+////////////////////////////////////////////////////////////////////////////////
+// Utility functions for manipulating DOM objects.
+////////////////////////////////////////////////////////////////////////////////
+
 // Mark a row of a table as selected.
 function select(row) {
-    row.parent().children().removeClass("selected");
+     row.parent().children().removeClass("selected");
      row.addClass("selected");
 }
 
+// Find the row of a table which is selected.
 function get_selected_row(table) {
     return (table.children("tbody").find(".selected").first());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Functions for getting at what the user wants to do.
+////////////////////////////////////////////////////////////////////////////////
+
+// Get the currently selected pipeline.
+function get_selected_pipeline() {
+    row = get_selected_row($("#pipeline_table"));
+    return (row.find("select").first().val());
+}
+
+// Get all the currently selected input datasets (in order).
+function get_selected_datasets() {
+    dataset_pks = [];
+    $("#data_panel").find("select").each(function (index, elem) {
+        dataset_pks.push($(elem).val());
+    });
+    return (dataset_pks);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Functions for communicating with the server.
+////////////////////////////////////////////////////////////////////////////////
 
 // Fetch a list of objects from the server and call a callback on them.
 function do_ajax(url, data, callback) {
@@ -22,113 +50,99 @@ function do_ajax(url, data, callback) {
 }
 
 // Get TransformationInputs for a pipeline.
-function fetch_inputs(pipeline_pk, callback) {
-    do_ajax("get_pipeline_inputs/", {"pk": pipeline_pk}, callback);
+function fetch_inputs(callback) {
+    do_ajax("get_pipeline_inputs/", {"pipeline_pk": get_selected_pipeline()}, callback);
 }
 
 // Get TransformationOutputs for a pipeline.
-function fetch_outputs(pipeline_pk, callback) {
-    do_ajax("get_pipeline_outputs/", {"pk": pipeline_pk}, callback);
+function fetch_outputs(callback) {
+    do_ajax("get_pipeline_outputs/", 
+            {"pipeline_pk": get_selected_pipeline(), "dataset_pks": get_selected_datasets()}, 
+            callback);
 }
 
-// Make a table header.
-function make_thead(header_fields) {
-    thead = $("<thead><tr></tr></thead>");
-    header_fields.forEach( function (field) {
-        thead.append($("<td>".concat(field).concat("</td>")));
-    });
-    return (thead);
-}
+// Run the selected pipeline with the selected inputs.
+function run_pipeline() {
+    pipeline_pk = get_selected_pipeline();
+    dataset_pks = get_selected_datasets();
 
-// Make data rows for a list of objects.
-function fill_table(objs, fields, table) {
-    tbody = table.children("tbody");
-    objs.forEach(function(obj) {
-        values = [];
-        fields.forEach(function (field) {
-            values.push(obj.fields[field]);
+    if (dataset_pks.some(function (elem, idx, arr) { return (elem == null); })) {
+        $("#run_error").html("select one dataset for each input");
+    } else if (!pipeline_pk) {
+        $("#run_error").html("select a pipeline");
+    } else {
+        $("#run_error").html("");
+        $("#run_button").html("running...");
+        $("#run_button").attr("disabled", true);
+        do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
+            $("#run_button").prop("disabled", false);
+            $("#run_button").html("run");
+            make_results_tables();
         });
-        tr = make_tr(values);
-        tr.attr("id", obj.pk);
-        tbody.append(tr);
-    });
+    }
 }
 
-// Make a new row for a table.
-function make_tr(values) {
-    row = $("<tr></tr>");
-    values.forEach(function (value) {
-        row.append($("<td>".concat(value).concat("</td>")));
-    });
-    return (row);
-}
+////////////////////////////////////////////////////////////////////////////////
+// More complex functions for filling out the page.
+////////////////////////////////////////////////////////////////////////////////
 
 // Make tables for selecting input data.
-function make_data_tables(pipeline_pk) {
+function make_data_tables() {
     $("#data_panel").empty();
-    fetch_inputs(pipeline_pk, function (objs) {
+    fetch_inputs(function (objs) {
         objs.forEach(function (obj) {
             input = obj[0];
             datasets = obj[1];
+            input_name = input.fields.dataset_idx + ": " + input.fields.dataset_name;
 
-            table = $("<table width=100%></table>");
-            input_name = input.fields.dataset_idx.toString().concat(": ").concat(input.fields.dataset_name);
-            table.append(make_thead([input_name]));
-            tbody = $("<tbody><tr><td></td></tr></tbody>");
-            cell = tbody.find("td").first();
-            select = $('<select size=5 class="data_select"></select>');
+            table = ["<table width=100%><thead><tr><th>"];
+            table.push(input_name);
+            table.push("</th></tr></thead>")
+            table.push('<tbody><tr><td><select size=5 class="data_select">')
             datasets.forEach(function (ds) {
-                opt = $("<option></option");
-                opt.val(ds.pk);
-                opt.html(ds.fields.name);
-                select.append(opt);
+                table.push("<option value=" + ds.pk + " uploaded=" + (ds.fields.created_by == null) + ">");
+                table.push(ds.fields.name + "</option>");
             });
-            select.children("option").first().prop("selected", true);
-            cell.append(select);
-            table.append(tbody);
+            table.push("</select></td></tr></tbody></table>");
+            table = $(table.join(""));
+            table.find("select").on("change", make_results_tables);
             $("#data_panel").append(table);
         });
     });
 }
 
 // Make tables for displaying output data.
-function make_results_tables(pipeline_pk) {
+// TODO: some duplication from make_data_tables().
+function make_results_tables() {
     $("#results_panel").empty();
-    fetch_outputs(pipeline_pk, function (objs) {
+    fetch_outputs(function (objs) {
         objs.forEach(function (obj) {
             outcable = obj[0];
             datasets = obj[1];
+            output_name = outcable.fields.dataset_idx + ": " + outcable.fields.dataset_name;
 
-            table = $("<table width=100%></table>");
-            idx = outcable.fields.dataset_idx.toString()
-            name = outcable.fields.dataset_name
-            output_name = idx.concat(": ").concat(name)
-            table.append(make_thead([output_name]));
-            table.append($("<tbody></tbody>"));
-            fill_table(datasets, ["date_created"], table);
-
+            table = ["<table width=100%><thead><tr><th>"];
+            table.push(output_name);
+            table.push("</th></tr></thead>")
+            table.push("<tbody>")
+            datasets.forEach(function (ds) {
+                table.push("<tr><td>" + ds.fields.date_created + "</td></tr>");
+            });
             if (datasets.length == 0) {
-                row = $('<tr><td class="greyedout">no results yet</td></tr>');
-                table.children("tbody").append(row);
+                table.push('<tr><td class="greyedout">no results yet</td></tr>');
             }
-            $("#results_panel").append(table);
+            table.push("</tbody></table>");
+            $("#results_panel").append($(table.join("")));
         });
     });
 }
 
-// Run the selected pipeline with the selected inputs.
-function run_pipeline() {
-    row = get_selected_row($("#pipeline_table"));
-    pipeline_pk = row.find(":selected").first().attr("id");
-
-    dataset_pks = [];
-    $("#data_panel").find("select").each(function (index, elem) {
-        dataset_pks.push($(elem).val());
-    });
-    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
-        $("#run_button").prop("disabled", false);
-        $("#run_button").html("run");
-    });
+function filter_uploaded_inputs() {
+    if ($(this).prop("checked")) {
+        $("#data_panel").find('option[uploaded="false"]').remove();
+    } else {
+        make_data_tables();
+    }
 }
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
@@ -176,20 +190,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
+    // When you click a pipeline, the input and output tables should repopulate.
     $("#pipeline_table").children("tbody").find("tr").on("click", function () {
         select($(this));
-        pipeline_pk = $(this).find("select").children(":selected").first().attr("id");
-        make_data_tables(pipeline_pk);
-        make_results_tables(pipeline_pk);
+        make_data_tables();
+        make_results_tables();
     });
 
-    $("#run_button").on("click", function () {
-        $(this).html("running...");
-        $(this).prop("disabled", true);
-        run_pipeline();
-        pipeline_pk = $("#pipeline_table").find("select").children(":selected").first().attr("id");
-        make_results_tables(pipeline_pk);
-    });
+    // When you click "run", the pipeline should be run.
+    $("#run_button").on("click", run_pipeline);
 
-    $("#pipeline_table").children("tbody").find("tr").first().click();
+    // Checking the "show only uploaded data" box should filter the inputs.
+    $("#uploads_checkbox").on("click", filter_uploaded_inputs);
 });
