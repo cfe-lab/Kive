@@ -285,9 +285,12 @@ class CodeResourceRevision(models.Model):
             # conflicts.  (Thus if an exception is raised, we want to
             # propagate it as that's a pretty deep problem.)
             path_for_deps = install_path
-            if dep.depPath != "":
-                path_for_deps = os.makedirs(
-                    os.path.join(install_path, dep.depPath))            
+            # June 12, 2014: the directory may already exist due to another dependency --
+            # or if depPath is ".".
+            try:
+                os.makedirs(os.path.normpath(os.path.join(install_path, dep.depPath)))
+            except os.error:
+                pass
             
             # Get the base name of this dependency.  If no special value
             # is specified in dep, then use the dependency's CRR name.
@@ -324,7 +327,8 @@ class CodeResourceDependency(models.Model):
     depPath = models.CharField(
         "Dependency path",
         max_length=255,
-        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent");
+        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
+        blank=True);
 
     depFileName = models.CharField(
         "Dependency file name",
