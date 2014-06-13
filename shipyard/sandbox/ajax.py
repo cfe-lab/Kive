@@ -13,19 +13,17 @@ from pprint import pprint
 # TODO: this might be better suited as a helper in the backend
 def find_runs_with_inputs(pipeline, datasets):
     """Find all Runs of a pipeline with the given set of inputs."""
-    runs = set([])
+    runs = set([run.pk for run in Run.objects.filter(pipeline=pipeline)])
     for i, dataset in enumerate(datasets, start=1):
+        if dataset is None: continue
         curr_runs = set([]) # runs compatible with this dataset being at position i
         for runsic in RunSIC.objects.filter(runstep__run__pipeline=pipeline, PSIC__source_step=0,
                                             PSIC__source__transformationinput__dataset_idx=i):
             if runsic.execrecord.execrecordins.first().symbolicdataset == dataset.symbolicdataset:
                 curr_runs.add(runsic.runstep.run.pk)
-        if i == 1:
-            runs = curr_runs
-        else:
-            runs = runs.intersection(curr_runs)
-            if len(runs) == 0:
-                return []
+        runs = runs.intersection(curr_runs)
+        if len(runs) == 0:
+            return runs
     return runs
 
 def qs2dict(qs):
@@ -68,6 +66,7 @@ def get_pipeline_inputs(request):
     return response
 
 def get_pipeline_outputs(request):
+    """Get outputs from a pipeline for a particular set of inputs."""
     pipeline, datasets = handle_xput_request(request)
     response = HttpResponse()
 
@@ -84,7 +83,8 @@ def get_pipeline_outputs(request):
                 dataset_dict = qs2dict(sd.dataset)
             else:
                 dataset_dict = qs2dict(sd)
-            outputs[i].append(dataset_dict)
+            if not dataset_dict in outputs[i]:
+                outputs[i].append(dataset_dict)
 
     # We will return a list of tuples (output, [datasets]).
     res = []
