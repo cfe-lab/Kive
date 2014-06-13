@@ -94,7 +94,8 @@ class MethodForm (forms.ModelForm):
         super(MethodForm, self).__init__(*args, **kwargs)
 
         # this is required to re-populate the drop-down with CRs created since first load
-        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + \
+                                              [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')]
         self.fields['coderesource'].label = 'Code resource'
         self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
 
@@ -104,7 +105,8 @@ class MethodForm (forms.ModelForm):
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
-    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
+                                               [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
     class Meta:
