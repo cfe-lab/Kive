@@ -15,9 +15,11 @@ def populate_method_revision_dropdown (request):
 
             # Go through all Methods with this family and retrieve their primary key and revision_name.
             method_dicts = []
-            for curr_method in Method.objects.filter(family=method_family):
+            for curr_method in Method.objects.filter(family=method_family).order_by('-pk'):
+                driver = curr_method.driver
                 method_dicts.append({"pk": curr_method.pk, "model": "method.method",
-                                     "fields": {"revision_name": curr_method.revision_name}})
+                                     "fields": {'revision_number': driver.revision_number,
+                                                'revision_name': driver.revision_name}})
 
             response.write(json.dumps(method_dicts))
         return response

@@ -658,7 +658,8 @@ def method_revise(request, id):
                                                 'revision_desc': most_recent.revision_desc,
                                                 'revisions': last_revision.pk,
                                                 'random': most_recent.random})
-        method_form.fields['revisions'].choices = [(x.id, x.revision_name) for x in all_revisions]
+        method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
+                                                   for x in all_revisions]
 
         input_forms = []
         output_forms = []

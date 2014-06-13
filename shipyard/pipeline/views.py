@@ -32,7 +32,7 @@ def pipeline_add(request):
     I don't think we need to use forms here.
     """
     t = loader.get_template('pipeline/pipeline_add.html')
-    method_families = MethodFamily.objects.all()
+    method_families = MethodFamily.objects.all().order_by('name')
     compound_datatypes = CompoundDatatype.objects.all()
     c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
     c.update(csrf(request))
