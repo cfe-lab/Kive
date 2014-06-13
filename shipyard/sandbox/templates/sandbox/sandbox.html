@@ -87,7 +87,7 @@ Run pipelines on data.
                 <!-- The Pipeline's PK is stored as the "id" of the option. -->
                 <select>
                     {% for pipeline in members %}
-                    <option id="{{ pipeline.pk }}">{{ pipeline.revision_name }}</option>
+                    <option value={{ pipeline.pk }}>{{ pipeline.revision_name }}</option>
                     {% endfor %}
                 </select>
         </tr>

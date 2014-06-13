@@ -23,7 +23,7 @@ def get_pipeline_inputs(request):
     """Get inputs for a pipeline, and possible datasets for each."""
     if request.is_ajax():
         response = HttpResponse()
-        pipeline_pk = request.POST.get("pk")
+        pipeline_pk = request.POST.get("pipeline_pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
         res = []
         for trans_input in pipeline.inputs.all():
@@ -43,9 +43,8 @@ def get_pipeline_inputs(request):
 def get_pipeline_outputs(request):
     if request.is_ajax():
         response = HttpResponse()
-        pipeline_pk = request.POST.get("pk")
+        pipeline_pk = request.POST.get("pipeline_pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
-        roc_ctype = ContentType.objects.get_for_model(RunOutputCable)
 
         res = [[qs2dict(to), []] for to in pipeline.outputs.order_by("dataset_idx")]
         for run in pipeline.pipeline_instances.all():
