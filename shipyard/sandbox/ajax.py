@@ -45,6 +45,7 @@ def get_pipeline_outputs(request):
         response = HttpResponse()
         pipeline_pk = request.POST.get("pk")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
+        roc_ctype = ContentType.objects.get_for_model(RunOutputCable)
 
         res = [[qs2dict(to), []] for to in pipeline.outputs.order_by("dataset_idx")]
         for run in pipeline.pipeline_instances.all():

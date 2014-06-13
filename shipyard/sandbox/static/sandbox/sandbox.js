@@ -74,14 +74,18 @@ function make_data_tables(pipeline_pk) {
             table = $("<table width=100%></table>");
             input_name = input.fields.dataset_idx.toString().concat(": ").concat(input.fields.dataset_name);
             table.append(make_thead([input_name]));
-            table.append($("<tbody></tbody>"));
-            fill_table(datasets, ["name"], table);
-            table.children("tbody").find("tr").on("click", function () { select ($(this)); });
-
-            if (datasets.length == 0) {
-                row = $('<tr><td class="greyedout">no compatible datasets</td></tr>');
-                table.children("tbody").append(row);
-            }
+            tbody = $("<tbody><tr><td></td></tr></tbody>");
+            cell = tbody.find("td").first();
+            select = $('<select size=5 class="data_select"></select>');
+            datasets.forEach(function (ds) {
+                opt = $("<option></option");
+                opt.val(ds.pk);
+                opt.html(ds.fields.name);
+                select.append(opt);
+            });
+            select.children("option").first().prop("selected", true);
+            cell.append(select);
+            table.append(tbody);
             $("#data_panel").append(table);
         });
     });
@@ -102,7 +106,6 @@ function make_results_tables(pipeline_pk) {
             table.append(make_thead([output_name]));
             table.append($("<tbody></tbody>"));
             fill_table(datasets, ["date_created"], table);
-            table.children("tbody").find("tr").on("click", function () { select ($(this)); });
 
             if (datasets.length == 0) {
                 row = $('<tr><td class="greyedout">no results yet</td></tr>');
@@ -113,17 +116,18 @@ function make_results_tables(pipeline_pk) {
     });
 }
 
+// Run the selected pipeline with the selected inputs.
 function run_pipeline() {
     row = get_selected_row($("#pipeline_table"));
     pipeline_pk = row.find(":selected").first().attr("id");
 
     dataset_pks = [];
-    $("#data_panel").children("table").each(function (index, table) {
-        dataset_pks.push(get_selected_row($(table)).attr("id"));
+    $("#data_panel").find("select").each(function (index, elem) {
+        dataset_pks.push($(elem).val());
     });
-    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function () {
-        $("#run_button").html("Run");
+    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
         $("#run_button").prop("disabled", false);
+        $("#run_button").html("run");
     });
 }
 
@@ -186,4 +190,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         pipeline_pk = $("#pipeline_table").find("select").children(":selected").first().attr("id");
         make_results_tables(pipeline_pk);
     });
+
+    $("#pipeline_table").children("tbody").find("tr").first().click();
 });
