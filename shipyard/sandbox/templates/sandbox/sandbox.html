@@ -36,6 +36,10 @@ html body {
     top: 50%;
 }
 
+.data_select {
+    width: 100%;
+}
+
 #buttons {
     float: left;
     width: 100%;
@@ -83,7 +87,7 @@ Run pipelines on data.
                 <!-- The Pipeline's PK is stored as the "id" of the option. -->
                 <select>
                     {% for pipeline in members %}
-                    <option id="{{ pipeline.pk }}">{{ pipeline.revision_name }}</option>
+                    <option value={{ pipeline.pk }}>{{ pipeline.revision_name }}</option>
                     {% endfor %}
                 </select>
         </tr>
@@ -106,7 +110,7 @@ Run pipelines on data.
 </div>
 
 <div id="buttons">
-    <button id="run_button">Run</button>
+    <button id="run_button">run</button>
 </div>
 
 {% endblock %}
