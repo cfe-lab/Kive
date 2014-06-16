@@ -6,11 +6,47 @@
 {% block title %}Pipelines{% endblock %}
 
 {% block javascript %}
+    <style>
+        #canvas{}
+    </style>
+
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
-    <style>#canvas{}</style>
+    <script>
+        $(function() {
+            // see http://jqueryui.com/dialog/#modal-form
+            var output_name = $( '#output_name'),
+                allFields = $( [] ).add( output_name );
+
+            $( "#dialog-form" ).dialog({
+                autoOpen: false,
+
+                // http://stackoverflow.com/questions/896777/remove-close-button-on-jqueryui-dialog
+                closeOnEscape: false,
+                open: function(event, ui) { $(".ui-dialog-titlebar-close", ui.dialog || ui).hide(); },
+
+                height: 150,
+                width: 350,
+                modal: true,
+                buttons: {
+                    "Create output": function() {
+                        console.log(name);
+                        $( this ).dialog( "close" );
+                    },
+                    Cancel: function() {
+                        $( this ).dialog( "close" );
+                    }
+                },
+                close: function() {
+                    allFields.val( "" ).removeClass( "ui-state-error" );
+                }
+            });
+        })
+    </script>
+
 {% endblock %}
 
 {% block content %}
@@ -95,5 +131,13 @@
 
     </div>
 
+    <div id="dialog-form" title="">
+        <form>
+            <fieldset>
+                <label for="output_name">Output name</label>
+                <input type="text" name="output_name" id="output_name" class="text ui-widget-content ui-corner-all">
+            </fieldset>
+        </form>
+    </div>
 
 {% endblock %}

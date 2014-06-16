@@ -231,6 +231,9 @@ CanvasState.prototype.doUp = function(e) {
                 this.valid = false;
             } else {
                 // valid Connector, assign non-null value
+                //TODO: spawn textfield to enter output name
+                $( "#dialog-form" ).dialog( "open" );
+
                 connector.in_magnet = '__output__';
                 connector.out_magnet.connected.push(connector);
                 connector.x = mouse.x;  // FIXME: is this necessary?

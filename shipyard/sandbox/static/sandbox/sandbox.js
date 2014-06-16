@@ -14,9 +14,7 @@ function get_selected_row(table) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Functions for getting currently selected database objects' primary keys.
-// When the layout changes, we should only need to change these to get
-// communication with the server to work.
+// Functions for getting at what the user wants to do.
 ////////////////////////////////////////////////////////////////////////////////
 
 // Get the currently selected pipeline.
@@ -63,6 +61,27 @@ function fetch_outputs(callback) {
             callback);
 }
 
+// Run the selected pipeline with the selected inputs.
+function run_pipeline() {
+    pipeline_pk = get_selected_pipeline();
+    dataset_pks = get_selected_datasets();
+
+    if (dataset_pks.some(function (elem, idx, arr) { return (elem == null); })) {
+        $("#run_error").html("select one dataset for each input");
+    } else if (!pipeline_pk) {
+        $("#run_error").html("select a pipeline");
+    } else {
+        $("#run_error").html("");
+        $("#run_button").html("running...");
+        $("#run_button").attr("disabled", true);
+        do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
+            $("#run_button").prop("disabled", false);
+            $("#run_button").html("run");
+            make_results_tables();
+        });
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // More complex functions for filling out the page.
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,10 +100,13 @@ function make_data_tables() {
             table.push("</th></tr></thead>")
             table.push('<tbody><tr><td><select size=5 class="data_select">')
             datasets.forEach(function (ds) {
-                table.push("<option value=" + ds.pk + ">" + ds.fields.name + "</option>");
+                table.push("<option value=" + ds.pk + " uploaded=" + (ds.fields.created_by == null) + ">");
+                table.push(ds.fields.name + "</option>");
             });
             table.push("</select></td></tr></tbody></table>");
-            $("#data_panel").append($(table.join("")));
+            table = $(table.join(""));
+            table.find("select").on("change", make_results_tables);
+            $("#data_panel").append(table);
         });
     });
 }
@@ -106,20 +128,21 @@ function make_results_tables() {
             datasets.forEach(function (ds) {
                 table.push("<tr><td>" + ds.fields.date_created + "</td></tr>");
             });
+            if (datasets.length == 0) {
+                table.push('<tr><td class="greyedout">no results yet</td></tr>');
+            }
             table.push("</tbody></table>");
             $("#results_panel").append($(table.join("")));
         });
     });
 }
 
-// Run the selected pipeline with the selected inputs.
-function run_pipeline() {
-    pipeline_pk = get_selected_pipeline();
-    dataset_pks = get_selected_datasets();
-    do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
-        $("#run_button").prop("disabled", false);
-        $("#run_button").html("run");
-    });
+function filter_uploaded_inputs() {
+    if ($(this).prop("checked")) {
+        $("#data_panel").find('option[uploaded="false"]').remove();
+    } else {
+        make_data_tables();
+    }
 }
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
@@ -175,13 +198,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // When you click "run", the pipeline should be run.
-    $("#run_button").on("click", function () {
-        $(this).html("running...");
-        $(this).prop("disabled", true);
-        run_pipeline();
-        make_results_tables();
-    });
+    $("#run_button").on("click", run_pipeline);
 
-    // Initially populate the input and output tables.
-    $("#pipeline_table").children("tbody").find("tr").first().click();
+    // Checking the "show only uploaded data" box should filter the inputs.
+    $("#uploads_checkbox").on("click", filter_uploaded_inputs);
 });
