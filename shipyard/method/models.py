@@ -693,8 +693,8 @@ class Method(transformation.models.Transformation):
 
         command = [code_to_run] + input_paths + output_paths
         self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                      cwd=run_path)
 
         return code_popen
 
