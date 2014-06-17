@@ -246,13 +246,13 @@ select:not([multiple]) {
 }
 input.add {
     border-radius: 1em 0 0 1em;
-    border-right: 0;
     font-weight: bold;
+    margin-right: -1px;
 }
 input.remove {
     border-radius: 0 1em 1em 0;
-    border-left: 0;
     font-weight: bold;
+    margin-left: 0;
 }
 
 .shortIntField{
@@ -298,14 +298,13 @@ ul#id_ctrl_nav li:hover {
     background-color: #aaa;
     color: #fff;
 }
-#pipeline_ctrl #id_input_ctrl,
-#pipeline_ctrl #id_method_ctrl,
-#pipeline_ctrl #id_meta_ctrl {
+#pipeline_ctrl .ctrl_menu {
     top: 4.3em;
     position: fixed;
     padding: .5em;
     border: 1px solid #aaa;
     display: none;
+    background: #fff;
 }
 .input-label { color: #ccc; }
 
@@ -315,7 +314,7 @@ ul#id_ctrl_nav li:hover {
 
 #pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
-#pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; }
+#pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
 #pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
 #pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
 

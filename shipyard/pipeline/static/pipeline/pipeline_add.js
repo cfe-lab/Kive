@@ -65,7 +65,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     }
                 })
                 
-                $('#id_method_revision_field').show();
+                $('#id_method_revision_field').show().focus();
             }
             else {
                 $("#id_method_revision_field").hide();
@@ -75,31 +75,42 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
-        var $this = $(this);
-        $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+        $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
     });
     
     // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(function() {
+    
         var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
+        
         if (lbl.length) {
             $(this).on('focus', function() {
-                if ($(this).val() == lbl.html())
+            
+                if (this.value == lbl.html()) {
                     $(this).removeClass('input-label').val('');
+                }
+                
             }).on('blur', function() {
-                if ($(this).val() === '')
+            
+                if (this.value === '') {
                     $(this).addClass('input-label').val(lbl.html());
+                }
+                
             }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
             lbl.remove();
         }
+        
     });
     
-    $('li', 'ul#id_ctrl_nav').on('click', function() {
-        var $this = $(this);
+    $('li', 'ul#id_ctrl_nav').on('click', function(e) {
+        var $this = $(this),
+            menu = $($this.data('rel'));
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
-        $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
-        $($this.data('rel')).show().css('left', $this.offset().left);
+        $('.ctrl_menu', '#pipeline_ctrl').hide();
+        menu.show().css('left', $this.offset().left);
+//            .find('input').eq(0).focus(); // INCOMPLETE: Focus on the first input field when menu opens. Needs to be a bit different... first empty field maybe?
+        e.stopPropagation();
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
@@ -121,16 +132,18 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     var canvasState = new CanvasState(canvas);
 
-    $('#id_cdt_button').on('click', function() {
-        var choice = $('#id_select_cdt option:selected');
-        var node_label = $('#id_datatype_name').val();
+    $('form','#id_input_ctrl').on('submit', function(e) {
+        e.preventDefault(); // stop default form submission behaviour
+        
+        var choice = $('#id_select_cdt option:selected', this);
+        var node_label = $('#id_datatype_name', this).val();
 
         if (node_label === '' || node_label === "Label") {
             // required field
-            $('#id_dt_error')[0].innerHTML = "Label is required";
+            $('#id_dt_error', this)[0].innerHTML = "Label is required";
         }
         else {
-            $('#id_dt_error')[0].innerHTML = "";
+            $('#id_dt_error', this)[0].innerHTML = "";
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
                 canvasState.addShape(new RawNode(100, 200 + 50 * Math.random(),
@@ -145,12 +158,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    $('#id_method_button').on('click', function() {
-        var bin = $(this).closest('div'),
-            method_name = $('#id_method_name', bin),
-            method_error = $('#id_method_error', bin),
-            method_family = $('#id_select_method_family', bin),
-            method = $('#id_select_method', bin);
+    $('form', '#id_method_ctrl').on('submit', function(e) {
+        e.preventDefault(); // stop default form submission behaviour
+        
+        var method_name = $('#id_method_name', this),
+            method_error = $('#id_method_error', this),
+            method_family = $('#id_select_method_family', this),
+            method = $('#id_select_method', this);
         var mid = method.val(); // pk of method
 
         if (mid === undefined || method_family.val() == '') {
@@ -161,6 +175,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             } else {
                 method_family.focus();
             }
+            
         } else {
             // user selected valid Method Revision
             var node_label = method_name.val();
@@ -243,9 +258,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     })
     
     $('#id_revision_desc').on('keydown', function() {
-        var $this = $(this),
-            getHappierEveryXKeystrokes = 12,
-            happy = -Math.min(15, Math.floor($this.val().length / getHappierEveryXKeystrokes)) * 32;
+        var getHappierEachXChars = 12,
+            happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
     
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
@@ -254,22 +268,32 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         .after('<div class="happy_indicator">')
         .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
         .on('focus keyup', function() {
-            var desc_length = $(this).val().length;
+            var desc_length = this.value.length,
+                wrap = $(this).parent();
             
-            if (desc_length > 20) {
-                $('.happy_indicator').show();
-                $('.happy_indicator_label').hide();
+            if (desc_length == 0 || $(this).hasClass('input-label')) {
+                $('.happy_indicator, .happy_indicator_label', wrap).hide();
             }
-            else if (desc_length > 0) {
-                $('.happy_indicator, .happy_indicator_label').show();
+            else if (desc_length > 20) {
+                $('.happy_indicator', wrap).show();
+                $('.happy_indicator_label', wrap).hide();
             }
             else {
-                $('.happy_indicator, .happy_indicator_label').hide();
+                $('.happy_indicator, .happy_indicator_label', wrap).show();
             }
         }).on('blur', function() {
-            $('.happy_indicator, .happy_indicator_label').hide();
-        }).blur();
+            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
+        }).blur()
+    ;
 
+    
+    $('body').on('click', function(e) {
+        var menus = $('.ctrl_menu');
+        if (menus.is(':visible') && $(e.target).closest(menus).length === 0) {
+            menus.hide();
+            $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+        }
+    });
 
     /* submit form */
     $('form#pipeline_ctrl').submit(function(e) {

@@ -400,23 +400,23 @@ CanvasState.prototype.deleteObject = function() {
             // delete Connectors from this shape to other nodes
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
-                out_magnet = out_magnets[i];
-                for (j = 0; j < out_magnets.connected.length; j++) {
-                    out_magnet = out_magnets[j];
-
-                }
-
-
-                this_connector = out_magnets[i].connected;
-                if (this_connector !== null) {
-                    index = this.connectors.indexOf(this_connector);
-                    this.connectors.splice(index, 1);
-
-                    out_magnets[i].connected = [];
-                    if (this_connector.in_magnet.constructor == Magnet) {
+            
+                for (j = 0; j < out_magnets[i].connected.length; j++) {
+                
+                    this_connector = out_magnets[i].connected[j];
+                    
+                    if (this_connector.constructor === Connector) {
+                        index = this.connectors.indexOf(this_connector);
+                        this.connectors.splice(index, 1);
+                    }
+                    
+                    if (this_connector.in_magnet.constructor === Magnet) {
                         this_connector.in_magnet.connected = [];
                     }
+                    
                 }
+
+                out_magnets[i].connected = [];
             }
 
             // remove MethodNode from list and any attached Connectors
