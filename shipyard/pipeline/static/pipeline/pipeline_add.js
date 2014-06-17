@@ -154,11 +154,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             $('#id_dt_error', this)[0].innerHTML = "";
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
-                canvasState.addShape(new RawNode(100, 200 + 50 * Math.random(),
+                canvasState.addShape(new RawNode(100, 200 + Math.round(50 * Math.random()),
                     20, '#88DD88', 10, 25, node_label
                 ))
             } else {
-                canvasState.addShape(new CDtNode(this_pk, 100, 200 + 50 * Math.random(),
+                canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
                     40, '#8888DD', 10, 10, node_label
                 ));
             }
@@ -207,11 +207,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         var inputs = result['inputs'],
                             outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999',
+                        canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()), 80, 10, 20, '#999999',
                             node_label, 10, inputs, outputs));
 
                         // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
-                        //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC',
+                        //canvasState.addShape(new MethodNode(200, 200 + Math.round(50 * Math.random()), 45, 5, 20, '#CCCCCC',
                         // node_label, 0, inputs, outputs));
                     }
                 });
@@ -409,6 +409,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['revision_name'] = '1';
         form_data['revision_desc'] = 'First version';
 
+        // Canvas information to store in the Pipeline object.
+        form_data["canvas_width"] = canvas.width;
+        form_data["canvas_height"] = canvas.height;
+
         // sort pipeline inputs by their Y-position on canvas (top to bottom)
         function sortByYpos (a, b) {
             var ay = a.y;
@@ -498,7 +502,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'transformation_pk': this_step.pk,  // to retrieve Method
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
-                'y': this_step.y
+                'y': this_step.y,
+                'name': this_step.label
             };
 
             // retrieve Connectors
@@ -550,7 +555,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     'source': this_step.pk,
                     'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                     'dataset_name': this_connector.out_magnet.label,  // magnet label
-                    'output_name': this_connector.out_magnet.label  // use same for now
+                    'output_name': this_connector.out_magnet.label,  // use same for now
+                    'x': this_connector.x,
+                    'y': this_connector.y
                 };
             }
         }
