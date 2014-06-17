@@ -41,9 +41,6 @@ def pipeline_add(request):
         # FIXME: this is probably a lousy way to handle JSON
         # Try this instead: formdata = json.loads(request.body)
         query = request.POST.dict()
-
-        print("\nSqueeeeeps\nquery={}\nSqueeeeeeps\n".format(query))
-
         exec('formdata=%s' % query.keys()[0])
 
         # does Pipeline family with this name already exist?
@@ -62,7 +59,9 @@ def pipeline_add(request):
         # make pipeline revision
         pipeline = pl_family.members.create(
             revision_name=formdata['revision_name'],
-            revision_desc=formdata['revision_desc']
+            revision_desc=formdata['revision_desc'],
+            canvas_width=formdata["canvas_width"],
+            canvas_height=formdata["canvas_height"]
         )
 
         try:
@@ -73,9 +72,9 @@ def pipeline_add(request):
                     compounddatatype=None if pk < 0 else CompoundDatatype.objects.get(pk=pk),
                     dataset_name=val['dataset_name'],
                     dataset_idx=val['dataset_idx'],
-                    x=float(val['x']), y=float(val['y'])
+                    x=int(val['x']), y=int(val['y'])
                 )
-        except:
+        except Exception as e:
             # FIXME: delete() fails with FieldError: Cannot resolve keyword u'object_id' into
             # FIXME: field. Choices are: RSICs, execrecordins, execrecordouts, generator, id,
             # FIXME: runoutputcables, runsteps
@@ -100,7 +99,7 @@ def pipeline_add(request):
                 pipeline_step = pipeline.steps.create(
                     transformation=method,
                     step_num=int(step['step_num']),
-                    x=int(step["x"]), y=int(step["y"], name=step["name"])
+                    x=int(step["x"]), y=int(step["y"]), name=step["name"]
                 )
                 # add input cables
                 for k2, v2 in step['cables_in'].iteritems():
@@ -128,7 +127,8 @@ def pipeline_add(request):
                         output_idx=v2['output_idx'],
                     )
                     outcabling.create_output(x=int(v2['x']), y=int(v2['y']))
-        except:
+        except Exception as e:
+            print(e)
             pl_family.delete()
             response_data = {'status': 'failure',
                              'error_msg': 'Invalid pipeline cable'}

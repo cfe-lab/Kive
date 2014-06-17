@@ -68,29 +68,28 @@
             <li data-rel="#id_method_ctrl">Methods</li>
         </ul>
         
-        <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
             <div id="form_ctrl">
-                <input type="button" id="id_example_button" value="Example">
-                <input type="button" id="id_delete_button" value="Delete">
-                <input type="button" id="id_reset_button" value="Clear">
+                <input type="button" id="id_example_button" value="Example"><input type="button" id="id_delete_button" value="Delete"><input type="button" id="id_reset_button" value="Clear">
                 <input type="submit" id="id_submit_button" value="Submit">
                 <div class="errortext" id="id_submit_error"></div>
             </div>
 
-            <div id="id_meta_ctrl">
+            <div id="id_meta_ctrl" class="ctrl_menu">
                 <h3>Pipeline</h3>
-            
+
                 <label for="#id_revision_name" class="text-field-label">Pipeline name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
-            
+
                 <label for="#id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
             </div>
         </form>
-        
-        <div id="id_input_ctrl">
+
+        <div id="id_input_ctrl" class="ctrl_menu">
             <h3>Inputs</h3>
             
+            <form>
             <label for="#id_datatype_name" class="text-field-label">Label</label>
             <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
             
@@ -101,13 +100,15 @@
                 {% endfor %}
             </select>
         
-            <input type="button" id="id_cdt_button" value="Add Input">
+            <input type="submit" id="id_cdt_button" value="Add Input">
             <div class="errortext" id="id_dt_error"></div>
+            </form>
         </div>
 
-        <div id="id_method_ctrl">
+        <div id="id_method_ctrl" class="ctrl_menu">
             <h3>Methods</h3>
 
+            <form>
             <label for="#id_method_name" class="text-field-label">Label</label>
             <input id="id_method_name" maxlength="128" name="method_name" type="text" />
             
@@ -124,8 +125,9 @@
             </select>
             </div>
             
-            <input type="button" id="id_method_button" value="Add Method">
+            <input type="submit" id="id_method_button" value="Add Method">
             <div class="errortext" id="id_method_error"></div>
+            </form>
         </div>
 
 

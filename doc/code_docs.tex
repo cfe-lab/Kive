@@ -33,6 +33,73 @@
 \tikzset{csv/.style={circle, draw, inner sep=2pt}}
 \tikzset{raw/.style={circle, draw, inner sep=2pt}}
 
+\section*{CodeResource}
+
+A CodeResource represents a software program, or part of a program, which will
+be used as part of a Pipeline to process data. Often, CodeResources will be
+executable programs, intended to operate directly on data, but they may also be
+libraries on which other CodeResources depend. Importantly, CodeResources do
+not actually contain the program contents (ie. the code itself) -- that is
+contained in a CodeResourceRevision, documented in the next section. A
+CodeResource is like a file under source control. Creating a new
+CodeResourceRevision for the CodeResource is like committing a change. The file
+contents will be modified, but metadata about the file (like its name and
+description) will stay the same. Just like in source control, CodeResources
+cannot exist without having at least one revision.
+
+Let's consider some examples. To learn how to use Shipyard, a user Jan has
+written a toy program in C which simply reads a list of strings and outputs the
+lexicographically first one. Jan compiles his C code, with whatever compiler he
+has on his system, and then creates a new CodeResource with the compiled binary
+as its first revision. It's important that Jan doesn't upload the C code itself
+in this case, since Shipyard knows only how to execute files, not how to
+compile them. If Jan's code made use of another header file he had written, he
+would not need to make a CodeResource for that file, because it are only used
+to compile his program and is not needed at runtime. 
+
+Another Shipyard user, Catherine, has written a program in perl called
+\code{count\_reads.pl} to process reads from a sequencing platform. It produces
+two output files: (1) a list of the unique, good quality reads and how many
+times they appeared, and (2) the number of bad quality reads which were
+discarded. The program uses a perl module Catherine has written called
+\code{read\_checking.pm}, which contains functions for testing the quality of
+the reads. To use this program, she will first make a CodeResource for
+\code{read\_checking.pm} by uploading the first revision. When she goes to
+create the CodeResource for \code{count\_reads.pl}, she will add the first
+revision of \code{read\_checking.pm} as a dependency.
+
+In a final case, user Dan wants to make use of the popular sequence alignment
+program Clustal Omega. He has installed the software on his system. However, as
+we'll see later under Method, CodeResources which are intended for execution by
+Shipyard must have a particular command line interface, namely
+\begin{verbatim}
+    program\_name input1 input2 ... inputN output1 ... outputM
+\end{verbatim}
+where \code{input1} through \code{inputN} are the names of the input files, and
+\code{output1} through \code{outputN} are the names of the output files.
+Clustal Omega does not have this interface; rather, it can be invoked as
+follows (from clustalo's help).
+\begin{verbatim}
+    clustalo -i my-in-seqs.fa -o my-out-seqs.fa -v
+\end{verbatim}
+To use Clustal Omega, Dan writes a wrapper script in bash which takes arguments
+in the form expected by Shipyard and passes them to clustalo. Note that in bash,
+``\$1'' means the first command line argument, and so on.
+\begin{verbatim}
+    #!/bin/bash
+    clustalo -i $1 -o $2 -v
+\end{verbatim}
+Dan creates a new CodeResource for this wrapper script. While Dan's script
+obviously depends on the program clustalo, he does not create a new
+CodeResource for clustalo. Shipyard is not intended to manage third-party
+applications that may be installed on the user's system. Rather, it is up to
+the user to keep track of what is installed and available on their own machine. 
+Importantly, this means that if the local installation of Clustal Omega is
+upgraded to a new version, Shipyard won't be aware of the change, which could
+cause inconsistencies or integrity errors. It is up to Dan to ensure this does
+not happen, perhaps by adding a check for a specific version number to the top
+of his wrapper script.
+
 \section*{Pipeline}
 
 At the top level, a Pipeline is composed of a sequence of PipelineSteps,

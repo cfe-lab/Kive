@@ -120,7 +120,7 @@ class Transformation(models.Model):
     # is not raw.
     @transaction.atomic
     def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
-                     min_row=None, max_row=None):
+                     min_row=None, max_row=None, x=0, y=0):
         """
         Create a TI for this transformation.
 
@@ -134,7 +134,8 @@ class Transformation(models.Model):
             raise ValueError("Row restrictions cannot be specified without a CDT")
 
         new_input = self.inputs.create(dataset_name=dataset_name,
-                                       dataset_idx=dataset_idx)
+                                       dataset_idx=dataset_idx,
+                                       x=x, y=y)
         new_input.full_clean()
 
         if compounddatatype != None:
@@ -155,7 +156,7 @@ class Transformation(models.Model):
     # Same thing to create outputs.
     @transaction.atomic
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
-                     min_row=None, max_row=None):
+                     min_row=None, max_row=None, x=0, y=0):
         """
         Create a TO for this transformation.
 
@@ -169,7 +170,8 @@ class Transformation(models.Model):
             raise ValueError("Row restrictions cannot be specified without a CDT")
 
         new_output = self.outputs.create(dataset_name=dataset_name,
-                                         dataset_idx=dataset_idx)
+                                         dataset_idx=dataset_idx,
+                                         x=x, y=y)
         new_output.full_clean()
 
         if compounddatatype != None:
