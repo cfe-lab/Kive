@@ -330,10 +330,18 @@ Connector.prototype.draw = function(ctx) {
         this.fromY = this.out_magnet.y;
     }
 
-    if (this.in_magnet !== null && this.in_magnet !== '__output__') {
-        // attachment to in-magnet of a shape that may have moved
-        this.x = this.in_magnet.x;
-        this.y = this.in_magnet.y;
+    if (this.in_magnet !== null) {
+        if (this.in_magnet === '__output__') {
+            // Connector to output, present label
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'left';
+            ctx.font = '10pt Lato, sans-serif';
+            ctx.fillText(this.out_magnet.label, this.x+2, this.y);
+        } else {
+            // attachment to in-magnet of a shape that may have moved
+            this.x = this.in_magnet.x;
+            this.y = this.in_magnet.y;
+        }
     }
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);

@@ -231,8 +231,10 @@ CanvasState.prototype.doUp = function(e) {
                 this.valid = false;
             } else {
                 // valid Connector, assign non-null value
-                //TODO: spawn textfield to enter output name
+
+                // spawn dialog for output label
                 $( "#dialog-form" ).dialog( "open" );
+                $('#output_name').val(connector.out_magnet.label);  // default value
 
                 connector.in_magnet = '__output__';
                 connector.out_magnet.connected.push(connector);

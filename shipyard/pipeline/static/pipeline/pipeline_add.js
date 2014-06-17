@@ -132,6 +132,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     var canvasState = new CanvasState(canvas);
 
+    $('form', '#dialog-form').on('submit', function(e) {
+        // override ENTER key, click Create output button on form
+        e.preventDefault();
+        var dialog = $('#dialog-form');
+        var buttons = dialog.dialog('option', 'buttons');
+        buttons['Create output'].apply(dialog);
+    });
+
     $('form','#id_input_ctrl').on('submit', function(e) {
         e.preventDefault(); // stop default form submission behaviour
         

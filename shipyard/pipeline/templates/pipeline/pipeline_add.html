@@ -28,12 +28,13 @@
                 closeOnEscape: false,
                 open: function(event, ui) { $(".ui-dialog-titlebar-close", ui.dialog || ui).hide(); },
 
-                height: 150,
+                height: 120,
                 width: 350,
                 modal: true,
                 buttons: {
                     "Create output": function() {
-                        console.log(name);
+                        console.log($('#output_name').val());
+
                         $( this ).dialog( "close" );
                     },
                     Cancel: function() {
@@ -134,7 +135,7 @@
     </div>
 
     <div id="dialog-form" title="">
-        <form>
+        <form id="id_output_name_form">
             <fieldset>
                 <label for="output_name">Output name</label>
                 <input type="text" name="output_name" id="output_name" class="text ui-widget-content ui-corner-all">
