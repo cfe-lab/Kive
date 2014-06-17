@@ -208,6 +208,10 @@ class TransformationXput(models.Model):
     # June 6, 2014: structure is now simply be implicitly defined via a OneToOneField on the
     # XputStructure, as is execrecordouts_referencing (via FK from librarian.ExecRecordOut).
 
+    # June 16, 2014: UI information.
+    x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+
     @property
     def is_input(self):
         try:

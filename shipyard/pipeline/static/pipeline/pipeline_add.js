@@ -464,7 +464,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'transformation_pk': this_step.pk,  // to retrieve Method
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
-                'y': this_step.y
+                'y': this_step.y,
+                'name': this_step.label
             };
 
             // retrieve Connectors
@@ -516,7 +517,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     'source': this_step.pk,
                     'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                     'dataset_name': this_connector.out_magnet.label,  // magnet label
-                    'output_name': this_connector.out_magnet.label  // use same for now
+                    'output_name': this_connector.out_magnet.label,  // use same for now
+                    'x': this_connector.x,
+                    'y': this_connector.y
                 };
             }
         }
