@@ -271,12 +271,14 @@ class CodeResourceRevision(models.Model):
     def install_h(self, install_path, base_name):
         """Helper for install."""
         self.logger.debug("Writing code to {}".format(install_path))
-        shutil.copyfile(self.content_file.name, os.path.join(install_path, base_name))
 
-        # Make sure this is written with read, write, and execute
-        # permission.
-        os.chmod(os.path.join(install_path, base_name),
-                 stat.S_IRUSR | stat.S_IXUSR)
+        # Install if not a metapackage.
+        if base_name != "":
+            shutil.copyfile(self.content_file.name, os.path.join(install_path, base_name))
+            # Make sure this is written with read, write, and execute
+            # permission.
+            os.chmod(os.path.join(install_path, base_name),
+                     stat.S_IRUSR| stat.S_IWUSR | stat.S_IXUSR )
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This should never
@@ -284,11 +286,11 @@ class CodeResourceRevision(models.Model):
             # we already checked that this CRR doesn't have file
             # conflicts.  (Thus if an exception is raised, we want to
             # propagate it as that's a pretty deep problem.)
-            path_for_deps = install_path
+            path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
             # June 12, 2014: the directory may already exist due to another dependency --
             # or if depPath is ".".
             try:
-                os.makedirs(os.path.normpath(os.path.join(install_path, dep.depPath)))
+                os.makedirs(path_for_deps)
             except os.error:
                 pass
             

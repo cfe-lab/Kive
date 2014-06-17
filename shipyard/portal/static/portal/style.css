@@ -95,17 +95,16 @@ a[rel="prev"] {
     margin-top: -4.5em;
     float: left;
     padding: 0.8em 1.4em;
-    background-color: #888;
+    background-color: #bbb;
     line-height: 0;
-    opacity: 0.4;
-    color: #fff;
+    color: transparent;
     font-style: italic;
     width: 0; overflow:hidden;
-    color: rgba(0,0,0,0);
+    z-index: 3;
+    position:relative;
 }
 a[rel="prev"]:hover {
-    background-color: #4ae;
-    opacity: 0.3;
+    background-color: #c7e5fa;
     outline: none;
     width: auto;
     color: #fff;
@@ -120,9 +119,7 @@ a[rel="prev"]:before {
 
 
 /* Navigation menu styles */
-nav {
-    width: 25em;
-}
+nav { width: 25em; }
 nav ul {
     list-style: none;
     display: block;
@@ -137,9 +134,7 @@ nav a:link {
     padding: 1em 2em 1em 4em;
     border-bottom: 1px solid #000;
 }
-nav a:visited {
-    color: inherit;
-}
+nav a:visited { color: inherit; }
 nav a:link:hover {
     background-color: rgba(68,170,238,0.2);
     outline: none;
@@ -150,24 +145,13 @@ nav a:link:hover:before {
     margin-left: -1.5em;
     font-size: 1.2em;
 }
-nav li:first-child a {
-    border-top: 1px solid #fff;
-}
-nav li:last-child a {
-    border-bottom: 1px solid #fff;
-}
-nav h4 {
-    font-size: 1.2em;
-    margin: 0;
-}
-nav .menu-description {
-    margin: .3em 0 0;
-}
+nav li:first-child a { border-top: 1px solid #fff; }
+nav li:last-child a {  border-bottom: 1px solid #fff; }
+nav h4 { font-size: 1.2em; margin: 0; }
+nav .menu-description {   margin: .3em 0 0; }
 
 /* Form styles */
-form input,
-form textarea,
-form select {
+input, textarea, select {
     font: inherit;
     border: 1px solid #ccc;
     outline: none; /* Annoying WebKit feature */
@@ -301,31 +285,32 @@ input.remove {
 ul#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
 ul#id_ctrl_nav li {
     display: inline;
-    border-left: 1em solid #caec2c;
-    padding: .2em 1.75em .2em .5em;
+    padding: .2em 1em;
     cursor: pointer;
     font-weight: bold;
 }
 ul#id_ctrl_nav li.clicked,
 ul#id_ctrl_nav li.clicked:hover {
-    padding-bottom: .75em;
+    background-color: #aaa;
+    color: #fff;
 }
 ul#id_ctrl_nav li:hover {
-    padding-bottom: .4em;
+    background-color: #aaa;
+    color: #fff;
 }
 #pipeline_ctrl #id_input_ctrl,
 #pipeline_ctrl #id_method_ctrl,
 #pipeline_ctrl #id_meta_ctrl {
-    top: 4.8em;
+    top: 4.3em;
     position: fixed;
     padding: .5em;
-    border: 1px solid #caec2c;
-    border-top-width: 3px;
+    border: 1px solid #aaa;
     display: none;
 }
 .input-label { color: #ccc; }
 
-#id_datatype_name, #id_select_method_family, #id_select_method, #id_method_name, 
+#id_datatype_name, #id_select_method_family, 
+#id_select_method, #id_method_name, 
 #id_revision_name, #id_select_cdt { width: 250px; }
 
 #pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }

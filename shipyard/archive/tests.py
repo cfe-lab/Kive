@@ -51,14 +51,14 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         reused an ExecRecord (ie. make a new ExecRecord).
 
         """
-        self.make_execlog_and_mark_non_reused_runatomic(record)
+        self.make_execlog_and_mark_non_reused_runcomponent(record)
 
         execrecord = ExecRecord.create(record.log, record.component, input_SDs, output_SDs)
         record.execrecord = execrecord
         record.save()
 
-    def make_execlog_and_mark_non_reused_runatomic(self, record):
-        """Attaches a good ExecLog to a RunAtomic."""
+    def make_execlog_and_mark_non_reused_runcomponent(self, record):
+        """Attaches a good ExecLog to a RunComponent."""
         record.reused = False
         record.save()
 
@@ -434,33 +434,33 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.deep_nested_run = run_sandbox.run
 
 
-class RunAtomicTests(ArchiveTestSetup):
-    """Tests of functionality shared by all RunAtomics."""
+class RunComponentTests(ArchiveTestSetup):
+    """Tests of functionality shared by all RunComponents."""
 
     def test_clean_execlogs_invoked_logs_cleaned(self):
         """Test that _clean_execlogs properly calls clean on its invoked logs."""
         self.step_through_run_creation("outcables_done")
 
-        # For every RunAtomic invoked during this run, break each of its invoked_logs and see if it appears.
+        # For every RunComponent invoked during this run, break each of its invoked_logs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
             if runstep.transformation.is_method:
                 atomicrunsteps.append(runstep)
-        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
+        runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
-        for runatomic in runatomics:
-            # Skip RunAtomics that are not part of this Run.
-            if runatomic.top_level_run != self.pE_run:
+        for runcomponent in runcomponents:
+            # Skip RunComponents that are not part of this Run.
+            if runcomponent.top_level_run != self.pE_run:
                 continue
 
-            for invoked_log in runatomic.invoked_logs.all():
+            for invoked_log in runcomponent.invoked_logs.all():
                 original_el_start_time = invoked_log.start_time
                 invoked_log.start_time = None
                 invoked_log.save()
                 self.assertRaisesRegexp(
                     ValidationError,
                     'Stopwatch "{}" does not have a start time but it has an end time'.format(invoked_log),
-                    runatomic.clean)
+                    runcomponent.clean)
                 invoked_log.start_time = original_el_start_time
                 invoked_log.save()
 
@@ -468,19 +468,19 @@ class RunAtomicTests(ArchiveTestSetup):
         """Test that ICLs and CCLs are appropriately cleaned in _clean_execlogs."""
         self.step_through_run_creation("outcables_done")
 
-        # For every RunAtomic invoked during this run, break each of its ICLs/CCLs and see if it appears.
+        # For every RunComponent invoked during this run, break each of its ICLs/CCLs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
             if runstep.transformation.is_method:
                 atomicrunsteps.append(runstep)
-        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
+        runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
-        for runatomic in runatomics:
-            # Skip RunAtomics that are not part of this Run.
-            if runatomic.top_level_run != self.pE_run:
+        for runcomponent in runcomponents:
+            # Skip RunComponents that are not part of this Run.
+            if runcomponent.top_level_run != self.pE_run:
                 continue
 
-            for invoked_log in runatomic.invoked_logs.all():
+            for invoked_log in runcomponent.invoked_logs.all():
                 for checklog in (list(invoked_log.integrity_checks.all()) + list(invoked_log.content_checks.all())):
                     original_checklog_start_time = checklog.start_time
                     checklog.start_time = None
@@ -488,16 +488,16 @@ class RunAtomicTests(ArchiveTestSetup):
                     self.assertRaisesRegexp(
                         ValidationError,
                         'Stopwatch "{}" does not have a start time but it has an end time'.format(checklog),
-                        runatomic.clean)
+                        runcomponent.clean)
                     checklog.start_time = original_checklog_start_time
                     checklog.save()
 
     def test_clean_execlogs_log_not_among_invoked_logs(self):
-        """A RunAtomic's log should be among its invoked_logs if any invoked_logs exist."""
+        """A RunComponent's log should be among its invoked_logs if any invoked_logs exist."""
         self.step_through_run_creation("outcables_done")
 
         # Imagine that step 3 invokes step 1 but not itself.  Note that this would break the Run overall
-        # but we're only looking to check for errors local to a single RunAtomic.
+        # but we're only looking to check for errors local to a single RunComponent.
         step_3_el = self.step_E3_RS.log
         step_1_el = self.step_E1_RS.log
 
@@ -514,11 +514,11 @@ class RunAtomicTests(ArchiveTestSetup):
                                 self.step_E3_RS.clean)
 
     def test_clean_execlogs_log_set_before_invoked_ExecLogs_complete(self):
-        """A RunAtomic's log should not be set before all invoked_logs are complete."""
+        """A RunComponent's log should not be set before all invoked_logs are complete."""
         self.step_through_run_creation("third_step_complete")
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
-        # but we're only looking to check for errors local to a single RunAtomic.
+        # but we're only looking to check for errors local to a single RunComponent.
         step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
@@ -534,11 +534,11 @@ class RunAtomicTests(ArchiveTestSetup):
                                 self.step_E3_RS.clean)
 
     def test_clean_execlogs_log_set_before_invoked_ExecLogs_finish_checks(self):
-        """A RunAtomic's log should not be set before all invoked_logs finish their checks."""
+        """A RunComponent's log should not be set before all invoked_logs finish their checks."""
         self.step_through_run_creation("third_step_complete")
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
-        # but we're only looking to check for errors local to a single RunAtomic.
+        # but we're only looking to check for errors local to a single RunComponent.
         step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
@@ -553,21 +553,21 @@ class RunAtomicTests(ArchiveTestSetup):
             )),
             self.step_E3_RS.clean)
 
-    def test_clean_execlogs_runatomic_invokes_previous_runatomic(self):
-        """Testing clean on a RunAtomic which invoked a previous RunAtomic in the correct fashion."""
+    def test_clean_execlogs_runcomponent_invokes_previous_runcomponent(self):
+        """Testing clean on a RunComponent which invoked a previous RunComponent in the correct fashion."""
         self.step_through_run_creation("third_step_complete")
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
-        # but we're only looking to check for errors local to a single RunAtomic.
+        # but we're only looking to check for errors local to a single RunComponent.
         step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
 
         self.assertIsNone(self.step_E3_RS.clean())
 
-    def test_clean_execlogs_runatomic_invoked_by_subsequent_runatomic(self):
+    def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
         """
-        Testing clean on a RunAtomic whose ExecLog was invoked by a subsequent RunAtomic.
+        Testing clean on a RunComponent whose ExecLog was invoked by a subsequent RunComponent.
         """
         # Run two pipelines, where the second reuses parts from the first.
         self.run_pipelines_recovering_reused_step()
@@ -582,7 +582,7 @@ class RunAtomicTests(ArchiveTestSetup):
         self.assertIsNone(run_two_step_two.clean())
 
     def test_clean_undecided_reused_invoked_logs_exist(self):
-        """A RunAtomic that has not decided on reuse should not have any invoked logs."""
+        """A RunComponent that has not decided on reuse should not have any invoked logs."""
         self.step_through_run_creation("third_step_cables_done")
         step_one_el = self.step_E1_RS.log
         step_one_el.invoking_record = self.step_E3_RS
@@ -596,7 +596,7 @@ class RunAtomicTests(ArchiveTestSetup):
         )
 
     def test_clean_reused_invoked_logs_exist(self):
-        """A RunAtomic that reuses an ExecRecord should not have any invoked logs."""
+        """A RunComponent that reuses an ExecRecord should not have any invoked logs."""
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = True
         for curr_output in self.step_E1_RS.outputs.all():
@@ -610,13 +610,13 @@ class RunAtomicTests(ArchiveTestSetup):
             self.step_E1_RS.clean
         )
 
-    # May 28, 2014: just introduced _clean_not_reused to RunAtomic.
-    def test_clean_not_reused_runatomic_log_invoked_elsewhere(self):
-        """Testing clean on a RunAtomic whose log was invoked elsewhere by a subsequent RunAtomic."""
+    # May 28, 2014: just introduced _clean_not_reused to RunComponent.
+    def test_clean_not_reused_runcomponent_log_invoked_elsewhere(self):
+        """Testing clean on a RunComponent whose log was invoked elsewhere by a subsequent RunComponent."""
         self.step_through_run_creation("third_step_complete")
 
         # Imagine that step 3 invokes step 1 and itself.  Note that this would break the Run overall
-        # but we're only looking to check for errors local to a single RunAtomic.
+        # but we're only looking to check for errors local to a single RunComponent.
         step_1_el = self.step_E1_RS.log
         step_1_el.invoking_record = self.step_E3_RS
         step_1_el.save()
@@ -627,6 +627,23 @@ class RunAtomicTests(ArchiveTestSetup):
                 "RunStep", self.step_E1_RS
             )),
             self.step_E1_RS.clean)
+
+    # June 13, 2014: need a test for _clean_has_execlog_no_execrecord_yet().
+    def test_clean_has_execlog_no_execrecord_yet_has_checks(self):
+        """Testing clean on a RunComponent that has an ExecLog but no ExecRecord yet also has data checks."""
+        self.step_through_run_creation("outcables_done")
+
+        for rc in RunComponent.objects.all():
+            if rc.definite.top_level_run == self.pE_run:
+                # Unset its ExecRecord and clean it.
+                orig_ER = rc.execrecord
+                rc.execrecord = None
+                self.assertRaisesRegexp(
+                    ValidationError,
+                    '{} "{}" does not have an ExecRecord so should not have any data checks'.format(
+                        rc.definite.__class__.__name__, rc.definite
+                    ),
+                    rc.definite.clean())
 
 
 class RunStepTests(ArchiveTestSetup):
@@ -736,7 +753,7 @@ class RunStepTests(ArchiveTestSetup):
                                           .format(self.step_E1_RS)),
                                 self.step_E1_RS.clean)
 
-    def test_RunStep_input_unquenched_invokes_other_RunAtomics(self):
+    def test_RunStep_input_unquenched_invokes_other_RunComponents(self):
         """
         A RunStep with unquenched input cables should not have any invoked_logs.
         """
@@ -2702,8 +2719,8 @@ class ExecLogTests(ArchiveTestSetup):
         execlog.save()
         self.assertIsNone(execlog.delete())
 
-    def test_clean_record_not_RunAtomic(self):
-        """record of ExecLog should be a RunAtomic."""
+    def test_clean_record_not_RunComponent(self):
+        """record of ExecLog should be a RunComponent."""
         self.step_through_run_creation("outcables_done")
         # Retrieve an ExecLog and point it at a subrun.
 
@@ -2840,7 +2857,7 @@ class ExecLogTests(ArchiveTestSetup):
 
 
 class GetCoordinatesTests(ArchiveTestSetup):
-    """Tests of the get_coordinates functions of all Run and RunAtomic classes."""
+    """Tests of the get_coordinates functions of all Run and RunComponent classes."""
 
     def test_get_coordinates_top_level_run(self):
         """Coordinates of a top-level run should be an empty tuple."""
@@ -3010,7 +3027,7 @@ class GetCoordinatesTests(ArchiveTestSetup):
 
 class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
     """
-    Tests the is_complete/successful_execution functions of Run, RunAtomic, RunStep, ExecLog.
+    Tests the is_complete/successful_execution functions of Run, RunComponent, RunStep, ExecLog.
 
     These functions are heavily dependent on each other, so we share the setups and test
     both functions at the same time.
@@ -3078,7 +3095,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(self.step_E1_RS.log.is_complete())
         self.assertFalse(self.step_E1_RS.log.is_successful())
 
-    def test_runatomic_successful_run(self):
+    def test_runcomponent_successful_run(self):
         """
         Quick test of good cases coming out of a (simulated) good run.
         """
@@ -3088,28 +3105,28 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         for runstep in RunStep.objects.all():
             if runstep.transformation.is_method:
                 atomicrunsteps.append(runstep)
-        runatomics = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
+        runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
-        for runatomic in runatomics:
-            # Skip RunAtomics that are not part of this Run.
-            if runatomic.top_level_run != self.pE_run:
+        for runcomponent in runcomponents:
+            # Skip RunComponents that are not part of this Run.
+            if runcomponent.top_level_run != self.pE_run:
                 continue
 
-            self.assertTrue(runatomic.is_complete())
-            self.assertTrue(runatomic.successful_execution())
+            self.assertTrue(runcomponent.is_complete())
+            self.assertTrue(runcomponent.successful_execution())
 
-    def test_runatomic_successful_no_execrecord(self):
-        """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
+    def test_runcomponent_successful_no_execrecord(self):
+        """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
 
-        self.make_execlog_and_mark_non_reused_runatomic(incomplete_cable)
+        self.make_execlog_and_mark_non_reused_runcomponent(incomplete_cable)
         self.assertFalse(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_execution())
 
-    def test_runatomic_successful_has_execrecord_reused(self):
-        """Testing of a RunAtomic which has an ExecRecord and is reused (so is done)"""
+    def test_runcomponent_successful_has_execrecord_reused(self):
+        """Testing of a RunComponent which has an ExecRecord and is reused (so is done)"""
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
@@ -3127,8 +3144,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_execution())
 
-    def test_runatomic_successful_checks_not_passed(self):
-        """Testing of a RunAtomic (RunSIC) that is successful but has no ExecRecord yet."""
+    def test_runcomponent_successful_checks_not_passed(self):
+        """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
@@ -3137,8 +3154,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertFalse(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_execution())
 
-    def test_runatomic_successful_checks_passed(self):
-        """Testing of a RunAtomic (RunSIC) that is successful and all checks pass."""
+    def test_runcomponent_successful_checks_passed(self):
+        """Testing of a RunComponent (RunSIC) that is successful and all checks pass."""
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
@@ -3152,8 +3169,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_execlog(self):
-        """Testing of a RunAtomic (RunStep) which fails at the ExecLog stage."""
+    def test_runcomponent_unsuccessful_failed_execlog(self):
+        """Testing of a RunComponent (RunStep) which fails at the ExecLog stage."""
         self.step_through_run_creation("first_step_complete")
 
         step_1_log = self.step_E1_RS.log
@@ -3169,8 +3186,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_content_check(self):
-        """Testing of a RunAtomic (RunStep) which failed at the content check stage."""
+    def test_runcomponent_unsuccessful_failed_content_check(self):
+        """Testing of a RunComponent (RunStep) which failed at the content check stage."""
         self.step_through_run_creation("first_step_complete")
 
         step_1_log = self.step_E1_RS.log
@@ -3181,8 +3198,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_integrity_check(self):
-        """Testing of a RunAtomic (RunSIC) which failed at the integrity check stage."""
+    def test_runcomponent_unsuccessful_failed_integrity_check(self):
+        """Testing of a RunComponent (RunSIC) which failed at the integrity check stage."""
         self.step_through_run_creation("first_cable_created")
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
@@ -3197,8 +3214,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(step_E1_RSIC.is_complete())
         self.assertFalse(step_E1_RSIC.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_invoked_log(self):
-        """Testing of a RunAtomic which has a failed invoked_log and never gets to its own execution."""
+    def test_runcomponent_unsuccessful_failed_invoked_log(self):
+        """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # screwed with in between.
         p_one = self.make_first_pipeline("p_one", "two no-ops")
@@ -3244,8 +3261,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(run2_step2.is_complete())
         self.assertFalse(run2_step2.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_integrity_check_during_recovery(self):
-        """Testing of a RunAtomic which has a failed integrity check during recovery."""
+    def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(self):
+        """Testing of a RunComponent which has a failed integrity check during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
         p_one = self.make_first_pipeline("p_one", "two no-ops")
@@ -3300,8 +3317,8 @@ echo "This is not what's supposed to be output here" > $2
         self.assertTrue(run2_step2.is_complete())
         self.assertFalse(run2_step2.successful_execution())
 
-    def test_runatomic_unsuccessful_failed_content_check_during_recovery(self):
-        """Testing of a RunAtomic which has a failed content check (missing data) during recovery."""
+    def test_runcomponent_unsuccessful_failed_content_check_during_recovery(self):
+        """Testing of a RunComponent which has a failed content check (missing data) during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
         p_one = self.make_first_pipeline("p_one", "two no-ops")
@@ -3455,7 +3472,7 @@ echo
 
     def test_run_step_failed(self):
         """Test on a Run with a failed and complete step."""
-        # Setup copied from test_runatomic_unsuccessful_failed_execlog.
+        # Setup copied from test_runcomponent_unsuccessful_failed_execlog.
         self.step_through_run_creation("first_step_complete")
 
         step_1_log = self.step_E1_RS.log

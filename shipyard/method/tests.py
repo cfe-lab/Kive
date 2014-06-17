@@ -2,15 +2,15 @@
 Unit tests for Shipyard method models.
 """
 
-from django.test import TestCase
+# from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.core.files import File
 
 import os.path
-import logging
+import os
 import shutil
 import tempfile
-import subprocess
+import filecmp
 
 from method.models import *
 from metadata.models import *
@@ -1547,6 +1547,272 @@ class CodeResourceDependencyTests(MethodTestSetup):
                                          depFileName="")
 
         self.assertEqual(good_crd.clean(), None)
+
+
+class CodeResourceRevisionInstallTests(MethodTestSetup):
+    """Tests of the install function of CodeResourceRevision."""
+    def test_base_case(self):
+        """
+        Test of base case -- installing a CRR with no dependencies.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_base_case")
+
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_second_revision(self):
+        """
+        Test of base case -- installing a CRR that is a second revision.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_base_case")
+
+        self.compv2_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependency_same_dir_dot(self):
+        """
+        Test of installing a CRR with a dependency in the same directory, specified using a dot.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_dot")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath=".")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependency_same_dir_blank(self):
+        """
+        Test of installing a CRR with a dependency in the same directory, specified using a blank.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_blank")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependency_override_dep_filename(self):
+        """
+        Test of installing a CRR with a dependency whose filename is overridden.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependency_override_dep_filename")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="",
+                                              depFileName="foo.py")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
+        self.assertFalse(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependency_in_subdirectory(self):
+        """
+        Test of installing a CRR with a dependency in a subdirectory.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependency_in_subdirectory")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_1.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependencies_in_same_subdirectory(self):
+        """
+        Test of installing a CRR with several dependencies in the same subdirectory.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_subdirectory")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="modules")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_1.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_2.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependencies_in_same_directory(self):
+        """
+        Test of installing a CRR with several dependencies in the base directory.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_directory")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_2.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependencies_in_subsub_directory(self):
+        """
+        Test of installing a CRR with dependencies in sub-sub-directories.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependencies_in_subsub_directory")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules/foo1")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="modules/foo2")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules/foo1")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules/foo2")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "foo1", "test_cr_1.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "foo2", "test_cr_2.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependencies_from_same_coderesource_same_dir(self):
+        """
+        Test of installing a CRR with a dependency having the same CodeResource in the same directory.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependencies_from_same_coderesource_same_dir")
+
+        self.compv1_crRev.dependencies.create(requirement=self.compv2_crRev, depPath="", depFileName="foo.py")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
+        # Test that the right files are in the right places.
+        self.assertTrue(
+            filecmp.cmp(os.path.join(samplecode_path, "complement.py"),
+                        os.path.join(test_path, "complement.py"))
+        )
+        self.assertTrue(
+            filecmp.cmp(os.path.join(samplecode_path, "complement_v2.py"),
+                        os.path.join(test_path, "foo.py"))
+        )
+
+        shutil.rmtree(test_path)
+
+    def test_dependencies_in_various_places(self):
+        """
+        Test of installing a CRR with dependencies in several places.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependencies_in_various_places")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="moremodules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_3_rev1, depPath="modules/foo")
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "moremodules")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "modules", "foo")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_1.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "moremodules", "test_cr_2.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "foo", "test_cr_3.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_nested_dependencies(self):
+        """
+        Test of installing a CRR with dependencies that have their own dependencies.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_nested_dependencies")
+
+        # Make test_cr_1_rev1 have its own dependencies.
+        self.test_cr_1_rev1.dependencies.create(requirement=self.script_1_crRev, depPath=".")
+        self.test_cr_1_rev1.dependencies.create(requirement=self.script_2_crRev, depPath="cr1mods")
+
+        self.test_cr_2_rev1.dependencies.create(requirement=self.script_3_crRev, depPath="cr2mods")
+        self.test_cr_2_rev1.dependencies.create(requirement=self.script_4_1_CRR, depPath="cr2mods/foo")
+
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="basemods")
+        self.compv1_crRev.install(test_path)
+
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "script_1_sum_and_products.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "cr1mods")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "cr1mods", "script_2_square_and_means.py")))
+
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "basemods", "test_cr_2.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods", "cr2mods")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "basemods", "cr2mods", "script_3_product.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods", "cr2mods", "foo")))
+        self.assertTrue(
+            os.path.exists(os.path.join(test_path, "basemods", "cr2mods", "foo",
+                                        "script_4_raw_in_CSV_out.py")))
+
+        shutil.rmtree(test_path)
+
+    def _setup_metapackage(self):
+        """Helper that sets up a metapackage."""
+        # Define comp_cr
+        self.metapackage = CodeResource(
+            name="metapackage",
+            description="Collection of modules",
+            filename="")
+        self.metapackage.save()
+
+        self.metapackage_r1 = CodeResourceRevision(
+            coderesource=self.metapackage,
+            revision_name="v1",
+            revision_number=1,
+            revision_desc="First version",
+        )
+        self.metapackage_r1.save()
+
+        # Add dependencies.
+        self.metapackage_r1.dependencies.create(requirement=self.script_1_crRev, depPath=".")
+        self.metapackage_r1.dependencies.create(requirement=self.script_2_crRev, depPath=".")
+        self.metapackage_r1.dependencies.create(requirement=self.script_3_crRev, depPath="metamodules")
+        self.metapackage_r1.dependencies.create(requirement=self.script_4_1_CRR, depPath="metamodules/foo")
+
+    def test_metapackage(self):
+        """
+        Test of installing a metapackage CRR.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_install_metapackage")
+        self._setup_metapackage()
+
+        self.metapackage_r1.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "script_1_sum_and_products.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "script_2_square_and_means.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "metamodules")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "metamodules", "script_3_product.py")))
+        self.assertTrue(os.path.isdir(os.path.join(test_path, "metamodules", "foo")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "metamodules", "foo", "script_4_raw_in_CSV_out.py")))
+
+        shutil.rmtree(test_path)
+
+    def test_dependency_is_metapackage(self):
+        """
+        Test of installing a CRR with a metapackage dependency.
+        """
+        test_path = tempfile.mkdtemp(prefix="test_dependency_is_metapackage")
+        self._setup_metapackage()
+
+        self.compv1_crRev.dependencies.create(requirement=self.metapackage_r1, depPath="modules")
+
+        self.compv1_crRev.install(test_path)
+        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+
+        metapackage_path = os.path.join(test_path, "modules")
+        self.assertTrue(os.path.isdir(metapackage_path))
+        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "script_1_sum_and_products.py")))
+        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "script_2_square_and_means.py")))
+        self.assertTrue(os.path.isdir(os.path.join(metapackage_path, "metamodules")))
+        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "metamodules", "script_3_product.py")))
+        self.assertTrue(os.path.isdir(os.path.join(metapackage_path, "metamodules", "foo")))
+        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "metamodules", "foo",
+                                                    "script_4_raw_in_CSV_out.py")))
 
 
 class MethodTests(MethodTestSetup):

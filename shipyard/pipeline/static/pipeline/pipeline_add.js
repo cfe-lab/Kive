@@ -79,6 +79,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
     });
     
+    // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(function() {
         var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
         if (lbl.length) {
@@ -97,7 +98,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var $this = $(this);
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
-        $('#pipeline_ctrl > div').not('#form_ctrl').hide();
+        $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
         $($this.data('rel')).show().css('left', $this.offset().left);
     });
 
@@ -233,11 +234,18 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             e.preventDefault();
             canvasState.deleteObject();
         }
+        // escape key closes menus
+        // TODO: also should deselect any selected objects
+        else if (e.which == 27) {
+            $('li', 'ul#id_ctrl_nav').removeClass('clicked');
+            $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
+        }
     })
     
     $('#id_revision_desc').on('keydown', function() {
         var $this = $(this),
-            happy = -Math.min(15, Math.floor($this.val().length / 9)) * 32;
+            getHappierEveryXKeystrokes = 12,
+            happy = -Math.min(15, Math.floor($this.val().length / getHappierEveryXKeystrokes)) * 32;
     
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
@@ -263,6 +271,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }).blur();
 
 
+    /* submit form */
     $('form#pipeline_ctrl').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
