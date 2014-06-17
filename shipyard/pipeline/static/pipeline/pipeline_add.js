@@ -272,10 +272,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
 
     /* submit form */
-    $('form#pipeline_ctrl').submit(function(e) {
+    $('#id_pipeline_form').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
+        console.log('submit form');
+
         e.preventDefault(); // override form submit action
 
         console.log(canvasState);

@@ -41,6 +41,7 @@ def pipeline_add(request):
         # FIXME: this is probably a lousy way to handle JSON
         # Try this instead: formdata = json.loads(request.body)
         query = request.POST.dict()
+        print query
         exec('formdata=%s' % query.keys()[0])
 
         # does Pipeline family with this name already exist?
