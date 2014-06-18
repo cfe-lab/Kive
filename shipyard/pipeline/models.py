@@ -27,7 +27,13 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
-
+    def get_absolute_url(self):
+        return '/pipelines/%i' % self.id
+    
+    @property
+    def size(self):
+        """Returns size of this Pipeline's family"""
+        return len(Pipeline.objects.filter(family=self))
     pass
 
 
@@ -60,9 +66,6 @@ class Pipeline(transformation.models.Transformation):
             string_rep = string_rep.format("[family unset]")
 
         return string_rep
-
-    def get_absolute_url(self):
-        return '/pipelines/%i' % self.id
 
     @property
     def is_method(self):

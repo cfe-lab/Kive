@@ -22,16 +22,14 @@ data.
 	<tr>
     <th>Family</th>
     <th># revisions</th>
-    <th>Name</th>
     <th>Description</th>
 	</tr>
 </thead>
-{% for pipeline in pipelines %}
+{% for family in families %}
 <tr>
-	<td><a href="{{ pipeline.get_absolute_url }}">{{ pipeline.family }}</a></td>
-    <td>{{ pipeline.family_size }}</td>
-    <td>{{ pipeline.revision_name }}</td>
-	<td>{{ pipeline.revision_desc }}</td>
+	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
+    <td>{{ family.size }}</td>
+	<td>{{ family.description }}</td>
 </tr>
 {% endfor %}
 </table>

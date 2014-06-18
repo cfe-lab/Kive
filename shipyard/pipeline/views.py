@@ -20,8 +20,9 @@ def pipelines(request):
     root members (without parent).
     """
     t = loader.get_template('pipeline/pipelines.html')
-    pipelines = Pipeline.objects.filter(revision_parent=None)
-    c = Context({'pipelines': pipelines})
+    families = PipelineFamily.objects.all()
+    #pipelines = Pipeline.objects.filter(revision_parent=None)
+    c = Context({'families': families})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
@@ -146,6 +147,20 @@ def pipeline_add(request):
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:
         return HttpResponse(t.render(c))
+
+
+def pipeline_revise(request, id):
+    """
+    Display all revisions in this PipelineFamily
+    """
+    t = loader.get_template('pipeline/pipeline_revise.html')
+    print id
+    # retrieve this pipeline from database
+    family = PipelineFamily.objects.filter(pk=id)[0]
+    revisions = Pipeline.objects.filter(family=family)
+
+    c = Context({'family': family, 'revisions': revisions})
+    return HttpResponse(t.render(c))
 
 
 def pipeline_exec(request):
