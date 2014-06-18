@@ -120,7 +120,7 @@ class Transformation(models.Model):
     # is not raw.
     @transaction.atomic
     def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
-                     min_row=None, max_row=None):
+                     min_row=None, max_row=None, x=0, y=0):
         """
         Create a TI for this transformation.
 
@@ -134,7 +134,8 @@ class Transformation(models.Model):
             raise ValueError("Row restrictions cannot be specified without a CDT")
 
         new_input = self.inputs.create(dataset_name=dataset_name,
-                                       dataset_idx=dataset_idx)
+                                       dataset_idx=dataset_idx,
+                                       x=x, y=y)
         new_input.full_clean()
 
         if compounddatatype != None:
@@ -155,7 +156,7 @@ class Transformation(models.Model):
     # Same thing to create outputs.
     @transaction.atomic
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
-                     min_row=None, max_row=None):
+                     min_row=None, max_row=None, x=0, y=0):
         """
         Create a TO for this transformation.
 
@@ -169,7 +170,8 @@ class Transformation(models.Model):
             raise ValueError("Row restrictions cannot be specified without a CDT")
 
         new_output = self.outputs.create(dataset_name=dataset_name,
-                                         dataset_idx=dataset_idx)
+                                         dataset_idx=dataset_idx,
+                                         x=x, y=y)
         new_output.full_clean()
 
         if compounddatatype != None:
@@ -207,6 +209,10 @@ class TransformationXput(models.Model):
 
     # June 6, 2014: structure is now simply be implicitly defined via a OneToOneField on the
     # XputStructure, as is execrecordouts_referencing (via FK from librarian.ExecRecordOut).
+
+    # June 16, 2014: UI information.
+    x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
 
     @property
     def is_input(self):

@@ -8,12 +8,11 @@ FIXME get all the models pointing at each other correctly!
 """
 
 from django.db import models, transaction
-from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.core.files import File
 
-import hashlib, os, re, string, stat, subprocess
+import hashlib, os, re, stat, subprocess
 import file_access_utils, transformation.models
 
 import traceback
@@ -237,7 +236,7 @@ class CodeResourceRevision(models.Model):
             md5gen.update(self.content_file.read());
             self.MD5_checksum = md5gen.hexdigest();
 
-        except ValueError as e:
+        except ValueError:
             self.MD5_checksum = "";
 
         # TODO: duplicate coderesourcerevision based on MD5 should not be permitted - Art.
@@ -524,39 +523,18 @@ class Method(transformation.models.Transformation):
         # No compatible ExecRecords found.
         return None
 
-    # May 20, 2014: we restore this now that we have protected the popen
-    # object with a lock.
-    def _poll_stream(self, proc, source_stream, dest_streams, lock):
+    def _poll_stream(self, source_stream, source_name, dest_streams):
+        """ Redirect all input from source_stream to all the dest_streams
+        
+        This is a helper function for run_code, like the Unix tee command.
+        @param source_stream: an input stream to redirect
+        @param dest_streams: a sequence of streams to redirect output to
         """
-        SYNOPSIS
-        Helper function for run_code, which polls a Popen'ed procedure
-        for output on source_stream until it terminates, and prints the output to
-        all the dest_streams (like the Unix tee command).
-        TODO: instead of source_stream, pass a flag which controls whether to read stdout
-        or stderr.
+        for line in source_stream:
+            self.logger.debug('%s: %s', source_name, line[:-1]) #drops \n
 
-        INPUTS
-        proc            subprocess.Popen object to poll for output
-        source_stream   which of proc's streams to poll - must be either
-                        proc.stdout or proc.stderr
-        dest_streams     streams to redirect output to
-        lock            Lock object that protects proc from concurrency issues
-        """
-        while True:
-            lock.acquire()
-            line = source_stream.readline()
-            poll_result = proc.poll()
-            lock.release()
-
-            if line:
-                for stream in dest_streams:
-                    stream.write(line)
-
-            if poll_result is not None:
-                remaining = source_stream.read()
-                for stream in dest_streams:
-                    stream.write(remaining)
-                break
+            for stream in dest_streams:
+                stream.write(line)
 
     def run_code(self, run_path, input_paths, output_paths, output_streams,
             error_streams, log=None, details_to_fill=None):
@@ -570,12 +548,12 @@ class Method(transformation.models.Transformation):
         to the provided handles (meaning these should be files, not
         standard streams, and they must be open for reading AND writing).
         If log is not None, set its start_time and end_time immediately
-        before and after calling run_code.
+        before and after calling invoke_code.
 
         INPUTS
-        run_path        see run_code
-        input_paths     see run_code
-        output_paths    see run_code
+        run_path        see invoke_code
+        input_paths     see invoke_code
+        output_paths    see invoke_code
         output_streams  list of streams (eg. open file handles) to output stdout to
         error_streams   list of streams (eg. open file handles) to output stderr to
         log             object with start_time and end_time fields to fill in (either
@@ -603,12 +581,10 @@ class Method(transformation.models.Transformation):
 
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
-            popen_lock = threading.Lock()
-
             out_thread = threading.Thread(target=self._poll_stream,
-                    args=(method_popen, method_popen.stdout, output_streams, popen_lock))
+                    args=(method_popen.stdout, 'stdout', output_streams))
             err_thread = threading.Thread(target=self._poll_stream,
-                    args=(method_popen, method_popen.stderr, error_streams, popen_lock))
+                    args=(method_popen.stderr, 'stderr', error_streams))
             out_thread.start()
             err_thread.start()
             out_thread.join()

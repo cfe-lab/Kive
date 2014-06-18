@@ -65,7 +65,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     }
                 })
                 
-                $('#id_method_revision_field').show();
+                $('#id_method_revision_field').show().focus();
             }
             else {
                 $("#id_method_revision_field").hide();
@@ -75,31 +75,42 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
-        var $this = $(this);
-        $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+        $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
     });
     
     // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(function() {
+    
         var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
+        
         if (lbl.length) {
             $(this).on('focus', function() {
-                if ($(this).val() == lbl.html())
+            
+                if (this.value == lbl.html()) {
                     $(this).removeClass('input-label').val('');
+                }
+                
             }).on('blur', function() {
-                if ($(this).val() === '')
+            
+                if (this.value === '') {
                     $(this).addClass('input-label').val(lbl.html());
+                }
+                
             }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
             lbl.remove();
         }
+        
     });
     
-    $('li', 'ul#id_ctrl_nav').on('click', function() {
-        var $this = $(this);
+    $('li', 'ul#id_ctrl_nav').on('click', function(e) {
+        var $this = $(this),
+            menu = $($this.data('rel'));
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
-        $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
-        $($this.data('rel')).show().css('left', $this.offset().left);
+        $('.ctrl_menu', '#pipeline_ctrl').hide();
+        menu.show().css('left', $this.offset().left);
+//            .find('input').eq(0).focus(); // INCOMPLETE: Focus on the first input field when menu opens. Needs to be a bit different... first empty field maybe?
+        e.stopPropagation();
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
@@ -121,23 +132,33 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     var canvasState = new CanvasState(canvas);
 
-    $('#id_cdt_button').on('click', function() {
-        var choice = $('#id_select_cdt option:selected');
-        var node_label = $('#id_datatype_name').val();
+    $('form', '#dialog-form').on('submit', function(e) {
+        // override ENTER key, click Create output button on form
+        e.preventDefault();
+        var dialog = $('#dialog-form');
+        var buttons = dialog.dialog('option', 'buttons');
+        buttons['Create output'].apply(dialog);
+    });
+
+    $('form','#id_input_ctrl').on('submit', function(e) {
+        e.preventDefault(); // stop default form submission behaviour
+        
+        var choice = $('#id_select_cdt option:selected', this);
+        var node_label = $('#id_datatype_name', this).val();
 
         if (node_label === '' || node_label === "Label") {
             // required field
-            $('#id_dt_error')[0].innerHTML = "Label is required";
+            $('#id_dt_error', this)[0].innerHTML = "Label is required";
         }
         else {
-            $('#id_dt_error')[0].innerHTML = "";
+            $('#id_dt_error', this)[0].innerHTML = "";
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
-                canvasState.addShape(new RawNode(100, 200 + 50 * Math.random(),
+                canvasState.addShape(new RawNode(100, 200 + Math.round(50 * Math.random()),
                     20, '#88DD88', 10, 25, node_label
                 ))
             } else {
-                canvasState.addShape(new CDtNode(this_pk, 100, 200 + 50 * Math.random(),
+                canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
                     40, '#8888DD', 10, 10, node_label
                 ));
             }
@@ -145,12 +166,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    $('#id_method_button').on('click', function() {
-        var bin = $(this).closest('div'),
-            method_name = $('#id_method_name', bin),
-            method_error = $('#id_method_error', bin),
-            method_family = $('#id_select_method_family', bin),
-            method = $('#id_select_method', bin);
+    $('form', '#id_method_ctrl').on('submit', function(e) {
+        e.preventDefault(); // stop default form submission behaviour
+        
+        var method_name = $('#id_method_name', this),
+            method_error = $('#id_method_error', this),
+            method_family = $('#id_select_method_family', this),
+            method = $('#id_select_method', this);
         var mid = method.val(); // pk of method
 
         if (mid === undefined || method_family.val() == '') {
@@ -161,6 +183,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             } else {
                 method_family.focus();
             }
+            
         } else {
             // user selected valid Method Revision
             var node_label = method_name.val();
@@ -184,11 +207,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         var inputs = result['inputs'],
                             outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(mid, 200, 200 + 50 * Math.random(), 80, 10, 20, '#999999',
+                        canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()), 80, 10, 20, '#999999',
                             node_label, 10, inputs, outputs));
 
                         // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
-                        //canvasState.addShape(new MethodNode(200, 200 + 50 * Math.random(), 45, 5, 20, '#CCCCCC',
+                        //canvasState.addShape(new MethodNode(200, 200 + Math.round(50 * Math.random()), 45, 5, 20, '#CCCCCC',
                         // node_label, 0, inputs, outputs));
                     }
                 });
@@ -243,9 +266,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     })
     
     $('#id_revision_desc').on('keydown', function() {
-        var $this = $(this),
-            getHappierEveryXKeystrokes = 12,
-            happy = -Math.min(15, Math.floor($this.val().length / getHappierEveryXKeystrokes)) * 32;
+        var getHappierEachXChars = 12,
+            happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
     
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
@@ -254,28 +276,40 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         .after('<div class="happy_indicator">')
         .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
         .on('focus keyup', function() {
-            var desc_length = $(this).val().length;
+            var desc_length = this.value.length,
+                wrap = $(this).parent();
             
-            if (desc_length > 20) {
-                $('.happy_indicator').show();
-                $('.happy_indicator_label').hide();
+            if (desc_length == 0 || $(this).hasClass('input-label')) {
+                $('.happy_indicator, .happy_indicator_label', wrap).hide();
             }
-            else if (desc_length > 0) {
-                $('.happy_indicator, .happy_indicator_label').show();
+            else if (desc_length > 20) {
+                $('.happy_indicator', wrap).show();
+                $('.happy_indicator_label', wrap).hide();
             }
             else {
-                $('.happy_indicator, .happy_indicator_label').hide();
+                $('.happy_indicator, .happy_indicator_label', wrap).show();
             }
         }).on('blur', function() {
-            $('.happy_indicator, .happy_indicator_label').hide();
-        }).blur();
+            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
+        }).blur()
+    ;
 
+    
+    $('body').on('click', function(e) {
+        var menus = $('.ctrl_menu');
+        if (menus.is(':visible') && $(e.target).closest(menus).length === 0) {
+            menus.hide();
+            $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+        }
+    });
 
     /* submit form */
-    $('form#pipeline_ctrl').submit(function(e) {
+    $('#id_pipeline_form').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
+        console.log('submit form');
+
         e.preventDefault(); // override form submit action
 
         console.log(canvasState);
@@ -375,6 +409,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['revision_name'] = '1';
         form_data['revision_desc'] = 'First version';
 
+        // Canvas information to store in the Pipeline object.
+        form_data["canvas_width"] = canvas.width;
+        form_data["canvas_height"] = canvas.height;
+
         // sort pipeline inputs by their Y-position on canvas (top to bottom)
         function sortByYpos (a, b) {
             var ay = a.y;
@@ -464,7 +502,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'transformation_pk': this_step.pk,  // to retrieve Method
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
-                'y': this_step.y
+                'y': this_step.y,
+                'name': this_step.label
             };
 
             // retrieve Connectors
@@ -516,7 +555,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     'source': this_step.pk,
                     'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                     'dataset_name': this_connector.out_magnet.label,  // magnet label
-                    'output_name': this_connector.out_magnet.label  // use same for now
+                    'output_name': this_connector.out_magnet.label,  // use same for now
+                    'x': this_connector.x,
+                    'y': this_connector.y
                 };
             }
         }

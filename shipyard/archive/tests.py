@@ -2,29 +2,14 @@
 Shipyard archive application unit tests.
 """
 
-from django.test import TestCase
-from django.core.files import File
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.contrib.auth.models import User
-from django.contrib.contenttypes.models import ContentType
-
-import os, sys
-import tempfile, shutil
-import random
-import logging
-import time
-import itertools
-
 from librarian.models import *
 from archive.models import *
 from method.models import *
 from metadata.models import *
 from pipeline.models import *
-from datachecking.models import ContentCheckLog, BadData
+from datachecking.models import BadData
 import sandbox.execute
 
-from method.tests import samplecode_path
 import librarian.tests
 # TODO: Put this someplace better, maybe shipyard/testing_utils.py?
 import sandbox.tests_rm
@@ -636,7 +621,6 @@ class RunComponentTests(ArchiveTestSetup):
         for rc in RunComponent.objects.all():
             if rc.definite.top_level_run == self.pE_run:
                 # Unset its ExecRecord and clean it.
-                orig_ER = rc.execrecord
                 rc.execrecord = None
                 self.assertRaisesRegexp(
                     ValidationError,
@@ -1623,9 +1607,6 @@ class RunSICTests(ArchiveTestSetup):
 
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_RS)
 
-        ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        # self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        # self.E11_32_output_DS.save()
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_clean_reused_complete_RSIC(self):
@@ -2318,15 +2299,6 @@ class RunOutputCableTests(ArchiveTestSetup):
         self.step_through_roc_creation("subrun_complete")
         self.D11_21_ROC.outputs.add(self.C1_in_DS)
         self.assertIsNone(self.D11_21_ROC.clean())
-
-    def test_ROC_clean_trivial_no_data(self):
-        """Trivial top-level cable, no data associated.
-
-        A trivial RunOutputCable not for a subrun, which has no output
-        Dataset associated, is clean.
-        """
-        self.step_through_roc_creation("trivial_roc_completed")
-        self.assertIsNone(self.E31_31_ROC.clean())
 
     def test_ROC_clean_trivial_with_data(self):
         """Trivial top-level cable with associated data.
@@ -3261,6 +3233,56 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.assertTrue(run2_step2.is_complete())
         self.assertFalse(run2_step2.successful_execution())
 
+    def test_long_output(self):
+        """Should handle lots of output to stdout or stderr without deadlocking."""
+        iteration_count = 100000
+        pythonCode = """\
+#! /usr/bin/python
+import sys
+
+for i in range(%d):
+    print i
+""" % iteration_count
+        expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
+
+        codeRevision = self.make_first_revision(
+            "long_out", 
+            "a script with lots of output", 
+            "long_out.py",
+            pythonCode)
+        
+        # A Method telling Shipyard how to use the noop code on string data.
+        method = self.make_first_method(
+            "string long_out", 
+            "a method with lots of output", 
+            codeRevision)
+        self.simple_method_io(method, self.cdt_string, "strings", "expected")
+        pipeline = self.make_first_pipeline("pipe", "noisy")
+        self.create_linear_pipeline(pipeline, [method], "in", "out")
+        pipeline.create_outputs()
+        pipeline.save()
+        
+        # Set up a words dataset.
+        self.make_words_symDS()
+
+        active_sandbox = sandbox.execute.Sandbox(self.user_bob, 
+                                                 pipeline, 
+                                                 [self.symds_words])
+        active_sandbox.execute_pipeline()
+
+        run_step = active_sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        stdout_file = run_step.log.methodoutput.output_log
+        stdout_file.open()
+        try:
+            stdout_content = stdout_file.read()
+        finally:
+            stdout_file.close()
+
+        self.assertTrue(run_step.is_complete())
+        self.assertTrue(run_step.log.is_successful())
+        self.assertEqual(len(stdout_content), len(expected_output))
+        self.assertEqual(stdout_content, expected_output)
+
     def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(self):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
@@ -3550,7 +3572,7 @@ echo
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
 
-        roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
+        self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
 
         self.assertFalse(self.pE_run.is_complete())
         self.assertFalse(self.pE_run.successful_execution())

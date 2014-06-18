@@ -27,7 +27,13 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
-
+    def get_absolute_url(self):
+        return '/pipelines/%i' % self.id
+    
+    @property
+    def size(self):
+        """Returns size of this Pipeline's family"""
+        return len(Pipeline.objects.filter(family=self))
     pass
 
 
@@ -44,6 +50,10 @@ class Pipeline(transformation.models.Transformation):
     family = models.ForeignKey(PipelineFamily, related_name="members")
     revision_parent = models.ForeignKey("self", related_name = "descendants", null=True, blank=True)
 
+    # June 16, 2014: UI information.
+    canvas_height = models.IntegerField(default=600, validators=[MinValueValidator(0)])
+    canvas_width = models.IntegerField(default=800, validators=[MinValueValidator(0)])
+
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
 
@@ -56,9 +66,6 @@ class Pipeline(transformation.models.Transformation):
             string_rep = string_rep.format("[family unset]")
 
         return string_rep
-
-    def get_absolute_url(self):
-        return '/pipelines/%i' % self.id
 
     @property
     def is_method(self):
@@ -131,21 +138,7 @@ class Pipeline(transformation.models.Transformation):
         # outcables is derived from (PipelineOutputCable/ForeignKey).
         # For each outcable, extract the cabling parameters.
         for outcable in self.outcables.all():
-            output_requested = outcable.source
-
-            new_pipeline_output = self.outputs.create(
-                dataset_name=outcable.output_name,
-                dataset_idx=outcable.output_idx)
-
-            if not outcable.is_raw():
-                # Define an XputStructure for new_pipeline_output.
-                new_structure = transformation.models.XputStructure(
-                    transf_xput=new_pipeline_output,
-                    compounddatatype=outcable.output_cdt,
-                    min_row=output_requested.get_min_row(),
-                    max_row=output_requested.get_max_row()
-                )
-                new_structure.save()
+            outcable.create_output()
 
     # Helper to create raw outcables.  This is just so that our unit tests
     # can be easily amended to work in our new scheme, and wouldn't really
@@ -206,6 +199,11 @@ class PipelineStep(models.Model):
         "transformation.TransformationOutput",
         help_text="TransformationOutputs whose data should not be retained",
         related_name="pipeline_steps_deleting")
+
+    # June 16, 2014: UI information.
+    x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    name = models.CharField(default="", max_length=128, blank=True)
 
     def __unicode__(self):
         """ Represent with the pipeline and step number """
@@ -1120,3 +1118,24 @@ class PipelineOutputCable(PipelineCable):
 
         # Call _wires_match.
         return self._wires_match(other_outcable)
+
+    def create_output(self, x=0, y=0):
+        """
+        Creates the corresponding output for the parent Pipeline.
+        """
+        output_requested = self.source
+
+        new_pipeline_output = self.pipeline.outputs.create(
+            dataset_name=self.output_name,
+            dataset_idx=self.output_idx,
+            x=x, y=y)
+
+        if not self.is_raw():
+            # Define an XputStructure for new_pipeline_output.
+            new_structure = transformation.models.XputStructure(
+                transf_xput=new_pipeline_output,
+                compounddatatype=self.output_cdt,
+                min_row=output_requested.get_min_row(),
+                max_row=output_requested.get_max_row()
+            )
+            new_structure.save()
