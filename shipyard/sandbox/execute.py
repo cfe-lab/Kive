@@ -689,7 +689,7 @@ class Sandbox:
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
         with open(stdout_path, "w+") as outwrite, open(stderr_path, "w+") as errwrite:
             pipelinestep.transformation.definite.run_code(step_run_dir, input_paths,
-                    output_paths, [outwrite, sys.stdout], [errwrite, sys.stderr],
+                    output_paths, [outwrite], [errwrite],
                     curr_log, curr_log.methodoutput)
         self.logger.debug("Method execution complete, ExecLog saved (started = {}, ended = {})".
                 format(curr_log.start_time, curr_log.end_time))
