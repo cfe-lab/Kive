@@ -8,9 +8,7 @@ Dataset, etc.
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 
-import hashlib
 import logging
 import itertools
 
@@ -410,23 +408,23 @@ class RunComponent(stopwatch.models.Stopwatch):
         # that log represents).
         if self.invoked_logs.exists() and self.has_log:
             if not self.invoked_logs.filter(pk=self.log.pk).exists():
-               raise ValidationError(
+                raise ValidationError(
                    'ExecLog of {} "{}" is not included with its invoked ExecLogs'.format(
                        self.__class__.__name__, self)
-               )
+                )
 
             preceding_logs = self.invoked_logs.exclude(pk=self.log.pk)
             if not all([x.is_complete() for x in preceding_logs]):
-               raise ValidationError(
+                raise ValidationError(
                    'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
                        self.__class__.__name__, self)
-               )
+                )
 
             if not all([x.all_checks_passed() for x in preceding_logs]):
-               raise ValidationError(
+                raise ValidationError(
                    'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
                        self.__class__.__name__, self)
-               )
+                )
 
     def _clean_has_execlog_no_execrecord_yet(self):
         """
@@ -1628,7 +1626,6 @@ class Dataset(models.Model):
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
-        md5gen = hashlib.md5()
         md5 = None
         try:
             self.dataset_file.open()
