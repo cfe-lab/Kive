@@ -14,7 +14,13 @@ from django.utils import timezone
 import os
 import csv
 import logging
+import json
+import operator
 import transformation.models
+import method.models
+
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineFamily(transformation.models.TransformationFamily):
@@ -160,17 +166,194 @@ class Pipeline(transformation.models.Transformation):
     # that of the providing TO.
     @transaction.atomic
     def create_outcable(self, output_name, output_idx, source_step,
-                        source):
+                        source, output_CDT=None):
         """Creates a non-raw outcable taking output_cdt from the providing TO."""
+        output_CDT = output_CDT or source.get_cdt()
         new_outcable = self.outcables.create(
             output_name=output_name,
             output_idx=output_idx,
             source_step=source_step,
             source=source,
-            output_cdt=source.get_cdt())
+            output_cdt=output_CDT)
         new_outcable.full_clean()
 
         return new_outcable
+
+    @classmethod
+    @transaction.atomic
+    def create_from_dict(cls, form_data):
+        """
+        Creates a fresh Pipeline with a new PipelineFamily from a dict.
+
+        The form_data dict should be structured as:
+         - family_name: string
+         - family_desc: string
+
+         - revision_name: string
+         - revision_desc: string
+
+         - canvas_width: int
+         - canvas_height: int
+
+         - pipeline_inputs: list of objects that look like:
+           - CDT_pk: -1 if raw; PK of desired CDT otherwise
+           - dataset_name: string
+           - dataset_idx: 1-based index
+           - x: int
+           - y: int
+
+         - pipeline_steps: list of objects that look like:
+           - transf_pk: PK of Method/Pipeline to go into this step
+           - transf_type: "Method" or "Pipeline"
+           - step_num: 1-based step number
+           - x: int
+           - y: int
+           - name: string
+           - cables_in: list of objects that look like:
+             - source: string saying either "Step", "raw", or "CDT"
+             - source_pk: PK of the source Method/Pipeline/TransformationInput (only necessary for the TI case)
+             - source_dataset_name: name of the source TI
+             - source_step: 0 if source is a Pipeline input; otherwise the 1-based index of the source step
+             - dest_dataset_name: name of TI to feed in this step
+             - wires: list of objects that look like:
+               - source_idx: column index of source
+               - dest_idx: column index of destination
+
+         - pipeline_output_cables: list of objects that look like:
+           - output_idx: index of the resulting Pipeline output,
+           - output_name: name of the resulting Pipeline output
+           - output_CDT_pk: PK of the CDT of the resulting Pipeline output (could be changed by wiring)
+           - source_step: 1-based index of the step producing the output
+           - source_dataset_name: name of the source output
+           - x: int
+           - y: int
+           - wires: list of objects as for pipeline_steps["cables_in"]
+        """
+        response_data = None
+        # Does Pipeline family with this name already exist?
+        if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
+            response_data = {'status': 'failure',
+                             'error_msg': 'Duplicate pipeline family name'}
+            return response_data
+
+        # Make a new PipelineFamily.
+        pl_family = PipelineFamily(
+            name=form_data['family_name'],
+            description=form_data['family_desc']
+        )
+        pl_family.save()
+
+        # Make a new Pipeline revision within this PipelineFamily.
+        pipeline = pl_family.members.create(
+            revision_name=form_data['revision_name'],
+            revision_desc=form_data['revision_desc'],
+            canvas_width=form_data["canvas_width"],
+            canvas_height=form_data["canvas_height"]
+        )
+
+        try:
+            # Create the inputs for the Pipeline.
+            for new_input in form_data["pipeline_inputs"]:
+                CDT_pk = new_input["CDT_pk"]
+                pipeline.create_input(
+                    compounddatatype=None if CDT_pk < 0 else CompoundDatatype.objects.get(pk=CDT_pk),
+                    dataset_name=new_input["dataset_name"],
+                    dataset_idx=new_input["dataset_idx"],
+                    x=new_input["x"], y=new_input["y"]
+                )
+        except Exception as e:
+            # The fact this is a transaction will roll back the Pipeline and PipelineFamily.
+            response_data = {'status': 'failure',
+                             'error_msg': 'Invalid pipeline input'}
+            return response_data
+
+        try:
+            # Make PipelineSteps.
+
+            # We need to sort the PipelineSteps by their step number so that step 1
+            # gets added before step 2, etc.
+            steps = form_data["pipeline_steps"]
+            sorted_steps = sorted(steps, key=operator.itemgetter("step_num"))
+
+            for step in sorted_steps:
+                transf_definite_type = method.models.Method if step["transf_type"] == "Method" else Pipeline
+                transf_pk = step["transf_pk"]
+                transf = transf_definite_type.objects.get(pk=transf_pk)
+                pipeline_step = pipeline.steps.create(
+                    transformation=transf,
+                    step_num=step['step_num'],
+                    x=step["x"], y=step["y"], name=step["name"]
+                )
+
+                # Add the corresponding PSICs.
+
+                try:
+                    for in_cable in step["cables_in"]:
+                        dest = transf.inputs.get(dataset_name=in_cable["dest_dataset_name"])
+                        source_step = in_cable["source_step_num"]
+                        source_transf = (pipeline if in_cable["source"] == "Step"
+                                         else pipeline.steps.get(step_num=in_cable["source_step_num"]).transformation)
+                        source_output = source_transf.outputs.get(dataset_name=in_cable["source_dataset_name"])
+                        new_cable = pipeline_step.cables_in.create(
+                            dest=dest,
+                            source_step=source_step,
+                            source=source_output)
+
+                        # Define some wires, while we're at it.
+                        for wire in in_cable["wires"]:
+                            new_cable.custom_wires.create(
+                                source_pin=source_output.get_cdt().columns.get(column_idx=wire["source_idx"]),
+                                dest_pin=dest.get_cdt().columns.get(column_idx=wire["dest_idx"])
+                            )
+
+                except Exception as e:
+                    response_data = {'status': 'failure', 'error_msg': 'Invalid pipeline step input cable'}
+                    return response_data
+
+        except Exception as e:
+            # Note that this is logger, not self.logger: this is a class method so it will write
+            # to the module-level logger.
+            logger.debug(e)
+            response_data = {'status': 'failure',
+                             'error_msg': 'Invalid pipeline step'}
+            return response_data
+
+        try:
+            # Add output cables.
+            for out_cable in form_data["pipeline_output_cable"]:
+                source_step = pipeline.steps.get(step_num=out_cable["source_step"])
+                source_output = source_step.transformation.outputs.get(dataset_name=out_cable['dataset_name'])
+                output_CDT = CompoundDatatype.objects.get(pk=out_cable["output_CDT_pk"])
+                new_outcable = pipeline.create_outcable(
+                    source_step=source_step,
+                    source=source_output,
+                    output_name=out_cable['output_name'],
+                    output_idx=out_cable['output_idx'],
+                    output_CDT = output_CDT
+                )
+                new_outcable.create_output(x=out_cable['x'], y=out_cable['y'])
+                # Define some wires, while we're at it.
+                for wire in out_cable["wires"]:
+                    new_outcable.custom_wires.create(
+                        source_pin=source_output.get_cdt().columns.get(column_idx=wire["source_idx"]),
+                        dest_pin=output_CDT.columns.get(column_idx=wire["dest_idx"])
+                    )
+
+        except Exception as e:
+            logger.debug(e)
+            response_data = {'status': 'failure',
+                             'error_msg': 'Invalid pipeline output cable'}
+            return response_data
+
+        try:
+            pipeline.clean()
+            pipeline.save()
+            response_data = {'status': 'success'}
+        except ValidationError as e:
+            response_data = {'status': 'failure',
+                             'error_msg': str(e.message_dict.values()[0][0])}
+
+        return response_data
 
 
 class PipelineStep(models.Model):

@@ -423,11 +423,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // update form data with inputs
         var this_input;
-        form_data['pipeline_inputs'] = {};
+        form_data['pipeline_inputs'] = [];
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
             form_data['pipeline_inputs'][i] = {
-                'pk': (this_input.constructor===CDtNode) ? this_input.pk : -1,
+                'CDT_pk': (this_input.constructor===CDtNode) ? this_input.pk : -1,
                 'dataset_name': this_input.label,
                 'dataset_idx': i+1,
                 'x': this_input.x,
@@ -493,13 +493,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var this_step;
         var this_source;
 
-        form_data['pipeline_step'] = {};
+        form_data['pipeline_steps'] = [];
 
         for (i = 0; i < sorted_elements.length; i++) {
             this_step = sorted_elements[i];
 
-            form_data['pipeline_step'][i] = {
-                'transformation_pk': this_step.pk,  // to retrieve Method
+            form_data['pipeline_steps'][i] = {
+                'transf_pk': this_step.pk,  // to retrieve Method
+                "transf_type": "Method", // in the future we can make this take Pipelines as well
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
                 'x': this_step.x,
                 'y': this_step.y,
@@ -508,7 +509,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
             // retrieve Connectors
             magnets = this_step.in_magnets;
-            form_data['pipeline_step'][i]['cables_in'] = {};
+            form_data['pipeline_steps'][i]['cables_in'] = [];
 
             for (j = 0; j < magnets.length; j++) {
                 this_magnet = magnets[j];
@@ -519,50 +520,52 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 this_source = this_connector.out_magnet.parent;
 
                 if (this_source.constructor === MethodNode) {
-                    form_data['pipeline_step'][i]['cables_in'][j] = {
+                    form_data['pipeline_steps'][i]['cables_in'][j] = {
                         'source': 'Method',
                         'source_pk': this_source.pk,
                         'source_dataset_name': this_connector.out_magnet.label,
-                        'source_step': sorted_elements.indexOf(this_source)+1,
-                        'dest': this_step.pk,
-                        'dest_dataset_name': this_connector.in_magnet.label
+                        'source_step_num': sorted_elements.indexOf(this_source)+1,
+                        'dest_dataset_name': this_connector.in_magnet.label,
+                        "wires": [] // in the future we can specify custom wires here
                     };
                 }
                 else {
                     // sourced by pipeline input
-                    form_data['pipeline_step'][i]['cables_in'][j] = {
+                    form_data['pipeline_steps'][i]['cables_in'][j] = {
                         'source': this_source.constructor === RawNode ? 'raw' : 'CDT',
                         'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
                         'source_dataset_name': this_connector.out_magnet.label,
-                        'source_step': 0,
-                        'dest': this_step.pk,
-                        'dest_dataset_name': this_connector.in_magnet.label
+                        'source_step_num': 0,
+                        'dest_dataset_name': this_connector.in_magnet.label,
+                        "wires": [] // no wires for a raw cable
                     };
                 }
             }
-
-            form_data['pipeline_step'][i]['cables_out'] = {};
-
-            for (j = 0; j < output_cables.length; j++) {
-                this_connector = output_cables[j];
-                this_source = this_connector.out_magnet.parent;
-                if (this_source !== this_step) {
-                    // Connector does not originate from this step
-                    continue;
-                }
-                form_data['pipeline_step'][i]['cables_out'][j] = {
-                    'output_idx': j+1,
-                    'source': this_step.pk,
-                    'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
-                    'dataset_name': this_connector.out_magnet.label,  // magnet label
-                    'output_name': this_connector.out_magnet.label,  // use same for now
-                    'x': this_connector.x,
-                    'y': this_connector.y
-                };
-            }
         }
+
+        form_data["pipeline_output_cables"] = [];
+
+        for (j = 0; j < output_cables.length; j++) {
+            this_connector = output_cables[j];
+            this_source_step = this_connector.out_magnet.parent;
+
+            form_data["pipeline_output_cables"][j] = {
+                'output_idx': j+1,
+                'output_name': this_connector.out_magnet.label,  // use same for now
+                "output_CDT_pk": this_connector.out_magnet.cdt,
+                'source': this_source_step.pk,
+                'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
+                'dataset_name': this_connector.out_magnet.label,  // magnet label
+                'x': this_connector.x,
+                'y': this_connector.y
+            };
+        }
+
         // this code written on Signal Hill, St. John's, Newfoundland
         // May 2, 2014 - afyp
+
+        // this code modified at my desk
+        // June 18, 2014 -- RL
 
         console.log(form_data);
 

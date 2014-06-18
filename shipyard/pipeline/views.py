@@ -39,113 +39,12 @@ def pipeline_add(request):
     c.update(csrf(request))
 
     if request.method == 'POST':
-        # FIXME: this is probably a lousy way to handle JSON
-        # Try this instead: formdata = json.loads(request.body)
-        query = request.POST.dict()
-        exec('formdata=%s' % query.keys()[0])
-
-        # does Pipeline family with this name already exist?
-        if PipelineFamily.objects.filter(name=formdata['family_name']).exists():
-            response_data = {'status': 'failure',
-                             'error_msg': 'Duplicate pipeline family name'}
-            return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-        # make Pipeline family
-        pl_family = PipelineFamily(
-            name=formdata['family_name'],
-            description=formdata['family_desc']
-        )
-        pl_family.save()
-
-        # make pipeline revision
-        pipeline = pl_family.members.create(
-            revision_name=formdata['revision_name'],
-            revision_desc=formdata['revision_desc'],
-            canvas_width=formdata["canvas_width"],
-            canvas_height=formdata["canvas_height"]
-        )
-
-        try:
-            # make pipeline inputs
-            for key, val in formdata['pipeline_inputs'].iteritems():
-                pk = int(val['pk'])
-                pipeline.create_input(
-                    compounddatatype=None if pk < 0 else CompoundDatatype.objects.get(pk=pk),
-                    dataset_name=val['dataset_name'],
-                    dataset_idx=val['dataset_idx'],
-                    x=int(val['x']), y=int(val['y'])
-                )
-        except Exception as e:
-            # FIXME: delete() fails with FieldError: Cannot resolve keyword u'object_id' into
-            # FIXME: field. Choices are: RSICs, execrecordins, execrecordouts, generator, id,
-            # FIXME: runoutputcables, runsteps
-            pl_family.delete()
-            response_data = {'status': 'failure',
-                             'error_msg': 'Invalid pipeline input'}
-            return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-        try:
-            # make pipeline steps
-
-            # We need to sort the PipelineSteps by their step number so that step 1
-            # gets added before step 2, etc.
-            steps = []
-            for key, val in formdata['pipeline_step'].iteritems():
-                steps.append(val)
-            sorted_steps = sorted(steps, key=operator.itemgetter("step_num"))
-
-            for step in sorted_steps:
-                pk = step['transformation_pk']  # primary key to CodeResourceRevision
-                method = Method.objects.get(pk=pk)
-                pipeline_step = pipeline.steps.create(
-                    transformation=method,
-                    step_num=int(step['step_num']),
-                    x=int(step["x"]), y=int(step["y"]), name=step["name"]
-                )
-                # add input cables
-                for k2, v2 in step['cables_in'].iteritems():
-                    if v2['source'] == 'Method':
-                        source_method = Method.objects.get(pk=v2['source_pk'])
-                        pipeline_step.cables_in.create(
-                            dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
-                            source_step=int(v2['source_step']),
-                            source=source_method.outputs.get(dataset_name=
-                                                             v2['source_dataset_name']))
-                    else:
-                        # data from pipeline input (raw or CDT)
-                        pipeline_step.cables_in.create(
-                            dest=method.inputs.get(dataset_name=v2['dest_dataset_name']),
-                            source_step=int(v2['source_step']),
-                            source=pipeline.inputs.get(dataset_name=v2['source_dataset_name'])
-                        )
-
-                # add output cables
-                for k2, v2 in step['cables_out'].iteritems():
-                    outcabling = pipeline.create_outcable(
-                        source_step=int(v2['source_step']),
-                        source=pipeline_step.transformation.outputs.get(dataset_name=v2['dataset_name']),
-                        output_name=v2['output_name'],
-                        output_idx=v2['output_idx'],
-                    )
-                    outcabling.create_output(x=int(v2['x']), y=int(v2['y']))
-        except Exception as e:
-            print(e)
-            pl_family.delete()
-            response_data = {'status': 'failure',
-                             'error_msg': 'Invalid pipeline cable'}
-            return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-        try:
-            pipeline.clean()
-            pipeline.save()
-            response_data = {'status': 'success'}
-        except ValidationError as e:
-            pl_family.delete()
-            response_data = {'status': 'failure',
-                             'error_msg': str(e.message_dict.values()[0][0])}
-
+        print("Hello")
+        form_data = json.loads(request.body)
+        response_data = Pipeline.create_from_dict(form_data)
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:
+        print("Goodbye")
         return HttpResponse(t.render(c))
 
 
