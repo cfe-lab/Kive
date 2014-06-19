@@ -502,7 +502,9 @@ class Method(transformation.models.Transformation):
         for possible_PS in self.pipelinesteps.all():
 
             # For linked runsteps which did not *completely* reuse an ER
-            for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
+            for possible_RS in possible_PS.pipelinestep_instances.filter(
+                    reused=False,
+                    execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
 
                 # Reject RunStep if its outputs are not OK.
