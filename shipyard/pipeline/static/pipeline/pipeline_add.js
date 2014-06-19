@@ -521,8 +521,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
                 if (this_source.constructor === MethodNode) {
                     form_data['pipeline_steps'][i]['cables_in'][j] = {
-                        'source': 'Method',
-                        'source_pk': this_source.pk,
+                        //'source_type': 'Method',
+                        //'source_pk': this_source.pk,
                         'source_dataset_name': this_connector.out_magnet.label,
                         'source_step_num': sorted_elements.indexOf(this_source)+1,
                         'dest_dataset_name': this_connector.in_magnet.label,
@@ -532,8 +532,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 else {
                     // sourced by pipeline input
                     form_data['pipeline_steps'][i]['cables_in'][j] = {
-                        'source': this_source.constructor === RawNode ? 'raw' : 'CDT',
-                        'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
+                        //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
+                        //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
                         'source_dataset_name': this_connector.out_magnet.label,
                         'source_step_num': 0,
                         'dest_dataset_name': this_connector.in_magnet.label,
@@ -557,7 +557,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                 'dataset_name': this_connector.out_magnet.label,  // magnet label
                 'x': this_connector.x,
-                'y': this_connector.y
+                'y': this_connector.y,
+                "wires": [] // in the future we might have this
             };
         }
 

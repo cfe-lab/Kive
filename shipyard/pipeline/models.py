@@ -18,6 +18,7 @@ import json
 import operator
 import transformation.models
 import method.models
+import metadata.models
 
 
 logger = logging.getLogger(__name__)
@@ -175,17 +176,17 @@ class Pipeline(transformation.models.Transformation):
             source_step=source_step,
             source=source,
             output_cdt=output_CDT)
+
         new_outcable.full_clean()
 
         return new_outcable
 
-    @classmethod
-    @transaction.atomic
-    def create_from_dict(cls, form_data):
+    # FIXME can we eliminate source_type and source_pk from the description of PSICs?
+    def represent_as_dict(self):
         """
-        Creates a fresh Pipeline with a new PipelineFamily from a dict.
+        Creates a dict-based representation of this Pipeline.
 
-        The form_data dict should be structured as:
+        This dict will be structured as:
          - family_name: string
          - family_desc: string
 
@@ -210,14 +211,15 @@ class Pipeline(transformation.models.Transformation):
            - y: int
            - name: string
            - cables_in: list of objects that look like:
-             - source: string saying either "Step", "raw", or "CDT"
-             - source_pk: PK of the source Method/Pipeline/TransformationInput (only necessary for the TI case)
+             - REMOVED source_type: string saying either "Step", "raw", or "CDT"
+             - REMOVED source_pk: PK of the source Method/Pipeline/TransformationInput (only necessary for the TI case)
              - source_dataset_name: name of the source TI
              - source_step: 0 if source is a Pipeline input; otherwise the 1-based index of the source step
              - dest_dataset_name: name of TI to feed in this step
              - wires: list of objects that look like:
                - source_idx: column index of source
                - dest_idx: column index of destination
+           - outputs_to_delete: list of names of TransformationOutputs that are not to be retained by this step
 
          - pipeline_output_cables: list of objects that look like:
            - output_idx: index of the resulting Pipeline output,
@@ -229,34 +231,203 @@ class Pipeline(transformation.models.Transformation):
            - y: int
            - wires: list of objects as for pipeline_steps["cables_in"]
         """
+        dict_repr = {
+            "family_name": self.family.name,
+            "family_desc": self.family.description,
+
+            "revision_name": self.revision_name,
+            "revision_desc": self.revision_desc,
+
+            "canvas_width": self.canvas_width,
+            "canvas_height": self.canvas_height,
+
+            "pipeline_inputs": [],
+            "pipeline_steps": [],
+            "pipeline_output_cables": []
+        }
+
+        # Populate dict_repr["pipeline_inputs"].
+        for curr_input in self.inputs.all():
+            input_CDT_pk = -1 if not self.has_structure() else self.structure.compounddatatype.pk
+            dict_repr["pipeline_inputs"].append({
+                "CDT_pk": input_CDT_pk,
+                "dataset_name": curr_input.dataset_name,
+                "dataset_idx": curr_input.dataset_idx,
+                "x": curr_input.x,
+                "y": curr_input.y
+            })
+
+        # Now populate dict_repr["pipeline_steps"].
+        for curr_step in self.steps.all():
+            transf_type_str = "Method" if curr_step.transformation.is_method else "Pipeline"
+            curr_step_dict = {
+                "transf_pk": curr_step.transformation.definite.pk,
+                "transf_type": transf_type_str,
+                "step_num": curr_step.step_num,
+                "x": curr_step.x,
+                "y": curr_step.y,
+                "name": curr_step.name,
+                "cables_in": [],
+                "outputs_to_delete": [x.dataset_name for x in curr_step.outputs_to_delete.all()]
+            }
+
+            # Populate curr_step_dict["cables_in"].
+            for curr_psic in curr_step.cables_in.all():
+                # source_type = None
+                # source_PK = None
+                # if curr_psic.source_step == 0:
+                #     source_PK = curr_psic.source.pk
+                #     source_type = "raw" if curr_psic.source.is_raw else "CDT"
+                # else:
+                #     source_PK = curr_psic.source.transformation.definite.pk
+                #     source_type = "Step"
+
+                curr_cable_dict = {
+                    # "source_type": source_type,
+                    # "source_pk": source_PK,
+                    "source_dataset_name": curr_psic.source.dataset_name,
+                    "source_step": curr_psic.source_step,
+                    "dest_dataset_name": curr_psic.dest.dataset_name,
+                    "wires": []
+                }
+
+                for wire in curr_psic.custom_wires.all():
+                    curr_cable_dict["wires"].append({
+                        "source_idx": wire.source_pin.column_idx,
+                        "dest_idx": wire.dest_pin.column_idx
+                    })
+
+                curr_step_dict["cables_in"].append(curr_cable_dict)
+
+            dict_repr["pipeline_steps"].append(curr_step_dict)
+
+        # Finally, populate dict_repr["pipeline_output_cables"].
+        for curr_poc in self.outcables.all():
+            dest_pipeline_output = self.outputs.get(dataset_name=curr_poc.output_name)
+            curr_outcable_dict = {
+                "output_idx": curr_poc.output_idx,
+                "output_name": curr_poc.output_name,
+                "output_CDT_pk": curr_poc.output_cdt.pk,
+                "source_step": curr_poc.source_step,
+                "source_dataset_name": curr_poc.source.dataset_name,
+                "x": dest_pipeline_output.x,
+                "y": dest_pipeline_output.y,
+                "wires": []
+            }
+
+            for wire in curr_poc.custom_wires.all():
+                curr_outcable_dict["wires"].append({
+                    "source_idx": wire.source_pin.column_idx,
+                    "dest_idx": wire.dest_pin.column_idx
+                })
+
+            dict_repr["pipeline_output_cables"].append(curr_outcable_dict)
+
+    @transaction.atomic
+    def update_from_dict(self, pipeline_dict_repr):
+        """
+        Update this Pipeline to reflect what's given in the specified dictionary.
+
+        Return a dict with the status and error message if applicable,
+        as expected by pipeline.views.pipeline_add.
+
+        This will raise a ValueError if the Pipeline has ever been run or revised
+        (and therefore it should never be changed).
+        """
+        if self.pipeline_instances.exists():
+            return {
+                "status": "failure",
+                "error_msg": 'Pipeline "{}" has been previously run so cannot be updated'.format(self)
+            }
+        elif self.descendants.exists():
+            return {
+                "status": "failure",
+                "error_msg": 'Pipeline "{}" has been previously revised so cannot be updated'.format(self)
+            }
+
+        # Nuke everything in this Pipeline.
+        for curr_input in self.inputs.all():
+            curr_input.delete()
+
+        for curr_step in self.inputs.all():
+            curr_step.delete()
+
+        for curr_outcable in self.outcables.all():
+            curr_outcable.delete()
+
+        # Now pass the dict representation to the function that fills out a Pipeline.
+        return Pipeline.create_from_dict(pipeline_dict_repr, self)
+
+    @transaction.atomic
+    def revise_from_dict(self, pipeline_dict_repr, revision_name, revision_desc, canvas_width, canvas_height):
+        """
+        Make a revision of this Pipeline with the specified dictionary.
+
+        Return a dict with the status and error message if applicable,
+        as expected by pipeline.views.pipeline_add.
+
+        This will raise a ValueError if the Pipeline has ever been run or revised
+        (and therefore it should never be changed).
+        """
+        # Make a new revision.
+        new_revision = self.family.members.create(
+            revision_parent=self,
+            revision_name=revision_name,
+            revision_desc=revision_desc,
+            canvas_height=canvas_height,
+            canvas_width=canvas_width
+        )
+
+        # Now pass the dict representation to the function that fills out a Pipeline.
+        return Pipeline.create_from_dict(pipeline_dict_repr, new_revision)
+
+    @classmethod
+    @transaction.atomic
+    def create_from_dict(cls, form_data, pipeline=None):
+        """
+        Creates a fresh Pipeline with a new PipelineFamily from a dict.
+
+        If the pipeline parameter is specified, we fill it in rather than creating a fresh one.
+        Otherwise, form_data must contain fields revision_name, revision_desc, canvas_width, canvas_height,
+        family_name, and family_desc.
+
+        The form_data dict should be structured the same way represent_as_dict produces them.
+        """
         response_data = None
-        # Does Pipeline family with this name already exist?
-        if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
-            response_data = {'status': 'failure',
-                             'error_msg': 'Duplicate pipeline family name'}
-            return response_data
+        if pipeline is None:
+            # Does Pipeline family with this name already exist?
+            if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
+                response_data = {'status': 'failure',
+                                 'error_msg': 'Duplicate pipeline family name'}
+                return response_data
 
-        # Make a new PipelineFamily.
-        pl_family = PipelineFamily(
-            name=form_data['family_name'],
-            description=form_data['family_desc']
-        )
-        pl_family.save()
+            # Make a new PipelineFamily.
+            pl_family = PipelineFamily(
+                name=form_data['family_name'],
+                description=form_data['family_desc']
+            )
+            pl_family.save()
 
-        # Make a new Pipeline revision within this PipelineFamily.
-        pipeline = pl_family.members.create(
-            revision_name=form_data['revision_name'],
-            revision_desc=form_data['revision_desc'],
-            canvas_width=form_data["canvas_width"],
-            canvas_height=form_data["canvas_height"]
-        )
+            # Make a new Pipeline revision within this PipelineFamily.
+            pipeline = pl_family.members.create(
+                revision_name=form_data['revision_name'],
+                revision_desc=form_data['revision_desc'],
+                canvas_width=form_data["canvas_width"],
+                canvas_height=form_data["canvas_height"]
+            )
+        else:
+            # Update the current Pipeline.
+            pipeline.revision_name = form_data['revision_name']
+            pipeline.revision_desc = form_data['revision_desc']
+            pipeline.canvas_width = form_data["canvas_width"]
+            pipeline.canvas_height = form_data["canvas_height"]
 
         try:
             # Create the inputs for the Pipeline.
             for new_input in form_data["pipeline_inputs"]:
                 CDT_pk = new_input["CDT_pk"]
                 pipeline.create_input(
-                    compounddatatype=None if CDT_pk < 0 else CompoundDatatype.objects.get(pk=CDT_pk),
+                    compounddatatype=None if CDT_pk < 0 else metadata.models.CompoundDatatype.objects.get(pk=CDT_pk),
                     dataset_name=new_input["dataset_name"],
                     dataset_idx=new_input["dataset_idx"],
                     x=new_input["x"], y=new_input["y"]
@@ -291,18 +462,22 @@ class Pipeline(transformation.models.Transformation):
                     for in_cable in step["cables_in"]:
                         dest = transf.inputs.get(dataset_name=in_cable["dest_dataset_name"])
                         source_step = in_cable["source_step_num"]
-                        source_transf = (pipeline if in_cable["source"] == "Step"
-                                         else pipeline.steps.get(step_num=in_cable["source_step_num"]).transformation)
-                        source_output = source_transf.outputs.get(dataset_name=in_cable["source_dataset_name"])
+                        source = None
+                        if source_step != 0:
+                            source = pipeline.steps.get(step_num=source_step).transformation.outputs.get(
+                                dataset_name=in_cable["source_dataset_name"])
+                        else:
+                            source = pipeline.inputs.get(dataset_name=in_cable["source_dataset_name"])
+
                         new_cable = pipeline_step.cables_in.create(
                             dest=dest,
                             source_step=source_step,
-                            source=source_output)
+                            source=source)
 
                         # Define some wires, while we're at it.
                         for wire in in_cable["wires"]:
                             new_cable.custom_wires.create(
-                                source_pin=source_output.get_cdt().columns.get(column_idx=wire["source_idx"]),
+                                source_pin=source.get_cdt().columns.get(column_idx=wire["source_idx"]),
                                 dest_pin=dest.get_cdt().columns.get(column_idx=wire["dest_idx"])
                             )
 
@@ -320,12 +495,14 @@ class Pipeline(transformation.models.Transformation):
 
         try:
             # Add output cables.
-            for out_cable in form_data["pipeline_output_cable"]:
+            for out_cable in form_data["pipeline_output_cables"]:
                 source_step = pipeline.steps.get(step_num=out_cable["source_step"])
                 source_output = source_step.transformation.outputs.get(dataset_name=out_cable['dataset_name'])
-                output_CDT = CompoundDatatype.objects.get(pk=out_cable["output_CDT_pk"])
+                output_CDT = None
+                if out_cable["output_CDT_pk"] != "__raw__":
+                    output_CDT = metadata.models.CompoundDatatype.objects.get(pk=out_cable["output_CDT_pk"])
                 new_outcable = pipeline.create_outcable(
-                    source_step=source_step,
+                    source_step=source_step.step_num,
                     source=source_output,
                     output_name=out_cable['output_name'],
                     output_idx=out_cable['output_idx'],

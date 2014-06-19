@@ -39,12 +39,10 @@ def pipeline_add(request):
     c.update(csrf(request))
 
     if request.method == 'POST':
-        print("Hello")
         form_data = json.loads(request.body)
         response_data = Pipeline.create_from_dict(form_data)
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:
-        print("Goodbye")
         return HttpResponse(t.render(c))
 
 
