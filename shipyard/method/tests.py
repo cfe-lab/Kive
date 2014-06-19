@@ -3,19 +3,23 @@ Unit tests for Shipyard method models.
 """
 
 # from django.test import TestCase
+
+import filecmp
+import hashlib
+import os.path
+import re
+import shutil
+import tempfile
+
 from django.core.exceptions import ValidationError
 from django.core.files import File
 
-import os.path
-import os
-import shutil
-import tempfile
-import filecmp
-
-from method.models import *
-from metadata.models import *
-import metadata.tests
 from constants import datatypes
+from metadata.models import CompoundDatatype, Datatype
+import metadata.tests
+from method.models import CodeResource, CodeResourceDependency, \
+    CodeResourceRevision, Method, MethodFamily
+    
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
@@ -2295,7 +2299,7 @@ class MethodTests(MethodTestSetup):
         empty_dir = tempfile.mkdtemp()
 
         proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [])
-        proc_out, proc_err = proc.communicate()
+        proc_out, _ = proc.communicate()
 
         self.assertEqual(proc_out, self.noop_indata)
 
