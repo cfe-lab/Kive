@@ -8,7 +8,6 @@ from archive.models import Dataset, Run, RunOutputCable, RunSIC
 from execute import Sandbox
 
 import json
-from pprint import pprint
 
 # TODO: this might be better suited as a helper in the backend
 def find_runs_with_inputs(pipeline, datasets):
@@ -110,7 +109,17 @@ def run_pipeline(request):
         sandbox = Sandbox(user, pipeline, inputs)
         sandbox.execute_pipeline()
 
-        response.write(serializers.serialize("json", [sandbox.run,]))
+        response.write(json.dumps(qs2dict(sandbox.run)))
+        return response
+    else:
+        raise Http404
+
+def poll_run_progress(request):
+    if request.is_ajax():
+        response = HttpResponse()
+        run_pk = int(request.POST.get("run_pk"))
+        run = Run.objects.get(pk=run_pk)
+        response.write(str(run.is_complete()))
         return response
     else:
         raise Http404

@@ -74,12 +74,32 @@ function run_pipeline() {
         $("#run_error").html("");
         $("#run_button").html("running...");
         $("#run_button").attr("disabled", true);
-        do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function() {
+        do_ajax("run_pipeline/", {"pipeline_pk": pipeline_pk, "dataset_pks": dataset_pks}, function(res) {
             $("#run_button").prop("disabled", false);
             $("#run_button").html("run");
             make_results_tables();
+            poll_progress(res.pk);
         });
     }
+}
+
+// Poll the progress of a Run.
+function poll_progress(run_pk) {
+    $.ajax({
+        type: "POST",
+        url: "poll_run_progress/",
+        data: {"run_pk": run_pk},
+        datatype: "json",
+        success: function(data) {
+            $("#progress").append($("<p>test</p>"));
+        },
+        complete: function(jqxhr) { 
+            if (jqxhr.responseText == "False") {
+                poll_progress(run_pk) 
+            }
+        },
+        timeout: 10000
+    });
 }
 
 ////////////////////////////////////////////////////////////////////////////////
