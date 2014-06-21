@@ -402,12 +402,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             return;
         }
 
+        // There is no PipelineFamily yet; we're going to create one.
+        form_data["family_pk"] = -1;
         form_data['family_name'] = revision_name;
         form_data['family_desc'] = revision_desc;
 
         // arguments to add first pipeline revision
-        form_data['revision_name'] = '1';
+        form_data['revision_name'] = 'v1';
         form_data['revision_desc'] = 'First version';
+        // There is no parent revision, as we're creating this one from scratch.
+        form_data["revision_parent_pk"] = -1;
 
         // Canvas information to store in the Pipeline object.
         form_data["canvas_width"] = canvas.width;
@@ -431,7 +435,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'dataset_name': this_input.label,
                 'dataset_idx': i+1,
                 'x': this_input.x,
-                'y': this_input.y
+                'y': this_input.y,
+                "min_row": -1, // in the future these can be more detailed
+                "max_row": -1
             }
         }
 
@@ -526,6 +532,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         'source_dataset_name': this_connector.out_magnet.label,
                         'source_step_num': sorted_elements.indexOf(this_source)+1,
                         'dest_dataset_name': this_connector.in_magnet.label,
+                        "keep_output": false, // in the future this can be more flexible
                         "wires": [] // in the future we can specify custom wires here
                     };
                 }
@@ -537,6 +544,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         'source_dataset_name': this_connector.out_magnet.label,
                         'source_step_num': 0,
                         'dest_dataset_name': this_connector.in_magnet.label,
+                        "keep_output": false, // in the future this can be more flexible
                         "wires": [] // no wires for a raw cable
                     };
                 }

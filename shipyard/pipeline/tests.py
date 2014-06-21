@@ -17,10 +17,12 @@ from pipeline.models import *
 from librarian.models import *
 from archive.models import *
 import method.tests
+import sandbox.tests_rm
 
 from constants import datatypes
 
 samplecode_path = "../samplecode"
+
 
 class PipelineTestSetup(method.tests.MethodTestSetup):
     """
@@ -97,6 +99,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
     def tearDown(self):
         shutil.rmtree(self.workdir)
 
+
 class PipelineFamilyTests(PipelineTestSetup):
 
     def test_unicode(self):
@@ -108,6 +111,7 @@ class PipelineFamilyTests(PipelineTestSetup):
     def test_delete_pipeline_family(self):
         """Can I delete a PipelineFamily?"""
         self.assertIsNone(PipelineFamily.objects.first().delete())
+
 
 class PipelineTests(PipelineTestSetup):
     
@@ -2387,6 +2391,7 @@ class PipelineTests(PipelineTestSetup):
         pipeline = Pipeline(family=family); pipeline.save()
         self.assertIsNone(pipeline.delete())
 
+
 class PipelineStepTests(PipelineTestSetup):
 
     def test_pipelineStep_without_pipeline_set_unicode(self):
@@ -2692,15 +2697,18 @@ class PipelineStepTests(PipelineTestSetup):
         """Deleting a PipelineStep is possible."""
         PipelineStep.objects.first().delete()
 
+
 class PipelineStepInputCableTests(PipelineTestSetup):
     def test_delete_pipeline_step_input_cable(self):
         """Deleting a PipelineStepInputCable is possible."""
         self.assertIsNone(PipelineStepInputCable.objects.first().delete())
 
+
 class PipelineOutputCableTests(PipelineTestSetup):
     def test_delete_pipeline_output_cable(self):
         """Deleting a PipelineOutputCable is possible."""
         self.assertIsNone(PipelineOutputCable.objects.first().delete())
+
 
 class PipelineStepRawDeleteTests(PipelineTestSetup):
 
@@ -4056,3 +4064,317 @@ class CustomOutputWiringTests(PipelineTestSetup):
         member = pipeline_out_members.get(column_idx=4)
         self.assertEquals(member.column_name, "col{}_str".format(4))
         self.assertEquals(member.datatype, self.string_dt)
+
+
+# June 19, 2014: for the functions that serialize and de-serialize Pipelines.
+class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
+    """
+    Tests of Pipeline serialization and de-serialization.
+    """
+    def setUp(self):
+        sandbox.tests_rm.UtilityMethods.setUp(self)
+
+        # Set up a CDT with two elements to allow some wiring to occur.
+        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+
+        # A CDT composed of only one column, strings.
+        self.string_doublet = CompoundDatatype()
+        self.string_doublet.save()
+        self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
+        self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
+
+    def _check_pipeline_own_members(self, dict_repr, pipeline):
+        """
+        Checks "internal" stuff is correct in a dictionary representation of a Pipeline.
+        """
+        # Check there are no extraneous keys being defined.
+        self.assertSetEqual(
+            set(dict_repr.keys()),
+            set([
+                "family_pk", "family_name", "family_desc", "revision_name", "revision_desc", "revision_parent_pk",
+                 "canvas_width", "canvas_height", "pipeline_inputs", "pipeline_steps", "pipeline_output_cables"
+            ]))
+
+        self.assertEquals(dict_repr["family_pk"], pipeline.family.pk)
+        self.assertEquals(dict_repr["family_name"], pipeline.family.name)
+        self.assertEquals(dict_repr["family_desc"], pipeline.family.description)
+        self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
+        self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
+
+        dict_rev_parent_pk = -1 if pipeline.revision_parent is None else pipeline.revision_parent.pk
+        self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
+        self.assertEquals(dict_repr["canvas_width"], pipeline.canvas_width)
+        self.assertEquals(dict_repr["canvas_height"], pipeline.canvas_height)
+
+    def _check_pipeline(self, dict_repr, pipeline):
+        """
+        Checks correctness of a dictionary representation of a Pipeline including all children.
+        """
+        self._check_pipeline_own_members(dict_repr, pipeline)
+
+        # First check the inputs.
+        self.assertEquals(len(dict_repr["pipeline_inputs"]), pipeline.inputs.count())
+        for input_dict in dict_repr["pipeline_inputs"]:
+            corresp_input = pipeline.inputs.get(dataset_idx=input_dict["dataset_idx"])
+            self._check_input(input_dict, corresp_input)
+
+        # Next the steps.
+        self.assertEquals(len(dict_repr["pipeline_steps"]), pipeline.steps.count())
+        for step_dict in dict_repr["pipeline_steps"]:
+            corresp_step = pipeline.steps.get(step_num=step_dict["step_num"])
+            self._check_step(step_dict, corresp_step)
+
+        # Finally the outcables.
+        self.assertEquals(len(dict_repr["pipeline_output_cables"]), pipeline.outcables.count())
+        for outcable_dict in dict_repr["pipeline_output_cables"]:
+            corresp_outcable = pipeline.outcables.get(output_idx=outcable_dict["output_idx"])
+            self._check_outcable(outcable_dict, corresp_outcable)
+
+    def _check_step_own_members(self, step_dict, step):
+        """
+        Checks "internal" stuff is correct in a dictionary representation of a PipelineStep.
+        """
+        # Check for extraneous keys.
+        self.assertSetEqual(
+            set(step_dict.keys()),
+            set([
+                "transf_pk", "transf_type", "step_num", "x", "y", "name",
+                 "cables_in", "outputs_to_delete"
+            ]))
+
+        self.assertEquals(step_dict["transf_pk"], step.transformation.definite.pk)
+        transf_type_str = "Method" if type(step.transformation.definite) == Method else "Pipeline"
+        self.assertEquals(step_dict["transf_type"], transf_type_str)
+        self.assertEquals(step_dict["step_num"], step.step_num)
+        self.assertEquals(step_dict["x"], step.x)
+        self.assertEquals(step_dict["y"], step.y)
+        self.assertEquals(step_dict["name"], step.name)
+
+    def _check_step(self, step_dict, step):
+        """
+        Checks correctness of a dictionary representation of a PS including cabling.
+        """
+        self._check_step_own_members(step_dict, step)
+
+        self.assertEquals(len(step_dict["cables_in"]), step.cables_in.count())
+        for incable_dict in step_dict["cables_in"]:
+            corresp_incable = step.cables_in.get(dest__dataset_name=incable_dict["dest_dataset_name"])
+            self._check_incable(incable_dict, corresp_incable)
+
+    def _check_input(self, input_dict, TI):
+        """
+        Checks correctness of a dictionary representation of a Pipeline input.
+        """
+        # Check for extraneous keys.
+        self.assertSetEqual(
+            set(input_dict.keys()),
+            set(["CDT_pk", "dataset_name", "dataset_idx", "x", "y", "min_row", "max_row"])
+        )
+        my_cdt_pk = -1 if TI.compounddatatype is None else TI.compounddatatype.pk
+        self.assertEquals(input_dict["CDT_pk"], my_cdt_pk)
+        self.assertEquals(input_dict["dataset_name"], TI.dataset_name)
+        self.assertEquals(input_dict["dataset_idx"], TI.dataset_idx)
+        self.assertEquals(input_dict["x"], TI.x)
+        self.assertEquals(input_dict["y"], TI.y)
+
+        effective_min_row = -1 if TI.get_min_row() is None else TI.get_min_row()
+        effective_max_row = -1 if TI.get_max_row() is None else TI.get_max_row()
+        self.assertEquals(input_dict["min_row"], effective_min_row)
+        self.assertEquals(input_dict["max_row"], effective_max_row)
+
+    def _check_incable_own_members(self, incable_dict, input_cable):
+        """
+        Checks correctness of a dictionary representation of a PSIC.
+        """
+        # Check for extraneous keys.
+        self.assertSetEqual(
+            set(incable_dict.keys()),
+            set(["source_dataset_name", "source_step", "dest_dataset_name", "keep_output", "wires"])
+        )
+        self.assertEquals(incable_dict["source_dataset_name"], input_cable.source.definite.dataset_name)
+        self.assertEquals(incable_dict["source_step"], input_cable.source_step)
+        self.assertEquals(incable_dict["dest_dataset_name"], input_cable.dest.definite.dataset_name)
+        self.assertEquals(incable_dict["keep_output"], input_cable.keep_output)
+
+    def _check_incable(self, incable_dict, input_cable):
+        """
+        Checks correctness of a PSIC's dictionary serialization including wiring.
+        """
+        self._check_incable_own_members(incable_dict, input_cable)
+
+        self.assertEquals(len(incable_dict["wires"]), input_cable.custom_wires.count())
+        for wire_dict in incable_dict["wires"]:
+            corresp_wire = input_cable.custom_wires.get(dest_pin__column_idx=wire_dict["dest_idx"])
+            self._check_wire(wire_dict, corresp_wire)
+
+    def _check_wire(self, wire_dict, wire):
+        """
+        Check correctness of a dictionary representation of a CCW.
+        """
+        # Check for extraneous keys.
+        self.assertSetEqual(
+            set(wire_dict.keys()),
+            set(["source_idx", "dest_idx"])
+        )
+        self.assertEquals(wire_dict["source_idx"], wire.source_pin.column_idx)
+        self.assertEquals(wire_dict["dest_idx"], wire.dest_pin.column_idx)
+
+    def _check_outcable_own_members(self, outcable_dict, outcable):
+        """
+        Checks correctness of a dictionary representation of a POC.
+        """
+        # Check for extraneous keys.
+        self.assertSetEqual(
+            set(outcable_dict.keys()),
+            set(["output_idx", "output_name", "output_CDT_pk", "source_step", "source_dataset_name",
+                 "x", "y", "wires"])
+        )
+        self.assertEquals(outcable_dict["output_idx"], outcable.output_idx)
+        self.assertEquals(outcable_dict["output_name"], outcable.output_name)
+        out_cdt_pk = -1 if outcable.output_cdt is None else outcable.output_cdt.pk
+        self.assertEquals(outcable_dict["output_CDT_pk"], out_cdt_pk)
+        self.assertEquals(outcable_dict["source_step"], outcable.source_step)
+        self.assertEquals(outcable_dict["source_dataset_name"], outcable.source.definite.dataset_name)
+
+    def _check_outcable(self, outcable_dict, outcable):
+        """
+        Checks correctness of a dictionary representation of a POC including wiring.
+        """
+        self._check_outcable_own_members(outcable_dict, outcable)
+
+        self.assertEquals(len(outcable_dict["wires"]), outcable.custom_wires.count())
+        for wire_dict in outcable_dict["wires"]:
+            corresp_wire = outcable.custom_wires.get(dest_pin__column_idx=wire_dict["dest_idx"])
+            self._check_wire(wire_dict, corresp_wire)
+
+    def test_serialize_empty_pipeline(self):
+        """Serializing an empty Pipeline."""
+        my_pipeline = self.make_first_pipeline("test", "Test family")
+
+        my_dict = my_pipeline.represent_as_dict()
+
+        self._check_pipeline_own_members(my_dict, my_pipeline)
+        self.assertListEqual(my_dict["pipeline_inputs"], [])
+        self.assertListEqual(my_dict["pipeline_steps"], [])
+        self.assertListEqual(my_dict["pipeline_output_cables"], [])
+
+    def test_serialize_incomplete_pipeline(self):
+        """Serializing an incomplete pipeline."""
+        # This makes a "words" Dataset called self.string_datafile.
+        self.make_words_symDS()
+
+        my_pipeline = self.make_first_pipeline("three-step noop", "Triple no-op")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
+                                    "input_to_not_touch", "untouched_output")
+
+        for outcable in my_pipeline.outcables.all():
+            outcable.delete()
+
+        # Delete step 3.
+        my_pipeline.steps.get(step_num=3).delete()
+
+        my_dict = my_pipeline.represent_as_dict()
+
+        self._check_pipeline(my_dict, my_pipeline)
+
+    def test_serialize_input(self):
+        """Serializing a Pipeline input."""
+        my_pipeline = self.make_first_pipeline("serialize input", "For testing serializing input")
+
+        input_1 = my_pipeline.create_input("foo", 1, compounddatatype=self.string_doublet)
+        input_raw = my_pipeline.create_input("bar", 2, compounddatatype=None, x=50, y=175)
+        input_3 = my_pipeline.create_input("baz", 3, compounddatatype=self.cdt_string, min_row=5, max_row=50)
+
+        self._check_input(input_1.represent_as_dict(), input_1)
+        self._check_input(input_raw.represent_as_dict(), input_raw)
+        self._check_input(input_3.represent_as_dict(), input_3)
+
+    def test_serialize_incable_no_wires(self):
+        """Serializing PSICs with no wiring."""
+        my_pipeline = self.make_first_pipeline("serialize PSIC", "For testing serializing PSIC")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
+                                    "input_to_not_touch", "untouched_output")
+
+        # All of the input cables in this Pipeline are unwired.
+        for step in my_pipeline.steps.all():
+            curr_incable = step.cables_in.first()
+            self._check_incable(curr_incable.represent_as_dict(), curr_incable)
+
+    def test_serialize_raw_incables(self):
+        """Serializing raw PSICs with no wiring."""
+        my_pipeline = self.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw, self.method_noop_raw],
+                                    "input_to_not_touch", "untouched_output")
+
+        # All of the input cables in this Pipeline are unwired.
+        for step in my_pipeline.steps.all():
+            curr_incable = step.cables_in.first()
+            self._check_incable(curr_incable.represent_as_dict(), curr_incable)
+
+    def test_serialize_incable_non_trivial(self):
+        """Serializing a PSIC with wiring."""
+        my_pipeline = self.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+                                                  dest=self.method_noop.inputs.first())
+        first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
+                                        dest_pin=self.string_doublet.members.get(column_idx=2))
+        first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
+                                        dest_pin=self.string_doublet.members.get(column_idx=1))
+        # Test cable from Pipeline input.
+        self._check_incable(first_cable.represent_as_dict(), first_cable)
+
+        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_doublet_noop)
+        second_cable = second_step.cables_in.create(source=self.method_doublet_noop.outputs.first(),
+                                                    source_step=1,
+                                                    dest=self.method_doublet_noop.inputs.first())
+        second_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
+                                         dest_pin=self.string_doublet.members.get(column_idx=2))
+        second_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
+                                         dest_pin=self.string_doublet.members.get(column_idx=1))
+        # Test cable from PipelineStep.
+        self._check_incable(second_cable.represent_as_dict(), second_cable)
+
+    def test_serialize_incable_non_trivial_deleted(self):
+        """Serializing a PSIC with wiring that keeps its output."""
+        my_pipeline = self.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+                                                  dest=self.method_noop.inputs.first())
+        first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
+                                        dest_pin=self.string_doublet.members.get(column_idx=2))
+        first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
+                                        dest_pin=self.string_doublet.members.get(column_idx=1))
+        first_cable.keep_output = True
+        first_cable.save()
+        # Test cable from Pipeline input.
+        self._check_incable(first_cable.represent_as_dict(), first_cable)
+
+        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_doublet_noop)
+        second_cable = second_step.cables_in.create(source=self.method_doublet_noop.outputs.first(),
+                                                    source_step=1,
+                                                    dest=self.method_doublet_noop.inputs.first())
+        second_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
+                                         dest_pin=self.string_doublet.members.get(column_idx=2))
+        second_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
+                                         dest_pin=self.string_doublet.members.get(column_idx=1))
+        second_cable.keep_output = True
+        second_cable.save()
+        # Test cable from PipelineStep.
+        self._check_incable(second_cable.represent_as_dict(), second_cable)

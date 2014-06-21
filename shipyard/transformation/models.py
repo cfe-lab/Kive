@@ -286,6 +286,36 @@ class TransformationXput(models.Model):
     def has_structure(self):
         return hasattr(self, "structure")
 
+    def represent_as_dict(self):
+        """
+        Make a dict serialization of this TransformationXput.
+
+        These will be dicts with the following fields:
+         - CDT_pk: -1 if raw; PK of desired CDT otherwise
+         - dataset_name: string
+         - dataset_idx: 1-based index
+         - x: int
+         - y: int
+         - min_row: -1 if no restriction; otherwise, int
+         - max_row: -1 if no restriction; otherwise, int
+        """
+        input_CDT_pk = -1
+        min_row = -1
+        max_row = -1
+        if self.has_structure:
+            input_CDT_pk = self.structure.compounddatatype.pk
+            min_row = self.get_min_row() or -1
+            max_row = self.get_max_row() or -1
+        return {
+            "CDT_pk": input_CDT_pk,
+            "dataset_name": self.dataset_name,
+            "dataset_idx": self.dataset_idx,
+            "x": self.x,
+            "y": self.y,
+            "min_row": min_row,
+            "max_row": max_row
+        }
+
 
 class XputStructure(models.Model):
     """

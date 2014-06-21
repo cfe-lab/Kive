@@ -133,6 +133,7 @@ class UtilityMethods(TestCase):
         # Create pipeline output.
         pipeline.create_outcable(output_name=outdata, output_idx=1, source_step=len(steps),
                                  source=methods[-1].outputs.first())
+        pipeline.create_outputs()
         pipeline.complete_clean()
 
     def simple_method_io(self, method, cdt, indataname, outdataname):

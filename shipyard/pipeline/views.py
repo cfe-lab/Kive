@@ -40,7 +40,11 @@ def pipeline_add(request):
 
     if request.method == 'POST':
         form_data = json.loads(request.body)
-        response_data = Pipeline.create_from_dict(form_data)
+        try:
+            Pipeline.create_from_dict(form_data)
+            response_data = {"status": "success", "error_msg": ""}
+        except PipelineSerializationException as e:
+            response_data = {"status": "failure", "error_msg": str(e)}
         return HttpResponse(json.dumps(response_data), content_type='application/json')
     else:
         return HttpResponse(t.render(c))

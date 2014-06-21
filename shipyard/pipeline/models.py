@@ -11,6 +11,7 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 from django.utils import timezone
 
+import exceptions
 import os
 import csv
 import logging
@@ -36,12 +37,23 @@ class PipelineFamily(transformation.models.TransformationFamily):
     #   members (Pipeline/ForeignKey)
     def get_absolute_url(self):
         return '/pipelines/%i' % self.id
-    
+
     @property
     def size(self):
         """Returns size of this Pipeline's family"""
         return len(Pipeline.objects.filter(family=self))
     pass
+
+
+class PipelineSerializationException(exceptions.Exception):
+    """
+    An exception class for problems arising in defining Pipelines from the UI.
+    """
+    def __init__(self, error_msg):
+        self.error_msg = error_msg
+
+    def __str__(self):
+        return repr(self.error_msg)
 
 
 class Pipeline(transformation.models.Transformation):
@@ -124,7 +136,7 @@ class Pipeline(transformation.models.Transformation):
         - steps are complete, not just clean
         """
         self.clean()
-        
+
         all_steps = self.steps.all()
         if all_steps.count == 0:
             raise ValidationError("Pipeline {} has no steps".format(unicode(self)))
@@ -187,56 +199,32 @@ class Pipeline(transformation.models.Transformation):
         Creates a dict-based representation of this Pipeline.
 
         This dict will be structured as:
+         - family_pk: -1 if no PipelineFamily exists yet; otherwise, its PK
          - family_name: string
          - family_desc: string
 
          - revision_name: string
          - revision_desc: string
+         - revision_parent_pk: -1 if there is no parent to this revision; otherwise, its PK
 
          - canvas_width: int
          - canvas_height: int
 
-         - pipeline_inputs: list of objects that look like:
-           - CDT_pk: -1 if raw; PK of desired CDT otherwise
-           - dataset_name: string
-           - dataset_idx: 1-based index
-           - x: int
-           - y: int
+         - pipeline_inputs: list of dicts as produced by the represent_as_dict method
+           of TransformationXput
 
-         - pipeline_steps: list of objects that look like:
-           - transf_pk: PK of Method/Pipeline to go into this step
-           - transf_type: "Method" or "Pipeline"
-           - step_num: 1-based step number
-           - x: int
-           - y: int
-           - name: string
-           - cables_in: list of objects that look like:
-             - REMOVED source_type: string saying either "Step", "raw", or "CDT"
-             - REMOVED source_pk: PK of the source Method/Pipeline/TransformationInput (only necessary for the TI case)
-             - source_dataset_name: name of the source TI
-             - source_step: 0 if source is a Pipeline input; otherwise the 1-based index of the source step
-             - dest_dataset_name: name of TI to feed in this step
-             - wires: list of objects that look like:
-               - source_idx: column index of source
-               - dest_idx: column index of destination
-           - outputs_to_delete: list of names of TransformationOutputs that are not to be retained by this step
+         - pipeline_steps: list of dicts as produced by the represent_as_dict method of PipelineStep.
 
-         - pipeline_output_cables: list of objects that look like:
-           - output_idx: index of the resulting Pipeline output,
-           - output_name: name of the resulting Pipeline output
-           - output_CDT_pk: PK of the CDT of the resulting Pipeline output (could be changed by wiring)
-           - source_step: 1-based index of the step producing the output
-           - source_dataset_name: name of the source output
-           - x: int
-           - y: int
-           - wires: list of objects as for pipeline_steps["cables_in"]
+         - pipeline_output_cables: list of dicts as produced by the represent_as_dict method of PipelineOutputCable.
         """
         dict_repr = {
+            "family_pk": self.family.pk,
             "family_name": self.family.name,
             "family_desc": self.family.description,
 
             "revision_name": self.revision_name,
             "revision_desc": self.revision_desc,
+            "revision_parent_pk": -1 if self.revision_parent is None else self.revision_parent.pk,
 
             "canvas_width": self.canvas_width,
             "canvas_height": self.canvas_height,
@@ -248,80 +236,17 @@ class Pipeline(transformation.models.Transformation):
 
         # Populate dict_repr["pipeline_inputs"].
         for curr_input in self.inputs.all():
-            input_CDT_pk = -1 if not self.has_structure() else self.structure.compounddatatype.pk
-            dict_repr["pipeline_inputs"].append({
-                "CDT_pk": input_CDT_pk,
-                "dataset_name": curr_input.dataset_name,
-                "dataset_idx": curr_input.dataset_idx,
-                "x": curr_input.x,
-                "y": curr_input.y
-            })
+            dict_repr["pipeline_inputs"].append(curr_input.represent_as_dict())
 
         # Now populate dict_repr["pipeline_steps"].
         for curr_step in self.steps.all():
-            transf_type_str = "Method" if curr_step.transformation.is_method else "Pipeline"
-            curr_step_dict = {
-                "transf_pk": curr_step.transformation.definite.pk,
-                "transf_type": transf_type_str,
-                "step_num": curr_step.step_num,
-                "x": curr_step.x,
-                "y": curr_step.y,
-                "name": curr_step.name,
-                "cables_in": [],
-                "outputs_to_delete": [x.dataset_name for x in curr_step.outputs_to_delete.all()]
-            }
-
-            # Populate curr_step_dict["cables_in"].
-            for curr_psic in curr_step.cables_in.all():
-                # source_type = None
-                # source_PK = None
-                # if curr_psic.source_step == 0:
-                #     source_PK = curr_psic.source.pk
-                #     source_type = "raw" if curr_psic.source.is_raw else "CDT"
-                # else:
-                #     source_PK = curr_psic.source.transformation.definite.pk
-                #     source_type = "Step"
-
-                curr_cable_dict = {
-                    # "source_type": source_type,
-                    # "source_pk": source_PK,
-                    "source_dataset_name": curr_psic.source.dataset_name,
-                    "source_step": curr_psic.source_step,
-                    "dest_dataset_name": curr_psic.dest.dataset_name,
-                    "wires": []
-                }
-
-                for wire in curr_psic.custom_wires.all():
-                    curr_cable_dict["wires"].append({
-                        "source_idx": wire.source_pin.column_idx,
-                        "dest_idx": wire.dest_pin.column_idx
-                    })
-
-                curr_step_dict["cables_in"].append(curr_cable_dict)
-
-            dict_repr["pipeline_steps"].append(curr_step_dict)
+            dict_repr["pipeline_steps"].append(curr_step.represent_as_dict())
 
         # Finally, populate dict_repr["pipeline_output_cables"].
         for curr_poc in self.outcables.all():
-            dest_pipeline_output = self.outputs.get(dataset_name=curr_poc.output_name)
-            curr_outcable_dict = {
-                "output_idx": curr_poc.output_idx,
-                "output_name": curr_poc.output_name,
-                "output_CDT_pk": curr_poc.output_cdt.pk,
-                "source_step": curr_poc.source_step,
-                "source_dataset_name": curr_poc.source.dataset_name,
-                "x": dest_pipeline_output.x,
-                "y": dest_pipeline_output.y,
-                "wires": []
-            }
+            dict_repr["pipeline_output_cables"].append(curr_poc.represent_as_dict())
 
-            for wire in curr_poc.custom_wires.all():
-                curr_outcable_dict["wires"].append({
-                    "source_idx": wire.source_pin.column_idx,
-                    "dest_idx": wire.dest_pin.column_idx
-                })
-
-            dict_repr["pipeline_output_cables"].append(curr_outcable_dict)
+        return dict_repr
 
     @transaction.atomic
     def update_from_dict(self, pipeline_dict_repr):
@@ -331,19 +256,15 @@ class Pipeline(transformation.models.Transformation):
         Return a dict with the status and error message if applicable,
         as expected by pipeline.views.pipeline_add.
 
-        This will raise a ValueError if the Pipeline has ever been run or revised
+        This will raise a PipelineSerializationException if the Pipeline has ever been run or revised
         (and therefore it should never be changed).
         """
         if self.pipeline_instances.exists():
-            return {
-                "status": "failure",
-                "error_msg": 'Pipeline "{}" has been previously run so cannot be updated'.format(self)
-            }
+            raise PipelineSerializationException(
+                'Pipeline "{}" has been previously run so cannot be updated'.format(self))
         elif self.descendants.exists():
-            return {
-                "status": "failure",
-                "error_msg": 'Pipeline "{}" has been previously revised so cannot be updated'.format(self)
-            }
+            raise PipelineSerializationException(
+                'Pipeline "{}" has been previously revised so cannot be updated'.format(self))
 
         # Nuke everything in this Pipeline.
         for curr_input in self.inputs.all():
@@ -381,6 +302,102 @@ class Pipeline(transformation.models.Transformation):
         # Now pass the dict representation to the function that fills out a Pipeline.
         return Pipeline.create_from_dict(pipeline_dict_repr, new_revision)
 
+    @transaction.atomic
+    def create_input_from_dict(self, input_dict):
+        """
+        Create a Pipeline input from a dictionary representation.
+
+        input_dict should be structured as the dictionaries produced
+        by the represent_as_dict() method of TransformationXput.
+
+        Raise a PipelineSerializationException on error.
+        """
+        try:
+            CDT_pk = input_dict["CDT_pk"]
+            self.create_input(
+                compounddatatype=None if CDT_pk < 0 else metadata.models.CompoundDatatype.objects.get(pk=CDT_pk),
+                dataset_name=input_dict["dataset_name"],
+                dataset_idx=input_dict["dataset_idx"],
+                min_row=None if input_dict["min_row"] < 0 else input_dict["min_row"],
+                max_row=None if input_dict["max_row"]< 0 else input_dict["max_row"],
+                x=input_dict["x"], y=input_dict["y"]
+            )
+        except Exception as e:
+            # The fact this is a transaction will roll back the Pipeline and PipelineFamily.
+            raise PipelineSerializationException("Error in creating pipeline input: {}".format(e))
+
+    @transaction.atomic
+    def create_PS_from_dict(self, PS_dict):
+        """
+        Create a PipelineStep from a dictionary representation.
+
+        The dictionary should be structured as those produced by
+        the represent_as_dict() method of PS.
+
+        Raises a PipelineSerializationException on error.
+        """
+        try:
+            transf_definite_type = method.models.Method if PS_dict["transf_type"] == "Method" else Pipeline
+            transf_pk = PS_dict["transf_pk"]
+            transf = transf_definite_type.objects.get(pk=transf_pk)
+            pipeline_step = self.steps.create(
+                transformation=transf,
+                step_num=PS_dict['step_num'],
+                x=PS_dict["x"], y=PS_dict["y"], name=PS_dict["name"]
+            )
+
+            # Add the corresponding PSICs.
+            for in_cable in PS_dict["cables_in"]:
+                pipeline_step.create_incable_from_dict(in_cable)
+
+        except PipelineSerializationException as e:
+            # Propagate this upwards.
+            raise e
+
+        except Exception as e:
+            # Note that this is logger, not self.logger: this is a class method so it will write
+            # to the module-level logger.
+            raise PipelineSerializationException("Error in creating pipeline step: {}".format(e))
+
+        return pipeline_step
+
+    @transaction.atomic
+    def create_outcable_from_dict(self, outcable_dict):
+        """
+        Create a PipelineOutputCable from a dictionary representation.
+
+        The dictionary should be structured as those produced by
+        the represent_as_dict() method of POC.
+
+        Raises a PipelineSerializationException on error.
+        """
+        try:
+            source_step = self.steps.get(step_num=outcable_dict["source_step"])
+            source_output = source_step.transformation.outputs.get(dataset_name=outcable_dict['dataset_name'])
+            output_CDT = None
+            if outcable_dict["output_CDT_pk"] != "__raw__":
+                output_CDT = metadata.models.CompoundDatatype.objects.get(pk=outcable_dict["output_CDT_pk"])
+            new_outcable = self.create_outcable(
+                source_step=source_step.step_num,
+                source=source_output,
+                output_name=outcable_dict['output_name'],
+                output_idx=outcable_dict['output_idx'],
+                output_CDT = output_CDT
+            )
+            new_outcable.create_output(x=outcable_dict['x'], y=outcable_dict['y'])
+            # Define some wires, while we're at it.
+            for wire in outcable_dict["wires"]:
+                new_outcable.create_wire_from_dict(wire)
+
+        except PipelineSerializationException as e:
+            # Propagate this upwards.
+            raise e
+
+        except Exception as e:
+            raise PipelineSerializationException("Error in creating pipeline output cable: {}".format(e))
+
+        return new_outcable
+
     @classmethod
     @transaction.atomic
     def create_from_dict(cls, form_data, pipeline=None):
@@ -392,14 +409,13 @@ class Pipeline(transformation.models.Transformation):
         family_name, and family_desc.
 
         The form_data dict should be structured the same way represent_as_dict produces them.
+
+        This raises a PipelineSerializationException if anything goes wrong.
         """
-        response_data = None
         if pipeline is None:
             # Does Pipeline family with this name already exist?
             if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
-                response_data = {'status': 'failure',
-                                 'error_msg': 'Duplicate pipeline family name'}
-                return response_data
+                raise PipelineSerializationException('Duplicate pipeline family name')
 
             # Make a new PipelineFamily.
             pl_family = PipelineFamily(
@@ -422,115 +438,27 @@ class Pipeline(transformation.models.Transformation):
             pipeline.canvas_width = form_data["canvas_width"]
             pipeline.canvas_height = form_data["canvas_height"]
 
-        try:
-            # Create the inputs for the Pipeline.
-            for new_input in form_data["pipeline_inputs"]:
-                CDT_pk = new_input["CDT_pk"]
-                pipeline.create_input(
-                    compounddatatype=None if CDT_pk < 0 else metadata.models.CompoundDatatype.objects.get(pk=CDT_pk),
-                    dataset_name=new_input["dataset_name"],
-                    dataset_idx=new_input["dataset_idx"],
-                    x=new_input["x"], y=new_input["y"]
-                )
-        except Exception as e:
-            # The fact this is a transaction will roll back the Pipeline and PipelineFamily.
-            response_data = {'status': 'failure',
-                             'error_msg': 'Invalid pipeline input'}
-            return response_data
+        # Create the inputs for the Pipeline.
+        for new_input in form_data["pipeline_inputs"]:
+            pipeline.create_input_from_dict(new_input)
 
-        try:
-            # Make PipelineSteps.
+        # Make PipelineSteps.
+        # We need to sort the PipelineSteps by their step number so that step 1
+        # gets added before step 2, etc.
+        for step_dict in sorted(form_data["pipeline_steps"], key=operator.itemgetter("step_num")):
+            pipeline.create_PS_from_dict(step_dict)
 
-            # We need to sort the PipelineSteps by their step number so that step 1
-            # gets added before step 2, etc.
-            steps = form_data["pipeline_steps"]
-            sorted_steps = sorted(steps, key=operator.itemgetter("step_num"))
-
-            for step in sorted_steps:
-                transf_definite_type = method.models.Method if step["transf_type"] == "Method" else Pipeline
-                transf_pk = step["transf_pk"]
-                transf = transf_definite_type.objects.get(pk=transf_pk)
-                pipeline_step = pipeline.steps.create(
-                    transformation=transf,
-                    step_num=step['step_num'],
-                    x=step["x"], y=step["y"], name=step["name"]
-                )
-
-                # Add the corresponding PSICs.
-
-                try:
-                    for in_cable in step["cables_in"]:
-                        dest = transf.inputs.get(dataset_name=in_cable["dest_dataset_name"])
-                        source_step = in_cable["source_step_num"]
-                        source = None
-                        if source_step != 0:
-                            source = pipeline.steps.get(step_num=source_step).transformation.outputs.get(
-                                dataset_name=in_cable["source_dataset_name"])
-                        else:
-                            source = pipeline.inputs.get(dataset_name=in_cable["source_dataset_name"])
-
-                        new_cable = pipeline_step.cables_in.create(
-                            dest=dest,
-                            source_step=source_step,
-                            source=source)
-
-                        # Define some wires, while we're at it.
-                        for wire in in_cable["wires"]:
-                            new_cable.custom_wires.create(
-                                source_pin=source.get_cdt().columns.get(column_idx=wire["source_idx"]),
-                                dest_pin=dest.get_cdt().columns.get(column_idx=wire["dest_idx"])
-                            )
-
-                except Exception as e:
-                    response_data = {'status': 'failure', 'error_msg': 'Invalid pipeline step input cable'}
-                    return response_data
-
-        except Exception as e:
-            # Note that this is logger, not self.logger: this is a class method so it will write
-            # to the module-level logger.
-            logger.debug(e)
-            response_data = {'status': 'failure',
-                             'error_msg': 'Invalid pipeline step'}
-            return response_data
-
-        try:
-            # Add output cables.
-            for out_cable in form_data["pipeline_output_cables"]:
-                source_step = pipeline.steps.get(step_num=out_cable["source_step"])
-                source_output = source_step.transformation.outputs.get(dataset_name=out_cable['dataset_name'])
-                output_CDT = None
-                if out_cable["output_CDT_pk"] != "__raw__":
-                    output_CDT = metadata.models.CompoundDatatype.objects.get(pk=out_cable["output_CDT_pk"])
-                new_outcable = pipeline.create_outcable(
-                    source_step=source_step.step_num,
-                    source=source_output,
-                    output_name=out_cable['output_name'],
-                    output_idx=out_cable['output_idx'],
-                    output_CDT = output_CDT
-                )
-                new_outcable.create_output(x=out_cable['x'], y=out_cable['y'])
-                # Define some wires, while we're at it.
-                for wire in out_cable["wires"]:
-                    new_outcable.custom_wires.create(
-                        source_pin=source_output.get_cdt().columns.get(column_idx=wire["source_idx"]),
-                        dest_pin=output_CDT.columns.get(column_idx=wire["dest_idx"])
-                    )
-
-        except Exception as e:
-            logger.debug(e)
-            response_data = {'status': 'failure',
-                             'error_msg': 'Invalid pipeline output cable'}
-            return response_data
+        # Add output cables.
+        for outcable_dict in form_data["pipeline_output_cables"]:
+            pipeline.create_outcable_from_dict(outcable_dict)
 
         try:
             pipeline.clean()
             pipeline.save()
-            response_data = {'status': 'success'}
         except ValidationError as e:
-            response_data = {'status': 'failure',
-                             'error_msg': str(e.message_dict.values()[0][0])}
+            raise PipelineSerializationException("Pipeline is invalid: {}".format(e))
 
-        return response_data
+        return pipeline
 
 
 class PipelineStep(models.Model):
@@ -577,12 +505,12 @@ class PipelineStep(models.Model):
     def is_subpipeline(self):
         """Is this PipelineStep a sub-pipeline?"""
         return self.transformation.is_pipeline
-    
+
     @property
     def inputs(self):
         """Inputs to this PipelineStep, ordered by index."""
         return self.transformation.inputs.order_by("dataset_idx")
-    
+
     @property
     def outputs(self):
         """Outputs from this PipelineStep, ordered by index."""
@@ -670,7 +598,7 @@ class PipelineStep(models.Model):
         to see if all inputs are quenched exactly once.
         """
         self.clean()
-            
+
         for transformation_input in self.transformation.inputs.all():
             # See if the input is specified more than 0 times (and
             # since clean() was called above, we know that therefore
@@ -708,7 +636,7 @@ class PipelineStep(models.Model):
         Mark a TO for deletion.
         """
         self.outputs_to_delete.add(output_to_delete)
-        
+
     def outputs_to_retain(self):
         """Returns a list of TOs this PipelineStep doesn't delete."""
         outputs_needed = []
@@ -719,8 +647,81 @@ class PipelineStep(models.Model):
             # Check if for this pipeline step we want to delete TO step_output
             if not self.outputs_to_delete.filter(pk=step_output.pk).exists():
                 outputs_needed.append(step_output)
-                
+
         return outputs_needed
+
+    @transaction.atomic
+    def represent_as_dict(self):
+        """
+        Make a dictionary representation of this PipelineStep.
+
+        This representation will look like:
+         - transf_pk: PK of Method/Pipeline to go into this step
+         - transf_type: "Method" or "Pipeline"
+         - step_num: 1-based step number
+         - x: int
+         - y: int
+         - name: string
+         - cables_in: list of objects as produced by PSIC.represent_as_dict()
+         - outputs_to_delete: list of names of TransformationOutputs that are not to be retained by this step
+        """
+        transf_type_str = "Method" if self.transformation.is_method else "Pipeline"
+        my_dict = {
+            "transf_pk": self.transformation.definite.pk,
+            "transf_type": transf_type_str,
+            "step_num": self.step_num,
+            "x": self.x,
+            "y": self.y,
+            "name": self.name,
+            "cables_in": [],
+            "outputs_to_delete": [x.dataset_name for x in self.outputs_to_delete.all()]
+        }
+
+        # Populate curr_step_dict["cables_in"].
+        for curr_psic in self.cables_in.all():
+            my_dict["cables_in"].append(curr_psic.represent_as_dict())
+
+        return my_dict
+
+    @transaction.atomic
+    def create_incable_from_dict(self, cable_dict):
+        """
+        Create a PSIC from a dictionary representation.
+
+        The dictionary should be structured as one produced by
+        PSIC's represent_as_dict() method.
+
+        Raises a PipelineSerializationException if anything goes wrong.
+        """
+        try:
+            dest = self.transformation.inputs.get(dataset_name=cable_dict["dest_dataset_name"])
+            source_step = cable_dict["source_step_num"]
+            source = None
+            if source_step != 0:
+                source = self.pipeline.steps.get(step_num=source_step).transformation.outputs.get(
+                    dataset_name=cable_dict["source_dataset_name"])
+            else:
+                source = self.pipeline.inputs.get(dataset_name=cable_dict["source_dataset_name"])
+
+            new_cable = self.cables_in.create(
+                dest=dest,
+                source_step=source_step,
+                source=source,
+                keep_output=cable_dict["keep_output"]
+            )
+
+            # Define some wires, while we're at it.
+            for wire in cable_dict["wires"]:
+                new_cable.create_wire_from_dict(wire)
+
+        except PipelineSerializationException as e:
+            # Propagate this upwards.
+            raise e
+
+        except Exception as e:
+            raise PipelineSerializationException("Error in creating pipeline step input cable: {}".format(e))
+
+        return new_cable
 
 
 class PipelineCable(models.Model):
@@ -774,7 +775,7 @@ class PipelineCable(models.Model):
 
             if not corresponding_wire.exists():
                 return False
-            
+
             # I'm not 100% sure which direction the restrictions need to go...
             if not wire.source_pin.datatype.is_restriction(corresponding_wire.first().source_pin.datatype):
                 return False
@@ -924,6 +925,24 @@ class PipelineCable(models.Model):
         if not self.is_incable and not self.is_outcable:
             raise ValidationError("PipelineCable with pk={} is neither a PSIC nor a POC".format(self.pk))
 
+    @transaction.atomic
+    def create_wire_from_dict(self, wire_dict):
+        """
+        Create a CustomCableWire from a dictionary representation.
+
+        wire_dict should be structured as one produced by CustomCableWire's
+        represent_as_dict() method.
+        """
+        try:
+            new_wire = self.custom_wires.create(
+                source_pin=source.get_cdt().columns.get(column_idx=wire_dict["source_idx"]),
+                dest_pin=dest.get_cdt().columns.get(column_idx=wire_dict["dest_idx"])
+            )
+        except Exception as e:
+            raise PipelineSerializationException("Error in defining custom wire: {}".format(e))
+
+        return new_wire
+
 
 class PipelineStepInputCable(PipelineCable):
     """
@@ -937,13 +956,13 @@ class PipelineStepInputCable(PipelineCable):
     """
     # The step (Which has a transformation) where we define incoming cabling
     pipelinestep = models.ForeignKey(PipelineStep, related_name = "cables_in")
-    
+
     # Input hole (TransformationInput) of the transformation
     # at this step to which the cable leads
     dest = models.ForeignKey("transformation.TransformationInput",
                              help_text="Wiring destination input hole",
                              related_name="cables_leading_in")
-    
+
     # (source_step, source) unambiguously defines
     # the source of the cable.  source_step can't refer to a PipelineStep
     # as it might also refer to the pipeline's inputs (i.e. step 0).
@@ -1001,12 +1020,12 @@ class PipelineStepInputCable(PipelineCable):
     def inputs(self):
         """Inputs to this cable (only one)."""
         return [self.source]
-    
+
     @property
     def outputs(self):
         """Outputs from this cable (only one)."""
         return [self.dest]
-    
+
     def clean(self):
         """
         Check coherence of the cable.
@@ -1074,7 +1093,7 @@ class PipelineStepInputCable(PipelineCable):
                     "Transformation at step {} does not produce output \"{}\"".
                     format(self.source_step,
                            unicode(self.source.definite)))
-        
+
         # Propagate to more specific clean functions.
         if self.is_raw():
             self._raw_clean()
@@ -1116,7 +1135,7 @@ class PipelineStepInputCable(PipelineCable):
         if self.custom_wires.all().exists():
             for wire in self.custom_wires.all():
                 wire.clean()
-        
+
     def clean_and_completely_wired(self):
         """
         Check coherence and wiring of this cable (if it is non-raw).
@@ -1133,7 +1152,7 @@ class PipelineStepInputCable(PipelineCable):
         # There are no checks to be done on wiring if this is a raw cable.
         if self.is_raw():
             return
-        
+
         # If source CDT cannot feed (i.e. is not a restriction of)
         # destination CDT, check presence of custom wiring
         if not self.source.get_cdt().is_restriction(self.dest.get_cdt()):
@@ -1202,6 +1221,31 @@ class PipelineStepInputCable(PipelineCable):
         # Now we know that they feed the same TransformationInput.
         # Call _wires_match.
         return self._wires_match(other_cable)
+
+    @transaction.atomic
+    def represent_as_dict(self):
+        """
+        Make a dict serialization of this PSIC.
+
+        It will be structured as:
+         - source_dataset_name: name of the source TI
+         - source_step: 0 if source is a Pipeline input; otherwise the 1-based index of the source step
+         - dest_dataset_name: name of TI to feed in this step
+         - keep_output: Boolean
+         - wires: list of wire dict serializations as produced by CustomCableWire.represent_as_dict()
+        """
+        curr_cable_dict = {
+            "source_dataset_name": self.source.definite.dataset_name,
+            "source_step": self.source_step,
+            "dest_dataset_name": self.dest.definite.dataset_name,
+            "keep_output": self.keep_output,
+            "wires": []
+        }
+
+        for wire in self.custom_wires.all():
+            curr_cable_dict["wires"].append(wire.represent_as_dict())
+
+        return curr_cable_dict
 
 
 class CustomCableWire(models.Model):
@@ -1287,6 +1331,20 @@ class CustomCableWire(models.Model):
         """
         return self.source_pin.datatype != self.dest_pin.datatype
 
+    @transaction.atomic
+    def represent_as_dict(self):
+        """
+        Serialize this wire as a Python dictionary.
+
+        The dictionary should be structured as:
+         - source_idx: column index of source
+         - dest_idx: column index of destination
+        """
+        return {
+            "source_idx": self.source_pin.column_idx,
+            "dest_idx": self.dest_pin.column_idx
+        }
+
 
 class PipelineOutputCable(PipelineCable):
     """
@@ -1321,7 +1379,7 @@ class PipelineOutputCable(PipelineCable):
 
     # Implicitly defined through PipelineCable and a FK from CustomCableWire:
     # - custom_wires
-    
+
     # Enforce uniqueness of output names and indices.
     # Note: in the pipeline, these will still need to be compared with the raw
     # output names and indices.
@@ -1364,7 +1422,7 @@ class PipelineOutputCable(PipelineCable):
     def inputs(self):
         """Inputs to this cable (only one)."""
         return [self.source]
-    
+
     @property
     def outputs(self):
         """Outputs from this cable (only one)."""
@@ -1383,7 +1441,7 @@ class PipelineOutputCable(PipelineCable):
         if self.source_step > self.pipeline.steps.all().count():
             raise ValidationError(
                 "Output requested from a non-existent step")
-        
+
         source_ps = self.pipeline.steps.get(step_num=self.source_step)
 
         # Try to find a matching output hole
@@ -1499,3 +1557,35 @@ class PipelineOutputCable(PipelineCable):
                 max_row=output_requested.get_max_row()
             )
             new_structure.save()
+
+    @transaction.atomic
+    def represent_as_dict(self):
+        """
+        Make a dict serialization of this POC.
+
+        The dict is structured as:
+         - output_idx: index of the resulting Pipeline output,
+         - output_name: name of the resulting Pipeline output
+         - output_CDT_pk: PK of the CDT of the resulting Pipeline output (could be changed by wiring)
+         - source_step: 1-based index of the step producing the output
+         - source_dataset_name: name of the source output
+         - x: x-coordinate of the corresponding Pipeline output
+         - y: y-coordinate of the same
+         - wires: list of dicts as produced by a CustomCableWire's represent_as_dict() method.
+        """
+        corresp_output = self.pipeline.outputs.get(dataset_name=self.output_name)
+        my_dict = {
+            "output_idx": self.output_idx,
+            "output_name": self.output_name,
+            "output_CDT_pk": self.output_cdt.pk,
+            "source_step": self.source_step,
+            "source_dataset_name": self.source.definite.dataset_name,
+            "x": corresp_output.x,
+            "y": corresp_output.y,
+            "wires": []
+        }
+
+        for wire in self.custom_wires.all():
+            my_dict["wires"].append(wire.represent_as_dict())
+
+        return my_dict
