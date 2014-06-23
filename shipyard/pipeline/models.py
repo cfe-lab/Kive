@@ -372,6 +372,7 @@ class Pipeline(transformation.models.Transformation):
         # Make a new revision.
         new_revision = self.family.members.create(
             revision_parent=self,
+            revision_number=self.family.num_revisions+1,
             revision_name=revision_name,
             revision_desc=revision_desc,
             canvas_height=canvas_height,
@@ -410,6 +411,7 @@ class Pipeline(transformation.models.Transformation):
 
             # Make a new Pipeline revision within this PipelineFamily.
             pipeline = pl_family.members.create(
+                revision_number=1,
                 revision_name=form_data['revision_name'],
                 revision_desc=form_data['revision_desc'],
                 canvas_width=form_data["canvas_width"],
@@ -417,6 +419,7 @@ class Pipeline(transformation.models.Transformation):
             )
         else:
             # Update the current Pipeline.
+            pipeline.revision_number = pl_family.num_revisions+1
             pipeline.revision_name = form_data['revision_name']
             pipeline.revision_desc = form_data['revision_desc']
             pipeline.canvas_width = form_data["canvas_width"]

@@ -17,9 +17,15 @@ def populate_method_revision_dropdown (request):
             method_dicts = []
             for curr_method in Method.objects.filter(family=method_family).order_by('-pk'):
                 driver = curr_method.driver
+                parent = driver.coderesource
                 method_dicts.append({"pk": curr_method.pk, "model": "method.method",
-                                     "fields": {'revision_number': driver.revision_number,
-                                                'revision_name': driver.revision_name}})
+                                     "fields": {'driver_number': driver.revision_number,
+                                                'driver_name': driver.revision_name,
+                                                'filename': parent.filename,
+                                                'method_number': curr_method.revision_number,
+                                                'method_name': curr_method.revision_name,
+                                                'method_desc': curr_method.revision_desc
+                                                }})
 
             response.write(json.dumps(method_dicts))
         return response

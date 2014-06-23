@@ -30,6 +30,13 @@ class TransformationFamily(models.Model):
         "Transformation family description",
 		help_text="A description for this collection of methods/pipelines")
 
+    @property
+    def num_revisions(self):
+        """
+        Number of revisions within this TransformationFamily
+        """
+        return Transformation.objects.filter(family=self).count()
+
     def __unicode__(self):
         """ Describe transformation family by it's name """
         return self.name
@@ -57,6 +64,8 @@ class Transformation(models.Model):
 		"Transformation revision description",
 		help_text="Description of this transformation revision")
 
+    revision_number = models.IntegerField('Transformation revision number',
+                                          help_text='Revision number of Transformation in its family')
     # Implicitly defined:
     # - inputs (via FK of TransformationInput)
     # - outputs (via FK of TransformationOutput)
