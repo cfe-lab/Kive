@@ -15,38 +15,6 @@
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
-    <script>
-        $(function() {
-            // see http://jqueryui.com/dialog/#modal-form
-            var output_name = $( '#output_name'),
-                allFields = $( [] ).add( output_name );
-
-            $( "#dialog-form" ).dialog({
-                autoOpen: false,
-
-                // http://stackoverflow.com/questions/896777/remove-close-button-on-jqueryui-dialog
-                closeOnEscape: false,
-                open: function(event, ui) { $(".ui-dialog-titlebar-close", ui.dialog || ui).hide(); },
-
-                height: 120,
-                width: 350,
-                modal: true,
-                buttons: {
-                    "Create output": function() {
-                        console.log($('#output_name').val());
-
-                        $( this ).dialog( "close" );
-                    },
-                    Cancel: function() {
-                        $( this ).dialog( "close" );
-                    }
-                },
-                close: function() {
-                    allFields.val( "" ).removeClass( "ui-state-error" );
-                }
-            });
-        })
-    </script>
 
 {% endblock %}
 

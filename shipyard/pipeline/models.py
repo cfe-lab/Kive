@@ -41,7 +41,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     @property
     def size(self):
         """Returns size of this Pipeline's family"""
-        return len(Pipeline.objects.filter(family=self))
+        return Pipeline.objects.filter(family=self).count()
     pass
 
 
@@ -73,6 +73,18 @@ class Pipeline(transformation.models.Transformation):
     canvas_height = models.IntegerField(default=600, validators=[MinValueValidator(0)])
     canvas_width = models.IntegerField(default=800, validators=[MinValueValidator(0)])
 
+    # June 24, 2014: moved this here from Transformation so that it can be put into
+    # the unique_together statement below.
+    revision_number = models.PositiveIntegerField(
+        'Pipeline revision number',
+        help_text='Revision number of this Pipeline in its family',
+        validators=[MinValueValidator(1)]
+    )
+
+    # revision_number must be unique within PipelineFamily.
+    class Meta:
+        unique_together = (("family", "revision_number"))
+
     def __unicode__(self):
         """Represent pipeline by revision name and pipeline family"""
 
@@ -97,7 +109,7 @@ class Pipeline(transformation.models.Transformation):
     @property
     def family_size(self):
         """Returns size of this Pipeline's family"""
-        return len(Pipeline.objects.filter(family=self.family))
+        return Pipeline.objects.filter(family=self.family).count()
 
     def clean(self):
         """
@@ -293,6 +305,7 @@ class Pipeline(transformation.models.Transformation):
         # Make a new revision.
         new_revision = self.family.members.create(
             revision_parent=self,
+            revision_number=self.family.num_revisions+1,
             revision_name=revision_name,
             revision_desc=revision_desc,
             canvas_height=canvas_height,
@@ -426,6 +439,7 @@ class Pipeline(transformation.models.Transformation):
 
             # Make a new Pipeline revision within this PipelineFamily.
             pipeline = pl_family.members.create(
+                revision_number=1,
                 revision_name=form_data['revision_name'],
                 revision_desc=form_data['revision_desc'],
                 canvas_width=form_data["canvas_width"],
@@ -433,6 +447,7 @@ class Pipeline(transformation.models.Transformation):
             )
         else:
             # Update the current Pipeline.
+            pipeline.revision_number = pl_family.num_revisions+1
             pipeline.revision_name = form_data['revision_name']
             pipeline.revision_desc = form_data['revision_desc']
             pipeline.canvas_width = form_data["canvas_width"]
@@ -453,7 +468,7 @@ class Pipeline(transformation.models.Transformation):
             pipeline.create_outcable_from_dict(outcable_dict)
 
         try:
-            pipeline.clean()
+            pipeline.complete_clean()
             pipeline.save()
         except ValidationError as e:
             raise PipelineSerializationException("Pipeline is invalid: {}".format(e))

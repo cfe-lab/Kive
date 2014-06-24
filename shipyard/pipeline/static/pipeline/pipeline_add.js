@@ -59,11 +59,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         var options = [];
                         var arr = JSON.parse(result)
                         $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '">', value.fields.revision_number, ': ', value.fields.revision_name, '</option>');
+                            options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
                         });
                         $("#id_select_method").show().html(options.join(''));
+                        $('#id_select_method').change();
                     }
-                })
+                });
                 
                 $('#id_method_revision_field').show().focus();
             }
@@ -72,6 +73,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
     ).change(); // trigger on load
+
+    $('#id_select_method').on('change', function() {
+        var filename = $('#id_select_method option:selected')[0].title;
+        $('#id_method_name').val(filename);
+    });
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
@@ -303,16 +309,35 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
+
+    // draw dialog on trigger
+    $( "#dialog-form" ).dialog({
+        autoOpen: false,
+        height: 120,
+        width: 350,
+        modal: true,
+        buttons: {
+            "Create output": function() {
+                var connector = $('#dialog-form').data().sender;
+                connector.dest = $('#output_name').val();
+                connector.draw(canvasState.ctx);
+                $( this ).dialog( "close" );
+            },
+            Cancel: function() {
+                $( this ).dialog( "close" );
+            }
+        },
+        close: function() {
+        }
+    });
+
     /* submit form */
     $('#id_pipeline_form').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
-        console.log('submit form');
 
         e.preventDefault(); // override form submit action
-
-        console.log(canvasState);
 
         // Since a field contains its label on pageload, a field's label as its value is treated as blank
         $('input, textarea', this).each(function() {
@@ -377,7 +402,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var pipeline_has_output = false;
         for (i = 0; i < connectors.length; i++) {
             this_connector = connectors[i];
-            if (this_connector.in_magnet === '__output__') {
+            if (this_connector.dest.constructor === String) {
                 pipeline_has_output = true;
             }
         }
@@ -461,7 +486,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         continue;
                     }
                     // trace up the Connector
-                    this_parent = this_magnet.connected[0].out_magnet.parent;  // in-magnets only have 1 connector
+                    this_parent = this_magnet.connected[0].source.parent;  // in-magnets only have 1 connector
                     if (this_parent.constructor === MethodNode) {  // ignore connections from data nodes
                         if ($.inArray(this_parent, sorted_elements) < 0) {
                             // dependency not cleared
@@ -488,7 +513,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var output_cables = [];
         for (i = 0; i < connectors.length; i++) {
             this_connector = connectors[i];
-            if (this_connector.in_magnet === '__output__') {
+            if (this_connector.dest.constructor === String) {
                 // connector terminates in output end-zone
                 output_cables.push(this_connector);
             }
@@ -523,15 +548,15 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     continue;
                 }
                 this_connector = this_magnet.connected[0];
-                this_source = this_connector.out_magnet.parent;
+                this_source = this_connector.source.parent;
 
                 if (this_source.constructor === MethodNode) {
                     form_data['pipeline_steps'][i]['cables_in'][j] = {
                         //'source_type': 'Method',
                         //'source_pk': this_source.pk,
-                        'source_dataset_name': this_connector.out_magnet.label,
+                        'source_dataset_name': this_connector.source.label,
                         'source_step_num': sorted_elements.indexOf(this_source)+1,
-                        'dest_dataset_name': this_connector.in_magnet.label,
+                        'dest_dataset_name': this_connector.dest.label,
                         "keep_output": false, // in the future this can be more flexible
                         "wires": [] // in the future we can specify custom wires here
                     };
@@ -541,9 +566,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     form_data['pipeline_steps'][i]['cables_in'][j] = {
                         //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
                         //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
-                        'source_dataset_name': this_connector.out_magnet.label,
+                        'source_dataset_name': this_connector.source.label,
                         'source_step_num': 0,
-                        'dest_dataset_name': this_connector.in_magnet.label,
+                        'dest_dataset_name': this_connector.dest.label,
                         "keep_output": false, // in the future this can be more flexible
                         "wires": [] // no wires for a raw cable
                     };
@@ -555,15 +580,15 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         for (j = 0; j < output_cables.length; j++) {
             this_connector = output_cables[j];
-            this_source_step = this_connector.out_magnet.parent;
+            var this_source_step = this_connector.source.parent;
 
             form_data["pipeline_output_cables"][j] = {
                 'output_idx': j+1,
-                'output_name': this_connector.out_magnet.label,  // use same for now
-                "output_CDT_pk": this_connector.out_magnet.cdt,
+                'output_name': this_connector.dest,
+                "output_CDT_pk": this_connector.source.cdt,
                 'source': this_source_step.pk,
                 'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
-                'dataset_name': this_connector.out_magnet.label,  // magnet label
+                'dataset_name': this_connector.source.label,  // magnet label
                 'x': this_connector.x,
                 'y': this_connector.y,
                 "wires": [] // in the future we might have this
@@ -575,9 +600,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // this code modified at my desk
         // June 18, 2014 -- RL
-
         console.log(form_data);
-
 
         // do AJAX transaction
         $.ajax({

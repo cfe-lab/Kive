@@ -3,19 +3,23 @@ Unit tests for Shipyard method models.
 """
 
 # from django.test import TestCase
+
+import filecmp
+import hashlib
+import os.path
+import re
+import shutil
+import tempfile
+
 from django.core.exceptions import ValidationError
 from django.core.files import File
 
-import os.path
-import os
-import shutil
-import tempfile
-import filecmp
-
-from method.models import *
-from metadata.models import *
-import metadata.tests
 from constants import datatypes
+from metadata.models import CompoundDatatype, Datatype
+import metadata.tests
+from method.models import CodeResource, CodeResourceDependency, \
+    CodeResourceRevision, Method, MethodFamily
+    
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
@@ -35,19 +39,19 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
 
         # Define comp_cr
         self.comp_cr = CodeResource(
-                name="complement",
-                description="Complement DNA/RNA nucleotide sequences",
-                filename="complement.py")
+            name="complement",
+            description="Complement DNA/RNA nucleotide sequences",
+            filename="complement.py")
         self.comp_cr.save()
 
         # Define compv1_crRev for comp_cr
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
             self.compv1_crRev = CodeResourceRevision(
-                    coderesource=self.comp_cr,
-                    revision_name="v1",
-                    revision_number=1,
-                    revision_desc="First version",
-                    content_file=File(f))
+                coderesource=self.comp_cr,
+                revision_name="v1",
+                revision_number=1,
+                revision_desc="First version",
+                content_file=File(f))
             self.compv1_crRev.full_clean()
             self.compv1_crRev.save()
 
@@ -121,30 +125,31 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
 
         # Define DNAcomp_mf
         self.DNAcomp_mf = MethodFamily(
-                name="DNAcomplement",
-                description="Complement DNA nucleotide sequences.")
+            name="DNAcomplement",
+            description="Complement DNA nucleotide sequences.")
         self.DNAcomp_mf.full_clean()
         self.DNAcomp_mf.save()
 
         # Define DNAcompv1_m (method revision) for DNAcomp_mf with driver compv1_crRev
         self.DNAcompv1_m = self.DNAcomp_mf.members.create(
-                revision_name="v1",
-                revision_desc="First version",
-                driver=self.compv1_crRev)
+            revision_name="v1",
+            revision_desc="First version",
+            revision_number=1,
+            driver=self.compv1_crRev)
 
         # Add input DNAinput_cdt to DNAcompv1_m
         self.DNAinput_ti = self.DNAcompv1_m.create_input(
-                compounddatatype = self.DNAinput_cdt,
-                dataset_name = "input",
-                dataset_idx = 1)
+            compounddatatype = self.DNAinput_cdt,
+            dataset_name = "input",
+            dataset_idx = 1)
         self.DNAinput_ti.full_clean()
         self.DNAinput_ti.save()
 
         # Add output DNAoutput_cdt to DNAcompv1_m
         self.DNAoutput_to = self.DNAcompv1_m.create_output(
-                compounddatatype = self.DNAoutput_cdt,
-                dataset_name = "output",
-                dataset_idx = 1)
+            compounddatatype = self.DNAoutput_cdt,
+            dataset_name = "output",
+            dataset_idx = 1)
         self.DNAoutput_to.full_clean()
         self.DNAoutput_to.save()
 
@@ -153,50 +158,53 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # automatically copied over from the parent using save(), now
         # we explicitly call copy_io_from_parent.
         self.DNAcompv2_m = self.DNAcomp_mf.members.create(
-                revision_name="v2",
-                revision_desc="Second version",
-                revision_parent=self.DNAcompv1_m,
-                driver=self.compv2_crRev)
+            revision_name="v2",
+            revision_desc="Second version",
+            revision_number=2,
+            revision_parent=self.DNAcompv1_m,
+            driver=self.compv2_crRev)
         self.DNAcompv2_m.full_clean()
         self.DNAcompv2_m.save()
         self.DNAcompv2_m.copy_io_from_parent()
 
         # Define second family, RNAcomp_mf
         self.RNAcomp_mf = MethodFamily(
-                name="RNAcomplement",
-                description="Complement RNA nucleotide sequences.")
+            name="RNAcomplement",
+            description="Complement RNA nucleotide sequences.")
         self.RNAcomp_mf.full_clean()
         self.RNAcomp_mf.save()
 
         # Define RNAcompv1_m for RNAcomp_mf with driver compv1_crRev
         self.RNAcompv1_m = self.RNAcomp_mf.members.create(
-                revision_name="v1",
-                revision_desc="First version",
-                driver=self.compv1_crRev)
+            revision_name="v1",
+            revision_desc="First version",
+            revision_number=1,
+            driver=self.compv1_crRev)
         
         # Add input RNAinput_cdt to RNAcompv1_m
         self.RNAinput_ti = self.RNAcompv1_m.create_input(
-                compounddatatype = self.RNAinput_cdt,
-                dataset_name = "input",
-                dataset_idx = 1)
+            compounddatatype = self.RNAinput_cdt,
+            dataset_name = "input",
+            dataset_idx = 1)
         self.RNAinput_ti.full_clean()
         self.RNAinput_ti.save()
 
         # Add output RNAoutput_cdt to RNAcompv1_m
         self.RNAoutput_to = self.RNAcompv1_m.create_output(
-                compounddatatype = self.RNAoutput_cdt,
-                dataset_name = "output",
-                dataset_idx = 1)
+            compounddatatype = self.RNAoutput_cdt,
+            dataset_name = "output",
+            dataset_idx = 1)
         self.RNAoutput_to.full_clean()
         self.RNAoutput_to.save()
 
         # Define RNAcompv2_m for RNAcompv1_mf with driver compv2_crRev
         # May 20, 2014: again, we now explicitly copy over the inputs/outputs.
         self.RNAcompv2_m = self.RNAcomp_mf.members.create(
-                revision_name="v2",
-                revision_desc="Second version",
-                revision_parent=self.RNAcompv1_m,
-                driver=self.compv2_crRev)
+            revision_name="v2",
+            revision_desc="Second version",
+            revision_number=2,
+            revision_parent=self.RNAcompv1_m,
+            driver=self.compv2_crRev)
         self.RNAcompv2_m.full_clean()
         self.RNAcompv2_m.save()
         self.RNAcompv2_m.copy_io_from_parent()
@@ -229,13 +237,14 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_1_method = Method(
             revision_name="script1",
             revision_desc="script1",
+            revision_number=1,
             family = self.test_mf,driver = self.script_1_crRev)
         self.script_1_method.save()
 
         # Assign tuple as both an input and an output to script_1_method
         self.script_1_method.create_input(compounddatatype = self.tuple_cdt,
-                                           dataset_name = "input_tuple",
-                                           dataset_idx = 1)
+                                          dataset_name = "input_tuple",
+                                          dataset_idx = 1)
         self.script_1_method.create_output(compounddatatype = self.tuple_cdt,
                                            dataset_name = "input_tuple",
                                            dataset_idx = 1)
@@ -265,6 +274,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_2_method = Method(
             revision_name="script2",
             revision_desc="script2",
+            revision_number=2,
             family = self.test_mf, driver = self.script_2_crRev)
         self.script_2_method.save()
 
@@ -307,20 +317,21 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_3_method = Method(
             revision_name="script3",
             revision_desc="script3",
+            revision_number=3,
             family = self.test_mf,
             driver = self.script_3_crRev)
         self.script_3_method.save()
 
         # Assign singlet as input and output
         self.script_3_method.create_input(compounddatatype = self.singlet_cdt,
-                                           dataset_name = "k",
-                                           dataset_idx = 1)
+                                          dataset_name = "k",
+                                          dataset_idx = 1)
 
         self.script_3_method.create_input(compounddatatype = self.singlet_cdt,
-                                           dataset_name = "r",
-                                           dataset_idx = 2,
-                                           max_row = 1,
-                                           min_row = 1)
+                                          dataset_name = "r",
+                                          dataset_idx = 2,
+                                          max_row = 1,
+                                          min_row = 1)
 
         self.script_3_method.create_output(compounddatatype = self.singlet_cdt,
                                            dataset_name = "kr",
@@ -342,6 +353,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.DNArecomp_m = self.DNArecomp_mf.members.create(
             revision_name="v1",
             revision_desc="First version",
+            revision_number=1,
             driver=self.compv2_crRev)
 
         # To this method revision, add inputs with CDT DNAoutput_cdt
@@ -390,6 +402,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_4_1_M = Method(
             revision_name="s4",
             revision_desc="s4",
+            revision_number=1,
             family = self.test_MF,
             driver = self.script_4_1_CRR)
         self.script_4_1_M.save()
@@ -421,7 +434,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         
         mfamily = MethodFamily(name="noop"); mfamily.save()
         self.noop_method = Method(family=mfamily, driver=revision,
-            revision_name = "1", revision_desc = "first version")
+            revision_name = "1", revision_desc = "first version", revision_number=1)
         self.noop_method.save()
         self.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
         self.noop_method.clean()
@@ -1843,7 +1856,8 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # check_input_indices() should not raise a ValidationError
@@ -1858,12 +1872,13 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # Add one valid input cdt at index 1 named "oneinput" to transformation
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
 
         # check_input_indices() should not raise a ValidationError
         self.assertEquals(foo.check_input_indices(), None)
@@ -1877,16 +1892,17 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # Add several input cdts that together are valid
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=2)
+                         dataset_name="twoinput", dataset_idx=2)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=3)
+                         dataset_name="threeinput", dataset_idx=3)
 
         # No ValidationErrors should be raised
         self.assertEquals(foo.check_input_indices(), None)
@@ -1900,16 +1916,17 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # Add several input cdts that together are valid
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=3)
+                         dataset_name="oneinput", dataset_idx=3)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=1)
+                         dataset_name="twoinput", dataset_idx=1)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=2)
+                         dataset_name="threeinput", dataset_idx=2)
 
         # No ValidationErrors should be raised
         self.assertEquals(foo.check_input_indices(), None)
@@ -1922,52 +1939,55 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # Add one invalid input cdt at index 4 named "oneinput"
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=4)
+                         dataset_name="oneinput", dataset_idx=4)
 
         # check_input_indices() should raise a ValidationError
         self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.check_input_indices)
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            foo.check_input_indices)
 
         self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean)
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            foo.clean)
 
     def test_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=2)
+                         dataset_name="oneinput", dataset_idx=2)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=6)
+                         dataset_name="twoinput", dataset_idx=6)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=1)
+                         dataset_name="threeinput", dataset_idx=1)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.check_input_indices)
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            foo.check_input_indices)
 
         self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean)
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            foo.clean)
 
     def test_no_outputs_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
 
         self.assertEquals(foo.check_output_indices(), None)
         self.assertEquals(foo.clean(), None)
@@ -1975,54 +1995,58 @@ class MethodTests(MethodTestSetup):
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=1)
+                          dataset_name="oneoutput", dataset_idx=1)
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         self.assertEquals(foo.check_output_indices(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_many_valid_outputs_scrambled_checkOutputIndices_good (self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="oneoutput", dataset_idx=3)
+                          dataset_name="oneoutput", dataset_idx=3)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="twooutput", dataset_idx=1)
+                          dataset_name="twooutput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
-                           dataset_name="threeoutput", dataset_idx=2)
+                          dataset_name="threeoutput", dataset_idx=2)
         self.assertEquals(foo.check_output_indices(), None)
         self.assertEquals(foo.clean(), None)
 
     def test_one_invalid_output_checkOutputIndices_bad (self):
         """Test output index check, one badly-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
                           dataset_name="oneoutput", dataset_idx=4)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.check_output_indices)
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.check_output_indices)
 
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.clean)
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.clean)
 
     def test_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
         
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -2034,9 +2058,9 @@ class MethodTests(MethodTestSetup):
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
                           dataset_name="threeoutput", dataset_idx=1)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.check_output_indices)
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.check_output_indices)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -2048,7 +2072,8 @@ class MethodTests(MethodTestSetup):
 
         # Define new Method with no parent
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", revision_number=self.DNAcomp_mf.members.count() + 1,
+                     driver=self.compv1_crRev)
         foo.save()
 
         # There should be no inputs
@@ -2149,7 +2174,8 @@ class MethodTests(MethodTestSetup):
 
         # Multiple output case (using script_2_method).
         foo = Method(family=self.test_mf, driver=self.script_2_crRev,
-                     revision_parent=self.script_2_method)
+                     revision_parent=self.script_2_method,
+                     revision_number=self.test_mf.members.count() + 1)
         foo.save()
         foo.copy_io_from_parent()
         # Check that it has the same input as script_2_method:
@@ -2178,7 +2204,8 @@ class MethodTests(MethodTestSetup):
 
         # Multiple input case (using script_3_method).
         bar = Method(family=self.test_mf, driver=self.script_3_crRev,
-                     revision_parent=self.script_3_method)
+                     revision_parent=self.script_3_method,
+                     revision_number=self.test_mf.members.count() + 1)
         bar.save()
         bar.copy_io_from_parent()
         # Check that the outputs match script_3_method:
@@ -2278,7 +2305,7 @@ class MethodTests(MethodTestSetup):
         res = CodeResource(); res.save()
         rev = CodeResourceRevision(coderesource=res, content_file=None, revision_number=1); rev.clean(); rev.save()
         f = MethodFamily(); f.save()
-        m = Method(family=f, driver=rev)
+        m = Method(family=f, driver=rev, revision_number=f.members.count() + 1)
         m.save()
         m.create_input(compounddatatype = self.singlet_cdt,
             dataset_name = "input",
@@ -2295,7 +2322,7 @@ class MethodTests(MethodTestSetup):
         empty_dir = tempfile.mkdtemp()
 
         proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [])
-        proc_out, proc_err = proc.communicate()
+        proc_out, _ = proc.communicate()
 
         self.assertEqual(proc_out, self.noop_indata)
 

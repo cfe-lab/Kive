@@ -300,11 +300,12 @@ function Connector (from_x, from_y, out_magnet) {
     - on mouse up
         - if mouse NOT on CDT-matched in-magnet, delete Connector
      */
-    this.in_magnet = null;
-    this.out_magnet = out_magnet || null;
+    this.dest = null;
+    this.source = out_magnet || null;
 
     // is this Connector being drawn from an out-magnet?
-    if (this.out_magnet == null) {
+    if (this.source == null) {
+        // FIXME: currently this should never be the case - afyp
         this.fromX = from_x;
         this.fromY = from_y;
     } else {
@@ -326,21 +327,21 @@ Connector.prototype.draw = function(ctx) {
 
     if (this.out_magnet !== null) {
         // update coordinates in case magnet has moved
-        this.fromX = this.out_magnet.x;
-        this.fromY = this.out_magnet.y;
+        this.fromX = this.source.x;
+        this.fromY = this.source.y;
     }
 
-    if (this.in_magnet !== null) {
-        if (this.in_magnet === '__output__') {
-            // Connector to output, present label
+    if (this.dest !== null) {
+        if (this.dest.constructor === Magnet) {
+            // move with the attached shape
+            this.x = this.dest.x;
+            this.y = this.dest.y;
+        } else if (this.dest.constructor === String) {
+            // string value indicates Connector to output, present label
             ctx.fillStyle = '#000';
             ctx.textAlign = 'left';
             ctx.font = '10pt Lato, sans-serif';
-            ctx.fillText(this.out_magnet.label, this.x+2, this.y);
-        } else {
-            // attachment to in-magnet of a shape that may have moved
-            this.x = this.in_magnet.x;
-            this.y = this.in_magnet.y;
+            ctx.fillText(this.dest, this.x+2, this.y);
         }
     }
     ctx.beginPath();

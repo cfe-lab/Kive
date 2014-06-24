@@ -148,12 +148,12 @@ CanvasState.prototype.doMove = function(e) {
             // are we carrying a connector?
             if (typeof this.selection.fromX != 'undefined') {
                 // reset to allow mouse to disengage Connector from a magnet
-                this.selection.in_magnet = null;
+                this.selection.dest = null;
 
                 // get this connector's shape
                 var own_shape = null;
-                if (this.selection.out_magnet !== null) {
-                    own_shape = this.selection.out_magnet.parent;
+                if (this.selection.source !== null) {
+                    own_shape = this.selection.source.parent;
                 }
 
                 // check if connector has been dragged to an in-magnet
@@ -179,27 +179,28 @@ CanvasState.prototype.doMove = function(e) {
                         if (own_shape.constructor === RawNode) {
                             connector_carrying_cdt = '__raw__';
                         } else {
-                            connector_carrying_cdt = this.selection.out_magnet.cdt;
+                            connector_carrying_cdt = this.selection.source.cdt;
                         }
 
                         // does this in-magnet accept this CompoundDatatype?
                         if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = 'yellow';
-                            if (in_magnet.connected.length == 0 && in_magnet.contains(this.selection.x, this.selection.y)) {
+                            if (in_magnet.connected.length == 0 &&
+                                in_magnet.contains(this.selection.x, this.selection.y)) {
                                 // jump to magnet
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
-                                this.selection.in_magnet = in_magnet;
+                                this.selection.dest = in_magnet;
                             }
                         }
                     }
                 }
             } else {
                 // carrying a shape
-                if (mouse.x < 0.1 * this.width || mouse.x > 0.9 * this.width) {
-                    // prevent shapes from being carried into end-zones
-                    return;
+                if (mouse.x > 0.9 * this.width) {
+                    // prevent shapes from being carried into output end-zone
+                    this.selection.x = 0.9 * this.width;
                 }
             }
         }
@@ -216,15 +217,13 @@ CanvasState.prototype.doUp = function(e) {
     }
 
     var connector = this.selection;
-    var in_magnet = connector.in_magnet;
-    var out_magnet = connector.out_magnet;
 
-    if (in_magnet === null) {
+    if (connector.dest === null) {
         var mouse = this.getPos(e);
 
         if (mouse.x > 0.9 * this.canvas.width) {
             // Connector drawn into output end-zone
-            if (out_magnet.parent.constructor !== MethodNode) {
+            if (connector.source.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
                 this.connectors.pop();
                 this.selection = null;
@@ -233,38 +232,28 @@ CanvasState.prototype.doUp = function(e) {
                 // valid Connector, assign non-null value
 
                 // spawn dialog for output label
-                $( "#dialog-form" ).dialog( "open" );
-                $('#output_name').val(connector.out_magnet.label);  // default value
-
-                connector.in_magnet = '__output__';
-                connector.out_magnet.connected.push(connector);
-                connector.x = mouse.x;  // FIXME: is this necessary?
-                connector.y = mouse.y;
+                $( "#dialog-form" ).data('sender', connector).dialog('open');
+                $('#output_name').val(connector.source.label);  // default value
+                connector.dest = connector.source.label;
+                connector.source.connected.push(connector);
+                connector.x = 0.91 * this.canvas.width; // snap to edge
             }
         } else {
             // Connector not linked to anything - delete
-            if (in_magnet === null) {
-                // not connected
-                this.connectors.pop();
-                this.selection = null;
-                this.valid = false; // redraw canvas to remove this Connector
-            }
+            this.connectors.pop();
+            this.selection = null;
+            this.valid = false; // redraw canvas to remove this Connector
         }
     } else {
         // connector has been linked to an in-magnet
-        if (out_magnet.connected.indexOf(connector) < 0) {
+        if (connector.source.connected.indexOf(connector) < 0) {
             // this is a new Connector, update source magnet
-            connector.out_magnet.connected.push(connector);
+            connector.source.connected.push(connector);
         }
 
-        // if destination is output end-zone, then do not update
-        if (in_magnet.constructor === Magnet) {
-            if (in_magnet.connected.indexOf(connector) < 0) {
-                // this is a new Connector, update destination magnet
-                connector.in_magnet.connected.push(connector);
-            }
-        } else {
-            in_magnet = '__output__';
+        if (connector.dest.connected.indexOf(connector) < 0) {
+            // this is a new Connector, update destination magnet
+            connector.dest.connected.push(connector);
         }
     }
 
@@ -315,7 +304,8 @@ CanvasState.prototype.draw = function() {
         for (var i = 0; i < shapes.length; i++) {
             var shape = shapes[i];
             // skip shapes moved off the screen
-            if (shape.x > this.width || shape.y > this.height || shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
+            if (shape.x > this.width || shape.y > this.height ||
+                shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
                 continue;
             }
             shapes[i].draw(ctx);
@@ -374,8 +364,8 @@ CanvasState.prototype.deleteObject = function() {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
             mySel.in_magnet.connected = [];
-            index = mySel.out_magnet.connected.indexOf(mySel);
-            mySel.out_magnet.connected.splice(index, 1);
+            index = mySel.source.connected.indexOf(mySel);
+            mySel.source.connected.splice(index, 1);
             index = this.connectors.indexOf(mySel);
             this.connectors.splice(index, 1);
         }
@@ -388,7 +378,7 @@ CanvasState.prototype.deleteObject = function() {
                     this_connector = in_magnet.connected[0];
 
                     // remove reference from out-magnet of source node
-                    out_magnet = this_connector.out_magnet;
+                    out_magnet = this_connector.source;
                     index = out_magnet.connected.indexOf(this_connector);
                     out_magnet.connected.splice(this_connector, 1);
 
@@ -434,9 +424,9 @@ CanvasState.prototype.deleteObject = function() {
                     index = this.connectors.indexOf(this_connector);
                     this.connectors.splice(index, 1);
 
-                    if (this_connector.in_magnet !== undefined && this_connector.in_magnet.constructor == Magnet) {
+                    if (this_connector.dest !== undefined && this_connector.dest.constructor == Magnet) {
                         // in-magnets can accept only one Connector
-                        this_connector.in_magnet.connected = [];
+                        this_connector.dest.connected = [];
                     }
                 }
                 out_magnet.connected = [];
@@ -450,24 +440,3 @@ CanvasState.prototype.deleteObject = function() {
     }
 };
 
-/*
-CanvasState.prototype.submitForm = function() {
-    var form_str = $('form').serialize();
-
-    var shapes = this.shapes;
-    for (var i = 0; i < shapes.length; i++) {
-
-    }
-
-    $.ajax({
-        type: "POST",
-        url: "pipeline_add",
-        contentType: 'text/javascript; charset=UTF-8',
-        data: form_str,
-        dataType: "json",
-        success: function(result) {
-            console.log(result);
-        }
-    })
-};
-*/

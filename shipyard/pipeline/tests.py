@@ -47,7 +47,8 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         # Define DNAcompv1_p (pipeline revision)
         self.DNAcompv1_p = self.DNAcomp_pf.members.create(
             revision_name="v1",
-            revision_desc="First version")
+            revision_desc="First version",
+            revision_number=1)
 
         # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
         self.DNAcompv1_p.create_input(
@@ -118,7 +119,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_one_valid_input_clean(self):
         """Test input index check, one well-indexed input case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -131,7 +133,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_one_invalid_input_clean(self):
         """Test input index check, one badly-indexed input case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=4)
@@ -144,11 +147,11 @@ class PipelineTests(PipelineTestSetup):
                 "Inputs are not consecutively numbered starting from 1",
                 foo.complete_clean)
 
-
     def test_pipeline_many_valid_inputs_clean(self):
         """Test input index check, well-indexed multi-input case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -161,7 +164,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_many_valid_inputs_scrambled_clean(self):
         """Test input index check, well-indexed multi-input (scrambled order) case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=2)
@@ -171,11 +175,11 @@ class PipelineTests(PipelineTestSetup):
                           dataset_name="threeinput", dataset_idx=1)
         self.assertEquals(foo.clean(), None)
 
-
     def test_pipeline_many_invalid_inputs_clean(self):
         """Test input index check, badly-indexed multi-input case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=2)
@@ -191,7 +195,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_one_valid_step_clean(self):
         """Test step index check, one well-indexed step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -212,7 +217,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_one_bad_step_clean(self):
         """Test step index check, one badly-indexed step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -225,7 +231,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_many_valid_steps_clean(self):
         """Test step index check, well-indexed multi-step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -239,7 +246,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_many_valid_steps_scrambled_clean(self):
         """Test step index check, well-indexed multi-step (scrambled order) case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -253,7 +261,8 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_many_invalid_steps_clean(self):
         """Test step index check, badly-indexed multi-step case."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -273,7 +282,8 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline 'foo' in family 'DNAcomp_pf'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Add single, validly indexed pipeline input
@@ -299,13 +309,14 @@ class PipelineTests(PipelineTestSetup):
         # Define a pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         
         # Define a validly indexed pipeline input
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         # Define step 2 without a step 1
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
@@ -332,7 +343,8 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define pipeline input for 'foo'
@@ -370,7 +382,8 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define pipeline input "oneinput" for foo with CDT type test_cdt
@@ -401,24 +414,26 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
 
         # Give curr_method properly indexed input with min_row = 10
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  min_row=10)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 min_row=10)
 
         # Give curr_method an output named 'output'
         curr_method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
 
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define properly indexed pipeline input for 'foo'
@@ -454,30 +469,32 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
 
         # Give curr_method an input with min_row = 10
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1, min_row=10)
+                                 dataset_name="input",
+                                 dataset_idx=1, min_row=10)
 
         # Give curr_method an unconstrained output
         curr_method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
 
         # Define pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define pipeline input of foo to have min_row of 5
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1,
-                          min_row=5)
+                         dataset_name="oneinput",
+                         dataset_idx=1,
+                         min_row=5)
 
         # Assign curr_method to step1 of foo
         step1 = foo.steps.create(transformation=curr_method,
@@ -499,7 +516,6 @@ class PipelineTests(PipelineTestSetup):
                 "Data fed to input \"input\" of step 1 may have too few rows",
                 foo.clean)
 
-
     def test_pipeline_oneStep_cabling_maxRow_constraints_may_be_breached_clean(self):
         """Unverifiable cabling: step requests input with possibly too many rows
         (input max_row unspecified)"""
@@ -508,24 +524,26 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1, max_row=10)
+                                 dataset_name="input",
+                                 dataset_idx=1, max_row=10)
        
         curr_method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
 
         # Define pipeline with unrestricted Pipeline input
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         # Assign curr_method to step 1 of foo, and cable the pipeline input to it
         step1 = foo.steps.create(transformation=curr_method, step_num=1)
@@ -545,7 +563,6 @@ class PipelineTests(PipelineTestSetup):
                 "Data fed to input \"input\" of step 1 may have too many rows",
                 foo.clean)
 
-
     def test_pipeline_oneStep_cabling_maxRow_constraints_may_breach_each_other_clean (self):
         """Unverifiable cabling: step requests input with possibly too
         many rows (max_row set for pipeline input)."""
@@ -554,24 +571,26 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  max_row=10)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 max_row=10)
         curr_method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
 
         # Define pipeline foo with Pipeline input having max_row = 20
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1,
-                          max_row=20)
+                         dataset_name="oneinput", dataset_idx=1,
+                         max_row=20)
 
         # Assign curr_method to foo step 1
         step1 = foo.steps.create(transformation=curr_method,
@@ -597,7 +616,8 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo with unconstrained input
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput",
@@ -628,16 +648,17 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo with validly indexed input and step 1 cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
 
         # Index a non-existent step to outcable
         outcable = foo.outcables.create(
@@ -662,16 +683,17 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(dest=self.DNAcompv2_m.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
  
         # Reference a correct step but TransformationOutput from another Transformation.
         outcable = foo.outcables.create(output_name="oneoutput", output_idx=1,
@@ -680,11 +702,11 @@ class PipelineTests(PipelineTestSetup):
             output_cdt=self.RNAoutput_to.get_cdt())
         
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 1 does not produce output ".*"',
-                outcable.clean)
+            'Transformation at step 1 does not produce output ".*"',
+            outcable.clean)
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 1 does not produce output ".*"',
-                foo.clean)
+            'Transformation at step 1 does not produce output ".*"',
+            foo.clean)
         
     def test_pipeline_oneStep_outcable_references_deleted_output_clean (self):
         """Output cabling, one-step pipeline: request deleted step output (OK)"""
@@ -692,15 +714,16 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(dest=self.DNAcompv2_m.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
 
         # Mark DNAcompv2_m output as deletable.
         # August 24, 2013: this is now OK.
@@ -721,16 +744,17 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline with validly indexed inputs, steps, and cabling
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
 
         # Outcable references a valid step and output, but is itself badly indexed
         outcable = foo.create_outcable(
@@ -741,9 +765,9 @@ class PipelineTests(PipelineTestSetup):
         
         self.assertEquals(outcable.clean(), None)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.clean)
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.clean)
 
     def test_pipeline_manySteps_valid_internal_cabling_clean(self):
         """Test good step cabling, chained-step pipeline."""
@@ -751,11 +775,12 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline 'foo' with validly indexed input and steps
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         # Map pipeline input to step1
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
@@ -798,18 +823,19 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         # step1 receives input from Pipeline input
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
 
         # step2 receives output not coming from from step1's transformation
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
@@ -822,37 +848,38 @@ class PipelineTests(PipelineTestSetup):
         step3 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=3)
         step3.cables_in.create(dest=step3.transformation.inputs.get(dataset_name="input"),
-                              source_step=2,
-                              source=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"))
+                               source_step=2,
+                               source=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"))
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 1 does not produce output ".*"',
-                cable2.clean)
+            'Transformation at step 1 does not produce output ".*"',
+            cable2.clean)
 
         # Check propagation of error.
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 1 does not produce output ".*"',
-                step2.clean)
+            'Transformation at step 1 does not produce output ".*"',
+            step2.clean)
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 1 does not produce output ".*"',
-                foo.clean)
+            'Transformation at step 1 does not produce output ".*"',
+            foo.clean)
         
     def test_pipeline_manySteps_cabling_references_deleted_input_clean(self):
         """Cabling: later step requests input deleted by producing step (OK)."""
 
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
 
         # Connect step 1 with pipeline input
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
 
         # Connect step2 with output of step1
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
@@ -886,23 +913,24 @@ class PipelineTests(PipelineTestSetup):
         """Bad cabling: later step requests input of wrong CompoundDatatype."""
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="oneinput"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="oneinput"))
         
         step2 = foo.steps.create(transformation=self.DNArecomp_m,
                                  step_num=2)
         step2.cables_in.create(dest=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
-                              source_step=1,
-                              source=step1.transformation.outputs.get(dataset_name="output"))
+                               source_step=1,
+                               source=step1.transformation.outputs.get(dataset_name="output"))
         
         step3 = foo.steps.create(transformation=self.RNAcompv2_m,
                                  step_num=3)
@@ -913,17 +941,17 @@ class PipelineTests(PipelineTestSetup):
 
         self.assertEquals(cable.clean(), None)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-                cable.clean_and_completely_wired)
+            ValidationError,
+            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
+            cable.clean_and_completely_wired)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-                step3.clean)
+            ValidationError,
+            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
+            step3.clean)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-                foo.clean)
+            ValidationError,
+            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
+            foo.clean)
 
     def test_pipeline_manySteps_minRow_constraint_may_be_breached_clean (self):
         """Unverifiable cabling: later step requests input with possibly too few rows (min_row unset for providing step)."""
@@ -932,40 +960,43 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
-                                  dataset_name="complemented_seqs",
-                                  dataset_idx=1)
+                                 dataset_name="complemented_seqs",
+                                 dataset_idx=1)
         step2method.create_output(compounddatatype=self.DNAinput_cdt,
-                                   dataset_name="recomplemented_seqs",
-                                   dataset_idx=1)
+                                  dataset_name="recomplemented_seqs",
+                                  dataset_idx=1)
 
         # Define another method with validly indexed inputs and outputs
         # But with the inputs requiring min_row = 5
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
 
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  min_row=5)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 min_row=5)
         step3method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
         
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         
@@ -999,7 +1030,6 @@ class PipelineTests(PipelineTestSetup):
                 "Data fed to input \"input\" of step 3 may have too few rows",
                 foo.clean)
 
-
     def test_pipeline_manySteps_minrow_constraints_may_breach_each_other_clean(self):
         """Bad cabling: later step requests input with possibly too few rows (providing step min_row is set)."""
         
@@ -1007,35 +1037,38 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
-                                  dataset_name="complemented_seqs",
-                                  dataset_idx=1)
+                                 dataset_name="complemented_seqs",
+                                 dataset_idx=1)
         
         step2method.create_output(compounddatatype=self.DNAinput_cdt,
-                                   dataset_name="recomplemented_seqs",
-                                   dataset_idx=1,
-                                   min_row=5)
+                                  dataset_name="recomplemented_seqs",
+                                  dataset_idx=1,
+                                  min_row=5)
 
         # Define another method with input min row of 10
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  min_row=10)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 min_row=10)
         step3method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
 
         # Define pipeline foo with validly indexed inputs and steps
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1073,7 +1106,6 @@ class PipelineTests(PipelineTestSetup):
                 "Data fed to input \"input\" of step 3 may have too few rows",
                 foo.clean)
 
-
     def test_pipeline_manySteps_maxRow_constraint_may_be_breached_clean(self):
         """Bad cabling: later step requests input with possibly too many rows (max_row unset for providing step)."""
 
@@ -1081,37 +1113,40 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
-                                  dataset_name="complemented_seqs",
-                                  dataset_idx=1)
+                                 dataset_name="complemented_seqs",
+                                 dataset_idx=1)
         step2method.create_output(compounddatatype=self.DNAinput_cdt,
-                                   dataset_name="recomplemented_seqs",
-                                   dataset_idx=1)
+                                  dataset_name="recomplemented_seqs",
+                                  dataset_idx=1)
 
         # step3 has an input with max_row = 100
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
 
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  max_row=100)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 max_row=100)
         step3method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
         
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(
@@ -1131,15 +1166,13 @@ class PipelineTests(PipelineTestSetup):
             source_step=2,
             source=step2method.outputs.get(dataset_name="recomplemented_seqs"))
         self.assertRaisesRegexp(
-                ValidationError,
-                "Data fed to input \"input\" of step 3 may have too many rows",
-                cable.clean)
+            ValidationError,
+            "Data fed to input \"input\" of step 3 may have too many rows",
+            cable.clean)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Data fed to input \"input\" of step 3 may have too many rows",
-                foo.clean)
-
-
+            ValidationError,
+            "Data fed to input \"input\" of step 3 may have too many rows",
+            foo.clean)
 
     def test_pipeline_manySteps_cabling_maxRow_constraints_may_breach_each_other_clean (self):
         """Bad cabling: later step requests input with possibly too many rows (max_row for providing step is set)."""
@@ -1148,37 +1181,40 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
-                                  dataset_name="complemented_seqs",
-                                  dataset_idx=1)
+                                 dataset_name="complemented_seqs",
+                                 dataset_idx=1)
         step2method.create_output(compounddatatype=self.DNAinput_cdt,
-                                   dataset_name="recomplemented_seqs",
-                                   dataset_idx=1,
-                                   max_row=100)
+                                  dataset_name="recomplemented_seqs",
+                                  dataset_idx=1,
+                                  max_row=100)
 
         # step3 has a max_row = 50 on it's input
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
+                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
-                                  dataset_name="input",
-                                  dataset_idx=1,
-                                  max_row=50)
+                                 dataset_name="input",
+                                 dataset_idx=1,
+                                 max_row=50)
         step3method.create_output(compounddatatype=self.DNAoutput_cdt,
-                                   dataset_name="output",
-                                   dataset_idx=1)
+                                  dataset_name="output",
+                                  dataset_idx=1)
         
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+                         dataset_name="oneinput",
+                         dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m,
                                  step_num=1)
         step1.cables_in.create(
@@ -1198,19 +1234,19 @@ class PipelineTests(PipelineTestSetup):
             source_step=2,
             source=step2method.outputs.get(dataset_name="recomplemented_seqs"))
         self.assertRaisesRegexp(
-                ValidationError,
-                "Data fed to input \"input\" of step 3 may have too many rows",
-                cable.clean)
+            ValidationError,
+            "Data fed to input \"input\" of step 3 may have too many rows",
+            cable.clean)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Data fed to input \"input\" of step 3 may have too many rows",
-                foo.clean)
+            ValidationError,
+            "Data fed to input \"input\" of step 3 may have too many rows",
+            foo.clean)
 
-        
     def test_pipeline_manySteps_valid_outcable_clean(self):
         """Good output cabling, chained-step pipeline."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -1242,14 +1278,14 @@ class PipelineTests(PipelineTestSetup):
         self.assertEquals(outcable2.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-
     def test_pipeline_manySteps_outcable_references_nonexistent_step_clean(self):
         """Bad output cabling, chained-step pipeline: request from nonexistent step"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(
             dest=step1.transformation.inputs.get(dataset_name="input"),
@@ -1278,22 +1314,23 @@ class PipelineTests(PipelineTestSetup):
             source=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"))
         
         self.assertRaisesRegexp(
-                ValidationError,
-                "Output requested from a non-existent step",
-                outcable1.clean)
+            ValidationError,
+            "Output requested from a non-existent step",
+            outcable1.clean)
         self.assertEquals(outcable2.clean(), None)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Output requested from a non-existent step",
-                foo.clean)
+            ValidationError,
+            "Output requested from a non-existent step",
+            foo.clean)
 
     def test_pipeline_manySteps_outcable_references_invalid_output_clean(self):
         """Bad output cabling, chained-step pipeline: request output not belonging to requested step"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(
             dest=step1.transformation.inputs.get(dataset_name="input"),
@@ -1322,20 +1359,20 @@ class PipelineTests(PipelineTestSetup):
 
         self.assertEquals(outcable1.clean(), None)
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 2 does not produce output ".*"',
-                outcable2.clean)
+            'Transformation at step 2 does not produce output ".*"',
+            outcable2.clean)
         self.assertRaisesRegexp(ValidationError,
-                'Transformation at step 2 does not produce output ".*"',
-                foo.clean)
-
+            'Transformation at step 2 does not produce output ".*"',
+            foo.clean)
         
     def test_pipeline_manySteps_outcable_references_deleted_output_clean(self):
         """Output cabling, chained-step pipeline: request deleted step output (OK)"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(
             dest=step1.transformation.inputs.get(dataset_name="input"),
@@ -1369,10 +1406,11 @@ class PipelineTests(PipelineTestSetup):
     def test_pipeline_manySteps_outcable_references_invalid_output_index_clean(self):
         """Bad output cabling, chain-step pipeline: outputs not consecutively numbered starting from 1"""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+                         dataset_name="oneinput", dataset_idx=1)
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(
             dest=step1.transformation.inputs.get(dataset_name="input"),
@@ -1403,9 +1441,9 @@ class PipelineTests(PipelineTestSetup):
         self.assertEquals(outcable1.clean(), None)
         self.assertEquals(outcable2.clean(), None)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Outputs are not consecutively numbered starting from 1",
-                foo.clean)
+            ValidationError,
+            "Outputs are not consecutively numbered starting from 1",
+            foo.clean)
 
     def test_pipeline_with_1_step_and_2_inputs_both_cabled_good(self):
         """
@@ -1418,19 +1456,20 @@ class PipelineTests(PipelineTestSetup):
         
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Pipeline inputs must be singlet_cdt to work with script_3_product
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_1_k",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_k",
+                         dataset_idx=1)
 
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_2_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_input_2_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         # Add script_3 as step 1 method
         step1 = foo.steps.create(transformation=self.script_3_method,
@@ -1464,19 +1503,20 @@ class PipelineTests(PipelineTestSetup):
         
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Pipeline inputs must be singlet_cdt to work with script_3_product
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_1_k",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_k",
+                         dataset_idx=1)
 
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_2_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_input_2_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         # Add script_3 as step 1 method
         step1 = foo.steps.create(transformation=self.script_3_method,
@@ -1527,19 +1567,20 @@ class PipelineTests(PipelineTestSetup):
         
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Pipeline inputs must be singlet_cdt to work with script_3_product
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_1_k",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_k",
+                         dataset_idx=1)
 
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_2_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_input_2_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         # Add script_3 as step 1 method
         step1 = foo.steps.create(transformation=self.script_3_method,
@@ -1577,19 +1618,20 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs that match inputs for script_3_product
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_1_k",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_k",
+                         dataset_idx=1)
         
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_2_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_input_2_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         # Add script_3 as step 1 method
         step1 = foo.steps.create(transformation=self.script_3_method,
@@ -1604,9 +1646,9 @@ class PipelineTests(PipelineTestSetup):
         # Step is clean (cables are OK) but not complete (inputs not quenched).
         self.assertEquals(step1.clean(), None)
         self.assertRaisesRegexp(
-                ValidationError,
-                "Input \"r\" to transformation at step 1 is not cabled",
-                step1.complete_clean)
+            ValidationError,
+            "Input \"r\" to transformation at step 1 is not cabled",
+            step1.complete_clean)
 
     def test_pipeline_with_1_step_and_2_inputs_but_only_second_input_is_cabled_in_step_1_bad(self):
         """
@@ -1617,19 +1659,20 @@ class PipelineTests(PipelineTestSetup):
         # Define pipeline foo
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_3_product
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_1_k",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_k",
+                         dataset_idx=1)
         
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_input_2_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_input_2_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         # Add script_3 as step 1 method
         step1 = foo.steps.create(transformation=self.script_3_method,
@@ -1637,8 +1680,8 @@ class PipelineTests(PipelineTestSetup):
 
         # Add cabling to step 1 from step 0
         step1.cables_in.create(dest=self.script_3_method.inputs.get(dataset_name="r"),
-                              source_step=0,
-                              source=foo.inputs.get(dataset_name="pipe_input_2_r"))
+                               source_step=0,
+                               source=foo.inputs.get(dataset_name="pipe_input_2_r"))
 
         # Step is clean (cables are OK) but not complete (inputs not quenched).
         self.assertEquals(step1.clean(), None)
@@ -1646,7 +1689,6 @@ class PipelineTests(PipelineTestSetup):
             ValidationError,
             "Input \"k\" to transformation at step 1 is not cabled",
             step1.complete_clean)
-        
 
     def test_pipeline_with_2_steps_and_2_inputs_one_cabled_from_step_0_other_from_undeleted_step_1_good(self):
         """
@@ -1668,18 +1710,19 @@ class PipelineTests(PipelineTestSetup):
 
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_a_b_c",
+                         dataset_idx=1)
         
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1)
@@ -1731,18 +1774,19 @@ class PipelineTests(PipelineTestSetup):
 
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_a_b_c",
+                         dataset_idx=1)
         
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1)
@@ -1776,25 +1820,25 @@ class PipelineTests(PipelineTestSetup):
         self.assertEquals(step2.complete_clean(), None)
         self.assertEquals(foo.clean(), None)
 
-
     def test_pipeline_with_2_steps_and_2_inputs_one_cabled_from_step_0_other_from_deleted_step_1_good(self):
         """
         Step 1 output a_b_c_mean is cabled into step 2, but is deleted.
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_a_b_c",
+                         dataset_idx=1)
         
         foo.create_input(compounddatatype=self.singlet_cdt,
-                          dataset_name="pipe_r",
-                          dataset_idx=2,
-                          max_row=1,
-                          min_row=1)
+                         dataset_name="pipe_r",
+                         dataset_idx=2,
+                         max_row=1,
+                         min_row=1)
 
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1)
@@ -1829,7 +1873,6 @@ class PipelineTests(PipelineTestSetup):
         self.assertEquals(step2.clean(), None)
         self.assertEquals(foo.clean(), None)
 
-
     def test_pipeline_with_1_step_and_2_outputs_outcable_1st_output_that_is_deleted_good(self):
         """
         Pipeline 1 output, with an internal step with 1 input and 2 outputs
@@ -1838,14 +1881,15 @@ class PipelineTests(PipelineTestSetup):
 
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -1890,13 +1934,14 @@ class PipelineTests(PipelineTestSetup):
 
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -1932,13 +1977,14 @@ class PipelineTests(PipelineTestSetup):
 
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -1969,13 +2015,14 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2011,13 +2058,14 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2052,12 +2100,13 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_a_b_c",
+                         dataset_idx=1)
 
         step1 = foo.steps.create(transformation=self.script_2_method,
                                  step_num=1)
@@ -2085,13 +2134,14 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2128,13 +2178,14 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2178,13 +2229,14 @@ class PipelineTests(PipelineTestSetup):
         """
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
         foo.create_input(compounddatatype=self.triplet_cdt,
-                          dataset_name="pipe_input_1_a_b_c",
-                          dataset_idx=1)
+                         dataset_name="pipe_input_1_a_b_c",
+                         dataset_idx=1)
         
         # Add script_2 as step 1 method (Has outputs a_b_c_squared and a_b_c_mean)
         step1 = foo.steps.create(transformation=self.script_2_method,
@@ -2226,7 +2278,6 @@ class PipelineTests(PipelineTestSetup):
         #
         # Besides this, incorporate some create_output checks in the above pipeline cases
 
-
     def test_create_outputs(self):
         """
         Create outputs from output cablings; also change the output cablings
@@ -2235,7 +2286,8 @@ class PipelineTests(PipelineTestSetup):
         # This setup is copied from one of the above tests.
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="transformation.revision_name",
-                       revision_desc="transformation.revision_desc")
+                       revision_desc="transformation.revision_desc",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # foo has two inputs which must match inputs for script_2
@@ -2316,11 +2368,11 @@ class PipelineTests(PipelineTestSetup):
         self.assertEquals(curr_out_new.get_min_row(), None)
         self.assertEquals(curr_out_new.get_max_row(), None)
 
-
     def test_create_outputs_multi_step(self):
         """Testing create_outputs with a multi-step pipeline."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -2388,7 +2440,7 @@ class PipelineTests(PipelineTestSetup):
     def test_delete_pipeline(self):
         """Deleting a Pipeline is possible."""
         family = PipelineFamily(); family.save()
-        pipeline = Pipeline(family=family); pipeline.save()
+        pipeline = Pipeline(family=family, revision_number=family.members.count() + 1); pipeline.save()
         self.assertIsNone(pipeline.delete())
 
 
@@ -2409,7 +2461,7 @@ class PipelineStepTests(PipelineTestSetup):
     def test_pipelineStep_invalid_request_for_future_step_data_clean(self):
         """Bad cabling: step requests data from after its execution step."""
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version", revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
@@ -2435,7 +2487,7 @@ class PipelineStepTests(PipelineTestSetup):
 
         # Define Pipeline
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version", revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define Pipeline input
@@ -2464,7 +2516,8 @@ class PipelineStepTests(PipelineTestSetup):
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define Pipeline input "oneinput"
@@ -2494,7 +2547,8 @@ class PipelineStepTests(PipelineTestSetup):
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Add a valid pipeline input
@@ -2524,7 +2578,8 @@ class PipelineStepTests(PipelineTestSetup):
 
         # Define pipeline
         foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Give it a single validly indexed pipeline input
@@ -2543,7 +2598,8 @@ class PipelineStepTests(PipelineTestSetup):
         # Define pipeline 'foo'
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Give it a single validly indexed pipeline input
@@ -2573,7 +2629,8 @@ class PipelineStepTests(PipelineTestSetup):
         # Define a second pipeline
         bar = Pipeline(family=self.DNAcomp_pf,
                        revision_name="bar",
-                       revision_desc="Bar version")
+                       revision_desc="Bar version",
+                       revision_number=self.DNAcomp_pf.members.count() + 1)
         bar.save()
 
         # Give it a single validly indexed pipeline input
@@ -2618,7 +2675,8 @@ class PipelineStepTests(PipelineTestSetup):
         # foo invokes DNAcompv2_m at step 1
         foo = Pipeline(family=self.DNAcomp_pf,
                        revision_name="foo",
-                       revision_desc="Foo version")
+                       revision_desc="Foo version",
+                       revision_number=self.DNAcomp_pf.members.count()+1)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput",
@@ -2639,7 +2697,8 @@ class PipelineStepTests(PipelineTestSetup):
         # bar invokes foo at step 1 and DNArecomp_m at step 2
         bar = Pipeline(family=self.DNAcomp_pf,
                        revision_name="bar",
-                       revision_desc="Bar version")
+                       revision_desc="Bar version",
+                       revision_number=self.DNAcomp_pf.members.count()+1)
         bar.save()
         bar.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="barinput",
@@ -2724,7 +2783,8 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         self.script_4_1_M.clean()
 
         # Define 1-step pipeline with a single raw pipeline input
-        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_1 = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -2739,7 +2799,8 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
             dataset_name="a_b_c_squared_raw", dataset_idx=1)
 
         # Define 1-step pipeline
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         step1.add_deletion(raw_output)
@@ -2749,14 +2810,18 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
     def test_PipelineStep_clean_delete_non_existent_tro_bad(self):
         # Define a 1-step pipeline containing self.script_4_1_M which has a raw_output
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
-        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(revision_name="s42", revision_desc="s42",
+                                   revision_number=self.test_MF.members.count() + 1,
+                                   family = self.test_MF, driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         raw_output_unrelated = self.script_4_2_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
-        pipeline_unrelated = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_unrelated = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                         revision_number=self.test_PF.members.count() + 1)
         step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in an unrelated method
@@ -2781,17 +2846,21 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
-        self.script_4_2_M = Method(revision_name="s42",revision_desc="s42",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(revision_name="s42", revision_desc="s42",
+                                   revision_number=self.test_MF.members.count() + 1,
+                                   family = self.test_MF, driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         unrelated_raw_output = self.script_4_2_M.create_output(dataset_name="unrelated_raw_output",dataset_idx=1)
 
         # Define 1-step pipeline with a single raw pipeline input
-        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_1 = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         # Define second 1-step pipeline with a single raw pipeline input
-        pipeline_2 = self.test_PF.members.create(revision_name="bar",revision_desc="Bar version")
+        pipeline_2 = self.test_PF.members.create(revision_name="bar",revision_desc="Bar version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_2.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_unrelated = pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
 
@@ -2817,7 +2886,10 @@ class RawOutputCableTests(PipelineTestSetup):
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -2843,7 +2915,10 @@ class RawOutputCableTests(PipelineTestSetup):
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         # Define 2-step pipeline with a single raw pipeline input
-        pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
         step2 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2)
@@ -2876,13 +2951,20 @@ class RawOutputCableTests(PipelineTestSetup):
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         # Define an unrelated method and give it a raw output
-        unrelated_method = Method(revision_name="s4 - unrelated",revision_desc="s4 - unrelated",family = self.test_MF,driver = self.script_4_1_CRR)
+        unrelated_method = Method(
+            revision_name="s4 - unrelated", revision_desc="s4 - unrelated",
+            revision_number=self.test_MF.members.count() + 1, family = self.test_MF,
+            driver = self.script_4_1_CRR
+        )
         unrelated_method.save()
         unrelated_method.clean()
         unrelated_raw_output = unrelated_method.create_output(dataset_name="unrelated raw output",dataset_idx=1)
 
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -2909,7 +2991,10 @@ class RawOutputCableTests(PipelineTestSetup):
         self.script_4_1_M.clean()
 
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -2940,7 +3025,10 @@ class RawInputCableTests(PipelineTestSetup):
         self.script_4_1_M.clean()
 
         # Define pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
 
         # Define 2 identical steps within the pipeline
@@ -2973,11 +3061,17 @@ class RawInputCableTests(PipelineTestSetup):
         self.script_4_1_M.clean()
 
         # Define two different 1-step pipelines with 1 raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_pipeline_1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        self.pipeline_2 = self.test_PF.members.create(revision_name="v2",revision_desc="Second version")
+        self.pipeline_2 = self.test_PF.members.create(
+            revision_name="v2", revision_desc="Second version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_2.save()
         self.pipeline_2.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1_pipeline_2 = self.pipeline_2.steps.create(transformation=self.script_4_1_M,step_num=1)
@@ -3010,12 +3104,18 @@ class RawInputCableTests(PipelineTestSetup):
         self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         # Define second unrelated method not part of any pipeline but containing a raw input with the same name (a_b_c)
-        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(
+            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+            family = self.test_MF, driver = self.script_4_1_CRR
+        )
         self.script_4_2_M.save()
         self.script_4_2_M.create_input(dataset_name="a_b_c_method",dataset_idx=1)
 
         # Define pipeline with a single raw pipeline input and a single step
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -3045,7 +3145,10 @@ class RawInputCableTests(PipelineTestSetup):
         self.script_4_1_M.clean()
 
         # Define pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(
+            revision_name="v1", revision_desc="First version",
+            revision_number=self.test_PF.members.count() + 1
+        )
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
 
         # Define 2 identical steps within the pipeline
@@ -3078,7 +3181,10 @@ class RawSaveTests(PipelineTestSetup):
         self.script_4_1_M.create_input(dataset_name="a_b_c", dataset_idx=1)
 
         # Make a method without a parent
-        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF, driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(
+            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+            family = self.test_MF, driver = self.script_4_1_CRR
+        )
         self.script_4_2_M.save()
 
         # There should be no raw inputs/outputs
@@ -3090,7 +3196,10 @@ class RawSaveTests(PipelineTestSetup):
         self.script_4_1_M.create_output(dataset_name="a_b_c", dataset_idx=1)
 
         # Make a method without a parent
-        self.script_4_2_M = Method(revision_name="s4",revision_desc="s4",family = self.test_MF, driver = self.script_4_1_CRR)
+        self.script_4_2_M = Method(
+            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+            family = self.test_MF, driver = self.script_4_1_CRR
+        )
         self.script_4_2_M.save()
 
         # There should be no raw inputs/outputs
@@ -3104,9 +3213,11 @@ class RawSaveTests(PipelineTestSetup):
         self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
 
         # Make a method with a parent, and do not specify inputs/outputs
-        self.script_4_2_M = Method(revision_parent=self.script_4_1_M,
-                revision_name="s4",revision_desc="s4",family = self.test_MF,
-                driver = self.script_4_1_CRR) 
+        self.script_4_2_M = Method(
+            revision_parent=self.script_4_1_M, revision_name="s4", revision_desc="s4",
+            revision_number=self.test_MF.members.count() + 1, family = self.test_MF,
+            driver = self.script_4_1_CRR
+        )
         self.script_4_2_M.save()
         self.script_4_2_M.copy_io_from_parent()
 
@@ -3160,10 +3271,10 @@ class SingleRawInputTests(PipelineTestSetup):
         # Wire 1 raw input to a pipeline step that expects only 1 input
         self.script_4_1_M.delete_inputs()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
-
         
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count() + 1)
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -3179,10 +3290,10 @@ class SingleRawInputTests(PipelineTestSetup):
         # Wire 1 raw input to a pipeline step that expects only 1 input
         self.script_4_1_M.delete_inputs()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
-
         
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count()+1)
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -3212,7 +3323,8 @@ class SingleRawInputTests(PipelineTestSetup):
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
         
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count() + 1)
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         pipeline_input_2 = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline_2",dataset_idx=2)
 
@@ -3240,7 +3352,8 @@ class SingleRawInputTests(PipelineTestSetup):
 
         
         # Define 1-step pipeline with a single raw pipeline input
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count() + 1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         errorMessage = "Input \"a_b_c\" to transformation at step 1 is not cabled'"
@@ -3327,7 +3440,8 @@ class SeveralRawInputsTests(PipelineTestSetup):
     def test_pipeline_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
 
         # Define 1-step pipeline with conflicting inputs
-        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_1 = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_1.create_input(dataset_name="input_1_raw",dataset_idx=1)
         pipeline_1.create_input(compounddatatype=self.triplet_cdt,dataset_name="input_2",dataset_idx=2)
         pipeline_1.create_input(dataset_name="input_3_raw",dataset_idx=3)
@@ -3348,7 +3462,8 @@ class SeveralRawInputsTests(PipelineTestSetup):
         method_raw_in_2 = self.script_4_1_M.create_input(dataset_name = "method_in_2",dataset_idx = 2)
         
         # Define 1-step pipeline with 2 raw pipeline inputs
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count() + 1)
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         pipeline_input_2 = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline_2",dataset_idx=2)
 
@@ -3470,8 +3585,8 @@ class CustomWiringTests(PipelineTestSetup):
     def test_CustomCableWire_wires_from_pipeline_input_identical_dt_good(self):
         """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
         # Define a pipeline with single pipeline input of type triplet_cdt
-        my_pipeline = self.test_PF.members.create(
-            revision_name="foo", revision_desc="Foo version")
+        my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                  revision_number=self.test_PF.members.count() + 1)
         my_pipeline.delete_inputs()
         pipeline_in = my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,
@@ -3519,8 +3634,6 @@ class CustomWiringTests(PipelineTestSetup):
         self.assertEquals(my_cable1.clean(), None)
         self.assertEquals(my_cable1.clean_and_completely_wired(), None)
 
-
-
     def test_CustomCableWire_clean_for_datatype_compatibility(self):
         # Wiring test 1 - Datatypes are identical (x -> x)
         # Wiring test 2 - Datatypes are not identical, but compatible (y restricts x, y -> x)
@@ -3552,7 +3665,8 @@ class CustomWiringTests(PipelineTestSetup):
         cdt_2.members.create(datatype=self.incompatible_dt,column_name="col_3",column_idx=3)
 
         # Define a pipeline with single pipeline input of type cdt_1
-        my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                  revision_number=self.test_PF.members.count() + 1)
         pipeline_in = my_pipeline.create_input(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
 
         # Define method to have an input with cdt_2, add it as a step, cable it
@@ -3610,21 +3724,25 @@ class CustomWiringTests(PipelineTestSetup):
         cdt_2.members.create(datatype=self.incompatible_dt,column_name="col_3",column_idx=3)
 
         # Define 2 methods with different inputs
-        method_1 = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        method_1 = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+                          family = self.test_MF, driver = self.script_4_1_CRR)
         method_1.save()
         method_1_in = method_1.create_input(dataset_name="TestIn", dataset_idx=1, compounddatatype=cdt_1)
         
-        method_2 = Method(revision_name="s4",revision_desc="s4",family = self.test_MF,driver = self.script_4_1_CRR)
+        method_2 = Method(revision_name="s5", revision_desc="s5", revision_number=self.test_MF.members.count() + 1,
+                          family = self.test_MF, driver = self.script_4_1_CRR)
         method_2.save()
         method_2_in = method_2.create_input(dataset_name="TestIn", dataset_idx=1, compounddatatype=cdt_2)
 
         # Define 2 pipelines
-        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_1 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_1_in = pipeline_1.create_input(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
         pipeline_1_step = pipeline_1.steps.create(transformation=method_1, step_num=1)
         pipeline_1_cable = pipeline_1_step.cables_in.create(dest=method_1_in, source_step=0, source=pipeline_1_in)
 
-        pipeline_2 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        pipeline_2 = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         pipeline_2_in = pipeline_2.create_input(compounddatatype=cdt_2,dataset_name="pipe_in_1",dataset_idx=1)
         pipeline_2_step = pipeline_2.steps.create(transformation=method_2, step_num=1)
         pipeline_2_cable = pipeline_2_step.cables_in.create(dest=method_2_in, source_step=0, source=pipeline_2_in)
@@ -3666,7 +3784,8 @@ class PipelineOutputCableRawTests(PipelineTestSetup):
     def test_pipeline_check_for_colliding_outputs_clean_good(self):
 
         # Define 1-step pipeline with 2 raw pipeline inputs
-        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version")
+        self.pipeline_1 = self.test_PF.members.create(revision_name="v1",revision_desc="First version",
+                                                      revision_number=self.test_PF.members.count() + 1)
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -3714,7 +3833,8 @@ class PipelineOutputCableRawTests(PipelineTestSetup):
 class CustomRawOutputCablingTests(PipelineTestSetup):
 
     def test_Pipeline_create_multiple_raw_outputs_with_raw_outmap(self):
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                       revision_number=self.test_PF.members.count() + 1)
 
         pipeline_in = self.my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,
@@ -3767,12 +3887,13 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
 
     def test_PSIC_clean_and_completely_wired_CDT_equal_no_wiring_good(self):
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", family =
-            self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+                   family = self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="method_in", dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3790,12 +3911,13 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         # C -> x
 
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", family =
-            self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+                   family=self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3827,12 +3949,14 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         # A -> y
 
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version")
+        myPipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt, dataset_name="pipe_in",
                                                    dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", family=self.test_MF, driver=self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+                   family=self.test_MF, driver=self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in", dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3858,12 +3982,13 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         # z -> z
 
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
-        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        myPipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                 revision_number=self.test_PF.members.count() + 1)
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", family =
-            self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+                   family=self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3956,7 +4081,8 @@ class CustomOutputWiringTests(PipelineTestSetup):
 
     def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
 
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version")
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
+                                                       revision_number=self.test_PF.members.count() + 1)
 
         pipeline_in = self.my_pipeline.create_input(compounddatatype=self.triplet_cdt, dataset_name="pipeline_in_1",
                                                     dataset_idx=1)
@@ -3984,7 +4110,8 @@ class CustomOutputWiringTests(PipelineTestSetup):
         
 
     def test_Pipeline_create_outputs_for_creation_of_output_CDT(self):
-        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
+        self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
+                                                       revision_number=self.test_PF.members.count() + 1)
 
         pipeline_in = self.my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,

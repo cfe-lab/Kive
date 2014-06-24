@@ -67,12 +67,14 @@ class ExecuteTests(TestCase):
             description="input to pipeline pX", cdt=None)
 
         # Method + input/outputs
-        self.mA = Method(revision_name="mA",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr); self.mA.save()
+        self.mA = Method(revision_name="mA", revision_desc="mA_desc", revision_number=1, family = self.mf,
+                         driver = self.mA_crr); self.mA.save()
         self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
         self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
 
         # Define pipeline containing the method, and its input + outcables
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X", revision_number=1)
+        self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
 
@@ -86,8 +88,10 @@ class ExecuteTests(TestCase):
         self.pX.create_outputs()
 
         # Pipeline with raw input.
-        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw",revision_desc="X"); pX_raw.save()
-        mA_raw = Method(revision_name="mA_raw",revision_desc="mA_desc",family = self.mf,driver = self.mA_crr)
+        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X", revision_number=2)
+        pX_raw.save()
+        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", revision_number=2, family = self.mf,
+                        driver = self.mA_crr)
         mA_raw.save()
         mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
         mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
@@ -150,7 +154,8 @@ class ExecuteTests(TestCase):
         """Two step pipeline with second step identical to the first"""
 
         # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X"); self.pX.save()
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", revision_number=3)
+        self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
         self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
@@ -207,7 +212,8 @@ class ExecuteTests(TestCase):
         self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
 
         # Define 1-step inner pipeline pY
-        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y")
+        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y",
+                           revision_number=self.pf.members.count() + 1)
         self.pY.save()
         self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
 
@@ -230,7 +236,8 @@ class ExecuteTests(TestCase):
         self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(column_name="pXr",column_idx=1,datatype=self.string_dt)
 
         # Define outer 2-step pipeline with mA at step 1 and pY at step 2
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X",
+                           revision_number=self.pf.members.count() + 1)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.pX_step_1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -355,7 +362,8 @@ class SandboxTests(ExecuteTests):
         """
         A Sandbox cannot be created if the pipeline has inputs but none are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
@@ -366,7 +374,8 @@ class SandboxTests(ExecuteTests):
         """
         A Sandbox cannot be created if the pipeline has fewer inputs than are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
@@ -376,7 +385,8 @@ class SandboxTests(ExecuteTests):
         """
         We can create a Sandbox if the supplied inputs match the pipeline inputs.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 8, max_row = 12)
@@ -387,7 +397,8 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects raw input and we give it nonraw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -399,7 +410,8 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects non-raw input and we give it raw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         tf = tempfile.NamedTemporaryFile(delete=False)
@@ -417,7 +429,8 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -431,7 +444,8 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 2, max_row = 4)
@@ -445,7 +459,8 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah",
+                     revision_number=self.pf.members.count() + 1)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 20)

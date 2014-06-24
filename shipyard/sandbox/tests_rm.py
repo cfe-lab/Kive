@@ -91,7 +91,8 @@ class UtilityMethods(TestCase):
         without making any changes. Hook up the steps to each other, but don't
         create inputs and outputs for the new Pipeline.
         """
-        new_pipeline = Pipeline(family=pipeline.family, revision_name="2", revision_desc="second version")
+        new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_number=2,
+                                revision_desc="second version")
         new_pipeline.save()
 
         for step in pipeline.steps.all():
@@ -191,8 +192,10 @@ class UtilityMethods(TestCase):
         family = MethodFamily(name=famname, description=famdesc)
         family.clean()
         family.save()
-        method = Method(revision_name="1",
+        method = Method(
+            revision_name="v1",
             revision_desc="first version",
+            revision_number=1,
             family=family,
             driver=driver)
         method.clean()
@@ -208,7 +211,7 @@ class UtilityMethods(TestCase):
         family = PipelineFamily(name=pname, description=pdesc)
         family.clean()
         family.save()
-        pipeline = Pipeline(family=family, revision_name="1",
+        pipeline = Pipeline(family=family, revision_name="v1", revision_number=1,
             revision_desc="first version")
         pipeline.complete_clean()
         pipeline.save()
@@ -311,7 +314,8 @@ class ExecuteTestsRM(UtilityMethods):
 
         # A second version of the complement Pipeline which doesn't keep any output.
         self.pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family, revision_name="2",
-                                               revision_desc="second version")
+                                               revision_desc="second version",
+                                               revision_number=self.pipeline_complement.family.members.count()+1)
         self.pipeline_complement_v2.save()
         self.create_linear_pipeline(self.pipeline_complement_v2, [self.method_complement], "lab data", 
                                     "complemented lab data")
@@ -322,7 +326,8 @@ class ExecuteTestsRM(UtilityMethods):
         # A second version of the reverse/complement Pipeline which doesn't keep 
         # intermediate or final output.
         self.pipeline_revcomp_v2 = Pipeline(family=self.pipeline_revcomp.family, revision_name="2",
-                                            revision_desc="second version")
+                                            revision_desc="second version",
+                                            revision_number=self.pipeline_revcomp.family.members.count()+1)
         self.pipeline_revcomp_v2.save()
         self.create_linear_pipeline(self.pipeline_revcomp_v2, [self.method_reverse, self.method_complement], "lab data",
                                     "revcomped lab data")
@@ -334,7 +339,8 @@ class ExecuteTestsRM(UtilityMethods):
         # A third version of the reverse/complement Pipeline which keeps
         # final output, but not intermediate.
         self.pipeline_revcomp_v3 = Pipeline(family=self.pipeline_revcomp.family, revision_name="3", 
-                                            revision_desc="third version")
+                                            revision_desc="third version",
+                                            revision_number=self.pipeline_revcomp.family.members.count()+1)
         self.pipeline_revcomp_v3.save()
         self.create_linear_pipeline(self.pipeline_revcomp_v3, [self.method_reverse, self.method_complement], "lab data",
                                     "revcomped lab data")

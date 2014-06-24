@@ -9,7 +9,7 @@ FIXME get all the models pointing at each other correctly!
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 
 import hashlib, os, re, stat, subprocess
@@ -385,6 +385,14 @@ class Method(transformation.models.Transformation):
     family = models.ForeignKey("MethodFamily", related_name="members")
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
 
+    # June 24, 2014: moved this here from Transformation so that it can be put into
+    # the unique_together statement below.
+    revision_number = models.PositiveIntegerField(
+        'Pipeline revision number',
+        help_text='Revision number of this Pipeline in its family',
+        validators=[MinValueValidator(1)]
+    )
+
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision);
     random = models.BooleanField(default=False,
@@ -396,6 +404,9 @@ class Method(transformation.models.Transformation):
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
+
+    class Meta:
+        unique_together = (("family", "revision_number"))
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -502,7 +513,9 @@ class Method(transformation.models.Transformation):
         for possible_PS in self.pipelinesteps.all():
 
             # For linked runsteps which did not *completely* reuse an ER
-            for possible_RS in possible_PS.pipelinestep_instances.filter(reused=False):
+            for possible_RS in possible_PS.pipelinestep_instances.filter(
+                    reused=False,
+                    execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
 
                 # Reject RunStep if its outputs are not OK.

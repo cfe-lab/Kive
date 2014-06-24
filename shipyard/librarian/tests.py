@@ -2,28 +2,26 @@
 Shipyard models pertaining to the librarian app.
 """
 
-from django.test import TestCase
+import os.path
+import random
+import re
+import tempfile
+import time
+
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.contrib.auth.models import User
 
-import random
-import tempfile
-import os.path
-import time
-
-import file_access_utils
+from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes
-
-from archive.models import *
-from pipeline.models import *
-from method.models import *
-from librarian.models import *
-from metadata.models import *
-
+from librarian.models import SymbolicDataset, ExecRecord
+from metadata.models import Datatype, CompoundDatatype
 import metadata.tests
+from method.models import CodeResource, CodeResourceRevision, Method, \
+    MethodFamily
 from method.tests import samplecode_path
+from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 
 
 class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
@@ -57,16 +55,22 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         
         # Method family, methods, and their input/outputs
         self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
-        self.mA = Method(revision_name="mA_name",revision_desc="A_desc",family = self.mf,driver = self.generic_crRev); self.mA.save()
+        self.mA = Method(
+            revision_name="mA_name", revision_desc="A_desc", revision_number=1, family = self.mf,
+            driver = self.generic_crRev); self.mA.save()
         self.A1_rawin = self.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
         self.A1_out = self.mA.create_output(compounddatatype=self.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
 
-        self.mB = Method(revision_name="mB_name",revision_desc="B_desc",family = self.mf,driver = self.generic_crRev); self.mB.save()
+        self.mB = Method(
+            revision_name="mB_name", revision_desc="B_desc", revision_number=2, family = self.mf,
+            driver = self.generic_crRev); self.mB.save()
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
         self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
 
-        self.mC = Method(revision_name="mC_name",revision_desc="C_desc",family = self.mf,driver = self.generic_crRev); self.mC.save()
+        self.mC = Method(
+            revision_name="mC_name", revision_desc="C_desc", revision_number=3, family = self.mf,
+            driver = self.generic_crRev); self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
         self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
         self.C1_out = self.mC.create_output(compounddatatype=self.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
@@ -75,10 +79,14 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
 
         # Pipeline family, pipelines, and their input/outputs
         self.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); self.pf.save()
-        self.pD = Pipeline(family=self.pf, revision_name="pD_name",revision_desc="D"); self.pD.save()
+        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D",
+                           revision_number=self.pf.members.count() + 1)
+        self.pD.save()
         self.D1_in = self.pD.create_input(compounddatatype=self.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
         self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
-        self.pE = Pipeline(family=self.pf, revision_name="pE_name",revision_desc="E"); self.pE.save()
+        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E",
+                           revision_number=self.pf.members.count() + 1)
+        self.pE.save()
         self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
         self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
         self.E3_rawin = self.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
@@ -303,7 +311,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         self.data = ""
         for i in range(rows):
-            seq = "".join([random.choice("ATCG") for j in range(seqlen)])
+            seq = "".join([random.choice("ATCG") for _ in range(seqlen)])
             self.data += "patient{},{}\n".format(i, seq)
         self.header = "header,sequence"
 
@@ -384,11 +392,11 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(data_file.name, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
+                                          .format(file_path, self.cdt_record)),
+                                lambda : SymbolicDataset.create_SD(file_path=file_path, cdt=self.cdt_record,
                                                                    user=self.myUser, name="bad data", 
                                                                    description="too many columns"))
-        os.remove(data_file.name)
+        os.remove(file_path)
 
     def test_dataset_created(self):
         """
@@ -415,7 +423,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(dataset.created_by, None)
         self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_path))
 
-    def test_dataset_created(self):
+    def test_dataset_created2(self):
         """
         Test coherence of the Dataset created alongsite a SymbolicDataset.
         """
@@ -717,8 +725,8 @@ class ExecRecordTests(LibrarianTestSetup):
                                         column_name="a", column_idx=1)
         col2 = other_CDT.members.create(datatype=self.string_dt,
                                         column_name="b", column_idx=2)
-        col3 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="c", column_idx=3)
+        other_CDT.members.create(datatype=self.string_dt,
+                                 column_name="c", column_idx=3)
 
         self.C1_in_symDS.structure.compounddatatype = other_CDT
         self.assertEqual(mC_ER_in_1.clean(), None)
@@ -751,10 +759,10 @@ class ExecRecordTests(LibrarianTestSetup):
         # Bad case: output SymbolicDataset has an identical CDT.
         other_CDT = CompoundDatatype()
         other_CDT.save()
-        col1 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="x", column_idx=1)
-        col2 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="y", column_idx=2)
+        other_CDT.members.create(datatype=self.string_dt,
+                                 column_name="x", column_idx=1)
+        other_CDT.members.create(datatype=self.string_dt,
+                                 column_name="y", column_idx=2)
         
         self.doublet_symDS.structure.compounddatatype = other_CDT
         self.doublet_symDS.structure.save()
@@ -789,8 +797,8 @@ class ExecRecordTests(LibrarianTestSetup):
         other_CDT.save()
         col1 = other_CDT.members.create(datatype=self.string_dt,
                                         column_name="x", column_idx=1)
-        col2 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="y", column_idx=2)
+        other_CDT.members.create(datatype=self.string_dt,
+                                 column_name="y", column_idx=2)
         
         self.E1_out_symDS.structure.compounddatatype = other_CDT
         self.E1_out_symDS.structure.save()
@@ -829,8 +837,8 @@ class ExecRecordTests(LibrarianTestSetup):
         other_CDT.save()
         col1 = other_CDT.members.create(datatype=self.string_dt,
                                         column_name="x", column_idx=1)
-        col2 = other_CDT.members.create(datatype=self.string_dt,
-                                        column_name="y", column_idx=2)
+        other_CDT.members.create(datatype=self.string_dt,
+                                 column_name="y", column_idx=2)
         
         self.doublet_symDS.structure.compounddatatype = other_CDT
         self.doublet_symDS.structure.save()
@@ -853,7 +861,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ER_trivial_PSICs_have_same_SD_on_both_sides(self):
         """ERs representing trivial PSICs must have the same SymbolicDataset on both sides."""
         cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
-        cable_ERI = cable_ER.execrecordins.create(
+        cable_ER.execrecordins.create(
             generic_input=self.E2_in,
             symbolicdataset = self.singlet_symDS)
         cable_ERO = cable_ER.execrecordouts.create(
@@ -876,7 +884,7 @@ class ExecRecordTests(LibrarianTestSetup):
         # E31_42 belongs to pipeline E
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
         outcable_ER = self.ER_from_record(outcable_ROC)
-        outcable_ERI = outcable_ER.execrecordins.create(
+        outcable_ER.execrecordins.create(
             generic_input=self.C1_out,
             symbolicdataset = self.C1_out_symDS)
         outcable_ERO = outcable_ER.execrecordouts.create(
@@ -980,9 +988,9 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertIsNotNone(pipeline)
         for run in pipeline.pipeline_instances.all():
             run.delete()
-        run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+        run = Run(pipeline=pipeline, user=user); run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
         execrecord = ExecRecord(generator=execlog); execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
@@ -1001,9 +1009,9 @@ class ExecRecordTests(LibrarianTestSetup):
             run.delete()
 
         for i in range(2):
-            run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+            run = Run(pipeline=pipeline, user=user); run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-            execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
             if i == 0:
                 execrecord = ExecRecord(generator=execlog); execrecord.save()
             runstep.execrecord = execrecord
@@ -1019,10 +1027,10 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertIsNotNone(pipeline)
         for run in pipeline.pipeline_instances.all():
             run.delete()
-        run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+        run = Run(pipeline=pipeline, user=user); run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
-        archive.models.MethodOutput(execlog=execlog, return_code=1).save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+        MethodOutput(execlog=execlog, return_code=1).save()
         execrecord = ExecRecord(generator=execlog); execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
@@ -1040,11 +1048,11 @@ class ExecRecordTests(LibrarianTestSetup):
             run.delete()
 
         for i in range(2):
-            run = archive.models.Run(pipeline=pipeline, user=user); run.save()
+            run = Run(pipeline=pipeline, user=user); run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-            execlog = archive.models.ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
             if i == 1:
-                archive.models.MethodOutput(execlog=execlog, return_code=1).save()
+                MethodOutput(execlog=execlog, return_code=1).save()
             else:
                 execrecord = ExecRecord(generator=execlog); execrecord.save()
             runstep.execrecord = execrecord
@@ -1089,3 +1097,50 @@ class FindCompatibleERTests(LibrarianTestSetup):
         method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
         self.assertIsNone(method.find_compatible_ER(input_SDs))
+
+    def test_find_compatible_exec_record_skips_nulls(self):
+        "Incomplete run steps don't break search for compatible exec records."
+        
+        # Find an exec record that has never failed
+        exec_record = None
+        for exec_record in ExecRecord.objects.all():
+            if not exec_record.has_ever_failed():
+                break
+        input_datasets = [eri.symbolicdataset 
+                          for eri in exec_record.execrecordins.all()]
+
+        # Create a method with two run steps, the first one is incomplete.
+        method = Method()
+        method.family = MethodFamily.objects.first()
+        method.driver = CodeResourceRevision.objects.first()
+        method.revision_number = method.family.members.count() + 1
+        method.save()
+        
+        pipeline_step1 = PipelineStep()
+        pipeline_step1.pipeline = Pipeline.objects.first()
+        pipeline_step1.transformation = method
+        pipeline_step1.step_num = 99
+        pipeline_step1.save()
+        
+        pipeline_step2 = PipelineStep()
+        pipeline_step2.pipeline = Pipeline.objects.first()
+        pipeline_step2.transformation = method
+        pipeline_step2.step_num = 100
+        pipeline_step2.save()
+        
+        # Incomplete: no exec record
+        run_step1 = RunStep()
+        run_step1.run = Run.objects.first()
+        run_step1.pipelinestep = pipeline_step1
+        run_step1.reused = False
+        run_step1.save()
+        
+        # Complete: has an exec record
+        run_step2 = RunStep()
+        run_step2.run = Run.objects.first()
+        run_step2.pipelinestep = pipeline_step2
+        run_step2.reused = False
+        run_step2.execrecord = exec_record
+        run_step2.save()
+        
+        self.assertEqual(method.find_compatible_ER(input_datasets), exec_record)

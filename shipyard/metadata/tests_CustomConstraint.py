@@ -167,7 +167,7 @@ class CustomConstraintTests(UtilityMethods):
         revision.save()
         methodfamily = MethodFamily(name=famname, description=famdesc)
         methodfamily.save()
-        method = methodfamily.members.create(driver=revision)
+        method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1)
         method.create_input("to_test", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
         method.create_output("failed_row", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK))
         method.save()
