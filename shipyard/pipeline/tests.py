@@ -4196,7 +4196,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
 # June 19, 2014: for the functions that serialize and de-serialize Pipelines.
 class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
     """
-    Tests of Pipeline serialization and de-serialization.
+    Tests of Pipeline serialization and deserialization.
     """
     def setUp(self):
         sandbox.tests_rm.UtilityMethods.setUp(self)
@@ -4233,7 +4233,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
         self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
 
-        dict_rev_parent_pk = -1 if pipeline.revision_parent is None else pipeline.revision_parent.pk
+        dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
         self.assertEquals(dict_repr["canvas_width"], pipeline.canvas_width)
         self.assertEquals(dict_repr["canvas_height"], pipeline.canvas_height)
@@ -4306,15 +4306,15 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
             set(input_dict.keys()),
             set(["CDT_pk", "dataset_name", "dataset_idx", "x", "y", "min_row", "max_row"])
         )
-        my_cdt_pk = -1 if TI.compounddatatype is None else TI.compounddatatype.pk
+        my_cdt_pk = None if TI.compounddatatype is None else TI.compounddatatype.pk
         self.assertEquals(input_dict["CDT_pk"], my_cdt_pk)
         self.assertEquals(input_dict["dataset_name"], TI.dataset_name)
         self.assertEquals(input_dict["dataset_idx"], TI.dataset_idx)
         self.assertEquals(input_dict["x"], TI.x)
         self.assertEquals(input_dict["y"], TI.y)
 
-        effective_min_row = -1 if TI.get_min_row() is None else TI.get_min_row()
-        effective_max_row = -1 if TI.get_max_row() is None else TI.get_max_row()
+        effective_min_row = None if TI.get_min_row() is None else TI.get_min_row()
+        effective_max_row = None if TI.get_max_row() is None else TI.get_max_row()
         self.assertEquals(input_dict["min_row"], effective_min_row)
         self.assertEquals(input_dict["max_row"], effective_max_row)
 
@@ -4367,7 +4367,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         )
         self.assertEquals(outcable_dict["output_idx"], outcable.output_idx)
         self.assertEquals(outcable_dict["output_name"], outcable.output_name)
-        out_cdt_pk = -1 if outcable.output_cdt is None else outcable.output_cdt.pk
+        out_cdt_pk = None if outcable.output_cdt is None else outcable.output_cdt.pk
         self.assertEquals(outcable_dict["output_CDT_pk"], out_cdt_pk)
         self.assertEquals(outcable_dict["source_step"], outcable.source_step)
         self.assertEquals(outcable_dict["source_dataset_name"], outcable.source.definite.dataset_name)
@@ -4395,6 +4395,51 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         self._check_input(input_raw.represent_as_dict(), input_raw)
         self._check_input(input_3.represent_as_dict(), input_3)
 
+    def test_deserialize_input(self):
+        """
+        Define a Pipeline input from a dictionary.
+        """
+        my_pipeline = self.make_first_pipeline("deserialize input", "For testing deserializing input")
+
+        input_1_dict = {
+            "dataset_name": "foo",
+            "dataset_idx": 1,
+            "CDT_pk": self.string_doublet.pk,
+            "x": 50,
+            "y": 175,
+            "min_row": None,
+            "max_row": None
+        }
+
+        input_raw_dict = {
+            "dataset_name": "bar",
+            "dataset_idx": 2,
+            "CDT_pk": None,
+            "x": 50,
+            "y": 175,
+            "min_row": None,
+            "max_row": None
+        }
+
+        input_3_dict = {
+            "dataset_name": "baz",
+            "dataset_idx": 3,
+            "CDT_pk": self.cdt_string.pk,
+            "x": 0,
+            "y": 0,
+            "min_row": 5,
+            "max_row": 50
+        }
+
+        input_1 = my_pipeline.create_input_from_dict(input_1_dict)
+        self._check_input(input_1_dict, input_1)
+
+        input_raw = my_pipeline.create_input_from_dict(input_raw_dict)
+        self._check_input(input_raw_dict, input_raw)
+
+        input_3 = my_pipeline.create_input_from_dict(input_3_dict)
+        self._check_input(input_3_dict, input_3)
+
     def test_serialize_incable_no_wires(self):
         """Serializing PSICs with no wiring."""
         my_pipeline = self.make_first_pipeline("serialize PSIC", "For testing serializing PSIC")
@@ -4406,6 +4451,44 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
             curr_incable = step.cables_in.first()
             self._check_incable(curr_incable.represent_as_dict(), curr_incable)
 
+    def test_deserialize_incable_no_wires(self):
+        """Define PSICs with no wiring from dictionaries."""
+        my_pipeline = self.make_first_pipeline("deserialize PSIC", "For testing deserializing PSIC")
+        my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=self.cdt_string)
+        step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop)
+
+        incable_1_dict = {
+            "source_dataset_name": "input_to_not_touch",
+            "source_step": 0,
+            "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_1 = step_1.create_incable_from_dict(incable_1_dict)
+        self._check_incable(incable_1_dict, incable_1)
+
+        step_2 = my_pipeline.steps.create(step_num=2, transformation=self.method_noop)
+        incable_2_dict = {
+            "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+            "source_step": 1,
+            "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_2 = step_2.create_incable_from_dict(incable_2_dict)
+        self._check_incable(incable_2_dict, incable_2)
+
+        step_3 = my_pipeline.steps.create(step_num=3, transformation=self.method_noop)
+        incable_3_dict = {
+            "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+            "source_step": 2,
+            "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_3 = step_3.create_incable_from_dict(incable_3_dict)
+        self._check_incable(incable_3_dict, incable_3)
+
     def test_serialize_raw_incables(self):
         """Serializing raw PSICs with no wiring."""
         my_pipeline = self.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC")
@@ -4416,6 +4499,90 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         for step in my_pipeline.steps.all():
             curr_incable = step.cables_in.first()
             self._check_incable(curr_incable.represent_as_dict(), curr_incable)
+
+    def test_deserialize_raw_incables(self):
+        """Define raw PSICs from dictionaries."""
+        my_pipeline = self.make_first_pipeline("de-serialize raw PSIC", "For testing de-serializing raw PSIC")
+        my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=None)
+        step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop_raw)
+
+        incable_1_dict = {
+            "source_dataset_name": "input_to_not_touch",
+            "source_step": 0,
+            "dest_dataset_name": self.method_noop_raw.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_1 = step_1.create_incable_from_dict(incable_1_dict)
+        self._check_incable(incable_1_dict, incable_1)
+
+        step_2 = my_pipeline.steps.create(step_num=2, transformation=self.method_noop_raw)
+        incable_2_dict = {
+            "source_dataset_name": self.method_noop_raw.outputs.first().dataset_name,
+            "source_step": 1,
+            "dest_dataset_name": self.method_noop_raw.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_2 = step_2.create_incable_from_dict(incable_2_dict)
+        self._check_incable(incable_2_dict, incable_2)
+
+        step_3 = my_pipeline.steps.create(step_num=3, transformation=self.method_noop_raw)
+        incable_3_dict = {
+            "source_dataset_name": self.method_noop_raw.outputs.first().dataset_name,
+            "source_step": 2,
+            "dest_dataset_name": self.method_noop_raw.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": []
+        }
+        incable_3 = step_3.create_incable_from_dict(incable_3_dict)
+        self._check_incable(incable_3_dict, incable_3)
+
+    def test_serialize_wire(self):
+        """Serializing a CustomCableWire."""
+        my_pipeline = self.make_first_pipeline("serialize wire", "For testing serializing a wire")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+                                                  dest=self.method_doublet_noop.inputs.first())
+        wire_1 = first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
+                                                 dest_pin=self.string_doublet.members.get(column_idx=2))
+        wire_2 = first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
+                                                 dest_pin=self.string_doublet.members.get(column_idx=1))
+        # Test cable from Pipeline input.
+        self._check_wire(wire_1.represent_as_dict(), wire_1)
+        self._check_wire(wire_2.represent_as_dict(), wire_2)
+
+    def test_deserialize_wire(self):
+        """Defining a CustomCableWire from a dictionary."""
+        my_pipeline = self.make_first_pipeline("de-serialize wire", "For testing de-serializing a wire")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+                                                  dest=self.method_doublet_noop.inputs.first())
+
+        wire_1_dict = {"source_idx": 1, "dest_idx": 2}
+        wire_2_dict = {"source_idx": 2, "dest_idx": 1}
+        wire_1 = first_cable.create_wire_from_dict(wire_1_dict)
+        wire_2 = first_cable.create_wire_from_dict(wire_2_dict)
+
+        # Test cable from Pipeline input.
+        self._check_wire(wire_1_dict, wire_1)
+        self._check_wire(wire_2_dict, wire_2)
 
     def test_serialize_incable_non_trivial(self):
         """Serializing a PSIC with wiring."""
@@ -4430,7 +4597,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
-                                                  dest=self.method_noop.inputs.first())
+                                                  dest=self.method_doublet_noop.inputs.first())
         first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=1),
                                         dest_pin=self.string_doublet.members.get(column_idx=2))
         first_cable.custom_wires.create(source_pin=self.string_doublet.members.get(column_idx=2),
@@ -4448,6 +4615,48 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
                                          dest_pin=self.string_doublet.members.get(column_idx=1))
         # Test cable from PipelineStep.
         self._check_incable(second_cable.represent_as_dict(), second_cable)
+
+    def test_deserialize_incable_non_trivial(self):
+        """Defining PSICs with wiring from dictionaries."""
+        my_pipeline = self.make_first_pipeline("deserialize non-trivial PSIC",
+                                               "For testing deserializing non-trivial PSIC")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+
+        first_cable_dict = {
+            "source_dataset_name": input_1.dataset_name,
+            "source_step": 0,
+            "dest_dataset_name": self.method_doublet_noop.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": [
+                {"source_idx": 1, "dest_idx": 2},
+                {"source_idx": 2, "dest_idx": 1}
+            ]
+        }
+        first_cable = first_step.create_incable_from_dict(first_cable_dict)
+        self._check_incable(first_cable_dict, first_cable)
+
+        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_doublet_noop)
+
+        second_cable_dict = {
+            "source_dataset_name": self.method_doublet_noop.outputs.first().dataset_name,
+            "source_step": 1,
+            "dest_dataset_name": self.method_doublet_noop.inputs.first().dataset_name,
+            "keep_output": False,
+            "wires": [
+                {"source_idx": 1, "dest_idx": 2},
+                {"source_idx": 2, "dest_idx": 1}
+            ]
+        }
+        second_cable = second_step.create_incable_from_dict(second_cable_dict)
+        self._check_incable(second_cable_dict, second_cable)
 
     def test_serialize_incable_non_trivial_deleted(self):
         """Serializing a PSIC with wiring that keeps its output."""
@@ -4485,6 +4694,48 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         # Test cable from PipelineStep.
         self._check_incable(second_cable.represent_as_dict(), second_cable)
 
+    def test_deserialize_incable_non_trivial_deleted(self):
+        """Defining a PSIC with wiring that keeps its output using a dictionary."""
+        my_pipeline = self.make_first_pipeline("de-serialize non-trivial PSIC",
+                                               "For testing de-serializing non-trivial PSIC")
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+
+        self.method_doublet_noop = self.make_first_method(
+            "string doublet noop",
+            "a noop on a two-column input",
+            self.coderev_noop)
+        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
+        first_cable_dict = {
+            "source_dataset_name": "pi",
+            "source_step": 0,
+            "dest_dataset_name": self.method_doublet_noop.inputs.first().dataset_name,
+            "keep_output": True,
+            "wires": [
+                {"source_idx": 1, "dest_idx": 2},
+                {"source_idx": 2, "dest_idx": 1}
+            ]
+        }
+        first_cable = first_step.create_incable_from_dict(first_cable_dict)
+        # Test cable from Pipeline input.
+        self._check_incable(first_cable_dict, first_cable)
+
+        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_doublet_noop)
+        second_cable_dict = {
+            "source_dataset_name": self.method_doublet_noop.outputs.first().dataset_name,
+            "source_step": 1,
+            "dest_dataset_name": self.method_doublet_noop.inputs.first().dataset_name,
+            "keep_output": True,
+            "wires": [
+                {"source_idx": 1, "dest_idx": 2},
+                {"source_idx": 2, "dest_idx": 1}
+            ]
+        }
+        second_cable = second_step.create_incable_from_dict(second_cable_dict)
+        # Test cable from PipelineStep.
+        self._check_incable(second_cable_dict, second_cable)
+
     def test_serialize_step_one_input_no_deletions(self):
         """Serializing a PS."""
         my_pipeline = self.make_first_pipeline(
@@ -4496,13 +4747,115 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
                                                   dest=self.method_noop.inputs.first())
 
-        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_noop)
+        second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_noop,
+                                               name="noop2", x=50, y=200)
         second_cable = second_step.cables_in.create(source=self.method_noop.outputs.first(),
                                                     source_step=1,
                                                     dest=self.method_noop.inputs.first())
 
         self._check_step(first_step.represent_as_dict(), first_step)
         self._check_step(second_step.represent_as_dict(), second_step)
+
+    def test_deserialize_step_one_input_no_deletions(self):
+        """Defining a PS from a dictionary."""
+        my_pipeline = self.make_first_pipeline(
+            "de-serialize PS", "For testing de-serializing PSs with one input and no deletions"
+        )
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+
+        first_step_dict = {
+            "transf_pk": self.method_noop.pk,
+            "transf_type": "Method",
+            "step_num": 1,
+            "x": 0,
+            "y": 0,
+            "name": "",
+            "cables_in": [
+                {
+                    "source_dataset_name": "pi",
+                    "source_step": 0,
+                    "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": []
+        }
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
+        second_step_dict = {
+            "transf_pk": self.method_noop.pk,
+            "transf_type": "Method",
+            "step_num": 2,
+            "x": 50,
+            "y": 200,
+            "name": "noop2",
+            "cables_in": [
+                {
+                    "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+                    "source_step": 1,
+                    "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": []
+        }
+        second_step = my_pipeline.create_PS_from_dict(second_step_dict)
+        self._check_step(second_step_dict, second_step)
+
+    def test_serialize_step_subpipeline(self):
+        """Serializing a PS whose Transformation is a Pipeline."""
+        # First, define a simple sub-Pipeline.
+        sub_pipeline = self.make_first_pipeline(
+            "sub-Pipeline", "For use as a sub-Pipeline"
+        )
+        self.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
+
+        my_pipeline = self.make_first_pipeline(
+            "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted"
+        )
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+
+        first_step = my_pipeline.steps.create(step_num=1, transformation=sub_pipeline)
+        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+                                                  dest=sub_pipeline.inputs.first())
+        self._check_step(first_step.represent_as_dict(), first_step)
+
+    def test_deserialize_step_subpipeline(self):
+        """Define a PS whose Transformation is a Pipeline from a dictionary."""
+        # First, define a simple sub-Pipeline as above.
+        sub_pipeline = self.make_first_pipeline(
+            "sub-Pipeline", "For use as a sub-Pipeline"
+        )
+        self.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
+
+        my_pipeline = self.make_first_pipeline(
+            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
+        )
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+
+        first_step_dict = {
+            "transf_pk": sub_pipeline.pk,
+            "transf_type": "Pipeline",
+            "step_num": 1,
+            "x": 0,
+            "y": 0,
+            "name": "",
+            "cables_in": [
+                {
+                    "source_dataset_name": "pi",
+                    "source_step": 0,
+                    "dest_dataset_name": "sp_in1",
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": []
+        }
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
 
     def test_serialize_step_one_input_output_deleted(self):
         """Serializing a PS with one input and one output (which is deleted)."""
@@ -4525,7 +4878,56 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         self._check_step(first_step.represent_as_dict(), first_step)
         self._check_step(second_step.represent_as_dict(), second_step)
 
-    def test_serialize_step_several_inputs(self):
+    def test_deserialize_step_one_input_output_deleted(self):
+        """Defining a PS with one input and one output (which is deleted) from a dictionary."""
+        my_pipeline = self.make_first_pipeline(
+            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
+        )
+        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+
+        first_step_dict = {
+            "transf_pk": self.method_noop.pk,
+            "transf_type": "Method",
+            "step_num": 1,
+            "x": 50,
+            "y": 200,
+            "name": "noop1",
+            "cables_in": [
+                {
+                    "source_dataset_name": "pi",
+                    "source_step": 0,
+                    "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": [self.method_noop.outputs.first().dataset_name]
+        }
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
+        second_step_dict = {
+            "transf_pk": self.method_noop.pk,
+            "transf_type": "Method",
+            "step_num": 2,
+            "x": 150,
+            "y": 200,
+            "name": "noop1",
+            "cables_in": [
+                {
+                    "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+                    "source_step": 1,
+                    "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": [self.method_noop.outputs.first().dataset_name]
+        }
+        second_step = my_pipeline.create_PS_from_dict(second_step_dict)
+        self._check_step(second_step_dict, second_step)
+
+    def test_serialize_step_several_inputs_outputs(self):
         """Serializing a PS with several inputs and outputs."""
         # Define a simple CodeResource and first revision for a method with multiple inputs and outputs.
         coderev_3cat = self.make_first_revision(
@@ -4580,6 +4982,88 @@ cat "$3" >> "$5"
         self.assertEquals(first_step.outputs_to_delete.count(), 2)
         self._check_step(first_step.represent_as_dict(), first_step)
 
+    def test_deserialize_step_several_inputs_outputs(self):
+        """Defining a PS with several inputs and outputs from a dictionary."""
+        # Define a simple CodeResource and first revision for a method with multiple inputs and outputs.
+        coderev_3cat = self.make_first_revision(
+            "threeintwoout",
+            "Sticks together two compatible CSV files and passes through a third file",
+            "threeintwoout.sh",
+            """#!/bin/bash -e
+cat "$1" > "$4"
+tail -n +2 "$2" >> "$4"
+cat "$3" >> "$5"
+""")
+
+        # The corresponding method.
+        method_threetwo_string_doublet = self.make_first_method(
+            "string doublet three-in two-out",
+            "appends two compatible CSV files and passes through a third",
+            coderev_3cat)
+        mi_1 = method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
+        mi_2 = method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
+        mi_3 = method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
+        mo_1 = method_threetwo_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
+        mo_2 = method_threetwo_string_doublet.create_output("passedfile", 2, compounddatatype=self.cdt_string)
+
+        my_pipeline = self.make_first_pipeline(
+            "de-serialize multi-input PS", "For testing de-serializing PSs with several inputs"
+        )
+        input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
+        input_2 = my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
+        input_3 = my_pipeline.create_input("pi_3", 3, compounddatatype=self.cdt_string)
+
+        first_step_dict = {
+            "transf_pk": method_threetwo_string_doublet.pk,
+            "transf_type": "Method",
+            "step_num": 1,
+            "x": 50,
+            "y": 200,
+            "name": "first step (defined from dictionary)",
+            "cables_in": [
+                {
+                    "source_dataset_name": "pi_1",
+                    "source_step": 0,
+                    "dest_dataset_name": method_threetwo_string_doublet.inputs.get(dataset_idx=1).dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                },
+                {
+                    "source_dataset_name": "pi_2",
+                    "source_step": 0,
+                    "dest_dataset_name": method_threetwo_string_doublet.inputs.get(dataset_idx=2).dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                },
+                {
+                    "source_dataset_name": "pi_3",
+                    "source_step": 0,
+                    "dest_dataset_name": method_threetwo_string_doublet.inputs.get(dataset_idx=3).dataset_name,
+                    "keep_output": False,
+                    "wires": []
+                }
+            ],
+            "outputs_to_delete": []
+        }
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
+        # Try it with deletions:
+        first_step.delete()
+        first_step_dict["outputs_to_delete"] = [mo_1.dataset_name]
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
+        first_step.delete()
+        first_step_dict["outputs_to_delete"] = [mo_2.dataset_name]
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
+        first_step.delete()
+        first_step_dict["outputs_to_delete"] = [mo_1.dataset_name, mo_2.dataset_name]
+        first_step = my_pipeline.create_PS_from_dict(first_step_dict)
+        self._check_step(first_step_dict, first_step)
+
     def test_serialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
         my_pipeline = self.make_first_pipeline("two-step noop", "Double no-op")
@@ -4588,6 +5072,65 @@ cat "$3" >> "$5"
 
         for outcable in my_pipeline.outcables.all():
             self._check_outcable(outcable.represent_as_dict(), outcable)
+
+    def test_deserialize_outcable_no_wires(self):
+        """Serializing a POC with no custom wiring."""
+        my_pipeline = self.make_first_pipeline("two-step noop", "Double no-op")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
+                                    "input_to_not_touch", "untouched_output")
+
+        # Throw out the outcables and define my own.
+        for outcable in my_pipeline.outcables.all():
+            outcable.delete()
+        for output in my_pipeline.outputs.all():
+            output.delete()
+
+        outcable_dict = {
+            "output_idx": 1,
+            "output_name": "untouched_output",
+            "output_CDT_pk": self.cdt_string.pk,
+            "source_step": 2,
+            "source_dataset_name": self.method_noop.outputs.get(dataset_idx=1).dataset_name,
+            "x": 500,
+            "y": 500,
+            "wires": []
+        }
+        outcable = my_pipeline.create_outcable_from_dict(outcable_dict)
+        self._check_outcable(outcable_dict, outcable)
+
+    def test_serialize_raw_outcable(self):
+        """Serializing a raw POC."""
+        my_pipeline = self.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
+                                    "input_to_not_touch", "untouched_output")
+
+        for outcable in my_pipeline.outcables.all():
+            self._check_outcable(outcable.represent_as_dict(), outcable)
+
+    def test_deserialize_raw_outcable(self):
+        """Defining a raw POC from a dictionary."""
+        my_pipeline = self.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
+                                    "input_to_not_touch", "untouched_output")
+
+        # Throw out the outcables and define my own.
+        for outcable in my_pipeline.outcables.all():
+            outcable.delete()
+        for output in my_pipeline.outputs.all():
+            output.delete()
+
+        raw_outcable_dict = {
+            "output_idx": 1,
+            "output_name": "untouched_output",
+            "output_CDT_pk": None,
+            "source_step": 2,
+            "source_dataset_name": self.method_noop_raw.outputs.get(dataset_idx=1).dataset_name,
+            "x": 500,
+            "y": 500,
+            "wires": []
+        }
+        raw_outcable = my_pipeline.create_outcable_from_dict(raw_outcable_dict)
+        self._check_outcable(raw_outcable_dict, raw_outcable)
 
     def test_serialize_outcable_custom_wires(self):
         """Serializing a POC with custom wiring."""
@@ -4618,6 +5161,152 @@ cat "$3" >> "$5"
 
         self._check_outcable(outcable.represent_as_dict(), outcable)
 
+    def test_deserialize_outcable_custom_wires(self):
+        """Defining a POC with custom wiring using a dictionary."""
+        my_pipeline = self.make_first_pipeline(
+            "custom-wired outcable", "For testing de-serialization of a POC with custom wiring"
+        )
+
+        # self.method_noop takes cdt_string, which is built on datatype_str, which is not the same as self.STR.
+        method_builtin_STR_noop = self.make_first_method(
+            "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop
+        )
+        self.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
+
+        my_pipeline.create_input("foo", 1, compounddatatype=self.string_singlet)
+
+        my_pipeline.steps.create(step_num=1, transformation=method_builtin_STR_noop)
+
+        wired_outcable_dict = {
+            "output_idx": 1,
+            "output_name": "bar",
+            "output_CDT_pk": self.string_doublet.pk,
+            "source_step": 1,
+            "source_dataset_name": method_builtin_STR_noop.outputs.get(dataset_idx=1).dataset_name,
+            "x": 750,
+            "y": 550,
+            "wires": [
+                {"source_idx": 1, "dest_idx": 1},
+                {"source_idx": 1, "dest_idx": 2}
+            ]
+        }
+        wired_outcable = my_pipeline.create_outcable_from_dict(wired_outcable_dict)
+
+        self._check_outcable(wired_outcable_dict, wired_outcable)
+
+    def _setup_pipeline_dict(self, state):
+        """
+        Dictionaries that define a Pipeline in varying stages of completion.
+        """
+        pipeline_dict = {
+            "family_pk": None,
+            "family_name": "test",
+            "family_desc": "Test family",
+
+            "revision_name": "v1",
+            "revision_desc": "first version",
+            "revision_parent_pk": None,
+
+            "canvas_width": 1200,
+            "canvas_height": 960,
+
+            "pipeline_inputs": [],
+            "pipeline_steps": [],
+            "pipeline_output_cables": []
+        }
+
+        if state == "empty":
+            return pipeline_dict
+
+        # Add an input and two steps.
+        pipeline_dict["pipeline_inputs"] = [
+                {
+                    "CDT_pk": self.cdt_string.pk,
+                    "dataset_name": "input_to_not_touch",
+                    "dataset_idx": 1,
+                    "x": 50,
+                    "y": 200,
+                    "min_row": None,
+                    "max_row": None
+                }
+            ]
+        pipeline_dict["pipeline_steps"] = [
+                {
+                    "transf_pk": self.method_noop.pk,
+                    "transf_type": "Method",
+                    "step_num": 1,
+                    "x": 150,
+                    "y": 200,
+                    "name": "step 1",
+                    "cables_in": [
+                        {
+                            "source_dataset_name": "input_to_not_touch",
+                            "source_step": 0,
+                            "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                            "keep_output": False,
+                            "wires": []
+                        }
+                    ],
+                    "outputs_to_delete": []
+                },
+                {
+                    "transf_pk": self.method_noop.pk,
+                    "transf_type": "Method",
+                    "step_num": 2,
+                    "x": 350,
+                    "y": 200,
+                    "name": "step 2",
+                    "cables_in": [
+                        {
+                            "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+                            "source_step": 1,
+                            "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                            "keep_output": False,
+                            "wires": []
+                        }
+                    ],
+                    "outputs_to_delete": []
+                }
+            ]
+
+        if state == "incomplete":
+            return pipeline_dict
+
+        # Add the last step and an output cable.
+        pipeline_dict["pipeline_steps"].append(
+            {
+                "transf_pk": self.method_noop.pk,
+                "transf_type": "Method",
+                "step_num": 3,
+                "x": 550,
+                "y": 200,
+                "name": "step 3",
+                "cables_in": [
+                    {
+                        "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+                        "source_step": 2,
+                        "dest_dataset_name": self.method_noop.inputs.first().dataset_name,
+                        "keep_output": False,
+                        "wires": []
+                    }
+                ],
+                "outputs_to_delete": []
+            })
+        pipeline_dict["pipeline_output_cables"] = [
+            {
+                "output_idx": 1,
+                "output_name": "untouched_output",
+                "output_CDT_pk": self.cdt_string.pk,
+                "source_step": 3,
+                "source_dataset_name": self.method_noop.outputs.first().dataset_name,
+                "x": 1100,
+                "y": 150,
+                "wires": []
+            }
+        ]
+
+        return pipeline_dict
+
     def test_serialize_empty_pipeline(self):
         """Serializing an empty Pipeline."""
         my_pipeline = self.make_first_pipeline("test", "Test family")
@@ -4628,6 +5317,15 @@ cat "$3" >> "$5"
         self.assertListEqual(my_dict["pipeline_inputs"], [])
         self.assertListEqual(my_dict["pipeline_steps"], [])
         self.assertListEqual(my_dict["pipeline_output_cables"], [])
+
+    def test_deserialize_empty_pipeline(self):
+        """Defining an empty Pipeline from a dictionary."""
+        empty_pipeline_dict = self._setup_pipeline_dict("empty")
+        my_pipeline = Pipeline.create_from_dict(empty_pipeline_dict)
+        # This created a PipelineFamily, so we update pipeline_dict["family_pk"]
+        # to match.
+        empty_pipeline_dict["family_pk"] = my_pipeline.family.pk
+        self._check_pipeline(empty_pipeline_dict, my_pipeline)
 
     def test_serialize_incomplete_pipeline(self):
         """Serializing an incomplete Pipeline."""
@@ -4645,6 +5343,14 @@ cat "$3" >> "$5"
 
         self._check_pipeline(my_dict, my_pipeline)
 
+    def test_deserialize_incomplete_pipeline(self):
+        """Defining an incomplete Pipeline from a dictionary."""
+        incomplete_pipeline_dict = self._setup_pipeline_dict("incomplete")
+        my_pipeline = Pipeline.create_from_dict(incomplete_pipeline_dict)
+        # Get the PipelineFamily PK:
+        incomplete_pipeline_dict["family_pk"] = my_pipeline.family.pk
+        self._check_pipeline(incomplete_pipeline_dict, my_pipeline)
+
     def test_serialize_pipeline(self):
         """Serializing a complete Pipeline."""
         my_pipeline = self.make_first_pipeline("three-step noop", "Triple no-op")
@@ -4652,6 +5358,16 @@ cat "$3" >> "$5"
                                     "input_to_not_touch", "untouched_output")
 
         self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline)
+
+    def test_deserialize_pipeline(self):
+        """Defining a complete Pipeline from a dictionary."""
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        complete_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+
+        # Get the PipelineFamily PK:
+        complete_pipeline_dict["family_pk"] = complete_pipeline.family.pk
+
+        self._check_pipeline(complete_pipeline_dict, complete_pipeline)
 
     def test_serialize_pipeline_multiple_steps_multiple_outputs(self):
         """Serializing a more complicated Pipeline."""
@@ -4713,3 +5429,260 @@ tail -n +2 "$2" >> "$3"
         my_pipeline.create_outputs()
 
         self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline)
+
+    def test_deserialize_pipeline_multiple_steps_multiple_outputs(self):
+        """Defining a more complicated Pipeline from a dictionary."""
+        coderev_twocat = self.make_first_revision(
+            "twocat",
+            "Sticks together two compatible CSV files",
+            "twocat.sh",
+            """#!/bin/bash -e
+cat "$1" > "$3"
+tail -n +2 "$2" >> "$3"
+""")
+
+        # The corresponding method.
+        method_twocat_string_doublet = self.make_first_method(
+            "string doublet two-cat",
+            "appends two string-doublet CSV files",
+            coderev_twocat)
+        doublet_i1 = method_twocat_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
+        doublet_i2 = method_twocat_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
+        doublet_o1 = method_twocat_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
+
+        method_twocat_string_singlet = self.make_first_method(
+            "string singlet two-cat",
+            "appends two string-singlet CSV files",
+            coderev_twocat)
+        singlet_i1 = method_twocat_string_singlet.create_input("firstsingletfile", 1,
+                                                               compounddatatype=self.string_singlet)
+        singlet_i2 = method_twocat_string_singlet.create_input("secondsingletfile", 2,
+                                                               compounddatatype=self.string_singlet)
+        singlet_o1 = method_twocat_string_singlet.create_output("combinedsingletfile", 1,
+                                                                compounddatatype=self.string_singlet)
+
+        complex_pipeline_dict = {
+            "family_pk": None,
+            "family_name": "more complicated Pipeline",
+            "family_desc": "For testing de-serialization of Pipelines",
+
+            "revision_name": "v1",
+            "revision_desc": "first version",
+            "revision_parent_pk": None,
+
+            "canvas_width": 1200,
+            "canvas_height": 960,
+
+            "pipeline_inputs": [
+                {
+                    "CDT_pk": self.string_doublet.pk,
+                    "dataset_name": "pi_1",
+                    "dataset_idx": 1,
+                    "x": 50,
+                    "y": 200,
+                    "min_row": None,
+                    "max_row": None
+                },
+                {
+                    "CDT_pk": self.string_doublet.pk,
+                    "dataset_name": "pi_2",
+                    "dataset_idx": 2,
+                    "x": 50,
+                    "y": 250,
+                    "min_row": None,
+                    "max_row": None
+                },
+                {
+                    "CDT_pk": self.string_singlet.pk,
+                    "dataset_name": "pi_3",
+                    "dataset_idx": 3,
+                    "x": 50,
+                    "y": 350,
+                    "min_row": None,
+                    "max_row": None
+                }
+            ],
+            "pipeline_steps": [
+                {
+                    "transf_pk": method_twocat_string_doublet.pk,
+                    "transf_type": "Method",
+                    "step_num": 1,
+                    "x": 150,
+                    "y": 200,
+                    "name": "step 1",
+                    "cables_in": [
+                        {
+                            "source_dataset_name": "pi_1",
+                            "source_step": 0,
+                            "dest_dataset_name": doublet_i1.dataset_name,
+                            "keep_output": False,
+                            "wires": []
+                        },
+                        {
+                            "source_dataset_name": "pi_2",
+                            "source_step": 0,
+                            "dest_dataset_name": doublet_i2.dataset_name,
+                            "keep_output": False,
+                            "wires": []
+                        }
+                    ],
+                    "outputs_to_delete": []
+                },
+                {
+                    "transf_pk": method_twocat_string_singlet.pk,
+                    "transf_type": "Method",
+                    "step_num": 2,
+                    "x": 350,
+                    "y": 200,
+                    "name": "step 2",
+                    "cables_in": [
+                        {
+                            "source_dataset_name": "pi_3",
+                            "source_step": 0,
+                            "dest_dataset_name": singlet_i1.dataset_name,
+                            "keep_output": False,
+                            "wires": []
+                        },
+                        {
+                            "source_dataset_name": doublet_o1.dataset_name,
+                            "source_step": 1,
+                            "dest_dataset_name": singlet_i2.dataset_name,
+                            "keep_output": True,
+                            "wires": [
+                                {"source_idx": 2, "dest_idx": 1}
+                            ]
+                        }
+                    ],
+                    "outputs_to_delete": []
+                }
+            ],
+            "pipeline_output_cables": [
+                {
+                    "output_idx": 1,
+                    "output_name": "output_1",
+                    "output_CDT_pk": self.string_doublet.pk,
+                    "source_step": 1,
+                    "source_dataset_name": doublet_o1.dataset_name,
+                    "x": 1100,
+                    "y": 150,
+                    "wires": []
+                },
+                {
+                    "output_idx": 2,
+                    "output_name": "output_2",
+                    "output_CDT_pk": self.string_doublet.pk,
+                    "source_step": 2,
+                    "source_dataset_name": singlet_o1.dataset_name,
+                    "x": 1100,
+                    "y": 250,
+                    "wires": [
+                        {"source_idx": 1, "dest_idx": 1},
+                        {"source_idx": 1, "dest_idx": 2}
+                    ]
+                }
+            ]
+        }
+        complex_pipeline = Pipeline.create_from_dict(complex_pipeline_dict)
+
+        # Get the PipelineFamily PK.
+        complex_pipeline_dict["family_pk"] = complex_pipeline.family.pk
+
+        self._check_pipeline(complex_pipeline_dict, complex_pipeline)
+
+    def test_update_from_dict(self):
+        """Testing making an update of an existing Pipeline from a dictionary."""
+        # Create an incomplete Pipeline (take it from one of the previous tests).
+        empty_pipeline_dict = self._setup_pipeline_dict("empty")
+        my_pipeline = Pipeline.create_from_dict(empty_pipeline_dict)
+        pipeline_family_just_created = my_pipeline.family
+
+        # Update it to a half-complete state.
+        incomplete_pipeline_dict = self._setup_pipeline_dict("incomplete")
+        my_pipeline.update_from_dict(incomplete_pipeline_dict)
+        # The updated Pipeline should still have the same family.
+        incomplete_pipeline_dict["family_pk"] = pipeline_family_just_created.pk
+        self._check_pipeline(incomplete_pipeline_dict, my_pipeline)
+
+        # Update it to a complete state.
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        my_pipeline.update_from_dict(complete_pipeline_dict)
+        # The PipelineFamily should still be the same.
+        complete_pipeline_dict["family_pk"] = pipeline_family_just_created.pk
+        self._check_pipeline(complete_pipeline_dict, my_pipeline)
+
+    def test_update_already_used_pipeline(self):
+        """Updating an already-used Pipeline from a dictionary should fail."""
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        my_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+
+        # Attach a dummy run.
+        my_pipeline.pipeline_instances.create(user=self.user_bob, name="DummyRun",
+                                              description="A run that should prohibit updating of the Pipeline")
+
+        # Try to update the Pipeline.
+        complete_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
+            self.method_noop.outputs.first().dataset_name)
+        complete_pipeline_dict["family_pk"] = my_pipeline.family.pk
+
+        self.assertRaisesRegexp(
+            PipelineSerializationException,
+            'Pipeline "{}" has been previously run so cannot be updated'.format(my_pipeline),
+            lambda: my_pipeline.update_from_dict(complete_pipeline_dict)
+        )
+
+    def test_revise_pipeline(self):
+        """Revising a Pipeline from a dictionary."""
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        my_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+
+        # Make a revision.
+        updated_pipeline_dict = complete_pipeline_dict
+        updated_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
+            self.method_noop.outputs.first().dataset_name)
+
+        new_and_improved = my_pipeline.revise_from_dict(updated_pipeline_dict, "v2", "Second version",
+                                                        1600, 1200)
+        # These fields will have changed in the revision.
+        updated_pipeline_dict["family_pk"] = my_pipeline.family.pk
+        updated_pipeline_dict["revision_name"] = "v2"
+        updated_pipeline_dict["revision_desc"] = "Second version"
+        updated_pipeline_dict["canvas_width"] = 1600
+        updated_pipeline_dict["canvas_height"] = 1200
+        updated_pipeline_dict["revision_parent_pk"] = my_pipeline.pk
+
+        self._check_pipeline(updated_pipeline_dict, new_and_improved)
+
+    def test_update_already_revised_pipeline(self):
+        """Updating an already-revised Pipeline from a dictionary should fail."""
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        my_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+
+        # Revise the Pipeline.
+        revision_pipeline_dict = complete_pipeline_dict
+        revision_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
+            self.method_noop.outputs.first().dataset_name)
+        revision_pipeline_dict["family_pk"] = my_pipeline.family.pk
+        new_revision = my_pipeline.revise_from_dict(revision_pipeline_dict,
+                                                    "v2", "Second version", 1600, 1200)
+
+        # Try to update the first one.
+        self.assertRaisesRegexp(
+            PipelineSerializationException,
+            'Pipeline "{}" has been previously revised so cannot be updated'.format(my_pipeline),
+            lambda: my_pipeline.update_from_dict(revision_pipeline_dict)
+        )
+
+    def test_create_to_existing_family(self):
+        """Creating a Pipeline with an already-existing PipelineFamily from a dictionary should fail."""
+        complete_pipeline_dict = self._setup_pipeline_dict("complete")
+        empty_pipeline_dict = self._setup_pipeline_dict("empty")
+
+        # First, create a complete Pipeline.
+        first_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+
+        # Now try to create a second to the same family.
+        self.assertRaisesRegexp(
+            PipelineSerializationException,
+            'Duplicate pipeline family name',
+            lambda: Pipeline.create_from_dict(empty_pipeline_dict)
+        )

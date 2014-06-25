@@ -42,6 +42,14 @@ class PipelineFamily(transformation.models.TransformationFamily):
     def size(self):
         """Returns size of this Pipeline's family"""
         return Pipeline.objects.filter(family=self).count()
+
+    @property
+    def num_revisions(self):
+        """
+        Number of revisions within this TransformationFamily
+        """
+        return self.size
+
     pass
 
 
@@ -211,13 +219,13 @@ class Pipeline(transformation.models.Transformation):
         Creates a dict-based representation of this Pipeline.
 
         This dict will be structured as:
-         - family_pk: -1 if no PipelineFamily exists yet; otherwise, its PK
+         - family_pk: None if no PipelineFamily exists yet; otherwise, its PK
          - family_name: string
          - family_desc: string
 
          - revision_name: string
          - revision_desc: string
-         - revision_parent_pk: -1 if there is no parent to this revision; otherwise, its PK
+         - revision_parent_pk: None if there is no parent to this revision; otherwise, its PK
 
          - canvas_width: int
          - canvas_height: int
@@ -236,7 +244,7 @@ class Pipeline(transformation.models.Transformation):
 
             "revision_name": self.revision_name,
             "revision_desc": self.revision_desc,
-            "revision_parent_pk": -1 if self.revision_parent is None else self.revision_parent.pk,
+            "revision_parent_pk": None if self.revision_parent is None else self.revision_parent.pk,
 
             "canvas_width": self.canvas_width,
             "canvas_height": self.canvas_height,
@@ -282,7 +290,7 @@ class Pipeline(transformation.models.Transformation):
         for curr_input in self.inputs.all():
             curr_input.delete()
 
-        for curr_step in self.inputs.all():
+        for curr_step in self.steps.all():
             curr_step.delete()
 
         for curr_outcable in self.outcables.all():
@@ -327,17 +335,19 @@ class Pipeline(transformation.models.Transformation):
         """
         try:
             CDT_pk = input_dict["CDT_pk"]
-            self.create_input(
-                compounddatatype=None if CDT_pk < 0 else metadata.models.CompoundDatatype.objects.get(pk=CDT_pk),
+            new_input = self.create_input(
+                compounddatatype=None if CDT_pk is None else metadata.models.CompoundDatatype.objects.get(pk=CDT_pk),
                 dataset_name=input_dict["dataset_name"],
                 dataset_idx=input_dict["dataset_idx"],
-                min_row=None if input_dict["min_row"] < 0 else input_dict["min_row"],
-                max_row=None if input_dict["max_row"]< 0 else input_dict["max_row"],
+                min_row=None if input_dict["min_row"] is None else input_dict["min_row"],
+                max_row=None if input_dict["max_row"] is None else input_dict["max_row"],
                 x=input_dict["x"], y=input_dict["y"]
             )
         except Exception as e:
             # The fact this is a transaction will roll back the Pipeline and PipelineFamily.
             raise PipelineSerializationException("Error in creating pipeline input: {}".format(e))
+
+        return new_input
 
     @transaction.atomic
     def create_PS_from_dict(self, PS_dict):
@@ -363,6 +373,10 @@ class Pipeline(transformation.models.Transformation):
             for in_cable in PS_dict["cables_in"]:
                 pipeline_step.create_incable_from_dict(in_cable)
 
+            # Mark the specified outputs as deletions.
+            for otd_name in PS_dict["outputs_to_delete"]:
+                pipeline_step.add_deletion(transf.outputs.get(dataset_name=otd_name))
+
         except PipelineSerializationException as e:
             # Propagate this upwards.
             raise e
@@ -386,21 +400,22 @@ class Pipeline(transformation.models.Transformation):
         """
         try:
             source_step = self.steps.get(step_num=outcable_dict["source_step"])
-            source_output = source_step.transformation.outputs.get(dataset_name=outcable_dict['dataset_name'])
+            source_output = source_step.transformation.outputs.get(dataset_name=outcable_dict["source_dataset_name"])
             output_CDT = None
-            if outcable_dict["output_CDT_pk"] != "__raw__":
+            if outcable_dict["output_CDT_pk"] is not None:
                 output_CDT = metadata.models.CompoundDatatype.objects.get(pk=outcable_dict["output_CDT_pk"])
-            new_outcable = self.create_outcable(
+            new_outcable = self.outcables.create(
                 source_step=source_step.step_num,
                 source=source_output,
-                output_name=outcable_dict['output_name'],
-                output_idx=outcable_dict['output_idx'],
-                output_CDT = output_CDT
+                output_name=outcable_dict["output_name"],
+                output_idx=outcable_dict["output_idx"],
+                output_cdt=output_CDT
             )
-            new_outcable.create_output(x=outcable_dict['x'], y=outcable_dict['y'])
-            # Define some wires, while we're at it.
+            # Define the wires as well.
             for wire in outcable_dict["wires"]:
                 new_outcable.create_wire_from_dict(wire)
+
+            new_outcable.create_output(x=outcable_dict["x"], y=outcable_dict["y"])
 
         except PipelineSerializationException as e:
             # Propagate this upwards.
@@ -442,16 +457,23 @@ class Pipeline(transformation.models.Transformation):
                 revision_number=1,
                 revision_name=form_data['revision_name'],
                 revision_desc=form_data['revision_desc'],
+                revision_parent=(None if form_data["revision_parent_pk"] is None
+                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"])),
                 canvas_width=form_data["canvas_width"],
                 canvas_height=form_data["canvas_height"]
             )
-        else:
-            # Update the current Pipeline.
-            pipeline.revision_number = pl_family.num_revisions+1
-            pipeline.revision_name = form_data['revision_name']
-            pipeline.revision_desc = form_data['revision_desc']
-            pipeline.canvas_width = form_data["canvas_width"]
-            pipeline.canvas_height = form_data["canvas_height"]
+
+        # June 24, 2014: don't bother with this, it will be passed in with all of this
+        # already set.
+        # else:
+        #     # Update the current Pipeline.
+        #     pipeline.revision_number = pipeline.family.num_revisions+1
+        #     pipeline.revision_name = form_data['revision_name']
+        #     pipeline.revision_desc = form_data['revision_desc']
+        #     pipeline.revision_parent = (None if form_data["revision_parent_pk"] is None
+        #                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"]))
+        #     pipeline.canvas_width = form_data["canvas_width"]
+        #     pipeline.canvas_height = form_data["canvas_height"]
 
         # Create the inputs for the Pipeline.
         for new_input in form_data["pipeline_inputs"]:
@@ -710,7 +732,7 @@ class PipelineStep(models.Model):
         """
         try:
             dest = self.transformation.inputs.get(dataset_name=cable_dict["dest_dataset_name"])
-            source_step = cable_dict["source_step_num"]
+            source_step = cable_dict["source_step"]
             source = None
             if source_step != 0:
                 source = self.pipeline.steps.get(step_num=source_step).transformation.outputs.get(
@@ -948,10 +970,15 @@ class PipelineCable(models.Model):
         wire_dict should be structured as one produced by CustomCableWire's
         represent_as_dict() method.
         """
+        if self.is_incable:
+            dest_CDT = self.dest.get_cdt()
+        else:
+            dest_CDT = self.output_cdt
+
         try:
             new_wire = self.custom_wires.create(
-                source_pin=source.get_cdt().columns.get(column_idx=wire_dict["source_idx"]),
-                dest_pin=dest.get_cdt().columns.get(column_idx=wire_dict["dest_idx"])
+                source_pin=self.source.get_cdt().members.get(column_idx=wire_dict["source_idx"]),
+                dest_pin=dest_CDT.members.get(column_idx=wire_dict["dest_idx"])
             )
         except Exception as e:
             raise PipelineSerializationException("Error in defining custom wire: {}".format(e))
@@ -1581,7 +1608,7 @@ class PipelineOutputCable(PipelineCable):
         The dict is structured as:
          - output_idx: index of the resulting Pipeline output,
          - output_name: name of the resulting Pipeline output
-         - output_CDT_pk: PK of the CDT of the resulting Pipeline output (could be changed by wiring)
+         - output_CDT_pk: None if raw, otherwise PK of the CDT of the resulting Pipeline output
          - source_step: 1-based index of the step producing the output
          - source_dataset_name: name of the source output
          - x: x-coordinate of the corresponding Pipeline output
@@ -1592,7 +1619,7 @@ class PipelineOutputCable(PipelineCable):
         my_dict = {
             "output_idx": self.output_idx,
             "output_name": self.output_name,
-            "output_CDT_pk": self.output_cdt.pk,
+            "output_CDT_pk": None if self.is_raw() else self.output_cdt.pk,
             "source_step": self.source_step,
             "source_dataset_name": self.source.definite.dataset_name,
             "x": corresp_output.x,

@@ -428,7 +428,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
 
         // There is no PipelineFamily yet; we're going to create one.
-        form_data["family_pk"] = -1;
+        form_data["family_pk"] = null;
         form_data['family_name'] = revision_name;
         form_data['family_desc'] = revision_desc;
 
@@ -436,7 +436,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['revision_name'] = 'v1';
         form_data['revision_desc'] = 'First version';
         // There is no parent revision, as we're creating this one from scratch.
-        form_data["revision_parent_pk"] = -1;
+        form_data["revision_parent_pk"] = null;
 
         // Canvas information to store in the Pipeline object.
         form_data["canvas_width"] = canvas.width;
@@ -456,13 +456,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
             form_data['pipeline_inputs'][i] = {
-                'CDT_pk': (this_input.constructor===CDtNode) ? this_input.pk : -1,
+                'CDT_pk': (this_input.constructor===CDtNode) ? this_input.pk : null,
                 'dataset_name': this_input.label,
                 'dataset_idx': i+1,
                 'x': this_input.x,
                 'y': this_input.y,
-                "min_row": -1, // in the future these can be more detailed
-                "max_row": -1
+                "min_row": null, // in the future these can be more detailed
+                "max_row": null
             }
         }
 

@@ -699,4 +699,9 @@ class MethodFamily(transformation.models.TransformationFamily):
     """
     # Implicitly defined:
     #   members (Method/ForeignKey)
-    pass
+    @property
+    def num_revisions(self):
+        """
+        Number of revisions within this TransformationFamily
+        """
+        return Method.objects.filter(family=self).count()
