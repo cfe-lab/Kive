@@ -447,7 +447,6 @@ class Pipeline(transformation.models.Transformation):
             )
         else:
             # Update the current Pipeline.
-            pipeline.revision_number = pl_family.num_revisions+1
             pipeline.revision_name = form_data['revision_name']
             pipeline.revision_desc = form_data['revision_desc']
             pipeline.canvas_width = form_data["canvas_width"]

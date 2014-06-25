@@ -52,15 +52,19 @@ def pipeline_add(request):
 
 def pipeline_revise(request, id):
     """
-    Display all revisions in this PipelineFamily
+    Display all revisions in this PipelineFamily.
+    Use an AJAX transaction to load the actual Pipeline object
+    from the database to front-end to render as HTML5 Canvas
+    objects.
     """
     t = loader.get_template('pipeline/pipeline_revise.html')
-    print id
+
     # retrieve this pipeline from database
     family = PipelineFamily.objects.filter(pk=id)[0]
     revisions = Pipeline.objects.filter(family=family)
 
     c = Context({'family': family, 'revisions': revisions})
+    c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 

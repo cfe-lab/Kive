@@ -1,5 +1,6 @@
 from django.http import HttpResponse, Http404
 from method.models import MethodFamily, Method
+from pipeline.models import Pipeline
 from django.core import serializers
 import json
 
@@ -72,5 +73,18 @@ def get_method_io (request):
 
         response_data = {'inputs': inputs, 'outputs': outputs}
         return HttpResponse(json.dumps(response_data), content_type='application/json')
+    else:
+        raise Http404
+
+
+def get_pipeline(request):
+    if request.is_ajax():
+        response = HttpResponse()
+        pipeline_revision_id = request.POST.get('pipeline_id')
+        if pipeline_revision_id != '':
+            pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
+            pipeline_dict = pipeline_revision.represent_as_dict()
+            return HttpResponse(json.dumps(pipeline_dict), content_type='application/json')
+        return response
     else:
         raise Http404

@@ -1,4 +1,37 @@
+// place in global namespace to access from other files
+var canvas;
+var canvasState;
+
+var rawNodeWidth = 20,
+    rawNodeColour = "#88DD88",
+    rawNodeInset = 10,
+    rawNodeOffset = 25;
+
+var cdtNodeWidth = 40,
+    cdtNodeColour = '#8888DD',
+    cdtNodeInset = 10,
+    cdtNodeOffset = 10;
+
+var mNodeWidth = 80,
+    mNodeInset = 10,
+    mNodeSpacing = 20,
+    mNodeColour = '#999999',
+    mNodeOffset = 10;
+
+
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+    // initialize animated canvas
+    canvas = document.getElementById('pipeline_canvas');
+    var canvasWidth = window.innerWidth;
+    var canvasHeight= window.innerHeight - 180;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
+    //    $(window).resize(function() {    });
+
+    canvasState = new CanvasState(canvas);
+
 
     // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
@@ -74,6 +107,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     ).change(); // trigger on load
 
+    // Use option TITLE as default Method node name
     $('#id_select_method').on('change', function() {
         var filename = $('#id_select_method option:selected')[0].title;
         $('#id_method_name').val(filename);
@@ -119,25 +153,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         e.stopPropagation();
     });
 
+    // FIXME: What does this do?
     $('a[rel="ctrl"]').on('click', function (e) {
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
         setTimeout("$('.fulltext').fadeOut(300);", 2000);
     });
 
-
-    // initialize animated canvas
-    var canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth = window.innerWidth;
-    var canvasHeight= window.innerHeight - 180;
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
-//    $(window).resize(function() {    });
-
-
-    var canvasState = new CanvasState(canvas);
-
+    // Handle jQuery-UI Dialog spawned for output cable
     $('form', '#dialog-form').on('submit', function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
@@ -146,6 +168,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         buttons['Create output'].apply(dialog);
     });
 
+    // Handle 'Inputs' menu
     $('form','#id_input_ctrl').on('submit', function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
@@ -161,17 +184,18 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
                 canvasState.addShape(new RawNode(100, 200 + Math.round(50 * Math.random()),
-                    20, '#88DD88', 10, 25, node_label
+                    rawNodeWidth, rawNodeColour, rawNodeInset, rawNodeOffset, node_label
                 ))
             } else {
                 canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
-                    40, '#8888DD', 10, 10, node_label
+                    cdtNodeWidth, cdtNodeColour, cdtNodeInset, cdtNodeOffset, node_label
                 ));
             }
             $('#id_datatype_name').val("");  // reset text field
         }
     });
 
+    // Handle 'Methods' menu
     $('form', '#id_method_ctrl').on('submit', function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
@@ -201,8 +225,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
             else {
                 method_error[0].innerHTML = '';
-                var n_inputs = null,
-                    n_outputs = null;
 
                 // use AJAX to retrieve Revision inputs and outputs
                 $.ajax({
@@ -213,12 +235,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         var inputs = result['inputs'],
                             outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()), 80, 10, 20, '#999999',
-                            node_label, 10, inputs, outputs));
-
-                        // x, y, w, inset, spacing, fill, label, offset, inputs, outputs
-                        //canvasState.addShape(new MethodNode(200, 200 + Math.round(50 * Math.random()), 45, 5, 20, '#CCCCCC',
-                        // node_label, 0, inputs, outputs));
+                        canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()), mNodeWidth,
+                            mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset, inputs, outputs));
                     }
                 });
 
@@ -331,7 +349,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    /* submit form */
+    /*
+        Submit form
+    */
     $('#id_pipeline_form').submit(function(e) {
         /*
         Trigger AJAX transaction on submitting form.
@@ -433,7 +453,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['family_desc'] = revision_desc;
 
         // arguments to add first pipeline revision
-        form_data['revision_name'] = 'v1';
+        form_data['revision_name'] = '1: Prototype';
         form_data['revision_desc'] = 'First version';
         // There is no parent revision, as we're creating this one from scratch.
         form_data["revision_parent_pk"] = -1;
