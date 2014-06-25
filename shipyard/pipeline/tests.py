@@ -4222,16 +4222,27 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         # Check there are no extraneous keys being defined.
         self.assertSetEqual(
             set(dict_repr.keys()),
-            set([
-                "family_pk", "family_name", "family_desc", "revision_name", "revision_desc", "revision_parent_pk",
-                 "canvas_width", "canvas_height", "pipeline_inputs", "pipeline_steps", "pipeline_output_cables"
-            ]))
+            {
+                "family_pk",
+                "family_name",
+                "family_desc",
+                "revision_number",
+                "revision_name",
+                "revision_desc",
+                "revision_parent_pk",
+                "canvas_width",
+                "canvas_height",
+                "pipeline_inputs",
+                "pipeline_steps",
+                "pipeline_output_cables"
+            })
 
         self.assertEquals(dict_repr["family_pk"], pipeline.family.pk)
         self.assertEquals(dict_repr["family_name"], pipeline.family.name)
         self.assertEquals(dict_repr["family_desc"], pipeline.family.description)
         self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
         self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
+        self.assertEquals(dict_repr["revision_number"], pipeline.revision_number)
 
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
@@ -5205,6 +5216,7 @@ cat "$3" >> "$5"
 
             "revision_name": "v1",
             "revision_desc": "first version",
+            "revision_number": 1,
             "revision_parent_pk": None,
 
             "canvas_width": 1200,
@@ -5468,6 +5480,7 @@ tail -n +2 "$2" >> "$3"
 
             "revision_name": "v1",
             "revision_desc": "first version",
+            "revision_number": 1,
             "revision_parent_pk": None,
 
             "canvas_width": 1200,
@@ -5646,6 +5659,7 @@ tail -n +2 "$2" >> "$3"
         updated_pipeline_dict["family_pk"] = my_pipeline.family.pk
         updated_pipeline_dict["revision_name"] = "v2"
         updated_pipeline_dict["revision_desc"] = "Second version"
+        updated_pipeline_dict["revision_number"] = 2
         updated_pipeline_dict["canvas_width"] = 1600
         updated_pipeline_dict["canvas_height"] = 1200
         updated_pipeline_dict["revision_parent_pk"] = my_pipeline.pk

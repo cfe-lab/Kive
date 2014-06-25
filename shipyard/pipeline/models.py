@@ -223,6 +223,7 @@ class Pipeline(transformation.models.Transformation):
          - family_name: string
          - family_desc: string
 
+         - revision_number: positive integer
          - revision_name: string
          - revision_desc: string
          - revision_parent_pk: None if there is no parent to this revision; otherwise, its PK
@@ -242,6 +243,7 @@ class Pipeline(transformation.models.Transformation):
             "family_name": self.family.name,
             "family_desc": self.family.description,
 
+            "revision_number": self.revision_number,
             "revision_name": self.revision_name,
             "revision_desc": self.revision_desc,
             "revision_parent_pk": None if self.revision_parent is None else self.revision_parent.pk,
@@ -259,7 +261,7 @@ class Pipeline(transformation.models.Transformation):
             dict_repr["pipeline_inputs"].append(curr_input.represent_as_dict())
 
         # Now populate dict_repr["pipeline_steps"].
-        for curr_step in self.steps.all():
+        for curr_step in self.steps.all().order_by("step_num"):
             dict_repr["pipeline_steps"].append(curr_step.represent_as_dict())
 
         # Finally, populate dict_repr["pipeline_output_cables"].
