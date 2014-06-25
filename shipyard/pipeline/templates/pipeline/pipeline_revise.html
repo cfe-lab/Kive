@@ -17,6 +17,34 @@
     <script src="/static/pipeline/pipeline_add.js"></script>
     <script>
     $(document).ready(function() {
+        // check for double-click on canvas
+        canvas.addEventListener('dblclick', function(e) {
+            canvasState.doDblClick(e);
+        })
+
+        // if double-click on MethodNode, open Methods menu with this node's info
+        canvasState.doDblClick = function(e) {
+            var pos = this.getPos(e);
+            var mx = pos.x;
+            var my = pos.y;
+            var shape;
+            for (var i = 0; i < canvasState.shapes.length; i++) {
+                shape = canvasState.shapes[i];
+                if (shape.contains(mx, my)) {
+                    // trigger Method menu to drop down
+                    console.log(shape);
+
+                    $('li', 'ul#id_ctrl_nav')[2].click();
+                    $('#id_select_method_family').val(shape.family).change();
+
+                    // TODO: Add Method will create node elsewhere
+                    // TODO: need to override this behaviour and replace selected node
+
+                    return;
+                }
+            }
+        };
+
         $('#id_pipeline_select').on('change', function () {
             $.ajax({
                 type: "POST",
@@ -25,6 +53,9 @@
                 datatype: "json",
                 success: function(result) {
                     console.log(result);
+
+                    submit_to_url = result['family_pk'];
+
                     var i, j, k; // counters
                     var node, cables, cable, connector, shape, source, magnet;
 
@@ -32,7 +63,7 @@
                     var pipeline_inputs = result['pipeline_inputs'];  // Array[]
                     for (i = 0; i < pipeline_inputs.length; i++) {
                         node = pipeline_inputs[i];
-                        if (node.CDT_pk < 0) {
+                        if (node.CDT_pk === null) {
                             canvasState.addShape(new RawNode(node.x, node.y, rawNodeWidth, rawNodeColour,
                                     rawNodeInset, rawNodeOffset, node.dataset_name));
                         } else {
@@ -61,6 +92,8 @@
                                 var method_node = new MethodNode(node.transf_pk, node.x, node.y, mNodeWidth,
                                         mNodeInset, mNodeSpacing, mNodeColour, node.name, mNodeOffset,
                                         inputs, outputs);
+                                method_node.family = node.family_pk;
+
                                 canvasState.addShape(method_node);
                                 method_node.draw(canvasState.ctx);  // to update Magnet x and y
 
@@ -90,6 +123,10 @@
                                         magnet = method_node.in_magnets[j];
                                         connector.x = magnet.x;
                                         connector.y = magnet.y;
+                                        connector.dest = magnet;
+
+                                        source.out_magnets[0].connected.push(connector);
+                                        method_node.in_magnets[j].connected.push(connector);
                                         canvasState.connectors.push(connector);
                                     }
                                     else {
@@ -107,6 +144,10 @@
                                                 magnet = method_node.in_magnets[j];
                                                 connector.x = magnet.x;
                                                 connector.y = magnet.y;
+                                                connector.dest = magnet;
+
+                                                source.out_magnets[k].connected.push(connector);
+                                                method_node.in_magnets[j].connected.push(connector);
                                                 canvasState.connectors.push(connector);
                                                 break;
                                             }
@@ -137,6 +178,8 @@
                                     connector.x = cable.x;
                                     connector.y = cable.y;
                                     connector.dest = cable.output_name;
+
+                                    magnet.connected.push(connector);
                                     canvasState.connectors.push(connector);
                                     break;
                                 }
@@ -152,7 +195,7 @@
 
 {% block content %}
 
-<a href="pipelines" rel="prev">Back to pipeline summary</a>
+<a href="/pipelines" rel="prev">Back to pipeline summary</a>
 
     <!-- CANVAS -->
     <div>
@@ -223,8 +266,8 @@
 
             <select id="id_select_method_family" name="select_method_family">
                 <option value="" class="label">Select method family</option>
-                {% for family in method_families %}
-                    <option value={{ family.pk }}>{{ family.name }}</option>
+                {% for mf in method_families %}
+                    <option value={{ mf.pk }}>{{ mf.name }}</option>
                 {% endfor %}
             </select>
 

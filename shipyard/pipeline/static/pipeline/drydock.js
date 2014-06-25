@@ -115,6 +115,9 @@ CanvasState.prototype.doDown = function(e) {
             this.dragoffy = my - mySel.y;
             this.dragging = true;
             this.selection = mySel;
+            if (this.selection.constructor === MethodNode) {
+                $('#id_method_button').val('Revise Method');
+            }
             this.valid = false;
             return;
         }
@@ -124,6 +127,7 @@ CanvasState.prototype.doDown = function(e) {
     if (this.selection) {
         this.selection = null;
         this.valid = false;
+        $('#id_method_button').val('Add Method');
     }
 };
 
@@ -219,6 +223,7 @@ CanvasState.prototype.doUp = function(e) {
     var connector = this.selection;
 
     if (connector.dest === null) {
+        // connector not yet linked to anything
         var mouse = this.getPos(e);
 
         if (mouse.x > 0.9 * this.canvas.width) {
@@ -244,7 +249,7 @@ CanvasState.prototype.doUp = function(e) {
             this.selection = null;
             this.valid = false; // redraw canvas to remove this Connector
         }
-    } else {
+    } else if (connector.dest.constructor === Magnet) {
         // connector has been linked to an in-magnet
         if (connector.source.connected.indexOf(connector) < 0) {
             // this is a new Connector, update source magnet
@@ -270,6 +275,7 @@ CanvasState.prototype.doUp = function(e) {
         }
     }
 };
+
 
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);

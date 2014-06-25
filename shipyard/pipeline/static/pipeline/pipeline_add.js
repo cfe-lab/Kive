@@ -1,6 +1,7 @@
 // place in global namespace to access from other files
 var canvas;
 var canvasState;
+var submit_to_url = 'pipeline_add';
 
 var rawNodeWidth = 20,
     rawNodeColour = "#88DD88",
@@ -145,6 +146,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $('li', 'ul#id_ctrl_nav').on('click', function(e) {
         var $this = $(this),
             menu = $($this.data('rel'));
+
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
@@ -235,8 +237,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     success: function(result) {
                         var inputs = result['inputs'],
                             outputs = result['outputs'];
-                        canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()), mNodeWidth,
-                            mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset, inputs, outputs));
+
+                        if ($('#id_method_button').val() === 'Add Method') {
+                            // create new MethodNode
+                            canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()),
+                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                                inputs, outputs));
+                        } else {
+                            // replace the selected MethodNode
+                            // if user clicks anywhere else, MethodNode is deselected
+                            // and Methods menu closes
+                            var shape = canvasState.selection;
+                            console.log(shape.inputs);
+                            console.log(inputs);
+                            console.log(shape.inputs==inputs);
+                        }
+
                     }
                 });
 
@@ -435,26 +451,47 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var form_data = {};
 
         // arguments to initialize new Pipeline Family
-        var revision_name = $('#id_revision_name').val();
-        var revision_desc = $('#id_revision_desc').val();
+        var family_name = $('#id_family_name').val(),
+            family_desc = $('#id_family_desc').val(),
+            revision_name = $('#id_revision_name').val(),
+            revision_desc = $('#id_revision_desc').val();
+
+        // form validation
+        if (family_name === '') {
+            // FIXME: is there a better way to do this trigger?
+            $('li', 'ul#id_ctrl_nav')[0].click();
+            $('#id_family_name').css({'background-color': '#FFFFCC'})
+            submit_error.innerHTML = 'Pipeline family must be named';
+            return;
+        }
+        if (family_desc === '') {
+            $('li', 'ul#id_ctrl_nav')[0].click();
+            $('#id_family_desc').css({'background-color': '#FFFFCC'})
+            submit_error.innerHTML = 'Pipeline family must have a description';
+            return;
+        }
 
         if (revision_name === '') {
+            $('li', 'ul#id_ctrl_nav')[1].click();
+            $('#id_revision_name').css({'background-color': '#FFFFCC'})
             submit_error.innerHTML = 'Pipeline must be named';
             return;
         }
         if (revision_desc === '') {
+            $('li', 'ul#id_ctrl_nav')[1].click();
+            $('#id_revision_desc').css({'background-color': '#FFFFCC'})
             submit_error.innerHTML = 'Pipeline must have a description';
             return;
         }
 
         // There is no PipelineFamily yet; we're going to create one.
         form_data["family_pk"] = null;
-        form_data['family_name'] = revision_name;
-        form_data['family_desc'] = revision_desc;
+        form_data['family_name'] = family_name;
+        form_data['family_desc'] = family_desc;
 
         // arguments to add first pipeline revision
-        form_data['revision_name'] = '1: Prototype';
-        form_data['revision_desc'] = 'First version';
+        form_data['revision_name'] = revision_name;
+        form_data['revision_desc'] = revision_desc;
         // There is no parent revision, as we're creating this one from scratch.
         form_data["revision_parent_pk"] = null;
 
@@ -620,12 +657,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // this code modified at my desk
         // June 18, 2014 -- RL
-        console.log(form_data);
 
         // do AJAX transaction
         $.ajax({
             type: 'POST',
-            url: 'pipeline_add',
+            url: submit_to_url,
             data: JSON.stringify(form_data),
             datatype: 'json',
             success: function(result) {

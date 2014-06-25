@@ -58,13 +58,27 @@ def pipeline_revise(request, id):
     objects.
     """
     t = loader.get_template('pipeline/pipeline_revise.html')
+    method_families = MethodFamily.objects.all().order_by('name')
+    compound_datatypes = CompoundDatatype.objects.all()
 
     # retrieve this pipeline from database
     family = PipelineFamily.objects.filter(pk=id)[0]
     revisions = Pipeline.objects.filter(family=family)
 
-    c = Context({'family': family, 'revisions': revisions})
+    c = Context({'family': family, 'revisions': revisions,
+                 'method_families': method_families, 'compound_datatypes': compound_datatypes})
     c.update(csrf(request))
+
+    if request.method == 'POST':
+        form_data = json.loads(request.body)
+        print form_data
+        try:
+            Pipeline.revise_from_dict(form_data)
+            response_data = {'status': 'success', 'error_msg': ''}
+        except PipelineSerializationException as e:
+            response_data = {'status': 'failure', 'error_msg': str(e)}
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
     return HttpResponse(t.render(c))
 
 

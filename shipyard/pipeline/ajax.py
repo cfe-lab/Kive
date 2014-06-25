@@ -48,7 +48,7 @@ def get_method_io (request):
         for input in method.inputs.all():
             if not input.has_structure:
                 # input is unstructured
-                cdt_pk = '__raw__'
+                cdt_pk = None
                 cdt_label = 'raw'
             else:
                 structure = input.structure
@@ -61,7 +61,7 @@ def get_method_io (request):
         for output in method.outputs.all():
             if not output.has_structure:
                 # output is unstructured
-                cdt_pk = '__raw__'
+                cdt_pk = None
                 cdt_label = 'raw'
             else:
                 structure = output.structure

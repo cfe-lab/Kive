@@ -32,6 +32,7 @@
     <!-- Method selector -->
     <div id="pipeline_ctrl">
         <ul id="id_ctrl_nav">
+            <li data-rel="#id_family_ctrl">Family</li>
             <li data-rel="#id_meta_ctrl">Pipeline</li>
             <li data-rel="#id_input_ctrl">Inputs</li>
             <li data-rel="#id_method_ctrl">Methods</li>
@@ -44,13 +45,21 @@
                 <div class="errortext" id="id_submit_error"></div>
             </div>
 
+            <div id="id_family_ctrl" class="ctrl_menu">
+                <h3>Family</h3>
+                <label for="#id_family_name" class="text-field-label">Family name</label>
+                <input id="id_family_name" maxlength="128" name="family_name" type="text" />
+
+                <label for="#id_family_desc" class="text-field-label">Family description</label>
+                <textarea id="id_family_desc" name="family_desc"></textarea>
+            </div>
+
             <div id="id_meta_ctrl" class="ctrl_menu">
                 <h3>Pipeline</h3>
-                <!-- TODO: Add fields for PipelineFamily name and description -->
                 <label for="#id_revision_name" class="text-field-label">Pipeline name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
 
-                <label for="#id_revision_desc" class="text-field-label">Description</label>
+                <label for="#id_revision_desc" class="text-field-label">Pipeline description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
             </div>
         </form>

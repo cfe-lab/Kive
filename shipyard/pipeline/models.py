@@ -36,7 +36,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
     def get_absolute_url(self):
-        return '/pipelines/%i' % self.id
+        return '/pipeline_revise/%i' % self.id
 
     @property
     def size(self):
@@ -707,6 +707,7 @@ class PipelineStep(models.Model):
         transf_type_str = "Method" if self.transformation.is_method else "Pipeline"
         my_dict = {
             "transf_pk": self.transformation.definite.pk,
+            "family_pk": self.transformation.definite.family.pk,
             "transf_type": transf_type_str,
             "step_num": self.step_num,
             "x": self.x,

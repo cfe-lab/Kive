@@ -127,6 +127,8 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
     and right sides, respectively.  The width must be greater than 2 * inset.
     */
     this.pk = pk;
+    this.family = null; // can be passed from database
+
     this.x = x || 0;
     this.y = y || 0;
     this.w = w || 10;
