@@ -177,7 +177,7 @@ CanvasState.prototype.doMove = function(e) {
 
                         // retrieve CompoundDatatype of out-magnet
                         if (own_shape.constructor === RawNode) {
-                            connector_carrying_cdt = '__raw__';
+                            connector_carrying_cdt = null;
                         } else {
                             connector_carrying_cdt = this.selection.source.cdt;
                         }

@@ -19,23 +19,15 @@ class TransformationFamily(models.Model):
     Extends :model:`method.MethodFamily`
     Extends :model:`pipeline.PipelineFamily`
     """
-
     name = models.CharField(
         "Transformation family name",
-		max_length=128,
-		help_text="The name given to a group of methods/pipelines",
+        max_length=128,
+        help_text="The name given to a group of methods/pipelines",
         unique=True)
 
     description = models.TextField(
         "Transformation family description",
-		help_text="A description for this collection of methods/pipelines")
-
-    @property
-    def num_revisions(self):
-        """
-        Number of revisions within this TransformationFamily
-        """
-        return Transformation.objects.filter(family=self).count()
+        help_text="A description for this collection of methods/pipelines")
 
     def __unicode__(self):
         """ Describe transformation family by it's name """
@@ -56,13 +48,13 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationOutput`
     """
     revision_name = models.CharField("Transformation revision name", max_length=128,
-		                             help_text="The name of this transformation revision")
+                                     help_text="The name of this transformation revision")
 
     revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add = True)
 
     revision_desc = models.TextField(
-		"Transformation revision description",
-		help_text="Description of this transformation revision")
+        "Transformation revision description",
+        help_text="Description of this transformation revision")
 
     # revision_number = models.IntegerField('Transformation revision number',
     #                                       help_text='Revision number of Transformation in its family')
@@ -300,21 +292,17 @@ class TransformationXput(models.Model):
         Make a dict serialization of this TransformationXput.
 
         These will be dicts with the following fields:
-         - CDT_pk: -1 if raw; PK of desired CDT otherwise
+         - CDT_pk: None if raw; PK of desired CDT otherwise
          - dataset_name: string
          - dataset_idx: 1-based index
          - x: int
          - y: int
-         - min_row: -1 if no restriction; otherwise, int
-         - max_row: -1 if no restriction; otherwise, int
+         - min_row: None if no restriction; otherwise, int
+         - max_row: None if no restriction; otherwise, int
         """
-        input_CDT_pk = -1
-        min_row = -1
-        max_row = -1
-        if self.has_structure:
-            input_CDT_pk = self.structure.compounddatatype.pk
-            min_row = self.get_min_row() or -1
-            max_row = self.get_max_row() or -1
+        input_CDT_pk = None if not self.has_structure else self.structure.compounddatatype.pk
+        min_row = self.get_min_row()
+        max_row = self.get_max_row()
         return {
             "CDT_pk": input_CDT_pk,
             "dataset_name": self.dataset_name,
