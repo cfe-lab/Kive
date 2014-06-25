@@ -1,0 +1,41 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Upload Datasets</h2>
+
+<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <table>
+    <thead>
+        <tr>
+            <th>{{ datasets.0.user.label }}</th>
+            <th>{{ datasets.0.name.label }}</th>
+            <th>{{ datasets.0.description.label }}</th>
+            <th>{{ datasets.0.date_created.label }}</th>
+            <th>{{ datasets.0.dataset_file.label }}</th>
+        </tr>
+    </thead>
+    {% for dataset in datasets %}
+    <tr>
+        <td>{{ dataset.user }}</td>
+        <td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>
+        <td>{{ dataset.description }}</td>
+        <td>{{ dataset.date_created }}</td>
+    </tr>
+    {% endfor %}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+{% endblock %}

@@ -55,6 +55,7 @@ urlpatterns = patterns('',
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
 
     url(r'^datasets', 'archive.views.datasets', name='datasets'),
+    url(r'^dataset_upload', 'archive.views.dataset_upload', name='datasets'),
 
     url(r'^sandbox$', 'sandbox.views.sandbox_setup', name='sandbox_setup'),
     url(r'^get_pipeline_inputs/$', 'sandbox.ajax.get_pipeline_inputs', name='get_pipeline_inputs'),

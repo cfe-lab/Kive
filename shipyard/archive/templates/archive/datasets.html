@@ -14,17 +14,15 @@
 
 <h2>Uploaded datasets</h2>
 
-<p>
-foo
-</p>
 
 <table>
 <thead>
 	<tr>
-    <th>Uploaded by</th>
-	<th>Name</th>
-	<th>Description</th>
-	<th>Date created</th>
+        <th>Created By</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Date Created</th>
+        <th>File Location</th>
 	</tr>
 </thead>
 {% for dataset in datasets %}
@@ -33,6 +31,7 @@ foo
 	<td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>
 	<td>{{ dataset.description }}</td>
     <td>{{ dataset.date_created }}</td>
+    <td>{{ dataset.dataset_file }}</td>
 </tr>
 {% endfor %}
 </table>

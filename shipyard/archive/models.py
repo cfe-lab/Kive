@@ -1589,11 +1589,11 @@ class Dataset(models.Model):
     """
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
 
-    name = models.CharField(max_length=128, help_text="Description of this Dataset.")
+    name = models.CharField(max_length=128, help_text="Name of this Dataset.")
 
-    description = models.TextField()
+    description = models.TextField(help_text="Description of this Dataset.")
 
-    date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date of Dataset creation.")
+    date_created = models.DateTimeField(auto_now_add=True, help_text="Date of Dataset creation.")
 
     # Four cases from which Datasets can originate:
     #
@@ -1605,7 +1605,7 @@ class Dataset(models.Model):
 
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to="Datasets", help_text="Physical path where datasets are stored",
-                                    null=False)
+                                    null=False, max_length=4096) # max path length for win=260, unix=4096, mac=1024
 
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
