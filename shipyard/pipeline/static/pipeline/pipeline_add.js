@@ -269,6 +269,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         canvasState.shapes = [];
         canvasState.connectors = [];
 
+        // TODO: need MethodNode that can tie these together, or pick different examples
         canvasState.addShape(
             new RawNode(100, 250, 20, '#88DD88', 10, 25, 'Unstructured data')
         );
@@ -598,6 +599,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             // retrieve Connectors
             magnets = this_step.in_magnets;
             form_data['pipeline_steps'][i]['cables_in'] = [];
+            form_data['pipeline_steps'][i]['outputs_to_delete'] = [];  // not yet implemented
 
             for (j = 0; j < magnets.length; j++) {
                 this_magnet = magnets[j];
@@ -612,7 +614,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         //'source_type': 'Method',
                         //'source_pk': this_source.pk,
                         'source_dataset_name': this_connector.source.label,
-                        'source_step_num': sorted_elements.indexOf(this_source)+1,
+                        'source_step': sorted_elements.indexOf(this_source)+1,
                         'dest_dataset_name': this_connector.dest.label,
                         "keep_output": false, // in the future this can be more flexible
                         "wires": [] // in the future we can specify custom wires here
@@ -624,7 +626,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
                         //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
                         'source_dataset_name': this_connector.source.label,
-                        'source_step_num': 0,
+                        'source_step': 0,
                         'dest_dataset_name': this_connector.dest.label,
                         "keep_output": false, // in the future this can be more flexible
                         "wires": [] // no wires for a raw cable
@@ -645,7 +647,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 "output_CDT_pk": this_connector.source.cdt,
                 'source': this_source_step.pk,
                 'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
-                'dataset_name': this_connector.source.label,  // magnet label
+                'source_dataset_name': this_connector.source.label,  // magnet label
                 'x': this_connector.x,
                 'y': this_connector.y,
                 "wires": [] // in the future we might have this
