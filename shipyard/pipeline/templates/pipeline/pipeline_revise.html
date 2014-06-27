@@ -52,8 +52,9 @@
                 data: {pipeline_id: $('#id_pipeline_select').val()},
                 datatype: "json",
                 success: function(result) {
-                    console.log(result);
-
+                    // prepare to redraw canvas
+                    $('#id_reset_button').click();
+                    
                     submit_to_url = result['family_pk'];
 
                     var i, j, k; // counters
@@ -226,9 +227,11 @@
 
                 <select id="id_pipeline_select">
                     {% for revision in revisions %}
-                    <option value="{{ revision.id }}">{{ revision.revision_name }}</option>
+                    <option value="{{ revision.id }}">{{ revision.revision_number }}: {{ revision.revision_name }}</option>
                     {% endfor %}
                 </select>
+                <input type="hidden" id="id_family_name" value="{{ family.name }}"/>
+                <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
 
                 <label for="#id_revision_name" class="text-field-label">Revision name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />

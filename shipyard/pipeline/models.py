@@ -302,7 +302,7 @@ class Pipeline(transformation.models.Transformation):
         return Pipeline.create_from_dict(pipeline_dict_repr, self)
 
     @transaction.atomic
-    def revise_from_dict(self, pipeline_dict_repr, revision_name, revision_desc, canvas_width, canvas_height):
+    def revise_from_dict(self, pipeline_dict_repr):
         """
         Make a revision of this Pipeline with the specified dictionary.
 
@@ -316,10 +316,10 @@ class Pipeline(transformation.models.Transformation):
         new_revision = self.family.members.create(
             revision_parent=self,
             revision_number=self.family.num_revisions+1,
-            revision_name=revision_name,
-            revision_desc=revision_desc,
-            canvas_height=canvas_height,
-            canvas_width=canvas_width
+            revision_name=pipeline_dict_repr['revision_name'],
+            revision_desc=pipeline_dict_repr['revision_desc'],
+            canvas_height=pipeline_dict_repr['canvas_height'],
+            canvas_width=pipeline_dict_repr['canvas_width']
         )
 
         # Now pass the dict representation to the function that fills out a Pipeline.

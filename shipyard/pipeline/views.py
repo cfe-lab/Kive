@@ -73,7 +73,9 @@ def pipeline_revise(request, id):
         form_data = json.loads(request.body)
         print form_data
         try:
-            Pipeline.revise_from_dict(form_data)
+            parent_pk = form_data['revision_parent_pk']
+            parent_revision = Pipeline.objects.get(pk=parent_pk)
+            parent_revision.revise_from_dict(form_data)
             response_data = {'status': 'success', 'error_msg': ''}
         except PipelineSerializationException as e:
             response_data = {'status': 'failure', 'error_msg': str(e)}

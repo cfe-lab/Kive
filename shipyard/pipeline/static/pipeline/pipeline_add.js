@@ -449,41 +449,61 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             return;
         }
 
-        var form_data = {};
+
+        var is_revision = false;
+        if ($('#id_pipeline_select').length > 0) {
+            is_revision = true;
+        }
 
         // arguments to initialize new Pipeline Family
-        var family_name = $('#id_family_name').val(),
+        var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val();
 
-        // form validation
-        if (family_name === '') {
-            // FIXME: is there a better way to do this trigger?
-            $('li', 'ul#id_ctrl_nav')[0].click();
-            $('#id_family_name').css({'background-color': '#FFFFCC'})
-            submit_error.innerHTML = 'Pipeline family must be named';
-            return;
-        }
-        if (family_desc === '') {
-            $('li', 'ul#id_ctrl_nav')[0].click();
-            $('#id_family_desc').css({'background-color': '#FFFFCC'})
-            submit_error.innerHTML = 'Pipeline family must have a description';
-            return;
+
+        // Form validation
+        if (!is_revision) {
+            if (family_name === '') {
+                // FIXME: is there a better way to do this trigger?
+                $('li', 'ul#id_ctrl_nav')[0].click();
+                $('#id_family_name').css({'background-color': '#FFFFCC'}).focus();
+                submit_error.innerHTML = 'Pipeline family must be named';
+                return;
+            }
+            $('#id_family_name').css({'background-color': '#FFFFFF'});
+
+            if (family_desc === '') {
+                $('li', 'ul#id_ctrl_nav')[0].click();
+                $('#id_family_desc').css({'background-color': '#FFFFCC'}).focus();
+                submit_error.innerHTML = 'Pipeline family must have a description';
+                return;
+            }
+            $('#id_family_desc').css({'background-color': '#FFFFFF'});
         }
 
+        // FIXME: This is fragile if we add a menu to either page
+        var meta_menu_index = (is_revision ? 0 : 1);
+
         if (revision_name === '') {
-            $('li', 'ul#id_ctrl_nav')[1].click();
-            $('#id_revision_name').css({'background-color': '#FFFFCC'})
+            $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
+            $('#id_revision_name').css({'background-color': '#FFFFCC'}).focus();
             submit_error.innerHTML = 'Pipeline must be named';
             return;
         }
+        $('#id_revision_name').css({'background-color': '#FFFFFF'});
+
         if (revision_desc === '') {
-            $('li', 'ul#id_ctrl_nav')[1].click();
-            $('#id_revision_desc').css({'background-color': '#FFFFCC'})
+            $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
+            $('#id_revision_desc').css({'background-color': '#FFFFCC'}).focus();
             submit_error.innerHTML = 'Pipeline must have a description';
             return;
         }
+        $('#id_revision_desc').css({'background-color': '#FFFFFF'});
+
+
+        // Now we're ready to start
+        var form_data = {};
 
         // There is no PipelineFamily yet; we're going to create one.
         form_data["family_pk"] = null;
@@ -493,8 +513,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         // arguments to add first pipeline revision
         form_data['revision_name'] = revision_name;
         form_data['revision_desc'] = revision_desc;
-        // There is no parent revision, as we're creating this one from scratch.
-        form_data["revision_parent_pk"] = null;
+
+        if (is_revision) {
+            form_data['revision_parent_pk'] = $('#id_pipeline_select').val();
+        } else {
+            // no parent, creating first revision of new Pipeline Family
+            form_data["revision_parent_pk"] = null;
+        }
+
 
         // Canvas information to store in the Pipeline object.
         form_data["canvas_width"] = canvas.width;
