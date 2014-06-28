@@ -1587,6 +1587,15 @@ class Dataset(models.Model):
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
+
+    #####################
+    # Constants
+    ###
+    UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
+
+    ####################
+    # Fields
+    ###
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
 
     name = models.CharField(max_length=128, help_text="Name of this Dataset.")
@@ -1604,11 +1613,16 @@ class Dataset(models.Model):
     created_by = models.ForeignKey(RunComponent, related_name="outputs", null=True, blank=True)
 
     # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(upload_to="Datasets", help_text="Physical path where datasets are stored",
+    dataset_file = models.FileField(upload_to=UPLOAD_DIR, help_text="Physical path where datasets are stored",
                                     null=False, max_length=4096) # max path length for win=260, unix=4096, mac=1024
 
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
+
+
+    ##################
+    # Methods
+    ###
 
     def __unicode__(self):
         """

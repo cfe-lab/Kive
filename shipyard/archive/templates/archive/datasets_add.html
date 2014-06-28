@@ -1,0 +1,51 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+{#<script src="/static/portal/jquery-2.0.3.min.js"></script>#}
+{#<script src="/static/archive/datasets_add.js"></script>#}
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Add Datasets</h2>
+
+<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <input type="button" id="addInputForm" class="add" value="+"/><input type="button" id="removeInputForm" class="remove" value="&minus;"/>
+    <small>Add/subtract input or output forms</small>
+    {{ datasets.management_form }}
+    <table id="datasetsTable" class="formtable">
+    <thead>
+        <tr>
+            <th>{{ datasets.0.name.label }}</th>
+            <th>{{ datasets.0.description.label }}</th>
+            <th>{{ datasets.0.dataset_file.label }}</th>
+            <th>{{ datasets.0.datatype.label }}</th>
+
+        </tr>
+    </thead>
+    {% for dataset in datasets %}
+    <tr>
+{#        TODO:  What URL should the dataset point to?#}
+{#        <td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>#}
+        <td>{{ dataset.name }}</td>
+        <td>{{ dataset.description }}</td>
+        <td>{{ dataset.dataset_file }}</td>
+        <td>{{ dataset.datatype }}</td>
+    </tr>
+    {% endfor %}
+{#        {% for dataset in datasets %}#}
+{#        {{ dataset }}#}
+{#        {% endfor %}#}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+{% endblock %}
