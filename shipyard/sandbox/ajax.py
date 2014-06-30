@@ -69,7 +69,6 @@ def get_pipeline_outputs(request):
     pipeline, datasets = handle_xput_request(request)
     response = HttpResponse()
 
-    # Find the outputs from all compatible Runs.
     outputs = [[] for i in range(pipeline.outputs.count())]
     for run_pk in find_runs_with_inputs(pipeline, datasets):
         run = Run.objects.get(pk=run_pk)
@@ -114,12 +113,43 @@ def run_pipeline(request):
     else:
         raise Http404
 
+# TODO: should this go in Run (ie. run.get_progress())?
+def _get_run_progress(run):
+    # Run is finished?
+    if run.is_complete():
+        if run.succesful_execution():
+            return "Complete"
+        return "Failed"
+
+    # One of the steps is in progress?
+    total_steps = run.pipeline.steps.count()
+    for i, step in enumerate(run.runsteps.order_by(pipelinestep__step_num), start=1):
+        if not step.is_complete():
+            return "Running step {} of {}".format(i, total_steps)
+
+    # Just finished a step, but didn't start the next one?
+    if run.runsteps.count() < total_steps:
+        return "Starting step {} of {}".format(run.runsteps.count()+1, total_steps)
+
+    # One of the outcables is in progress?
+    total_cables = run.pipeline.outcables.count()
+    for i, cable in enumerate(run.runoutputcables.order_by(pipelineoutputcable__output_idx), start=1):
+        if not cable.is_complete():
+            return "Creating output {} of {}".format(i, total_cables)
+
+    # Just finished a cable, but didn't start the next one?
+    if run.runoutputcables.count() < total_cables:
+        return "Starting output {} of {}".format(run.runoutputcables.count()+1, total_cables)
+
+    # Something is wrong.
+    return "Unknown status"
+
 def poll_run_progress(request):
     if request.is_ajax():
         response = HttpResponse()
         run_pk = int(request.POST.get("run_pk"))
         run = Run.objects.get(pk=run_pk)
-        response.write(str(run.is_complete()))
+        response.write(_get_run_progress(run))
         return response
     else:
         raise Http404
