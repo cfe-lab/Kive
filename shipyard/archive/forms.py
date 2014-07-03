@@ -4,9 +4,10 @@ from archive.models import Dataset
 from django.contrib.auth.models import User
 from librarian.models import SymbolicDataset
 import os
-import tempfile
 import logging
-from django.core.files.base import ContentFile
+from django.db import transaction
+from time import gmtime, strftime, time
+import tempfile
 """
 Generate an HTML form to create a new DataSet object
 """
@@ -14,76 +15,118 @@ Generate an HTML form to create a new DataSet object
 
 LOGGER = logging.getLogger(__name__)
 
-class DatasetForm (forms.ModelForm):
+
+class Uploader:
+
+    @staticmethod
+    def handle_uploaded_file(filestream, filebasename, dest_parent_dir=None):
+        """
+        Uploads the file in memory to temporary folder.
+        :param InMemoryUploadedFile filestream :  InMemoryUploadedFile stream for file stored in memory
+        :param str filebasename:  basename of the file to store in temp dir  (i.e.  just the file name, no directory path)
+        :param str dest_parent_dir:  if None, then saves to the temporary directory.  Otherwise saves to specifed dir.
+        :return str: the full path to the temporary file written to
+        """
+        if dest_parent_dir:
+            destination_filename = dest_parent_dir + os.sep + filebasename
+        else:
+            destination_filename = tempfile.gettempdir() + os.sep + filebasename
+
+        # TODO: handle possible race conditions with multiple people uploading same file at same time
+        if os.path.exists(destination_filename):
+            destination_filename += Uploader.timestamp()
+
+        with open(destination_filename, 'wb+') as fh_destination:
+            for chunk in filestream.chunks():
+                fh_destination.write(chunk)
+
+        return destination_filename
+
+    @staticmethod
+    def timestamp():
+       now = time.time()
+       milliseconds = '%03d' % int((now - int(now)) * 1000)
+       return time.strftime('%Y%m%d%H%M%S', gmtime()) + milliseconds
+
+    @staticmethod
+    def remove_uploaded_file(filepath):
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+class DatasetForm (forms.Form):
     """
-    use for validating only two entries
+    User-entered single dataset.  We avoid using ModelForm since we can't set Dataset.user and Dataset.symbolicdataset
+    before checking if the ModelForm.is_valid.  As a result, the internal calls to Model.clean() fail.
     """
+
+    name = forms.CharField(max_length=Dataset.MAX_NAME_LEN)
+    description = forms.CharField(widget=forms.Textarea)
+    dataset_file = forms.FileField(allow_empty_file="False",  max_length=Dataset.MAX_FILE_LEN)
+
     compound_datatypes = CompoundDatatype.objects.all()
     compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
     for compound_datatype in compound_datatypes:
         compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
-    datatype = forms.ChoiceField(choices=compound_datatype_choices)
+    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-
-
-    def save(self, force_insert=False, force_update=False, commit=True):
+    def create_dataset(self):
         """
-        Override ModelForm.save()
-        :rtype : object
-        :param force_insert:
-        :param force_update:
-        :param commit:
+        Creates and commits the Dataset and its associated SymbolicDataset to db.
+        Expects that DatasetForm.is_valid() has been called so that DatasetForm.cleaned_data dict has been populated
+        with validated data.
         """
 
-        # Create a new DatasetsetForm object but do not commit to database
-        dataset = super(DatasetForm, self).save(commit=False)
-
-        username = 'shipyard'
-        dataset.user = User.objects.get(username=username)
-
+        username = 'shipyard'   # TODO:  do not hardcode this
+        user = User.objects.get(username=username)
 
         compound_datatype_obj = None
-        if self.cleaned_data['datatype'] != CompoundDatatype.RAW_ID:
-            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['datatype'])
+        if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
+            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        dataset.symbolicdataset = SymbolicDataset.create_empty(compound_datatype=compound_datatype_obj)
+        # Upload InMemoryUploadedFile to disk to calc MD5 on file
+        uploaded_filepath = Uploader.handle_uploaded_file(filestream=self.cleaned_data['dataset_file'],
+                                      filebasename=self.cleaned_data['dataset_file'].name,
+                                      dest_parent_dir=Dataset.UPLOAD_DIR)
 
-        # Upload InMemoryUploadedFile to disk
-        uploaded_filepath = os.path.abspath(Dataset.UPLOAD_DIR + "/" + dataset.dataset_file.name)
-        dataset.dataset_file.save(uploaded_filepath, dataset.dataset_file)
-
-        # Set MD5 and validate headers
-        if compound_datatype_obj is None:
-            dataset.symbolicdataset.set_MD5(uploaded_filepath)
-        else:
-            dataset.symbolicdataset.set_MD5_and_count_rows(uploaded_filepath)
-            run_dir = tempfile.mkdtemp(prefix="SD{}".format(dataset.symbolicdataset.pk))
-            content_check = dataset.symbolicdataset.check_file_contents(uploaded_filepath, run_dir, None, None, None)
-            if content_check.is_fail():
-                if content_check.baddata.bad_header:
-                    raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                     .format(uploaded_filepath, compound_datatype_obj))
-                elif content_check.baddata.cell_errors.exists():
-                    error = content_check.baddata.cell_errors.first()
-                    compound_datatype_objm = error.column
-                    raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                     'Datatype "{}"'.format(error.row_num, compound_datatype_objm.column_idx, uploaded_filepath, compound_datatype_objm.datatype))
-                else:
-                    # Shouldn't reach here.
-                    raise ValueError('The file "{}" was malformed'.format(uploaded_filepath))
-            LOGGER.debug("Read {} rows from file {}".format(dataset.symbolicdataset.structure.num_rows, uploaded_filepath))
+        try:
+            symbolicdataset = SymbolicDataset.create_SD(uploaded_filepath, cdt=compound_datatype_obj,
+                                                        make_dataset=True, user=user, name=self.cleaned_data['name'],
+                                                        description=self.cleaned_data['description'],
+                                                        created_by=None, check=True)
+        except Exception, e:
+            # Delete uploaded file from disk
+            LOGGER.debug("Removing uploaded file " + uploaded_filepath)
+            Uploader.remove_uploaded_file(uploaded_filepath)
+            raise e
 
 
-        dataset.symbolicdataset.clean()
-        dataset.save()  # save both the Dataset and SymbolicDataset
+class BulkDatasetForm (forms.Form):
+    """
+    Creates multiple datasets from a CSV.
+    Expects that BulkDatasetForm.is_valid() has been called so that BulkDatasetForm.cleaned_data dict has been populated
+        with validated data.
+    """
 
-        return dataset
+    datasets_csv = forms.FileField(allow_empty_file="False",  max_length=4096)
 
-    class Meta:
-        model = Dataset
-        fields = ['dataset_file', 'name', 'description']
-        exclude = ['user', 'symbolicdataset']
+    compound_datatypes = CompoundDatatype.objects.all()
+    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
+    for compound_datatype in compound_datatypes:
+        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
+    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
+    def create_datasets(self):
 
-class BulkDatasetForm(forms.Form):
-    bulk_csv = forms.FileField()
+        username = 'shipyard'   # TODO:  do not hardcode this
+        user = User.objects.get(username=username)
+
+        compound_datatype_obj = None
+        if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
+            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
+
+        uploaded_filepath = Uploader.handle_uploaded_file(filestream=self.cleaned_data['datasets_csv'],
+                                                          filebasename=self.cleaned_data['datasets_csv'].name,
+                                                          dest_parent_dir=None)
+        SymbolicDataset.create_SD_bulk(csv_file_path=uploaded_filepath, cdt=compound_datatype_obj, make_dataset=True,
+                                       user=user, created_by=None, check=True)
+        Uploader.remove_uploaded_file(uploaded_filepath)

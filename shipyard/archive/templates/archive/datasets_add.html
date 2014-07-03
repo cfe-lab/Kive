@@ -6,8 +6,6 @@
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
-{#<script src="/static/portal/jquery-2.0.3.min.js"></script>#}
-{#<script src="/static/archive/datasets_add.js"></script>#}
 {% endblock %}
 
 {% block content %}
@@ -16,36 +14,35 @@
 
 <h2>Add Datasets</h2>
 
-<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-    <input type="button" id="addInputForm" class="add" value="+"/><input type="button" id="removeInputForm" class="remove" value="&minus;"/>
-    <small>Add/subtract input or output forms</small>
-    {{ datasets.management_form }}
-    <table id="datasetsTable" class="formtable">
-    <thead>
-        <tr>
-            <th>{{ datasets.0.name.label }}</th>
-            <th>{{ datasets.0.description.label }}</th>
-            <th>{{ datasets.0.dataset_file.label }}</th>
-            <th>{{ datasets.0.datatype.label }}</th>
 
-        </tr>
-    </thead>
-    {% for dataset in datasets %}
-    <tr>
-{#        TODO:  What URL should the dataset point to?#}
-{#        <td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>#}
-        <td>{{ dataset.name }}</td>
-        <td>{{ dataset.description }}</td>
-        <td>{{ dataset.dataset_file }}</td>
-        <td>{{ dataset.datatype }}</td>
-    </tr>
-    {% endfor %}
-{#        {% for dataset in datasets %}#}
-{#        {{ dataset }}#}
-{#        {% endfor %}#}
-    </table>
-
-    <input type="submit" value="Submit" />
+    <form id="datasetAddForm" name="datasetAddForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <div style="width:90em">
+            <div style="float:left">
+                <fieldset class="multiFieldSet">
+                    <legend>Add Single Dataset</legend>
+                    <table>
+                        <tr><td><label>{{ singleDataset.dataset_file.label }}</label></td><td>{{ singleDataset.dataset_file }}</td></tr>
+                        <tr><td><label>{{ singleDataset.name.label }}</label></td><td>{{ singleDataset.name }}</td></tr>
+                        <tr><td><label>{{ singleDataset.description.label }}</label></td><td>{{ singleDataset.description }}</td></tr>
+                        <tr><td><label>{{ singleDataset.compound_datatype.label }}</label></td><td>{{ singleDataset.compound_datatype }}</td></tr>
+                    </table>
+                </fieldset>
+                <input type="submit" name="singleSubmit" value="Submit Single Dataset" />
+            </div>
+            <div style="float:right">
+                <fieldset class="multiFieldSet">
+                    <legend>Bulk Add Multiple Datasets From CSV</legend>
+                    <table>
+                        <tr><td><label>{{ bulkDataset.datasets_csv.label }}</label></td><td>{{ bulkDataset.datasets_csv }}</td></tr>
+                        <tr><td><label>{{ bulkDataset.compound_datatype.label }}</label></td><td>{{ bulkDataset.compound_datatype }}</td></tr>
+                    </table>
+                </fieldset>
+                <input type="submit" name="bulkSubmit" value="Submit Bulk Datasets" />
+            </div>
+            <div class="errorStrip errortext">{{ error }}</div>
+        </div>
 </form>
+
+
 
 {% endblock %}

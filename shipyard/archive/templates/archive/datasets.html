@@ -22,20 +22,19 @@
         <th>Name</th>
         <th>Description</th>
         <th>Date Created</th>
-        <th>File Location</th>
 	</tr>
 </thead>
 {% for dataset in datasets %}
 <tr>
     <td>{{ dataset.user }}</td>
+{#    TODO:  what should the URL point to?  Should we show the file?#}
 	<td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>
 	<td>{{ dataset.description }}</td>
     <td>{{ dataset.date_created }}</td>
-    <td>{{ dataset.dataset_file }}</td>
 </tr>
 {% endfor %}
 </table>
 
-<a href="/datasets_add">Add a new dataset</a>
+<a href="/datasets_add">Add Datasets</a>
 
 {% endblock %}

@@ -25,6 +25,8 @@ import transformation.models
 import datachecking.models
 import file_access_utils
 import logging_utils
+from metadata.models import CompoundDatatype
+import csv
 
 LOGGER = logging.getLogger(__name__)
 
@@ -224,36 +226,97 @@ class SymbolicDataset(models.Model):
         Returns the SymbolicDataset created.
         """
         LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
-        symDS = cls.create_empty(cdt)
+        with transaction.atomic():
+            symDS = cls.create_empty(cdt)
 
-        if cdt is None:
-            symDS.set_MD5(file_path)
-        else:
-            symDS.set_MD5_and_count_rows(file_path)
+            if cdt is None:
+                symDS.set_MD5(file_path)
+            else:
+                symDS.set_MD5_and_count_rows(file_path)
 
-            if check:
-                run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-                content_check = symDS.check_file_contents(file_path, run_dir, None, None, None) 
-                if content_check.is_fail():
-                    if content_check.baddata.bad_header:
-                        raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                         .format(file_path, cdt))
-                    elif content_check.baddata.cell_errors.exists():
-                        error = content_check.baddata.cell_errors.first()
-                        cdtm = error.column
-                        raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                         'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
-                    else:
-                        # Shouldn't reach here.
-                        raise ValueError('The file "{}" was malformed'.format(file_path))
-                LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_path))
+                if check:
+                    run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+                    content_check = symDS.check_file_contents(file_path, run_dir, None, None, None)
+                    if content_check.is_fail():
+                        if content_check.baddata.bad_header:
+                            raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                             .format(file_path, cdt))
+                        elif content_check.baddata.cell_errors.exists():
+                            error = content_check.baddata.cell_errors.first()
+                            cdtm = error.column
+                            raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                                             'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
+                        else:
+                            # Shouldn't reach here.
+                            raise ValueError('The file "{}" was malformed'.format(file_path))
+                    LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_path))
 
-        if make_dataset:
-            symDS.register_dataset(file_path, user, name, description, created_by)
-    
-        symDS.clean()
-        symDS.save()
+            if make_dataset:
+                symDS.register_dataset(file_path, user, name, description, created_by)
+
+            symDS.clean()
+            symDS.save()
         return symDS
+
+    @classmethod
+    # FIXME what does it do for num_rows when file_path is unset?
+    def create_SD_bulk(cls, csv_file_path, cdt=None, make_dataset=True, user=None,
+                       created_by=None, check=True):
+        """
+        Helper function to make defining multiple SDs and Datasets faster.
+        Instead of specifying datasets one by one,
+        specify multiple datasets in a CSV.
+
+        The CSV must have these columns, not necessarily in this order:
+        - Name
+        - Description
+        - Datatype
+        - File
+
+        make_dataset creates a Dataset from the given file path to go
+        with the SD. created_by can be a RunAtomic to register the
+        Dataset with, or None if it was uploaded by the user (or if
+        make_dataset=False). If check is True, do a ContentCheck on the
+        file.
+
+        Returns the SymbolicDataset created.
+        :rtype : object
+        :param csv_file_path:
+        :param cdt:
+        :param make_dataset:
+        :param user:
+        :param created_by:
+        :param check:
+        """
+        symDSs = []
+        LOGGER.debug("Creating SymbolicDataset from file {}".format(csv_file_path))
+        with open(csv_file_path, 'rU') as fh_datasets:
+            # TODO:  this is a major db blocking call.  Can we break this up?
+            try:
+                with transaction.atomic():
+                    line = 0
+                    reader = csv.DictReader(fh_datasets)
+                    for row in reader:
+                        line += 1
+                        name = row['Name'].strip() if row['Name'] else ""
+                        desc = row['Description'].strip() if row['Description'] else ""
+                        file = row['File'].strip() if row['File'] else ""
+
+                        # check for empty entries:
+                        if not (name or desc or file):
+                            raise Exception("Line " + line + " is invalid: " +
+                                            "Name, Description, File, Datatype must be defined")
+
+                        symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
+                                                          description=desc, created_by=None, check=True)
+
+                    symDSs.extend([symDS])
+            except Exception, e:
+                LOGGER.exception("Error while parsing line " + str(line) + " -- " + str(row))
+                raise e
+
+        return symDSs
+
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
