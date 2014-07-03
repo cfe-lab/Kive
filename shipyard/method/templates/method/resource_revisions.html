@@ -36,7 +36,7 @@
 {% for revision in revisions %}
 <tr>
     <td>{{ revision.revision_number }}</td>
-    <td><a href="{{ revision.get_absolute_url }}">{{ revision.revision_name }}</a></td>
+    <td><a href="{{ revision.get_absolute_url }}">{{ revision }}</a></td>
     <td>{{ revision.revision_desc }}</td>
     <td>{{ revision.revision_DateTime }}</td>
 </tr>

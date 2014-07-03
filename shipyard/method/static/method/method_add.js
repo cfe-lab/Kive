@@ -179,4 +179,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             $('#id_description').prop('disabled', true);
         }
     }).change(); // trigger on load
+
+    // set default MethodFamily name to name of CodeResource
+    $("#id_coderesource").on("change", function () {
+        $("#id_revision_name").val($(this).children("option:selected").text());
+    });
 });
