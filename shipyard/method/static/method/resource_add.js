@@ -154,4 +154,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
         setTimeout("$('.fulltext').fadeOut(300);", 2000);
     });
+
+    $("#id_content_file").on("change", function() {
+        path = $(this).val().split("\\");
+        filename = path[path.length-1].split(".").slice(0, -1).join(".");
+        $("#id_resource_name").val(filename);
+    });
 });
