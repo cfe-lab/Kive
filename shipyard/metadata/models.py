@@ -1150,6 +1150,9 @@ class CompoundDatatype(models.Model):
     Related to :model:`copperfish.Dataset`
     """
 
+    RAW_ID = "__raw__"
+    RAW_VERBOSE_NAME = "Unstructured"
+
     # Implicitly defined:
     #   members (CompoundDatatypeMember/ForeignKey)
     #   Conforming_datasets (Dataset/ForeignKey)

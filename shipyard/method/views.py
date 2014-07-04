@@ -20,7 +20,7 @@ def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = CodeResource.objects.filter()
+    resources = CodeResource.objects.all()
 
     t = loader.get_template('method/resources.html')
     c = Context({'resources': resources})

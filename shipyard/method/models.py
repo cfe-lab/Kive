@@ -7,10 +7,13 @@ do with CodeResources.
 FIXME get all the models pointing at each other correctly!
 """
 
+from __future__ import unicode_literals
+
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
+from django.utils.encoding import python_2_unicode_compatible
 
 import hashlib, os, re, stat, subprocess
 import file_access_utils, transformation.models
@@ -70,6 +73,7 @@ class CodeResource(models.Model):
         return self.name
     
 
+@python_2_unicode_compatible
 class CodeResourceRevision(models.Model):
     """
     A particular revision of a code resource.
@@ -121,6 +125,7 @@ class CodeResourceRevision(models.Model):
     def filename(self):
         """
         Return original file name (without path to CodeResources, timestamp).
+        TODO: use os.path.split() instead of split("/")
         """
         return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
 
@@ -137,23 +142,12 @@ class CodeResourceRevision(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
-        """Represent a resource revision by it's CodeResource name and revision name"""
-        
-        # Admin can create CR without save() and allow CRRev to be created in memory
-        # So, in MEMORY, a revision can temporarily have no corresponding CodeResource
-        if not hasattr(self, "coderesource"):
-            returnCodeResource = u"[no code resource set]"
-        else:
-            returnCodeResource = unicode(self.coderesource)
-
+    def __str__(self):
+        """Represent a resource revision by its revision name"""
         if self.revision_name == "":
-            returnRevisionName = u"[no revision name]"
+            return u"[no revision name]"
         else:
-            returnRevisionName = unicode(self.revision_name)
-
-        string_rep = unicode(returnCodeResource + ' ' + returnRevisionName)
-        return string_rep
+            return unicode(self.revision_name)
 
     # This CRR includes it's own filename at the root
     def list_all_filepaths(self):
@@ -388,13 +382,13 @@ class Method(transformation.models.Transformation):
     # June 24, 2014: moved this here from Transformation so that it can be put into
     # the unique_together statement below.
     revision_number = models.PositiveIntegerField(
-        'Pipeline revision number',
-        help_text='Revision number of this Pipeline in its family',
+        'Method revision number',
+        help_text='Revision number of this Method in its family',
         validators=[MinValueValidator(1)]
     )
 
     # Code resource revisions are executable if they link to Method
-    driver = models.ForeignKey(CodeResourceRevision);
+    driver = models.ForeignKey(CodeResourceRevision)
     random = models.BooleanField(default=False,
         help_text="Is the output of this method nondeterministic?")
 
@@ -418,14 +412,12 @@ class Method(transformation.models.Transformation):
 
         # MethodFamily may not be temporally saved in DB if created by admin
         if hasattr(self, "family"):
-            string_rep = string_rep.format(unicode(self.family))
+            return string_rep.format(unicode(self.family))
         else:
-            string_rep = string_rep.format("[family unset]")
-
-        return string_rep
+            return string_rep.format("[family unset]")
 
     def get_absolute_url(self):
-        return '/methods/%i' % self.id
+        return "/methods/{}".format(self.id)
 
     def get_num_inputs(self):
         """Returns number of inputs."""
