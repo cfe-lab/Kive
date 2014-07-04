@@ -408,8 +408,8 @@ CanvasState.prototype.deleteObject = function() {
                         this.connectors.splice(index, 1);
                     }
                     
-                    if (this_connector.in_magnet.constructor === Magnet) {
-                        this_connector.in_magnet.connected = [];
+                    if (this_connector.dest.constructor === Magnet) {
+                        this_connector.dest.connected = [];
                     }
                     
                 }
