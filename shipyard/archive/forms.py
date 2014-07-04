@@ -5,8 +5,7 @@ from django.contrib.auth.models import User
 from librarian.models import SymbolicDataset
 import os
 import logging
-from django.db import transaction
-from time import gmtime, strftime, time
+import time
 import tempfile
 """
 Generate an HTML form to create a new DataSet object
@@ -44,9 +43,9 @@ class Uploader:
 
     @staticmethod
     def timestamp():
-       now = time.time()
-       milliseconds = '%03d' % int((now - int(now)) * 1000)
-       return time.strftime('%Y%m%d%H%M%S', gmtime()) + milliseconds
+        now = time.time()
+        milliseconds = '%03d' % int((now - int(now)) * 1000)
+        return time.strftime('%Y%m%d%H%M%S', time.gmtime()) + milliseconds
 
     @staticmethod
     def remove_uploaded_file(filepath):

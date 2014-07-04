@@ -432,12 +432,12 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         dsname = "tempdataset"
         dsdesc = "some headers and sequences"
         file_paths = []
-        for i in [0,1]:
+        for i in range(2):
             data_file = tempfile.NamedTemporaryFile(delete=False)
             data_file.write(self.header + "\n" + self.data)
             file_path = data_file.name
             data_file.close()
-            file_paths.append([file_path])
+            file_paths.extend([file_path])
             bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + data_file.name)
         bulk_dataset_csv.close()
 

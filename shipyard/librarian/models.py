@@ -310,7 +310,7 @@ class SymbolicDataset(models.Model):
                         symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
                                                           description=desc, created_by=None, check=True)
 
-                    symDSs.extend([symDS])
+                        symDSs.extend([symDS])
             except Exception, e:
                 LOGGER.exception("Error while parsing line " + str(line) + " -- " + str(row))
                 raise e
