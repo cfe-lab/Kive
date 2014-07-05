@@ -114,3 +114,34 @@ def file_exists(path):
         if e.errno == errno.ENOENT:
             return False
         raise
+
+
+class FileReadHandler:
+    """
+    Helper class for retrieving a file handle in with-clauses
+    where it is unknown a priori if the user will give a file path
+    or the actual file handle.
+
+    EG)
+
+    with FileHandle(file_path, file_handle, access_mode) as fh:
+        do_stuff
+
+    If the file_handle is given, then seeks the beginning of the file.
+    Otherwise, opens the file using the file_path.
+    Closes the file upon exiting the with-clause.
+    """
+    def __init__(self, file_path, file_handle, access_mode):
+        self.file_path = file_path
+        self.file_handle = file_handle
+        self.access_mode = access_mode
+
+    def __enter__(self):
+        if not self.file_handle:
+            self.file_handle = open(self.file_path, self.access_mode)
+        else:
+            self.file_handle.seek(0)
+        return self.file_handle
+
+    def __exit__(self, type, value, traceback):
+        self.file_handle.close()

@@ -34,20 +34,19 @@ def datasets_add(request):
         try:
 
             if "singleSubmit" in single_dataset_form.data and single_dataset_form.is_valid():
-                single_dataset_form.create_dataset()
+                    single_dataset_form.create_dataset()
             elif "bulkSubmit" in bulk_dataset_form.data and bulk_dataset_form.is_valid():
-                bulk_dataset_form.create_datasets()
+                    bulk_dataset_form.create_datasets()
             else:
                 raise Exception("Invalid form submission")
 
             datasets = Dataset.objects.all()    # Once saved, let user browse table of all datasets
-
             t = loader.get_template('archive/datasets.html')
             c = Context({'datasets': datasets})
         except Exception, e:
-            error = e.message
+            create_error = "Error while adding datasets.  " + str(e)
             t = loader.get_template('archive/datasets_add.html')
-            c = Context({'singleDataset': single_dataset_form, 'bulkDataset': bulk_dataset_form, 'error': error})
+            c = Context({'singleDataset': single_dataset_form, 'bulkDataset': bulk_dataset_form, 'create_error': create_error})
             LOGGER.exception(e.message)
 
     else:  # return an empty formset for the user to fill in

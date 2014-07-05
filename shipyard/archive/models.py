@@ -11,7 +11,8 @@ from django.core.exceptions import ValidationError
 
 import logging
 import itertools
-
+import os
+import time
 import file_access_utils
 
 import stopwatch.models
@@ -1572,6 +1573,19 @@ class RunOutputCable(RunCable):
     #     return self.run.get_top_level_run()
 
 
+def get_upload_path(instance, filename):
+    """
+    Helper method for uploading dataset_files for Dataset.
+    This is outside of the Dataset class, since @staticmethod and other method decorators were used instead of the
+    method pointer when this method was inside Dataset class.
+
+    :param instance:  Dataset instance
+    :param filename: Dataset.dataset_file.name
+    :return:  The upload directory for Dataset files.
+    """
+    return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
+
+
 class Dataset(models.Model):
     """
     Data files uploaded by users or created by transformations.
@@ -1587,16 +1601,18 @@ class Dataset(models.Model):
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
-
     #####################
     # Constants
     ###
     UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
     MAX_NAME_LEN = 128
     MAX_FILE_LEN = 4096
-    ####################
+
+
+    #####################
     # Fields
     ###
+
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
 
     name = models.CharField(max_length=MAX_NAME_LEN, help_text="Name of this Dataset.")
@@ -1613,8 +1629,9 @@ class Dataset(models.Model):
     # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
     created_by = models.ForeignKey(RunComponent, related_name="outputs", null=True, blank=True)
 
+
     # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(upload_to=UPLOAD_DIR, help_text="Physical path where datasets are stored",
+    dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
                                     null=False, max_length=MAX_FILE_LEN) # max path length for win=260, unix=4096, mac=1024
 
     # Datasets always have a referring SymbolicDataset
@@ -1662,6 +1679,8 @@ class Dataset(models.Model):
         """
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
+
+
 
 
 class ExecLog(stopwatch.models.Stopwatch):

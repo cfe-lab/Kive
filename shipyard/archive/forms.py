@@ -3,10 +3,7 @@ from metadata.models import CompoundDatatype
 from archive.models import Dataset
 from django.contrib.auth.models import User
 from librarian.models import SymbolicDataset
-import os
 import logging
-import time
-import tempfile
 """
 Generate an HTML form to create a new DataSet object
 """
@@ -15,42 +12,7 @@ Generate an HTML form to create a new DataSet object
 LOGGER = logging.getLogger(__name__)
 
 
-class Uploader:
 
-    @staticmethod
-    def handle_uploaded_file(filestream, filebasename, dest_parent_dir=None):
-        """
-        Uploads the file in memory to temporary folder.
-        :param InMemoryUploadedFile filestream :  InMemoryUploadedFile stream for file stored in memory
-        :param str filebasename:  basename of the file to store in temp dir  (i.e.  just the file name, no directory path)
-        :param str dest_parent_dir:  if None, then saves to the temporary directory.  Otherwise saves to specifed dir.
-        :return str: the full path to the temporary file written to
-        """
-        if dest_parent_dir:
-            destination_filename = dest_parent_dir + os.sep + filebasename
-        else:
-            destination_filename = tempfile.gettempdir() + os.sep + filebasename
-
-        # TODO: handle possible race conditions with multiple people uploading same file at same time
-        if os.path.exists(destination_filename):
-            destination_filename += Uploader.timestamp()
-
-        with open(destination_filename, 'wb+') as fh_destination:
-            for chunk in filestream.chunks():
-                fh_destination.write(chunk)
-
-        return destination_filename
-
-    @staticmethod
-    def timestamp():
-        now = time.time()
-        milliseconds = '%03d' % int((now - int(now)) * 1000)
-        return time.strftime('%Y%m%d%H%M%S', time.gmtime()) + milliseconds
-
-    @staticmethod
-    def remove_uploaded_file(filepath):
-        if os.path.exists(filepath):
-            os.remove(filepath)
 
 class DatasetForm (forms.Form):
     """
@@ -82,21 +44,12 @@ class DatasetForm (forms.Form):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        # Upload InMemoryUploadedFile to disk to calc MD5 on file
-        uploaded_filepath = Uploader.handle_uploaded_file(filestream=self.cleaned_data['dataset_file'],
-                                      filebasename=self.cleaned_data['dataset_file'].name,
-                                      dest_parent_dir=Dataset.UPLOAD_DIR)
+        symbolicdataset = SymbolicDataset.create_SD(file_path=None, file_handle=self.cleaned_data['dataset_file'],
+                                                    cdt=compound_datatype_obj,
+                                                    make_dataset=True, user=user, name=self.cleaned_data['name'],
+                                                    description=self.cleaned_data['description'],
+                                                    created_by=None, check=True)
 
-        try:
-            symbolicdataset = SymbolicDataset.create_SD(uploaded_filepath, cdt=compound_datatype_obj,
-                                                        make_dataset=True, user=user, name=self.cleaned_data['name'],
-                                                        description=self.cleaned_data['description'],
-                                                        created_by=None, check=True)
-        except Exception, e:
-            # Delete uploaded file from disk
-            LOGGER.debug("Removing uploaded file " + uploaded_filepath)
-            Uploader.remove_uploaded_file(uploaded_filepath)
-            raise e
 
 
 class BulkDatasetForm (forms.Form):
@@ -123,9 +76,6 @@ class BulkDatasetForm (forms.Form):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        uploaded_filepath = Uploader.handle_uploaded_file(filestream=self.cleaned_data['datasets_csv'],
-                                                          filebasename=self.cleaned_data['datasets_csv'].name,
-                                                          dest_parent_dir=None)
-        SymbolicDataset.create_SD_bulk(csv_file_path=uploaded_filepath, cdt=compound_datatype_obj, make_dataset=True,
+        SymbolicDataset.create_SD_bulk(csv_file_path=None, csv_file_handle=self.cleaned_data['datasets_csv'],
+                                       cdt=compound_datatype_obj, make_dataset=True,
                                        user=user, created_by=None, check=True)
-        Uploader.remove_uploaded_file(uploaded_filepath)

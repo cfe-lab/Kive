@@ -25,7 +25,6 @@ import transformation.models
 import datachecking.models
 import file_access_utils
 import logging_utils
-from metadata.models import CompoundDatatype
 import csv
 
 LOGGER = logging.getLogger(__name__)
@@ -124,33 +123,44 @@ class SymbolicDataset(models.Model):
         structure.save()
         return structure
 
-    def set_MD5(self, file_path):
-        """Set the MD5 hash from a file."""
-        with open(file_path, "rb") as f:
+    def set_MD5(self, file_path, file_handle=None):
+        """Set the MD5 hash from a file.
+
+        :param str file_path:  path to file to calculate MD5 for
+        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
+                        If this is None, then uses file_path.
+        """
+
+        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
             self.MD5_checksum = file_access_utils.compute_md5(f)
+
         self.clean()
         self.save()
 
-    def set_MD5_and_count_rows(self, file_path):
+    def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
 
         PRE
         This SymbolicDataset must have a DatasetStructure
+        :param str file_path:  path to file to calculate MD5 for
+        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
+                        If this is None, then uses file_path.
         """
         assert not self.is_raw()
 
         num_rows = -1 # skip header
         md5gen = hashlib.md5()
-        with open(file_path, "r") as f:
+        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rU") as f:
             for line in f:
                 md5gen.update(line)
                 num_rows += 1
+
         self.structure.num_rows = num_rows
         self.MD5_checksum = md5gen.hexdigest()
         self.clean()
         self.save()
 
-    def register_dataset(self, file_path, user, name, description, created_by=None):
+    def register_dataset(self, file_path, user, name, description, created_by=None, file_handle=None):
         """Create and register a new Dataset for this SymbolicDataset.
 
         Note that this does NOT compute an MD5 for the new Dataset, nor
@@ -158,6 +168,9 @@ class SymbolicDataset(models.Model):
         
         INPUTS
         file_path           file to upload as the new Dataset
+        file_handle         file handle of the file to upload as the new Dataset.
+                            If supplied, then does not reopen the file in file_path.
+                            If None, then opens the file in file_path.
         user                user who uploaded the Dataset
         name                name for the new Dataset
         description         description for the new Dataset
@@ -173,8 +186,10 @@ class SymbolicDataset(models.Model):
         dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=self)
         if created_by:
             dataset.created_by = created_by
-        with open(file_path, "r") as f:
-            dataset.dataset_file.save(file_path, File(f))
+
+        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
+            dataset.dataset_file.save(f.name, File(f))
+
         dataset.clean()
         dataset.save()
 
@@ -211,7 +226,7 @@ class SymbolicDataset(models.Model):
         
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
+    def create_SD(cls, file_path, file_handle=None, cdt=None, make_dataset=True, user=None,
                   name=None, description=None, created_by=None, check=True):
         """
         Helper function to make defining SDs and Datasets faster.
@@ -225,18 +240,25 @@ class SymbolicDataset(models.Model):
     
         Returns the SymbolicDataset created.
         """
-        LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
+        if file_path:
+            LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
+        elif file_handle:
+            LOGGER.debug("Creating SymbolicDataset from file {}".format(file_handle.name))
+        else:
+            raise Exception("Must supply either the file path or file handle")
+
         with transaction.atomic():
             symDS = cls.create_empty(cdt)
 
             if cdt is None:
-                symDS.set_MD5(file_path)
+                symDS.set_MD5(file_path, file_handle)
             else:
-                symDS.set_MD5_and_count_rows(file_path)
+                symDS.set_MD5_and_count_rows(file_path, file_handle)
 
                 if check:
                     run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-                    content_check = symDS.check_file_contents(file_path, run_dir, None, None, None)
+                    content_check = symDS.check_file_contents(file_path_to_check=file_path, file_handle=file_handle,
+                                                              summary_path=run_dir, min_row=None, max_row=None, execlog=None)
                     if content_check.is_fail():
                         if content_check.baddata.bad_header:
                             raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
@@ -252,7 +274,8 @@ class SymbolicDataset(models.Model):
                     LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_path))
 
             if make_dataset:
-                symDS.register_dataset(file_path, user, name, description, created_by)
+                symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
+                                       description=description, created_by=created_by)
 
             symDS.clean()
             symDS.save()
@@ -260,7 +283,7 @@ class SymbolicDataset(models.Model):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD_bulk(cls, csv_file_path, cdt=None, make_dataset=True, user=None,
+    def create_SD_bulk(cls, csv_file_path, csv_file_handle=None, cdt=None, make_dataset=True, user=None,
                        created_by=None, check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
@@ -282,6 +305,8 @@ class SymbolicDataset(models.Model):
         Returns the SymbolicDataset created.
         :rtype : object
         :param csv_file_path:
+        :param csv_file_handle:  file handle of csv.  If not None, then does not reopen csv_file_path.
+                If None, then uses csv_file_path.
         :param cdt:
         :param make_dataset:
         :param user:
@@ -289,8 +314,14 @@ class SymbolicDataset(models.Model):
         :param check:
         """
         symDSs = []
-        LOGGER.debug("Creating SymbolicDataset from file {}".format(csv_file_path))
-        with open(csv_file_path, 'rU') as fh_datasets:
+        if csv_file_path:
+            LOGGER.debug("Creating SymbolicDatasets from csv {}".format(csv_file_path))
+        elif csv_file_handle:
+            LOGGER.debug("Creating SymbolicDatasets from csv {}".format(csv_file_handle.name))
+        else:
+            raise Exception("Must supply either the csv file path or csv file handle")
+
+        with file_access_utils.FileReadHandler(file_path=csv_file_path, file_handle=csv_file_handle, access_mode='rU') as fh_datasets:
             # TODO:  this is a major db blocking call.  Can we break this up?
             try:
                 with transaction.atomic():
@@ -320,7 +351,7 @@ class SymbolicDataset(models.Model):
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
-    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog):
+    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog, file_handle=None):
         """
         Performs content check on a file, generates a CCL, and sets this
         SD's num_rows.
@@ -333,6 +364,15 @@ class SymbolicDataset(models.Model):
         PRE
         Should never be called twice on the same symbolic dataset, as
         this would overwrite num_rows to a potentially new value?
+
+        :param file_path_to_check:  path of file to check
+        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
+                        If this is None, then uses file_path.
+        :param summary_path: 
+        :param min_row: 
+        :param max_row: 
+        :param execlog:
+        :rtype ContentCheckLog :
         """
         self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
                           .format(file_path_to_check))
@@ -344,7 +384,7 @@ class SymbolicDataset(models.Model):
             return ccl
 
         my_CDT = self.get_cdt()
-        with open(file_path_to_check, "rb") as f:
+        with file_access_utils.FileReadHandler(file_path=file_path_to_check, file_handle=file_handle, access_mode="rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
