@@ -4,6 +4,9 @@ archive views
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
 from django.core.context_processors import csrf
+from django.core.servers.basehttp import FileWrapper
+import mimetypes
+import os
 from archive.models import Dataset
 from archive.forms import DatasetForm, BulkDatasetForm
 import logging
@@ -20,6 +23,20 @@ def datasets(request):
     c = Context({'datasets': datasets})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+
+
+def dataset_download(request, dataset_id):
+    """
+    Retrieve the file associated with the dataset for client download.
+    """
+    dataset = Dataset.objects.filter(id=dataset_id).get()
+
+    file_chunker = FileWrapper(dataset.dataset_file)  # stream file in chunks to avoid overloading memory
+    mimetype = mimetypes.guess_type(dataset.dataset_file.url)[0]
+    response = HttpResponse(file_chunker, content_type=mimetype)
+    response['Content-Length'] = dataset.get_filesize()
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(dataset.dataset_file.name))
+    return response
 
 
 def datasets_add(request):

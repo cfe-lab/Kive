@@ -18,3 +18,4 @@ doc/*.aux
 doc/*.dvi
 doc/*.pdf
 doc/*.log
+/.idea/

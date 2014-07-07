@@ -8,6 +8,7 @@ Dataset, etc.
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
 
 import logging
 import itertools
@@ -1649,6 +1650,18 @@ class Dataset(models.Model):
         This looks like "[name] (created by [user] on [date])"
         """
         return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
+
+    def get_absolute_url(self):
+        """
+        :return str: URL to access the dataset_file
+        """
+        return reverse('dataset_download', kwargs={"dataset_id": self.id})
+
+    def get_filesize(self):
+        """
+        :return int: size of dataset_file in bytes
+        """
+        return os.path.getsize(self.dataset_file.url)
 
     def clean(self):
         """If this Dataset has an MD5 set, verify the dataset file integrity"""

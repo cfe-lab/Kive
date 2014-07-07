@@ -55,6 +55,7 @@ urlpatterns = patterns('',
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
 
     url(r'^datasets$', 'archive.views.datasets', name='datasets'),
+    url(r'^dataset_download/(?P<dataset_id>\d+)$', 'archive.views.dataset_download', name='dataset_download'),
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
 
     url(r'^sandbox$', 'sandbox.views.sandbox_setup', name='sandbox_setup'),
