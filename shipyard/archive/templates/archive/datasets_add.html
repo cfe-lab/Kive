@@ -1,0 +1,48 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Add Datasets</h2>
+
+
+    <form id="datasetAddForm" name="datasetAddForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <div style="width:90em">
+            <div style="float:left">
+                <fieldset class="multiFieldSet">
+                    <legend>Add Single Dataset</legend>
+                    <table>
+                        <tr><td><label>{{ singleDataset.dataset_file.label }}</label></td><td>{{ singleDataset.dataset_file }}</td></tr>
+                        <tr><td><label>{{ singleDataset.name.label }}</label></td><td>{{ singleDataset.name }}</td></tr>
+                        <tr><td><label>{{ singleDataset.description.label }}</label></td><td>{{ singleDataset.description }}</td></tr>
+                        <tr><td><label>{{ singleDataset.compound_datatype.label }}</label></td><td>{{ singleDataset.compound_datatype }}</td></tr>
+                    </table>
+                </fieldset>
+                <input type="submit" name="singleSubmit" value="Submit Single Dataset" />
+            </div>
+            <div style="float:right">
+                <fieldset class="multiFieldSet">
+                    <legend>Bulk Add Multiple Datasets From CSV</legend>
+                    <table>
+                        <tr><td><label>{{ bulkDataset.datasets_csv.label }}</label></td><td>{{ bulkDataset.datasets_csv }}</td></tr>
+                        <tr><td><label>{{ bulkDataset.compound_datatype.label }}</label></td><td>{{ bulkDataset.compound_datatype }}</td></tr>
+                    </table>
+                </fieldset>
+                <input type="submit" name="bulkSubmit" value="Submit Bulk Datasets" />
+            </div>
+            <div class="errorStrip errortext">{{ error }}</div>
+        </div>
+</form>
+
+
+
+{% endblock %}

@@ -95,8 +95,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                         $.each(arr, function(index,value) {
                             options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
                         });
-                        $("#id_select_method").show().html(options.join(''));
-                        $('#id_select_method').change();
+                        $("#id_select_method").show().html(options.join('')).change();
                     }
                 });
                 
@@ -247,10 +246,48 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                             // replace the selected MethodNode
                             // if user clicks anywhere else, MethodNode is deselected
                             // and Methods menu closes
-                            var shape = canvasState.selection;
-                            console.log(shape.inputs);
-                            console.log(inputs);
-                            console.log(shape.inputs==inputs);
+                            var old_node = canvasState.selection;
+                            var idx;
+
+                            // draw new node over old node
+                            var new_node = new MethodNode(mid, old_node.x, old_node.y,
+                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                                inputs, outputs);
+
+
+                            // check if we can re-use any Connectors
+                            var new_xput, old_xput, connector;
+
+                            for (idx in old_node.inputs) {
+                                old_xput = old_node.inputs[idx];
+                                if (inputs.hasOwnProperty(idx)) {
+                                    new_xput = inputs[idx];
+                                    if (new_xput.cdt_pk === old_xput.cdt_pk) {
+                                        // re-attach Connector
+                                        connector = old_node.in_magnets[idx-1].connected.pop();
+                                        connector.dest = new_node.in_magnets[idx-1];
+                                        new_node.in_magnets[idx-1].connected.push(connector);
+                                    }
+                                }
+                            }
+
+                            for (idx in old_node.outputs) {
+                                old_xput = old_node.outputs[idx];
+                                if (outputs.hasOwnProperty(idx)) {
+                                    new_xput = outputs[idx];
+                                    if (new_xput.cdt_pk === old_xput.cdt_pk) {
+                                        // re-attach all Connectors - note this reverses order
+                                        for (var i = 0; i < old_node.out_magnets[idx-1].connected.length; i++) {
+                                            connector = old_node.out_magnets[idx-1].connected.pop();
+                                            connector.source = new_node.out_magnets[idx-1];
+                                            new_node.out_magnets[idx-1].connected.push(connector);
+                                        }
+                                    }
+                                }
+                            }
+
+                            canvasState.deleteObject();  // delete selected (old Method)
+                            canvasState.addShape(new_node);
                         }
 
                     }
@@ -426,7 +463,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     num_connections += this_magnet.connected.length;
                 }
                 if (num_connections === 0) {
-                    console.log(this_magnet);
                     submit_error.innerHTML = 'MethodNode with unused outputs';
                     return;
                 }

@@ -32,19 +32,19 @@
                 shape = canvasState.shapes[i];
                 if (shape.contains(mx, my)) {
                     // trigger Method menu to drop down
-                    console.log(shape);
-
                     $('li', 'ul#id_ctrl_nav')[2].click();
-                    $('#id_select_method_family').val(shape.family).change();
-
-                    // TODO: Add Method will create node elsewhere
-                    // TODO: need to override this behaviour and replace selected node
+                    $('#id_select_method_family').val(shape.family).change();  // trigger ajax
+                    $(document).ajaxComplete(function() {
+                        // wait for AJAX to populate drop-down before selecting option
+                        $('#id_method_revision_field select').val(shape.pk);
+                    });
 
                     return;
                 }
             }
         };
 
+        // change pipeline revision drop-down triggers ajax to redraw canvas
         $('#id_pipeline_select').on('change', function () {
             $.ajax({
                 type: "POST",

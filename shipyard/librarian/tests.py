@@ -423,6 +423,40 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(dataset.created_by, None)
         self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_path))
 
+    def test_dataset_bulk_created(self):
+        """
+        Test coherence of the Dataset created alongsite a SymbolicDataset.
+        """
+        bulk_dataset_csv = tempfile.NamedTemporaryFile(delete=False, suffix="csv")
+        bulk_dataset_csv.write("Name,Description,File")
+        dsname = "tempdataset"
+        dsdesc = "some headers and sequences"
+        file_paths = []
+        for i in range(2):
+            data_file = tempfile.NamedTemporaryFile(delete=False)
+            data_file.write(self.header + "\n" + self.data)
+            file_path = data_file.name
+            data_file.close()
+            file_paths.extend([file_path])
+            bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + data_file.name)
+        bulk_dataset_csv.close()
+
+        sym_datasets = SymbolicDataset.create_SD_bulk(csv_file_path=bulk_dataset_csv.name, check=True,
+                                                      cdt=self.cdt_record, make_dataset=True, user=self.myUser)
+
+        for i, sym_dataset in enumerate(sym_datasets):
+
+            dataset = sym_dataset.dataset
+            self.assertEqual(dataset.clean(), None)
+            self.assertEqual(dataset.user, self.myUser)
+            self.assertEqual(dataset.name, dsname+str(i))
+            self.assertEqual(dataset.description, dsdesc+str(i))
+            self.assertEqual(dataset.date_created.date(), timezone.now().date())
+            self.assertEqual(dataset.date_created < timezone.now(), True)
+            self.assertEqual(dataset.symbolicdataset, sym_dataset)
+            self.assertEqual(dataset.created_by, None)
+            self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_paths[i]))
+
     def test_dataset_created2(self):
         """
         Test coherence of the Dataset created alongsite a SymbolicDataset.
