@@ -14,7 +14,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
-from django.db.models.signals import pre_save
 
 import hashlib, os, re, stat, subprocess
 import file_access_utils, transformation.models
@@ -23,8 +22,6 @@ import traceback
 import threading
 import logging
 import shutil
-
-import method.signals
 
 class CodeResource(models.Model):
     """
@@ -699,7 +696,3 @@ class MethodFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return Method.objects.filter(family=self).count()
-
-
-# Register signal handlers.
-pre_save.connect(method.signals.set_revision_number, sender=CodeResourceRevision)
