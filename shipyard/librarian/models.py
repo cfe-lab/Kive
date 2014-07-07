@@ -24,7 +24,7 @@ import pipeline.models
 import transformation.models
 import datachecking.models
 import file_access_utils
-import logging_utils
+import sys
 import csv
 
 LOGGER = logging.getLogger(__name__)
@@ -293,7 +293,6 @@ class SymbolicDataset(models.Model):
         The CSV must have these columns, not necessarily in this order:
         - Name
         - Description
-        - Datatype
         - File
 
         make_dataset creates a Dataset from the given file path to go
@@ -334,17 +333,17 @@ class SymbolicDataset(models.Model):
                         file = row['File'].strip() if row['File'] else ""
 
                         # check for empty entries:
-                        if not (name or desc or file):
-                            raise Exception("Line " + line + " is invalid: " +
-                                            "Name, Description, File, Datatype must be defined")
+                        if not (name and desc and file):
+                            raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
                         symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
                                                           description=desc, created_by=None, check=True)
 
                         symDSs.extend([symDS])
             except Exception, e:
-                LOGGER.exception("Error while parsing line " + str(line) + " -- " + str(row))
-                raise e
+                LOGGER.exception("Error while parsing line " + str(line) + ":\n" + str(row))
+                raise ValueError("Error while parsing line " + str(line) + ":\n" + str(row) + ":\n" + str(e)), None, sys.exc_info()[2]
+
 
         return symDSs
 
