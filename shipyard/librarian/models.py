@@ -150,7 +150,7 @@ class SymbolicDataset(models.Model):
 
         num_rows = -1 # skip header
         md5gen = hashlib.md5()
-        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rU") as f:
+        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             for line in f:
                 md5gen.update(line)
                 num_rows += 1
@@ -226,8 +226,8 @@ class SymbolicDataset(models.Model):
         
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, file_handle=None, cdt=None, make_dataset=True, user=None,
-                  name=None, description=None, created_by=None, check=True):
+    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
+                  name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
     
