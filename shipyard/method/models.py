@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
+from django.db.models.signals import pre_save
 
 import hashlib, os, re, stat, subprocess
 import file_access_utils, transformation.models
@@ -23,6 +24,7 @@ import threading
 import logging
 import shutil
 
+import method.signals
 
 class CodeResource(models.Model):
     """
@@ -112,7 +114,8 @@ class CodeResourceRevision(models.Model):
 
     revision_desc = models.TextField(
             "Revision description",
-            help_text="A description for this particular resource revision")
+            help_text="A description for this particular resource revision",
+            blank=True)
 
     content_file = models.FileField(
             "File contents",
@@ -133,10 +136,6 @@ class CodeResourceRevision(models.Model):
             max_length=64,
             blank=True,
             help_text="Used to validate file contents of this resource revision")
-
-    # Enforce unique revision names within a CodeResource.
-    class Meta:
-        unique_together = ("coderesource", "revision_name")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -697,3 +696,7 @@ class MethodFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return Method.objects.filter(family=self).count()
+
+
+# Register signal handlers.
+pre_save.connect(method.signals.set_revision_number, sender=CodeResourceRevision)

@@ -54,7 +54,8 @@ class Transformation(models.Model):
 
     revision_desc = models.TextField(
         "Transformation revision description",
-        help_text="Description of this transformation revision")
+        help_text="Description of this transformation revision",
+        blank=True)
 
     # revision_number = models.IntegerField('Transformation revision number',
     #                                       help_text='Revision number of Transformation in its family')
