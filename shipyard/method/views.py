@@ -173,7 +173,6 @@ def resource_add(request):
     return HttpResponse(t.render(c))
 
 
-
 def resource_revision_add(request, id):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
@@ -194,7 +193,7 @@ def resource_revision_add(request, id):
             try:
                 file_in_memory = request.FILES['content_file']
                 # modify actual filename prior to saving revision object
-                file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+                file_in_memory.name += datetime.now().strftime('_%Y%m%d%H%M%S')
             except:
                 exceptions.update({'content_file': 'You must specify a file upload.'})
                 raise  # content_file required for next steps
@@ -279,8 +278,6 @@ def resource_revision_add(request, id):
     return HttpResponse(t.render(c))
 
 
-
-
 def methods(request):
     """
     Display a list of all MethodFamily objects in database.
@@ -292,7 +289,6 @@ def methods(request):
     c = Context({'methods': methods})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
-
 
 
 def return_method_forms (request, exceptions):
@@ -349,7 +345,6 @@ def return_method_forms (request, exceptions):
         output_forms.append((t_form, xs_form))
 
     return method_form, input_forms, output_forms
-
 
 
 def method_add(request):

@@ -524,22 +524,21 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_unicode(self):
         """
         CodeResourceRevision.unicode() should return it's code resource
-        name and it's code resource revision name.
+        revision name.
 
-        Or, if no CodeResource has been linked, should display an error.
+        Or, if no CodeResource has been linked, should display a placeholder.
         """
 
         # Valid crRev should return it's cr.name and crRev.revision_name
-        self.assertEquals(unicode(self.compv1_crRev), "complement v1")
+        self.assertEquals(unicode(self.compv1_crRev), "v1")
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision()
-        self.assertEquals(unicode(no_cr_set),
-                          "[no code resource set] [no revision name]")
+        self.assertEquals(unicode(no_cr_set), "[no revision name]")
 
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo"
-        self.assertEquals(unicode(no_cr_set), "[no code resource set] foo")
+        self.assertEquals(unicode(no_cr_set), "foo")
 
 
     # Tests of has_circular_dependence and clean
@@ -1344,8 +1343,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
                                           depFileName="foo.py")
 
         # Display unicode for this dependency under valid conditions
-        self.assertEquals(
-                unicode(test_crd),
+        self.assertEquals(unicode(test_crd),
                 "complement v1 requires complement v2 as subdir/foo.py")
 
     def test_invalid_dotdot_path_clean(self):

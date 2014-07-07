@@ -27,7 +27,8 @@ class TransformationFamily(models.Model):
 
     description = models.TextField(
         "Transformation family description",
-        help_text="A description for this collection of methods/pipelines")
+        help_text="A description for this collection of methods/pipelines",
+		blank=True)
 
     def __unicode__(self):
         """ Describe transformation family by it's name """

@@ -44,7 +44,7 @@ class CodeResource(models.Model):
                                                    message="Invalid code resource filename"),
                                 ])
 
-    description = models.TextField("Resource description")
+    description = models.TextField("Resource description", blank=True)
 
     @property
     def num_revisions(self):
@@ -301,6 +301,7 @@ class CodeResourceRevision(models.Model):
         return '/resource_revision_add/%i' % self.id
 
 
+@python_2_unicode_compatible
 class CodeResourceDependency(models.Model):
     """
     Dependencies of a CodeResourceRevision - themselves also CRRs.
@@ -310,7 +311,7 @@ class CodeResourceDependency(models.Model):
 
     coderesourcerevision = models.ForeignKey(
         CodeResourceRevision,
-		related_name="dependencies");
+        related_name="dependencies");
 
     # Dependency is a codeResourceRevision
     requirement = models.ForeignKey(CodeResourceRevision,
@@ -358,10 +359,12 @@ class CodeResourceDependency(models.Model):
             raise ValidationError("Metapackage dependencies cannot have a depFileName");
 
 
-    def __unicode__(self):
+    def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        return u"{} requires {} as {}".format(
+        return u"{} {} requires {} {} as {}".format(
+                unicode(self.coderesourcerevision.coderesource),
                 unicode(self.coderesourcerevision),
+                unicode(self.requirement.coderesource),
                 unicode(self.requirement),
                 os.path.join(self.depPath, self.depFileName));
 
