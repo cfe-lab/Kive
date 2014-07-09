@@ -1,0 +1,112 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
+    <script type="text/javascript" src="/static/jQuery-File-Upload-9.5.8/js/jquery.fileupload.js" %}"></script>
+{#    <script>#}
+{#        $("document").ready(function(){#}
+{##}
+{#            if (window.File && window.FileReader && window.FileList && window.Blob) {#}
+{#              // Great success! All the File APIs are supported.#}
+{#            } else {#}
+{#              alert('Unsupported browser');#}
+{#            }#}
+{##}
+{#            $.fn.handleFilesSelect = function() {#}
+{#                //var fileList = $('#datasetFiles')[0].files;#}
+{#                var fileList = this[0].files;#}
+{#                var output = [];#}
+{#                for (var i= 0, f=null; f=fileList[i]; i++) {#}
+{#                    output.push('<li>',#}
+{#                            encodeURI(f.name),#}
+{#                            '(', f.type || 'n/a', ') ',#}
+{#                            f.size, ' bytes',#}
+{#                            '</li>');#}
+{#                }#}
+{#                $("#list").html("<ul>" + output.join('') + "</ul>")#}
+{#            }#}
+{##}
+{##}
+{#            $("#droparea").on("dragover", function(e) {#}
+{#                e.stopPropagation();  //don't propogate event to parent DOM#}
+{#                e.preventDefault();  //prevent default action of populating div with content#}
+{#                //e.dataTransfer.dropEffect = 'copy';#}
+{#                e.originalEvent.dataTransfer.dropEffect = 'copy'#}
+{##}
+{#            });#}
+{##}
+{#            $("#datasetFiles").change($("#datasetFiles").handleFilesSelect());  // TODO:  this does not work#}
+{#            $("#droparea").on("drop", $("#datasetFiles").handleFilesSelect());  // TODO:  this does not work#}
+{#            $("#datasetFiles").change(function() {#}
+{#                var fileList = $('#datasetFiles')[0].files;#}
+{#                var output = [];#}
+{#                for (var i= 0, f=null; f=fileList[i]; i++) {#}
+{#                    output.push('<li>',#}
+{#                            encodeURI(f.name),#}
+{#                            '(', f.type || 'n/a', ') ',#}
+{#                            f.size, ' bytes',#}
+{#                            '</li>');#}
+{##}
+{#                    //var reader = new FileReader();#}
+{#                    //reader.readAsBinaryString(f); // Reads entire file into memory#}
+{#                    var blob = f.slice()#}
+{#                }#}
+{#                $("#list").html("<ul>" + output.join('') + "</ul>")#}
+{#            });#}
+{##}
+{##}
+{##}
+{##}
+{##}
+{#        });#}
+{##}
+{#    </script>#}
+
+    <script>
+        $('#id_datasets_files').fileupload();  // initialize bluimp file upload jquery plugin
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Add Bulk Datasets</h2>
+
+<form id="datasetAddFormBulk" name="datasetAddFormBulk" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div style="width:100em">
+
+            <fieldset class="multiFieldSet">
+                <legend>Bulk Add Multiple Datasets From CSV</legend>
+                <table>
+                    <tr><td><label>{{ bulkDataset.datasets_files.label }}</label></td>
+                        <td>{{ bulkDataset.datasets_files }}</td>
+                        <td class="errortext">{{ bulkDataset.datasets_files.errors }}</td>
+                    </tr>
+{#                    <tr><td><label>{{ bulkDataset.datasets_csv.label }}</label></td>#}
+{#                        <td><input type="file" id="datasetFiles" name="datasetFiles" multiple/></td>#}
+{#                        <td class="errortext">{{ bulkDataset.datasets_csv.errors }}</td>#}
+{#                    </tr>#}
+                    <tr><td><label>{{ bulkDataset.compound_datatype.label }}</label></td>
+                        <td>{{ bulkDataset.compound_datatype }}</td>
+                        <td class="errortext">{{ bulkDataset.compound_datatype.errors }}</td>
+                    </tr>
+                </table>
+            </fieldset>
+            <input type="submit" name="bulkSubmit" value="Submit Bulk Datasets" />
+
+        <div class="errorStrip errortext">{{ create_error }}</div>
+        <div id="droparea">Drop files here</div>
+        <div><output id="list"></output></div>
+    </div>
+</form>
+
+
+
+{% endblock %}
