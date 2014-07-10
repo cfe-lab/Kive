@@ -4,72 +4,99 @@
 {% extends "portal/base.html" %}
 
 {% block title %}Datasets{% endblock %}
+<style>
+    .bar {
+        height: 18px;
+        background: green;
+    }
 
+    .bulk_dataset_table {
+        overflow:scroll;
+        height:50em;
+    }
+
+    .loading_container {
+        position:absolute;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        z-index:1000;
+        background-color:grey;
+        opacity: .8;
+    }
+
+    .loading_img {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        margin-left: -32px; /* -1 * image width / 2 */
+        margin-top: -32px;  /* -1 * image height / 2 */
+        display: block;
+    }
+
+</style>
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
-    <script type="text/javascript" src="/static/jQuery-File-Upload-9.5.8/js/jquery.fileupload.js" %}"></script>
-{#    <script>#}
-{#        $("document").ready(function(){#}
-{##}
-{#            if (window.File && window.FileReader && window.FileList && window.Blob) {#}
-{#              // Great success! All the File APIs are supported.#}
-{#            } else {#}
-{#              alert('Unsupported browser');#}
-{#            }#}
-{##}
-{#            $.fn.handleFilesSelect = function() {#}
-{#                //var fileList = $('#datasetFiles')[0].files;#}
-{#                var fileList = this[0].files;#}
-{#                var output = [];#}
-{#                for (var i= 0, f=null; f=fileList[i]; i++) {#}
-{#                    output.push('<li>',#}
-{#                            encodeURI(f.name),#}
-{#                            '(', f.type || 'n/a', ') ',#}
-{#                            f.size, ' bytes',#}
-{#                            '</li>');#}
-{#                }#}
-{#                $("#list").html("<ul>" + output.join('') + "</ul>")#}
-{#            }#}
-{##}
-{##}
-{#            $("#droparea").on("dragover", function(e) {#}
-{#                e.stopPropagation();  //don't propogate event to parent DOM#}
-{#                e.preventDefault();  //prevent default action of populating div with content#}
-{#                //e.dataTransfer.dropEffect = 'copy';#}
-{#                e.originalEvent.dataTransfer.dropEffect = 'copy'#}
-{##}
-{#            });#}
-{##}
-{#            $("#datasetFiles").change($("#datasetFiles").handleFilesSelect());  // TODO:  this does not work#}
-{#            $("#droparea").on("drop", $("#datasetFiles").handleFilesSelect());  // TODO:  this does not work#}
-{#            $("#datasetFiles").change(function() {#}
-{#                var fileList = $('#datasetFiles')[0].files;#}
-{#                var output = [];#}
-{#                for (var i= 0, f=null; f=fileList[i]; i++) {#}
-{#                    output.push('<li>',#}
-{#                            encodeURI(f.name),#}
-{#                            '(', f.type || 'n/a', ') ',#}
-{#                            f.size, ' bytes',#}
-{#                            '</li>');#}
-{##}
-{#                    //var reader = new FileReader();#}
-{#                    //reader.readAsBinaryString(f); // Reads entire file into memory#}
-{#                    var blob = f.slice()#}
-{#                }#}
-{#                $("#list").html("<ul>" + output.join('') + "</ul>")#}
-{#            });#}
-{##}
-{##}
-{##}
-{##}
-{##}
-{#        });#}
-{##}
-{#    </script>#}
-
     <script>
-        $('#id_datasets_files').fileupload();  // initialize bluimp file upload jquery plugin
+        // Taken from http://tutorialzine.com/2013/05/mini-ajax-file-upload-form/
+        // Helper function that formats the file sizes
+        function formatFileSize(bytes) {
+            if (typeof bytes !== 'number') {
+                return '';
+            }
+
+            if (bytes >= 1000000000) {
+                return (bytes / 1000000000).toFixed(2) + ' GB';
+            }
+
+            if (bytes >= 1000000) {
+                return (bytes / 1000000).toFixed(2) + ' MB';
+            }
+
+            return (bytes / 1000).toFixed(2) + ' KB';
+        }
+
+        $("document").ready(function(e){
+
+            if (window.File && window.FileReader && window.FileList && window.Blob) {
+              // Great success! All the File APIs are supported.
+            } else {
+              alert('Unsupported browser');
+            }
+
+            // Hide loading gif
+            $("#loading").hide();
+
+            $("#id_dataset_files").change(function() {
+                // clear contents of Upload Progress Table
+                $('#uploadProgressTable tbody').remove();
+
+                var fileList = $('#id_dataset_files')[0].files;
+                for (var i= 0, f=null; f=fileList[i]; i++) {
+                    var newDatasetRow =
+                            '<tr>' +
+                            '<td>' + f.name + '</td>' +
+                            '<td>' + formatFileSize(f.size) + '</td>' +
+                            '<td></td>' +
+                            '<td></td>' +
+                            '<td></td>' +
+                            '<td></td>' +
+                            '</tr>';
+
+                    $('#uploadProgressTable').append(newDatasetRow);
+                }
+            });
+
+            $("#bulkSubmit").submit(function(event){
+                //disable the submit button until after the files have been uploaded and the datasets have been created.
+                $("#bulkSubmit").attr("disabled", true);
+
+                // Indicate to user that we are going to wait a long time
+                $("#loading").show();
+            });
+        });
     </script>
 {% endblock %}
 
@@ -81,32 +108,54 @@
 
 <form id="datasetAddFormBulk" name="datasetAddFormBulk" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <div style="width:100em">
+        <fieldset class="multiFieldSet">
+            <legend>Bulk Add Multiple Datasets From CSV</legend>
+            <table>
+                <tr><td><label>{{ addBulkDatasetForm.dataset_files.label }}</label></td>
+                    <td>{{ addBulkDatasetForm.dataset_files }}</td>
+                    <td class="errortext">{{ addBulkDatasetForm.dataset_files.errors }}</td>
+                </tr>
+                <tr><td><label>{{ addBulkDatasetForm.compound_datatype.label }}</label></td>
+                    <td>{{ addBulkDatasetForm.compound_datatype }}</td>
+                    <td class="errortext">{{ addBulkDatasetForm.compound_datatype.errors }}</td>
+                </tr>
+            </table>
+        </fieldset>
+        <input type="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
 
-            <fieldset class="multiFieldSet">
-                <legend>Bulk Add Multiple Datasets From CSV</legend>
-                <table>
-                    <tr><td><label>{{ bulkDataset.datasets_files.label }}</label></td>
-                        <td>{{ bulkDataset.datasets_files }}</td>
-                        <td class="errortext">{{ bulkDataset.datasets_files.errors }}</td>
+        <div class="bulk_dataset_table">
+            <p><span>Uploaded Datasets</span></p>
+            <table id="uploadProgressTable">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>File Size</th>
+                        <th>Dataset Name</th>
+                        <th>Dataset Description</th>
+                        <th>Dataset MD5</th>
+                        <th>Status</th>
                     </tr>
-{#                    <tr><td><label>{{ bulkDataset.datasets_csv.label }}</label></td>#}
-{#                        <td><input type="file" id="datasetFiles" name="datasetFiles" multiple/></td>#}
-{#                        <td class="errortext">{{ bulkDataset.datasets_csv.errors }}</td>#}
-{#                    </tr>#}
-                    <tr><td><label>{{ bulkDataset.compound_datatype.label }}</label></td>
-                        <td>{{ bulkDataset.compound_datatype }}</td>
-                        <td class="errortext">{{ bulkDataset.compound_datatype.errors }}</td>
-                    </tr>
-                </table>
-            </fieldset>
-            <input type="submit" name="bulkSubmit" value="Submit Bulk Datasets" />
+                </thead>
+                <tbody>
+                    {% for updateBulkDatasetForm in updateBulkDatasetForms %}
+                        <tr>
+                            <!-- instance means Django model.  Noneditable -->
+                            <td>{{ updateBulkDatasetForm.instance.orig_filename }}</td>
+                            <td>{{ updateBulkDatasetForm.instance.dataset_file.size }}</td>
+                            <td>{{ updateBulkDatasetForm.instance.dataset.name }}</td>
+                            <td>{{ updateBulkDatasetForm.dataset.description }}</td>
+                            <td>{{ updateBulkDatasetForm.instance.dataset.compute_md5 }}</td>
+                            <td>{{ updateBulkDatasetForm.instance.create_status }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         <div class="errorStrip errortext">{{ create_error }}</div>
-        <div id="droparea">Drop files here</div>
-        <div><output id="list"></output></div>
+        <div id="loading" class="loading_container">
+            <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
+        </div>
     </div>
 </form>
-
-
-
 {% endblock %}
