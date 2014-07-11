@@ -13,6 +13,7 @@
     .bulk_dataset_table {
         overflow:scroll;
         height:50em;
+        clear: both;
     }
 
     .loading_container {
@@ -40,25 +41,27 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
     <script>
-        // Taken from http://tutorialzine.com/2013/05/mini-ajax-file-upload-form/
         // Helper function that formats the file sizes
         function formatFileSize(bytes) {
             if (typeof bytes !== 'number') {
                 return '';
             }
-
-            if (bytes >= 1000000000) {
-                return (bytes / 1000000000).toFixed(2) + ' GB';
+            else if (bytes >= 1099511627776) {
+                return (bytes / 1099511627776).toFixed(2) + ' TB';
             }
-
-            if (bytes >= 1000000) {
-                return (bytes / 1000000).toFixed(2) + ' MB';
+            else if (bytes >= 1073741824) {
+                return (bytes / 1073741824).toFixed(2) + ' GB';
             }
-
-            return (bytes / 1000).toFixed(2) + ' KB';
+            else if (bytes >= 1048576) {
+                return (bytes / 1048576).toFixed(2) + ' MB';
+            }
+            else if (bytes >= 1024) {
+                return (bytes / 1024).toFixed(2) + ' KB';
+            }
+            return bytes + ' B';
         }
 
-        $("document").ready(function(e){
+        $("document").ready(function(readEvent){
 
             if (window.File && window.FileReader && window.FileList && window.Blob) {
               // Great success! All the File APIs are supported.
@@ -69,32 +72,37 @@
             // Hide loading gif
             $("#loading").hide();
 
-            $("#id_dataset_files").change(function() {
+            $("#id_dataset_files").change(function(changeEvt) {
                 // clear contents of Upload Progress Table
                 $('#uploadProgressTable tbody').remove();
 
                 var fileList = $('#id_dataset_files')[0].files;
-                for (var i= 0, f=null; f=fileList[i]; i++) {
+                for (var i= 0; i < fileList.length; i++) {
+                    var f = fileList[i];
                     var newDatasetRow =
-                            '<tr>' +
-                            '<td>' + f.name + '</td>' +
-                            '<td>' + formatFileSize(f.size) + '</td>' +
-                            '<td></td>' +
-                            '<td></td>' +
-                            '<td></td>' +
-                            '<td></td>' +
-                            '</tr>';
-
+                        '<tr>' +
+                        '<td>' + f.name + '</td>' +
+                        '<td>' + formatFileSize(f.size) + '</td>' +
+                        '<td></td>' +  // Dataset Name
+                        '<td></td>' +  // Dataset Description
+                        '<td></td>' +  // Dataset MD5
+                        '<td></td>' +  // Dataset status
+                        '</tr>';
                     $('#uploadProgressTable').append(newDatasetRow);
                 }
             });
 
-            $("#bulkSubmit").submit(function(event){
+            $("#bulkSubmit").submit(function(submitEvent){
                 //disable the submit button until after the files have been uploaded and the datasets have been created.
                 $("#bulkSubmit").attr("disabled", true);
 
                 // Indicate to user that we are going to wait a long time
                 $("#loading").show();
+
+                // Update mode?
+                if (!$("#editButton").is(":disabled")) {
+                    $("#datasetBulkForm").action = "/datasets_update_bulk";
+                }
             });
         });
     </script>
@@ -106,46 +114,54 @@
 
 <h2>Add Bulk Datasets</h2>
 
-<form id="datasetAddFormBulk" name="datasetAddFormBulk" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+<form id="datasetBulkForm" name="datasetBulkForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <div style="width:100em">
         <fieldset class="multiFieldSet">
             <legend>Bulk Add Multiple Datasets From CSV</legend>
             <table>
-                <tr><td><label>{{ addBulkDatasetForm.dataset_files.label }}</label></td>
-                    <td>{{ addBulkDatasetForm.dataset_files }}</td>
-                    <td class="errortext">{{ addBulkDatasetForm.dataset_files.errors }}</td>
+                <tr><td><label>{{ bulkAddDatasetForm.dataset_files.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.dataset_files }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.dataset_files.errors }}</td>
+
+                    <td><label>{{ bulkAddDatasetForm.compound_datatype.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.compound_datatype }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.compound_datatype.errors }}</td>
                 </tr>
-                <tr><td><label>{{ addBulkDatasetForm.compound_datatype.label }}</label></td>
-                    <td>{{ addBulkDatasetForm.compound_datatype }}</td>
-                    <td class="errortext">{{ addBulkDatasetForm.compound_datatype.errors }}</td>
+                <tr><td><label>{{ bulkAddDatasetForm.name_prefix.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.name_prefix }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.name_prefix.errors }}</td>
+
+                    <td><label>{{ bulkAddDatasetForm.description.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.description }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
                 </tr>
             </table>
         </fieldset>
-        <input type="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
+        <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
+
 
         <div class="bulk_dataset_table">
-            <p><span>Uploaded Datasets</span></p>
             <table id="uploadProgressTable">
                 <thead>
                     <tr>
                         <th>File Name</th>
                         <th>File Size</th>
                         <th>Dataset Name</th>
-                        <th>Dataset Description</th>
-                        <th>Dataset MD5</th>
+                        <th>Description</th>
+                        <th>MD5</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for updateBulkDatasetForm in updateBulkDatasetForms %}
+                    {% for bulkDisplayResult in bulkDisplayResults %}
                         <tr>
                             <!-- instance means Django model.  Noneditable -->
-                            <td>{{ updateBulkDatasetForm.instance.orig_filename }}</td>
-                            <td>{{ updateBulkDatasetForm.instance.dataset_file.size }}</td>
-                            <td>{{ updateBulkDatasetForm.instance.dataset.name }}</td>
-                            <td>{{ updateBulkDatasetForm.dataset.description }}</td>
-                            <td>{{ updateBulkDatasetForm.instance.dataset.compute_md5 }}</td>
-                            <td>{{ updateBulkDatasetForm.instance.create_status }}</td>
+                            <td>{{ bulkDisplayResult.orig_filename }}</td>
+                            <td>{{ bulkDisplayResult.dataset.get_formatted_filesize }}</td>
+                            <td>{{ bulkDisplayResult.dataset.name }}</td>
+                            <td>{{ bulkDisplayResult.dataset.description }}</td>
+                            <td>{{ bulkDisplayResult.dataset.compute_md5 }}</td>
+                            <td>{{ bulkDisplayResult.status }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

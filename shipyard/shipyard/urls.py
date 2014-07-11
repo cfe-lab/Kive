@@ -58,7 +58,7 @@ urlpatterns = patterns('',
     url(r'^dataset_download/(?P<dataset_id>\d+)$', 'archive.views.dataset_download', name='dataset_download'),
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'archive.views.datasets_add_bulk', name='datasets_add_bulk'),
-    url(r'^datasets_update_bulk', 'archive.views.datasets_update_bulk', name='datasets_update_bulk'),
+
 
     url(r'^sandbox$', 'sandbox.views.sandbox_setup', name='sandbox_setup'),
     url(r'^get_pipeline_inputs/$', 'sandbox.ajax.get_pipeline_inputs', name='get_pipeline_inputs'),

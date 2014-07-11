@@ -16,47 +16,30 @@
 
 
     <form id="datasetAddForm" name="datasetAddForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-        <div style="width:100em">
-            <div style="float:left">
-                <fieldset class="multiFieldSet">
-                    <legend>Add Single Dataset</legend>
-                    <table>
-                        <tr><td><label>{{ singleDataset.dataset_file.label }}</label></td>
-                            <td>{{ singleDataset.dataset_file }}</td>
-                            <td class="errortext">{{ singleDataset.dataset_file.errors }}</td>
-                        </tr>
-                        <tr><td><label>{{ singleDataset.name.label }}</label></td>
-                            <td>{{ singleDataset.name }}</td>
-                            <td class="errortext">{{ singleDataset.name.errors }}</td>
-                        </tr>
-                        <tr><td><label>{{ singleDataset.description.label }}</label></td>
-                            <td>{{ singleDataset.description }}</td>
-                            <td class="errortext">{{ singleDataset.description.errors }}</td>
-                        </tr>
-                        <tr><td><label>{{ singleDataset.compound_datatype.label }}</label></td>
-                            <td>{{ singleDataset.compound_datatype }}</td>
-                            <td class="errortext">{{ singleDataset.compound_datatype.errors }}</td>
-                        </tr>
-                    </table>
-                </fieldset>
-                <input type="submit" name="singleSubmit" value="Submit Single Dataset" />
-            </div>
-            <div style="float:right">
-                <fieldset class="multiFieldSet">
-                    <legend>Bulk Add Multiple Datasets From CSV</legend>
-                    <table>
-                        <tr><td><label>{{ bulkDataset.datasets_csv.label }}</label></td>
-                            <td>{{ bulkDataset.datasets_csv }}</td>
-                            <td class="errortext">{{ bulkDataset.datasets_csv.errors }}</td>
-                        </tr>
-                        <tr><td><label>{{ bulkDataset.compound_datatype.label }}</label></td>
-                            <td>{{ bulkDataset.compound_datatype }}</td>
-                            <td class="errortext">{{ bulkDataset.compound_datatype.errors }}</td>
-                        </tr>
-                    </table>
-                </fieldset>
-                <input type="submit" name="bulkSubmit" value="Submit Bulk Datasets" />
-            </div>
+        <div style="width: 50em">
+
+            <fieldset class="multiFieldSet">
+                <legend>Add Single Dataset</legend>
+                <table>
+                    <tr><td><label>{{ singleDataset.dataset_file.label }}</label></td>
+                        <td>{{ singleDataset.dataset_file }}</td>
+                        <td class="errortext">{{ singleDataset.dataset_file.errors }}</td>
+                    </tr>
+                    <tr><td><label>{{ singleDataset.name.label }}</label></td>
+                        <td>{{ singleDataset.name }}</td>
+                        <td class="errortext">{{ singleDataset.name.errors }}</td>
+                    </tr>
+                    <tr><td><label>{{ singleDataset.description.label }}</label></td>
+                        <td>{{ singleDataset.description }}</td>
+                        <td class="errortext">{{ singleDataset.description.errors }}</td>
+                    </tr>
+                    <tr><td><label>{{ singleDataset.compound_datatype.label }}</label></td>
+                        <td>{{ singleDataset.compound_datatype }}</td>
+                        <td class="errortext">{{ singleDataset.compound_datatype.errors }}</td>
+                    </tr>
+                </table>
+            </fieldset>
+            <input type="submit" name="singleSubmit" value="Submit Single Dataset" />
             <div class="errorStrip errortext">{{ create_error }}</div>
         </div>
 </form>
