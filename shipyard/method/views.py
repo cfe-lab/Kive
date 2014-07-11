@@ -304,7 +304,7 @@ def return_method_forms (request, exceptions):
                                       'revision_desc': query['revision_desc'],
                                       'coderesource': query['coderesource'],
                                       'revisions': query['revisions'],
-                                      'random': query.has_key('random')})
+                                      'deterministic': query.has_key('deterministic')})
     for key, msg in exceptions.iteritems():
         method_form.errors.update({key: msg})
 
@@ -390,7 +390,7 @@ def method_add(request):
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
                                     driver=coderesource_revision,
-                                    random=query.has_key('random'))
+                                    deterministic=query.has_key('deterministic'))
                 new_method.full_clean()
                 new_method.save()
             except ValidationError as e:
@@ -550,7 +550,7 @@ def method_revise(request, id):
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
                                     driver=coderesource_revision,
-                                    random=query.has_key('random'))
+                                    deterministic=query.has_key('deterministic'))
                 new_method.full_clean()
                 new_method.save()
             except ValidationError as e:
@@ -654,7 +654,7 @@ def method_revise(request, id):
         method_form = MethodReviseForm(initial={'revision_name': most_recent.revision_name,
                                                 'revision_desc': most_recent.revision_desc,
                                                 'revisions': last_revision.pk,
-                                                'random': most_recent.random})
+                                                'deterministic': most_recent.deterministic})
         method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
                                                    for x in all_revisions]
 

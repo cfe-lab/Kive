@@ -388,8 +388,8 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision)
-    random = models.BooleanField(default=False,
-        help_text="Is the output of this method nondeterministic?")
+    deterministic = models.BooleanField(default=True,
+        help_text="Is the output of this method deterministic?")
 
     tainted = models.BooleanField(
         default=False,

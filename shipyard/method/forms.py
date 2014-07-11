@@ -111,7 +111,7 @@ class MethodForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'random')
+        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'deterministic')
         widgets = {
             'revision_desc': forms.Textarea(attrs={'rows': 5,
                                                    'cols': 30,
@@ -137,7 +137,7 @@ class MethodReviseForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('revisions', 'revision_name', 'revision_desc', 'random')
+        fields = ('revisions', 'revision_name', 'revision_desc', 'deterministic')
 
 
 class TransformationXputForm (forms.ModelForm):
