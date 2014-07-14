@@ -2449,8 +2449,7 @@ class PipelineStepTests(PipelineTestSetup):
     def test_pipelineStep_without_pipeline_set_unicode(self):
         """Test unicode representation when no pipeline is set."""
         nopipeline = PipelineStep(step_num=2)
-        self.assertEquals(unicode(nopipeline),
-                          "[no pipeline assigned] step 2")
+        self.assertEquals(unicode(nopipeline), "Pipeline [no family] [no pipeline assigned] step 2")
 
     def test_pipelineStep_with_pipeline_set_unicode(self):
         """Test unicode representation when pipeline is set."""

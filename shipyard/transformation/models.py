@@ -9,7 +9,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
-
+from django.utils.encoding import python_2_unicode_compatible
 
 class TransformationFamily(models.Model):
     """
@@ -28,7 +28,7 @@ class TransformationFamily(models.Model):
     description = models.TextField(
         "Transformation family description",
         help_text="A description for this collection of methods/pipelines",
-		blank=True)
+        blank=True)
 
     def __unicode__(self):
         """ Describe transformation family by it's name """
@@ -38,6 +38,7 @@ class TransformationFamily(models.Model):
         abstract = True
 
 
+@python_2_unicode_compatible
 class Transformation(models.Model):
     """
     Abstract class that defines common parameters
@@ -49,7 +50,8 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationOutput`
     """
     revision_name = models.CharField("Transformation revision name", max_length=128,
-                                     help_text="The name of this transformation revision")
+                                     help_text="The name of this transformation revision",
+                                     blank=True)
 
     revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add = True)
 
@@ -93,6 +95,11 @@ class Transformation(models.Model):
             return self.pipeline
         else:
             return self.method
+
+    def __str__(self):
+        if self.revision_name:
+            return "{}: {}".format(self.definite.revision_number, self.revision_name)
+        return str(self.definite.revision_number)
 
     def check_input_indices(self):
         """Check that input indices are numbered consecutively from 1."""

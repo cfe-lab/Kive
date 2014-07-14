@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import transaction
 from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
 
 import exceptions
 import os
@@ -64,6 +65,7 @@ class PipelineSerializationException(exceptions.Exception):
         return repr(self.error_msg)
 
 
+@python_2_unicode_compatible
 class Pipeline(transformation.models.Transformation):
     """
     A particular pipeline revision.
@@ -93,18 +95,11 @@ class Pipeline(transformation.models.Transformation):
     class Meta:
         unique_together = (("family", "revision_number"))
 
-    def __unicode__(self):
+    def __str__(self):
         """Represent pipeline by revision name and pipeline family"""
-
-        string_rep = u"Pipeline {} {}".format("{}", self.revision_name)
-
-        # If family isn't set (if created from family admin page)
-        if hasattr(self, "family"):
-            string_rep = string_rep.format(unicode(self.family))
-        else:
-            string_rep = string_rep.format("[family unset]")
-
-        return string_rep
+        if self.revision_name:
+            return "{}: {}".format(self.revision_number, self.revision_name)
+        return str(self.revision_number)
 
     @property
     def is_method(self):
@@ -503,6 +498,7 @@ class Pipeline(transformation.models.Transformation):
         return pipeline
 
 
+@python_2_unicode_compatible
 class PipelineStep(models.Model):
     """
     A step within a Pipeline representing a single transformation
@@ -535,13 +531,15 @@ class PipelineStep(models.Model):
     y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     name = models.CharField(default="", max_length=128, blank=True)
 
-    def __unicode__(self):
+    def __str__(self):
         """ Represent with the pipeline and step number """
 
+        family_name = "[no family]"
         pipeline_name = "[no pipeline assigned]"
         if hasattr(self, "pipeline"):
-            pipeline_name = unicode(self.pipeline)
-        return "{} step {}".format(pipeline_name, self.step_num)
+            pipeline_name = self.pipeline.revision_name
+            family_name = self.pipeline.family.name
+        return "Pipeline {} {} step {}".format(family_name, pipeline_name, self.step_num)
 
     @property
     def is_subpipeline(self):
@@ -992,6 +990,7 @@ class PipelineCable(models.Model):
         return new_wire
 
 
+@python_2_unicode_compatible
 class PipelineStepInputCable(PipelineCable):
     """
     Represents the "cables" feeding into the transformation of a
@@ -1037,7 +1036,7 @@ class PipelineStepInputCable(PipelineCable):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Represent PipelineStepInputCable with the pipeline step, and the cabling destination input name.
 
