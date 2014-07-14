@@ -204,8 +204,7 @@ class Transformation(models.Model):
             curr_output.delete()
 
 
-# August 20, 2013: changed the structure of our Xputs so that there is no distinction
-# between raw and non-raw Xputs beyond the existence of an associated "structure"
+@python_2_unicode_compatible
 class TransformationXput(models.Model):
     """
     Describes parameters common to all inputs and outputs
@@ -213,14 +212,13 @@ class TransformationXput(models.Model):
 
     Related to :models:`transformation.Transformation`
     """
-    # June 6, 2014: this is now a real thing, and transformation, dataset_name, and
-    # dataset_idx have been moved to the derived classes so they can have their own
-    # unique_together constraints.
+    # transformation, dataset_name, and dataset_idx have been moved to
+    # the derived classes so they can have their own unique_together
+    # constraints. structure is implicitly defined via a OneToOneField
+    # on the XputStructure, as is execrecordouts_referencing (via FK
+    # from librarian.ExecRecordOut)
 
-    # June 6, 2014: structure is now simply be implicitly defined via a OneToOneField on the
-    # XputStructure, as is execrecordouts_referencing (via FK from librarian.ExecRecordOut).
-
-    # June 16, 2014: UI information.
+    # UI information.
     x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
 
@@ -252,26 +250,12 @@ class TransformationXput(models.Model):
         if not self.is_input and not self.is_output:
             return ValidationError("TransformationXput with pk={} is neither an input nor an output".format(self.pk))
 
-    def __unicode__(self):
-        unicode_rep = u"";
-        definite_xput = self.definite
-        if self.is_raw():
-            unicode_rep = u"[{}]:raw{} {}".format(
-                    definite_xput.transformation.definite,
-                    definite_xput.dataset_idx,
-                    definite_xput.dataset_name)
-        else:
-            unicode_rep = u"{} name:{} idx:{} cdt:{}".format(
-                    definite_xput.transformation.definite,
-                    definite_xput.dataset_name,
-                    definite_xput.dataset_idx,
-                    self.get_cdt())
-        return unicode_rep
+    def __str__(self):
+        return u"{}: {}".format(self.definite.dataset_idx, self.definite.dataset_name)
 
     @property
     def compounddatatype(self):
-        if self.is_raw(): return None
-        return self.structure.compounddatatype
+        return None if self.is_raw() else self.structure.compounddatatype
 
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
@@ -279,10 +263,7 @@ class TransformationXput(models.Model):
 
     def get_cdt(self):
         """Accessor that returns the CDT of this xput (and None if it is raw)."""
-        my_cdt = None
-        if not self.is_raw():
-            my_cdt = self.structure.compounddatatype
-        return my_cdt
+        return None if self.is_raw() else self.structure.compounddatatype
 
     def get_min_row(self):
         """Accessor that returns min_row for this xput (and None if it is raw)."""

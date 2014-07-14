@@ -4,8 +4,6 @@
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/sandbox/sandbox.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -34,7 +32,7 @@ html body {
 <h2>Analysis</h2>
 
 <p>
-Run pipelines on data.
+Select a pipeline
 </p>
 
 <div class="panel" id="pipeline_panel">
@@ -49,9 +47,12 @@ Run pipelines on data.
     <tbody>
         {% for form in pipeline_forms %}
         <tr>
+            <form action="choose_inputs" method="post">
+            {% csrf_token %}
             <td>{{ form.family_name }}</td>
-            <td>{{ form.revision }}</td>
+            <td>{{ form.pipeline }}</td>
             <td><input type="submit" value="Make it so"></td>
+            </form>
         </tr>
         {% endfor %}
     </tbody>
