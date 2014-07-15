@@ -7,6 +7,7 @@ from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 
+import re
 import os.path
 import tempfile
 import shutil
@@ -380,16 +381,12 @@ class PipelineTests(PipelineTestSetup):
         """Bad cabling: input is of wrong CompoundDatatype."""
 
         # Define pipeline 'foo'
-        foo = Pipeline(family=self.DNAcomp_pf,
-                       revision_name="foo",
-                       revision_desc="Foo version",
+        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version",
                        revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
 
         # Define pipeline input "oneinput" for foo with CDT type test_cdt
-        foo.create_input(compounddatatype=self.test_cdt,
-                          dataset_name="oneinput",
-                          dataset_idx=1)
+        foo.create_input(compounddatatype=self.test_cdt, dataset_name="oneinput", dataset_idx=1)
 
         # Define step 1 by transformation DNAcompv2_m
         step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
@@ -401,9 +398,9 @@ class PipelineTests(PipelineTestSetup):
             source_step=0,
             source=foo.inputs.get(dataset_name="oneinput"))
 
-        self.assertEquals(cable.clean(), None)
+        self.assertIsNone(cable.clean())
         self.assertRaisesRegexp(ValidationError,
-            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 1:input\"",
+            'Custom wiring required for cable "{}"'.format(cable),
             cable.clean_and_completely_wired)
         
     def test_pipeline_oneStep_cabling_minrow_constraint_may_be_breached_clean (self):
@@ -916,42 +913,28 @@ class PipelineTests(PipelineTestSetup):
                        revision_desc="Foo version",
                        revision_number=self.DNAcomp_pf.members.count() + 1)
         foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                         dataset_name="oneinput",
-                         dataset_idx=1)
+        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=1)
         
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m,
-                                 step_num=1)
+        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         step1.cables_in.create(dest=step1.transformation.inputs.get(dataset_name="input"),
                                source_step=0,
                                source=foo.inputs.get(dataset_name="oneinput"))
         
-        step2 = foo.steps.create(transformation=self.DNArecomp_m,
-                                 step_num=2)
+        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2)
         step2.cables_in.create(dest=step2.transformation.inputs.get(dataset_name="complemented_seqs"),
                                source_step=1,
                                source=step1.transformation.outputs.get(dataset_name="output"))
         
-        step3 = foo.steps.create(transformation=self.RNAcompv2_m,
-                                 step_num=3)
+        step3 = foo.steps.create(transformation=self.RNAcompv2_m, step_num=3)
         cable = step3.cables_in.create(
             dest=step3.transformation.inputs.get(dataset_name="input"),
             source_step=2,
             source=step2.transformation.outputs.get(dataset_name="recomplemented_seqs"))
 
         self.assertEquals(cable.clean(), None)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-            cable.clean_and_completely_wired)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-            step3.clean)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Custom wiring required for cable \"Pipeline DNAcomplement foo step 3:input\"",
-            foo.clean)
+        error_msg = 'Custom wiring required for cable "{}"'.format(str(cable))
+        for fun in [cable.clean_and_completely_wired, step3.clean, foo.clean]:
+            self.assertRaisesRegexp(ValidationError, error_msg, fun)
 
     def test_pipeline_manySteps_minRow_constraint_may_be_breached_clean (self):
         """Unverifiable cabling: later step requests input with possibly too few rows (min_row unset for providing step)."""
@@ -2449,13 +2432,12 @@ class PipelineStepTests(PipelineTestSetup):
     def test_pipelineStep_without_pipeline_set_unicode(self):
         """Test unicode representation when no pipeline is set."""
         nopipeline = PipelineStep(step_num=2)
-        self.assertEquals(unicode(nopipeline), "Pipeline [no family] [no pipeline assigned] step 2")
+        self.assertEquals(unicode(nopipeline), "2: ")
 
     def test_pipelineStep_with_pipeline_set_unicode(self):
         """Test unicode representation when pipeline is set."""
         pipelineset = self.DNAcompv1_p.steps.get(step_num=1)
-        self.assertEquals(unicode(pipelineset),
-                          "Pipeline DNAcomplement v1 step 1")
+        self.assertEquals(unicode(pipelineset), "1: ")
 
     def test_pipelineStep_invalid_request_for_future_step_data_clean(self):
         """Bad cabling: step requests data from after its execution step."""
@@ -2826,17 +2808,9 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         # For pipeline 1, mark a raw output to be deleted in an unrelated method
         step1.add_deletion(raw_output_unrelated)
 
-        errorMessage = "Transformation at step 1 does not have output \"\[Method test method family s42\]:raw1 a_b_c_squared_raw\""
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            errorMessage,
-            step1.clean)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            errorMessage,
-            pipeline_1.clean)
+        errorMessage = 'Transformation at step 1 does not have output "1: a_b_c_squared_raw"'
+        self.assertRaisesRegexp(ValidationError, errorMessage, step1.clean)
+        self.assertRaisesRegexp(ValidationError, errorMessage, pipeline_1.clean)
         
     def test_PipelineStep_clean_raw_output_to_be_deleted_in_different_pipeline_bad(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
@@ -2866,10 +2840,8 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2)
         step1.add_deletion(unrelated_raw_output)
 
-        error_msg = "Transformation at step 1 does not have output \"\[Method test method family s42\]:raw1 unrelated_raw_output\""
-
+        error_msg = 'Transformation at step 1 does not have output "1: unrelated_raw_output"'
         self.assertRaisesRegexp(ValidationError, error_msg, step1.clean)
-
         self.assertRaisesRegexp(ValidationError, error_msg, pipeline_1.clean)
 
 
@@ -2976,7 +2948,7 @@ class RawOutputCableTests(PipelineTestSetup):
 
         self.assertRaisesRegexp(
             ValidationError,
-            "Transformation at step 1 does not produce output \"\[Method test method family s4 - unrelated\]:raw1 unrelated raw output\"",
+            'Transformation at step 1 does not produce output "{}"'.format(unrelated_raw_output),
             outcable1.clean)
 
     def test_PipelineOutputCable_raw_outcable_references_invalid_step_bad(self):
@@ -3124,7 +3096,7 @@ class RawInputCableTests(PipelineTestSetup):
             source_step=0,
             source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"))
 
-        error_msg = "Transformation at step 1 does not have input \"\[Method test method family s4\]:raw1 a_b_c_method\""
+        error_msg = 'Transformation at step 1 does not have input "{}"'.format(source)
         self.assertRaisesRegexp(ValidationError,error_msg,rawcable1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,step1.clean)
         self.assertRaisesRegexp(ValidationError,error_msg,step1.complete_clean)
@@ -3169,7 +3141,7 @@ class RawInputCableTests(PipelineTestSetup):
             dest_pin=self.doublet_cdt.members.all()[0])
         
         self.assertRaisesRegexp(ValidationError,
-            "Cable \"Pipeline test pipeline family v1 step 1:a_b_c\(raw\)\" is raw and should not have custom wiring defined",
+            re.escape('Cable "{}" is raw and should not have custom wiring defined'.format(rawcable1)),
             rawcable1.clean)
 
 
