@@ -1,11 +1,14 @@
 from django.template import loader, Context
 from django.core.context_processors import csrf
 from django.http import HttpResponse
+from django.contrib.auth.models import User
 
 from sandbox.forms import *
 
 import pipeline.models
 import librarian.models
+import archive.models
+from sandbox.execute import Sandbox
 
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
@@ -17,6 +20,7 @@ def choose_pipeline(request):
     return HttpResponse(template.render(context))
 
 def choose_inputs(request):
+    """Load the input selection page."""
     if request.method == "POST":
         template = loader.get_template("sandbox/choose_inputs.html")
         pipeline = request.POST.get("pipeline")

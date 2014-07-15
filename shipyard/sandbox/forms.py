@@ -23,17 +23,17 @@ class InputSelectionForm(forms.Form):
     """Form for selecting input Datasets for a Pipeline."""
 
     def __init__(self, *args, **kwargs):
-        pipeline_pk = kwargs.pop("pipeline")
+        self.pipeline = kwargs.pop("pipeline")
         super(InputSelectionForm, self).__init__(*args, **kwargs)
 
-        pipeline = Pipeline.objects.get(pk=pipeline_pk)
+        my_pipeline = Pipeline.objects.get(pk=self.pipeline)
         symbolic_datasets = SymbolicDataset.objects.filter(dataset__isnull=False)
-        for my_input in pipeline.inputs.order_by("dataset_idx"):
+        for my_input in my_pipeline.inputs.order_by("dataset_idx"):
             if my_input.is_raw():
                 symbolic_datasets = symbolic_datasets.filter(structure__isnull=True)
             else:
                 compound_datatype = my_input.get_cdt()
                 symbolic_datasets = symbolic_datasets.filter(structure__compounddatatype=compound_datatype)
             symbolic_datasets = symbolic_datasets.order_by("dataset__created_by", "dataset__date_created")
-            choices = [(s.dataset.pk, s.dataset) for s in symbolic_datasets]
-            self.fields[str(my_input)] = forms.ChoiceField(choices=choices)
+            choices = [(s.pk, s.dataset) for s in symbolic_datasets]
+            self.fields[my_input.dataset_idx] = forms.ChoiceField(label=str(my_input), choices=choices)

@@ -5,11 +5,12 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
+    <script src="/static/sandbox/sandbox.js"></script>
 {% endblock %}
 
 {% block content %}
 
-<a href="choose_pipeline.html" rel="prev">Back to pipeline selection</a>
+<a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
 
 <h2>Analysis</h2>
 
@@ -17,10 +18,11 @@
 Choose pipeline inputs
 </p>
 
-<form action="." method="post">
+<form id="inputs_form" action="run_pipeline" method="post">
+    <input type="hidden" name="pipeline" value="{{ input_form.pipeline }}" />
     {{ input_form }}
     {% csrf_token %}
-    <input type="submit" value="Engage">
+    <input type="submit" id="submit" value="Engage">
 </form>
 
 {% endblock %}
