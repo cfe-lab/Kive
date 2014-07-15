@@ -64,8 +64,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     */
 
     // Ajax transaction to get Python type
-    $('#id_to_hide').hide()
-    $('#int_constraints').hide();
+    $('#id_to_hide, #int_constraints').hide();
+    
     $('#id_restricts').on('change',
         function() {
             selected_options = $(this).val();
@@ -74,15 +74,14 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 $.ajax({
                     type: "POST",
                     url: "get_python_type/",
-                    data: {restricts: selected_options}, // specify data as an object
+                    data: { restricts: selected_options }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
                         var arr = JSON.parse(result)
 
                         if (arr.length > 1) {
                             // reject this combination of restrictions
-                            $('#str_constraints').hide(300); // animated with delay 300 ms
-                            $('#int_constraints').hide(300);
+                            $('#str_constraints, #int_constraints').hide(300); // animated with delay 300 ms
                             $('#bad_restrictions').text('Incompatible restriction of Datatypes');
                         } else {
                             $('#bad_restrictions').text('');
@@ -94,15 +93,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                             } else {
                                 $('#int_constraints').hide(300);
                                 $('#str_constraints').show(300);
-                                if (python_type == 'boolean') {
-                                    $('#id_minlen').prop('disabled', true).css({backgroundColor: '#ffcccc'});
-                                    $('#id_maxlen').prop('disabled', true).css({backgroundColor: '#ffcccc'});
-                                } else {
-                                    $('#id_minlen').prop('disabled', false).css({backgroundColor: '#ffffff'});
-                                    $('#id_maxlen').prop('disabled', false).css({backgroundColor: '#ffffff'});
-                                }
+                                
+                                $('#id_minlen, #id_maxlen').prop('disabled', python_type == 'boolean');
                             }
-
+                            
                             $('#id_to_hide').select(python_type);
                         }
                     }
@@ -113,8 +107,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
-        var $this = $(this);
-        $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+        $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
     });
     
     $('a[rel="ctrl"]').on('click', function (e) {
