@@ -155,7 +155,8 @@ class CodeResourceRevision(models.Model):
 
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
-        self.revision_number = self.coderesource.num_revisions+1
+        if not self.revision_number:
+            self.revision_number = self.coderesource.num_revisions+1
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
     # This CRR includes it's own filename at the root
@@ -392,12 +393,13 @@ class Method(transformation.models.Transformation):
     family = models.ForeignKey("MethodFamily", related_name="members")
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
 
-    # June 24, 2014: moved this here from Transformation so that it can be put into
-    # the unique_together statement below.
+    # moved this here from Transformation so that it can be put into the
+    # unique_together statement below. Allowed to be blank because it's
+    # automatically set on save.
     revision_number = models.PositiveIntegerField(
         'Method revision number',
         help_text='Revision number of this Method in its family',
-        validators=[MinValueValidator(1)]
+        blank=True
     )
 
     # Code resource revisions are executable if they link to Method
@@ -428,6 +430,12 @@ class Method(transformation.models.Transformation):
             return string_rep.format(unicode(self.family))
         else:
             return string_rep.format("[family unset]")
+
+    def save(self, *args, **kwargs):
+        """Save a Method, automatically setting the revision number."""
+        if not self.revision_number:
+            self.revision_number = self.family.num_revisions + 1
+        super(Method, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
         return "/methods/{}".format(self.id)

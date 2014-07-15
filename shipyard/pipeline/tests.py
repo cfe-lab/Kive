@@ -371,7 +371,6 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
 
@@ -423,7 +422,6 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
 
@@ -475,7 +473,6 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
@@ -519,7 +516,6 @@ class PipelineTests(PipelineTestSetup):
         curr_method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         curr_method.save()
         curr_method.create_input(compounddatatype=self.DNAinput_cdt,
@@ -865,7 +861,6 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
@@ -880,7 +875,6 @@ class PipelineTests(PipelineTestSetup):
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
 
@@ -939,7 +933,6 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
@@ -955,7 +948,6 @@ class PipelineTests(PipelineTestSetup):
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1012,7 +1004,6 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
@@ -1026,7 +1017,6 @@ class PipelineTests(PipelineTestSetup):
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
 
@@ -1077,7 +1067,6 @@ class PipelineTests(PipelineTestSetup):
         step2method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step2method.save()
         step2method.create_input(compounddatatype=self.DNAoutput_cdt,
@@ -1092,7 +1081,6 @@ class PipelineTests(PipelineTestSetup):
         step3method = Method(family=self.DNAcomp_mf,
                              revision_name="foo",
                              revision_desc="foo",
-                             revision_number=self.DNAcomp_mf.members.count() + 1,
                              driver=self.compv2_crRev)
         step3method.save()
         step3method.create_input(compounddatatype=self.DNAinput_cdt,
@@ -2657,7 +2645,6 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
 
         # Define a 1-step pipeline containing self.script_4_2_M which has a raw_output
         self.script_4_2_M = Method(revision_name="s42", revision_desc="s42",
-                                   revision_number=self.test_MF.members.count() + 1,
                                    family = self.test_MF, driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         raw_output_unrelated = self.script_4_2_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
@@ -2679,7 +2666,6 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         self.script_4_2_M = Method(revision_name="s42", revision_desc="s42",
-                                   revision_number=self.test_MF.members.count() + 1,
                                    family = self.test_MF, driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         unrelated_raw_output = self.script_4_2_M.create_output(dataset_name="unrelated_raw_output",dataset_idx=1)
@@ -2776,8 +2762,7 @@ class RawOutputCableTests(PipelineTestSetup):
         # Define an unrelated method and give it a raw output
         unrelated_method = Method(
             revision_name="s4 - unrelated", revision_desc="s4 - unrelated",
-            revision_number=self.test_MF.members.count() + 1, family = self.test_MF,
-            driver = self.script_4_1_CRR
+            family = self.test_MF, driver = self.script_4_1_CRR
         )
         unrelated_method.save()
         unrelated_method.clean()
@@ -2913,7 +2898,7 @@ class RawInputCableTests(PipelineTestSetup):
 
         # Define second unrelated method not part of any pipeline but containing a raw input with the same name (a_b_c)
         self.script_4_2_M = Method(
-            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+            revision_name="s4", revision_desc="s4", 
             family = self.test_MF, driver = self.script_4_1_CRR
         )
         self.script_4_2_M.save()
@@ -2984,7 +2969,7 @@ class RawSaveTests(PipelineTestSetup):
 
         # Make a method without a parent
         self.script_4_2_M = Method(
-            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+            revision_name="s4", revision_desc="s4", 
             family = self.test_MF, driver = self.script_4_1_CRR
         )
         self.script_4_2_M.save()
@@ -2998,8 +2983,7 @@ class RawSaveTests(PipelineTestSetup):
         self.script_4_1_M.create_output(dataset_name="a_b_c", dataset_idx=1)
 
         # Make a method without a parent
-        self.script_4_2_M = Method(
-            revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
+        self.script_4_2_M = Method(revision_name="s4", revision_desc="s4", 
             family = self.test_MF, driver = self.script_4_1_CRR
         )
         self.script_4_2_M.save()
@@ -3017,9 +3001,7 @@ class RawSaveTests(PipelineTestSetup):
         # Make a method with a parent, and do not specify inputs/outputs
         self.script_4_2_M = Method(
             revision_parent=self.script_4_1_M, revision_name="s4", revision_desc="s4",
-            revision_number=self.test_MF.members.count() + 1, family = self.test_MF,
-            driver = self.script_4_1_CRR
-        )
+            family = self.test_MF, driver = self.script_4_1_CRR)
         self.script_4_2_M.save()
         self.script_4_2_M.copy_io_from_parent()
 
@@ -3518,13 +3500,11 @@ class CustomWiringTests(PipelineTestSetup):
         cdt_2.members.create(datatype=self.incompatible_dt,column_name="col_3",column_idx=3)
 
         # Define 2 methods with different inputs
-        method_1 = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
-                          family = self.test_MF, driver = self.script_4_1_CRR)
+        method_1 = Method(revision_name="s4", revision_desc="s4", family = self.test_MF, driver = self.script_4_1_CRR)
         method_1.save()
         method_1_in = method_1.create_input(dataset_name="TestIn", dataset_idx=1, compounddatatype=cdt_1)
         
-        method_2 = Method(revision_name="s5", revision_desc="s5", revision_number=self.test_MF.members.count() + 1,
-                          family = self.test_MF, driver = self.script_4_1_CRR)
+        method_2 = Method(revision_name="s5", revision_desc="s5", family = self.test_MF, driver = self.script_4_1_CRR)
         method_2.save()
         method_2_in = method_2.create_input(dataset_name="TestIn", dataset_idx=1, compounddatatype=cdt_2)
 
@@ -3681,8 +3661,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
-                   family = self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", family = self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="method_in", dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3704,8 +3683,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
-                   family=self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", family=self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in",dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3742,8 +3720,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
                                                    dataset_idx=1)
 
         # Define method with doublet_cdt input (string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
-                   family=self.test_MF, driver=self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", family=self.test_MF, driver=self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.doublet_cdt,dataset_name="method_in", dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)
@@ -3773,8 +3750,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         myPipeline_input = myPipeline.create_input(compounddatatype=self.mix_triplet_cdt,dataset_name="pipe_in",dataset_idx=1)
 
         # Define method with triplet_cdt input (string, string, string), add it to the pipeline, and cable it
-        m = Method(revision_name="s4", revision_desc="s4", revision_number=self.test_MF.members.count() + 1,
-                   family=self.test_MF, driver = self.script_4_1_CRR)
+        m = Method(revision_name="s4", revision_desc="s4", family=self.test_MF, driver = self.script_4_1_CRR)
         m.save()
         method_input = m.create_input(compounddatatype=self.triplet_cdt,dataset_name="method_in",dataset_idx=1)
         pipelineStep = myPipeline.steps.create(transformation=m, step_num=1)

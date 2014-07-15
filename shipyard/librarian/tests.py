@@ -47,30 +47,27 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
             filename="generic_script.py")
         self.generic_cr.save()
         self.generic_crRev = CodeResourceRevision(
-            coderesource=self.generic_cr, revision_name="v1", revision_number=1,
-            revision_desc="desc")
+            coderesource=self.generic_cr, revision_name="v1", revision_desc="desc")
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.generic_crRev.content_file.save("generic_script.py", File(f))
         self.generic_crRev.save()
         
         # Method family, methods, and their input/outputs
         self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
-        self.mA = Method(
-            revision_name="mA_name", revision_desc="A_desc", revision_number=1, family = self.mf,
-            driver = self.generic_crRev); self.mA.save()
+        self.mA = Method(revision_name="mA_name", revision_desc="A_desc", family = self.mf, driver =
+                self.generic_crRev)
+        self.mA.save()
         self.A1_rawin = self.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
         self.A1_out = self.mA.create_output(compounddatatype=self.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
 
-        self.mB = Method(
-            revision_name="mB_name", revision_desc="B_desc", revision_number=2, family = self.mf,
-            driver = self.generic_crRev); self.mB.save()
+        self.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=self.mf, driver=self.generic_crRev)
+        self.mB.save()
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
         self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
 
-        self.mC = Method(
-            revision_name="mC_name", revision_desc="C_desc", revision_number=3, family = self.mf,
-            driver = self.generic_crRev); self.mC.save()
+        self.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=self.mf, driver=self.generic_crRev) 
+        self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
         self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
         self.C1_out = self.mC.create_output(compounddatatype=self.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
@@ -79,13 +76,11 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
 
         # Pipeline family, pipelines, and their input/outputs
         self.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); self.pf.save()
-        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D",
-                           revision_number=self.pf.members.count() + 1)
+        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D")
         self.pD.save()
         self.D1_in = self.pD.create_input(compounddatatype=self.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
         self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
-        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E",
-                           revision_number=self.pf.members.count() + 1)
+        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E")
         self.pE.save()
         self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
         self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
@@ -1147,7 +1142,6 @@ class FindCompatibleERTests(LibrarianTestSetup):
         method = Method()
         method.family = MethodFamily.objects.first()
         method.driver = CodeResourceRevision.objects.first()
-        method.revision_number = method.family.members.count() + 1
         method.save()
         
         pipeline_step1 = PipelineStep()
