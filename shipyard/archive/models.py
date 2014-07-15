@@ -46,12 +46,17 @@ class Run(stopwatch.models.Stopwatch):
         """
         Returns the top-level Run this belongs to.
         """
-        # Base case: this is the top-level Run.
-        if self.parent_runstep is None:
-            return self
+        # Base case: this is the top-level Run. Otherwise, return the
+        # top-level run of the parent RunStep.
+        return self if self.parent_runstep is None else self.parent_runstep.top_level_run
 
-        # Otherwise, return the top-level run of the parent RunStep.
-        return self.parent_runstep.top_level_run
+    @property
+    def runsteps_in_order(self):
+        return self.runsteps.order_by("pipelinestep__step_num")
+
+    @property
+    def outcables_in_order(self):
+        return self.runoutputcables.order_by("pipelineoutputcable__output_idx")
 
     def clean(self):
         """
@@ -1031,12 +1036,6 @@ class RunStep(RunComponent):
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
 
-    # def get_top_level_run(self):
-    #     """
-    #     Returns the top-level Run this belongs to.
-    #     """
-    #     return self.run.get_top_level_run()
-
 
 class RunCable(RunComponent):
     """
@@ -1442,12 +1441,6 @@ class RunSIC(RunCable):
         """
         return self.runstep.get_coordinates()
 
-    # def get_top_level_run(self):
-    #     """
-    #     Returns the top-level Run this belongs to.
-    #     """
-    #     return self.runstep.get_top_level_run()
-
 
 class RunOutputCable(RunCable):
     """
@@ -1466,11 +1459,6 @@ class RunOutputCable(RunCable):
         # Uniqueness constraint ensures that no POC is
         # multiply-represented within a run.
         unique_together = ("run", "pipelineoutputcable")
-    #
-    # def __init__(self, *args, **kwargs):
-    #     """Instantiate and set up a logger."""
-    #     super(self.__class__, self).__init__(*args, **kwargs)
-    #     self.logger = logging.getLogger(self.__class__.__name__)
 
     @classmethod
     def create(cls, pipelineoutputcable, run):
@@ -1566,12 +1554,6 @@ class RunOutputCable(RunCable):
         after all of the RunSteps belonging to the same Run.
         """
         return self.run.get_coordinates()
-
-    # def get_top_level_run(self):
-    #     """
-    #     Returns the top-level Run this belongs to.
-    #     """
-    #     return self.run.get_top_level_run()
 
 
 def get_upload_path(instance, filename):
@@ -1692,8 +1674,6 @@ class Dataset(models.Model):
         """
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
-
-
 
 
 class ExecLog(stopwatch.models.Stopwatch):

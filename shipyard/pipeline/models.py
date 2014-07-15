@@ -518,28 +518,19 @@ class PipelineStep(models.Model):
     step_num = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
     # Which outputs of this step we want to delete.
-    # Previously, this was done via another explicit class (PipelineStepDelete)
-    # this is more compact.
-    # -- August 21, 2013
     outputs_to_delete = models.ManyToManyField(
         "transformation.TransformationOutput",
         help_text="TransformationOutputs whose data should not be retained",
         related_name="pipeline_steps_deleting")
 
-    # June 16, 2014: UI information.
+    # UI information.
     x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     name = models.CharField(default="", max_length=128, blank=True)
 
     def __str__(self):
         """ Represent with the pipeline and step number """
-
-        family_name = "[no family]"
-        pipeline_name = "[no pipeline assigned]"
-        if hasattr(self, "pipeline"):
-            pipeline_name = self.pipeline.revision_name
-            family_name = self.pipeline.family.name
-        return "Pipeline {} {} step {}".format(family_name, pipeline_name, self.step_num)
+        return "{}: {}".format(self.step_num, self.name)
 
     @property
     def is_subpipeline(self):

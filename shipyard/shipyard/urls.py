@@ -60,6 +60,7 @@ urlpatterns = patterns('',
 
     url(r'^choose_pipeline$', 'sandbox.views.choose_pipeline', name='choose_pipeline'),
     url(r'^choose_inputs$', 'sandbox.views.choose_inputs', name='choose_inputs'),
+    url(r'^view_results$', 'sandbox.views.view_results', name='view_results'),
     url(r'^run_pipeline$', 'sandbox.ajax.run_pipeline', name='run_pipeline'),
     url(r'^poll_run_progress$', 'sandbox.ajax.poll_run_progress', name='poll_run_progress'),
 )

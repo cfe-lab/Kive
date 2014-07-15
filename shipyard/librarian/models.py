@@ -567,6 +567,14 @@ class ExecRecord(models.Model):
                           u"{}".format(u", ".join(outputs_list)))
         return string_rep
 
+    @property
+    def execrecordins_in_order(self):
+        return sorted(self.execrecordins.all(), key=lambda e: e.generic_input.definite.dataset_idx)
+
+    @property
+    def execrecordouts_in_order(self):
+        return sorted(self.execrecordins.all(), key=lambda e: e.generic_output.definite.dataset_idx)
+
     @classmethod
     @transaction.atomic
     def create(cls, generator, component, input_SDs, output_SDs):

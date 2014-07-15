@@ -348,9 +348,6 @@ class TransformationInput(TransformationXput):
         help_text="Name for input as an alternative to index")
 
     # Input index on the transformation.
-    ####### NOTE: ONLY METHODS NEED INDICES, NOT TRANSFORMATIONS....!!
-    # If we were to differentiate between methods/pipelines... dataset_idx would only
-    # belong to methods
     dataset_idx = models.PositiveIntegerField(
             "input index",
             validators=[MinValueValidator(1)],
