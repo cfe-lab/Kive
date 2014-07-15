@@ -15,14 +15,20 @@ from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 
-import hashlib, os, re, stat, subprocess
-import file_access_utils, transformation.models
+import transformation.models
+import file_access_utils
 
+import os
+import re
+import stat
+import subprocess
+import hashlib
 import traceback
 import threading
 import logging
 import shutil
 
+@python_2_unicode_compatible
 class CodeResource(models.Model):
     """
     A CodeResource is any file tracked by Shipyard.
@@ -68,7 +74,7 @@ class CodeResource(models.Model):
         """
         return '/resource_revisions/%i' % self.id
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
     
 
@@ -92,7 +98,9 @@ class CodeResourceRevision(models.Model):
             CodeResource,
             related_name="revisions")
 
-    revision_number = models.IntegerField('Revision number', help_text="Revision number of code resource")
+    # revision_number is allowed to be null because it's automatically set on save
+    revision_number = models.IntegerField('Revision number', help_text="Revision number of code resource",
+                                          blank=True)
 
     revision_name = models.CharField(
             max_length=128,
@@ -145,6 +153,11 @@ class CodeResourceRevision(models.Model):
         else:
             return unicode(self.revision_name)
 
+    def save(self, *args, **kwargs):
+        """Save this CodeResourceRevision, incrementing the revision number."""
+        self.revision_number = self.coderesource.num_revisions+1
+        super(CodeResourceRevision, self).save(*args, **kwargs)
+
     # This CRR includes it's own filename at the root
     def list_all_filepaths(self):
         """Return all filepaths associated with this CodeResourceRevision.
@@ -176,7 +189,7 @@ class CodeResourceRevision(models.Model):
             # is a non-metapackage CRR and so there is an associated
             # file).
             if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename;
+                dep_fn = dep.requirement.coderesource.filename
             
             inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
 
@@ -191,7 +204,7 @@ class CodeResourceRevision(models.Model):
 
     def has_circular_dependence(self):
         """Detect any circular dependences defined in this CodeResourceRevision."""
-        return self.has_circular_dependence_h([]);
+        return self.has_circular_dependence_h([])
 
     def has_circular_dependence_h(self, dependants):
         """Helper for has_circular_dependence.
@@ -201,15 +214,15 @@ class CodeResourceRevision(models.Model):
         """
         # Base case: self is dependant on itself, in which case, return true.
         if self in dependants:
-            return True;
+            return True
         
         # Recursive case: go to all dependencies and check them.
         check_dep = False;
         for dep in self.dependencies.all():
             if dep.requirement.has_circular_dependence_h(dependants + [self]):
-                check_dep = True;
+                check_dep = True
 
-        return check_dep;
+        return check_dep
 
     def clean(self):
         """Check coherence of this CodeResourceRevision.
@@ -222,23 +235,23 @@ class CodeResourceRevision(models.Model):
         # CodeResource can be a collection of dependencies and not contain
         # a file - in this case, MD5 has no meaning and shouldn't exist
         try:
-            md5gen = hashlib.md5();
-            md5gen.update(self.content_file.read());
-            self.MD5_checksum = md5gen.hexdigest();
+            md5gen = hashlib.md5()
+            md5gen.update(self.content_file.read())
+            self.MD5_checksum = md5gen.hexdigest()
 
         except ValueError:
-            self.MD5_checksum = "";
+            self.MD5_checksum = ""
 
         # TODO: duplicate coderesourcerevision based on MD5 should not be permitted - Art.
 
         # Check for a circular dependency.
         if self.has_circular_dependence():
-            raise ValidationError("Self-referential dependency"); 
+            raise ValidationError("Self-referential dependency") 
 
         # Check if dependencies conflict with each other
         listOfDependencyPaths = self.list_all_filepaths()
         if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-            raise ValidationError("Conflicting dependencies");
+            raise ValidationError("Conflicting dependencies")
 
         # If content file exists, it must have a file name
         if self.content_file and self.coderesource.filename == "":
@@ -366,6 +379,7 @@ class CodeResourceDependency(models.Model):
                 os.path.join(self.depPath, self.depFileName));
 
 
+@python_2_unicode_compatible
 class Method(transformation.models.Transformation):
     """
     Methods are atomic transformations.
@@ -405,7 +419,7 @@ class Method(transformation.models.Transformation):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """Represent a method by it's revision name and method family"""
         string_rep = u"Method {} {}".format("{}", self.revision_name)
 
@@ -681,6 +695,7 @@ class Method(transformation.models.Transformation):
         return code_popen
 
 
+@python_2_unicode_compatible
 class MethodFamily(transformation.models.TransformationFamily):
     """
     MethodFamily groups revisions of Methods together.
@@ -696,3 +711,6 @@ class MethodFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return Method.objects.filter(family=self).count()
+
+    def __str__(self):
+        return self.name
