@@ -79,16 +79,17 @@ class Pipeline(transformation.models.Transformation):
     family = models.ForeignKey(PipelineFamily, related_name="members")
     revision_parent = models.ForeignKey("self", related_name = "descendants", null=True, blank=True)
 
-    # June 16, 2014: UI information.
+    # UI information.
     canvas_height = models.IntegerField(default=600, validators=[MinValueValidator(0)])
     canvas_width = models.IntegerField(default=800, validators=[MinValueValidator(0)])
 
-    # June 24, 2014: moved this here from Transformation so that it can be put into
-    # the unique_together statement below.
+    # moved this here from Transformation so that it can be put into the
+    # unique_together statement below. allowed to be blank because it's
+    # automatically set on save.
     revision_number = models.PositiveIntegerField(
         'Pipeline revision number',
         help_text='Revision number of this Pipeline in its family',
-        validators=[MinValueValidator(1)]
+        blank=True
     )
 
     # revision_number must be unique within PipelineFamily.
@@ -100,6 +101,11 @@ class Pipeline(transformation.models.Transformation):
         if self.revision_name:
             return "{}: {}".format(self.revision_number, self.revision_name)
         return str(self.revision_number)
+
+    def save(self, *args, **kwargs):
+        if not self.revision_number:
+            self.revision_number = self.family.num_revisions+1
+        super(Pipeline, self).save(*args, **kwargs)
 
     @property
     def is_method(self):

@@ -116,11 +116,8 @@ def resource_add(request):
             file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
             try:
-                prototype = CodeResourceRevision(revision_number=1,
-                                                 revision_name='Prototype',
-                                                 revision_desc=query['resource_desc'],
-                                                 coderesource=new_code_resource,
-                                                 content_file=file_in_memory)
+                prototype = CodeResourceRevision(revision_name='Prototype', revision_desc=query['resource_desc'],
+                        coderesource=new_code_resource, content_file=file_in_memory)
                 prototype.full_clean()
                 prototype.save()
             except ValidationError as e:
@@ -200,8 +197,7 @@ def resource_revision_add(request, id):
 
             # is this file identical to another CodeResourceRevision?
             try:
-                revision = CodeResourceRevision(revision_number=coderesource.num_revisions+1,
-                                                revision_parent=parent_revision,
+                revision = CodeResourceRevision(revision_parent=parent_revision,
                                                 revision_name=query['revision_name'],
                                                 revision_desc=query['revision_desc'],
                                                 coderesource=coderesource,
@@ -386,7 +382,6 @@ def method_add(request):
             # attempt to make Method object
             try:
                 new_method = Method(family = method_family,
-                                    revision_number=1,
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
                                     driver=coderesource_revision,
@@ -545,7 +540,6 @@ def method_revise(request, id):
             try:
                 # attempt to make Method object
                 new_method = Method(family = family, # same family
-                                    revision_number=family.num_revisions+1,
                                     revision_parent=most_recent,
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
