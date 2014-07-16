@@ -158,11 +158,10 @@ class Pipeline(transformation.models.Transformation):
         """
         self.clean()
 
-        all_steps = self.steps.all()
-        if all_steps.count == 0:
-            raise ValidationError("Pipeline {} has no steps".format(unicode(self)))
+        if self.steps.count() == 0:
+            raise ValidationError("Pipeline {} has no steps".format(self))
 
-        for step in all_steps:
+        for step in self.steps.all():
             step.complete_clean()
 
     def create_outputs(self):

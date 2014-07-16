@@ -407,9 +407,7 @@ class Method(transformation.models.Transformation):
     deterministic = models.BooleanField(default=True,
         help_text="Is the output of this method deterministic?")
 
-    tainted = models.BooleanField(
-        default=False,
-        help_text="Is this Method broken?")
+    tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
