@@ -4,14 +4,15 @@ metadata.models
 Shipyard data models relating to metadata: Datatypes and their related
 paraphernalia, CompoundDatatypes, etc.
 """
+from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
 
-import operator
 import re
 import csv
 import os
@@ -21,7 +22,7 @@ import tempfile
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import datatypes, CDTs
+from constants import datatypes, CDTs, maxlengths
 from datachecking.models import VerificationLog
 
 import logging
@@ -29,26 +30,23 @@ import logging
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
 
-def get_builtin_types(DTs):
+def get_builtin_types(datatypes):
     """
-    Retrieves the built-in types of all DTs passed as input.
+    Retrieves the built-in types of all datatypess passed as input.
 
     Returns a set (to remove duplicates) with all of the built-in
     types represented in the inputs.
 
     INPUTS
-    DTs                 iterable of Datatypes
+    datatypes           iterable of Datatypes
 
     OUTPUT
-    builtins            set of built-in Datatypes represented by DTs
+    builtins            set of built-in Datatypes represented by datatypes
 
     ASSUMPTIONS
-    All Datatypes in DTs are clean and complete.
+    All Datatypes in datatypes are clean and complete.
     """
-    all_builtin_types = []
-    for curr_DT in DTs:
-        all_builtin_types.append(curr_DT.get_builtin_type())
-    return set(all_builtin_types)
+    return set([datatype.get_builtin_type() for datatype in datatypes])
 
 
 def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
@@ -229,13 +227,16 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     return (rownum, failing_cells)
 
 
+@python_2_unicode_compatible
 class Datatype(models.Model):
     """
     Abstract definition of a semantically atomic type of data.
-    Related to :model:`copperfish.CompoundDatatype`
+    Related to :model:`metadata.models.CompoundDatatype`
     """
-    name = models.CharField( "Datatype name", max_length=64, help_text="The name for this Datatype", unique=True)
-    description = models.TextField("Datatype description", help_text="A description for this Datatype")
+    name = models.CharField("Datatype name", max_length=maxlengths.MAX_NAME_LENGTH, 
+            help_text="The name for this Datatype", unique=True)
+    description = models.TextField("Datatype description", help_text="A description for this Datatype",
+            max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
     # auto_now_add: set to now on instantiation (editable=False)
     date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date Datatype was defined")
@@ -243,9 +244,9 @@ class Datatype(models.Model):
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
 
-    def get_restricts(self):
+    @property
+    def restricts_str(self):
         return ','.join([dt['name'] for dt in self.restricts.values()])
-    restricts_str = property(get_restricts)
 
     prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled")
     # TODO: related_name for custom_constraint?
@@ -257,9 +258,6 @@ class Datatype(models.Model):
         self.effective_constraints = {}
 
     def __str__(self):
-        return self.name
-
-    def __unicode__(self):
         return self.name
 
     def get_absolute_url(self):
@@ -916,6 +914,7 @@ class Datatype(models.Model):
         return failing_cells
 
 
+@python_2_unicode_compatible
 class BasicConstraint(models.Model):
     """
     Basic (level 1) constraint on a Datatype.
@@ -957,13 +956,13 @@ class BasicConstraint(models.Model):
 
     rule = models.CharField("Rule specification", max_length = 100)
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation of this BasicConstraint.
 
         The representation takes the form {rule type}={rule}.
         """
-        return u"{}={}".format(self.ruletype, self.rule)
+        return "{}={}".format(self.ruletype, self.rule)
 
     def clean(self):
         """
@@ -1087,6 +1086,7 @@ class CustomConstraint(models.Model):
                 format(self))
 
 
+@python_2_unicode_compatible
 class CompoundDatatypeMember(models.Model):
     """
     A data type member of a particular CompoundDatatype.
@@ -1098,7 +1098,7 @@ class CompoundDatatypeMember(models.Model):
 
     datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is")
 
-    column_name = models.CharField("Column name", blank=False, max_length=128,
+    column_name = models.CharField("Column name", blank=False, max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Gives datatype a 'column name' as an alternative to column index")
 
     # MinValueValidator(1) constrains column_idx to be >= 1
@@ -1111,12 +1111,12 @@ class CompoundDatatypeMember(models.Model):
         unique_together = (("compounddatatype", "column_name"),
                            ("compounddatatype", "column_idx"))
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Describe a CompoundDatatypeMember with it's column number,
         datatype name, and column name
         """
-        return u'{}: {}'.format(unicode(self.datatype), self.column_name)
+        return '{}: {}'.format(unicode(self.datatype), self.column_name)
 
     def has_custom_constraint(self):
         """
@@ -1140,6 +1140,7 @@ class CompoundDatatypeMember(models.Model):
         return self.datatype.check_basic_constraints(value)
 
 
+@python_2_unicode_compatible
 class CompoundDatatype(models.Model):
     """
     A definition of a structured collection of datatypes,
@@ -1161,41 +1162,14 @@ class CompoundDatatype(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """ Represent CompoundDatatype with a list of it's members """
 
-        string_rep = u"("
-
-        # Get the members for this compound data type
-        all_members = self.members.all()
-
-        # A) Get the column index for each member
-        member_indices = [member.column_idx for member in all_members]
-
-        # B) Get the column index of each Datatype member, along with the Datatype member itself
-        members_with_indices = [ (member_indices[i], all_members[i]) for i in range(len(all_members))]
-        # Can we do this?
-        # members_with_indices = [ (all_members[i].column_idx, all_members[i])
-        #                          for i in range(len(all_members))]
-
-        # Sort members using column index as a basis (operator.itemgetter(0))
-        members_with_indices = sorted(  members_with_indices,
-                                        key=operator.itemgetter(0))
-
-        # Add sorted Datatype members to the string representation
-        for i, colIdx_and_member in enumerate(members_with_indices):
-            colIdx, member = colIdx_and_member
-            string_rep += unicode(member)
-
-            # Add comma if not at the end of member list
-            if i != len(members_with_indices) - 1:
-                string_rep += ", "
-
+        string_rep = "("
+        string_rep += ", ".join(str(m) for m in self.members.order_by("column_idx"))
         string_rep += ")"
-
         if string_rep == "()":
             string_rep = "[empty CompoundDatatype]"
-
         return string_rep
 
     # clean() is executed prior to save() to perform model validation

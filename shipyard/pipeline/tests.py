@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+from django.db.models import Count
 
 import re
 import os.path
@@ -83,17 +84,24 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, cdt=self.DNAinput_cdt, user=self.user,
                                                         name="DNA input", description="input for DNAcomp pipeline")
 
-        #############################
-        
-        # Setup used in the "2nd-wave" tests (this was originally in
-        # Copperfish_Raw_Setup).
-
         # Define PF in order to define pipeline
         self.test_PF = PipelineFamily(
             name="test pipeline family",
             description="pipeline family placeholder")
         self.test_PF.full_clean()
         self.test_PF.save()
+
+        self.manufacture_pipeline()
+
+    def manufacture_pipeline(self):
+        """Create Pipelines in various stages of manufacture."""
+
+        family = PipelineFamily.objects.first()
+        cdt = CompoundDatatype.objects.first()
+
+        # Nothing defined.
+        p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version")
+        p.save()
 
     def tearDown(self):
         shutil.rmtree(self.workdir)
@@ -113,85 +121,67 @@ class PipelineFamilyTests(PipelineTestSetup):
 
 
 class PipelineTests(PipelineTestSetup):
+    """Tests for basic Pipeline functionality."""
     
-    def test_pipeline_one_valid_input_clean(self):
-        """Test input index check, one well-indexed input case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
-        self.assertEquals(foo.clean(), None)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Pipeline foo has no steps",
-            foo.complete_clean())
+    def test_pipeline_one_valid_input_no_steps(self):
+        """A Pipeline with one valid input, but no steps, is clean but not complete."""
+        p = Pipeline.objects.filter(steps__isnull=True, inputs__isnull=True).first()
+        p.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=1)
+        self.assertIsNone(p.clean())
+        self.assertRaisesRegexp(ValidationError, "Pipeline {} has no steps".format(p), p.complete_clean)
 
     def test_pipeline_one_invalid_input_clean(self):
-        """Test input index check, one badly-indexed input case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=4)
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean)
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.complete_clean)
+        """A Pipeline with one input not numbered "1" is not clean."""
+        p = Pipeline.objects.filter(inputs__isnull=True).first()
+        cdt = CompoundDatatype.objects.first()
+        p.create_input(compounddatatype=cdt, dataset_name="oneinput", dataset_idx=4)
+        error = "Inputs are not consecutively numbered starting from 1"
+        self.assertRaisesRegexp(ValidationError, error, p.clean)
+        self.assertRaisesRegexp(ValidationError, error, p.complete_clean)
 
     def test_pipeline_many_valid_inputs_clean(self):
-        """Test input index check, well-indexed multi-input case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=1)
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="twoinput", dataset_idx=2)
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="threeinput", dataset_idx=3)
-        self.assertEquals(foo.clean(), None)
+        """A Pipeline with multiple, properly indexed inputs is clean."""
+        p = Pipeline.objects.filter(inputs__isnull=True).first()
+        cdt = CompoundDatatype.objects.first()
+        p.create_input(compounddatatype=cdt, dataset_name="oneinput", dataset_idx=1)
+        p.create_input(compounddatatype=cdt, dataset_name="twoinput", dataset_idx=2)
+        p.create_input(compounddatatype=cdt, dataset_name="threeinput", dataset_idx=3)
+        self.assertIsNone(p.clean())
 
     def test_pipeline_many_valid_inputs_scrambled_clean(self):
-        """Test input index check, well-indexed multi-input (scrambled order) case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=2)
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="twoinput", dataset_idx=3)
-        foo.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="threeinput", dataset_idx=1)
-        self.assertEquals(foo.clean(), None)
+        """A Pipeline with multiple, properly indexed inputs, in any order, is clean."""
+        p = Pipeline.objects.filter(inputs__isnull=True).first()
+        cdt = CompoundDatatype.objects.first()
+        p.create_input(compounddatatype=cdt, dataset_name="oneinput", dataset_idx=2)
+        p.create_input(compounddatatype=cdt, dataset_name="twoinput", dataset_idx=3)
+        p.create_input(compounddatatype=cdt, dataset_name="threeinput", dataset_idx=1)
+        self.assertIsNone(p.clean())
 
     def test_pipeline_many_invalid_inputs_clean(self):
-        """Test input index check, badly-indexed multi-input case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=2)
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="twoinput", dataset_idx=3)
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="threeinput", dataset_idx=4)
-        self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                foo.clean)
+        """A Pipeline with multiple, badly indexed inputs is not clean."""
+        p = Pipeline.objects.filter(inputs__isnull=True).first()
+        p.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=2)
+        p.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="twoinput", dataset_idx=3)
+        p.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="threeinput", dataset_idx=4)
+        self.assertRaisesRegexp(ValidationError, "Inputs are not consecutively numbered starting from 1", p.clean)
 
     def test_pipeline_one_valid_step_clean(self):
-        """Test step index check, one well-indexed step case."""
-        foo = Pipeline(family=self.DNAcomp_pf, revision_name="foo", revision_desc="Foo version")
-        foo.save()
-        foo.create_input(compounddatatype=self.DNAinput_cdt,
-                          dataset_name="oneinput", dataset_idx=1)
+        """A Pipeline with one validly indexed step and input is clean.
+        
+        The PipelineStep and Pipeline are not complete unless there is a
+        cable in place.
+        """
+        p = Pipeline.objects.filter(steps__isnull=True, inputs__isnull=True).first()
+        m = Method.objects.annotate(Count("inputs")).filter(inputs__count=1, inputs__structure__isnull=False).first()
+        cdt = m.inputs.first().structure.compounddatatype
+        p.create_input(compounddatatype=cdt, dataset_name="oneinput", dataset_idx=1)
+        step1 = p.steps.create(transformation=m, step_num=1)
 
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
-
-        self.assertEquals(step1.clean(), None)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input \"input\" to transformation at step 1 is not cabled",
-            step1.complete_clean)
-        self.assertEquals(foo.clean(), None)
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Input \"input\" to transformation at step 1 is not cabled",
-            foo.complete_clean)
+        error = 'Input "input" to transformation at step 1 is not cabled'
+        self.assertIsNone(step1.clean())
+        self.assertRaisesRegexp(ValidationError, error, step1.complete_clean)
+        self.assertIsNone(p.clean())
+        self.assertRaisesRegexp(ValidationError, error, p.complete_clean)
 
     def test_pipeline_one_bad_step_clean(self):
         """Test step index check, one badly-indexed step case."""

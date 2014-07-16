@@ -3,6 +3,7 @@ datachecking.models
 
 Shipyard models pertaining to verification of correctness of data.
 """
+from __future__ import unicode_literals
 
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
@@ -75,9 +76,7 @@ class BadData(models.Model):
     """
     Denotes a failed result from a content check.
     """
-    contentchecklog = models.OneToOneField(ContentCheckLog,
-                                           related_name="baddata")
-
+    contentchecklog = models.OneToOneField(ContentCheckLog, related_name="baddata")
     # In decreasing order of severity....
     missing_output = models.BooleanField(default=False)
     bad_header = models.NullBooleanField()
@@ -207,13 +206,10 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     checksum of the SD is confirmed, be it during the execution
     of a Pipeline (i.e. a Run) or on a manual check.
     """
-    symbolicdataset = models.ForeignKey(
-        "librarian.SymbolicDataset",
-        related_name="integrity_checks")
+    symbolicdataset = models.ForeignKey("librarian.SymbolicDataset", related_name="integrity_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey("archive.ExecLog", null=True,
-                                related_name="integrity_checks")
+    execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="integrity_checks")
 
     # Implicit through inheritance: start_time, end_time.
 
@@ -246,9 +242,7 @@ class VerificationLog(stopwatch.models.Stopwatch):
     on a Dataset.
     """
     # The log of the content check where we performed this verification.
-    contentchecklog = models.ForeignKey(
-        "datachecking.ContentCheckLog",
-        related_name="verification_logs")
+    contentchecklog = models.ForeignKey("datachecking.ContentCheckLog", related_name="verification_logs")
     # The compound datatype member which was verified.
     CDTM = models.ForeignKey("metadata.CompoundDatatypeMember")
     # The return code from the Method's driver. Null indicates it hasn't
@@ -289,10 +283,5 @@ class MD5Conflict(models.Model):
     """
     Denotes an MD5 conflict found during an integrity check.
     """
-    integritychecklog = models.OneToOneField(
-        IntegrityCheckLog,
-        related_name="usurper")
-    
-    conflicting_SD = models.OneToOneField(
-        "librarian.SymbolicDataset",
-        related_name="usurps")
+    integritychecklog = models.OneToOneField(IntegrityCheckLog, related_name="usurper")
+    conflicting_SD = models.OneToOneField("librarian.SymbolicDataset", related_name="usurps")

@@ -34,3 +34,11 @@ class Extensions:
 extensions = Extensions()
 extensions.CSV = "csv"
 extensions.RAW = "raw"
+
+class MaxLengths:
+    pass
+
+maxlengths = MaxLengths()
+maxlengths.MAX_FILENAME_LENGTH = 260
+maxlengths.MAX_NAME_LENGTH = 60
+maxlengths.MAX_DESCRIPTION_LENGTH = 1000

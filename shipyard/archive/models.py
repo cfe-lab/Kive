@@ -4,11 +4,13 @@ archive.models
 Shipyard data models relating to archiving information: Run, RunStep,
 Dataset, etc.
 """
+from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
+from django.utils.encoding import python_2_unicode_compatible
 
 import logging
 import itertools
@@ -17,8 +19,9 @@ import time
 import file_access_utils
 
 import stopwatch.models
+from constants import maxlengths
 
-
+@python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch):
     """
     Stores data associated with an execution of a pipeline.
@@ -31,8 +34,8 @@ class Run(stopwatch.models.Stopwatch):
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
                                  help_text="Pipeline used in this run")
 
-    name = models.CharField("Run name", max_length=256)
-    description = models.TextField("Run description", blank=True)
+    name = models.CharField("Run name", max_length=maxlengths.MAX_NAME_LENGTH)
+    description = models.TextField("Run description", max_length=maxlengths.MAX_DESCRIPTION_LENGTH, blank=True)
 
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
@@ -144,11 +147,11 @@ class Run(stopwatch.models.Stopwatch):
         if not self.is_complete():
             raise ValidationError('Run "{}" is not complete'.format(self))
 
-    def __unicode__(self):
+    def __str__(self):
         if self.is_subrun():
-            unicode_rep = u"Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
+            unicode_rep = "Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
         else:
-            unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
+            unicode_rep = "Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
 
     def is_subrun(self):
@@ -199,10 +202,8 @@ class RunComponent(stopwatch.models.Stopwatch):
     This class encapsulates much of the common function
     of the three "atomic" Run* classes.
     """
-    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True,
-                                   related_name="used_by_components")
-    reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord",
-                                     default=None)
+    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
+    reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
 
     # Implicit:
     # - log: via OneToOneField from ExecLog
@@ -547,6 +548,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         return True
 
 
+@python_2_unicode_compatible
 class RunStep(RunComponent):
     """
     Annotates the execution of a pipeline step within a run.
@@ -566,9 +568,8 @@ class RunStep(RunComponent):
         # a given PipelineStep within a Run.
         unique_together = ("run", "pipelinestep")
 
-    def __unicode__(self):
-        unicode_rep = u"Runstep with PS [{}]".format(self.pipelinestep)
-        return unicode_rep
+    def __str__(self):
+        return "Runstep with PS [{}]".format(self.pipelinestep)
 
     @property
     def component(self):
@@ -1569,6 +1570,7 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
+@python_2_unicode_compatible
 class Dataset(models.Model):
     """
     Data files uploaded by users or created by transformations.
@@ -1584,24 +1586,12 @@ class Dataset(models.Model):
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
-    #####################
-    # Constants
-    ###
     UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
-    MAX_NAME_LEN = 128
-    MAX_FILE_LEN = 4096
-
-
-    #####################
-    # Fields
-    ###
 
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
-
-    name = models.CharField(max_length=MAX_NAME_LEN, help_text="Name of this Dataset.")
-
-    description = models.TextField(help_text="Description of this Dataset.")
-
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, help_text="Name of this Dataset.")
+    description = models.TextField(help_text="Description of this Dataset.",
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
     date_created = models.DateTimeField(auto_now_add=True, help_text="Date of Dataset creation.")
 
     # Four cases from which Datasets can originate:
@@ -1612,20 +1602,14 @@ class Dataset(models.Model):
     # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
     created_by = models.ForeignKey(RunComponent, related_name="outputs", null=True, blank=True)
 
-
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
-                                    null=False, max_length=MAX_FILE_LEN) # max path length for win=260, unix=4096, mac=1024
+                                    null=False, max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
-
-    ##################
-    # Methods
-    ###
-
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation of this Dataset.
 
@@ -1916,12 +1900,9 @@ class MethodOutput(models.Model):
     in progress.
     """
     execlog = models.OneToOneField(ExecLog, related_name="methodoutput")
-
     return_code = models.IntegerField("return code", null=True)
-
     output_log = models.FileField("output log", upload_to="Logs",
                                   help_text="Terminal output of the RunStep Method, i.e. stdout.")
-
     error_log = models.FileField("error log", upload_to="Logs",
                                  help_text="Terminal error output of the RunStep Method, i.e. stderr.")
     

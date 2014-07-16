@@ -4,6 +4,7 @@ pipeline.models
 Shipyard data models relating to the (abstract) definition of
 Pipeline.
 """
+from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -21,7 +22,7 @@ import operator
 import transformation.models
 import method.models
 import metadata.models
-
+from constants import maxlengths
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
     def get_absolute_url(self):
-        return '/pipeline_revise/%i' % self.id
+        return '/pipeline_revise/{}'.format(self.id)
 
     @property
     def size(self):
@@ -118,7 +119,7 @@ class Pipeline(transformation.models.Transformation):
     @property
     def family_size(self):
         """Returns size of this Pipeline's family"""
-        return Pipeline.objects.filter(family=self.family).count()
+        return self.family.members.count()
 
     def clean(self):
         """
@@ -158,11 +159,10 @@ class Pipeline(transformation.models.Transformation):
         """
         self.clean()
 
-        all_steps = self.steps.all()
-        if all_steps.count == 0:
-            raise ValidationError("Pipeline {} has no steps".format(unicode(self)))
+        if self.steps.count() == 0:
+            raise ValidationError("Pipeline {} has no steps".format(self))
 
-        for step in all_steps:
+        for step in self.steps.all():
             step.complete_clean()
 
     def create_outputs(self):
@@ -532,7 +532,7 @@ class PipelineStep(models.Model):
     # UI information.
     x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    name = models.CharField(default="", max_length=128, blank=True)
+    name = models.CharField(default="", max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
 
     def __str__(self):
         """ Represent with the pipeline and step number """
@@ -1017,9 +1017,9 @@ class PipelineStepInputCable(PipelineCable):
     # Implicitly defined:
     # - custom_wires (through inheritance)
 
-    # October 15, 2013: allow the data coming out of a PSIC to be
-    # saved.  Note that this is only relevant if the PSIC is not
-    # trivial, and is false by default.
+    # allow the data coming out of a PSIC to be saved.  Note that this
+    # is only relevant if the PSIC is not trivial, and is false by
+    # default.
     keep_output = models.BooleanField(
         "Whether or not to retain the output of this PSIC",
         help_text="Keep or delete output",
@@ -1304,15 +1304,9 @@ class CustomCableWire(models.Model):
     """
     cable = models.ForeignKey(PipelineCable, related_name="custom_wires")
 
-    # CDT member on the source output hole
-    source_pin = models.ForeignKey(
-        "metadata.CompoundDatatypeMember",
-        related_name="source_pins")
-
-    # CDT member on the destination input hole
-    dest_pin = models.ForeignKey(
-        "metadata.CompoundDatatypeMember",
-        related_name="dest_pins")
+    # CDT member on the source and destination output holes
+    source_pin = models.ForeignKey("metadata.CompoundDatatypeMember", related_name="source_pins")
+    dest_pin = models.ForeignKey("metadata.CompoundDatatypeMember", related_name="dest_pins")
 
     # A cable cannot have multiple wires leading to the same dest_pin
     class Meta:
@@ -1390,6 +1384,7 @@ class CustomCableWire(models.Model):
         }
 
 
+@python_2_unicode_compatible
 class PipelineOutputCable(PipelineCable):
     """
     Defines which outputs of internal PipelineSteps are mapped to
@@ -1402,7 +1397,8 @@ class PipelineOutputCable(PipelineCable):
     """
     pipeline = models.ForeignKey(Pipeline, related_name="outcables")
 
-    output_name = models.CharField("Output hole name", max_length=128, help_text="Pipeline output hole name")
+    output_name = models.CharField("Output hole name", max_length=maxlengths.MAX_NAME_LENGTH, 
+            help_text="Pipeline output hole name")
 
     # We need to specify both the output name and the output index because
     # we are defining the outputs of the Pipeline indirectly through
@@ -1435,7 +1431,7 @@ class PipelineOutputCable(PipelineCable):
         self.logger = logging.getLogger(self.__class__.__name__)
         super(self.__class__, self).__init__(*args, **kwargs)
 
-    def __unicode__(self):
+    def __str__(self):
         """ Represent with the pipeline name, and TO output index + name """
 
         pipeline_name = "[no pipeline set]"

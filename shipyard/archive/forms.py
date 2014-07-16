@@ -1,9 +1,13 @@
 from django import forms
+from django.contrib.auth.models import User
+
 from metadata.models import CompoundDatatype
 from archive.models import Dataset
-from django.contrib.auth.models import User
 from librarian.models import SymbolicDataset
+
 import logging
+
+from constants import maxlengths
 """
 Generate an HTML form to create a new DataSet object
 """
@@ -20,14 +24,14 @@ class DatasetForm (forms.Form):
     before checking if the ModelForm.is_valid.  As a result, the internal calls to Model.clean() fail.
     """
 
-    name = forms.CharField(max_length=Dataset.MAX_NAME_LEN)
+    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
     description = forms.CharField(widget=forms.Textarea)
-    dataset_file = forms.FileField(allow_empty_file="False",  max_length=Dataset.MAX_FILE_LEN)
+    dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     compound_datatypes = CompoundDatatype.objects.all()
     compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
     for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
+        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_dataset(self):
@@ -64,7 +68,7 @@ class BulkDatasetForm (forms.Form):
     compound_datatypes = CompoundDatatype.objects.all()
     compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
     for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
+        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_datasets(self):

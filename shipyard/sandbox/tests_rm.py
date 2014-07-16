@@ -45,7 +45,7 @@ def clean_files():
             rmf(output.error_log.name)
 
 
-class UtilityMethods(TestCase):
+class UtilityMethods():
 
     def setUp(self):
 
@@ -209,7 +209,7 @@ class UtilityMethods(TestCase):
         family.clean()
         family.save()
         pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version")
-        pipeline.complete_clean()
+        pipeline.clean()
         pipeline.save()
         family.clean()
         return pipeline

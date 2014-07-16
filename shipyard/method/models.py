@@ -3,8 +3,6 @@ method.models
 
 Shipyard data models relating to Methods: this includes everything to
 do with CodeResources.
-
-FIXME get all the models pointing at each other correctly!
 """
 
 from __future__ import unicode_literals
@@ -17,9 +15,9 @@ from django.utils.encoding import python_2_unicode_compatible
 
 import transformation.models
 import file_access_utils
+from constants import maxlengths
 
 import os
-import re
 import stat
 import subprocess
 import hashlib
@@ -34,45 +32,42 @@ class CodeResource(models.Model):
     A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
-    name = models.CharField( "Resource name", max_length=255,
+    name = models.CharField( "Resource name", max_length=maxlengths.MAX_NAME_LENGTH,
                              help_text="The name for this resource and all subsequent revisions.",
                              unique=True)  # to prevent confusion in drop-down menus
 
     # File names must either be empty, or be 1 or more of any from
     # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
     # contains a slash. They can't start or end with spaces.
-    filename = models.CharField("Resource file name", max_length=255, help_text="The filename for this resource",
+    filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH, 
+                                help_text="The filename for this resource",
                                 blank=True, validators=[
                                     RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
                                                    message="Invalid code resource filename"),
                                 ])
-
-    description = models.TextField("Resource description", blank=True)
+    description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
     @property
     def num_revisions(self):
         """
         Number of revisions associated with this CodeResource.
         """
-        return CodeResourceRevision.objects.filter(coderesource=self).count()
+        return self.revisions.count()
 
     @property
     def last_revision_date(self):
         """
         Date of most recent revision to this CodeResource.
         """
-        revisions = CodeResourceRevision.objects.filter(coderesource=self)
-        if len(revisions) == 0:
+        if self.revisions.count() == 0:
             return 'n/a'
-        revision_dates = [revision.revision_DateTime for revision in revisions]
-        revision_dates.sort() # ascending order
-        return revision_dates[0]
+        return max([revision.revision_DateTime for revision in self.revisions.all()])
 
     def get_absolute_url(self):
         """
         A page that displays all revisions of this CodeResource
         """
-        return '/resource_revisions/%i' % self.id
+        return '/resource_revisions/{}'.format(self.id)
 
     def __str__(self):
         return self.name
@@ -94,16 +89,14 @@ class CodeResourceRevision(models.Model):
     #   needed_by (CodeResourceDependency/ForeignKey)
     #   method_set (Method/ForeignKey)
 
-    coderesource = models.ForeignKey(
-            CodeResource,
-            related_name="revisions")
+    coderesource = models.ForeignKey(CodeResource, related_name="revisions")
 
     # revision_number is allowed to be null because it's automatically set on save
     revision_number = models.IntegerField('Revision number', help_text="Revision number of code resource",
                                           blank=True)
 
     revision_name = models.CharField(
-            max_length=128,
+            max_length=maxlengths.MAX_NAME_LENGTH,
             help_text="A name to differentiate revisions of a CodeResource",
             blank=True)
 
@@ -120,6 +113,7 @@ class CodeResourceRevision(models.Model):
     revision_desc = models.TextField(
             "Revision description",
             help_text="A description for this particular resource revision",
+            max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
             blank=True)
 
     content_file = models.FileField(
@@ -149,9 +143,9 @@ class CodeResourceRevision(models.Model):
     def __str__(self):
         """Represent a resource revision by its revision name"""
         if self.revision_name == "":
-            return u"[no revision name]"
+            return "[no revision name]"
         else:
-            return unicode(self.revision_name)
+            return self.revision_name
 
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
@@ -320,13 +314,10 @@ class CodeResourceDependency(models.Model):
     Related to :model:`method.CodeResourceRevision`
     """
 
-    coderesourcerevision = models.ForeignKey(
-        CodeResourceRevision,
-        related_name="dependencies");
+    coderesourcerevision = models.ForeignKey(CodeResourceRevision, related_name="dependencies")
 
     # Dependency is a codeResourceRevision
-    requirement = models.ForeignKey(CodeResourceRevision,
-                                    related_name="needed_by");
+    requirement = models.ForeignKey(CodeResourceRevision, related_name="needed_by")
 
     # Where to place it during runtime relative to the CodeResource
     # that relies on this CodeResourceDependency.
@@ -334,34 +325,21 @@ class CodeResourceDependency(models.Model):
         "Dependency path",
         max_length=255,
         help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
-        blank=True);
+        blank=True)
 
     depFileName = models.CharField(
         "Dependency file name",
         max_length=255,
         help_text="The file name the dependency is given on the sandbox at execution",
-        blank=True);
+        blank=True)
 
     def clean(self):
         """
         depPath cannot reference ".."
         """
-
         # Collapse down to a canonical path
         self.depPath = os.path.normpath(self.depPath)
-
-        # Catch ".." on it's own
-        if re.search("^\.\.$", self.depPath):
-            raise ValidationError("depPath cannot reference ../");
-
-        # Catch "../[whatever]"
-        if re.search("^\.\./", self.depPath):
-            raise ValidationError("depPath cannot reference ../");
-
-        # This next case actually should never happen since we've collapsed down
-        # to a canonical path.
-        # Catch any occurrence of "/../" within a larger path (Ex: blah/../bar)
-        if re.search("/\.\./", self.depPath):
+        if any(component == ".." for component in self.depPath.split(os.sep)):
             raise ValidationError("depPath cannot reference ../");
 
         # If the child CR is a meta-package (no filename), we cannot
@@ -369,15 +347,14 @@ class CodeResourceDependency(models.Model):
         if self.requirement.coderesource.filename == "" and self.depFileName != "":
             raise ValidationError("Metapackage dependencies cannot have a depFileName");
 
-
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        return u"{} {} requires {} {} as {}".format(
-                unicode(self.coderesourcerevision.coderesource),
-                unicode(self.coderesourcerevision),
-                unicode(self.requirement.coderesource),
-                unicode(self.requirement),
-                os.path.join(self.depPath, self.depFileName));
+        return "{} {} requires {} {} as {}".format(
+                self.coderesourcerevision.coderesource,
+                self.coderesourcerevision,
+                self.requirement.coderesource,
+                self.requirement,
+                os.path.join(self.depPath, self.depFileName))
 
 
 @python_2_unicode_compatible
@@ -404,12 +381,8 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision)
-    deterministic = models.BooleanField(default=True,
-        help_text="Is the output of this method deterministic?")
-
-    tainted = models.BooleanField(
-        default=False,
-        help_text="Is this Method broken?")
+    deterministic = models.BooleanField(default=True, help_text="Is the output of this method deterministic?")
+    tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
@@ -423,7 +396,7 @@ class Method(transformation.models.Transformation):
 
     def __str__(self):
         """Represent a method by it's revision name and method family"""
-        string_rep = u"Method {} {}".format("{}", self.revision_name)
+        string_rep = "Method {} {}".format("{}", self.revision_name)
 
         # MethodFamily may not be temporally saved in DB if created by admin
         if hasattr(self, "family"):
@@ -439,14 +412,6 @@ class Method(transformation.models.Transformation):
 
     def get_absolute_url(self):
         return "/methods/{}".format(self.id)
-
-    def get_num_inputs(self):
-        """Returns number of inputs."""
-        return len(self.inputs.all())
-
-    def get_num_outputs(self):
-        """Returns number of outputs."""
-        return len(self.outputs.all())
 
     @property
     def is_method(self):
@@ -471,7 +436,7 @@ class Method(transformation.models.Transformation):
     @property
     def family_size(self):
         """Returns size of this Method's family"""
-        return len(Method.objects.filter(family=self.family))
+        return self.family.members.count()
 
     def clean(self):
         """
@@ -489,7 +454,7 @@ class Method(transformation.models.Transformation):
         Copy inputs and outputs from parent revision.
         """
         # If no parent revision exists, there are no input/outputs to copy
-        if self.revision_parent == None:
+        if self.revision_parent is None:
             return None
 
         # If inputs/outputs already exist, do nothing.
@@ -715,10 +680,8 @@ class MethodFamily(transformation.models.TransformationFamily):
     #   members (Method/ForeignKey)
     @property
     def num_revisions(self):
-        """
-        Number of revisions within this TransformationFamily
-        """
-        return Method.objects.filter(family=self).count()
+        """Number of revisions within this family."""
+        return self.members.count()
 
     def __str__(self):
         return self.name

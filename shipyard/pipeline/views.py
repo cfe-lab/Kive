@@ -10,7 +10,6 @@ from metadata.models import *
 from pipeline.models import *
 from django.core.exceptions import ValidationError
 import json
-import operator
 
 logger = logging.getLogger(__name__)
 

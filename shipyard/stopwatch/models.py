@@ -4,6 +4,8 @@ stopwatch.models
 Shipyard abstract class defining anything that has a start- and end-time.
 All such classes should extend Stopwatch.
 """
+from __future__ import unicode_literals
+
 from django.db import models, transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -11,16 +13,10 @@ from django.core.exceptions import ValidationError
 # Create your models here.
 class Stopwatch(models.Model):
     # If the start_time is unset, we haven't started the clock yet.
-    start_time = models.DateTimeField("start time",
-                                      null=True,
-                                      blank=True,
-                                      help_text="Starting time")
+    start_time = models.DateTimeField("start time", null=True, blank=True, help_text="Starting time")
 
     # If the end_time is unset, we're in the middle of execution.
-    end_time = models.DateTimeField("end time",
-                                    null=True,
-                                    blank=True,
-                                    help_text="Ending time")
+    end_time = models.DateTimeField("end time", null=True, blank=True, help_text="Ending time")
 
     class Meta:
         abstract = True
