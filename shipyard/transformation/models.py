@@ -12,6 +12,8 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 
+from constants import maxlengths
+
 @python_2_unicode_compatible
 class TransformationFamily(models.Model):
     """
@@ -23,13 +25,14 @@ class TransformationFamily(models.Model):
     """
     name = models.CharField(
         "Transformation family name",
-        max_length=128,
+        max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="The name given to a group of methods/pipelines",
         unique=True)
 
     description = models.TextField(
         "Transformation family description",
         help_text="A description for this collection of methods/pipelines",
+        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
         blank=True)
 
     def __str__(self):
@@ -51,7 +54,7 @@ class Transformation(models.Model):
     Related to :model:`transformation.TransformationInput`
     Related to :model:`transformation.TransformationOutput`
     """
-    revision_name = models.CharField("Transformation revision name", max_length=128,
+    revision_name = models.CharField("Transformation revision name", max_length=maxlengths.MAX_NAME_LENGTH,
                                      help_text="The name of this transformation revision",
                                      blank=True)
 
@@ -60,6 +63,7 @@ class Transformation(models.Model):
     revision_desc = models.TextField(
         "Transformation revision description",
         help_text="Description of this transformation revision",
+        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
         blank=True)
 
     # revision_number = models.IntegerField('Transformation revision number',
@@ -346,7 +350,7 @@ class TransformationInput(TransformationXput):
     # The name of the input "hole".
     dataset_name = models.CharField(
         "input name",
-        max_length=128,
+        max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Name for input as an alternative to index")
 
     # Input index on the transformation.
@@ -371,7 +375,7 @@ class TransformationOutput(TransformationXput):
 
     dataset_name = models.CharField(
         "output name",
-        max_length=128,
+        max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Name for output as an alternative to index")
 
     dataset_idx = models.PositiveIntegerField(

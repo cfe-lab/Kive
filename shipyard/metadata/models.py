@@ -22,7 +22,7 @@ import tempfile
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import datatypes, CDTs
+from constants import datatypes, CDTs, maxlengths
 from datachecking.models import VerificationLog
 
 import logging
@@ -30,26 +30,23 @@ import logging
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
 
-def get_builtin_types(DTs):
+def get_builtin_types(datatypes):
     """
-    Retrieves the built-in types of all DTs passed as input.
+    Retrieves the built-in types of all datatypess passed as input.
 
     Returns a set (to remove duplicates) with all of the built-in
     types represented in the inputs.
 
     INPUTS
-    DTs                 iterable of Datatypes
+    datatypes           iterable of Datatypes
 
     OUTPUT
-    builtins            set of built-in Datatypes represented by DTs
+    builtins            set of built-in Datatypes represented by datatypes
 
     ASSUMPTIONS
-    All Datatypes in DTs are clean and complete.
+    All Datatypes in datatypes are clean and complete.
     """
-    all_builtin_types = []
-    for curr_DT in DTs:
-        all_builtin_types.append(curr_DT.get_builtin_type())
-    return set(all_builtin_types)
+    return set([datatype.get_builtin_type() for datatype in datatypes])
 
 
 def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
@@ -236,8 +233,10 @@ class Datatype(models.Model):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`metadata.models.CompoundDatatype`
     """
-    name = models.CharField("Datatype name", max_length=64, help_text="The name for this Datatype", unique=True)
-    description = models.TextField("Datatype description", help_text="A description for this Datatype")
+    name = models.CharField("Datatype name", max_length=maxlengths.MAX_NAME_LENGTH, 
+            help_text="The name for this Datatype", unique=True)
+    description = models.TextField("Datatype description", help_text="A description for this Datatype",
+            max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
     # auto_now_add: set to now on instantiation (editable=False)
     date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date Datatype was defined")
@@ -1099,7 +1098,7 @@ class CompoundDatatypeMember(models.Model):
 
     datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is")
 
-    column_name = models.CharField("Column name", blank=False, max_length=128,
+    column_name = models.CharField("Column name", blank=False, max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Gives datatype a 'column name' as an alternative to column index")
 
     # MinValueValidator(1) constrains column_idx to be >= 1

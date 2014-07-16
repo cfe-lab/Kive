@@ -15,6 +15,8 @@ from django.core.files import File
 from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
 
+import sys
+import csv
 import re
 import logging
 import tempfile
@@ -26,8 +28,6 @@ import pipeline.models
 import transformation.models
 import datachecking.models
 import file_access_utils
-import sys
-import csv
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class SymbolicDataset(models.Model):
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
-    MD5_checksum = models.CharField( max_length=64,
+    MD5_checksum = models.CharField(max_length=64,
         validators=[RegexValidator(
             regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
             message="MD5 checksum is not either 32 hex characters or blank")],
@@ -530,13 +530,8 @@ class DatasetStructure(models.Model):
     # this came from (both for its Run and its RunStep) but this is
     # now done more cleanly using ExecRecord.
 
-    symbolicdataset = models.OneToOneField(
-            SymbolicDataset,
-            related_name="structure")
-
-    compounddatatype = models.ForeignKey(
-            "metadata.CompoundDatatype",
-            related_name="conforming_datasets")
+    symbolicdataset = models.OneToOneField(SymbolicDataset, related_name="structure")
+    compounddatatype = models.ForeignKey("metadata.CompoundDatatype", related_name="conforming_datasets")
 
     # A value of -1 means the file is missing or num rows has never been counted
     num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
