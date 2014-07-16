@@ -1,0 +1,39 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Analysis{% endblock %}
+
+{% block content %}
+
+<a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
+
+<h2>Analysis</h2>
+
+<p>
+View pipeline results
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Output</th>
+            <th>Size</th>
+            <th>Date created</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for outcable in run.outcables_in_order %}
+        <tr>
+            <td>{{ outcable.execrecord.execrecordouts.first.generic_output }}</td>
+            <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.dataset_file.size|filesizeformat }}</td>
+            <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.date_created }}</td>
+            <td>
+                <a href="dataset_download/{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.pk }}">
+                    Download
+                </a>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+
+{% endblock %}
