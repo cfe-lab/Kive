@@ -4,6 +4,7 @@ transformation.models
 Shipyard data models relating to the (abstract) definition of
 Transformation.
 """
+from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -11,6 +12,7 @@ from django.core.validators import MinValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 
+@python_2_unicode_compatible
 class TransformationFamily(models.Model):
     """
     TransformationFamily is abstract and describes common
@@ -30,7 +32,7 @@ class TransformationFamily(models.Model):
         help_text="A description for this collection of methods/pipelines",
         blank=True)
 
-    def __unicode__(self):
+    def __str__(self):
         """ Describe transformation family by it's name """
         return self.name
 
@@ -251,7 +253,7 @@ class TransformationXput(models.Model):
             return ValidationError("TransformationXput with pk={} is neither an input nor an output".format(self.pk))
 
     def __str__(self):
-        return u"{}: {}".format(self.definite.dataset_idx, self.definite.dataset_name)
+        return "{}: {}".format(self.definite.dataset_idx, self.definite.dataset_name)
 
     @property
     def compounddatatype(self):

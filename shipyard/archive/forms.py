@@ -27,7 +27,7 @@ class DatasetForm (forms.Form):
     compound_datatypes = CompoundDatatype.objects.all()
     compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
     for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
+        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_dataset(self):
@@ -64,7 +64,7 @@ class BulkDatasetForm (forms.Form):
     compound_datatypes = CompoundDatatype.objects.all()
     compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
     for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
+        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_datasets(self):

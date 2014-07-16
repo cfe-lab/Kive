@@ -4,11 +4,13 @@ archive.models
 Shipyard data models relating to archiving information: Run, RunStep,
 Dataset, etc.
 """
+from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
+from django.utils.encoding import python_2_unicode_compatible
 
 import logging
 import itertools
@@ -19,6 +21,7 @@ import file_access_utils
 import stopwatch.models
 
 
+@python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch):
     """
     Stores data associated with an execution of a pipeline.
@@ -144,11 +147,11 @@ class Run(stopwatch.models.Stopwatch):
         if not self.is_complete():
             raise ValidationError('Run "{}" is not complete'.format(self))
 
-    def __unicode__(self):
+    def __str__(self):
         if self.is_subrun():
-            unicode_rep = u"Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
+            unicode_rep = "Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
         else:
-            unicode_rep = u"Run with pipeline [{}]".format(self.pipeline)
+            unicode_rep = "Run with pipeline [{}]".format(self.pipeline)
         return unicode_rep
 
     def is_subrun(self):
@@ -547,6 +550,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         return True
 
 
+@python_2_unicode_compatible
 class RunStep(RunComponent):
     """
     Annotates the execution of a pipeline step within a run.
@@ -566,9 +570,8 @@ class RunStep(RunComponent):
         # a given PipelineStep within a Run.
         unique_together = ("run", "pipelinestep")
 
-    def __unicode__(self):
-        unicode_rep = u"Runstep with PS [{}]".format(self.pipelinestep)
-        return unicode_rep
+    def __str__(self):
+        return "Runstep with PS [{}]".format(self.pipelinestep)
 
     @property
     def component(self):
@@ -1569,6 +1572,7 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
+@python_2_unicode_compatible
 class Dataset(models.Model):
     """
     Data files uploaded by users or created by transformations.
@@ -1590,11 +1594,6 @@ class Dataset(models.Model):
     UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
     MAX_NAME_LEN = 128
     MAX_FILE_LEN = 4096
-
-
-    #####################
-    # Fields
-    ###
 
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
 
@@ -1620,12 +1619,7 @@ class Dataset(models.Model):
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
-
-    ##################
-    # Methods
-    ###
-
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation of this Dataset.
 

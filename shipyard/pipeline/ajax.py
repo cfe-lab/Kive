@@ -53,7 +53,7 @@ def get_method_io (request):
             else:
                 structure = input.structure
                 cdt_pk = structure.compounddatatype.pk
-                cdt_label = structure.compounddatatype.__unicode__()
+                cdt_label = str(structure.compounddatatype)
             inputs.update({input.dataset_idx: {'datasetname': input.dataset_name,
                                                'cdt_pk': cdt_pk,
                                                'cdt_label': cdt_label}})
@@ -66,7 +66,7 @@ def get_method_io (request):
             else:
                 structure = output.structure
                 cdt_pk = structure.compounddatatype.pk
-                cdt_label = structure.compounddatatype.__unicode__()
+                cdt_label = str(structure.compounddatatype)
             outputs.update({output.dataset_idx: {'datasetname': output.dataset_name,
                                                  'cdt_pk': cdt_pk,
                                                  'cdt_label': cdt_label}})

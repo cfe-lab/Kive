@@ -149,9 +149,9 @@ class CodeResourceRevision(models.Model):
     def __str__(self):
         """Represent a resource revision by its revision name"""
         if self.revision_name == "":
-            return u"[no revision name]"
+            return "[no revision name]"
         else:
-            return unicode(self.revision_name)
+            return self.revision_name
 
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
@@ -372,7 +372,7 @@ class CodeResourceDependency(models.Model):
 
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        return u"{} {} requires {} {} as {}".format(
+        return "{} {} requires {} {} as {}".format(
                 unicode(self.coderesourcerevision.coderesource),
                 unicode(self.coderesourcerevision),
                 unicode(self.requirement.coderesource),
@@ -421,7 +421,7 @@ class Method(transformation.models.Transformation):
 
     def __str__(self):
         """Represent a method by it's revision name and method family"""
-        string_rep = u"Method {} {}".format("{}", self.revision_name)
+        string_rep = "Method {} {}".format("{}", self.revision_name)
 
         # MethodFamily may not be temporally saved in DB if created by admin
         if hasattr(self, "family"):

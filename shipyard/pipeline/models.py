@@ -4,6 +4,7 @@ pipeline.models
 Shipyard data models relating to the (abstract) definition of
 Pipeline.
 """
+from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -118,7 +119,7 @@ class Pipeline(transformation.models.Transformation):
     @property
     def family_size(self):
         """Returns size of this Pipeline's family"""
-        return Pipeline.objects.filter(family=self.family).count()
+        return self.family.members.count()
 
     def clean(self):
         """
@@ -1389,6 +1390,7 @@ class CustomCableWire(models.Model):
         }
 
 
+@python_2_unicode_compatible
 class PipelineOutputCable(PipelineCable):
     """
     Defines which outputs of internal PipelineSteps are mapped to
@@ -1434,7 +1436,7 @@ class PipelineOutputCable(PipelineCable):
         self.logger = logging.getLogger(self.__class__.__name__)
         super(self.__class__, self).__init__(*args, **kwargs)
 
-    def __unicode__(self):
+    def __str__(self):
         """ Represent with the pipeline name, and TO output index + name """
 
         pipeline_name = "[no pipeline set]"

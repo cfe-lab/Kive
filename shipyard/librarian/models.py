@@ -4,6 +4,7 @@ librarian.models
 Shipyard data models pertaining to the lookup of the past: ExecRecord,
 SymbolicDataset, etc.
 """
+from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.contrib.contenttypes.models import ContentType
@@ -12,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
 
 import re
 import logging
@@ -30,6 +32,7 @@ import csv
 LOGGER = logging.getLogger(__name__)
 
 
+@python_2_unicode_compatible
 class SymbolicDataset(models.Model):
     """
     Symbolic representation of a (possibly temporary) data file.
@@ -59,7 +62,7 @@ class SymbolicDataset(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation of a SymbolicDataset.
 
@@ -539,6 +542,7 @@ class DatasetStructure(models.Model):
     num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
 
 
+@python_2_unicode_compatible
 class ExecRecord(models.Model):
     """
     Record of a previous execution of a Method/PSIC/POC
@@ -549,23 +553,21 @@ class ExecRecord(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """Unicode representation of this ExecRecord."""
         inputs_list = [unicode(eri) for eri in self.execrecordins.all()]
         outputs_list = [unicode(ero) for ero in self.execrecordouts.all()]
 
-        string_rep = u""
         if type(self.general_transf()) == method.models.Method:
-            string_rep = u"{}({}) = ({})".format(
+            return "{}({}) = ({})".format(
                     self.general_transf(),
-                    u", ".join(inputs_list),
-                    u", ".join(outputs_list))
+                    ", ".join(inputs_list),
+                    ", ".join(outputs_list))
         else:
             # Return a representation for a cable.
-            string_rep = (u"{}".format(u", ".join(inputs_list)) +
-                          " ={" + u"{}".format(self.general_transf()) + "}=> " +
-                          u"{}".format(u", ".join(outputs_list)))
-        return string_rep
+            return ("{}".format(", ".join(inputs_list)) +
+                          " ={" + "{}".format(self.general_transf()) + "}=> " +
+                          "{}".format(", ".join(outputs_list)))
 
     @property
     def execrecordins_in_order(self):
@@ -753,6 +755,7 @@ class ExecRecord(models.Model):
         return any(not runstep.successful_execution() for runstep in runsteps_using_this)
 
 
+@python_2_unicode_compatible
 class ExecRecordIn(models.Model):
     """
     Denotes a symbolic input fed to the Method/POC/PSIC in the parent ExecRecord.
@@ -770,7 +773,7 @@ class ExecRecordIn(models.Model):
     class Meta:
         unique_together = ("execrecord", "generic_input");
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation.
         
@@ -785,16 +788,13 @@ class ExecRecordIn(models.Model):
 
         PRE: the parent ER must exist and be clean.
         """
-        dest_name = "";
-
         if (type(self.execrecord.general_transf()) in
                 (pipeline.models.PipelineOutputCable,
                  pipeline.models.PipelineStepInputCable)):
-            return unicode(self.symbolicdataset)
+            return str(self.symbolicdataset)
         else:
             dest_name = self.generic_input.definite.dataset_name
-
-        return "{}=>{}".format(self.symbolicdataset, dest_name)
+            return "{}=>{}".format(self.symbolicdataset, dest_name)
 
     def clean(self):
         """
@@ -888,6 +888,7 @@ class ExecRecordIn(models.Model):
         return self.symbolicdataset.is_OK()
 
 
+@python_2_unicode_compatible
 class ExecRecordOut(models.Model):
     """
     Denotes a symbolic output from the Method/PSIC/POC in the parent ExecRecord.
@@ -915,7 +916,7 @@ class ExecRecordOut(models.Model):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Unicode representation of this ExecRecordOut.
 
@@ -929,13 +930,13 @@ class ExecRecordOut(models.Model):
         S458
         output_one=>S458
         """
-        unicode_rep = u""
+        unicode_rep = ""
         if (type(self.execrecord.general_transf()) in
                 (pipeline.models.PipelineOutputCable,
                  pipeline.models.PipelineStepInputCable)):
             unicode_rep = unicode(self.symbolicdataset)
         else:
-            unicode_rep = u"{}=>{}".format(self.generic_output.definite.dataset_name,
+            unicode_rep = "{}=>{}".format(self.generic_output.definite.dataset_name,
                                            self.symbolicdataset)
         return unicode_rep
 

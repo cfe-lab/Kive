@@ -4,6 +4,8 @@ stopwatch.models
 Shipyard abstract class defining anything that has a start- and end-time.
 All such classes should extend Stopwatch.
 """
+from __future__ import unicode_literals
+
 from django.db import models, transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError

@@ -151,12 +151,12 @@ class XputStructureForm (forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(XputStructureForm, self).__init__(*args, **kwargs)
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + \
-                                                  [(x.id, x.__unicode__()) for x in CompoundDatatype.objects.all()]
+                                                  [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
         self.fields['min_row'].widget.attrs['class'] = 'shortIntField'
         self.fields['max_row'].widget.attrs['class'] = 'shortIntField'
 
     choices = [('', '--------'), ('__raw__', 'Unstructured')]
-    choices.extend([(x.id, x.__unicode__()) for x in CompoundDatatype.objects.all()])
+    choices.extend([(x.id, str(x)) for x in CompoundDatatype.objects.all()])
 
     compounddatatype = forms.ChoiceField(choices=choices)
     class Meta:
