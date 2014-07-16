@@ -12,14 +12,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $("#addForm").click(function() {  // query button by id selector
         // copies the existing row rather than writing new HTML
         // also changes ID/name fields in a dynamic, flexible way.
-        var $forms = $('#cdmForms'),
-            newrow = $('tr:last', $forms).clone(),
-            index_cell = $('td', newrow).eq(0);
+        var cdmForms = $('#cdmForms'),
+            new_row = $('tr:last', cdmForms).clone();
         
-        index_cell.html(parseInt(index_cell.html()) + 1);
+        $('td', new_row)[0].innerHTML++;
         
-        $('input, select', newrow).each(function() {
-            var this_n = parseInt(this.id.match(/[0-9]+$/)[0]) + 1,
+        $('input, select', new_row).each(function() {
+            var this_n = parseInt( this.id.match(/[0-9]+$/)[0] ) + 1,
                 stub_regexp = /^(.+_)[0-9]+$/;
             
             $(this).attr({
@@ -28,7 +27,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             });
         });
         
-        $forms.append(newrow);
+        cdmForms.append(new_row);
         nForms++;
     });
     

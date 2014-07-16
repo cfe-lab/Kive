@@ -1,0 +1,50 @@
+[
+    {
+        "pID": 1,
+        "Title": "Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America",
+        "Journal": "Am J Epidemiol",
+        "PMID": 21813792
+    },
+    {
+        "pID": 2,
+        "Title": "IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility",
+        "Journal": "Substance Use &amp; Misuse",
+        "PMID": 20874006
+    },
+    {
+        "pID": 3,
+        "Title": "Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries",
+        "Journal": "Public Health Nutr",
+        "PMID": 21806867
+    },
+    {
+        "pID": 5,
+        "Title": "Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020",
+        "Journal": "AIDS Res Ther",
+        "PMID": 21385370
+    },
+    {
+        "pID": 6,
+        "Title": "High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting",
+        "Journal": "AIDS Care",
+        "PMID": 21259135
+    },
+    {
+        "pID": 7,
+        "Title": "Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment",
+        "Journal": "Clin Epidemiol",
+        "PMID": 21326656
+    },
+    {
+        "pID": 8,
+        "Title": "Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda",
+        "Journal": "AIDS",
+        "PMID": 21160412
+    },
+    {
+        "pID": 9,
+        "Title": "Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort",
+        "Journal": "HIV Medicine",
+        "PMID": 21059167
+    }
+]

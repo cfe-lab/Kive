@@ -94,7 +94,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                                 $('#int_constraints').hide(300);
                                 $('#str_constraints').show(300);
                                 
-                                $('#id_minlen, #id_maxlen').prop('disabled', python_type == 'boolean');
+                                $('#id_minlen, #id_maxlen').prop('disabled', 'boolean' == python_type);// disabled if python type == 'boolean', otherwise enabled
                             }
                             
                             $('#id_to_hide').select(python_type);
