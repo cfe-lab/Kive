@@ -21,9 +21,9 @@ def choose_pipeline(request):
 
 def choose_inputs(request):
     """Load the input selection page."""
-    if request.method == "POST":
+    if request.method == "GET":
         template = loader.get_template("sandbox/choose_inputs.html")
-        pipeline_pk = request.POST.get("pipeline")
+        pipeline_pk = int(request.GET.get("pipeline"))
 
         response_data = []
         my_pipeline = pipeline.models.Pipeline.objects.get(pk=pipeline_pk)

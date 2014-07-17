@@ -47,7 +47,7 @@ Select a pipeline
     <tbody>
         {% for form in pipeline_forms %}
         <tr>
-            <form action="choose_inputs" method="post">
+            <form action="choose_inputs" method="get">
             {% csrf_token %}
             <td>{{ form.family_name }}</td>
             <td>{{ form.pipeline }}</td>
