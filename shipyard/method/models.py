@@ -32,14 +32,14 @@ class CodeResource(models.Model):
     A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
     """
-    name = models.CharField( "Resource name", max_length=maxlengths.MAX_NAME_LENGTH,
+    name = models.CharField("Resource name", max_length=maxlengths.MAX_NAME_LENGTH,
                              help_text="The name for this resource and all subsequent revisions.",
                              unique=True)  # to prevent confusion in drop-down menus
 
     # File names must either be empty, or be 1 or more of any from
-    # {alphanumeric, space, "-._()"}. This will prevent "../" as it 
+    # {alphanumeric, space, "-._()"}. This will prevent "../" as it
     # contains a slash. They can't start or end with spaces.
-    filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH, 
+    filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH,
                                 help_text="The filename for this resource",
                                 blank=True, validators=[
                                     RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
@@ -104,18 +104,12 @@ class CodeResourceRevision(models.Model):
             auto_now_add=True,
             help_text="Date this resource revision was uploaded")
 
-    revision_parent = models.ForeignKey(
-            'self',
-            related_name="descendants",
-            null=True,
-            blank=True);
-
+    revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True)
     revision_desc = models.TextField(
             "Revision description",
             help_text="A description for this particular resource revision",
             max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
             blank=True)
-
     content_file = models.FileField(
             "File contents",
             upload_to="CodeResources",
@@ -178,7 +172,7 @@ class CodeResourceRevision(models.Model):
 
             # Get all file paths of the CR of the child dependency
             # relative to itself
-            dep_fn = dep.depFileName;
+            dep_fn = dep.depFileName
             # If depFileName is blank, check and see if the
             # corresponding CodeResource had a filename (i.e. if this
             # is a non-metapackage CRR and so there is an associated
@@ -212,7 +206,7 @@ class CodeResourceRevision(models.Model):
             return True
         
         # Recursive case: go to all dependencies and check them.
-        check_dep = False;
+        check_dep = False
         for dep in self.dependencies.all():
             if dep.requirement.has_circular_dependence_h(dependants + [self]):
                 check_dep = True
@@ -241,7 +235,7 @@ class CodeResourceRevision(models.Model):
 
         # Check for a circular dependency.
         if self.has_circular_dependence():
-            raise ValidationError("Self-referential dependency") 
+            raise ValidationError("Self-referential dependency")
 
         # Check if dependencies conflict with each other
         listOfDependencyPaths = self.list_all_filepaths()
@@ -293,9 +287,9 @@ class CodeResourceRevision(models.Model):
             
             # Get the base name of this dependency.  If no special value
             # is specified in dep, then use the dependency's CRR name.
-            dep_fn = dep.depFileName;
+            dep_fn = dep.depFileName
             if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename;
+                dep_fn = dep.requirement.coderesource.filename
             
             dep.requirement.install_h(path_for_deps, dep_fn)
 
@@ -340,12 +334,12 @@ class CodeResourceDependency(models.Model):
         # Collapse down to a canonical path
         self.depPath = os.path.normpath(self.depPath)
         if any(component == ".." for component in self.depPath.split(os.sep)):
-            raise ValidationError("depPath cannot reference ../");
+            raise ValidationError("depPath cannot reference ../")
 
         # If the child CR is a meta-package (no filename), we cannot
         # have a depFileName as this makes no sense
         if self.requirement.coderesource.filename == "" and self.depFileName != "":
-            raise ValidationError("Metapackage dependencies cannot have a depFileName");
+            raise ValidationError("Metapackage dependencies cannot have a depFileName")
 
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
@@ -629,7 +623,7 @@ class Method(transformation.models.Transformation):
 
         3) We don't handle exceptions of Popen here, the caller must do that.
         """
-        if (len(input_paths) != self.inputs.count() or  len(output_paths) != self.outputs.count()):
+        if len(input_paths) != self.inputs.count() or len(output_paths) != self.outputs.count():
             raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
                              .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
                                      len(output_paths)))

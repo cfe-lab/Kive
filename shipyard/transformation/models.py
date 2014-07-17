@@ -342,9 +342,6 @@ class TransformationInput(TransformationXput):
     """
     Inherits from :model:`transformation.TransformationXput`
     """
-    # # Specify an explicit parent link field so that we can go from here back up to
-    # # the TransformationXput (e.g. so we can get at its structure).
-    # transformationxput = models.OneToOneField(TransformationXput, parent_link=True)
     transformation = models.ForeignKey(Transformation, related_name="inputs")
 
     # The name of the input "hole".

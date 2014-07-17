@@ -63,4 +63,5 @@ urlpatterns = patterns('',
     url(r'^view_results$', 'sandbox.views.view_results', name='view_results'),
     url(r'^run_pipeline$', 'sandbox.ajax.run_pipeline', name='run_pipeline'),
     url(r'^poll_run_progress$', 'sandbox.ajax.poll_run_progress', name='poll_run_progress'),
+    url(r'^filter_datasets$', 'sandbox.ajax.filter_datasets', name='filter_datasets'),
 )

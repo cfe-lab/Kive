@@ -41,6 +41,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     noXSS();
     
     // Run a pipeline when "submit" is pressed.
+    /*
     $("#submit").on("click", function () {
         $(this).prop('disabled', 1);
         $.ajax({
@@ -56,6 +57,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         });
         return false;
     });
+    */
 
     /*
      TABLE FILTER
@@ -139,7 +141,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             noResults.hide();
             activeFilters.html('');
             
-            $.get("/static/sandbox/search_results_static.json", filters, function (data) {
+            request_data = {"filter_data": JSON.stringify(filters), 
+                            "compound_datatype": tab.data("compoundatatype")};
+            $.getJSON("filter_datasets", request_data, function (data) {
                 var tbody = tab.find('tbody'),
                     new_tbody = [];
                 

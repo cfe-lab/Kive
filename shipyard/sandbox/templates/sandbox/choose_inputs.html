@@ -3,11 +3,11 @@
 {% block title %}Analysis{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/sandbox/sandbox.js"></script>
-    <script src="/static/sandbox/jq_color_anim.min.js"></script>
-    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
+	<script src="/static/portal/jquery-2.0.3.min.js"></script>
+	<script src="/static/portal/noxss.js"></script>
+	<script src="/static/sandbox/sandbox.js"></script>
+	<script src="/static/sandbox/jq_color_anim.min.js"></script>
+	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
 {% block content %}
@@ -20,277 +20,48 @@
 Choose pipeline inputs
 </p>
 
-<form id="inputs_form" action="run_pipeline" method="post">
-    <input type="hidden" name="pipeline" value="{{ input_form.pipeline }}" />
-    {{ input_form }}
-    {% csrf_token %}
-    <input type="submit" id="submit" value="Engage">
-</form>
-
-<hr><hr>
-
 <ul id="input_forms">
 <li>
-<h3>Input 1: <code>fasta_raw</code></h3>
-<div class="filter_ctrl">
-<form>
-<label>Title</label>
-<input type="text" data-link="Title">
-<label>Journal</label>
-<input type="text" data-link="Journal">
-<input type="submit" value="Filter">
-</form>
-</div>
-<div class="active_filters">
-</div>
-<div class="no_results">
-<strong>No results were found.</strong>
-</div>
-<div class="results" data-pkey="pID" data-displaycols="2,4" data-truncatecols="2">
-<table>
-<thead>
-<tr>
-<th>pID</th>
-<th>Title</th>
-<th>Journal</th>
-<th>PMID</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America</td>
-<td>Am J Epidemiol</td>
-<td>21813792</td>
-</tr>
-            
-<tr>
-<td>2</td>
-<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td>
-<td>Substance Use &amp; Misuse</td>
-<td>20874006</td>
-</tr>
-            
-<tr>
-<td>3</td>
-<td>Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries</td>
-<td>Public Health Nutr</td>
-<td>21806867</td>
-</tr>
-            
-<tr>
-<td>5</td>
-<td>Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020</td>
-<td>AIDS Res Ther</td>
-<td>21385370</td>
-</tr>
-            
-<tr>
-<td>6</td>
-<td>High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting</td>
-<td>AIDS Care</td>
-<td>21259135</td>
-</tr>
+{% for input, datasets in input_data %}
+	<li>
+		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
+	<div class="filter_ctrl">
+		<form>
+		<label>Name</label>
+		<input type="text" data-link="Name">
+		<input type="submit" value="Filter">
+		</form>
+	</div>
 
-<tr>
-<td>7</td>
-<td>Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment</td>
-<td>Clin Epidemiol</td>
-<td>21326656</td>
-</tr>
+	<div class="active_filters">
+	</div>
 
-<tr>
-<td>8</td>
-<td>Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda</td>
-<td>AIDS</td>
-<td>21160412</td>
-</tr>
-            
-<tr>
-<td>9</td>
-<td>Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort</td>
-<td>HIV Medicine</td>
-<td>21059167</td>
-</tr>
+	<div class="no_results">
+		<strong>No results were found.</strong>
+	</div>
 
-</tbody>
-</table>
-</div>
-</li>
-<li>
-<h3>Input 2: <code>some_var</code></h3>
-<div class="filter_ctrl">
-<form>
-<label>Title</label>
-<input type="text" data-link="Title">
-<label>Journal</label>
-<input type="text" data-link="Journal">
-<input type="submit" value="Filter">
-</form>
-</div>
-<div class="active_filters">
-</div>
-<div class="no_results">
-<strong>No results were found.</strong>
-</div>
-<div class="results" data-pkey="pID" data-displaycols="2,4" data-truncatecols="2">
-<table>
-<thead>
-<tr>
-<th>pID</th>
-<th>Title</th>
-<th>Journal</th>
-<th>PMID</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America</td>
-<td>Am J Epidemiol</td>
-<td>21813792</td>
-</tr>
-            
-<tr>
-<td>2</td>
-<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td>
-<td>Substance Use &amp; Misuse</td>
-<td>20874006</td>
-</tr>
-            
-<tr>
-<td>3</td>
-<td>Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries</td>
-<td>Public Health Nutr</td>
-<td>21806867</td>
-</tr>
-            
-<tr>
-<td>5</td>
-<td>Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020</td>
-<td>AIDS Res Ther</td>
-<td>21385370</td>
-</tr>
-            
-<tr>
-<td>6</td>
-<td>High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting</td>
-<td>AIDS Care</td>
-<td>21259135</td>
-</tr>
-
-<tr>
-<td>7</td>
-<td>Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment</td>
-<td>Clin Epidemiol</td>
-<td>21326656</td>
-</tr>
-
-<tr>
-<td>8</td>
-<td>Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda</td>
-<td>AIDS</td>
-<td>21160412</td>
-</tr>
-            
-<tr>
-<td>9</td>
-<td>Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort</td>
-<td>HIV Medicine</td>
-<td>21059167</td>
-</tr>
-
-</tbody>
-</table>
-</div>
-</li>
-<li>
-<h3>Input 3: <code>foo_bar</code></h3>
-<div class="filter_ctrl">
-<form>
-<label>Title</label>
-<input type="text" data-link="Title">
-<label>Journal</label>
-<input type="text" data-link="Journal">
-<input type="submit" value="Filter">
-</form>
-</div>
-<div class="active_filters">
-</div>
-<div class="no_results">
-<strong>No results were found.</strong>
-</div>
-<div class="results" data-pkey="pID" data-displaycols="2,4" data-truncatecols="2">
-<table>
-<thead>
-<tr>
-<th>pID</th>
-<th>Title</th>
-<th>Journal</th>
-<th>PMID</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>Missing Data on the Estimation of the Prevalence of Accumulated Human Immunodeficiency Virus Drug Resistance in Patients Treated With Antiretroviral Drugs in North America</td>
-<td>Am J Epidemiol</td>
-<td>21813792</td>
-</tr>
-            
-<tr>
-<td>2</td>
-<td>IDU perspectives on the design and operation of North America&apos;s first medically supervised injection facility</td>
-<td>Substance Use &amp; Misuse</td>
-<td>20874006</td>
-</tr>
-            
-<tr>
-<td>3</td>
-<td>Availability of nutritional support services in HIV care and treatment sites in sub-Saharan African countries</td>
-<td>Public Health Nutr</td>
-<td>21806867</td>
-</tr>
-            
-<tr>
-<td>5</td>
-<td>Estimating the impact of expanded access to antiretroviral therapy on maternal, paternal and double orphans in sub-Saharan Africa, 2009-2020</td>
-<td>AIDS Res Ther</td>
-<td>21385370</td>
-</tr>
-            
-<tr>
-<td>6</td>
-<td>High prevalence of food insecurity among HIV-infected individuals receiving HAART in a resource-rich setting</td>
-<td>AIDS Care</td>
-<td>21259135</td>
-</tr>
-
-<tr>
-<td>7</td>
-<td>Tuberculosis mortality in HIV-infected individuals: a cross-national systematic assessment</td>
-<td>Clin Epidemiol</td>
-<td>21326656</td>
-</tr>
-
-<tr>
-<td>8</td>
-<td>Association of aging and survival in a large HIV-infected cohort on antiretroviral therapy in Uganda</td>
-<td>AIDS</td>
-<td>21160412</td>
-</tr>
-            
-<tr>
-<td>9</td>
-<td>Factors associated with virological suppression among HIV-positive individuals on highly active antiretroviral therapy in a multi-site Canadian cohort</td>
-<td>HIV Medicine</td>
-<td>21059167</td>
-</tr>
-
-</tbody>
-</table>
-</div>
-</li>
+	<div class="results" data-pkey="pk" data-displaycols="2,3" data-truncatecols="2">
+		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
+		<thead>
+			<tr>
+				<th>pk</th>
+				<th>Name</th>
+				<th>Date</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for dataset in datasets %}
+			<tr>
+				<td>{{ dataset.pk }}</td>
+				<td>{{ dataset.name }}</td>
+				<td>{{ dataset.date_created }}</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+		</table>
+	</div>
+	</li>
+{% endfor %}
 </ul>
 
 {% endblock %}

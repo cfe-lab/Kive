@@ -23,9 +23,22 @@ def choose_inputs(request):
     """Load the input selection page."""
     if request.method == "POST":
         template = loader.get_template("sandbox/choose_inputs.html")
-        pipeline = request.POST.get("pipeline")
-        form = InputSelectionForm(pipeline=pipeline)
-        context = Context({"input_form": form})
+        pipeline_pk = request.POST.get("pipeline")
+
+        response_data = []
+        my_pipeline = pipeline.models.Pipeline.objects.get(pk=pipeline_pk)
+
+        # Find all compatible datasets for each input.
+        for my_input in my_pipeline.inputs.order_by("dataset_idx"):
+            if my_input.is_raw():
+                query = archive.models.Dataset.objects.filter(symbolicdataset__structure__isnull=True)
+            else:
+                compound_datatype = my_input.get_cdt()
+                query = archive.models.Dataset.objects.filter(symbolicdataset__structure__isnull=True)
+            query = query.order_by("created_by", "date_created")[:5]
+            response_data.append((my_input, query))
+
+        context = Context({"input_data": response_data})
         context.update(csrf(request))
         return HttpResponse(template.render(context))
     else:

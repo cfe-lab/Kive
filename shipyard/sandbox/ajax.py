@@ -1,6 +1,7 @@
 from multiprocessing import Process
 import time
 import json
+import re
 
 from django.http import HttpResponse
 from django.core import serializers
@@ -8,8 +9,10 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 
 from pipeline.models import Pipeline, PipelineFamily
-from archive.models import Dataset, Run, RunOutputCable, RunSIC
+from archive.models import Dataset, Run
 from librarian.models import SymbolicDataset
+from transformation.models import TransformationInput
+from metadata.models import CompoundDatatype
 from execute import Sandbox
 
 def run_pipeline(request):
@@ -35,7 +38,32 @@ def run_pipeline(request):
     else:
         return HttpResponse(status=405) # Method not allowed.
 
-# TODO: should this go in Run (ie. run.get_progress())?
+def filter_datasets(request):
+    if request.is_ajax():
+        filters = json.loads(request.GET.get("filter_data"))
+        try:
+            cdt_pk = int(request.GET.get("compound_datatype"))
+            query = Dataset.objects.filter(symbolicdataset__structure__compounddatatype=cdt_pk)
+        except TypeError:
+            query = Dataset.objects.filter(symbolicdataset__structure__isnull=True)
+
+        for filter_instance in filters:
+            key = filter_instance["key"]
+            value = filter_instance["val"]
+            if key == "Name":
+                query = query.filter(name__iregex=value)
+
+        response_data = []
+        for dataset in query.all():
+            response_data.append({"pk": dataset.pk, 
+                                  "Name": dataset.name, 
+                                  "Date": dataset.date_created.isoformat()})
+        response = HttpResponse()
+        response.write(json.dumps(response_data))
+        return response
+    else:
+        return HttpResponse(status=405) # Method not allowed.
+
 def _get_run_progress(run):
     """
     Return a tuple (status, finished), where status is a string

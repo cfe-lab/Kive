@@ -540,7 +540,7 @@ class DatasetStructure(models.Model):
 @python_2_unicode_compatible
 class ExecRecord(models.Model):
     """
-    Record of a previous execution of a Method/PSIC/POC
+    Record of a previous execution of a Pipeline component.
     """
     generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
 
@@ -925,23 +925,22 @@ class ExecRecordOut(models.Model):
         S458
         output_one=>S458
         """
-        unicode_rep = ""
         if (type(self.execrecord.general_transf()) in
                 (pipeline.models.PipelineOutputCable,
                  pipeline.models.PipelineStepInputCable)):
-            unicode_rep = unicode(self.symbolicdataset)
+            return str(self.symbolicdataset)
         else:
-            unicode_rep = "{}=>{}".format(self.generic_output.definite.dataset_name,
-                                           self.symbolicdataset)
-        return unicode_rep
-
+            return "{}=>{}".format(self.generic_output.definite.dataset_name, self.symbolicdataset)
 
     def clean(self):
         """
-        If ER represents a POC, check output defined by the POC.
-        If ER represents a PSIC, check output is the TI the cable feeds.
-        If ER is not a cable, check output belongs to ER's Method.
-        The SD is compatible with generic_output. (??)
+        - If the ExecRecord represents a PipelineOutputCable, check
+          that the output is the one defined by the PipelineOutputCable.
+        - If the ExecRecord represents a PipelineStepInputCable, check
+          that the output is the TransformationInput that the cable feeds.
+        - If the ExecRecord is not for a cable, check that the output
+          belongs to the ExecRecord's Method.
+        - The SymbolicDataset is compatible with generic_output. (??)
         """
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if (type(self.execrecord.general_transf()) == pipeline.models.PipelineOutputCable):
@@ -968,13 +967,6 @@ class ExecRecordOut(models.Model):
                 raise ValidationError(
                     "Parent of ExecRecordOut \"{}\" represents a PSIC; ERO must be a TransformationInput".
                     format(self))
-
-            # June 9, 2014: this requirement has been relaxed.
-            # # The TI this ERO points to must be the one fed by the PSIC.
-            # if parent_er_psic.dest != self.generic_output:
-            #     raise ValidationError(
-            #         "Input \"{}\" is not the one fed by the PSIC of ExecRecord \"{}\"".
-            #         format(self.generic_output, self.execrecord))
 
         # Else the parent ER is linked with a method
         else:
