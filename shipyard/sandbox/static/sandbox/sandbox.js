@@ -36,28 +36,44 @@ function show_run_progress(run_data) {
     $("#submit").val(run_data["status"]);
 }
 
-$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+$(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
     // Run a pipeline when "submit" is pressed.
-    /*
-    $("#submit").on("click", function () {
-        $(this).prop('disabled', 1);
-        $.ajax({
-            type: "POST",
-            url: "run_pipeline",
-            data: $("#inputs_form").serialize(),
-            datatype: "json",
-            success: function (result) { 
-                run_data = $.parseJSON(result);
-                show_run_progress(run_data);
-                poll_run_progress(run_data); 
-            }
-        });
+    $("#run_pipeline").on("submit", function(e) {
+        e.preventDefault();
+        
+        $('input[type="submit"]', this).prop('disabled', 1);
+        var tbselects = $('.tbselect-value').detach().appendTo(this);
+        
+        if (tbselects.filter(function() { return this.value === ''; }).length === 0) {
+            console.log($(this).serialize());
+            /*
+            $.ajax({
+                type: "POST",
+                url: "run_pipeline",
+                data: $(this).serialize(),
+                datatype: "json",
+                success: function (result) { 
+                    run_data = $.parseJSON(result);
+                    show_run_progress(run_data);
+                    poll_run_progress(run_data); 
+                }
+            });*/
+        }
+        else console.log('not all fields are filled');
+        
         return false;
     });
-    */
+    
+    $('.tbselect-value').filter(function() { return this.value !== ''; }).each(function() {
+        console.log('remembered input value detected');
+        /* TODO: browsers will remember input values, even for hidden fields, on page refresh.
+         * Write a function to sync input tables with their hidden input representation.
+         */
+    });
+    
 
     /*
      TABLE FILTER
@@ -93,17 +109,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 }
                 
                 cells.hide();
-            }
-        
-            if (typeof data.truncatecols != 'undefined') {
-                cells = $();
-                tcols = data.truncatecols.toString().split(',');
-                
-                for (var i = 0; i < tcols.length; i++) {
-                    cells = cells.add('tbody td:nth-child(' + tcols[i] + ')', tab);
-                }
-                
-                cells.addClass('truncate');
             }
         };
         
@@ -141,8 +146,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             noResults.hide();
             activeFilters.html('');
             
-            request_data = {"filter_data": JSON.stringify(filters), 
-                            "compound_datatype": tab.data("compoundatatype")};
+            request_data = {
+                "filter_data": JSON.stringify(filters), 
+                "compound_datatype": tab.data("compoundatatype")
+            };
+            
             $.getJSON("filter_datasets", request_data, function (data) {
                 var tbody = tab.find('tbody'),
                     new_tbody = [];
@@ -163,12 +171,19 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 }
                 
                 numResults = new_tbody.length;
-                tbody.html( new_tbody.join("\n") ).find('th,td')
-                    .css('background-color','#ffd')
-                    .animate({ 'background-color': '#fff' }, 2000, 'swing', function() { 
-                        $(this).css('background-color', ''); 
-                    });
-                columnPresentation(tab);
+                
+                if (numResults == 0) {
+                    tab.hide();
+                    noResults.show();
+                }
+                else {
+                    tbody.html( new_tbody.join("\n") ).find('th,td')
+                        .css('background-color','#ffd')
+                        .animate({ 'background-color': '#fff' }, 2000, 'swing', function() { 
+                            $(this).css('background-color', ''); 
+                        });
+                    columnPresentation(tab);
+                }
             });
             
             for (var i = 0; i < filters.length; i++) {
@@ -188,11 +203,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     ');
                 }
             }
-        
-            if (numResults <= 10)
-                tab.addClass('long-form');
-            else
-                tab.removeClass('long-form');
         }
     
         $('form', cpanels).on('submit',function(e) {
@@ -228,30 +238,19 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         });
     
         $('.results').on('click', 'tbody tr', function() {
-            var $this = $(this),
-                tab = $this.closest('.results'),
+            var tab = $(this).closest('.results'),
                 row_key = parseInt( $('td', this).eq( tab.data('pkey') ).html() ),
-                selected = tab.data('selected');
-        
-            if (this.classList.contains('selected')) // classList.contains faster than jQuery hasClass or is('.class').
-                selected.splice(selected.indexOf(row_key), 1);
-            else
-                selected.push( row_key );
+                tbselect = tab.siblings('input.tbselect-value');
             
-            this.classList.toggle('selected');
-            tab.data('selected', selected);
-            
-            console.log(selected);
-            console.log(tab.data('pkey'));
-        });
-    
-        // Workaround is necessary since td.truncate gets "position: absolute" on hover and scrolling functionality is all wonky.
-        $('td.truncate', tables).on('wheel', function (e) {
-            var scrollWindow = $(this).trigger('mouseout').closest('.results').get(0);
-            if (typeof scrollWindow.scrollByLines !== 'undefined')
-                scrollWindow.scrollByLines(e.originalEvent.deltaY);
-            else
-                scrollWindow.scrollTop += e.originalEvent.deltaY * 16;
+            $('tr', tab).removeClass('selected');
+            if (this.classList.contains('selected')) {
+                // classList.contains is faster than jQuery .hasClass or .is('.class').
+                tbselect.val('');
+            }
+            else {
+                tbselect.val(row_key);
+                $(this).addClass('selected');  
+            }
         });
     }
 });

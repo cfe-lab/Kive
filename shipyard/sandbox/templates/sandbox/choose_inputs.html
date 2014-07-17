@@ -14,33 +14,29 @@
 
 <a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
 
-<h2>Analysis</h2>
-
-<p>
-Choose pipeline inputs
-</p>
+<h2>Choose pipeline inputs</h2>
 
 <ul id="input_forms">
-<li>
 {% for input, datasets in input_data %}
 	<li>
 		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
 	<div class="filter_ctrl">
 		<form>
 		<label>Name</label>
-		<input type="text" data-link="Name">
+		<input type="text" data-link="Name"><br>
+		<label>Uploaded by user?</label>
+		<input type="checkbox" data-link="Uploaded">
 		<input type="submit" value="Filter">
 		</form>
 	</div>
 
-	<div class="active_filters">
-	</div>
+	<div class="active_filters"></div>
 
 	<div class="no_results">
 		<strong>No results were found.</strong>
 	</div>
 
-	<div class="results" data-pkey="pk" data-displaycols="2,3" data-truncatecols="2">
+	<div class="results" data-pkey="pk" data-displaycols="2,3">
 		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
 		<thead>
 			<tr>
@@ -60,8 +56,18 @@ Choose pipeline inputs
 		</tbody>
 		</table>
 	</div>
+	
+	<input type="hidden" name="input_{{ input.dataset_idx }}" class="tbselect-value" value="">
 	</li>
 {% endfor %}
 </ul>
+
+<form action="run_pipeline" id="run_pipeline" method="post">
+    <input type="hidden" name="pipeline" value="{{ input_form.pipeline }}"><!--TODO: get pipeline variable so that it goes with the form submission -->
+    <!--Annoyingly, some browsers will disallow form submission unless >= 1 user input field is present. -->
+    <input type="text" style="display: none;">
+    {% csrf_token %}
+    <input type="submit" id="submit" value="Engage">
+</form>
 
 {% endblock %}
