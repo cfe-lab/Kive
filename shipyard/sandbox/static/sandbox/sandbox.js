@@ -43,12 +43,17 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     // Run a pipeline when "submit" is pressed.
     $("#run_pipeline").on("submit", function(e) {
         e.preventDefault();
+        var tbselects = $('.tbselect-value'),
+            submit = $('input[type="submit"]', this);
         
-        $('input[type="submit"]', this).prop('disabled', 1);
-        var tbselects = $('.tbselect-value').detach().appendTo(this);
-        
+        console.log('hi');
+        // Check if all inputs have been selected
         if (tbselects.filter(function() { return this.value === ''; }).length === 0) {
-            console.log($(this).serialize());
+            tbselects.detach().appendTo(this);
+            $('#input_forms').hide('slow');
+            
+            console.log( $(this).serialize() );
+            submit.hide().after( $('<img src="/static/portal/loading.gif">').hide().show('slow') );
             /*
             $.ajax({
                 type: "POST",
@@ -65,13 +70,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         else console.log('not all fields are filled');
         
         return false;
-    });
-    
-    $('.tbselect-value').filter(function() { return this.value !== ''; }).each(function() {
-        console.log('remembered input value detected');
-        /* TODO: browsers will remember input values, even for hidden fields, on page refresh.
-         * Write a function to sync input tables with their hidden input representation.
-         */
     });
     
 
@@ -188,7 +186,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             
             for (var i = 0; i < filters.length; i++) {
                 key = filters[i].key;
-                val = filters[i].val;
+                val = filters[i].val.toString();
             
                 nth_cell = tab.data('cols').indexOf(key) + 1;
             
@@ -207,14 +205,20 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     
         $('form', cpanels).on('submit',function(e) {
             e.preventDefault();
-            var fields = $('input[type="text"], input[type="hidden"], select', this),
+            var val_fields = $('input[type="text"], input[type="hidden"], select', this),
+                bool_fields = $('input[type="checkbox"], input[type="radio"]', this),
                 filters_html = $(this).closest('li').find('.active_filters');
                 filters_js = filters_html.data('filters_js') || [];
             
-            fields.each(function() {
+            val_fields.each(function() {
                 if (this.value.length > 0)
                     filters_js.push({ key: $(this).data('link'), val: this.value });
             }).val('');
+            
+            bool_fields.each(function() {
+                if (this.checked)
+                    filters_js.push({ key: $(this).data('link'), val: true });
+            }).prop('checked', false);
             
             filterTable_ajax(filters_html.siblings('.results'));
             return false;
@@ -252,5 +256,22 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 $(this).addClass('selected');  
             }
         });
+        
+        /* Browsers will remember input values, even for hidden fields, on page refresh
+         * In this function we add this behaviour to our table select widget, which is not a native <form> element.
+         * The widget stores its selected value in an <input type="hidden">.
+         * On pageload, these inputs all have an empty string value, unless the browser is "remembering".
+         */
+        $('.tbselect-value').filter(function() { return this.value !== ''; }).each(function() {
+            var tab = $(this).siblings('.results'),
+                pkey = tab.data('pkey'),
+                remembered_value = this.value;
+            
+            $('tbody tr', tab).filter(function() {
+                return parseInt($('td', this).eq( pkey ).html()) == remembered_value;
+            }).click();
+        });
+        
+        submit = $('input[type="submit"]').prop('disabled', false);
     }
 });
