@@ -19,7 +19,8 @@ def run_pipeline(request):
     """Run a Pipeline as the global Shipyard user."""
     if request.is_ajax():
         response = HttpResponse()
-        pipeline_pk = request.POST.get("pipeline")
+        print(request.GET.dict())
+        pipeline_pk = request.GET.get("pipeline")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
 
         symbolic_datasets = []

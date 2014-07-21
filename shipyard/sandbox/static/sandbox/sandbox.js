@@ -33,7 +33,7 @@ function poll_run_progress(run_data) {
 
 /* Display the progress of a run on the page. */
 function show_run_progress(run_data) {
-    $("#submit").val(run_data["status"]);
+    $("#progress").html(run_data["status"]);
 }
 
 $(function(){ // wait for page to finish loading before executing jQuery code
@@ -46,26 +46,19 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         var tbselects = $('.tbselect-value'),
             submit = $('input[type="submit"]', this);
         
-        console.log('hi');
         // Check if all inputs have been selected
         if (tbselects.filter(function() { return this.value === ''; }).length === 0) {
             tbselects.detach().appendTo(this);
             $('#input_forms').hide('slow');
             
-            console.log( $(this).serialize() );
             submit.hide().after( $('<img src="/static/portal/loading.gif">').hide().show('slow') );
-            /*
-            $.ajax({
-                type: "POST",
-                url: "run_pipeline",
-                data: $(this).serialize(),
-                datatype: "json",
-                success: function (result) { 
+            $.getJSON("run_pipeline", $(this).serialize(),
+                function (result) { 
                     run_data = $.parseJSON(result);
                     show_run_progress(run_data);
                     poll_run_progress(run_data); 
                 }
-            });*/
+            );
         }
         else console.log('not all fields are filled');
         

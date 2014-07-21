@@ -37,6 +37,7 @@ def choose_inputs(request):
                 query = archive.models.Dataset.objects.filter(symbolicdataset__structure__isnull=True)
             query = query.order_by("created_by", "date_created")[:5]
             response_data.append((my_input, query))
+            print(my_input.transformation.definite.pk)
 
         context = Context({"input_data": response_data})
         context.update(csrf(request))
