@@ -65,12 +65,12 @@
 <form action="run_pipeline" id="run_pipeline" method="post">
     <input type="hidden" name="pipeline" value="{{ input_data.0.0.transformation.definite.pk }}">
     <!--Annoyingly, some browsers will disallow form submission unless >= 1 user input field is present. -->
-    <input type="text" style="display: none;" value="ignore">
+    <input type="text" style="display: none;">
     {% csrf_token %}
     <input type="submit" id="submit" value="Engage">
 </form>
 
-<div id="progress">
-</div>
+<div id="errors"></div>
+<div id="progress"></div>
 
 {% endblock %}

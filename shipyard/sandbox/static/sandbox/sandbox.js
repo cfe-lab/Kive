@@ -10,12 +10,8 @@ var timeout = 1000;
 /* Ask the server for a progress report of the run. */
 function poll_run_progress(run_data) {
     setTimeout(function() {
-        $.ajax({
-            type: "POST",
-            url: "poll_run_progress",
-            data: run_data,
-            datatype: "json",
-            success: function (new_data) { 
+        $.getJSON("poll_run_progress", run_data,
+            function (new_data) { 
                 new_data = $.parseJSON(new_data);
                 show_run_progress(new_data);
                 if (new_data["finished"]) {
@@ -27,13 +23,18 @@ function poll_run_progress(run_data) {
                     poll_run_progress(new_data); 
                 }
             }
-        });
+        );
     }, timeout);
 }
 
 /* Display the progress of a run on the page. */
 function show_run_progress(run_data) {
     $("#progress").html(run_data["status"]);
+}
+
+/* Display an error on the page. */
+function display_error(message) {
+    $("#errors").html(message);
 }
 
 $(function(){ // wait for page to finish loading before executing jQuery code
@@ -50,6 +51,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         if (tbselects.filter(function() { return this.value === ''; }).length === 0) {
             tbselects.detach().appendTo(this);
             $('#input_forms').hide('slow');
+            $("#errors").html("");
             
             submit.hide().after( $('<img src="/static/portal/loading.gif">').hide().show('slow') );
             $.getJSON("run_pipeline", $(this).serialize(),
@@ -59,10 +61,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     poll_run_progress(run_data); 
                 }
             );
+        } else {
+            display_error("not all fields are filled");
+            return false;
         }
-        else console.log('not all fields are filled');
-        
-        return false;
     });
     
 

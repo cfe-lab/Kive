@@ -19,13 +19,12 @@ def run_pipeline(request):
     """Run a Pipeline as the global Shipyard user."""
     if request.is_ajax():
         response = HttpResponse()
-        print(request.GET.dict())
         pipeline_pk = request.GET.get("pipeline")
         pipeline = Pipeline.objects.get(pk=pipeline_pk)
 
         symbolic_datasets = []
         for i in range(1, pipeline.inputs.count()+1):
-            pk = int(request.POST.get(str(i)))
+            pk = int(request.GET.get("input_{}".format(i)))
             symbolic_datasets.append(SymbolicDataset.objects.get(pk=pk))
 
         # TODO: for now this is just using the global Shipyard user
@@ -102,8 +101,8 @@ def _get_run_progress(run):
 
 def poll_run_progress(request):
     if request.is_ajax():
-        run_pk = int(request.POST.get("run"))
-        last_status = request.POST.get("status")
+        run_pk = int(request.GET.get("run"))
+        last_status = request.GET.get("status")
         run = Run.objects.get(pk=run_pk)
         status, finished = _get_run_progress(run)
         # Arrrgh I hate sleeping. Find a better way.
