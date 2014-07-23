@@ -62,7 +62,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 }
             );
         } else {
-            display_error("not all fields are filled");
+            display_error("Not all inputs have been set.");
             return false;
         }
     });
@@ -132,6 +132,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             var key, val, nth_cell,
                 activeFilters = tab.siblings('.active_filters'),
                 noResults = tab.siblings('.no_results'),
+                selectedValue = tab.siblings('.tbselect-value').val(),
                 numResults = $('tbody tr', tab).show().length,
                 filters = activeFilters.data('filters_js') || [];
             
@@ -146,7 +147,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             
             $.getJSON("filter_datasets", request_data, function (data) {
                 var tbody = tab.find('tbody'),
-                    new_tbody = [];
+                    new_tbody = [],
+                    bg = 'background-color';
                 
                 for (var i = 0; i < data.length; i++) {
                     var cols = tab.data('cols'),
@@ -168,21 +170,40 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 if (numResults == 0) {
                     tab.hide();
                     noResults.show();
+                    tab.siblings('.tbselect-value').val('');
+                    return;
                 }
-                else {
-                    tbody.html( new_tbody.join("\n") ).find('th,td')
-                        .css('background-color','#ffd')
-                        .animate({ 'background-color': '#fff' }, 2000, 'swing', function() { 
-                            $(this).css('background-color', ''); 
+                
+                var new_cells = tbody.html( new_tbody.join("\n") ).find('th,td');
+                columnPresentation(tab);
+                
+                // Was a row already selected, and is it still in the returned set?
+                if (selectedValue !== "") {
+                    var selectedRow = 
+                            $('tbody td:nth-child(' + (tab.data('pkey') + 1) + ')').filter(function() {
+                                console.log('pkey cell: ' + this.innerHTML);
+                                return parseInt(this.innerHTML) == selectedValue;
+                            }).closest('tr').click();
+                    
+                    if (selectedRow.length == 0) {
+                        tab.siblings('.tbselect-value').val('');
+                    }
+                }
+                
+                new_cells.each(function() {
+                    var col = $(this).css(bg);
+                    $(this).css(bg, '#ffd')
+                        .animate({ 'background-color': col }, {
+                            duration: 500,
+                            complete: function() { $(this).css(bg, ''); }
                         });
-                    columnPresentation(tab);
-                }
+                });
             });
             
             for (var i = 0; i < filters.length; i++) {
                 key = filters[i].key;
                 val = filters[i].val.toString();
-            
+                
                 nth_cell = tab.data('cols').indexOf(key) + 1;
             
                 if (typeof filters[i].invisible === 'undefined' || !filters[i].invisible) {

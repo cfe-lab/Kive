@@ -21,11 +21,12 @@
 	<li>
 		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
 	<div class="filter_ctrl">
+	    <h4>Search datasets</h4>
 		<form>
-		<label>Name</label>
-		<input type="text" data-link="Name"><br>
-		<label>Show only user uploads</label>
-		<input type="checkbox" data-link="Uploaded">
+		<label for="name">Name</label>
+		<input name="name" type="text" data-link="Name">
+		<input name="uploads" type="checkbox" data-link="Uploaded">
+		<label for="uploads">Show only user uploads</label>
 		<input type="submit" value="Filter">
 		</form>
 	</div>
@@ -70,7 +71,7 @@
     <input type="submit" id="submit" value="Engage">
 </form>
 
-<div id="errors"></div>
+<div id="errors" class="errortext"></div>
 <div id="progress"></div>
 
 {% endblock %}

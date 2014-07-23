@@ -399,3 +399,6 @@ ul#id_ctrl_nav li:hover {
 .errortext {
     color: #FF0000;
 }
+#errors {
+    margin-top: 1em;
+}

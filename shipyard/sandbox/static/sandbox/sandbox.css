@@ -3,38 +3,36 @@
     list-style: none;
 }
 #input_forms li {
-	width: calc(25% - 2em - 1px);
-	float: left;
-	border-left: 1px solid #444;
-	padding: 0 1em;
-}
-#input_forms li:first-child {
-	border-left: 0;
-	padding-left: 0;
+	clear:left;
 }
 #run_pipeline {
 	clear: left;
+	padding-top: 1em;
 }
 #input_forms h3 {
 	margin-top: 0;
+	padding-top: 1em;
 }
 
 .results {
-    width: 100%;
     max-height: 15em;
     overflow-y: auto;
-    border-top: 1px solid #888;
     padding: 0 0 1em;
     position: relative;
 }
 .results table {
     border-collapse: collapse;
-    width: 100%;
+    min-width: 33%;
 }
 .results th {
     padding: .25em .5em;
     font-size: .75em;
     text-align: center;
+    background-color: #eee;
+    border-right: 1px solid #fff;
+}
+.results th:last-child {
+    border-right-width: 0;
 }
 .results td {
     border: 1px solid #eee;
@@ -53,41 +51,44 @@
     background-color: #c7e6fa;
 }
 .no_results {
-    border: 1px solid red;
-    color: red;
+    color: #a00;
     display: none;
     padding: 1em;
 }
 .filter_ctrl {
-    margin: .5em 0 0 .5em;
-	font-size: 0.8em;
+    padding: .5em 0 0 .5em;
+	font-size: 0.7em;
+	border: 1px solid #ddd;
+	width: 10.5em;
+	float: left;
+	margin-right: 1em;
 }
 .filter_ctrl input[type='text'] {
-    margin-top: -1px;
-    width: calc(100% - 9em - 2px);
+    margin: .5em 1.5em .5em 0;
+    width: 9em;
+    border: 0;
+    background-color: #eee;
+    display:block;
 }
 .filter_ctrl select {
     margin-top: -1px;
     width: calc(100% - 9em);
 }
+.filter_ctrl h4 {
+    margin: 0 0 .5em;
+}
 .filter_ctrl input[type='submit'] {
-    float: right;
+    display:block;
     background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg==');
     background-repeat: no-repeat;
     background-position: .7em 3px;
     text-indent: -999em; overflow: hidden;
-	font-size:1.25em;
-}
-.filter_ctrl label {
-    display: inline-block;
-    height: 28px;
-    line-height: 28px;
-    min-width: 4.5em;
+	font-size: 1.5em;
+	margin: .5em 0;
 }
 
 .active_filters {
-    margin-bottom: 1em;
-	clear:left;
+    padding-bottom: .75em;
 }
 .active_filters:empty {
 	display: none;
