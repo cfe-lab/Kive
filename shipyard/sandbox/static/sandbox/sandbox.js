@@ -67,6 +67,20 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         }
     });
     
+    $('.advanced-filter').prepend('<input type="button" class="close ctrl" value="Close">');
+    $('input[value="Advanced"]').on('click', function() {
+        $(this).closest('.short-filter').fadeOut({ complete: function() {
+            $(this).siblings('.advanced-filter').fadeIn()
+                .closest('li').addClass('advanced');
+        } });
+    });
+    $('.advanced-filter input.close.ctrl').on('click', function() {
+        $(this).closest('.advanced-filter').fadeOut({ complete: function() {
+            $(this).siblings('.short-filter').fadeIn()
+                .closest('li').removeClass('advanced');
+        } });
+    });
+    
 
     /*
      TABLE FILTER
@@ -218,7 +232,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 }
             }
         }
-    
+        
         $('form', cpanels).on('submit',function(e) {
             e.preventDefault();
             var val_fields = $('input[type="text"], input[type="hidden"], select', this),
