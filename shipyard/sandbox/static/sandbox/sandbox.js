@@ -142,6 +142,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         });
         
         // After filters_js is populated, call this function to apply the filters to the table.
+        // TODO: only return true once connection was successfully made.
         var filterTable_ajax = function(tab) { 
             var key, val, nth_cell,
                 activeFilters = tab.siblings('.active_filters'),
@@ -181,37 +182,40 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 
                 numResults = new_tbody.length;
                 
-                if (numResults == 0) {
+                if (numResults > 0) {
+                    var new_cells = tbody.html( new_tbody.join("\n") ).find('th,td');
+                    columnPresentation(tab);
+                
+                    // Was a row already selected, and is it still in the returned set?
+                    if (selectedValue !== "") {
+                        // Check index row. nth-child(), as a CSS function, is 1-indexed
+                        // rather than 0-indexed like everything else. We use jQuery.filter()
+                        // to search the rows. Any matches have their click event triggered.
+                        var selectedRow = $('tbody td:nth-child(' + (tab.data('pkey') + 1) + ')', tab)
+                                .filter(function() {
+                                    return parseInt(this.innerHTML) == selectedValue;
+                                }).closest('tr').click();
+                    
+                        // If no rows were matched, the selection is cleared to be empty.
+                        if (selectedRow.length == 0) {
+                            tab.siblings('.tbselect-value').val('');
+                        }
+                    }
+                
+                    new_cells.each(function() {
+                        var old_col = $(this).css(bg);
+                        $(this).css(bg, '#ffd')
+                            .animate({ 'background-color': old_col }, {
+                                duration: 500,
+                                complete: function() { $(this).css(bg, ''); }
+                            });
+                    });
+                }
+                else {
                     tab.hide();
                     noResults.show();
                     tab.siblings('.tbselect-value').val('');
-                    return;
                 }
-                
-                var new_cells = tbody.html( new_tbody.join("\n") ).find('th,td');
-                columnPresentation(tab);
-                
-                // Was a row already selected, and is it still in the returned set?
-                if (selectedValue !== "") {
-                    var selectedRow = 
-                            $('tbody td:nth-child(' + (tab.data('pkey') + 1) + ')').filter(function() {
-                                console.log('pkey cell: ' + this.innerHTML);
-                                return parseInt(this.innerHTML) == selectedValue;
-                            }).closest('tr').click();
-                    
-                    if (selectedRow.length == 0) {
-                        tab.siblings('.tbselect-value').val('');
-                    }
-                }
-                
-                new_cells.each(function() {
-                    var col = $(this).css(bg);
-                    $(this).css(bg, '#ffd')
-                        .animate({ 'background-color': col }, {
-                            duration: 500,
-                            complete: function() { $(this).css(bg, ''); }
-                        });
-                });
             });
             
             for (var i = 0; i < filters.length; i++) {
@@ -255,6 +259,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         });
     
         // Mechanism for removing filter elements.
+        // TODO: only execute this function once filterTable_ajax returns true.
         $('.active_filters').on('click', 'a.remove', function() {
             var filter = $(this).closest('.filter'),
                 container = filter.closest('.active_filters'),
