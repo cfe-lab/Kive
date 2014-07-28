@@ -45,15 +45,10 @@ def choose_inputs(request):
         # Method not allowed
         return HttpResponse(status=405)
 
-def view_results(request):
+def view_results(request, id):
     """View outputs from a pipeline run."""
-    if request.method == "POST":
-        template = loader.get_template("sandbox/view_results.html")
-        run_pk = request.POST.get("run")
-        run = archive.models.Run.objects.get(pk=run_pk)
-        context = Context({"run": run})
-        context.update(csrf(request))
-        return HttpResponse(template.render(context))
-    else:
-        # Method not allowed
-        return HttpResponse(status=405)
+    template = loader.get_template("sandbox/view_results.html")
+    run = archive.models.Run.objects.get(pk=id)
+    context = Context({"run": run})
+    context.update(csrf(request))
+    return HttpResponse(template.render(context))

@@ -18,6 +18,8 @@ function poll_run_progress(run_data) {
                     $("#inputs_form").append(run_elem);
                     $("#submit").unbind("click");
                     $("#inputs_form").attr("action", "view_results");
+                    $("#loading").hide("slow");
+					show_results_link(run_data["run"]);
                 } else {
                     poll_run_progress(new_data); 
                 }
@@ -36,6 +38,12 @@ function display_error(message) {
     $("#errors").html(message);
 }
 
+/* Display the link to the next page. */
+function show_results_link(run_pk) {
+	$("#progress").append('<a href="view_results/' + run_pk + '/">View results</a>');
+}
+
+
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
@@ -52,7 +60,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             $('#input_forms').hide('slow');
             $("#errors").html("");
             
-            submit.hide().after( $('<img src="/static/portal/loading.gif">').hide().show('slow') );
+            submit.hide().after( $('<img id="loading" src="/static/portal/loading.gif">').hide().show('slow') );
             $.getJSON("run_pipeline", $(this).serialize(),
                 function (run_data) { 
                     show_run_progress(run_data);
