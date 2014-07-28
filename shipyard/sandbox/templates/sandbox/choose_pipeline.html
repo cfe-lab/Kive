@@ -6,7 +6,6 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
 	<script src="/static/portal/noxss.js"></script>
 	<script src="/static/sandbox/sandbox.js"></script>
-	<link rel="stylesheet" href="/static/sandbox/choose_pipeline.css">
 	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
@@ -23,17 +22,20 @@ Select a pipeline
 {% if pipeline_forms|length > 0 %}
 	<div class="filter_ctrl">
 		<form class="short-filter">
-		<input name="name" type="text" data-link="Smart"><input type="button" class="advanced ctrl" value="Advanced"><input type="submit" value="Filter">
+		<input name="name" type="text" data-link="Smart"><!--
+		    /* There will be a time and a place for this. That time is not now. */
+		    <input type="button" class="advanced ctrl" value="Advanced">
+		--><input type="submit" value="Filter">
 		</form>
 		
-		<form class="advanced-filter">
+<!--		<form class="advanced-filter">
 	    <h4>Advanced search</h4>
 		<label for="name">Name</label>
 		<input name="name" type="text" data-link="Name">
 		<input name="uploads" type="checkbox" data-link="Uploaded">
 		<label for="uploads">Show only user uploads</label>
 		<input type="submit" value="Filter">
-		</form>
+		</form>-->
 	</div>
 
 	<div class="active_filters"></div>
@@ -43,26 +45,29 @@ Select a pipeline
 	</div>
 {% endif %}
 {% if pipeline_forms|length > 0 %}
-    <table id="pipeline_table">
-    <thead>
-	    <tr>
-            <th>Pipeline Family</th>
-            <th>Revision</th>
-	    </tr>
-    </thead>
-    <tbody>
-        {% for form in pipeline_forms %}
-        <tr>
-            <form action="choose_inputs" method="get">
-            {% csrf_token %}
-            <td>{{ form.family_name }}</td>
-            <td>{{ form.pipeline }}</td>
-            <td><input type="submit" value="Run pipeline"></td>
-            </form>
-        </tr>
-        {% endfor %}
-    </tbody>
-    </table>
+    <div class="results" data-pkey="Revision:selected">
+        <table id="pipeline_table">
+        <thead>
+            <tr>
+                <th>Pipeline Family</th>
+                <th>Revision</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for form in pipeline_forms %}
+            <tr>
+                {% csrf_token %}
+                <td>{{ form.family_name }}</td>
+                <td>{{ form.pipeline }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+    <input type="hidden" class="tbselect-value" value="">
+    <form action="choose_inputs" method="get" id="choose_inputs">
+        <input type="submit" value="Run pipeline">
+	</form>
 {% else %}
     <div class="greyedout">
         There's nothing here.

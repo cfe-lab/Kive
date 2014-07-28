@@ -37,6 +37,22 @@ function display_error(message) {
     $("#errors").html(message);
 }
 
+/* Custom jQuery function to retrieve a tuple's primary key according to its selector syntax. */
+$.fn.get_pkey = function(pkey) {
+    if (this.prop('tagName') == "TR") {
+        var row_key = $('td', this).eq( parseInt( pkey ) );
+        
+        if (pkey.toString().match(/:selected$/)) {
+            row_key = row_key.find(':selected').val();
+        } else {
+            row_key = row_key.html();
+        }
+        
+        console.log(row_key);
+        return parseInt(row_key);
+    }
+};
+
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
@@ -63,6 +79,19 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             );
         } else {
             display_error("Not all inputs have been set.");
+            return false;
+        }
+    });
+    
+    $('#choose_inputs').on('submit', function(e) {
+        var tbselect = $('.tbselect-value');
+        
+        // Check if all inputs have been selected
+        if (tbselect.val() !== '') {
+            tbselect.attr('name', 'pipeline').detach().appendTo(this);
+        } else {
+            display_error("No pipeline selected.");
+            e.preventDefault();
             return false;
         }
     });
@@ -122,7 +151,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         tables.each(function() {
             var $this = $(this),
                 cols = [],
-                filters_html = $this.siblings('.active_filters');
+                filters_html = $this.siblings('.active_filters'),
+                pkey = $this.data('pkey');
         
             if (filters_html.length == 0)
                 $this.before('<div class="active_filters">');
@@ -132,9 +162,16 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             });
         
             filters_html.data('filters_js', []);
+            
+            if (!!pkey.match(/:selected$/)) {
+                pkey = cols.indexOf(pkey.replace(":selected", "")) + ":selected";
+            } else {
+                pkey = cols.indexOf(pkey);
+            }
+            
             $this.data({
                 'cols': cols,
-                'pkey': cols.indexOf($this.data('pkey')),
+                'pkey': pkey,
                 'selected': []
             });
         
@@ -278,16 +315,16 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     
         $('.results').on('click', 'tbody tr', function() {
             var tab = $(this).closest('.results'),
-                row_key = parseInt( $('td', this).eq( tab.data('pkey') ).html() ),
                 tbselect = tab.siblings('input.tbselect-value');
             
             $('tr', tab).removeClass('selected');
+            
+            // classList.contains is faster than jQuery .hasClass or .is('.class').
             if (this.classList.contains('selected')) {
-                // classList.contains is faster than jQuery .hasClass or .is('.class').
                 tbselect.val('');
             }
             else {
-                tbselect.val(row_key);
+                tbselect.val( $(this).get_pkey(tab.data('pkey')) );
                 $(this).addClass('selected');  
             }
         });
@@ -299,11 +336,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
          */
         $('.tbselect-value').filter(function() { return this.value !== ''; }).each(function() {
             var tab = $(this).siblings('.results'),
-                pkey = tab.data('pkey'),
                 remembered_value = this.value;
             
             $('tbody tr', tab).filter(function() {
-                return parseInt($('td', this).eq( pkey ).html()) == remembered_value;
+                return $(this).get_pkey(tab.data('pkey')) == remembered_value;
             }).click();
         });
         
