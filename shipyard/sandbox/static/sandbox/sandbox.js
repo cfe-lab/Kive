@@ -12,13 +12,14 @@ function poll_run_progress(run_data) {
     setTimeout(function() {
         $.getJSON("poll_run_progress", run_data,
             function (new_data) { 
-                new_data = $.parseJSON(new_data);
                 show_run_progress(new_data);
                 if (new_data["finished"]) {
                     run_elem = $('<input type="hidden" name="run" value="' + run_data["run"] + '"/>');
                     $("#inputs_form").append(run_elem);
                     $("#submit").unbind("click");
                     $("#inputs_form").attr("action", "view_results");
+                    $("#loading").hide("slow");
+					show_results_link(run_data["run"]);
                 } else {
                     poll_run_progress(new_data); 
                 }
@@ -35,6 +36,11 @@ function show_run_progress(run_data) {
 /* Display an error on the page. */
 function display_error(message) {
     $("#errors").html(message);
+}
+
+/* Display the link to the next page. */
+function show_results_link(run_pk) {
+	$("#progress").append('<a href="view_results/' + run_pk + '/">View results</a>');
 }
 
 /* Custom jQuery function to retrieve a tuple's primary key according to its selector syntax. */
@@ -69,10 +75,9 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             $('#input_forms').hide('slow');
             $("#errors").html("");
             
-            submit.hide().after( $('<img src="/static/portal/loading.gif">').hide().show('slow') );
+            submit.hide().after( $('<img id="loading" src="/static/portal/loading.gif">').hide().show('slow') );
             $.getJSON("run_pipeline", $(this).serialize(),
-                function (result) { 
-                    run_data = $.parseJSON(result);
+                function (run_data) { 
                     show_run_progress(run_data);
                     poll_run_progress(run_data); 
                 }

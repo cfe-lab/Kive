@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
+<a href="../../choose_pipeline" rel="prev">Back to pipeline selection</a>
 
 <h2>Analysis</h2>
 
@@ -28,7 +28,7 @@ View pipeline results
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.dataset_file.size|filesizeformat }}</td>
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.date_created }}</td>
             <td>
-                <a href="dataset_download/{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.pk }}">
+                <a href="../../dataset_download/{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.pk }}">
                     Download
                 </a>
             </td>
