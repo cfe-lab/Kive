@@ -21,11 +21,11 @@
 	<li>
 		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
 	<div class="filter_ctrl">
-		<form class="short-filter" action="filter_datasets">
+		<form class="short-filter">
 		<input name="name" type="text" data-link="Smart"><input type="button" class="advanced ctrl" value="Advanced"><input type="submit" value="Filter">
 		</form>
 		
-		<form class="advanced-filter" action="filter_datasets">
+		<form class="advanced-filter">
 	    <h4>Advanced search</h4>
 		<label for="name">Name</label>
 		<input name="name" type="text" data-link="Name">
@@ -41,7 +41,7 @@
 		<strong>No results were found.</strong>
 	</div>
 
-	<div class="results" data-pkey="pk" data-displaycols="2,3">
+	<div class="results" data-pkey="pk" data-displaycols="2,3" data-ajax-url="filter_datasets">
 		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
 		<thead>
 			<tr>

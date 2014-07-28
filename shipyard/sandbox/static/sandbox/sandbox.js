@@ -188,7 +188,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         
         // After filters_js is populated, call this function to apply the filters to the table.
         // TODO: only return true once connection was successfully made.
-        var filterTable_ajax = function(recipient_url, tab) { 
+        var filterTable_ajax = function(tab) { 
             var key, val, nth_cell,
                 activeFilters = tab.siblings('.active_filters'),
                 noResults = tab.siblings('.no_results'),
@@ -205,7 +205,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 "compound_datatype": tab.data("compoundatatype")
             };
             
-            $.getJSON(recipient_url, request_data, function (data) {
+            $.getJSON(tab.data('ajax-url'), request_data, function (data) {
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
                     bg = 'background-color';
@@ -261,6 +261,9 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     noResults.show();
                     tab.siblings('.tbselect-value').val('');
                 }
+            }).fail(function() {
+                /* Contingency in case of Django error. */
+                display_error("Whoops! Something went wrong.");
             });
             
             for (var i = 0; i < filters.length; i++) {
@@ -299,7 +302,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     filters_js.push({ key: $(this).data('link'), val: true });
             }).prop('checked', false);
             
-            filterTable_ajax($(this).attr('action'), filters_html.siblings('.results'));
+            filterTable_ajax(filters_html.siblings('.results'));
             return false;
         });
     

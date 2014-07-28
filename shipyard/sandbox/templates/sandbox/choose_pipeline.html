@@ -21,7 +21,7 @@ Select a pipeline
 
 {% if pipeline_forms|length > 0 %}
 	<div class="filter_ctrl">
-		<form class="short-filter" action="filter_pipelines">
+		<form class="short-filter">
 		<input name="name" type="text" data-link="Smart"><!--
 		    /* There will be a time and a place for this. That time is not now. */
 		    <input type="button" class="advanced ctrl" value="Advanced">
@@ -45,7 +45,7 @@ Select a pipeline
 	</div>
 {% endif %}
 {% if pipeline_forms|length > 0 %}
-    <div class="results" data-pkey="Revision:selected">
+    <div class="results" data-pkey="Revision:selected" data-ajax-url="filter_pipelines">
         <table id="pipeline_table">
         <thead>
             <tr>
@@ -72,5 +72,7 @@ Select a pipeline
         There's nothing here.
     </div>
 {% endif %}
+
+<div id="errors" class="errortext"></div>
 
 {% endblock %}
