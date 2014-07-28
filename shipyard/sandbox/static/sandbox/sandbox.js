@@ -40,10 +40,14 @@ function display_error(message) {
 
 /* Display the link to the next page. */
 function show_results_link(run_pk) {
-	$("#progress").append('<a href="view_results/' + run_pk + '/">View results</a>');
+	$("#progress").append('<div><a href="view_results/' + run_pk + '/">View results</a></div>');
 }
 
-/* Custom jQuery function to retrieve a tuple's primary key according to its selector syntax. */
+/* Custom jQuery function to retrieve a tuple's primary key according to the table's metadata.
+   This is either:
+   1- a cell's contents
+   2- the value of a select field within a cell
+   */
 $.fn.get_pkey = function(pkey) {
     if (this.prop('tagName') == "TR") {
         var row_key = $('td', this).eq( parseInt( pkey ) );
@@ -54,7 +58,6 @@ $.fn.get_pkey = function(pkey) {
             row_key = row_key.html();
         }
         
-        console.log(row_key);
         return parseInt(row_key);
     }
 };
@@ -185,7 +188,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         
         // After filters_js is populated, call this function to apply the filters to the table.
         // TODO: only return true once connection was successfully made.
-        var filterTable_ajax = function(tab) { 
+        var filterTable_ajax = function(recipient_url, tab) { 
             var key, val, nth_cell,
                 activeFilters = tab.siblings('.active_filters'),
                 noResults = tab.siblings('.no_results'),
@@ -202,7 +205,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 "compound_datatype": tab.data("compoundatatype")
             };
             
-            $.getJSON("filter_datasets", request_data, function (data) {
+            $.getJSON(recipient_url, request_data, function (data) {
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
                     bg = 'background-color';
@@ -283,7 +286,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             e.preventDefault();
             var val_fields = $('input[type="text"], input[type="hidden"], select', this),
                 bool_fields = $('input[type="checkbox"], input[type="radio"]', this),
-                filters_html = $(this).closest('li').find('.active_filters');
+                filters_html = cpanels.siblings('.active_filters');
                 filters_js = filters_html.data('filters_js') || [];
             
             val_fields.each(function() {
@@ -296,7 +299,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     filters_js.push({ key: $(this).data('link'), val: true });
             }).prop('checked', false);
             
-            filterTable_ajax(filters_html.siblings('.results'));
+            filterTable_ajax($(this).attr('action'), filters_html.siblings('.results'));
             return false;
         });
     
@@ -341,10 +344,11 @@ $(function(){ // wait for page to finish loading before executing jQuery code
          */
         $('.tbselect-value').filter(function() { return this.value !== ''; }).each(function() {
             var tab = $(this).siblings('.results'),
-                remembered_value = this.value;
+                remembered_value = this.value,
+                pkey = tab.data('pkey');
             
             $('tbody tr', tab).filter(function() {
-                return $(this).get_pkey(tab.data('pkey')) == remembered_value;
+                return $(this).get_pkey(pkey) == remembered_value;
             }).click();
         });
         

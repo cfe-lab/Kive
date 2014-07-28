@@ -21,7 +21,7 @@ Select a pipeline
 
 {% if pipeline_forms|length > 0 %}
 	<div class="filter_ctrl">
-		<form class="short-filter">
+		<form class="short-filter" action="filter_pipelines">
 		<input name="name" type="text" data-link="Smart"><!--
 		    /* There will be a time and a place for this. That time is not now. */
 		    <input type="button" class="advanced ctrl" value="Advanced">
@@ -56,7 +56,6 @@ Select a pipeline
         <tbody>
             {% for form in pipeline_forms %}
             <tr>
-                {% csrf_token %}
                 <td>{{ form.family_name }}</td>
                 <td>{{ form.pipeline }}</td>
             </tr>
