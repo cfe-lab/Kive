@@ -55,7 +55,7 @@
 			<tr>
 				<td>{{ dataset.pk }}</td>
 				<td>{{ dataset.name }}</td>
-				<td>{{ dataset.date_created }}</td>
+				<td>{{ dataset.date_created|date:"b d, Y, P"|capfirst}}</td>
 			</tr>
 			{% endfor %}
 		</tbody>
