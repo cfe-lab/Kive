@@ -45,30 +45,25 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
     // trigger ajax on CR drop-down to populate revision select
-    $("#id_coderesource").on('change',
-        function() {
-            cr_id = $(this).val();
-            if (cr_id != "") {
-                $.ajax({
-                    type: "POST",
-                    url: "get_revisions/",
-                    data: {cr_id: cr_id}, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        var options = [];
-                        var arr = JSON.parse(result)
-                        $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '">', value.fields.revision_number, ': ', value.fields.revision_name, '</option>');
-                        });
-                        $("#id_revisions").html(options.join(''));
-                    }
-                })
-            }
-            else {
-                $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
-            }
+    $("#id_coderesource").on('change', function() {
+        cr_id = this.value;
+        if (cr_id != "") {
+            $.getJSON(
+                "get_revisions/",
+                { cr_id: cr_id }, // specify data as an object
+                function(result) {
+                    var options = '';
+                    $.each(result, function(index,value) {
+                        options += '<option value="' + value.pk + '">' + value.fields.revision_number + ': ' + value.fields.revision_name + '</option>';
+                    });
+                    $("#id_revisions").html(options);
+                }
+            );
         }
-    ).change(); // trigger on load
+        else {
+            $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
+        }
+    }).change(); // trigger on load
 
     // add or subtract input forms
     var numberOfInputForms = $('#extraInputForms > tr').length;
