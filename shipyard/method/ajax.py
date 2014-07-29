@@ -12,7 +12,7 @@ def populate_revision_dropdown (request):
     """
     if request.is_ajax():
         response = HttpResponse()
-        coderesource_id = request.POST.get('cr_id')
+        coderesource_id = request.GET.get('cr_id')
         if coderesource_id != '':
             # pk (primary key) implies id__exact
             coderesource = CodeResource.objects.get(pk=coderesource_id)
