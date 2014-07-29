@@ -9,8 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 
-from archive.models import ExecLog, MethodOutput, Run, RunComponent, \
-    RunOutputCable, RunSIC, RunStep
+from archive.models import *
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord
@@ -2584,6 +2583,15 @@ class DatasetTests(librarian.tests.LibrarianTestSetup):
                                 re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
                                            'checksum "{}"'.format(self.raw_DS, new_md5, old_md5)),
                                 self.raw_DS.clean)
+
+    def test_Dataset_filename_MD5_clash(self):
+        ds1, ds2 = Dataset.objects.all()[:2]
+        ds1.name = ds2.name
+        ds1.symbolicdataset.MD5_checksum = ds2.symbolicdataset.MD5_checksum
+        ds1.symbolicdataset.save()
+        ds1.save()
+        msg = "A Dataset with that name and MD5 already exists"
+        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_unique)
 
 
 # Added March 26, 2014, as it's not working if I put this in

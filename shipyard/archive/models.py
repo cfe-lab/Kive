@@ -1617,6 +1617,13 @@ class Dataset(models.Model):
         """
         return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
 
+    def validate_unique(self, *args, **kwargs):
+        query = Dataset.objects.filter(symbolicdataset__MD5_checksum=self.symbolicdataset.MD5_checksum,
+                                       name=self.name)
+        if query.exclude(pk=self.pk).exists():
+            raise ValidationError("A Dataset with that name and MD5 already exists.")
+        super(Dataset, self).validate_unique(*args, **kwargs)
+
     def get_absolute_url(self):
         """
         :return str: URL to access the dataset_file

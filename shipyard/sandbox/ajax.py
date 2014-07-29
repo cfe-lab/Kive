@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from django.core import serializers
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 
 from pipeline.models import Pipeline, PipelineFamily
 from archive.models import Dataset, Run
@@ -51,13 +52,15 @@ def filter_datasets(request):
             key = filter_instance["key"]
             value = filter_instance["val"]
             if key == "Name":
-                query = query.filter(name__iregex=value)
+                query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))
+            elif key == "Uploaded" and value:
+                query = query.filter(created_by__isnull=True)
 
         response_data = []
         for dataset in query.all():
             response_data.append({"pk": dataset.pk, 
                                   "Name": dataset.name, 
-                                  "Date": dataset.date_created.isoformat()})
+                                  "Date": str(dataset.date_created)})
         response = HttpResponse()
         response.write(json.dumps(response_data))
         return response
