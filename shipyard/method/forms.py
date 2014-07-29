@@ -68,6 +68,7 @@ class CodeResourceRevisionForm (forms.ModelForm):
 class CodeResourceDependencyForm (forms.ModelForm):
     def __init__(self, parent=None, *args, **kwargs):
         super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
+        self.fields['coderesource'].widget = forms.Select(attrs={'class': 'coderesource'})
         self.fields['coderesource'].choices = self.get_code_resource_list(parent)
 
     def get_code_resource_list(self, parent):

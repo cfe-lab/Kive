@@ -1,5 +1,5 @@
-$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
-
+// wait for page to finish loading before executing jQuery code
+$(function(){
 
     // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
@@ -8,7 +8,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             On each XMLHttpRequest, set a custom X-CSRFToken header to the value of the CSRF token.
             ajaxSend is a function to be executed before an Ajax request is sent.
         */
-        //console.log('ajaxSend triggered');
 
         function getCookie(name) {
             var cookieValue = null;
@@ -46,35 +45,35 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-    // populate CR revision dropdown on selection of CodeResource
-    $("[id^='id_coderesource_']").on('change',
-        function() {
-            var suffix = $(this).attr('id').split('_')[2];
-            cr_id = $(this).val();
-            if (cr_id != "") {
-                $.ajax({
-                    type: "POST",
-                    url: "get_revisions/",
-                    data: {cr_id: cr_id}, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        var options = [];
-                        var arr = JSON.parse(result)
-                        $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                        });
-                        $("#id_revisions_"+suffix).html(options.join(''));
-                    }
-                })
-            }
-            else {
-                $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
-            }
+    /* populate CR revision dropdown on selection of CodeResource
+     * By *delegating* this event to #dependencyForms rather than each select.coderesource
+     * directly, new dynamically-generated selects retain this behaviour. */
+    $("#dependencyForms").on('change', 'select.coderesource', function() {
+        var suffix = this.id.split('_')[2];
+        cr_id = this.value;
+        if (cr_id != "") {
+            $.getJSON(// shorthand for $.ajax where datatype is JSON and request method is GET. also parses JSON automatically.
+                "get_revisions/", // url
+                { cr_id: cr_id }, // specify data as an object
+                function (result) { // callback for successful request
+                    /* String appends are *much* faster than array joins in JS.
+                     * More info at http://jsperf.com/append-string-vs-join-array
+                     */
+                    var options = '';
+                    $.each(result, function(index,value) {
+                        options += '<option value="' + value.pk + '">' + value.fields.revision_name + '</option>\n';
+                    });
+                    $("#id_revisions_" + suffix).html(options);
+                }
+            );
         }
-    ).change() // trigger on load
+        else {
+            $("#id_revisions_" + suffix).html('<option value="">--- select a CodeResource first ---</option>');
+        }
+    }).change(); // trigger on load
 
-    var options = document.getElementById("id_coderesource_0").options;
-    var numberOfForms = $('#dependencyForms > tr').length;
+    var options = document.getElementById("id_coderesource_0").options,
+        numberOfForms = $('#dependencyForms > tr').length;
 
     // modify name attributes for extra input forms received from server
     for (var i = 0; i < numberOfForms; i++) {
@@ -84,65 +83,36 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $('#id_depFileName_'+i).attr('name', 'depFileName_'+i);
     }
 
-    $("#addDependencyForm").click(  // query button by id selector
-        function () {   // anonymous function
-            numberOfForms += 1;
-            i = numberOfForms - 1; // zero-based index
-            var htmlStr = "<tr>";
-            htmlStr += "<td><select class=\"coderesource\" id=\"id_coderesource_" + i + "\" name=\"coderesource_" + i + "\">";
-            for (var j = 0; j < options.length; j++) {
-                htmlStr += "<option value=\"" + options[j].value + "\">" + options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><select class=\"revisions\" id=\"id_revisions_" + i + "\" name=\"revisions_" + i + "\">";
-            htmlStr += "<option value=\"\" selected=\"selected\">--- select a CodeResource first ---</option></select></td>";
-
-            // generate char fields
-            htmlStr += "<td><input id=\"id_depPath_" + i + "\" maxlength=\"255\" name=\"depPath_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><input id=\"id_depFileName_" + i + "\" maxlength=\"255\" name=\"depFileName_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "</tr>";
-
-            $('#dependencyForms').find('tr:last').after(htmlStr);
-
-            // repeated within this class-based event handler for the dynamic HTML elements
-            $("select.coderesource").on('change',
-                function() {
-                    var suffix = $(this).attr('id').split('_')[2];
-                    cr_id = $(this).val();
-                    if (cr_id != "") {
-                        $.ajax({
-                            type: "POST",
-                            url: "get_revisions/",
-                            data: {cr_id: cr_id}, // specify data as an object
-                            datatype: "json", // type of data expected back from server
-                            success: function(result) {
-                                //console.log(result);
-                                var options = [];
-                                var arr = JSON.parse(result)
-                                $.each(arr, function(index,value) {
-                                    options.push('<option value="', value.pk, '">', value.fields.revision_name, '</option>');
-                                });
-                                $("#id_revisions_"+suffix).html(options.join(''));
-                            },
-                        })
-                    }
-                    else {
-                        // reset the second drop-down
-                        $("#id_revisions_"+suffix).html('<option value="">--- select a CodeResource first ---</option>');
-                    }
-                }
-            )
+    // query button by id selector
+    $("#addDependencyForm").click(function() {
+        numberOfForms += 1;
+        i = numberOfForms - 1; // zero-based index
+        var htmlStr = '<tr>\n';
+        htmlStr += '<td><select class="coderesource" id="id_coderesource_' + i + '" name="coderesource_' + i + '">\n';
+        
+        for (var j = 0; j < options.length; j++) {
+            htmlStr += '<option value="' + options[j].value + '">' + options[j].text + '</option>\n';
         }
-    );
+        
+        htmlStr += '</select></td>\n\
+            <td><select class="revisions" id="id_revisions_' + i + '" name="revisions_' + i + '">\n\
+            <option value="" selected="selected">--- select a CodeResource first ---</option></select></td>\n';
 
-    $("#removeDependencyForm").click(
-        function() {
-            if (numberOfForms > 1) {
-                numberOfForms -= 1;
-                $('#dependencyForms').find('tr:last').remove();
-            }
+        // generate char fields
+        htmlStr += '<td><input id="id_depPath_' + i + '" maxlength="255" name="depPath_' + i + '" type="text"></td>\n\
+            <td><input id="id_depFileName_' + i + '" maxlength="255" name="depFileName_' + i + '" type="text"></td>\n\
+            </tr>\n';
+
+        $('#dependencyForms').find('tr:last').after(htmlStr);
+
+    });
+
+    $("#removeDependencyForm").click(function() {
+        if (numberOfForms > 1) {
+            numberOfForms -= 1;
+            $('#dependencyForms').find('tr:last').remove();
         }
-    );
+    });
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {

@@ -23,6 +23,7 @@
     <th>Description</th>
 	</tr>
 </thead>
+<tbody>
 {% for family in families %}
 <tr>
 	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
@@ -30,8 +31,7 @@
 	<td>{{ family.description }}</td>
 </tr>
 {% endfor %}
+</tbody>
 </table>
-
-<a href="pipeline_exec">Run a pipeline</a>
 
 {% endblock %}

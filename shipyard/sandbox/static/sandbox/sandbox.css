@@ -13,6 +13,9 @@
 	margin-top: 0;
 	padding-top: 1em;
 }
+#pipeline_table {
+    width: 100%;
+}
 
 .results {
     max-height: 15em;
@@ -53,6 +56,24 @@
 .results tr.selected td,
 .results tr.selected:hover td {
     background-color: #c7e6fa;
+}
+.results tr select {
+    border: 0;
+    margin: -3px;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: transparent;
+}
+.results tr:not(.selected) select {
+    background-image: none;
+}
+.results tr.selected select:focus {
+    background-color: #fff;
+}
+
+.greyedout {
+    color: #839496;
 }
 .no_results {
     color: #a00;
