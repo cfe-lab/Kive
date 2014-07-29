@@ -343,7 +343,7 @@ Connector.prototype.draw = function(ctx) {
             ctx.fillStyle = '#000';
             ctx.textAlign = 'left';
             ctx.font = '10pt Lato, sans-serif';
-            ctx.fillText(this.dest, this.x+2, this.y);
+            ctx.fillText(this.dest, this.x+5, this.y+4);
         }
     }
     ctx.beginPath();
@@ -396,3 +396,39 @@ Connector.prototype.contains = function(mx, my, pad) {
     )
 };
 
+function OutputZone (cw, ch, offset) {
+    this.x = cw * .75;
+    this.y = ch * .1;
+    this.w = cw * .2;
+    this.h = ch * .35;
+    this.offset = offset || 12; // distance of label from center
+}
+
+OutputZone.prototype.draw = function (ctx) {
+    // draw output zone
+    ctx.fillStyle = this.fill;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = "#aaa";
+    ctx.setLineDash([5]);
+    ctx.lineWidth = 1;
+    ctx.rect(this.x, this.y, this.w, this.h);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([0]);
+
+    // draw label
+    ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'center';
+    ctx.font = '10pt Lato, sans-serif';
+    ctx.fillText("Drag here to create an output", this.x + this.w/2, this.y - this.offset);
+};
+
+OutputZone.prototype.contains = function (mx, my) {
+    return (
+        mx >= this.x 
+        && mx <= this.x + this.w 
+        && my >= this.y 
+        && my <= this.y + this.h
+    );
+};

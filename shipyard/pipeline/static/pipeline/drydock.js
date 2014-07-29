@@ -15,6 +15,8 @@ function CanvasState (canvas) {
     this.canvas = canvas;
     this.width = canvas.width;
     this.height = canvas.height;
+    this.pos_y = canvas.offsetTop;
+    this.pos_x = canvas.offsetLeft;
     this.ctx = canvas.getContext('2d');
 
     // fixes issues with mouse coordinates
@@ -33,7 +35,7 @@ function CanvasState (canvas) {
     var html = document.body.parentNode;
     this.htmlTop = html.offsetTop;
     this.htmlLeft = html.offsetLeft;
-
+    
     this.valid = false; // if false, canvas will redraw everything
     this.shapes = []; // collection of shapes to be drawn
     this.connectors = []; // collection of connectors between shapes
@@ -44,8 +46,13 @@ function CanvasState (canvas) {
     this.dragoffy = 0;
 
     // events
+    
+    // FIXME: what is this for? myState will not be a clone of the object, rather it will just be a reference to the object.
+    // canvasState.myState will just reference back to canvasState. —JN
     var myState = this; // save reference to this particular CanvasState
-
+    
+    this.outputZone = new OutputZone(this.width, this.height);
+    
     // de-activate double-click selection of text on page
     canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
 
@@ -226,7 +233,7 @@ CanvasState.prototype.doUp = function(e) {
         // connector not yet linked to anything
         var mouse = this.getPos(e);
 
-        if (mouse.x > 0.9 * this.canvas.width) {
+        if (this.outputZone.contains(mouse.x, mouse.y)) {
             // Connector drawn into output end-zone
             if (connector.source.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
@@ -237,11 +244,19 @@ CanvasState.prototype.doUp = function(e) {
                 // valid Connector, assign non-null value
 
                 // spawn dialog for output label
-                $( "#dialog-form" ).data('sender', connector).dialog('open');
-                $('#output_name').val(connector.source.label);  // default value
+                var dialog = document.getElementById("dialog_form");
+                
+                $(dialog).data('sender', connector).show().css({
+                    left: Math.min(mouse.x, this.outputZone.x + this.outputZone.w/2 - dialog.offsetWidth/2 ) + this.pos_x,
+                    top:  Math.min(mouse.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
+                }).find('#output_name').select();
+                
+                document.getElementById("output_name").value = connector.source.label;  // default value
+                
                 connector.dest = connector.source.label;
                 connector.source.connected.push(connector);
-                connector.x = 0.91 * this.canvas.width; // snap to edge
+                connector.x = this.outputZone.x + this.outputZone.w/2;// snap to center of output zone
+                this.valid = false;
             }
         } else {
             // Connector not linked to anything - delete
@@ -290,10 +305,11 @@ CanvasState.prototype.clear = function() {
     this.ctx.font = '12pt Lato, sans-serif';
 
     // draw output end-zone
-    this.ctx.fillStyle = '#faa';
+    this.outputZone.draw(this.ctx);
+/*    this.ctx.fillStyle = '#adf';
     this.ctx.fillRect(this.width * 0.9, 0, this.width, this.height);
     this.ctx.fillStyle = 'black';
-    this.ctx.fillText('Output', this.width * 0.95, 20);
+    this.ctx.fillText('Output', this.width * 0.95, 20);*/
 };
 
 CanvasState.prototype.draw = function() {
@@ -369,7 +385,10 @@ CanvasState.prototype.deleteObject = function() {
     if (mySel !== null) {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
-            mySel.in_magnet.connected = [];
+            
+            // in_magnet will be undefined for output cables
+            if (typeof mySel.in_magnet !== 'undefined')
+                mySel.in_magnet.connected = [];
             index = mySel.source.connected.indexOf(mySel);
             mySel.source.connected.splice(index, 1);
             index = this.connectors.indexOf(mySel);

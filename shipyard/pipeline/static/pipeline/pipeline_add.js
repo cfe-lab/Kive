@@ -121,7 +121,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(function() {
     
-        var lbl = $('label[for="#' + this.id +'"]', '#pipeline_ctrl');
+        var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
         
         if (lbl.length) {
             $(this).on('focus', function() {
@@ -150,23 +150,30 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
-//            .find('input').eq(0).focus(); // INCOMPLETE: Focus on the first input field when menu opens. Needs to be a bit different... first empty field maybe?
+        
+        for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
+            if (inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html() || inputs[i].value == '') {
+                $(inputs[i]).focus();
+                break;
+            }
+        }
+        
         e.stopPropagation();
     });
 
-    // FIXME: What does this do?
-    $('a[rel="ctrl"]').on('click', function (e) {
-        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
-        setTimeout("$('.fulltext').fadeOut(300);", 2000);
-    });
-
     // Handle jQuery-UI Dialog spawned for output cable
-    $('form', '#dialog-form').on('submit', function(e) {
+    $('form', '#dialog_form').on('submit', function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
-        var dialog = $('#dialog-form');
-        var buttons = dialog.dialog('option', 'buttons');
-        buttons['Create output'].apply(dialog);
+        var dialog = $(this).closest('#dialog_form');
+        var connector = dialog.data('sender');
+        connector.dest = $('#output_name').val();
+        canvasState.valid = false;
+        dialog.fadeOut(400);
+    }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript
+        $(this).closest('#dialog_form').fadeOut(400);
+        canvasState.connectors.pop();
+        canvasStage.valid = false;
     });
 
     // Handle 'Inputs' menu
@@ -340,6 +347,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         else if (e.which == 27) {
             $('li', 'ul#id_ctrl_nav').removeClass('clicked');
             $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
+            
+            canvasState.selection = null;
+            canvasState.valid = false;
         }
     })
     
@@ -381,27 +391,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         }
     });
 
-
-    // draw dialog on trigger
-    $( "#dialog-form" ).dialog({
-        autoOpen: false,
-        height: 120,
-        width: 350,
-        modal: true,
-        buttons: {
-            "Create output": function() {
-                var connector = $('#dialog-form').data().sender;
-                connector.dest = $('#output_name').val();
-                connector.draw(canvasState.ctx);
-                $( this ).dialog( "close" );
-            },
-            Cancel: function() {
-                $( this ).dialog( "close" );
-            }
-        },
-        close: function() {
-        }
-    });
 
     /*
         Submit form

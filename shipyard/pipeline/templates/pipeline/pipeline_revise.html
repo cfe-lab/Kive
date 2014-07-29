@@ -11,12 +11,13 @@
     </style>
 
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
+    <!--<script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>-->
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
+    <link rel="stylesheet" href="/static/pipeline/drydock.css">
     <script>
-    $(document).ready(function() {
+    $(function() {
         // check for double-click on canvas
         canvas.addEventListener('dblclick', function(e) {
             canvasState.doDblClick(e);
@@ -32,7 +33,7 @@
                 shape = canvasState.shapes[i];
                 if (shape.contains(mx, my)) {
                     // trigger Method menu to drop down
-                    $('li', 'ul#id_ctrl_nav')[2].click();
+                    $('li[data-rel="#id_method_ctrl"]', 'ul#id_ctrl_nav').click();
                     $('#id_select_method_family').val(shape.family).change();  // trigger ajax
                     $(document).ajaxComplete(function() {
                         // wait for AJAX to populate drop-down before selecting option
@@ -176,7 +177,13 @@
                                 magnet = source.out_magnets[k];
                                 if (magnet.label === cable.source_dataset_name) {
                                     connector = new Connector(null, null, magnet);
-                                    connector.x = cable.x;
+//                                    connector.x = cable.x;
+                                    /* 
+                                        since canvas size is based off window size, 
+                                        outputs should always go at the 90% mark of
+                                        the canvas width regardless of the saved x-pos.
+                                    */
+                                    connector.x = canvasState.width * 0.9;
                                     connector.y = cable.y;
                                     connector.dest = cable.output_name;
 
@@ -233,10 +240,10 @@
                 <input type="hidden" id="id_family_name" value="{{ family.name }}"/>
                 <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
 
-                <label for="#id_revision_name" class="text-field-label">Revision name</label>
+                <label for="id_revision_name" class="text-field-label">Revision name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
 
-                <label for="#id_revision_desc" class="text-field-label">Description</label>
+                <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
             </div>
         </form>
@@ -245,7 +252,7 @@
             <h3>Inputs</h3>
 
             <form>
-            <label for="#id_datatype_name" class="text-field-label">Label</label>
+            <label for="id_datatype_name" class="text-field-label">Label</label>
             <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
 
             <select id="id_select_cdt" name="select_cdt" class="select-label">
@@ -264,7 +271,7 @@
             <h3>Methods</h3>
 
             <form>
-            <label for="#id_method_name" class="text-field-label">Label</label>
+            <label for="id_method_name" class="text-field-label">Label</label>
             <input id="id_method_name" maxlength="128" name="method_name" type="text" />
 
             <select id="id_select_method_family" name="select_method_family">
@@ -288,12 +295,11 @@
 
     </div>
 
-    <div id="dialog-form" title="">
+    <div id="dialog_form">
         <form id="id_output_name_form">
-            <fieldset>
-                <label for="output_name">Output name</label>
-                <input type="text" name="output_name" id="output_name" class="text ui-widget-content ui-corner-all">
-            </fieldset>
+            <label for="output_name">Output name</label>
+            <input type="text" name="output_name" id="output_name" class="text">
+            <input type="submit" id="output_submit" value="OK">
         </form>
     </div>
 
