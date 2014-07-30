@@ -66,9 +66,11 @@ def _filter_datasets(request):
     for filter_instance in filters:
         key, value = filter_instance["key"], filter_instance["val"]
         if key == "Name":
-            query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))
+            query = query.filter(name__iregex=value)
         elif key == "Uploaded" and value:
             query = query.filter(created_by__isnull=True)
+        elif key == "Smart":
+            query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))
 
     response_data = []
     for dataset in query.all():
@@ -141,14 +143,14 @@ def _poll_run_progress(request):
     run_pk = int(request.GET.get("run"))
     last_status = request.GET.get("status")
     run = Run.objects.get(pk=run_pk)
-    status = _get_run_progress(run)
     finished = run.is_complete()
+    status = _get_run_progress(run)
 
     # Arrrgh I hate sleeping. Find a better way.
     while status == last_status and not finished:
         time.sleep(1)
-        status = _get_run_progress(run)
         finished = run.is_complete()
+        status = _get_run_progress(run)
     return json.dumps({"status": status, "run": run_pk, "finished": finished})
 
 def poll_run_progress(request):
