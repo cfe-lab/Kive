@@ -1,0 +1,92 @@
+/* Pipeline-specific formatting. */
+#pipeline_canvas {
+    margin-left: -4em;
+    margin-top: -2.5em;
+}
+#pipeline_ctrl {
+    position: fixed;
+    top: 46px; left: 0;
+    width: 100%;
+    height: 1.5em;
+}
+#pipeline_ctrl input,
+#pipeline_ctrl textarea,
+#pipeline_ctrl select {
+    display: block;
+    margin-bottom: -1px;
+}
+#pipeline_ctrl #id_method_button, 
+#pipeline_ctrl #id_cdt_button {
+    margin: .5em;
+}
+#pipeline_ctrl h3 { display: none; }
+ul#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
+ul#id_ctrl_nav li {
+    display: inline;
+    padding: .2em 1em;
+    cursor: pointer;
+    font-weight: bold;
+}
+ul#id_ctrl_nav li.clicked,
+ul#id_ctrl_nav li.clicked:hover {
+    background-color: #aaa;
+    color: #fff;
+}
+ul#id_ctrl_nav li:hover {
+    background-color: #aaa;
+    color: #fff;
+}
+#pipeline_ctrl .ctrl_menu {
+    top: 4.3em;
+    position: fixed;
+    padding: .5em;
+    border: 1px solid #aaa;
+    display: none;
+    background: #fff;
+}
+.input-label { color: #ccc; }
+
+#id_datatype_name, #id_select_method_family, 
+#id_select_method, #id_method_name, 
+#id_revision_name, #id_select_cdt { width: 250px; }
+
+#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }
+#pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
+#pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
+#pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
+#pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
+
+#id_submit_error {
+    display: none;
+    position: absolute;
+    top: 2.5em;
+    right: 0;
+    margin: 0 1em;
+    padding: 1em;
+    border: 1px solid #f00;
+    background-color: #fee;
+    max-width: calc(50% - 4em - 2px);
+}
+
+#dialog_form {
+    display: none;
+    position: absolute;
+}
+#dialog_form label {
+    font-size: .8em;
+    text-align: center;
+    text-shadow: -.5px 1px 0px #fff;
+}
+#dialog_form input[type="submit"] {
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: -1px;
+    border-radius: 0 0 1em 1em;
+}
+#dialog_form #output_name {
+    border-radius: 1em 1em 0 0;
+    text-align: center;
+}
+#dialog_form form > * {
+    display: block;
+}

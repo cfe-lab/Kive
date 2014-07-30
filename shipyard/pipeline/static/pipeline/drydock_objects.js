@@ -327,7 +327,7 @@ Connector.prototype.draw = function(ctx) {
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
 
-    if (this.out_magnet !== null) {
+    if (this.source !== null) {
         // update coordinates in case magnet has moved
         this.fromX = this.source.x;
         this.fromY = this.source.y;
@@ -397,10 +397,15 @@ Connector.prototype.contains = function(mx, my, pad) {
 };
 
 function OutputZone (cw, ch, offset) {
-    this.x = cw * .75;
-    this.y = ch * .1;
-    this.w = cw * .2;
-    this.h = ch * .35;
+    this.x = cw * .8;
+    this.w = cw * .15;
+    this.h = this.w;
+    this.y = ch * .5 - this.h / 2;
+    
+    while (this.h + this.y > ch) {
+        this.h /= 1.5;
+    }
+    
     this.offset = offset || 12; // distance of label from center
 }
 

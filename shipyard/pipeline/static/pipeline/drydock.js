@@ -157,25 +157,24 @@ CanvasState.prototype.doMove = function(e) {
             this.valid = false; // redraw
 
             // are we carrying a connector?
-            if (typeof this.selection.fromX != 'undefined') {
+            if (this.selection.constructor == Connector) {
                 // reset to allow mouse to disengage Connector from a magnet
                 this.selection.dest = null;
 
                 // get this connector's shape
-                var own_shape = null;
                 if (this.selection.source !== null) {
-                    own_shape = this.selection.source.parent;
+                    var own_shape = this.selection.source.parent;
                 }
 
                 // check if connector has been dragged to an in-magnet
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
                     if (typeof shape.in_magnets == 'undefined') {
-                        // ignore Connectors
+                        // ignore Connectors, RawNodes, CDtNodes
                         continue;
                     }
 
-                    if (own_shape !== null && shape == own_shape) {
+                    if (typeof own_shape !== 'undefined' && shape == own_shape) {
                         // disallow self-referential connections
                         continue;
                     }
@@ -197,8 +196,9 @@ CanvasState.prototype.doMove = function(e) {
                         if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = 'yellow';
-                            if (in_magnet.connected.length == 0 &&
-                                in_magnet.contains(this.selection.x, this.selection.y)) {
+                            if (in_magnet.connected.length == 0 
+                                && in_magnet.contains(this.selection.x, this.selection.y)
+                                ) {
                                 // jump to magnet
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
@@ -209,10 +209,6 @@ CanvasState.prototype.doMove = function(e) {
                 }
             } else {
                 // carrying a shape
-                if (mouse.x > 0.9 * this.width) {
-                    // prevent shapes from being carried into output end-zone
-                    this.selection.x = 0.9 * this.width;
-                }
             }
         }
         // TODO: else dragging on canvas - we could implement block selection here
@@ -221,9 +217,18 @@ CanvasState.prototype.doMove = function(e) {
 
 CanvasState.prototype.doUp = function(e) {
     this.dragging = false;
+    var mouse = this.getPos(e);
 
     // are we carrying a Connector?
-    if (this.selection === null || typeof this.selection.fromX === 'undefined') {
+    if (this.selection === null) {
+        return;
+    }
+    if (this.selection.constructor != Connector) {
+        if (this.outputZone.contains(mouse.x, mouse.y)) {
+            // Shape dragged into output zone
+            this.selection.x = this.outputZone.x - this.selection.w;
+            this.valid = false;
+        }
         return;
     }
 
@@ -231,10 +236,9 @@ CanvasState.prototype.doUp = function(e) {
 
     if (connector.dest === null) {
         // connector not yet linked to anything
-        var mouse = this.getPos(e);
 
         if (this.outputZone.contains(mouse.x, mouse.y)) {
-            // Connector drawn into output end-zone
+            // Connector drawn into output zone
             if (connector.source.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
                 this.connectors.pop();
@@ -304,12 +308,6 @@ CanvasState.prototype.clear = function() {
     this.ctx.textAlign = 'center';
     this.ctx.font = '12pt Lato, sans-serif';
 
-    // draw output end-zone
-    this.outputZone.draw(this.ctx);
-/*    this.ctx.fillStyle = '#adf';
-    this.ctx.fillRect(this.width * 0.9, 0, this.width, this.height);
-    this.ctx.fillStyle = 'black';
-    this.ctx.fillText('Output', this.width * 0.95, 20);*/
 };
 
 CanvasState.prototype.draw = function() {
@@ -321,6 +319,18 @@ CanvasState.prototype.draw = function() {
         var shapes = this.shapes;
         var connectors = this.connectors;
         this.clear();
+
+        // draw output end-zone -when- dragging a connector from a MethodNode
+        if (this.dragging && this.selection 
+            && this.selection.constructor == Connector
+            && this.selection.source.parent.constructor == MethodNode // CDtNode -> output is not allowed
+            ) {
+            this.outputZone.draw(this.ctx);
+        /*    this.ctx.fillStyle = '#adf';
+            this.ctx.fillRect(this.width * 0.9, 0, this.width, this.height);
+            this.ctx.fillStyle = 'black';
+            this.ctx.fillText('Output', this.width * 0.95, 20);*/
+        }
 
         // draw all shapes and magnets
         for (var i = 0; i < shapes.length; i++) {
@@ -373,22 +383,23 @@ CanvasState.prototype.getPos = function(e) {
 
 CanvasState.prototype.deleteObject = function() {
     // delete selected object
-    var mySel = this.selection;
-    var index = -1;
-    var i = 0; // loop counter
-    var in_magnets = [];
-    var in_magnet;
-    var out_magnets = [];
-    var out_magnet;
-    var this_connector = null;
+    var mySel = this.selection,
+        index = -1,
+        i = 0, // loop counter
+        in_magnets = [],
+        in_magnet,
+        out_magnets = [],
+        out_magnet,
+        this_connector = null;
 
     if (mySel !== null) {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
             
-            // in_magnet will be undefined for output cables
-            if (typeof mySel.in_magnet !== 'undefined')
-                mySel.in_magnet.connected = [];
+            // destination will be a string for output cables
+            if (typeof mySel.dest !== 'string')
+                mySel.dest.connected = [];
+            
             index = mySel.source.connected.indexOf(mySel);
             mySel.source.connected.splice(index, 1);
             index = this.connectors.indexOf(mySel);
