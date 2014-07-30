@@ -1,7 +1,7 @@
 // place in global namespace to access from other files
 var canvas;
 var canvasState;
-var submit_to_url = 'pipeline_add';
+var submit_to_url = '/pipeline_add';
 
 var rawNodeWidth = 20,
     rawNodeColour = "#88DD88",
@@ -89,7 +89,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             if (mf_id != "") {
                 $.ajax({
                     type: "POST",
-                    url: "get_method_revisions/",
+                    url: "/get_method_revisions/",
                     data: {mf_id: mf_id}, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
@@ -240,7 +240,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 // use AJAX to retrieve Revision inputs and outputs
                 $.ajax({
                     type: "POST",
-                    url: "get_method_io/",
+                    url: "/get_method_io/",
                     data: { mid: mid }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {

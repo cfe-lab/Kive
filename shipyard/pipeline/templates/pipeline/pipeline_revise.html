@@ -49,8 +49,8 @@
         $('#id_pipeline_select').on('change', function () {
             $.ajax({
                 type: "POST",
-                url: "get_pipeline/",
-                data: {pipeline_id: $('#id_pipeline_select').val()},
+                url: "/get_pipeline/",
+                data: { pipeline_id: $('#id_pipeline_select').val() },
                 datatype: "json",
                 success: function(result) {
                     // prepare to redraw canvas
@@ -84,7 +84,7 @@
                         // use AJAX transaction to retrieve this Method's inputs and outputs
                         req = $.ajax({
                             type: "POST",
-                            url: "get_method_io/",
+                            url: "/get_method_io/",
                             data: {mid: node.transf_pk},
                             datatype: "json",
                             success: function(methodio) {
