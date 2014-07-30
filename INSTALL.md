@@ -57,13 +57,13 @@ This process still requires some manual steps. To create and run your first pipe
 
 1. Create a raw data set.
 
-    cd ~/git/Shipyard/shipyard
-    python manage.py shell
-    from librarian.models import SymbolicDataset
-    from django.contrib.auth.models import User
-    u = User.objects.get(username='shipyard')
-    SymbolicDataset.create_SD('../samplecode/script_1_sum_and_products_input.csv', user=u, name='2cols', description='two columns of numbers')
-    exit()
+        cd ~/git/Shipyard/shipyard
+        python manage.py shell
+        from librarian.models import SymbolicDataset
+        from django.contrib.auth.models import User
+        u = User.objects.get(username='shipyard')
+        SymbolicDataset.create_SD('../samplecode/script_1_sum_and_products_input.csv', user=u, name='2cols', description='two columns of numbers')
+        exit()
 
 2. Go to the Shipyard web interface, and navigate to Developer portal: Code resources.
 3. Click Add new code resource.
