@@ -497,13 +497,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 return;
             }
             $('#id_family_name').css({'background-color': '#FFFFFF'});
-
-            if (family_desc === '') {
-                $('li', 'ul#id_ctrl_nav')[0].click();
-                $('#id_family_desc').css({'background-color': '#FFFFCC'}).focus();
-                submitError('Pipeline family must have a description');
-                return;
-            }
             $('#id_family_desc').css({'background-color': '#FFFFFF'});
         }
 
@@ -517,13 +510,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             return;
         }
         $('#id_revision_name').css({'background-color': '#FFFFFF'});
-
-        if (revision_desc === '') {
-            $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
-            $('#id_revision_desc').css({'background-color': '#FFFFCC'}).focus();
-            submitError('Pipeline must have a description');
-            return;
-        }
         $('#id_revision_desc').css({'background-color': '#FFFFFF'});
 
 
