@@ -12,14 +12,10 @@ function poll_run_progress(run_data) {
     setTimeout(function() {
         $.getJSON("poll_run_progress", run_data,
             function (new_data) { 
-                show_run_progress(new_data);
+                show_run_progress(new_data["status"]);
                 if (new_data["finished"]) {
-                    run_elem = $('<input type="hidden" name="run" value="' + run_data["run"] + '"/>');
-                    $("#inputs_form").append(run_elem);
-                    $("#submit").unbind("click");
-                    $("#inputs_form").attr("action", "view_results");
                     $("#loading").hide("slow");
-					show_results_link(run_data["run"]);
+                    show_results_link(run_data["run"]);
                 } else {
                     poll_run_progress(new_data); 
                 }
@@ -29,8 +25,8 @@ function poll_run_progress(run_data) {
 }
 
 /* Display the progress of a run on the page. */
-function show_run_progress(run_data) {
-    $("#progress").html(run_data["status"]);
+function show_run_progress(message) {
+    $("#progress").html(message);
 }
 
 /* Display an error on the page. */
@@ -40,7 +36,7 @@ function display_error(message) {
 
 /* Display the link to the next page. */
 function show_results_link(run_pk) {
-	$("#progress").append('<div><a href="view_results/' + run_pk + '/">View results</a></div>');
+    $("#progress").append('<div><a href="view_results/' + run_pk + '/">View results</a></div>');
 }
 
 /* Custom jQuery function to retrieve a tuple's primary key according to the table's metadata.
@@ -79,15 +75,15 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             $("#errors").html("");
             
             submit.hide().after( $('<img id="loading" src="/static/portal/loading.gif">').hide().show('slow') );
+            $("#submit").unbind("click");
             $.getJSON("run_pipeline", $(this).serialize(),
                 function (run_data) { 
-                    show_run_progress(run_data);
+                    show_run_progress(run_data["status"]);
                     poll_run_progress(run_data); 
                 }
             );
         } else {
             display_error("Not all inputs have been set.");
-            return false;
         }
     });
     
@@ -100,7 +96,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         } else {
             display_error("No pipeline selected.");
             e.preventDefault();
-            return false;
         }
     });
     
@@ -200,12 +195,15 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             noResults.hide();
             activeFilters.html('');
             
+            // TODO: make this generic (put all the table data in the dict, not 
+            // just compound_datatype specifically).
             request_data = {
-                "filter_data": JSON.stringify(filters), 
-                "compound_datatype": tab.data("compoundatatype")
+                filter_data: JSON.stringify(filters),
+                compound_datatype: tab.data("compoundatatype")
             };
             
             $.getJSON(tab.data('ajax-url'), request_data, function (data) {
+                console.log(data);
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
                     bg = 'background-color';
@@ -303,7 +301,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             }).prop('checked', false);
             
             filterTable_ajax(filters_html.siblings('.results'));
-            return false;
         });
     
         // Mechanism for removing filter elements.
