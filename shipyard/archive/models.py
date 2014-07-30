@@ -1591,7 +1591,8 @@ class Dataset(models.Model):
     user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, help_text="Name of this Dataset.")
     description = models.TextField(help_text="Description of this Dataset.",
-                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+                                   blank=True)
     date_created = models.DateTimeField(auto_now_add=True, help_text="Date of Dataset creation.")
 
     # Four cases from which Datasets can originate:

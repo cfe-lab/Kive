@@ -234,7 +234,7 @@ class SymbolicDataset(models.Model):
         """
         Helper function to make defining SDs and Datasets faster.
     
-        user, name, and description must all be set if make_dataset=True.
+        user and name must both be set if make_dataset=True.
         make_dataset creates a Dataset from the given file path to go
         with the SD. created_by can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if 
