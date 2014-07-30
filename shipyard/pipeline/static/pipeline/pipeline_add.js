@@ -19,6 +19,9 @@ var mNodeWidth = 80,
     mNodeColour = '#999999',
     mNodeOffset = 10;
 
+var submitError = function(error) {
+    $('#id_submit_error').show().html(error);
+};
 
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
@@ -169,11 +172,11 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var connector = dialog.data('sender');
         connector.dest = $('#output_name').val();
         canvasState.valid = false;
-        dialog.fadeOut(400);
+        dialog.hide();
     }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript
-        $(this).closest('#dialog_form').fadeOut(400);
+        $(this).closest('#dialog_form').hide();
         canvasState.connectors.pop();
-        canvasStage.valid = false;
+        canvasState.valid = false;
     });
 
     // Handle 'Inputs' menu
@@ -409,7 +412,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 $this.val('');
         });
         
-        var submit_error = $('#id_submit_error')[0];
 
         var shapes = canvasState.shapes;
 
@@ -422,7 +424,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var method_nodes = [];
         var num_connections;
 
-        submit_error.innerHTML = '';
+        document.getElementById('id_submit_error').innerHTML = '';
 
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
@@ -437,7 +439,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 // is this magnet connected?
                 if (this_magnet.connected.length == 0) {
                     // unconnected input in graph, exit
-                    submit_error.innerHTML = 'Unconnected input node';
+                    submitError('Unconnected input node');
                     return;
                 }
             }
@@ -452,7 +454,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     num_connections += this_magnet.connected.length;
                 }
                 if (num_connections === 0) {
-                    submit_error.innerHTML = 'MethodNode with unused outputs';
+                    submitError('MethodNode with unused outputs');
                     return;
                 }
             }
@@ -466,19 +468,17 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             this_connector = connectors[i];
             if (this_connector.dest.constructor === String) {
                 pipeline_has_output = true;
+                break;
             }
         }
 
         if (!pipeline_has_output) {
-            submit_error.innerHTML = 'Pipeline has no output';
+            submitError('Pipeline has no output');
             return;
         }
 
 
-        var is_revision = false;
-        if ($('#id_pipeline_select').length > 0) {
-            is_revision = true;
-        }
+        var is_revision = 0 < $('#id_pipeline_select').length;
 
         // arguments to initialize new Pipeline Family
         var family_name = $('#id_family_name').val(),  // hidden input if revision
@@ -493,7 +493,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 // FIXME: is there a better way to do this trigger?
                 $('li', 'ul#id_ctrl_nav')[0].click();
                 $('#id_family_name').css({'background-color': '#FFFFCC'}).focus();
-                submit_error.innerHTML = 'Pipeline family must be named';
+                submitError('Pipeline family must be named');
                 return;
             }
             $('#id_family_name').css({'background-color': '#FFFFFF'});
@@ -501,7 +501,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             if (family_desc === '') {
                 $('li', 'ul#id_ctrl_nav')[0].click();
                 $('#id_family_desc').css({'background-color': '#FFFFCC'}).focus();
-                submit_error.innerHTML = 'Pipeline family must have a description';
+                submitError('Pipeline family must have a description');
                 return;
             }
             $('#id_family_desc').css({'background-color': '#FFFFFF'});
@@ -513,7 +513,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         if (revision_name === '') {
             $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
             $('#id_revision_name').css({'background-color': '#FFFFCC'}).focus();
-            submit_error.innerHTML = 'Pipeline must be named';
+            submitError('Pipeline must be named');
             return;
         }
         $('#id_revision_name').css({'background-color': '#FFFFFF'});
@@ -521,7 +521,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         if (revision_desc === '') {
             $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
             $('#id_revision_desc').css({'background-color': '#FFFFCC'}).focus();
-            submit_error.innerHTML = 'Pipeline must have a description';
+            submitError('Pipeline must have a description');
             return;
         }
         $('#id_revision_desc').css({'background-color': '#FFFFFF'});
@@ -540,7 +540,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         form_data['revision_desc'] = revision_desc;
 
         if (is_revision) {
-            form_data['revision_parent_pk'] = $('#id_pipeline_select').val();
+            form_data['revision_parent_pk'] = document.getElementById('id_pipeline_select').value;
         } else {
             // no parent, creating first revision of new Pipeline Family
             form_data["revision_parent_pk"] = null;
@@ -565,7 +565,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
             form_data['pipeline_inputs'][i] = {
-                'CDT_pk': (this_input.constructor===CDtNode) ? this_input.pk : null,
+                'CDT_pk': (this_input.constructor === CDtNode) ? this_input.pk : null,
                 'dataset_name': this_input.label,
                 'dataset_idx': i+1,
                 'x': this_input.x,
@@ -582,6 +582,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var this_parent;
         var okay_to_add;
         i = 0;
+        
         while (method_nodes.length > 0) {
             for (j = 0; j < method_nodes.length; j++) {
                 method_node = method_nodes[j];
@@ -612,7 +613,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 }
             }
             i += 1;
-            if (i > 5*shapes.length) {
+            if (i > 5 * shapes.length) {
                 console.log('DEBUG: topological sort routine failed')
                 return;
             }
@@ -710,6 +711,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // this code modified at my desk
         // June 18, 2014 -- RL
+        
+        // I code at my desk too.
+        // July 30, 2014 - JN
 
         // do AJAX transaction
         $.ajax({
@@ -720,7 +724,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             success: function(result) {
                 console.log(result);
                 if (result['status'] == 'failure') {
-                    submit_error.innerHTML = result['error_msg'];
+                    submitError(result['error_msg']);
                 }
             }
         })
