@@ -203,7 +203,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             };
             
             $.getJSON(tab.data('ajax-url'), request_data, function (data) {
-                console.log(data);
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
                     bg = 'background-color';
