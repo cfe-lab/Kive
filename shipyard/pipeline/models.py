@@ -237,7 +237,7 @@ class Pipeline(transformation.models.Transformation):
 
          - pipeline_steps: list of dicts as produced by the represent_as_dict method of PipelineStep.
 
-         - pipeline_output_cables: list of dicts as produced by the represent_as_dict method of PipelineOutputCable.
+         - pipeline_outputs: list of dicts as produced by the represent_as_dict method of PipelineOutputCable.
         """
         dict_repr = {
             "family_pk": self.family.pk,
@@ -254,7 +254,7 @@ class Pipeline(transformation.models.Transformation):
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
-            "pipeline_output_cables": []
+            "pipeline_outputs": []
         }
 
         # Populate dict_repr["pipeline_inputs"].
@@ -265,9 +265,9 @@ class Pipeline(transformation.models.Transformation):
         for curr_step in self.steps.all().order_by("step_num"):
             dict_repr["pipeline_steps"].append(curr_step.represent_as_dict())
 
-        # Finally, populate dict_repr["pipeline_output_cables"].
+        # Finally, populate dict_repr["pipeline_outputs"].
         for curr_poc in self.outcables.all():
-            dict_repr["pipeline_output_cables"].append(curr_poc.represent_as_dict())
+            dict_repr["pipeline_outputs"].append(curr_poc.represent_as_dict())
 
         return dict_repr
 
@@ -492,7 +492,7 @@ class Pipeline(transformation.models.Transformation):
             pipeline.create_PS_from_dict(step_dict)
 
         # Add output cables.
-        for outcable_dict in form_data["pipeline_output_cables"]:
+        for outcable_dict in form_data["pipeline_outputs"]:
             pipeline.create_outcable_from_dict(outcable_dict)
 
         try:
