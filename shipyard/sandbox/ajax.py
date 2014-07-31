@@ -134,7 +134,7 @@ def _get_run_progress(run):
 
     # Just finished a cable, but didn't start the next one?
     if run.runoutputcables.count() < total_cables:
-        return "Starting output {} of {}"
+        return "Starting output {} of {}".format(run.runoutputcables.count()+1, total_cables)
 
     # Something is wrong.
     return "Unknown status"
