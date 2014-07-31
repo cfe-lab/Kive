@@ -421,6 +421,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         var this_magnet;
         var i, j;
         var pipeline_inputs = [];  // collect data nodes
+        var pipeline_outputs = [];
         var method_nodes = [];
         var num_connections;
 
@@ -428,22 +429,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
-            if (this_shape.constructor !== MethodNode) {
-                // this is a data node
-                pipeline_inputs.push(this_shape);
-
-                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode
-                magnets = this_shape.out_magnets;
-                this_magnet = magnets[0];  // data nodes only ever have one magnet
-
-                // is this magnet connected?
-                if (this_magnet.connected.length == 0) {
-                    // unconnected input in graph, exit
-                    submitError('Unconnected input node');
-                    return;
-                }
-            }
-            else {
+            if (this_shape.constructor == MethodNode) {
                 method_nodes.push(this_shape);
 
                 // at least one out-magnet must be occupied
@@ -458,21 +444,31 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     return;
                 }
             }
-        }
+            else if (this_shape.constructor == OutputNode) {
+                pipeline_outputs.push(this_shape);
 
-        // at least one Connector must terminate as pipeline output
-        var connectors = canvasState.connectors;
-        var this_connector;
-        var pipeline_has_output = false;
-        for (i = 0; i < connectors.length; i++) {
-            this_connector = connectors[i];
-            if (this_connector.dest.constructor === String) {
-                pipeline_has_output = true;
-                break;
+                // no need to check for connected magnets - all output nodes have
+                // exactly 1 magnet with exactly 1 cable.
+            }
+            else {
+                // this is a data node
+                pipeline_inputs.push(this_shape);
+
+                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode
+                magnets = this_shape.out_magnets;
+                this_magnet = magnets[0];  // data nodes only ever have one magnet
+
+                // is this magnet connected?
+                if (this_magnet.connected.length == 0) {
+                    // unconnected input in graph, exit
+                    submitError('Unconnected input node');
+                    return;
+                }
             }
         }
 
-        if (!pipeline_has_output) {
+        // at least one Connector must terminate as pipeline output
+        if (pipeline_outputs.length == 0) {
             submitError('Pipeline has no output');
             return;
         }
@@ -619,17 +615,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
-        // sort output cables by y-position (top to bottom)
-        var output_cables = [];
-        for (i = 0; i < connectors.length; i++) {
-            this_connector = connectors[i];
-            if (this_connector.dest.constructor === String) {
-                // connector terminates in output end-zone
-                output_cables.push(this_connector);
-            }
-        }
-        output_cables.sort(sortByYpos);
-
         // add arguments for input cabling
         var this_step;
         var this_source;
@@ -687,21 +672,25 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             }
         }
 
-        form_data["pipeline_output_cables"] = [];
+        // sort output cables by y-position (top to bottom)
+        pipeline_outputs.sort(sortByYpos);
 
-        for (j = 0; j < output_cables.length; j++) {
-            this_connector = output_cables[j];
+        var this_output;
+        form_data['pipeline_outputs'] = [];
+        for (i = 0; i < pipeline_outputs.length; i++) {
+            this_output = pipeline_outputs[i];
+            this_connector = this_output.in_magnets[0].connected[0];
             var this_source_step = this_connector.source.parent;
-
-            form_data["pipeline_output_cables"][j] = {
-                'output_idx': j+1,
-                'output_name': this_connector.dest,
-                "output_CDT_pk": this_connector.source.cdt,
+            
+            form_data['pipeline_outputs'][i] = {
+                'output_name': this_output.label,
+                'output_idx': i+1,
+                'output_CDT_pk': this_connector.source.cdt,
                 'source': this_source_step.pk,
                 'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
                 'source_dataset_name': this_connector.source.label,  // magnet label
-                'x': this_connector.x,
-                'y': this_connector.y,
+                'x': this_output.x,
+                'y': this_output.y,
                 "wires": [] // in the future we might have this
             };
         }
