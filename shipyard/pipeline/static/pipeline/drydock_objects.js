@@ -245,7 +245,10 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
 }
 
 MethodNode.prototype.contains = function(mx, my) {
-    return this.x <= mx && this.x + this.w >= mx && this.y <= my && this.y + this.h >= my;
+    return this.x <= mx 
+        && this.x + this.w >= mx 
+        && this.y <= my 
+        && this.y + this.h >= my;
 };
 
 
@@ -268,10 +271,7 @@ function Magnet (parent, r, attract, fill, cdt, label) {
 }
 
 Magnet.prototype.draw = function(ctx) {
-    // update values passed from shape
-    // ** Update magnet.x and magnet.y and then call draw(). —JN
-//    this.x = x;
-//    this.y = y;
+    // magnet coords are set by containing shape
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
     ctx.closePath();
@@ -317,6 +317,7 @@ function Connector (from_x, from_y, out_magnet) {
 
     this.x = this.from_x; // for compatibility with shape-based functions
     this.y = this.from_y;
+    this.midX = this.fromX + (this.x - this.fromX) / 2;
 }
 
 Connector.prototype.draw = function(ctx) {
@@ -338,17 +339,14 @@ Connector.prototype.draw = function(ctx) {
             // move with the attached shape
             this.x = this.dest.x;
             this.y = this.dest.y;
-        } else if (this.dest.constructor === String) {
-            // string value indicates Connector to output, present label
-            ctx.fillStyle = '#000';
-            ctx.textAlign = 'left';
-            ctx.font = '10pt Lato, sans-serif';
-            ctx.fillText(this.dest, this.x+5, this.y+4);
         }
     }
+    
+    this.midX = this.fromX + (this.x - this.fromX) / 2;
+    
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
-    ctx.lineTo(this.x, this.y);
+    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
     ctx.stroke();
 };
 
@@ -361,14 +359,51 @@ Connector.prototype.highlight = function(ctx, dragging) {
      */
     if (dragging === false) {
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.fromX, this.fromY);
-        ctx.closePath();
+        ctx.moveTo(this.fromX, this.fromY);
+        ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
         ctx.stroke();
     }
 }
 
 Connector.prototype.contains = function(mx, my, pad) {
+    // Uses library jsBezier to accomplish certain tasks.
+    // Since precise bezier distance is expensive to compute, we start by
+    // running a faster algorithm to see if mx,my is outside the rectangle
+    // given by fromX,fromY,x,y (plus padding).
+
+    // assume certain things about top/bottom/right/left
+    var bottom = this.y,
+        top = this.fromY,
+        right = this.x,
+        left = this.fromX;
+    
+    // now check if our assumptions were correct
+    if (this.fromX > this.x) {
+        left = this.x,
+        right = this.fromX;
+    }
+    if (this.fromY > this.y) {
+        top = this.y,
+        bottom = this.fromY;
+    }
+    
+    if (mx > left - pad && mx < right + pad
+        && my > top - pad && my < bottom + pad
+        ) {
+        // expensive route: run bezier distance algorithm
+        return pad > 
+            jsBezier.quickDistFromCurve(
+                mx, my, 
+                this.fromX, this.fromY, 
+                this.midX, 
+                this.x, this.y
+            );
+    }
+    // mx,my is outside the rectangle, don't bother computing the bezier distance
+    else return false;
+
+/*  Old code for straight line
+
     /*
     Determine if mouse coordinates (x,y) are on or close to this
     connector with coordinates (x1,y1) and (x2,y2).
@@ -377,10 +412,11 @@ Connector.prototype.contains = function(mx, my, pad) {
     (2) y1 < y < y2
     (3) the distance of x,y to the line is below cutoff,
         see http://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-     */
+     * /
+     
     var dx = this.x - this.fromX,
         dy = this.y - this.fromY;
-
+        
     return (
         (this.x < mx) !== (this.fromX < mx)
         && (this.y < my) !== (this.fromY < my)
@@ -393,20 +429,20 @@ Connector.prototype.contains = function(mx, my, pad) {
             )
             / Math.sqrt(dx * dx + dy * dy)
         ) < pad
-    )
+    )*/
 };
 
-function OutputZone (cw, ch, offset) {
+function OutputZone (cw, ch, inset) {
     this.x = cw * .8;
     this.w = cw * .15;
     this.h = this.w;
-    this.y = ch * .5 - this.h / 2;
+    this.y = 1;
     
     while (this.h + this.y > ch) {
         this.h /= 1.5;
     }
     
-    this.offset = offset || 12; // distance of label from center
+    this.inset = inset || 15; // distance of label from center
 }
 
 OutputZone.prototype.draw = function (ctx) {
@@ -425,8 +461,9 @@ OutputZone.prototype.draw = function (ctx) {
     // draw label
     ctx.fillStyle = '#aaa';
     ctx.textAlign = 'center';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText("Drag here to create an output", this.x + this.w/2, this.y - this.offset);
+    ctx.font = 'bold 10pt Lato, sans-serif';
+    ctx.fillText("Drag here to", this.x + this.w/2, this.y + this.inset);
+    ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
 };
 
 OutputZone.prototype.contains = function (mx, my) {
@@ -437,3 +474,64 @@ OutputZone.prototype.contains = function (mx, my) {
         && my <= this.y + this.h
     );
 };
+
+function OutputNode (x, y, r, h, fill, topFill, inset, offset, label) {
+    /*
+    Node representing an output.
+    Rendered as a cylinder.
+     */
+    this.x = x || 0; // defaults to top left corner
+    this.y = y || 0;
+    this.r = r || 20; // x-radius (ellipse)
+    this.r2 = this.r / 2; // y-radius (ellipse)
+    this.w = this.r; // for compatibility
+    this.h = h || 25; // height of cylinder
+    this.fill = fill || "#aaa";
+    this.topFill = topFill || "#ddd";
+    this.inset = inset || 12; // distance of magnet from center
+    this.offset = offset || 18; // distance of label from center
+    this.label = label || '';
+    this.out_magnets = []; // for compatibility
+
+    // CDT node always has one magnet
+    var magnet = new Magnet(this, 5, 2, "white", null, this.label);
+    this.in_magnets = [ magnet ];
+}
+
+OutputNode.prototype.draw = function(ctx) {
+    // draw bottom ellipse
+    ctx.fillStyle = this.fill;
+    drawEllipse(ctx, this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.fill();
+    
+    // draw stack 
+    ctx.fillRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    
+    // draw top ellipse
+    ctx.fillStyle = this.topFill;
+    drawEllipse(ctx, this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.fill();
+
+    // draw label
+    ctx.fillStyle = 'black';
+    ctx.textAlign = 'center';
+    ctx.font = '10pt Lato, sans-serif';
+    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
+
+    // draw magnet
+    in_magnet = this.in_magnets[0];
+    in_magnet.x = this.x - this.inset;
+    in_magnet.y = this.y + this.r2/2;
+    in_magnet.draw(ctx);
+};
+
+OutputNode.prototype.contains = function(mx, my) {
+    // FIXME: only checking the rectangle portion for now
+    return Math.abs(mx - this.x) < this.r
+        && Math.abs(my - this.y) < this.h/2;
+};
+
+OutputNode.prototype.highlight = function(ctx) {
+    // FIXME: only highlighting the rectangle portion for now 
+    ctx.strokeRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+}

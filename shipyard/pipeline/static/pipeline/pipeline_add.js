@@ -169,8 +169,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         // override ENTER key, click Create output button on form
         e.preventDefault();
         var dialog = $(this).closest('#dialog_form');
-        var connector = dialog.data('sender');
-        connector.dest = $('#output_name').val();
+        var out_node = dialog.data('node');
+        out_node.label = $('#output_name').val();
         canvasState.valid = false;
         dialog.hide();
     }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript

@@ -71,8 +71,20 @@ function CanvasState (canvas) {
     // options
     this.selectionColor = '#8af';
     this.selectionWidth = 2.5;
-    setInterval(function() { myState.draw(); }, 30); // 30 ms between redraws
+    setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
 }
+
+function drawEllipse (ctx, cx, cy, rx, ry) {
+    ctx.save(); // save state
+    ctx.beginPath();
+
+    ctx.translate(cx - rx, cy - ry);
+    ctx.scale(rx, ry);
+    ctx.arc(1, 1, 1, 0, 2 * Math.PI, false);
+
+    ctx.restore(); // restore to original state
+    ctx.fill();
+};
 
 CanvasState.prototype.doDown = function(e) {
     var pos = this.getPos(e);
@@ -82,19 +94,8 @@ CanvasState.prototype.doDown = function(e) {
     var shapes = this.shapes;
     var connectors = this.connectors;
 
-    // did we click on a Connector?
-    var l = connectors.length;
-    for (var i = l-1; i >= 0; i--) {
-        if (connectors[i].contains(mx, my, 5)) {
-            this.selection = connectors[i];
-            this.valid = false; // highlight but no drag
-            return;
-        }
-    }
-
     // did we click on a shape?
-    l = shapes.length;
-    for (i = l-1; i >= 0; i--) {
+    for (i = shapes.length - 1; i >= 0; i--) {
         // check shapes in reverse order
         if (shapes[i].contains(mx, my)) {
             var mySel = shapes[i];
@@ -102,11 +103,10 @@ CanvasState.prototype.doDown = function(e) {
             out_magnets = mySel.out_magnets;
             for (var j = 0; j < out_magnets.length; j++) {
                 out_magnet = out_magnets[j];
-                // FIXME: actually an out-magnet should be able to have multiple connectors
+                
                 if (out_magnet.contains(mx, my)) {
                     // create Connector from this out-magnet
                     conn = new Connector(null, null, out_magnet);
-                    //out_magnet.connected.push(conn);  // wait until mouse-up
                     connectors.push(conn);
                     this.selection = conn;
                     this.dragoffx = mx - conn.fromX;
@@ -123,9 +123,19 @@ CanvasState.prototype.doDown = function(e) {
             this.dragging = true;
             this.selection = mySel;
             if (this.selection.constructor === MethodNode) {
-                $('#id_method_button').val('Revise Method');
+                document.getElementById('id_method_button').value = 'Revise Method';
             }
             this.valid = false;
+            return;
+        }
+    }
+
+    // did we click on a Connector?
+    // check this -after- checking shapes, as the algorithm is slower.
+    for (var i = connectors.length - 1; i >= 0; i--) {
+        if (connectors[i].contains(mx, my, 5)) {
+            this.selection = connectors[i];
+            this.valid = false; // highlight but no drag
             return;
         }
     }
@@ -218,11 +228,12 @@ CanvasState.prototype.doMove = function(e) {
 CanvasState.prototype.doUp = function(e) {
     this.dragging = false;
     var mouse = this.getPos(e);
-
-    // are we carrying a Connector?
+    
     if (this.selection === null) {
         return;
     }
+
+    // are we carrying a Connector?
     if (this.selection.constructor != Connector) {
         if (this.outputZone.contains(mouse.x, mouse.y)) {
             // Shape dragged into output zone
@@ -246,21 +257,24 @@ CanvasState.prototype.doUp = function(e) {
                 this.valid = false;
             } else {
                 // valid Connector, assign non-null value
+                
+                var outNode = new OutputNode(mouse.x, mouse.y, null, null, '#d40', '#e60', null, null, connector.source.label);
+                connector.dest = outNode.in_magnets[0];
+                this.addShape(outNode);
+                outNode.in_magnets[0].connected = [ connector ];
+                connector.source.connected.push(connector);
+                connector.y = this.outputZone.y + this.outputZone.h;// push out of output zone
+                this.valid = false;
 
                 // spawn dialog for output label
                 var dialog = document.getElementById("dialog_form");
                 
-                $(dialog).data('sender', connector).show().css({
+                $(dialog).data('node', outNode).show().css({
                     left: Math.min(mouse.x, this.outputZone.x + this.outputZone.w/2 - dialog.offsetWidth/2 ) + this.pos_x,
                     top:  Math.min(mouse.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
-                }).find('#output_name').select();
+                });
                 
-                document.getElementById("output_name").value = connector.source.label;  // default value
-                
-                connector.dest = connector.source.label;
-                connector.source.connected.push(connector);
-                connector.x = this.outputZone.x + this.outputZone.w/2;// snap to center of output zone
-                this.valid = false;
+                $('#output_name', dialog).val(connector.source.label).select(); // default value;
             }
         } else {
             // Connector not linked to anything - delete
@@ -396,12 +410,16 @@ CanvasState.prototype.deleteObject = function() {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
             
-            // destination will be a string for output cables
-            if (typeof mySel.dest !== 'string')
-                mySel.dest.connected = [];
+            // if a cable to an output node is severed, delete the node as well
+            // contains a LEGACY CHECK!!!
+            if (typeof mySel.dest !== 'string' && mySel.dest.parent.constructor == OutputNode) {
+                index = this.shapes.indexOf(mySel.dest.parent);
+                this.shapes.splice(index, 1);
+            }
             
             index = mySel.source.connected.indexOf(mySel);
             mySel.source.connected.splice(index, 1);
+            
             index = this.connectors.indexOf(mySel);
             this.connectors.splice(index, 1);
         }
@@ -451,6 +469,19 @@ CanvasState.prototype.deleteObject = function() {
             index = this.shapes.indexOf(mySel);
             this.shapes.splice(index, 1);
         }
+        else if (mySel.constructor == OutputNode) {
+            // deleting an output node also deletes the cable
+            this_connector = mySel.in_magnets[0].connected[0];
+            
+            index = this.connectors.indexOf(this_connector);
+            this.connectors.splice(index, 1);
+            
+            index = this_connector.source.connected.indexOf(this_connector);
+            this_connector.source.connected.splice(index, 1);
+            
+            index = this.shapes.indexOf(mySel);
+            this.shapes.splice(index, 1);
+        }
         else {  // CDtNode or RawNode
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
@@ -475,4 +506,3 @@ CanvasState.prototype.deleteObject = function() {
         this.valid = false; // re-draw canvas to make Connector disappear
     }
 };
-
