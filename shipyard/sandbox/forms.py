@@ -18,3 +18,4 @@ class PipelineSelectionForm(forms.Form):
         self.family_name = pipeline.name
         choices = [(rev.pk, str(rev)) for rev in pipeline.members.order_by("revision_number")]
         self.fields["pipeline"].choices = choices
+        self.fields["pipeline"].initial = choices[-1][0]
