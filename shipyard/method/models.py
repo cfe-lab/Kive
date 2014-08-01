@@ -405,7 +405,7 @@ class Method(transformation.models.Transformation):
         super(Method, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return "/methods/{}".format(self.id)
+        return "/method_revise/{}".format(self.id)
 
     @property
     def is_method(self):
@@ -672,6 +672,11 @@ class MethodFamily(transformation.models.TransformationFamily):
     """
     # Implicitly defined:
     #   members (Method/ForeignKey)
+
+    def get_absolute_url(self):
+        """ go to a page listing all Methods under this family"""
+        return "/methods/{}".format(self.id)
+
     @property
     def num_revisions(self):
         """Number of revisions within this family."""

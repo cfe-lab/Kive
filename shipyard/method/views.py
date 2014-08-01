@@ -274,15 +274,26 @@ def resource_revision_add(request, id):
     return HttpResponse(t.render(c))
 
 
-def methods(request):
+def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
-    A MethodFamily class has no member variables of its own, so we
-    query for all "root" methods (with no parents).
     """
-    methods = Method.objects.filter(revision_parent=None)
+    families = MethodFamily.objects.all()
+    t = loader.get_template('method/method_families.html')
+    c = Context({'families': families})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
+
+def methods(request, id):
+    """
+    Display a list of all Methods within a given MethodFamily.
+    """
+    family = MethodFamily.objects.filter(pk=id)[0]
+    print family
+    its_methods = Method.objects.filter(family=family)
+
     t = loader.get_template('method/methods.html')
-    c = Context({'methods': methods})
+    c = Context({'methods': its_methods, 'family': family})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
@@ -343,10 +354,13 @@ def return_method_forms (request, exceptions):
     return method_form, input_forms, output_forms
 
 
-def method_add(request):
+def method_add(request, id=None):
     """
     Generate forms for adding Methods, and validate and process POST data returned
     by the user.  Allows for an arbitrary number of input and output forms.
+
+    [id] : User is not creating a new MethodFamily, but adding to an existing family
+            without a specified parent Method (different CodeResource)
     """
     t = loader.get_template('method/method_add.html')
     if request.method == 'POST':
@@ -355,6 +369,7 @@ def method_add(request):
         num_input_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_in_')])
         num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
         exceptions = {'inputs': {}, 'outputs': {}}
+
         method_family = None
         new_method = None
         new_inputs = []
@@ -369,11 +384,15 @@ def method_add(request):
                 raise
 
             # use this prototype Method's name and description to initialize the MethodFamily
+
             try:
-                method_family = MethodFamily(name=query['revision_name'],
-                                             description=query['revision_desc'])
-                method_family.full_clean()
-                method_family.save()
+                if id:
+                    method_family = MethodFamily.objects.get(pk=id)
+                else:
+                    method_family = MethodFamily(name=query['family_name'],
+                                                 description=query['family_desc'])
+                    method_family.full_clean()
+                    method_family.save()
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})

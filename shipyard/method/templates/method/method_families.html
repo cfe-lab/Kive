@@ -1,0 +1,41 @@
+<!-- Django template -->
+<!-- Display contents of Method Families as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Methods{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="dev.html" rel="prev">Back to developer's portal</a>
+
+<h2>Method Families</h2>
+
+<p>
+A MethodFamily is a collection of Methods that share a certain function
+in common.
+</p>
+
+<table>
+<thead>
+	<tr>
+        <th>Family</th>
+        <th>Description</th>
+        <th># revisions</th>
+	</tr>
+</thead>
+{% for family in families %}
+<tr>
+	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
+    <td>{{ family.description }}</td>
+    <td>{{ family.num_revisions }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<a href="method_add">Add a new method</a>
+
+{% endblock %}

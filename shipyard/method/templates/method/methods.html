@@ -12,7 +12,7 @@
 
 <a href="dev.html" rel="prev">Back to developer's portal</a>
 
-<h2>Methods</h2>
+<h2>Methods ({{ family.name }})</h2>
 
 <p>
 A Method is a set of instructions on how a Code Resource will be used.
@@ -21,22 +21,18 @@ A Method is a set of instructions on how a Code Resource will be used.
 <table>
 <thead>
 	<tr>
-    <th>Family</th>
-    <th># revisions</th>
-    <th>Name</th>
-    <th>Description</th>
+        <th>Name</th>
+        <th>Description</th>
 	</tr>
 </thead>
 {% for method in methods %}
 <tr>
-	<td><a href="{{ method.get_absolute_url }}">{{ method.family }}</a></td>
-    <td>{{ method.family_size }}</td>
-    <td>{{ method.revision_name }}</td>
-	<td>{{ method.revision_desc }}</td>
+	<td><a href="{{ method.get_absolute_url }}">{{ method.revision_name }}</a></td>
+    <td>{{ method.revision_desc }}</td>
 </tr>
 {% endfor %}
 </table>
 
-<a href="method_add">Add a new method</a>
+<a href="/method_add/{{ family.pk }}">Add a new method</a>
 
 {% endblock %}

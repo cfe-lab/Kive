@@ -136,7 +136,7 @@ class MethodForm (forms.ModelForm):
         widgets = {
             'revision_desc': forms.Textarea(attrs={'rows': 5,
                                                    'cols': 30,
-                                                   'style': 'height: 3em;'}),
+                                                   'style': 'height: 5em;'}),
         }
 
 
