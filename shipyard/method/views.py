@@ -253,7 +253,7 @@ def resource_revision_add(request, id):
         dependencies = parent_revision.dependencies.all()
         dep_forms = []
         for i, dependency in enumerate(dependencies):
-            its_crv = dependency.coderesourcerevision
+            its_crv = dependency.requirement
             its_cr = its_crv.coderesource
             dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
                                                   initial={'coderesource': its_cr.pk,

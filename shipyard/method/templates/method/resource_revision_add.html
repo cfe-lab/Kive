@@ -33,10 +33,17 @@
                 <div style="color:red">{{ resource_form.content_file.errors }}</div></td>
         </tr>
         <tr>
-            <th>{{ resource_form.revision_name.label }} <div class="helptext">{{ resource_form.revision_name.help_text }}</div></th>
+            <th>
+                {{ resource_form.revision_name.label }}
+                <div class="helptext">{{ resource_form.revision_name.help_text }}</div>
+                <br/>
+                <i>&nbsp;Optional</i>
+            </th>
             <td></td>
             <td>{{ resource_form.revision_name }}
-                <div style="color:red">{{ resource_form.revision_name.errors }}</div></td>
+                <div style="color:red">{{ resource_form.revision_name.errors }}</div>
+            </td>
+
         </tr>
         <tr>
             <th>{{ resource_form.revision_desc.label }} <div class="helptext">{{ resource_form.revision_desc.help_text }}</div></th>

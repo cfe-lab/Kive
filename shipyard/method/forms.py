@@ -66,10 +66,30 @@ class CodeResourceRevisionForm (forms.ModelForm):
 
 
 class CodeResourceDependencyForm (forms.ModelForm):
-    def __init__(self, parent=None, *args, **kwargs):
+    """
+    ModelForm for submitting a CodeResourceDependency
+    initial:  A dictionary to pass initial values from view function
+    parent:  Primary key (ID) of CodeResource having this dependency.
+    """
+    def __init__(self, initial=None, parent=None, *args, **kwargs):
         super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
         self.fields['coderesource'].widget = forms.Select(attrs={'class': 'coderesource'})
         self.fields['coderesource'].choices = self.get_code_resource_list(parent)
+        if initial:
+            # populate drop-downs before rendering template
+            cr= CodeResource.objects.get(pk=initial['coderesource'])
+            self.fields['coderesource'].initial = cr.pk
+
+            rev = CodeResourceRevision.objects.get(coderesource=cr)
+            if type(rev) is list:
+                self.fields['revisions'].choices = [(x.pk, x.revision_name) for x in rev]
+                self.fields['revisions'].initial = initial['revisions']
+            else:
+                self.fields['revisions'].choices = [(rev.pk, rev.revision_name)]
+
+            self.fields['depPath'].initial = initial['depPath']
+            self.fields['depFileName'].initial = initial['depFileName']
+
 
     def get_code_resource_list(self, parent):
         # required to refresh list on addition of a new CodeResource

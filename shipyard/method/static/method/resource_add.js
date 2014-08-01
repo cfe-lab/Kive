@@ -53,7 +53,7 @@ $(function(){
         cr_id = this.value;
         if (cr_id != "") {
             $.getJSON(// shorthand for $.ajax where datatype is JSON and request method is GET. also parses JSON automatically.
-                "get_revisions/", // url
+                "/get_revisions/", // url
                 { cr_id: cr_id }, // specify data as an object
                 function (result) { // callback for successful request
                     /* String appends are *much* faster than array joins in JS.
