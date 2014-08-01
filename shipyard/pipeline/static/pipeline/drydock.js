@@ -270,6 +270,7 @@ CanvasState.prototype.doUp = function(e) {
                 
                 connector.dest = outNode.in_magnets[0];
                 connector.dest.connected = [ connector ];
+                connector.source.connected.push(connector);
                 
                 outNode.y = this.outputZone.y + this.outputZone.h + outNode.h/2 + outNode.r2;// push out of output zone
                 outNode.x = mouse.x;

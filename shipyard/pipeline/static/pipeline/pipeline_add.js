@@ -702,6 +702,9 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 if (result['status'] == 'failure') {
                     submitError(result['error_msg']);
                 }
+                else if (result['status'] == 'success') {
+                    $('#id_submit_error').html('').hide();
+                }
             }
         })
     })
