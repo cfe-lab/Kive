@@ -4,6 +4,7 @@ var canvasState;
 var submit_to_url = '/pipeline_add';
 
 var rawNodeWidth = 20,
+    rawNodeHeight = 25,
     rawNodeColour = "#88DD88",
     rawNodeInset = 10,
     rawNodeOffset = 25;
@@ -195,7 +196,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
                 canvasState.addShape(new RawNode(100, 200 + Math.round(50 * Math.random()),
-                    rawNodeWidth, rawNodeColour, rawNodeInset, rawNodeOffset, node_label
+                    rawNodeWidth, rawNodeHeight, rawNodeColour, rawNodeInset, rawNodeOffset, node_label
                 ))
             } else {
                 canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
@@ -318,7 +319,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // TODO: need MethodNode that can tie these together, or pick different examples
         canvasState.addShape(
-            new RawNode(100, 250, 20, '#88DD88', 10, 25, 'Unstructured data')
+            new RawNode(100, 250, 20, 25, '#88DD88', 10, 25, 'Unstructured data')
         );
         canvasState.addShape(
             new CDtNode(1, 100, 150, 40, '#8888DD', 10, 10, 'Strings')

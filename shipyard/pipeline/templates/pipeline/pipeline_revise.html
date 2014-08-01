@@ -67,7 +67,7 @@
                     for (i = 0; i < pipeline_inputs.length; i++) {
                         node = pipeline_inputs[i];
                         if (node.CDT_pk === null) {
-                            canvasState.addShape(new RawNode(node.x, node.y, rawNodeWidth, rawNodeColour,
+                            canvasState.addShape(new RawNode(node.x, node.y, rawNodeWidth, rawNodeHeight, rawNodeColour,
                                     rawNodeInset, rawNodeOffset, node.dataset_name));
                         } else {
                             canvasState.addShape(new CDtNode(node.CDT_pk, node.x, node.y, cdtNodeWidth,

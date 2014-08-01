@@ -80,10 +80,19 @@
 		flatnessTolerance = Math.pow(2.0,-maxRecursion-1);
 
 	/**
-	 * Shortened version of distanceFromCurve() for the purposes of Shipyard.
-	 * Skips the location.
+	 * Shorthand version of distanceFromCurve() for the purposes of Shipyard.
 	 */
 	var _quickDistFromCurve = function(mx, my, x1, y1, midX, x2, y2) {
+        var point = { x: mx, y: my },
+		    curve = [
+                { x: x1, y: y1 },
+                { x: midX, y: y1 },
+                { x: midX, y: y2 },
+                { x: x2, y: y2 }
+            ];
+        return _distanceFromCurve(point, curve);
+        
+        /*
 		var candidates = [],
             point = { x: mx, y: my },
 		    curve = [
@@ -109,7 +118,7 @@
 	    if (newDist < dist) {
 	        dist = newDist;
 	    }
-		return dist;
+		return dist;*/
 	};
 	/**
 	 * Calculates the distance that the point lies from the curve.

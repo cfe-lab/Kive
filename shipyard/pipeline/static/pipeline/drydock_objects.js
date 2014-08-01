@@ -4,14 +4,50 @@
  *   (see drydock.js)
  */
 
-function RawNode (x, y, r, fill, inset, offset, label) {
+var Geometry = {
+    inEllipse: function(mx, my, cx, cy, rx, ry) {
+        var dx = mx - cx, dy = my - cy;
+        return (dx*dx) / (rx*rx)
+             + (dy*dy) / (ry*ry) <= 1;
+    },
+    inRectangle: function(mx, my, x, y, w, h) {
+        return mx > x && mx < x + w
+            && my > y && my < y + h;
+    },
+    inRectangleFromCentre: function(mx, my, cx, cy, w2, h2) {
+        return Math.abs(mx - cx) < w2
+            && Math.abs(my - cy) < h2;
+    },
+    inCircle: function(mx, my, cx, cy, r) {
+        var dx = cx - mx,
+            dy = cy - my;
+        return Math.sqrt(dx*dx + dy*dy) <= r;
+    }
+};
+
+// Add ellipses to canvas element prototype.
+CanvasRenderingContext2D.prototype.ellipse = function (cx, cy, rx, ry) {
+    this.save(); // save state
+    this.beginPath();
+
+    this.translate(cx - rx, cy - ry);
+    this.scale(rx, ry);
+    this.arc(1, 1, 1, 0, 2 * Math.PI, false);
+
+    this.restore(); // restore to original state
+};
+
+function RawNode (x, y, r, h, fill, inset, offset, label) {
     /*
     Node representing an unstructured (raw) datatype.
     Rendered as a circle.
      */
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
-    this.r = r || 10; // radius
+    this.r = r || 10; // x-radius
+    this.r2 = this.r/2; // y-radius
+    this.w = this.r; // for compatibility
+    this.h = h || 10; // stack height
     this.fill = fill || "#aaa";
     this.inset = inset || 5; // distance of magnet from center
     this.offset = offset || 12; // distance of label from center
@@ -24,7 +60,39 @@ function RawNode (x, y, r, fill, inset, offset, label) {
 }
 
 RawNode.prototype.draw = function(ctx) {
-    // draw circle
+
+    // draw bottom ellipse
+    ctx.fillStyle = this.fill;
+    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.fill();
+    
+    // draw stack 
+    ctx.fillRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    
+    // draw top ellipse
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.fill();
+    
+    // some shading
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.18;
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // draw label
+    ctx.fillStyle = 'black';
+    ctx.textAlign = 'center';
+    ctx.font = '10pt Lato, sans-serif';
+    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
+
+    // draw magnet
+    out_magnet = this.out_magnets[0];
+    out_magnet.x = this.x + this.inset;
+    out_magnet.y = this.y + this.r2/2;
+    out_magnet.draw(ctx);
+    
+/*    // draw circle
     ctx.fillStyle = this.fill;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, false);
@@ -41,23 +109,31 @@ RawNode.prototype.draw = function(ctx) {
     out_magnet = this.out_magnets[0];
     out_magnet.x = this.x + this.inset;
     out_magnet.y = this.y;
-    out_magnet.draw(ctx);
+    out_magnet.draw(ctx);*/
 };
 
 RawNode.prototype.highlight = function(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI, false);
-    ctx.closePath();
+    ctx.globalCompositeOperation = 'destination-over';
+    
+    // draw bottom ellipse
+    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
     ctx.stroke();
+    
+    // draw stack 
+    ctx.strokeRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    
+    // draw top ellipse
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.stroke();
+    
+    ctx.globalCompositeOperation = 'source-over';
 }
 
 RawNode.prototype.contains = function(mx, my) {
-    // determine if mouse pointer coordinates (mx, my) are
-    // within this shape's bounds - compare length of hypotenuse
-    // to radius
-    var dx = this.x - mx;
-    var dy = this.y - my;
-    return Math.sqrt(dx*dx + dy*dy) <= this.r;
+    // node is comprised of a rectangle and two ellipses
+    return Geometry.inRectangleFromCentre(mx, my, this.x, this.y, this.r, this.h/2)
+        || Geometry.inEllipse(mx, my, this.x, this.y - this.h/2, this.r, this.r2)
+        || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
 };
 
 
@@ -99,6 +175,7 @@ CDtNode.prototype.draw = function(ctx) {
 };
 
 CDtNode.prototype.highlight = function(ctx) {
+    ctx.globalCompositeOperation = 'destination-over';
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
     ctx.lineTo(this.x+this.w, this.y);
@@ -106,6 +183,7 @@ CDtNode.prototype.highlight = function(ctx) {
     ctx.lineTo(this.x, this.y+this.w);
     ctx.closePath();
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
 };
 
 
@@ -234,6 +312,7 @@ MethodNode.prototype.draw = function(ctx) {
 MethodNode.prototype.highlight = function(ctx, dragging) {
     // highlight this node shape
     var hx, hy;
+    ctx.globalCompositeOperation = 'destination-over';
     ctx.beginPath();
     ctx.moveTo(hx = this.x, hy = this.y);
     ctx.lineTo(hx += this.w, hy);
@@ -242,6 +321,7 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
     ctx.lineTo(hx = this.x, hy);
     ctx.closePath();
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
 }
 
 MethodNode.prototype.contains = function(mx, my) {
@@ -350,19 +430,21 @@ Connector.prototype.draw = function(ctx) {
     ctx.stroke();
 };
 
-Connector.prototype.highlight = function(ctx, dragging) {
+Connector.prototype.highlight = function(ctx) {
     /*
     Highlight this Connector by drawing another line along
-    its length.  Colour and line width set by canvasState.
-    Requires [dragging] to be false so Connector is not highlighted
+    its length. Colour and line width set by canvasState.
+    
+    (I removed this requirement - to me it makes more sense for the
+     connector to be highlighted while dragging. -JN)
+    ##Requires [dragging] to be false so Connector is not highlighted
     while it is being drawn.
+    
      */
-    if (dragging === false) {
-        ctx.beginPath();
-        ctx.moveTo(this.fromX, this.fromY);
-        ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
-        ctx.stroke();
-    }
+    ctx.beginPath();
+    ctx.moveTo(this.fromX, this.fromY);
+    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
+    ctx.stroke();
 }
 
 Connector.prototype.contains = function(mx, my, pad) {
@@ -397,7 +479,7 @@ Connector.prototype.contains = function(mx, my, pad) {
                 this.fromX, this.fromY, 
                 this.midX, 
                 this.x, this.y
-            );
+            ).distance;
     }
     // mx,my is outside the rectangle, don't bother computing the bezier distance
     else return false;
@@ -475,7 +557,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, topFill, inset, offset, label) {
+function OutputNode (x, y, r, h, fill, inset, offset, label) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -487,7 +569,6 @@ function OutputNode (x, y, r, h, fill, topFill, inset, offset, label) {
     this.w = this.r; // for compatibility
     this.h = h || 25; // height of cylinder
     this.fill = fill || "#aaa";
-    this.topFill = topFill || "#ddd";
     this.inset = inset || 12; // distance of magnet from center
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';
@@ -501,16 +582,22 @@ function OutputNode (x, y, r, h, fill, topFill, inset, offset, label) {
 OutputNode.prototype.draw = function(ctx) {
     // draw bottom ellipse
     ctx.fillStyle = this.fill;
-    drawEllipse(ctx, this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
     ctx.fill();
     
     // draw stack 
     ctx.fillRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
-    ctx.fillStyle = this.topFill;
-    drawEllipse(ctx, this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
     ctx.fill();
+    
+    // some shading
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.18;
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
 
     // draw label
     ctx.fillStyle = 'black';
@@ -526,12 +613,31 @@ OutputNode.prototype.draw = function(ctx) {
 };
 
 OutputNode.prototype.contains = function(mx, my) {
-    // FIXME: only checking the rectangle portion for now
+    // node is comprised of a rectangle and two ellipses
     return Math.abs(mx - this.x) < this.r
-        && Math.abs(my - this.y) < this.h/2;
+        && Math.abs(my - this.y) < this.h/2
+        || Geometry.inEllipse(mx, my, this.x, this.y - this.h/2, this.r, this.r2)
+        || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
 };
 
 OutputNode.prototype.highlight = function(ctx) {
-    // FIXME: only highlighting the rectangle portion for now 
+    // This line means that we are drawing "behind" the canvas now.
+    // We must set it back after we're done otherwise it'll be utter chaos.
+    ctx.globalCompositeOperation = 'destination-over';
+    
+    // draw bottom ellipse
+    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.stroke();
+    
+    // draw stack 
     ctx.strokeRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    
+    // draw top ellipse
+    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.stroke();
+    
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // The cable leading to the output is also selected.
+    this.in_magnets[0].connected[0].highlight(ctx);
 }

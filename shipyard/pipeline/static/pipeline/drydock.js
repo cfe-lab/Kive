@@ -69,22 +69,10 @@ function CanvasState (canvas) {
     }, true);
 
     // options
-    this.selectionColor = '#8af';
-    this.selectionWidth = 2.5;
+    this.selectionColor = '#7bf';
+    this.selectionWidth = 2;
     setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
 }
-
-function drawEllipse (ctx, cx, cy, rx, ry) {
-    ctx.save(); // save state
-    ctx.beginPath();
-
-    ctx.translate(cx - rx, cy - ry);
-    ctx.scale(rx, ry);
-    ctx.arc(1, 1, 1, 0, 2 * Math.PI, false);
-
-    ctx.restore(); // restore to original state
-    ctx.fill();
-};
 
 CanvasState.prototype.doDown = function(e) {
     var pos = this.getPos(e);
@@ -135,7 +123,9 @@ CanvasState.prototype.doDown = function(e) {
     for (var i = connectors.length - 1; i >= 0; i--) {
         if (connectors[i].contains(mx, my, 5)) {
             this.selection = connectors[i];
-            this.valid = false; // highlight but no drag
+            this.dragoffx = this.dragoffy = 0;
+            this.dragging = true;
+            this.valid = false;
             return;
         }
     }
@@ -169,7 +159,22 @@ CanvasState.prototype.doMove = function(e) {
             // are we carrying a connector?
             if (this.selection.constructor == Connector) {
                 // reset to allow mouse to disengage Connector from a magnet
-                this.selection.dest = null;
+                
+                if (this.selection.dest) {
+                    if (this.selection.dest.parent.constructor == OutputNode) {
+                        // if the cable leads to an output node, then act as if
+                        // the output node itself was clicked...
+                        // not sure if this is the ideal behaviour...
+                        // maybe output nodes should just disappear when they are
+                        // disconnected? -JN
+                        this.selection = this.selection.dest.parent;
+                        return;
+                    }
+                    else if (this.selection.dest.constructor == Magnet) {
+                        this.selection.dest.connected = [];
+                        this.selection.dest = null;
+                    }
+                }
 
                 // get this connector's shape
                 if (this.selection.source !== null) {
@@ -179,7 +184,7 @@ CanvasState.prototype.doMove = function(e) {
                 // check if connector has been dragged to an in-magnet
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
-                    if (typeof shape.in_magnets == 'undefined') {
+                    if (typeof shape.in_magnets == 'undefined' || shape.in_magnets.length == 0) {
                         // ignore Connectors, RawNodes, CDtNodes
                         continue;
                     }
@@ -201,17 +206,17 @@ CanvasState.prototype.doMove = function(e) {
                         } else {
                             connector_carrying_cdt = this.selection.source.cdt;
                         }
-
                         // does this in-magnet accept this CompoundDatatype?
                         if (connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
-                            in_magnet.fill = 'yellow';
+                            in_magnet.fill = '#ff8';
                             if (in_magnet.connected.length == 0 
                                 && in_magnet.contains(this.selection.x, this.selection.y)
                                 ) {
                                 // jump to magnet
                                 this.selection.x = in_magnet.x;
                                 this.selection.y = in_magnet.y;
+                                in_magnet.connected = [ this.selection ];
                                 this.selection.dest = in_magnet;
                             }
                         }
@@ -227,7 +232,9 @@ CanvasState.prototype.doMove = function(e) {
 
 CanvasState.prototype.doUp = function(e) {
     this.dragging = false;
+    this.valid = false;
     var mouse = this.getPos(e);
+    var index;
     
     if (this.selection === null) {
         return;
@@ -238,7 +245,6 @@ CanvasState.prototype.doUp = function(e) {
         if (this.outputZone.contains(mouse.x, mouse.y)) {
             // Shape dragged into output zone
             this.selection.x = this.outputZone.x - this.selection.w;
-            this.valid = false;
         }
         return;
     }
@@ -252,18 +258,21 @@ CanvasState.prototype.doUp = function(e) {
             // Connector drawn into output zone
             if (connector.source.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
-                this.connectors.pop();
+                index = this.connectors.indexOf(connector);
+                this.connectors.splice(index, 1);
                 this.selection = null;
                 this.valid = false;
             } else {
                 // valid Connector, assign non-null value
                 
-                var outNode = new OutputNode(mouse.x, mouse.y, null, null, '#d40', '#e60', null, null, connector.source.label);
-                connector.dest = outNode.in_magnets[0];
+                var outNode = new OutputNode(mouse.x, mouse.y, null, null, '#d40', null, null, connector.source.label);
                 this.addShape(outNode);
-                outNode.in_magnets[0].connected = [ connector ];
-                connector.source.connected.push(connector);
-                connector.y = this.outputZone.y + this.outputZone.h;// push out of output zone
+                
+                connector.dest = outNode.in_magnets[0];
+                connector.dest.connected = [ connector ];
+                
+                outNode.y = this.outputZone.y + this.outputZone.h;// push out of output zone
+                outNode.x = mouse.x;
                 this.valid = false;
 
                 // spawn dialog for output label
@@ -278,7 +287,8 @@ CanvasState.prototype.doUp = function(e) {
             }
         } else {
             // Connector not linked to anything - delete
-            this.connectors.pop();
+            index = this.connectors.indexOf(connector);
+            this.connectors.splice(index, 1);
             this.selection = null;
             this.valid = false; // redraw canvas to remove this Connector
         }
@@ -365,9 +375,9 @@ CanvasState.prototype.draw = function() {
         if (this.selection != null) {
             // draw selection ring
             ctx.strokeStyle = this.selectionColor;
-            ctx.lineWidth = this.selectionWidth;
+            ctx.lineWidth = this.selectionWidth * 2;
             var mySel = this.selection;
-
+            
             mySel.highlight(ctx, this.dragging);
         }
 
