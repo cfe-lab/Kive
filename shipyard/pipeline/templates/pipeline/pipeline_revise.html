@@ -166,7 +166,7 @@
 
                     // wait for MethodNodes to be built before connecting Pipeline outputs
                     $.when.apply(null, ajax_requests).done(function() {
-                        var pipeline_outputs = result['pipeline_output_cables'];
+                        var pipeline_outputs = result['pipeline_outputs'];
                         for (i = 0; i < pipeline_outputs.length; i++) {
                             cable = pipeline_outputs[i];
 
