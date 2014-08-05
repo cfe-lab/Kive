@@ -10,12 +10,17 @@
 
 {% block content %}
 
-<a href="dev.html" rel="prev">Back to developer's portal</a>
+<a href="/dev.html" rel="prev">Back to developer's portal</a>
 
-<h2>Methods ({{ family.name }})</h2>
+<h2>Method Family: {{ family.name }}</h2>
 
 <p>
-A Method is a set of instructions on how a Code Resource will be used.
+{{ family.description }}
+</p>
+
+<p style="font-style: italic; color: gray">
+Click on 'Revise' link to revise the corresponding method, or click 'Add new method' to
+add a method without specifying a parent revision.
 </p>
 
 <table>
@@ -23,12 +28,14 @@ A Method is a set of instructions on how a Code Resource will be used.
 	<tr>
         <th>Name</th>
         <th>Description</th>
+        <th></th>
 	</tr>
 </thead>
 {% for method in methods %}
 <tr>
-	<td><a href="{{ method.get_absolute_url }}">{{ method.revision_name }}</a></td>
+	<td>{{ method.revision_number }}: {{ method.revision_name }}</td>
     <td>{{ method.revision_desc }}</td>
+    <td><a href="{{ method.get_absolute_url }}">Revise</a></td>
 </tr>
 {% endfor %}
 </table>

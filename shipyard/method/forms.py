@@ -141,9 +141,7 @@ class MethodForm (forms.ModelForm):
 
 
 class MethodReviseForm (forms.ModelForm):
-    """
-    Revise an existing method.  No need to specify MethodFamily.
-    """
+    """Revise an existing method.  No need to specify MethodFamily."""
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
 
@@ -185,9 +183,15 @@ class XputStructureForm (forms.ModelForm):
         fields = ('compounddatatype', 'min_row', 'max_row')
 
 class MethodFamilyForm (forms.ModelForm):
+    """Form to create a new MethodFamily"""
     def __init__ (self, *args, **kwargs):
         super(MethodFamilyForm, self).__init__(*args, **kwargs)
         self.fields['name'].label = 'Family name'
         self.fields['description'].label = 'Family description'
     class Meta:
         model = MethodFamily
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 5,
+                                                   'cols': 30,
+                                                   'style': 'height: 5em;'}),
+        }

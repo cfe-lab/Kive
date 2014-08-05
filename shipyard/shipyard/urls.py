@@ -40,6 +40,7 @@ urlpatterns = patterns('',
     url(r'^get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 
     url(r'^method_families$', 'method.views.method_families', name='method_families'),
+    #url(r'^method_family_add$', 'method.views.method_add', name='method_family_add'),
     url(r'^method_add$', 'method.views.method_add', name='method_add'),
     url(r'^methods/(?P<id>\d+)/$', 'method.views.methods', name='methods'),
     url(r'^method_add/(?P<id>\d+)/$', 'method.views.method_add', name='method_add'),

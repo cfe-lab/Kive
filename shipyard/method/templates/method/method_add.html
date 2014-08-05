@@ -12,19 +12,18 @@
 
 {% block content %}
 
-<a href="/methods" rel="prev">return to Methods summary</a>
+<a href="/method_families" rel="prev">return to Methods summary</a>
 
-<h2>Add a new method</h2>
+<h2>{{ header }}</h2>
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
+<!--
 <p>
-    A Method is the application of a CodeResource to data.  Because there can be
-    more than one way to use a given CodeResource, there can be multiple Methods
-    defined on the same CR.  Thus, a Method's NAME and DESCRIPTION should be
-    sufficiently informative to differentiate between different uses of a CR, or
-    revisions of this specific Method.
+    This form is for adding a Method to a given MethodFamily with no parent
+    revision.
 </p>
+-->
 
 <table>
     <tr>
@@ -59,18 +58,27 @@
         <th>Family name</th>
         <td>
             <!-- not populated by Django -->
-            <input id="id_family_name" maxlength="60" name="family_name" type="text" />
+            {% if family == None %}
+                {{ family_form.name }}
+            {% else %}
+                <input id="id_family_name" maxlength="60" name="name" type="text"
+                       style="background-color: lightgrey" disabled="true" value="{{ family.name }}"/>
+            {% endif %}
             <div class="helptext">A name for this Method Family</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.family_name }}</div>
+            <div class="errortext">{{ method_form.errors.name }}</div>
         </td>
         <th>Family<br/>description</th>
         <td>
-            <textarea cols="30" id="id_family_desc" name="family_desc" rows="" style="height: 5em;">
-            </textarea>
+            {% if family == None %}
+                {{ family_form.description }}
+            {% else %}
+                <textarea cols="30" id="id_family_desc" name="description" rows="" style="height: 5em; background-color: lightgrey" disabled="true">{{ family.description }}
+                </textarea>
+            {% endif %}
             <div class="helptext">Description of this Method Family</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.family_desc }}</div>
+            <div class="errortext">{{ method_form.errors.description }}</div>
         </td>
     </tr>
     <tr>
@@ -79,14 +87,14 @@
             {{ method_form.revision_name }}
             <div class="helptext">{{ method_form.revision_name.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.name }}</div>
+            <div class="errortext">{{ method_form.errors.revision_name }}</div>
         </td>
         <th>Method<br/> description</th>
         <td>
             {{ method_form.revision_desc }}
             <div class="helptext">{{ method_form.revision_desc.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.description }}</div>
+            <div class="errortext">{{ method_form.errors.revision_desc }}</div>
         </td>
     </tr>
 </table>

@@ -303,8 +303,16 @@ def return_method_forms (request, exceptions):
     Helper function for method_add()
     Send HttpResponse Context with forms filled out with previous values including error messages
     """
-    # TODO: update this function to handle separate input and output forms
     query = request.POST.dict()
+
+    if 'name' in query:
+        family_form = MethodFamilyForm(initial={'name': query['name'],
+                                                'description': query['description']})
+    else:
+        family_form = MethodFamilyForm()
+
+    for key, msg in exceptions.iteritems():
+        family_form.errors.update({key: msg})
 
     # populate main form with submitted values
     method_form = MethodForm(initial={'revision_name': query['revision_name'],
@@ -312,6 +320,7 @@ def return_method_forms (request, exceptions):
                                       'coderesource': query['coderesource'],
                                       'revisions': query['revisions'],
                                       'deterministic': query.has_key('deterministic')})
+
     for key, msg in exceptions.iteritems():
         method_form.errors.update({key: msg})
 
@@ -351,7 +360,7 @@ def return_method_forms (request, exceptions):
 
         output_forms.append((t_form, xs_form))
 
-    return method_form, input_forms, output_forms
+    return family_form, method_form, input_forms, output_forms
 
 
 def method_add(request, id=None):
@@ -362,6 +371,13 @@ def method_add(request, id=None):
     [id] : User is not creating a new MethodFamily, but adding to an existing family
             without a specified parent Method (different CodeResource)
     """
+    if id:
+        this_family = MethodFamily.objects.get(pk=id)
+        header = "Add a new Method to MethodFamily '%s'" % this_family.name
+    else:
+        this_family = None
+        header = 'Start a new MethodFamily with an initial Method'
+
     t = loader.get_template('method/method_add.html')
     if request.method == 'POST':
         query = request.POST.dict()
@@ -389,8 +405,8 @@ def method_add(request, id=None):
                 if id:
                     method_family = MethodFamily.objects.get(pk=id)
                 else:
-                    method_family = MethodFamily(name=query['family_name'],
-                                                 description=query['family_desc'])
+                    method_family = MethodFamily(name=query['name'],
+                                                 description=query['description'])
                     method_family.full_clean()
                     method_family.save()
             except ValidationError as e:
@@ -488,7 +504,10 @@ def method_add(request, id=None):
                 raise
 
             # success!
-            return HttpResponseRedirect('/methods')
+            if this_family:
+                return HttpResponseRedirect('/methods/%d' % id)
+            else:
+                return HttpResponseRedirect('/method_families')
 
         except:
             # clean up after ourselves
@@ -497,24 +516,31 @@ def method_add(request, id=None):
             if hasattr(method_family, 'id') and method_family.id is not None:
                 method_family.delete()
 
-            method_form, input_forms, output_forms = return_method_forms(request, exceptions)
-            c = Context({'method_form': method_form,
+            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+            c = Context({'family_form': family_form,
+                         'method_form': method_form,
                          'input_forms': input_forms,
-                         'output_forms': output_forms})
+                         'output_forms': output_forms,
+                         'family': this_family,
+                         'header': header})
             c.update(csrf(request))
             return HttpResponse(t.render(c))
 
     else:
         # first set of forms
+        family_form = MethodFamilyForm()
         method_form = MethodForm()
         input_forms = [(TransformationXputForm(auto_id='id_%s_in_0'),
                        XputStructureForm(auto_id='id_%s_in_0'))]
         output_forms = [(TransformationXputForm(auto_id='id_%s_out_0'),
                        XputStructureForm(auto_id='id_%s_out_0'))]
 
-    c = Context({'method_form': method_form,
+    c = Context({'family_form': family_form,
+                 'method_form': method_form,
                  'input_forms': input_forms,
-                 'output_forms': output_forms})
+                 'output_forms': output_forms,
+                 'family': this_family,
+                 'header': header})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 
@@ -527,19 +553,20 @@ def method_revise(request, id):
     t = loader.get_template('method/method_revise.html')
 
     # retrieve the most recent member of this Method's family
-    root = Method.objects.filter(pk=id)[0]
-    family = root.family
-    all_members = Method.objects.filter(family=family).order_by('-id')
-    most_recent = all_members[0]  # always tack on revisions to most recent version (no trees)
+    parent_method = Method.objects.filter(pk=id)[0]
+    family = parent_method.family
+    #all_members = Method.objects.filter(family=family).order_by('-id')
+    #most_recent = all_members[0]  # always tack on revisions to most recent version (no trees)
 
     # retrieve the most recent revision of the corresponding CR
-    this_code_resource = most_recent.driver.coderesource
+    parent_revision = parent_method.driver
+    this_code_resource = parent_revision.coderesource
     all_revisions = CodeResourceRevision.objects.filter(coderesource=this_code_resource).order_by('-revision_DateTime')
-    last_revision = all_revisions[0]
+    #last_revision = all_revisions[0]
 
     if request.method == 'POST':
         query = request.POST.dict()
-        query.update({'coderesource': this_code_resource})  # so we can pass it back to the form
+        query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
 
         num_input_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_in_')])
         num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
@@ -559,7 +586,7 @@ def method_revise(request, id):
             try:
                 # attempt to make Method object
                 new_method = Method(family = family, # same family
-                                    revision_parent=most_recent,
+                                    revision_parent=parent_method,
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
                                     driver=coderesource_revision,
@@ -648,14 +675,14 @@ def method_revise(request, id):
                 raise
 
             # success!
-            return HttpResponseRedirect('/methods')
+            return HttpResponseRedirect('/methods/%d' % family.pk)
 
         except:
             # do not delete method_family!!
             if hasattr(new_method, 'id') and new_method.id is not None:
                 new_method.delete()
 
-            method_form, input_forms, output_forms = return_method_forms(request, exceptions)
+            family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
             c = Context({'method_form': method_form,
                          'input_forms': input_forms,
                          'output_forms': output_forms})
@@ -663,17 +690,17 @@ def method_revise(request, id):
             return HttpResponse(t.render(c))
 
     else:
-        # initialize forms with values of previous Method
-        method_form = MethodReviseForm(initial={'revision_name': most_recent.revision_name,
-                                                'revision_desc': most_recent.revision_desc,
-                                                'revisions': last_revision.pk,
-                                                'deterministic': most_recent.deterministic})
+        # initialize forms with values of parent Method
+        method_form = MethodReviseForm(initial={#'revision_name': parent_method.revision_name,
+                                                'revision_desc': parent_method.revision_desc,
+                                                'revisions': parent_revision.pk,
+                                                'deterministic': parent_method.deterministic})
         method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
                                                    for x in all_revisions]
 
         input_forms = []
         output_forms = []
-        for input in most_recent.inputs.all():
+        for input in parent_method.inputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_in_'+str(len(input_forms)),
                                             initial={'dataset_name': input.dataset_name,
                                                      'dataset_idx': input.dataset_idx})
@@ -695,7 +722,7 @@ def method_revise(request, id):
             xs_form = XputStructureForm(auto_id='id_%s_in_0')
             input_forms.append((tx_form, xs_form))
 
-        for output in most_recent.outputs.all():
+        for output in parent_method.outputs.all():
             tx_form = TransformationXputForm(auto_id='id_%s_out_'+str(len(output_forms)),
                                             initial={'dataset_name': output.dataset_name,
                                                      'dataset_idx': output.dataset_idx})
@@ -714,6 +741,8 @@ def method_revise(request, id):
     c = Context({'coderesource': this_code_resource,
                  'method_form': method_form,
                  'input_forms': input_forms,
-                 'output_forms': output_forms})
+                 'output_forms': output_forms,
+                 'family': family,
+                 'parent': parent_method})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

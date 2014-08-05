@@ -49,7 +49,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         cr_id = this.value;
         if (cr_id != "") {
             $.getJSON(
-                "get_revisions/",
+                "/get_revisions/",
                 { cr_id: cr_id }, // specify data as an object
                 function(result) {
                     var options = '';
