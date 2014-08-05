@@ -25,7 +25,7 @@ class DatasetForm (forms.Form):
     """
 
     name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
-    description = forms.CharField(widget=forms.Textarea)
+    description = forms.CharField(widget=forms.Textarea, required=False)
     dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     compound_datatypes = CompoundDatatype.objects.all()
