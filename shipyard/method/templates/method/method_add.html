@@ -12,7 +12,11 @@
 
 {% block content %}
 
-<a href="/method_families" rel="prev">return to Methods summary</a>
+{% if family == None %}
+<a href="/method_families" rel="prev">return to Method Family summary</a>
+{% else %}
+<a href="/methods/{{ family.pk }}" rel="prev">return to Methods summary</a>
+{% endif %}
 
 <h2>{{ header }}</h2>
 
