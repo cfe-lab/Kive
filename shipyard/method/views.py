@@ -48,7 +48,6 @@ def return_crv_forms(request, exceptions, is_new):
     """
     print exceptions
     query = request.POST.dict()
-
     if is_new:
         # creating a new CodeResource
         crv_form = CodeResourcePrototypeForm(initial={'resource_name': query['resource_name'],
@@ -67,9 +66,14 @@ def return_crv_forms(request, exceptions, is_new):
     num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
     dep_forms = []
     for i in range(num_dep_forms):
-        dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
-                                              initial={'coderesource': query['coderesource_'+str(i)],
-                                                       'revisions': query['revisions_'+str(i)]})
+        if query['coderesource_'+str(i)]:
+            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
+                                                  initial={'coderesource': query['coderesource_'+str(i)],
+                                                           'revisions': query['revisions_'+str(i)],
+                                                           'depPath': query['depPath_'+str(i)],
+                                                           'depFileName': query['depFileName_'+str(i)]})
+        else:
+            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i))
         dep_form.errors['Errors'] = ErrorList(exceptions.get(i, ''))
         dep_forms.append(dep_form)
 
@@ -255,12 +259,15 @@ def resource_revision_add(request, id):
         for i, dependency in enumerate(dependencies):
             its_crv = dependency.requirement
             its_cr = its_crv.coderesource
-            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
-                                                  initial={'coderesource': its_cr.pk,
-                                                           'revisions': its_crv.pk,
-                                                           'depPath': dependency.depPath,
-                                                           'depFileName': dependency.depFileName},
-                                                  parent=coderesource.id)
+            if its_cr:
+                dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
+                                                      initial={'coderesource': its_cr.pk,
+                                                               'revisions': its_crv.pk,
+                                                               'depPath': dependency.depPath,
+                                                               'depFileName': dependency.depFileName},
+                                                      parent=coderesource.id)
+            else:
+                dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i))
             dep_forms.append(dep_form)
 
         # in case the parent revision has no CR dependencies, add a blank form
@@ -370,6 +377,7 @@ def method_add(request, id=None):
 
     [id] : User is not creating a new MethodFamily, but adding to an existing family
             without a specified parent Method (different CodeResource)
+            If ID is not specified, then user is creating a new MethodFamily.
     """
     if id:
         this_family = MethodFamily.objects.get(pk=id)
