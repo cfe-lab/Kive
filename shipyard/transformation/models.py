@@ -14,6 +14,8 @@ from django.utils.encoding import python_2_unicode_compatible
 
 from constants import maxlengths
 
+import itertools
+
 @python_2_unicode_compatible
 class TransformationFamily(models.Model):
     """
@@ -41,6 +43,15 @@ class TransformationFamily(models.Model):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    @transaction.atomic
+    def create(cls, *args, **kwargs):
+        """Create a new TransformationFamily."""
+        family = cls(*args, **kwargs)
+        family.full_clean()
+        family.save()
+        return family
 
 
 @python_2_unicode_compatible
@@ -125,6 +136,18 @@ class Transformation(models.Model):
             raise ValidationError("Transformation with pk={} is neither Method nor Pipeline".format(self.pk))
         self.check_input_indices()
         self.check_output_indices()
+
+    def is_identical(self, other):
+        """Is this Transformation identical to another?
+
+        Ignores names (compares inputs and outputs only).
+        """
+        my_xputs = itertools.chain(self.inputs.order_by("dataset_idx"), self.outputs.order_by("dataset_idx"))
+        other_xputs = itertools.chain(other.inputs.order_by("dataset_idx"), other.outputs.order_by("dataset_idx"))
+        for my_xput, other_xput in itertools.izip_longest(my_xputs, other_xputs, fillvalue=None):
+            if my_xput is None or other_xput is None or not my_xput.is_identical(other_xput):
+                return False
+        return True
 
     @transaction.atomic
     def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
@@ -241,6 +264,20 @@ class TransformationXput(models.Model):
         """Accessor that returns max_row for this xput (and None if it is raw)."""
         return (None if self.is_raw() else self.structure.max_row)
 
+    def is_identical(self, other):
+        """Is this TransformationXput the same as another?
+
+        Ignores names and indices.
+        """
+        if self.is_input != other.is_input:
+            return False
+
+        if self.is_raw() and other.is_raw():
+            return True
+        if self.is_raw() or other.is_raw():
+            return False
+        return self.structure.is_identical(other.structure)
+
     @property
     def has_structure(self):
         return hasattr(self, "structure")
@@ -295,7 +332,6 @@ class XputStructure(models.Model):
 
     Related to :model:`transformation.TransformationXput`
     """
-    # June 6, 2014: turned into regular FK.
     transf_xput = models.OneToOneField(TransformationXput, related_name="structure")
 
     # The expected compounddatatype of the input/output
@@ -314,6 +350,12 @@ class XputStructure(models.Model):
         help_text="Maximum number of rows this input/output returns",
         null=True,
         blank=True)
+
+    def is_identical(self, other):
+        """Is this XputStructure identical to another one?"""
+        return (self.compounddatatype == other.compounddatatype and
+                self.min_row == other.min_row and
+                self.max_row == other.max_row)
 
 
 class TransformationInput(TransformationXput):
