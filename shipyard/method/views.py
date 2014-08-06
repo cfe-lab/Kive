@@ -393,7 +393,6 @@ def method_add(request, id=None):
         num_output_forms = sum([1 for k in query.iterkeys() if k.startswith('dataset_name_out_')])
         exceptions = {'inputs': {}, 'outputs': {}}
 
-        method_family = None
         new_method = None
         new_inputs = []
         new_outputs = []
@@ -408,13 +407,11 @@ def method_add(request, id=None):
 
             # use this prototype Method's name and description to initialize the MethodFamily
             try:
-                if id:
-                    method_family = MethodFamily.objects.get(pk=id)
-                else:
-                    method_family = MethodFamily(name=query['name'],
+                if this_family is None:
+                    this_family = MethodFamily(name=query['name'],
                                                  description=query['description'])
-                    method_family.full_clean()
-                    method_family.save()
+                    this_family.full_clean()
+                    this_family.save()
             except ValidationError as e:
                 for key, msg in e.message_dict.iteritems():
                     exceptions.update({key: str(msg[0])})
@@ -422,7 +419,7 @@ def method_add(request, id=None):
 
             # attempt to make Method object
             try:
-                new_method = Method(family = method_family,
+                new_method = Method(family = this_family,
                                     revision_name=query['revision_name'],
                                     revision_desc=query['revision_desc'],
                                     driver=coderesource_revision,
@@ -520,8 +517,9 @@ def method_add(request, id=None):
             # clean up after ourselves
             if hasattr(new_method, 'id') and new_method.id is not None:
                 new_method.delete()
-            if id is None and hasattr(method_family, 'id') and method_family.id is not None:
-                method_family.delete()
+            if id is None and hasattr(this_family, 'id') and this_family.id is not None:
+                # only delete if MethodFamily was created for this case only
+                this_family.delete()
 
             family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
             c = Context({'family_form': family_form,
