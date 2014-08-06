@@ -2595,7 +2595,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
 
     def test_PipelineStep_clean_raw_output_to_be_deleted_good(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(
             compounddatatype=self.triplet_cdt,
@@ -2650,7 +2650,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         
     def test_PipelineStep_clean_raw_output_to_be_deleted_in_different_pipeline_bad(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2684,8 +2684,8 @@ class RawOutputCableTests(PipelineTestSetup):
     def test_PipelineOutputCable_raw_outcable_references_valid_step_good(self):
 
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2710,8 +2710,8 @@ class RawOutputCableTests(PipelineTestSetup):
     def test_PipelineOutputCable_raw_outcable_references_deleted_output_good(self):
 
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2743,8 +2743,8 @@ class RawOutputCableTests(PipelineTestSetup):
     def test_PipelineOutputCable_raw_outcable_references_valid_step_but_invalid_raw_TO_bad(self):
         
         # Define 1 raw input, and 1 raw + 1 CSV (self.triplet_cdt) output for method self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2778,8 +2778,8 @@ class RawOutputCableTests(PipelineTestSetup):
     def test_PipelineOutputCable_raw_outcable_references_invalid_step_bad(self):
         
         # Define 1 raw input, and 1 raw + 1 CSV (self.triplet_cdt) output for method self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2809,8 +2809,8 @@ class RawInputCableTests(PipelineTestSetup):
         """
 
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2842,8 +2842,8 @@ class RawInputCableTests(PipelineTestSetup):
         Destination must belong to a PS Transformation in THIS pipeline.
         """
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2880,8 +2880,8 @@ class RawInputCableTests(PipelineTestSetup):
         dest does not specify a TransformationRawInput of THIS pipeline step
         """
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c_method",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2917,8 +2917,8 @@ class RawInputCableTests(PipelineTestSetup):
         Raw PSIC has custom wiring defined.
         """
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
-        self.script_4_1_M.delete_inputs()
-        self.script_4_1_M.delete_outputs()
+        self.script_4_1_M.inputs.all().delete()
+        self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
         self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
@@ -2954,7 +2954,7 @@ class RawInputCableTests(PipelineTestSetup):
 class RawSaveTests(PipelineTestSetup):
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
         # Give script_4_1_M a raw input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c", dataset_idx=1)
 
         # Make a method without a parent
@@ -2985,7 +2985,7 @@ class RawSaveTests(PipelineTestSetup):
     def test_method_with_no_xputs_defined_copy_raw_xputs_to_new_revision(self):
 
         # Give script_4_1_M a raw input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
 
         # Make a method with a parent, and do not specify inputs/outputs
@@ -3007,7 +3007,7 @@ class SingleRawInputTests(PipelineTestSetup):
     def test_transformation_rawinput_coexists_with_nonraw_inputs_clean_good(self):
 
         # Define raw input "a_b_c" at index = 1
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name = "a_b_c", dataset_idx = 1)
 
         # Define input "a_b_c_squared" of type "triplet_cdt" at index = 2
@@ -3025,7 +3025,7 @@ class SingleRawInputTests(PipelineTestSetup):
     def test_transformation_rawinput_coexists_with_nonraw_inputs_but_not_consecutive_indexed_bad(self):
 
         # Define raw input "a_b_c" at index = 1
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
 
         # Define input name "a_b_c_squared" of type "triplet_cdt" at nonconsecutive index = 3
@@ -3043,7 +3043,7 @@ class SingleRawInputTests(PipelineTestSetup):
         
     def test_PipelineStep_completeClean_check_quenching_of_raw_inputs_good(self):
         # Wire 1 raw input to a pipeline step that expects only 1 input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
         
         # Define 1-step pipeline with a single raw pipeline input
@@ -3061,7 +3061,7 @@ class SingleRawInputTests(PipelineTestSetup):
     def test_PipelineStep_completeClean_check_overquenching_doubled_source_of_raw_inputs_bad(self):
 
         # Wire 1 raw input to a pipeline step that expects only 1 input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
         
         # Define 1-step pipeline with a single raw pipeline input
@@ -3091,7 +3091,7 @@ class SingleRawInputTests(PipelineTestSetup):
     def test_PipelineStep_completeClean_check_overquenching_different_sources_of_raw_inputs_bad(self):
 
         # Wire 1 raw input to a pipeline step that expects only 1 input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
         
         # Define 1-step pipeline with a single raw pipeline input
@@ -3118,7 +3118,7 @@ class SingleRawInputTests(PipelineTestSetup):
     def test_PipelineStep_completeClean_check_underquenching_of_raw_inputs_bad(self):
 
         # Wire 1 raw input to a pipeline step that expects only 1 input
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
 
         
@@ -3140,7 +3140,7 @@ class SeveralRawInputsTests(PipelineTestSetup):
     def test_transformation_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
         # Note that this method wouldn't actually run -- inputs don't match.
 
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         # Define raw input "a_b_c" at index = 1
         self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
         
@@ -3160,7 +3160,7 @@ class SeveralRawInputsTests(PipelineTestSetup):
 
     def test_transformation_several_rawinputs_several_nonraw_inputs_not1based_bad(self):
         # Note that this method wouldn't actually run -- inputs don't match.
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
 
         # Define raw input "a_b_c" at index = 2
         self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 2)
@@ -3226,7 +3226,7 @@ class SeveralRawInputsTests(PipelineTestSetup):
     def test_PipelineStep_completeClean_check_overquenching_different_sources_of_raw_inputs_bad(self):
 
         # Define 2 inputs for the method
-        self.script_4_1_M.delete_inputs()
+        self.script_4_1_M.inputs.all().delete()
         method_raw_in = self.script_4_1_M.create_input(dataset_name = "method_in_1",dataset_idx = 1)
         method_raw_in_2 = self.script_4_1_M.create_input(dataset_name = "method_in_2",dataset_idx = 2)
         
@@ -3354,14 +3354,14 @@ class CustomWiringTests(PipelineTestSetup):
         """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
         # Define a pipeline with single pipeline input of type triplet_cdt
         my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version")
-        my_pipeline.delete_inputs()
+        my_pipeline.inputs.all().delete()
         pipeline_in = my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,
             dataset_name="pipe_in_1",
             dataset_idx=1)
 
         # Define method to have an input with the same CDT, add it as a step, cable it
-        self.testmethod.delete_inputs()
+        self.testmethod.inputs.all().delete()
         method_in = self.testmethod.create_input(
             dataset_name="TestIn",
             dataset_idx=1,
@@ -3436,7 +3436,7 @@ class CustomWiringTests(PipelineTestSetup):
         pipeline_in = my_pipeline.create_input(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
 
         # Define method to have an input with cdt_2, add it as a step, cable it
-        self.testmethod.delete_inputs()
+        self.testmethod.inputs.all().delete()
         method_in = self.testmethod.create_input(dataset_name="TestIn", dataset_idx=1,compounddatatype=cdt_2)
         my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
         my_cable1 = my_step1.cables_in.create(dest=method_in, source_step=0, source=pipeline_in)

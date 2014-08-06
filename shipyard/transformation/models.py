@@ -177,15 +177,6 @@ class Transformation(models.Model):
         """Create a TransformationOutput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False)
 
-    # June 10, 2014: two helpers that we use in testing.  Maybe they'll be useful elsewhere?
-    def delete_inputs(self):
-        for curr_input in self.inputs.all():
-            curr_input.delete()
-
-    def delete_outputs(self):
-        for curr_output in self.outputs.all():
-            curr_output.delete()
-
 
 @python_2_unicode_compatible
 class TransformationXput(models.Model):
