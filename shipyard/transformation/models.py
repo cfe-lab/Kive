@@ -115,15 +115,9 @@ class Transformation(models.Model):
         
     def check_output_indices(self):
         """Check that output indices are numbered consecutively from 1."""
-        # Append each output index (hole number) to a list
-        output_nums = []
-        for curr_output in self.outputs.all():
-            output_nums += [curr_output.dataset_idx]
-
-        # Indices must be consecutively numbered from 1 to n
-        if sorted(output_nums) != range(1, self.outputs.count()+1):
-            raise ValidationError(
-                "Outputs are not consecutively numbered starting from 1")
+        for i, curr_output in enumerate(self.outputs.order_by("dataset_idx"), start=1):
+            if i != curr_output.dataset_idx:
+                raise ValidationError("Outputs are not consecutively numbered starting from 1")
 
     def clean(self):
         """Validate transformation inputs and outputs, and reject if it is neither Method nor Pipeline."""
