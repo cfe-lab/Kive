@@ -189,7 +189,7 @@ class Transformation(models.Model):
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True)
     
     @transaction.atomic
-    def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
+    def create_output(self, dataset_name, dataset_idx=None, compounddatatype=None,
                      min_row=None, max_row=None, x=0, y=0):
         """Create a TransformationOutput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False)

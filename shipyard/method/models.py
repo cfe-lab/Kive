@@ -661,6 +661,10 @@ class Method(transformation.models.Transformation):
 
         return code_popen
 
+    def is_identical(self, other):
+        """Is this Method identical to another one?"""
+        return self.driver == other.driver and super(Method, self).is_identical(super(Method, other))
+
 
 @python_2_unicode_compatible
 class MethodFamily(transformation.models.TransformationFamily):

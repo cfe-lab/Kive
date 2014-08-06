@@ -13,6 +13,7 @@ import tempfile
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.db.models import Q
 
 from constants import datatypes
 from metadata.models import CompoundDatatype, Datatype
@@ -1298,9 +1299,6 @@ class CodeResourceRevisionTests(MethodTestSetup):
         self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
                          [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
 
-    # This seems like enough tests of the blank depFileName case, as we have
-    # pretty thoroughly checked other paths with the above cases.
-
 
 class CodeResourceDependencyTests(MethodTestSetup):
 
@@ -2108,9 +2106,6 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_out.get_min_row(), None)
         self.assertEqual(curr_out.get_max_row(), None)
 
-    # May 20, 2014: this was previously a test of save(), but now the
-    # functionality has been moved to a helper function, which we
-    # now test.
     def test_copy_io_from_parent(self):
         """Test save when revision parent is specified."""
 
@@ -2299,6 +2294,50 @@ class MethodTests(MethodTestSetup):
         """Deleting a method is possible."""
         self.assertIsNone(Method.objects.first().delete())
 
+    def test_identical_self(self):
+        """A Method should be identical to itself."""
+        m = Method.objects.first()
+        self.assertTrue(m.is_identical(m))
+
+    def test_identical_different_names(self):
+        """Two methods differing only in names are identical."""
+        m1 = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
+        m2 = Method(revision_name="x" + m1.revision_name, driver=m1.driver, family=MethodFamily.objects.first())
+        m2.save()
+        for input in m1.inputs.order_by("dataset_idx"):
+            m2.create_input("x" + input.dataset_name, 
+                    compounddatatype=input.compounddatatype,
+                    min_row=input.get_min_row(), 
+                    max_row=input.get_max_row())
+        for output in m1.outputs.order_by("dataset_idx"):
+            m2.create_output("x" + output.dataset_name, 
+                    compounddatatype=output.compounddatatype,
+                    min_row=output.get_min_row(), 
+                    max_row=output.get_max_row())
+        self.assertFalse(m1.revision_name == m2.revision_name)
+        self.assertFalse(m1.inputs.first().dataset_name == m2.inputs.first().dataset_name)
+        self.assertFalse(m1.outputs.first().dataset_name == m2.outputs.first().dataset_name)
+        self.assertTrue(m1.is_identical(m2))
+
+    def test_identical_different_drivers(self):
+        """Two methods with identical IO, but different drivers, are not identical."""
+        m1 = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
+        driver = CodeResourceRevision.objects.exclude(pk=m1.driver.pk).first()
+        m2 = Method(revision_name=m1.revision_name, driver=driver, family=m1.family)
+        m2.save()
+        for input in m1.inputs.order_by("dataset_idx"):
+            m2.create_input("x" + input.dataset_name, 
+                    compounddatatype=input.compounddatatype,
+                    min_row=input.get_min_row(), 
+                    max_row=input.get_max_row())
+        for output in m1.outputs.order_by("dataset_idx"):
+            m2.create_output("x" + output.dataset_name, 
+                    compounddatatype=output.compounddatatype,
+                    min_row=output.get_min_row(), 
+                    max_row=output.get_max_row())
+        self.assertTrue(super(Method, m1).is_identical(super(Method, m2)))
+        self.assertFalse(m1.driver.pk == m2.driver.pk)
+        self.assertFalse(m1.is_identical(m2))
 
 class MethodFamilyTests(MethodTestSetup):
 

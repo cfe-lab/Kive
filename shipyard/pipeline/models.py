@@ -503,6 +503,15 @@ class Pipeline(transformation.models.Transformation):
 
         return pipeline
 
+    def is_identical(self, other):
+        """Is this Pipeline identical to another one?
+
+        Currently this is just a stub, because we don't want to
+        just call transformation.is_identical (which only checks
+        inputs and outputs).
+        """
+        raise NotImplementedError("Structural comparison not available for pipelines.")
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
