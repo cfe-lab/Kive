@@ -149,6 +149,48 @@ class Transformation(models.Model):
                 return False
         return True
 
+    @classmethod
+    @transaction.atomic
+    def create(cls, names, compounddatatypes=None, row_limits=None, coords=None, num_inputs=0, *args, **kwargs):
+        """Create a new Transformation.
+
+        names, compounddatatypes, row_limits, and coords are lists of
+        items corresponding to the inputs and outputs for the new
+        Transformation, ordered by index (inputs first). num_inputs
+        controls how these are interpreted (eg. if num_inputs=2, then
+        the first 2 items of names are for inputs, and the rest are for
+        outputs).
+
+        PARAMETERS
+        names               names for inputs and outputs
+        compounddatatyps    CompoundDatatypes for inputs and outputs
+        row_limits          tuples (min_row, max_row)
+        coords              tuples (x, y)
+        num_inputs          number of inputs for the new Transformation
+        *args, **kwargs     additional arguments for constructor
+        """
+        row_limits = row_limits or [None for name in names]
+        coords = coords or [None for name in names]
+        compounddatatypes = compounddatatypes or [None for name in names]
+
+        transformation = cls(*args, **kwargs)
+        transformation.save()
+        for i in range(len(names)):
+            transformation.create_xput(names[i], 
+                    compounddatatype=compounddatatypes[i], 
+                    row_limits=row_limits[i],
+                    coords=coords[i],
+                    input=i<num_inputs)
+
+        # Hack: complete_clean() for Methods only (Pipelines can be
+        # created without being complete).
+        if transformation.is_method:
+            transformation.complete_clean()
+        else:
+            transformation.full_clean()
+        transformation.save()
+        return transformation
+
     @transaction.atomic
     def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
                     input=True):
@@ -182,13 +224,11 @@ class Transformation(models.Model):
             new_xput.add_structure(compounddatatype, min_row, max_row)
         return new_xput
 
-    @transaction.atomic
     def create_input(self, dataset_name, dataset_idx=None, compounddatatype=None,
                      min_row=None, max_row=None, x=0, y=0):
         """Create a TransformationInput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True)
     
-    @transaction.atomic
     def create_output(self, dataset_name, dataset_idx=None, compounddatatype=None,
                      min_row=None, max_row=None, x=0, y=0):
         """Create a TransformationOutput for this Transformation."""

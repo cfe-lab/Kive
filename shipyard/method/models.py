@@ -443,6 +443,17 @@ class Method(transformation.models.Transformation):
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
 
+    def complete_clean(self):
+        """Check coherence and completeness of this Method.
+
+        Checks that the Method is clean, and that no identical
+        Methods already exist in the database.
+        """
+        self.clean()
+        for other_method in Method.objects.filter(driver=self.driver).exclude(pk=self.pk):
+            if self.is_identical(other_method):
+                raise ValidationError("An identical method already exists")
+
     def copy_io_from_parent(self):
         """
         Copy inputs and outputs from parent revision.

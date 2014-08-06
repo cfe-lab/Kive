@@ -10,6 +10,7 @@ import os.path
 import re
 import shutil
 import tempfile
+import itertools
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -2338,6 +2339,37 @@ class MethodTests(MethodTestSetup):
         self.assertTrue(super(Method, m1).is_identical(super(Method, m2)))
         self.assertFalse(m1.driver.pk == m2.driver.pk)
         self.assertFalse(m1.is_identical(m2))
+
+    def test_create(self):
+        """Create a new Method by the constructor."""
+        names = ["a", "b"]
+        cdts = CompoundDatatype.objects.all()[:2]
+        family = MethodFamily.objects.first()
+        driver = CodeResourceRevision.objects.first()
+        m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver)
+        self.assertIsNone(m.complete_clean())
+
+    def test_create_identical(self):
+        """Cannot create a duplicate Method."""
+        m = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
+        num_inputs = m.inputs.count()
+
+        xputs = itertools.chain(m.inputs.order_by("dataset_idx"), m.outputs.order_by("dataset_idx"))
+        names = []
+        compounddatatypes = []
+        row_limits = []
+        for xput in xputs:
+            names.append(xput.dataset_name)
+            compounddatatypes.append(xput.compounddatatype)
+            row_limits.append((xput.get_min_row(), xput.get_max_row()))
+
+        factory = lambda: Method.create(names, 
+                compounddatatypes=compounddatatypes, 
+                row_limits=row_limits, 
+                num_inputs=num_inputs,
+                driver=m.driver, 
+                family=m.family)
+        self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
 
 class MethodFamilyTests(MethodTestSetup):
 
