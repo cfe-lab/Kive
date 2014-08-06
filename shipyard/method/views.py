@@ -296,7 +296,6 @@ def methods(request, id):
     Display a list of all Methods within a given MethodFamily.
     """
     family = MethodFamily.objects.filter(pk=id)[0]
-    print family
     its_methods = Method.objects.filter(family=family)
 
     t = loader.get_template('method/methods.html')
@@ -408,7 +407,6 @@ def method_add(request, id=None):
                 raise
 
             # use this prototype Method's name and description to initialize the MethodFamily
-
             try:
                 if id:
                     method_family = MethodFamily.objects.get(pk=id)
@@ -502,7 +500,7 @@ def method_add(request, id=None):
                     if i not in exceptions['outputs']:
                         exceptions['outputs'].update({i: {}})
                     exceptions['outputs'][i].update({'compounddatatype': 'You must select a Compound Datatype.'})
-                
+
             if len(new_outputs) == 0 and len(exceptions['outputs']) == 0:
                 exceptions['outputs'].update({0: {'dataset_name': 'You must specify at least one output.'}})
 
@@ -512,16 +510,17 @@ def method_add(request, id=None):
                 raise
 
             # success!
-            if this_family:
-                return HttpResponseRedirect('/methods/%d' % id)
+            if id:
+                return HttpResponseRedirect('/methods/%d' % int(id))
             else:
                 return HttpResponseRedirect('/method_families')
 
         except:
+            print 'cleaning up'
             # clean up after ourselves
             if hasattr(new_method, 'id') and new_method.id is not None:
                 new_method.delete()
-            if hasattr(method_family, 'id') and method_family.id is not None:
+            if id is None and hasattr(method_family, 'id') and method_family.id is not None:
                 method_family.delete()
 
             family_form, method_form, input_forms, output_forms = return_method_forms(request, exceptions)
