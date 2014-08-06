@@ -132,73 +132,50 @@ class Transformation(models.Model):
         self.check_input_indices()
         self.check_output_indices()
 
-    # Helper to create inputs, which is now a 2-step operation if the input
-    # is not raw.
     @transaction.atomic
-    def create_input(self, dataset_name, dataset_idx, compounddatatype=None,
-                     min_row=None, max_row=None, x=0, y=0):
-        """
-        Create a TI for this transformation.
+    def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
+                    input=True):
+        """Create a TranformationXput for this Transformation.
 
-        Decides whether the created TI should have a structure or not based
-        on the parameters given.
+        Decides whether the created TransformationXput should have a
+        structure or not based on the parameters given. If
+        compounddatatype os None but row limits are provided, then a
+        ValueError is raised.
 
-        If CDT is None but min_row or max_row is not None, then a ValueError
-        is raised.
+        PARAMETERS
+        dataset_name        name for new xput
+        dataset_idx         index for new output (defaults to number of
+                            current in/outputs plus one)
+        compounddatatype    CompoundDatatype for new xput
+        row_limits          tuple (min_row, max_row), defaults to no limits
+        coords              tuple (x, y), defaults to (0, 0)
+        input               True to create a TransformationInput, False to
+                            create a TransformationOutput
         """
-        if compounddatatype == None and (min_row != None or max_row != None):
+        min_row, max_row = (None, None) if not row_limits else row_limits
+        x, y = (0, 0) if not coords else coords
+
+        if compounddatatype is None and (min_row is not None or max_row is not None):
             raise ValueError("Row restrictions cannot be specified without a CDT")
 
-        new_input = self.inputs.create(dataset_name=dataset_name,
-                                       dataset_idx=dataset_idx,
-                                       x=x, y=y)
-        new_input.full_clean()
+        xputs = self.inputs if input else self.outputs
+        new_xput = xputs.create(dataset_name=dataset_name, dataset_idx=dataset_idx or xputs.count()+1, x=x, y=y)
+        new_xput.full_clean()
+        if compounddatatype:
+            new_xput.add_structure(compounddatatype, min_row, max_row)
+        return new_xput
 
-        if compounddatatype != None:
-            new_input_structure = XputStructure(
-                transf_xput=new_input,
-                compounddatatype=compounddatatype,
-                min_row=min_row, max_row=max_row)
-            # June 6, 2014: now that we aren't using GFKs anymore we go back
-            # to using full_clean() here.  Previously it was barfing on
-            # clean_fields().
-            new_input_structure.full_clean()
-            # new_input_structure.clean()
-            # new_input_structure.validate_unique()
-            new_input_structure.save()
-
-        return new_input
-
-    # Same thing to create outputs.
+    @transaction.atomic
+    def create_input(self, dataset_name, dataset_idx=None, compounddatatype=None,
+                     min_row=None, max_row=None, x=0, y=0):
+        """Create a TransformationInput for this Transformation."""
+        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True)
+    
     @transaction.atomic
     def create_output(self, dataset_name, dataset_idx, compounddatatype=None,
                      min_row=None, max_row=None, x=0, y=0):
-        """
-        Create a TO for this transformation.
-
-        Decides whether the created TO should have a structure or not based
-        on the parameters given.
-
-        If CDT is None but min_row or max_row is not None, then a ValueError
-        is raised.
-        """
-        if compounddatatype == None and (min_row != None or max_row != None):
-            raise ValueError("Row restrictions cannot be specified without a CDT")
-
-        new_output = self.outputs.create(dataset_name=dataset_name,
-                                         dataset_idx=dataset_idx,
-                                         x=x, y=y)
-        new_output.full_clean()
-
-        if compounddatatype != None:
-            new_output_structure = XputStructure(
-                transf_xput=new_output,
-                compounddatatype=compounddatatype,
-                min_row=min_row, max_row=max_row)
-            new_output_structure.full_clean()
-            new_output_structure.save()
-
-        return new_output
+        """Create a TransformationOutput for this Transformation."""
+        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False)
 
     # June 10, 2014: two helpers that we use in testing.  Maybe they'll be useful elsewhere?
     def delete_inputs(self):
@@ -282,6 +259,22 @@ class TransformationXput(models.Model):
     @property
     def has_structure(self):
         return hasattr(self, "structure")
+
+    @transaction.atomic
+    def add_structure(self, compounddatatype, min_row, max_row):
+        """Add an XputStructure to this TransformationXput.
+
+        ASSUMPTIONS
+        This TransformationXput does not already have a structure.
+        """
+        assert not self.has_structure
+        assert compounddatatype is not None
+
+        new_structure = XputStructure(transf_xput=self,
+                compounddatatype=compounddatatype,
+                min_row=min_row, max_row=max_row)
+        new_structure.full_clean()
+        new_structure.save()
 
     def represent_as_dict(self):
         """
