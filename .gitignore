@@ -8,6 +8,7 @@ shipyard/shipyard/settings.py
 shipyard/CodeResources
 shipyard/VerificationScripts
 shipyard/Datasets
+shipyard/Logs
 shipyard/shipyard.log*
 # Don't get the customized version of the script that nukes the DB
 shipyard/nukeDB.expect
