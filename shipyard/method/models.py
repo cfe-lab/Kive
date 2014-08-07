@@ -9,7 +9,7 @@ from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator, MinValueValidator
+from django.core.validators import RegexValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -375,7 +375,10 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision)
-    deterministic = models.BooleanField(default=True, help_text="Is the output of this method deterministic?")
+    deterministic = models.BooleanField(
+        default=True,
+        help_text="Is the output of this method the same if you run it again "
+            "with the same inputs?")
     tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
 
     # Implicitly defined:
