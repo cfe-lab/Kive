@@ -513,7 +513,7 @@ def method_revise(request, id):
         query = request.POST.dict()
         query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
 
-        exceptions = parse_method_form(query, parent_method=parent_method)
+        exceptions = parse_method_form(query, family=family, parent_method=parent_method)
         if exceptions is None:
             # success!
             return HttpResponseRedirect('/methods/%d' % family.pk)
@@ -527,45 +527,34 @@ def method_revise(request, id):
         method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
                                                    for x in all_revisions]
 
-        input_forms = []
-        output_forms = []
-        for input in parent_method.inputs.all():
-            tx_form = TransformationXputForm(auto_id='id_%s_in_'+str(len(input_forms)),
-                                            initial={'dataset_name': input.dataset_name,
-                                                     'dataset_idx': input.dataset_idx})
-            if input.has_structure:
-                structure = input.structure
-                xs_form = XputStructureForm(auto_id='id_%s_in_'+str(len(input_forms)),
+        xput_forms = []
+        inputs = parent_method.inputs.order_by("dataset_idx")
+        outputs = parent_method.outputs.order_by("dataset_idx")
+        for xput_type, xputs in (("in", inputs), ("out", outputs)):
+            forms = []
+            for xput in xputs:
+                tx_form = TransformationXputForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
+                                                initial={'dataset_name': xput.dataset_name,
+                                                         'dataset_idx': xput.dataset_idx})
+                if xput.has_structure:
+                    structure = xput.structure
+                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
                                             initial={'compounddatatype': structure.compounddatatype.id,
                                                      'min_row': structure.min_row,
                                                      'max_row': structure.max_row})
-            else:
-                xs_form = XputStructureForm(auto_id='id_%s_in_'+str(len(input_forms)),
+                else:
+                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
                                             initial={'compounddatatype': '__raw__'})
 
-            input_forms.append((tx_form, xs_form))
+                forms.append((tx_form, xs_form))
+            xput_forms.append(forms)
 
+        input_forms, output_forms = xput_forms
         # if previous Method has no inputs, provide blank forms
         if len(input_forms) == 0:
             tx_form = TransformationXputForm(auto_id='id_%s_in_0')
             xs_form = XputStructureForm(auto_id='id_%s_in_0')
             input_forms.append((tx_form, xs_form))
-
-        for output in parent_method.outputs.all():
-            tx_form = TransformationXputForm(auto_id='id_%s_out_'+str(len(output_forms)),
-                                            initial={'dataset_name': output.dataset_name,
-                                                     'dataset_idx': output.dataset_idx})
-            if output.has_structure:
-                structure = output.structure
-                xs_form = XputStructureForm(auto_id='id_%s_out_'+str(len(output_forms)),
-                                            initial={'compounddatatype': structure.compounddatatype.id,
-                                                     'min_row': structure.min_row,
-                                                     'max_row': structure.max_row})
-            else:
-                xs_form = XputStructureForm(auto_id='id_%s_out_'+str(len(output_forms)),
-                                            initial={'compounddatatype': '__raw__'})
-
-            output_forms.append((tx_form, xs_form))
 
     c = Context({'coderesource': this_code_resource,
                  'method_form': method_form,
