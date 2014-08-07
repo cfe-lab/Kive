@@ -1,0 +1,12 @@
+[
+{
+    "pk": 1, 
+    "model": "datachecking.contentchecklog", 
+    "fields": {
+        "execlog": null, 
+        "start_time": "2014-08-07T23:42:45.757Z", 
+        "symbolicdataset": 1, 
+        "end_time": "2014-08-07T23:42:45.951Z"
+    }
+}
+]

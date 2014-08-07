@@ -1,0 +1,18 @@
+[
+{
+    "pk": 1, 
+    "model": "librarian.symbolicdataset", 
+    "fields": {
+        "MD5_checksum": "d7fb24458b3b25e0962e55e874117710"
+    }
+},
+{
+    "pk": 1, 
+    "model": "librarian.datasetstructure", 
+    "fields": {
+        "num_rows": 5, 
+        "symbolicdataset": 1, 
+        "compounddatatype": 5
+    }
+}
+]

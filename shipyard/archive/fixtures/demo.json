@@ -1,0 +1,15 @@
+[
+{
+    "pk": 1, 
+    "model": "archive.dataset", 
+    "fields": {
+        "description": "Pairs of integers as examples for script 1.", 
+        "symbolicdataset": 1, 
+        "created_by": null, 
+        "user": 1, 
+        "date_created": "2014-08-07T23:42:45.955Z", 
+        "dataset_file": "Datasets/2014_08/script_1_sum_and_products_input.csv", 
+        "name": "pairs"
+    }
+}
+]
