@@ -1,0 +1,66 @@
+[{
+    "pk": 1, 
+    "model": "pipeline.pipelinefamily", 
+    "fields": {
+        "name": "Sums and Products", 
+        "description": ""
+    }
+},
+{
+    "pk": 3, 
+    "model": "pipeline.pipeline", 
+    "fields": {
+        "canvas_width": 1765, 
+        "revision_number": 1, 
+        "revision_parent": null, 
+        "family": 1, 
+        "canvas_height": 794
+    }
+},
+{
+    "pk": 1, 
+    "model": "pipeline.pipelinestep", 
+    "fields": {
+        "pipeline": 3, 
+        "name": "script_1_sum_and_products.py", 
+        "outputs_to_delete": [], 
+        "y": 236, 
+        "x": 258, 
+        "transformation": 2, 
+        "step_num": 1
+    }
+},
+{
+    "pk": 1, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 2, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 1, 
+    "model": "pipeline.pipelinestepinputcable", 
+    "fields": {
+        "pipelinestep": 1, 
+        "dest": 3, 
+        "keep_output": false, 
+        "source": 5, 
+        "source_step": 0
+    }
+},
+{
+    "pk": 2, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 3, 
+        "output_idx": 1, 
+        "source": 4, 
+        "output_cdt": 6, 
+        "output_name": "sums_products", 
+        "source_step": 1
+    }
+}
+]

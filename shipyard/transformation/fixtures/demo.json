@@ -1,0 +1,128 @@
+[
+{
+    "pk": 2, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-07T21:52:47.509Z", 
+        "revision_desc": "", 
+        "revision_name": "script_1_sum_and_products"
+    }
+},
+{
+    "pk": 3, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-07T21:57:44.989Z", 
+        "revision_desc": "", 
+        "revision_name": "Sums and Products"
+    }
+},
+{
+    "pk": 3, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 4, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 5, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 226, 
+        "x": 100
+    }
+},
+{
+    "pk": 6, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 288, 
+        "x": 1486
+    }
+},
+{
+    "pk": 2, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 3, 
+        "max_row": null, 
+        "compounddatatype": 5
+    }
+},
+{
+    "pk": 3, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 4, 
+        "max_row": null, 
+        "compounddatatype": 6
+    }
+},
+{
+    "pk": 4, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 5, 
+        "max_row": null, 
+        "compounddatatype": 5
+    }
+},
+{
+    "pk": 5, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 6, 
+        "max_row": null, 
+        "compounddatatype": 6
+    }
+},
+{
+    "pk": 3, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 2, 
+        "dataset_name": "pairs"
+    }
+},
+{
+    "pk": 5, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 3, 
+        "dataset_name": "pairs"
+    }
+},
+{
+    "pk": 4, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 2, 
+        "dataset_name": "sums_products"
+    }
+},
+{
+    "pk": 6, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 3, 
+        "dataset_name": "sums_products"
+    }
+}
+]

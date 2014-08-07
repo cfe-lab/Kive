@@ -1,0 +1,45 @@
+[
+{
+    "pk": 2, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Take in two integers, output sums and products.", 
+        "name": "script_1_sum_and_products", 
+        "filename": "script_1_sum_and_products.py"
+    }
+},
+{
+    "pk": 2, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Take in two integers, output sums and products.", 
+        "coderesource": 2, 
+        "MD5_checksum": "5d454fec2eb55b5e643afa6c988ac974", 
+        "content_file": "CodeResources/script_1_sum_and_products.py_20140807145144", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-07T21:51:44.301Z"
+    }
+},
+{
+    "pk": 2, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 2, 
+        "deterministic": true, 
+        "driver": 2, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 2, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "Sums and Products", 
+        "description": ""
+    }
+}
+]

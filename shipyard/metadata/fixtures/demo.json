@@ -1,0 +1,52 @@
+[
+{
+    "pk": 7, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 1, 
+        "column_name": "x", 
+        "compounddatatype": 5
+    }
+},
+{
+    "pk": 8, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 2, 
+        "column_name": "y", 
+        "compounddatatype": 5
+    }
+},
+{
+    "pk": 9, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 1, 
+        "column_name": "sum", 
+        "compounddatatype": 6
+    }
+},
+{
+    "pk": 10, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 2, 
+        "column_name": "product", 
+        "compounddatatype": 6
+    }
+},
+{
+    "pk": 5, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 6, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+}
+]
