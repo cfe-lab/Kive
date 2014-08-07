@@ -245,8 +245,10 @@ class SymbolicDataset(models.Model):
         """
         if file_path:
             LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
+            file_name = file_path
         elif file_handle:
             LOGGER.debug("Creating SymbolicDataset from file {}".format(file_handle.name))
+            file_name = file_handle.name
         else:
             raise Exception("Must supply either the file path or file handle")
 
@@ -265,7 +267,7 @@ class SymbolicDataset(models.Model):
                     if content_check.is_fail():
                         if content_check.baddata.bad_header:
                             raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                             .format(file_path, cdt))
+                                             .format(file_name, cdt))
                         elif content_check.baddata.cell_errors.exists():
                             error = content_check.baddata.cell_errors.first()
                             cdtm = error.column
@@ -273,8 +275,8 @@ class SymbolicDataset(models.Model):
                                              'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
                         else:
                             # Shouldn't reach here.
-                            raise ValueError('The file "{}" was malformed'.format(file_path))
-                    LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_path))
+                            raise ValueError('The file "{}" was malformed'.format(file_name))
+                    LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
 
             if make_dataset:
                 symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
