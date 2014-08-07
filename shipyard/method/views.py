@@ -373,7 +373,7 @@ def parse_method_form(query, family=None, parent_method=None):
     # retrieve CodeResource revision as driver
     try:
         coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
-    except DoesNotExist:
+    except ValueError:
         exceptions.update({'coderesource': 'Must specify code resource'})
 
     # attempt to make in/outputs
@@ -443,7 +443,10 @@ def parse_method_form(query, family=None, parent_method=None):
                 exceptions.update({key: str(msg[0])})
         else:
             # TODO: where to display our own (non-Django) ValidationErrors?
-            exceptions["revision_name"] = e.messages[0]
+            if parent_method:
+                exceptions["name"] = e.messages[0]
+            else:
+                exceptions["revision_name"] = e.messages[0]
 
     return exceptions
 
@@ -524,9 +527,6 @@ def method_revise(request, id):
                                                 'revision_desc': parent_method.revision_desc,
                                                 'revisions': parent_revision.pk,
                                                 'deterministic': parent_method.deterministic})
-        method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
-                                                   for x in all_revisions]
-
         xput_forms = []
         inputs = parent_method.inputs.order_by("dataset_idx")
         outputs = parent_method.outputs.order_by("dataset_idx")
@@ -556,6 +556,8 @@ def method_revise(request, id):
             xs_form = XputStructureForm(auto_id='id_%s_in_0')
             input_forms.append((tx_form, xs_form))
 
+    method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
+                                               for x in all_revisions]
     c = Context({'coderesource': this_code_resource,
                  'method_form': method_form,
                  'input_forms': input_forms,
