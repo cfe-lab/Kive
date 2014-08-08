@@ -426,11 +426,17 @@ CanvasState.prototype.deleteObject = function() {
             if (typeof mySel.dest !== 'string' && mySel.dest.parent.constructor == OutputNode) {
                 index = this.shapes.indexOf(mySel.dest.parent);
                 this.shapes.splice(index, 1);
+            } else {
+                // remove connector from destination in-magnet
+                index = mySel.dest.connected.indexOf(mySel);
+                mySel.dest.connected.splice(index, 1);
             }
-            
+
+            // remove connector from source out-magnet
             index = mySel.source.connected.indexOf(mySel);
             mySel.source.connected.splice(index, 1);
-            
+
+            // remove Connector from master list
             index = this.connectors.indexOf(mySel);
             this.connectors.splice(index, 1);
         }

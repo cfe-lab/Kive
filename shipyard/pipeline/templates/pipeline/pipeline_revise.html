@@ -167,6 +167,8 @@
                     // wait for MethodNodes to be built before connecting Pipeline outputs
                     $.when.apply(null, ajax_requests).done(function() {
                         var pipeline_outputs = result['pipeline_outputs'];
+                        var output_node;
+
                         for (i = 0; i < pipeline_outputs.length; i++) {
                             cable = pipeline_outputs[i];
 
@@ -183,12 +185,24 @@
                                         since canvas size is based off window size, 
                                         outputs should always go at the 90% mark of
                                         the canvas width regardless of the saved x-pos.
-                                    */
-                                    connector.x = canvasState.width * 0.9;
-                                    connector.y = cable.y;
-                                    connector.dest = cable.output_name;
 
-                                    magnet.connected.push(connector);
+                                        AP: actually, now that we have OutputNodes,
+                                        cable should retain original x, y coords.
+                                    */
+                                    //connector.x = canvasState.width * 0.9;
+                                    //connector.y = cable.y;
+                                    //connector.dest = cable.output_name;
+                                    output_node = new OutputNode(cable['x'], cable['y'], null, null, '#d40', null, null, cable['output_name']);
+                                    canvasState.addShape(output_node);
+
+                                    connector.x = cable['x'];
+                                    connector.y = cable['y'];
+
+                                    connector.dest = output_node.in_magnets[0];
+                                    connector.dest.connected = [ connector ];  // bind cable to output node
+                                    connector.source = magnet;
+
+                                    magnet.connected.push(connector);  // bind cable to source Method
                                     canvasState.connectors.push(connector);
                                     break;
                                 }

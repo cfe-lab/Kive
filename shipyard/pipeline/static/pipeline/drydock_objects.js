@@ -75,7 +75,7 @@ RawNode.prototype.draw = function(ctx) {
     
     // some shading
     ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.35;
     ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
     ctx.fill();
     ctx.globalAlpha = 1.0;
@@ -594,7 +594,7 @@ OutputNode.prototype.draw = function(ctx) {
     
     // some shading
     ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.35;
     ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
     ctx.fill();
     ctx.globalAlpha = 1.0;

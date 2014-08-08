@@ -70,7 +70,6 @@ def pipeline_revise(request, id):
 
     if request.method == 'POST':
         form_data = json.loads(request.body)
-        print form_data
         try:
             parent_pk = form_data['revision_parent_pk']
             parent_revision = Pipeline.objects.get(pk=parent_pk)

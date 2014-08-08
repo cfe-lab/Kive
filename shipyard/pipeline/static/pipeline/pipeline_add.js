@@ -396,6 +396,8 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     });
 
 
+
+
     /*
         Submit form
     */
@@ -704,9 +706,10 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 }
                 else if (result['status'] == 'success') {
                     $('#id_submit_error').html('').hide();
+                    window.location.href = '/pipelines';
                 }
             }
         })
     })
 });
-
+// end of document.ready()
