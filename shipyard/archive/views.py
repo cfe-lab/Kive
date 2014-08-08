@@ -39,6 +39,18 @@ def dataset_download(request, dataset_id):
     return response
 
 
+def dataset_view(request, dataset_id):
+    """
+    Display the file associated with the dataset in the browser.
+    """
+    dataset = Dataset.objects.filter(id=dataset_id).get()
+
+    file_chunker = FileWrapper(dataset.dataset_file)  # stream file in chunks to avoid overloading memory
+    response = HttpResponse(file_chunker, content_type="text/plain")
+    response['Content-Length'] = dataset.get_filesize()
+    return response
+
+
 def datasets_add(request):
     """
     Add datasets to db.
