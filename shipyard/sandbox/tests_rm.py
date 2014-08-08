@@ -83,6 +83,7 @@ class UtilityMethods():
         self.user_bob.save()
 
     def tearDown(self):
+        os.remove(self.string_datafile.name)
         clean_files()
 
     def make_second_pipeline(self, pipeline):
@@ -219,7 +220,6 @@ class UtilityMethods():
         self.string_datafile = tempfile.NamedTemporaryFile(delete=False)
         self.string_datafile.write("word\n")
         self.string_datafile.close()
-        # Aw heck.
         os.system("head -1 /usr/share/dict/words >> {}".
                   format(self.string_datafile.name))
         self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
@@ -630,45 +630,6 @@ class ExecuteTestsRM(UtilityMethods):
         self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
         self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
 
-#    def test_execute_pipeline_reuse_clever(self):
-#        """
-#        A Pipeline uses, in an intermediate step, a Symbolic Dataset which has previously
-#        been created by another pipeline.
-#
-#        At the moment, this fails, because of the way equality of SD's is
-#        defined (we don't match by MD5). Possibly we will implement this in the future.
-#        """
-#        # Feed input dataset to both reverse and complement pipelines.
-#        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
-#        sandbox_reverse.execute_pipeline()
-#        sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-#        sandbox_complement.execute_pipeline()
-#
-#        outcable_complement = sandbox_complement.run.runoutputcables.first()
-#        symds_compd = outcable_complement.execrecord.execrecordouts.first().symbolicdataset
-#
-#        # Now feed the reversed data into the reverse and complement pipeline.
-#        # Out of the first step should come the input data (because we're just
-#        # reversing what was reversed). Then we feed that into the complement
-#        # step, which should reuse the ExecRecord from the first run of the
-#        # complement pipeline.
-#        outcable_reverse = sandbox_reverse.run.runoutputcables.first()
-#        symds_reversed = outcable_reverse.execrecord.execrecordouts.first().symbolicdataset
-#
-#        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [symds_reversed])
-#        sandbox_revcomp.execute_pipeline()
-#
-#        # What did we get out of the second (complement) step of the reverse and
-#        # complement pipeline?
-#        rev_step = sandbox_revcomp.run.runsteps.first()
-#        comp_step = sandbox_revcomp.run.runsteps.last()
-#        rev_output = rev_step.execrecord.execrecordouts.first().symbolicdataset
-#        comp_output = comp_step.execrecord.execrecordouts.first().symbolicdataset
-#
-#        self.assertEqual(rev_output, self.symds_labdata)
-#        self.assertEqual(comp_output, symds_compd)
-#        self.assertEqual(comp_step.reused, True)
-
     def test_discard_intermediate_file(self):
         """
         A Pipeline which indicates one of its intermediate outputs should not be kept,
@@ -752,6 +713,7 @@ class BadRunTests(UtilityMethods):
 
     def tearDown(self):
         super(BadRunTests, self).tearDown()
+        os.remove(self.grandpa_datafile.name)
         clean_files()
 
     def test_code_bad_execution(self):

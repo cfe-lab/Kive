@@ -19,6 +19,7 @@ import os
 import sys
 import math
 import tempfile
+import shutil
 from datetime import datetime
 
 from file_access_utils import set_up_directory
@@ -687,6 +688,7 @@ class Datatype(models.Model):
                 elif not valid and (rownum, 1) not in failing_cells:
                     raise ValidationError('The prototype for Datatype "{}" indicates the value "{}" should be '
                                           'invalid, but it passed all constraints'.format(self, row[0]))
+        shutil.rmtree(summary_path)
 
     def clean(self):
         """

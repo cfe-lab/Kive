@@ -2,7 +2,7 @@
 Shipyard models pertaining to the librarian app.
 """
 
-import os.path
+import os
 import random
 import re
 import tempfile
@@ -334,6 +334,10 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.sym_dataset = SymbolicDataset.create_SD(file_path = self.file_path,
                 cdt = self.cdt_record, make_dataset = True, user = self.myUser,
                 name = self.dsname, description = self.dsdesc)
+
+    def tearDown(self):
+        super(SymbolicDatasetTests, self).tearDown()
+        os.remove(self.file_path)
     
     def test_is_raw(self):
         self.assertEqual(self.triplet_symDS.is_raw(), False)
@@ -345,9 +349,8 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         the data file.
         """
         # Write the data with no header.
-        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file = tempfile.NamedTemporaryFile()
         data_file.write(self.data)
-        data_file.close()
 
         # Try to create a symbolic dataset.
         self.assertRaisesRegexp(ValueError,
@@ -356,15 +359,14 @@ class SymbolicDatasetTests(LibrarianTestSetup):
                                 lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
                                                                    user=self.myUser, name="lab data", 
                                                                    description = "patient sequences"))
-        os.remove(data_file.name)
+        data_file.close()
 
     def test_empty_file(self):
         """
         SymbolicDataset creation fails if the file passed is empty.
         """
-        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file = tempfile.NamedTemporaryFile()
         file_path = data_file.name
-        data_file.close()
 
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
@@ -372,18 +374,18 @@ class SymbolicDatasetTests(LibrarianTestSetup):
                                 lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
                                                                    user=self.myUser, name="missing data", 
                                                                    description="oops!"))
+        data_file.close()
 
     def test_too_many_columns(self):
         """
         Symbolic dataset creation fails if the data file has too many
         columns.
         """
-        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file = tempfile.NamedTemporaryFile()
         header = "header,sequence,extra"
         data = "foo,bar,baz"
         data_file.write(header + "\n" + data)
         file_path = data_file.name
-        data_file.close()
 
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
@@ -391,16 +393,16 @@ class SymbolicDatasetTests(LibrarianTestSetup):
                                 lambda : SymbolicDataset.create_SD(file_path=file_path, cdt=self.cdt_record,
                                                                    user=self.myUser, name="bad data", 
                                                                    description="too many columns"))
-        os.remove(file_path)
+        data_file.close()
 
     def test_dataset_created(self):
         """
         Test coherence of the Dataset created alongsite a SymbolicDataset.
         """
-        data_file = tempfile.NamedTemporaryFile(delete=False)
+        data_file = tempfile.NamedTemporaryFile()
         data_file.write(self.header + "\n" + self.data)
+        data_file.seek(0)
         file_path = data_file.name
-        data_file.close()
 
         dsname = "good data"
         dsdesc = "some headers and sequences"
@@ -417,28 +419,30 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(dataset.symbolicdataset, sym_dataset)
         self.assertEqual(dataset.created_by, None)
         self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_path))
+        data_file.close()
 
     def test_dataset_bulk_created(self):
         """
         Test coherence of the Dataset created alongsite a SymbolicDataset.
         """
-        bulk_dataset_csv = tempfile.NamedTemporaryFile(delete=False, suffix="csv")
+        bulk_dataset_csv = tempfile.NamedTemporaryFile(suffix="csv")
         bulk_dataset_csv.write("Name,Description,File")
         dsname = "tempdataset"
         dsdesc = "some headers and sequences"
         file_paths = []
+        data_files = []
         for i in range(2):
-            data_file = tempfile.NamedTemporaryFile(delete=False)
-            data_file.write(self.header + "\n" + self.data)
-            file_path = data_file.name
-            data_file.close()
+            data_files.append(tempfile.NamedTemporaryFile())
+            data_files[-1].write(self.header + "\n" + self.data)
+            file_path = data_files[-1].name
             file_paths.extend([file_path])
-            bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + data_file.name)
-        bulk_dataset_csv.close()
+            bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + file_path)
 
         sym_datasets = SymbolicDataset.create_SD_bulk(csv_file_path=bulk_dataset_csv.name, check=True,
                                                       cdt=self.cdt_record, make_dataset=True, user=self.myUser)
-
+        for f in data_files:
+            f.close()
+        bulk_dataset_csv.close()
         for i, sym_dataset in enumerate(sym_datasets):
 
             dataset = sym_dataset.dataset
@@ -474,6 +478,7 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(self.sym_dataset.clean(), None)
         self.assertEqual(self.sym_dataset.has_data(), True)
         self.assertEqual(self.sym_dataset.is_raw(), False)
+
 
 
 class DatasetStructureTests(LibrarianTestSetup):
