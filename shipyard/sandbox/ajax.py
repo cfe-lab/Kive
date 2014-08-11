@@ -1,4 +1,4 @@
-from multiprocessing import Process
+from threading import Thread
 import time
 import json
 import re
@@ -50,7 +50,7 @@ def _run_pipeline(request):
     user = User.objects.get(username="shipyard")
 
     sandbox = Sandbox(user, pipeline, symbolic_datasets)
-    Process(target=sandbox.execute_pipeline).start()
+    Thread(target=sandbox.execute_pipeline).start()
     return json.dumps({"run": sandbox.run.pk, "status": "Starting run", "finished": False})
 
 def run_pipeline(request):
@@ -213,6 +213,7 @@ def _poll_run_progress(request):
         time.sleep(1)
         finished = run.is_complete()
         status = _get_run_progress(run)
+    	success = run.successful_execution()
     return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success})
 
 def poll_run_progress(request):
