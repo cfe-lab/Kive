@@ -1,7 +1,8 @@
-from threading import Thread
 import time
 import json
 import re
+import os
+import threading
 
 from django.http import HttpResponse
 from django.core import serializers
@@ -50,8 +51,11 @@ def _run_pipeline(request):
     user = User.objects.get(username="shipyard")
 
     sandbox = Sandbox(user, pipeline, symbolic_datasets)
-    Thread(target=sandbox.execute_pipeline).start()
-    return json.dumps({"run": sandbox.run.pk, "status": "Starting run", "finished": False})
+    thread = threading.Thread(name="user{}run{}".format(user.username, sandbox.run.pk),
+                              target=sandbox.execute_pipeline)
+    thread.start()
+    return json.dumps({"run": sandbox.run.pk, "status": "Starting run", "finished": False, 
+                       "thread": thread.name})
 
 def run_pipeline(request):
     return AJAXRequestHandler(request, _run_pipeline).response
@@ -202,11 +206,18 @@ def _get_run_progress(run):
 
 def _poll_run_progress(request):
     run_pk = int(request.GET.get("run"))
+    thread = request.GET.get("thread")
     last_status = request.GET.get("status")
     run = Run.objects.get(pk=run_pk)
     finished = run.is_complete()
     status = _get_run_progress(run)
     success = run.successful_execution()
+
+    running = False
+    for active_thread in threading.enumerate():
+        if active_thread.name == thread:
+            running = True
+            break
 
     # Arrrgh I hate sleeping. Find a better way.
     while status == last_status and not finished:
@@ -214,7 +225,15 @@ def _poll_run_progress(request):
         finished = run.is_complete()
         status = _get_run_progress(run)
     	success = run.successful_execution()
-    return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success})
+
+    # If the Run isn't done but the process is, we've crashed.
+    if not finished and not running:
+        status = "Crashed"
+        finished = True
+        success = False
+
+    return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success,
+                       "thread": thread})
 
 def poll_run_progress(request):
     return AJAXRequestHandler(request, _poll_run_progress).response
