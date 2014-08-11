@@ -41,5 +41,207 @@
         "name": "Sums and Products", 
         "description": ""
     }
+},
+{
+    "pk": 3, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "To make pipeline portable, allow user to specify local paths and thread counts.", 
+        "name": "settings", 
+        "filename": "settings.py"
+    }
+},
+{
+    "pk": 4, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Standard configuration for logging", 
+        "name": "miseq_logging", 
+        "filename": "miseq_logging.py"
+    }
+},
+{
+    "pk": 5, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Reference sequences", 
+        "name": "cfe.fasta", 
+        "filename": "cfe.fasta"
+    }
+},
+{
+    "pk": 6, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.", 
+        "name": "prelim_map", 
+        "filename": "prelim_map.py"
+    }
+},
+{
+    "pk": 3, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "To make pipeline portable, allow user to specify local paths and thread counts.", 
+        "coderesource": 3, 
+        "MD5_checksum": "f3d84d1555896e94d8e4ab0ee7c762b5", 
+        "content_file": "CodeResources/settings.py_20140811115944", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T18:59:44.931Z"
+    }
+},
+{
+    "pk": 4, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Standard configuration for logging", 
+        "coderesource": 4, 
+        "MD5_checksum": "d98e48f57cc791eb7b68230af283dd3b", 
+        "content_file": "CodeResources/miseq_logging.py_20140811120034", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T19:00:34.738Z"
+    }
+},
+{
+    "pk": 5, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Reference sequences", 
+        "coderesource": 5, 
+        "MD5_checksum": "fd2fd44aabab5a12fdbe5d05714a6cba", 
+        "content_file": "CodeResources/cfe.fasta_20140811120123", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T19:01:23.014Z"
+    }
+},
+{
+    "pk": 6, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.", 
+        "coderesource": 6, 
+        "MD5_checksum": "2baf0f9454e52c150e53655a5bd22367", 
+        "content_file": "CodeResources/prelim_map.py_20140811120247", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T19:02:47.539Z"
+    }
+},
+{
+    "pk": 1, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 6, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 2, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 4, 
+        "coderesourcerevision": 6, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 3, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 5, 
+        "coderesourcerevision": 6, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 4, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 3, 
+        "deterministic": true, 
+        "driver": 6, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 3, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "prelim_map", 
+        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file."
+    }
+},
+{
+    "pk": 4, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T19:05:56.425Z", 
+        "revision_desc": "", 
+        "revision_name": "prelim_map"
+    }
+},
+{
+    "pk": 7, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 8, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 9, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 7, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 4, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 8, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 4, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 9, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 4, 
+        "dataset_name": "prelim_csv"
+    }
 }
 ]
