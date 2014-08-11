@@ -14,5 +14,19 @@
         "symbolicdataset": 1, 
         "compounddatatype": 5
     }
+},
+{
+    "pk": 2, 
+    "model": "librarian.symbolicdataset", 
+    "fields": {
+        "MD5_checksum": "0d87c1329ab1f96f919fc61e991447ac"
+    }
+},
+{
+    "pk": 3, 
+    "model": "librarian.symbolicdataset", 
+    "fields": {
+        "MD5_checksum": "b52c0b81c0ad3c4188da47c221ab28fb"
+    }
 }
 ]

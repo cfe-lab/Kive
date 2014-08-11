@@ -185,63 +185,76 @@
     }
 },
 {
+    "pk": 7, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
+        "name": "remap", 
+        "filename": "remap.py"
+    }
+},
+{
+    "pk": 7, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
+        "coderesource": 7, 
+        "MD5_checksum": "39d2e6dcee3506ed11b76706d21c8680", 
+        "content_file": "CodeResources/remap.py_20140811122443", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T19:24:43.487Z"
+    }
+},
+{
     "pk": 4, 
-    "model": "transformation.transformation", 
+    "model": "method.coderesourcedependency", 
     "fields": {
-        "revision_DateTime": "2014-08-11T19:05:56.425Z", 
-        "revision_desc": "", 
-        "revision_name": "prelim_map"
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 7, 
+        "depFileName": ""
     }
 },
 {
-    "pk": 7, 
-    "model": "transformation.transformationxput", 
+    "pk": 5, 
+    "model": "method.coderesourcedependency", 
     "fields": {
-        "y": 0, 
-        "x": 0
+        "depPath": ".", 
+        "requirement": 4, 
+        "coderesourcerevision": 7, 
+        "depFileName": ""
     }
 },
 {
-    "pk": 8, 
-    "model": "transformation.transformationxput", 
+    "pk": 6, 
+    "model": "method.coderesourcedependency", 
     "fields": {
-        "y": 0, 
-        "x": 0
+        "depPath": ".", 
+        "requirement": 5, 
+        "coderesourcerevision": 7, 
+        "depFileName": ""
     }
 },
 {
-    "pk": 9, 
-    "model": "transformation.transformationxput", 
+    "pk": 5, 
+    "model": "method.method", 
     "fields": {
-        "y": 0, 
-        "x": 0
+        "revision_parent": null, 
+        "family": 4, 
+        "deterministic": true, 
+        "driver": 7, 
+        "tainted": false, 
+        "revision_number": 1
     }
 },
 {
-    "pk": 7, 
-    "model": "transformation.transformationinput", 
+    "pk": 4, 
+    "model": "method.methodfamily", 
     "fields": {
-        "dataset_idx": 1, 
-        "transformation": 4, 
-        "dataset_name": "fastq1"
-    }
-},
-{
-    "pk": 8, 
-    "model": "transformation.transformationinput", 
-    "fields": {
-        "dataset_idx": 2, 
-        "transformation": 4, 
-        "dataset_name": "fastq2"
-    }
-},
-{
-    "pk": 9, 
-    "model": "transformation.transformationoutput", 
-    "fields": {
-        "dataset_idx": 1, 
-        "transformation": 4, 
-        "dataset_name": "prelim_csv"
+        "name": "remap", 
+        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing."
     }
 }
 ]

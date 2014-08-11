@@ -124,5 +124,176 @@
         "transformation": 3, 
         "dataset_name": "sums_products"
     }
+},
+{
+    "pk": 4, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T19:05:56.425Z", 
+        "revision_desc": "", 
+        "revision_name": "prelim_map"
+    }
+},
+{
+    "pk": 7, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 8, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 9, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 7, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 4, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 8, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 4, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 9, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 4, 
+        "dataset_name": "prelim_csv"
+    }
+},
+{
+    "pk": 5, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T19:26:50.681Z", 
+        "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
+        "revision_name": "remap"
+    }
+},
+{
+    "pk": 10, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 11, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 12, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 13, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 14, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 15, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 10, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 5, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 11, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 5, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 12, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 5, 
+        "dataset_name": "prelim_csv"
+    }
+},
+{
+    "pk": 13, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 5, 
+        "dataset_name": "remap_csv"
+    }
+},
+{
+    "pk": 14, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 5, 
+        "dataset_name": "remap_counts_csv"
+    }
+},
+{
+    "pk": 15, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 5, 
+        "dataset_name": "remap_conseq_csv"
+    }
 }
 ]

@@ -11,5 +11,31 @@
         "dataset_file": "Datasets/2014_08/script_1_sum_and_products_input.csv", 
         "name": "pairs"
     }
+},
+{
+    "pk": 2, 
+    "model": "archive.dataset", 
+    "fields": {
+        "description": "Tiny FASTQ example - forward read", 
+        "symbolicdataset": 2, 
+        "created_by": null, 
+        "user": 1, 
+        "date_created": "2014-08-11T19:27:33.327Z", 
+        "dataset_file": "Datasets/2014_08/1234A-V3LOOP_S1_L001_R1_001.fastq", 
+        "name": "1234A_R1.fastq"
+    }
+},
+{
+    "pk": 3, 
+    "model": "archive.dataset", 
+    "fields": {
+        "description": "Tiny FASTQ example - reverse read", 
+        "symbolicdataset": 3, 
+        "created_by": null, 
+        "user": 1, 
+        "date_created": "2014-08-11T19:27:58.100Z", 
+        "dataset_file": "Datasets/2014_08/1234A-V3LOOP_S1_L001_R2_001.fastq", 
+        "name": "1234A_R2.fastq"
+    }
 }
 ]
