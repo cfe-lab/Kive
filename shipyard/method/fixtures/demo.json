@@ -438,5 +438,101 @@
         "name": "csf2counts", 
         "description": "Post-processing of short-read alignments."
     }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "", 
+        "name": "csf_to_fasta_by_nucref", 
+        "filename": "csf_to_fasta_by_nucref.csv"
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Clip out sub-regions from MiSeq read alignments", 
+        "name": "csf2nuc", 
+        "filename": "csf2nuc.py"
+    }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "", 
+        "coderesource": 12, 
+        "MD5_checksum": "e6e49dc0484a4a2ceb81809ce58cfcd7", 
+        "content_file": "CodeResources/csf_to_fasta_by_nucref.csv_20140811162253", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:22:53.769Z"
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Clip out sub-regions from MiSeq read alignments", 
+        "coderesource": 13, 
+        "MD5_checksum": "51aba85560352913d54ed9785afc8f53", 
+        "content_file": "CodeResources/csf2nuc.py_20140811162856", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:28:56.731Z"
+    }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 12, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 14, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 10, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 8, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 7, 
+        "deterministic": true, 
+        "driver": 13, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 7, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "csf2nuc", 
+        "description": "Clip out sub-regions from MiSeq read alignments"
+    }
 }
 ]

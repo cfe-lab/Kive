@@ -466,5 +466,48 @@
         "transformation": 7, 
         "dataset_name": "conseq_csv"
     }
+},
+{
+    "pk": 8, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T23:29:46.329Z", 
+        "revision_desc": "Clip out sub-regions from MiSeq read alignments", 
+        "revision_name": "csf2nuc"
+    }
+},
+{
+    "pk": 25, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 26, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 25, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 8, 
+        "dataset_name": "aligned_csv"
+    }
+},
+{
+    "pk": 26, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 8, 
+        "dataset_name": "nuc_variants_csv"
+    }
 }
 ]
