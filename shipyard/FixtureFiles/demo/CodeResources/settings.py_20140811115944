@@ -1,0 +1,69 @@
+"""
+settings_default.py
+To make pipeline portable, allow user to specify
+"""
+
+pipeline_version = '6.3'
+
+production = False  # set this to True to push results to NAS
+filter_cross_contaminants = False
+
+## Modify this path to your pipeline directory
+base_path = '../'
+# base_path += 'production/' if production else 'development/'
+
+# Local path for writing data
+#home = '/home/don/data/miseq/'
+
+
+## FIFO settings
+are_temp_folders_deleted = True # Should FIFO scheduler clean up working folders?
+
+# Scheduling processes: these should be a multiple of the total number of slots
+# in your hostfile.
+mapping_processes = 2
+counting_processes = 4
+
+
+## MISEQ_MONITOR settings
+
+#rawdata_mount = '/home/don/data/RAW_DATA/' # local
+#rawdata_mount = '/media/raw_data/'  # NAS
+
+delay = 10  # Delay (seconds) for polling NAS for unprocessed runs
+
+NEEDS_PROCESSING = 'needsprocessing'  # File flags
+ERROR_PROCESSING = 'errorprocessing'
+
+
+## Mapping parameters
+
+# location of .bt2 files
+ref_path = base_path + 'reference_sequences/'
+mapping_ref_path = ref_path + 'cfe'
+
+bowtie_threads = 4              # Bowtie performance roughly scales with number of threads
+min_mapping_efficiency = 0.95   # Fraction of fastq reads mapped needed
+max_remaps = 3                  # Number of remapping attempts if mapping efficiency unsatisfied
+consensus_q_cutoff = 20         # Min Q for base to contribute to conseq (pileup2conseq)
+
+
+## sam2csf parameters
+sam2csf_q_cutoffs = [15]  # Q-cutoff for base censoring
+max_prop_N = 0.5                 # Drop reads with more censored bases than this proportion
+read_mapping_cutoff = 10         # Minimum bowtie read mapping quality
+
+## g2p parameters (Amplicon only)
+g2p_alignment_cutoff = 50               # Minimum alignment score during g2p scoring
+g2p_fpr_cutoffs = [3.0]  # FPR cutoff to determine R5/X4 tropism
+v3_mincounts = [0]       # Min number of reads to contribute to %X4 calculation
+
+## csf2counts parameters
+conseq_mixture_cutoffs = [0.02, 0.20]
+final_alignment_ref_path = ref_path + 'csf2counts_amino_refseqs.csv'
+final_nuc_align_ref_path = ref_path + 'csf_to_fasta_by_nucref.csv'
+
+# Default database user and password.
+oracle_uploader = "FILLINUSERNAME"
+oracle_uploader_pass = "****"
+oracle_db = "//192.168.X.Y:port/DBname"
