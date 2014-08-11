@@ -676,7 +676,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 'output_idx': i+1,
                 'output_CDT_pk': this_connector.source.cdt,
                 'source': this_source_step.pk,
-                'source_step': sorted_elements.indexOf(this_step) + 1, // 1-index
+                'source_step': sorted_elements.indexOf(this_source_step) + 1, // 1-index
                 'source_dataset_name': this_connector.source.label,  // magnet label
                 'x': this_output.x,
                 'y': this_output.y,
