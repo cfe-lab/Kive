@@ -275,7 +275,7 @@
         "revision_desc": "Conversion of SAM data into aligned format.", 
         "coderesource": 8, 
         "MD5_checksum": "44ecb64b5b210876aed6f7829f86430c", 
-        "content_file": "CodeResources/sam2csf.py_20140811143206", 
+        "content_file": "CodeResources/sam2csf.py_20140811144919", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T21:32:06.239Z"
     }
@@ -308,6 +308,135 @@
     "fields": {
         "name": "sam2csf", 
         "description": "Conversion of SAM data into aligned format."
+    }
+},
+{
+    "pk": 9, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Amino acid reference sequences", 
+        "name": "csf2counts_amino_refseqs", 
+        "filename": "csf2counts_amino_refseqs.csv"
+    }
+},
+{
+    "pk": 10, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().", 
+        "name": "hyphyAlign", 
+        "filename": "hyphyAlign.py"
+    }
+},
+{
+    "pk": 11, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Post-processing of short-read alignments.", 
+        "name": "csf2counts", 
+        "filename": "csf2counts.py"
+    }
+},
+{
+    "pk": 9, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Amino acid reference sequences", 
+        "coderesource": 9, 
+        "MD5_checksum": "e70ee496676ceb704f859a316cd2d826", 
+        "content_file": "CodeResources/csf2counts_amino_refseqs.csv_20140811153950", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T22:39:50.890Z"
+    }
+},
+{
+    "pk": 10, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().", 
+        "coderesource": 10, 
+        "MD5_checksum": "3563b23f2e275d184865e2907e50034b", 
+        "content_file": "CodeResources/hyphyAlign.py_20140811154128", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T22:41:28.990Z"
+    }
+},
+{
+    "pk": 11, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Post-processing of short-read alignments.", 
+        "coderesource": 11, 
+        "MD5_checksum": "795b15973f8d541462eea57058c45aa4", 
+        "content_file": "CodeResources/csf2counts.py_20140811154315", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T22:43:15.594Z"
+    }
+},
+{
+    "pk": 8, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 9, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 9, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 10, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 4, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 11, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 10, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 7, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 6, 
+        "deterministic": true, 
+        "driver": 11, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 6, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "csf2counts", 
+        "description": "Post-processing of short-read alignments."
     }
 }
 ]
