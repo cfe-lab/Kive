@@ -256,5 +256,58 @@
         "name": "remap", 
         "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing."
     }
+},
+{
+    "pk": 8, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Conversion of SAM data into aligned format.", 
+        "name": "sam2csf", 
+        "filename": "sam2csf.py"
+    }
+},
+{
+    "pk": 8, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Conversion of SAM data into aligned format.", 
+        "coderesource": 8, 
+        "MD5_checksum": "44ecb64b5b210876aed6f7829f86430c", 
+        "content_file": "CodeResources/sam2csf.py_20140811143206", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T21:32:06.239Z"
+    }
+},
+{
+    "pk": 7, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 8, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 6, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 5, 
+        "deterministic": true, 
+        "driver": 8, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 5, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "sam2csf", 
+        "description": "Conversion of SAM data into aligned format."
+    }
 }
 ]

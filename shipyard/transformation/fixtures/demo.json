@@ -295,5 +295,65 @@
         "transformation": 5, 
         "dataset_name": "remap_conseq_csv"
     }
+},
+{
+    "pk": 6, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T21:34:09.900Z", 
+        "revision_desc": "Conversion of SAM data into aligned format.", 
+        "revision_name": "sam2csf"
+    }
+},
+{
+    "pk": 16, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 17, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 18, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 16, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 6, 
+        "dataset_name": "remap_csv"
+    }
+},
+{
+    "pk": 17, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 6, 
+        "dataset_name": "aligned_csv"
+    }
+},
+{
+    "pk": 18, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 6, 
+        "dataset_name": "failed_csv"
+    }
 }
 ]
