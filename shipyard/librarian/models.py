@@ -22,6 +22,7 @@ import logging
 import tempfile
 import hashlib
 import shutil
+import os
 
 import archive.models
 import method.models
@@ -192,7 +193,7 @@ class SymbolicDataset(models.Model):
             dataset.created_by = created_by
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
-            dataset.dataset_file.save(f.name, File(f))
+            dataset.dataset_file.save(os.path.basename(f.name), File(f))
 
         dataset.clean()
         dataset.save()
@@ -274,7 +275,7 @@ class SymbolicDataset(models.Model):
                             error = content_check.baddata.cell_errors.first()
                             cdtm = error.column
                             raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                             'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_path, cdtm.datatype))
+                                             'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype))
                         else:
                             # Shouldn't reach here.
                             raise ValueError('The file "{}" was malformed'.format(file_name))
