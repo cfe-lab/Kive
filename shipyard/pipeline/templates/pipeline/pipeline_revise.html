@@ -70,7 +70,7 @@
                             canvasState.addShape(new RawNode(node.x, node.y, rawNodeWidth, rawNodeHeight, rawNodeColour,
                                     rawNodeInset, rawNodeOffset, node.dataset_name));
                         } else {
-                            canvasState.addShape(new CDtNode(node.CDT_pk, node.x, node.y, cdtNodeWidth,
+                            canvasState.addShape(new CDtNode(node.CDT_pk, node.x, node.y, cdtNodeWidth, cdtNodeColour,
                                     cdtNodeInset, cdtNodeOffset, node.dataset_name));
                         }
                     }
@@ -116,6 +116,8 @@
                                         }
                                         if (source === null) {
                                             alert("Failed to redraw Pipeline: missing data node");
+                                            console.log(shape.label);
+                                            console.log(cable.source_dataset_name);
                                             return;
                                         }
 
@@ -171,14 +173,18 @@
 
                         for (i = 0; i < pipeline_outputs.length; i++) {
                             cable = pipeline_outputs[i];
+                            console.log(cable);
 
                             // identify source Method
                             source = canvasState.shapes[method_node_offset + cable.source_step - 1];
+                            console.log(source);
 
                             // find the correct out-magnet
                             for (k = 0; k < source.out_magnets.length; k++) {
                                 magnet = source.out_magnets[k];
                                 if (magnet.label === cable.source_dataset_name) {
+                                    console.log('found');
+                                    console.log(magnet);
                                     connector = new Connector(null, null, magnet);
 //                                    connector.x = cable.x;
                                     /* 
@@ -195,8 +201,8 @@
                                     output_node = new OutputNode(cable['x'], cable['y'], null, null, '#d40', null, null, cable['output_name']);
                                     canvasState.addShape(output_node);
 
-                                    connector.x = cable['x'];
-                                    connector.y = cable['y'];
+                                    connector.x = cable.x;
+                                    connector.y = cable.y;
 
                                     connector.dest = output_node.in_magnets[0];
                                     connector.dest.connected = [ connector ];  // bind cable to output node

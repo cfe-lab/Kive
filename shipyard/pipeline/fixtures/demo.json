@@ -10,11 +10,11 @@
     "pk": 3, 
     "model": "pipeline.pipeline", 
     "fields": {
-        "canvas_width": 1765, 
+        "canvas_width": 900, 
         "revision_number": 1, 
         "revision_parent": null, 
         "family": 1, 
-        "canvas_height": 794
+        "canvas_height": 500
     }
 },
 {
