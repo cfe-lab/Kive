@@ -3,6 +3,8 @@
 
 {% extends "portal/base.html" %}
 
+{% load filters %}
+
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
@@ -23,6 +25,7 @@
         <th>Description</th>
         <th>Date Created</th>
         <th>File Size (B)</th>
+        <th></th>
 	</tr>
 </thead>
 {% for dataset in datasets %}
@@ -32,6 +35,7 @@
 	<td>{{ dataset.description }}</td>
     <td>{{ dataset.date_created }}</td>
     <td>{{ dataset.get_filesize }}</td>
+    <td><a href="{{ dataset.get_absolute_url|get_view_link }}">View</a></td>
 </tr>
 {% endfor %}
 </table>
