@@ -355,5 +355,116 @@
         "transformation": 6, 
         "dataset_name": "failed_csv"
     }
+},
+{
+    "pk": 7, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-11T22:46:19.889Z", 
+        "revision_desc": "Post-processing of short-read alignments.", 
+        "revision_name": "csf2counts"
+    }
+},
+{
+    "pk": 19, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 20, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 21, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 22, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 23, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 24, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 19, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 7, 
+        "dataset_name": "aligned_csv"
+    }
+},
+{
+    "pk": 20, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 7, 
+        "dataset_name": "remap_conseq_csv"
+    }
+},
+{
+    "pk": 21, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 7, 
+        "dataset_name": "nuc_csv"
+    }
+},
+{
+    "pk": 22, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 7, 
+        "dataset_name": "amino_csv"
+    }
+},
+{
+    "pk": 23, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 7, 
+        "dataset_name": "indels_csv"
+    }
+},
+{
+    "pk": 24, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 4, 
+        "transformation": 7, 
+        "dataset_name": "conseq_csv"
+    }
 }
 ]
