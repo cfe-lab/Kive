@@ -15,6 +15,7 @@
             <th>Size</th>
             <th>Date created</th>
             <th></th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -23,6 +24,11 @@
             <td>{{ outcable.execrecord.execrecordouts.first.generic_output }}</td>
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.dataset_file.size|filesizeformat }}</td>
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.date_created }}</td>
+            <td>
+                <a href="../../dataset_view/{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.pk }}">
+                    View
+                </a>
+            </td>
             <td>
                 <a href="../../dataset_download/{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.pk }}">
                     Download

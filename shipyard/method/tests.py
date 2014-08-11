@@ -399,7 +399,7 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
 
         # Some code for a no-op method.
         resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
-        with tempfile.NamedTemporaryFile(delete=False) as f:
+        with tempfile.NamedTemporaryFile() as f:
             f.write("#!/bin/bash\ncat $1")
             self.noop_data_file = f.name
             revision = CodeResourceRevision(coderesource = resource, content_file = File(f))
@@ -1794,6 +1794,7 @@ class CodeResourceRevisionInstallTests(MethodTestSetup):
         self.assertTrue(os.path.isdir(os.path.join(metapackage_path, "metamodules", "foo")))
         self.assertTrue(os.path.exists(os.path.join(metapackage_path, "metamodules", "foo",
                                                     "script_4_raw_in_CSV_out.py")))
+        shutil.rmtree(test_path)
 
 
 class MethodTests(MethodTestSetup):

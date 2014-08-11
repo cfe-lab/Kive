@@ -14,6 +14,7 @@ from archive.models import Dataset, Run
 from librarian.models import SymbolicDataset
 from transformation.models import TransformationInput
 from metadata.models import CompoundDatatype
+from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from execute import Sandbox
 from forms import PipelineSelectionForm
 
@@ -104,6 +105,66 @@ def _filter_pipelines(request):
 def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
+def _describe_run_failure(run):
+    """
+    Return a tuple (error, reason) describing a Run failure.
+
+    TODO: this is very rudimentary at the moment.
+    - It does not take recovery into account - should report which step
+      was actually executed and failed, not which step tried to recover
+      and failed.
+    - It does not take sub-pipelines into account.
+    - Failure details for a cable are not reported.
+    - Details of cell errors are not reported.
+    """
+    total_steps = run.pipeline.steps.count()
+    error = ""
+    reason = ""
+
+    # Check each step for failure.
+    for i, runstep in enumerate(run.runsteps.order_by("pipelinestep__step_num"), start=1):
+
+        if runstep.is_complete() and not runstep.successful_execution():
+            error = "Step {} of {} failed".format(i, total_steps)
+
+            # Check each cable.
+            total_cables = runstep.pipelinestep.cables_in.count()
+            for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
+                if not runcable.successful_execution():
+                    return (error, "Input cable {} of {} failed".format(j, total_cables))
+
+            # Check the step execution.
+            if not runstep.log:
+                return (error, "Recovery failed")
+            return_code = runstep.log.methodoutput.return_code 
+            if return_code != 0:
+                return (error, "Return code {}".format(return_code))
+
+            # Check for bad output.
+            for output in runstep.execrecord.execrecordouts.all():
+                try:
+                    check = runstep.log.content_checks.get(symbolicdataset=output.symbolicdataset)
+                except ContentCheckLog.DoesNotExist:
+                    try:
+                        check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
+                    except IntegrityCheckLog.DoesNotExist:
+                        continue
+
+                if check.is_fail():
+                    return (error, "Output {}: {}".format(output.generic_output.definite.dataset_idx, check))
+
+            # Something else went wrong with the step?
+            return (error, "Unknown error")
+                
+    # Check each output cable.
+    total_cables = run.pipeline.outcables.count()
+    for i, runcable in enumerate(run.runoutputcables.order_by("pipelineoutputcable__output_idx")):
+        if not runcable.successful_execution():
+            return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
+
+    # Shouldn't reach here.
+    return ("Unknown error", "Unknown reason")
+
 def _get_run_progress(run):
     """
     Return a tuple (status, finished), where status is a string
@@ -114,7 +175,7 @@ def _get_run_progress(run):
     if run.is_complete():
         if run.successful_execution():
             return "Complete"
-        return "Failed"
+        return "{} ({})".format(*_describe_run_failure(run))
 
     # One of the steps is in progress?
     total_steps = run.pipeline.steps.count()
@@ -145,13 +206,14 @@ def _poll_run_progress(request):
     run = Run.objects.get(pk=run_pk)
     finished = run.is_complete()
     status = _get_run_progress(run)
+    success = run.successful_execution()
 
     # Arrrgh I hate sleeping. Find a better way.
     while status == last_status and not finished:
         time.sleep(1)
         finished = run.is_complete()
         status = _get_run_progress(run)
-    return json.dumps({"status": status, "run": run_pk, "finished": finished})
+    return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success})
 
 def poll_run_progress(request):
     return AJAXRequestHandler(request, _poll_run_progress).response

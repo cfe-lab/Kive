@@ -32,6 +32,8 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
     def tearDown(self):
         super(ArchiveTestSetup, self).tearDown()
         sandbox.tests_rm.clean_files()
+        if hasattr(self, "string_datafile"):
+            os.remove(self.string_datafile.name)
 
     def make_complete_non_reused(self, record, input_SDs, output_SDs):
         """
@@ -3190,14 +3192,14 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
 
         # Make a bad ICL.
-        conflicting_datafile = tempfile.NamedTemporaryFile(delete=False)
+        conflicting_datafile = tempfile.NamedTemporaryFile()
         conflicting_datafile.write("THIS IS A FAILURE")
-        conflicting_datafile.close()
 
         # The output of this first cable is self.raw_symDS.  This creates a bad ICL.
         self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
         self.assertTrue(step_E1_RSIC.is_complete())
         self.assertFalse(step_E1_RSIC.successful_execution())
+        conflicting_datafile.close()
 
     def test_runcomponent_unsuccessful_failed_invoked_log(self):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""

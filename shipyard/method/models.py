@@ -265,11 +265,12 @@ class CodeResourceRevision(models.Model):
 
         # Install if not a metapackage.
         if base_name != "":
-            shutil.copyfile(self.content_file.name, os.path.join(install_path, base_name))
+            dest_path = os.path.join(install_path, base_name)
+            with open(dest_path, "w") as f:
+                shutil.copyfileobj(self.content_file, f)
             # Make sure this is written with read, write, and execute
             # permission.
-            os.chmod(os.path.join(install_path, base_name),
-                     stat.S_IRUSR| stat.S_IWUSR | stat.S_IXUSR )
+            os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This should never
@@ -278,7 +279,7 @@ class CodeResourceRevision(models.Model):
             # conflicts.  (Thus if an exception is raised, we want to
             # propagate it as that's a pretty deep problem.)
             path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
-            # June 12, 2014: the directory may already exist due to another dependency --
+            # the directory may already exist due to another dependency --
             # or if depPath is ".".
             try:
                 os.makedirs(path_for_deps)

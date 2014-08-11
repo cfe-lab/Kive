@@ -1,7 +1,14 @@
 /*
- * run_data is a JSON object of the form {"run": integer, "status": string, "finished": bool},
- * where "run" is the primary key of the Run, "status" is a string describing the Run's status,
- * and "finished" is true if the Run is done or False otherwise.
+ * run_data is a JSON object of the form 
+ *
+ *      {"run": integer, 
+ *       "status": string,
+ *       "finished": bool, 
+ *       "success": bool}
+ *
+ * where "run" is the primary key of the Run, "status" is a string describing
+ * the Run's status, and "finished" is true if the Run is done or False
+ * otherwise.
  */
 
 /* How long to wait for a server response. */
@@ -15,7 +22,9 @@ function poll_run_progress(run_data) {
                 show_run_progress(new_data["status"]);
                 if (new_data["finished"]) {
                     $("#loading").hide("slow");
-                    show_results_link(run_data["run"]);
+                    if (new_data["success"]) {
+                        show_results_link(run_data["run"]);
+                    }
                 } else {
                     poll_run_progress(new_data); 
                 }

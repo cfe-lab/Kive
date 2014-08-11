@@ -104,6 +104,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         p.save()
 
     def tearDown(self):
+        super(PipelineTestSetup, self).tearDown()
         shutil.rmtree(self.workdir)
 
 
@@ -3803,25 +3804,10 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
         self.assertEqual(len(log.missing_outputs()), 0)
         self.assertEqual(log.is_successful(), True)
 
-    # May 14, 2014: this is now deprecated.  run_cable is now only meant to be
-    # run on filenames.
-    # def test_execlog_psic_run_cable_dataset(self):
-    #     """
-    #     Check the coherence of an ExecLog created by running a cable with a Dataset.
-    #     """
-    #     import time
-    #
-    #     scratch_dir, output_file = self._setup_dirs()
-    #     log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.DNAinput_symDS.dataset)
-    #     self._log_checks(log, rsic)
-    #     shutil.rmtree(scratch_dir)
-
     def test_execlog_psic_run_cable_file(self):
         """
         Check the coherence of an ExecLog created by running a cable with a Dataset.
         """
-        import time
-
         scratch_dir, output_file = self._setup_dirs()
         log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.datafile.name)
         self._log_checks(log, rsic)

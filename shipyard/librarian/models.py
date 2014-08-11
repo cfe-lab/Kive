@@ -21,6 +21,7 @@ import re
 import logging
 import tempfile
 import hashlib
+import shutil
 
 import archive.models
 import method.models
@@ -264,6 +265,7 @@ class SymbolicDataset(models.Model):
                     run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
                     content_check = symDS.check_file_contents(file_path_to_check=file_path, file_handle=file_handle,
                                                               summary_path=run_dir, min_row=None, max_row=None, execlog=None)
+                    shutil.rmtree(run_dir)
                     if content_check.is_fail():
                         if content_check.baddata.bad_header:
                             raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'

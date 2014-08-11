@@ -9,10 +9,12 @@ from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
+from django.utils.encoding import python_2_unicode_compatible
 
 import stopwatch.models
 
 
+@python_2_unicode_compatible
 class ContentCheckLog(stopwatch.models.Stopwatch):
     """
     Denotes a check performed on a SymbolicDataset's contents.
@@ -28,6 +30,11 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
 
     # Implicit through inheritance: start_time, end_time.
+
+    def __str__(self):
+        if self.is_fail():
+            return str(self.baddata)
+        return "OK"
 
     def add_missing_output(self):
         """Add a BadData for missing output."""
@@ -72,6 +79,7 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
         return hasattr(self, "baddata")
 
 
+@python_2_unicode_compatible
 class BadData(models.Model):
     """
     Denotes a failed result from a content check.
@@ -81,6 +89,16 @@ class BadData(models.Model):
     missing_output = models.BooleanField(default=False)
     bad_header = models.NullBooleanField()
     bad_num_rows = models.NullBooleanField()
+
+    def __str__(self):
+        if self.missing_output:
+            return "missing output"
+        elif self.bad_header:
+            return "malformed header"
+        elif self.bad_num_rows:
+            return "bad number of rows"
+        else:
+            return "cell error"
 
     def clean(self):
         """
@@ -133,8 +151,7 @@ class CellError(models.Model):
         blank=True)
     object_id = models.PositiveIntegerField(null=True)
     # This shows which constraint failed; if it's null that means that
-    # the parent BadData object failed the basic Python type-based
-    # check.
+    # the parent BadData object failed the basic type-based check.
     constraint_failed = generic.GenericForeignKey("content_type", "object_id")
 
     def clean(self):
@@ -213,6 +230,11 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
 
     # Implicit through inheritance: start_time, end_time.
 
+    def __str__(self):
+        if self.is_fail():
+            return "OK"
+        return "MD5 conflict"
+
     def clean(self):
         """
         Checks coherence of this IntegrityCheckLog.
@@ -278,6 +300,7 @@ class VerificationLog(stopwatch.models.Stopwatch):
         if self.return_code is None or self.end_time is None:
             raise ValidationError(error_messages["verificationlog_incomplete"].
                     format(self))
+
 
 class MD5Conflict(models.Model):
     """
