@@ -373,7 +373,7 @@
         "revision_parent": null, 
         "revision_desc": "Post-processing of short-read alignments.", 
         "coderesource": 11, 
-        "MD5_checksum": "795b15973f8d541462eea57058c45aa4", 
+        "MD5_checksum": "c399c371de1a1d389d3466ee115b1150", 
         "content_file": "CodeResources/csf2counts.py_20140811154315", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T22:43:15.594Z"
