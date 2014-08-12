@@ -509,5 +509,227 @@
         "transformation": 8, 
         "dataset_name": "nuc_variants_csv"
     }
+},
+{
+    "pk": 9, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-12T00:04:53.535Z", 
+        "revision_desc": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "revision_name": "fasta_to_g2p.sh"
+    }
+},
+{
+    "pk": 27, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 28, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 27, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 9, 
+        "dataset_name": "aligned_csv"
+    }
+},
+{
+    "pk": 28, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 9, 
+        "dataset_name": "g2p_csv"
+    }
+},
+{
+    "pk": 10, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-12T00:25:49.583Z", 
+        "revision_desc": "", 
+        "revision_name": "MiSeq"
+    }
+},
+{
+    "pk": 29, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 227, 
+        "x": 100
+    }
+},
+{
+    "pk": 30, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 333, 
+        "x": 100
+    }
+},
+{
+    "pk": 31, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 104, 
+        "x": 612
+    }
+},
+{
+    "pk": 32, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 137, 
+        "x": 989
+    }
+},
+{
+    "pk": 33, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 204, 
+        "x": 986
+    }
+},
+{
+    "pk": 34, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 272, 
+        "x": 985
+    }
+},
+{
+    "pk": 35, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 342, 
+        "x": 986
+    }
+},
+{
+    "pk": 36, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 402, 
+        "x": 1076
+    }
+},
+{
+    "pk": 37, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 430, 
+        "x": 686
+    }
+},
+{
+    "pk": 38, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 486, 
+        "x": 1080
+    }
+},
+{
+    "pk": 29, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 10, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 30, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 10, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 31, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 10, 
+        "dataset_name": "remap_counts_csv"
+    }
+},
+{
+    "pk": 32, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 10, 
+        "dataset_name": "nuc_csv"
+    }
+},
+{
+    "pk": 33, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 10, 
+        "dataset_name": "amino_csv"
+    }
+},
+{
+    "pk": 34, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 4, 
+        "transformation": 10, 
+        "dataset_name": "indels_csv"
+    }
+},
+{
+    "pk": 35, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 5, 
+        "transformation": 10, 
+        "dataset_name": "conseq_csv"
+    }
+},
+{
+    "pk": 36, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 6, 
+        "transformation": 10, 
+        "dataset_name": "nuc_variants_csv"
+    }
+},
+{
+    "pk": 37, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 7, 
+        "transformation": 10, 
+        "dataset_name": "failed_csv"
+    }
+},
+{
+    "pk": 38, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 8, 
+        "transformation": 10, 
+        "dataset_name": "g2p_csv"
+    }
 }
 ]
