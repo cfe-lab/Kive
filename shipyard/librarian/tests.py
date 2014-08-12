@@ -36,7 +36,7 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         # Methods, CR/CRR/CRDs, DTs/CDTs, and Pipelines are set up by
         # calling this.
         super(LibrarianTestSetup, self).setUp()
-        
+
         ####
         # This is the big pipeline Eric developed that was originally
         # used in copperfish/tests.py.
@@ -478,7 +478,6 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertEqual(self.sym_dataset.clean(), None)
         self.assertEqual(self.sym_dataset.has_data(), True)
         self.assertEqual(self.sym_dataset.is_raw(), False)
-
 
 
 class DatasetStructureTests(LibrarianTestSetup):

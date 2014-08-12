@@ -2,8 +2,6 @@
 Unit tests for Shipyard method models.
 """
 
-# from django.test import TestCase
-
 import filecmp
 import hashlib
 import os.path
@@ -427,13 +425,13 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)[1]
         self.noop_indata = "word\nhello\nworld"
 
-        handle = os.fdopen(fd, "w")
+        handle = open(self.noop_infile, "w")
         handle.write(self.noop_indata)
         handle.close()
 
     def tearDown(self):
         shutil.rmtree(self.scratch_dir)
-
+        CodeResource.objects.all().delete()
 
 class CodeResourceTests(MethodTestSetup):
      

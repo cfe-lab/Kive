@@ -7,6 +7,7 @@ Dataset, etc.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
+from django.db.models.signals import post_delete
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
@@ -20,6 +21,7 @@ import file_access_utils
 
 import stopwatch.models
 from constants import maxlengths
+import archive.signals
 
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch):
@@ -1920,3 +1922,6 @@ class MethodOutput(models.Model):
         methodoutput.clean()
         methodoutput.save()
         return methodoutput
+
+# Register signals.
+post_delete.connect(archive.signals.dataset_post_delete, sender=Dataset)

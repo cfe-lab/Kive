@@ -8,6 +8,7 @@ do with CodeResources.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
+from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.core.files import File
@@ -16,6 +17,7 @@ from django.utils.encoding import python_2_unicode_compatible
 import transformation.models
 import file_access_utils
 from constants import maxlengths
+import method.signals
 
 import os
 import stat
@@ -703,3 +705,6 @@ class MethodFamily(transformation.models.TransformationFamily):
 
     def __str__(self):
         return self.name
+
+# Register signals.
+post_delete.connect(method.signals.code_resource_revision_post_delete, sender=CodeResourceRevision)

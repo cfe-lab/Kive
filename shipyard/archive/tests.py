@@ -601,7 +601,6 @@ class RunComponentTests(ArchiveTestSetup):
             self.step_E1_RS.clean
         )
 
-    # May 28, 2014: just introduced _clean_not_reused to RunComponent.
     def test_clean_not_reused_runcomponent_log_invoked_elsewhere(self):
         """Testing clean on a RunComponent whose log was invoked elsewhere by a subsequent RunComponent."""
         self.step_through_run_creation("third_step_complete")
@@ -619,7 +618,6 @@ class RunComponentTests(ArchiveTestSetup):
             )),
             self.step_E1_RS.clean)
 
-    # June 13, 2014: need a test for _clean_has_execlog_no_execrecord_yet().
     def test_clean_has_execlog_no_execrecord_yet_has_checks(self):
         """Testing clean on a RunComponent that has an ExecLog but no ExecRecord yet also has data checks."""
         self.step_through_run_creation("outcables_done")
@@ -1098,8 +1096,6 @@ class RunStepTests(ArchiveTestSetup):
                                           .format(self.step_E1_RS)),
                                 self.step_E1_RS.complete_clean)
 
-    ####
-    # keeps_output tests added March 26, 2014 -- RL
     def test_RunStep_keeps_output_true(self):
         """
         A RunStep with retained output.
@@ -2567,6 +2563,10 @@ class RunOutputCableTests(ArchiveTestSetup):
 
 class DatasetTests(librarian.tests.LibrarianTestSetup):
 
+    def tearDown(self):
+        super(DatasetTests, self).tearDown()
+        sandbox.tests_rm.clean_files()
+
     def test_Dataset_check_MD5(self):
         old_md5 = "7dc85e11b5c02e434af5bd3b3da9938e"
         new_md5 = "d41d8cd98f00b204e9800998ecf8427e"
@@ -3221,6 +3221,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
             f.write("#!/bin/bash\n exit 1")
+            os.remove(self.coderev_noop.content_file.name)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3326,6 +3327,7 @@ echo "This is not what's supposed to be output here" > $2
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
             f.write(tampered_script)
+            os.remove(self.coderev_noop.content_file.name)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3381,6 +3383,7 @@ echo
         """
         with tempfile.TemporaryFile() as f:
             f.write(tampered_script)
+            os.remove(self.coderev_noop.content_file.name)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3401,9 +3404,6 @@ echo
         run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
         run2_step2_cable = run2_step2.RSICs.first()
 
-        #self.assertIsNone(run2_step2_cable.log)
-        #self.assertEquals(run2_step2_cable.invoked_logs.count(), 1)
-        #self.assertEquals(run2_step2_cable.invoked_logs.first(), run2_step1.log)
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 1)
         self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log)
@@ -3411,7 +3411,6 @@ echo
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
-        #self.assertFalse(run2_step2_cable.successful_execution())
         self.assertTrue(run2_step2_cable.successful_execution())
         self.assertFalse(run2_step2.successful_execution())
 
@@ -3453,7 +3452,8 @@ echo
         # Let's tamper with self.raw_symDS.
         with tempfile.NamedTemporaryFile() as f:
             f.write("This is a tampered-with file.")
-            self.raw_symDS.dataset.dataset_file=File(f)
+            os.remove(self.raw_symDS.dataset.dataset_file.name)
+            self.raw_symDS.dataset.dataset_file=File(f, name="tampered")
             self.raw_symDS.dataset.save()
 
             self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])

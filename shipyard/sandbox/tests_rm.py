@@ -35,10 +35,8 @@ def rmf(path):
 
 
 def clean_files():
-    for dataset in Dataset.objects.all():
-        rmf(dataset.dataset_file.name)
-    for crr in CodeResourceRevision.objects.all():
-        rmf(crr.content_file.name)
+    Dataset.objects.all().delete()
+    CodeResourceRevision.objects.all().delete()
     for cls in [MethodOutput, VerificationLog]:
         for output in cls.objects.all():
             rmf(output.output_log.name)

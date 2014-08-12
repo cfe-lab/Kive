@@ -105,6 +105,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
 
     def tearDown(self):
         super(PipelineTestSetup, self).tearDown()
+        Dataset.objects.all().delete()
         shutil.rmtree(self.workdir)
 
 

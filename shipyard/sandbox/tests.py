@@ -7,7 +7,7 @@ from django.core.files import File
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from archive.models import MethodOutput
+from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -110,6 +110,9 @@ class ExecuteTests(TestCase):
             method_out.output_log.delete()
             method_out.error_log.close()
             method_out.error_log.delete()
+
+        for dataset in Dataset.objects.all():
+            dataset.delete()
 
     def find_raw_pipeline(self):
         """Find a Pipeline with a raw input."""
