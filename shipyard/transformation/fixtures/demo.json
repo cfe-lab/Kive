@@ -566,80 +566,80 @@
     "pk": 29, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 227, 
-        "x": 100
+        "y": 83, 
+        "x": 27
     }
 },
 {
     "pk": 30, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 333, 
-        "x": 100
+        "y": 169, 
+        "x": 28
     }
 },
 {
     "pk": 31, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 104, 
-        "x": 612
+        "y": 60, 
+        "x": 318
     }
 },
 {
     "pk": 32, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 137, 
-        "x": 989
+        "y": 49, 
+        "x": 513
     }
 },
 {
     "pk": 33, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 204, 
-        "x": 986
+        "y": 114, 
+        "x": 512
     }
 },
 {
     "pk": 34, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 272, 
-        "x": 985
+        "y": 206, 
+        "x": 709
     }
 },
 {
     "pk": 35, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 342, 
-        "x": 986
+        "y": 276, 
+        "x": 709
     }
 },
 {
     "pk": 36, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 402, 
-        "x": 1076
+        "y": 196, 
+        "x": 610
     }
 },
 {
     "pk": 37, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 430, 
-        "x": 686
+        "y": 344, 
+        "x": 709
     }
 },
 {
     "pk": 38, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 486, 
-        "x": 1080
+        "y": 412, 
+        "x": 709
     }
 },
 {
@@ -729,6 +729,279 @@
     "fields": {
         "dataset_idx": 8, 
         "transformation": 10, 
+        "dataset_name": "g2p_csv"
+    }
+},
+{
+    "pk": 11, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-12T18:43:20.837Z", 
+        "revision_desc": "Plot coverage for each region in a sample.", 
+        "revision_name": "coverage_plots"
+    }
+},
+{
+    "pk": 12, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-08-12T18:45:44.829Z", 
+        "revision_desc": "", 
+        "revision_name": "added coverage plots"
+    }
+},
+{
+    "pk": 39, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 40, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 41, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0, 
+        "x": 0
+    }
+},
+{
+    "pk": 42, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 83, 
+        "x": 27
+    }
+},
+{
+    "pk": 43, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 169, 
+        "x": 28
+    }
+},
+{
+    "pk": 44, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 60, 
+        "x": 318
+    }
+},
+{
+    "pk": 45, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 49, 
+        "x": 513
+    }
+},
+{
+    "pk": 46, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 62, 
+        "x": 709
+    }
+},
+{
+    "pk": 47, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 114, 
+        "x": 512
+    }
+},
+{
+    "pk": 48, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 206, 
+        "x": 709
+    }
+},
+{
+    "pk": 49, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 132, 
+        "x": 709
+    }
+},
+{
+    "pk": 50, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 276, 
+        "x": 709
+    }
+},
+{
+    "pk": 51, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 196, 
+        "x": 610
+    }
+},
+{
+    "pk": 52, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 344, 
+        "x": 709
+    }
+},
+{
+    "pk": 53, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 412, 
+        "x": 709
+    }
+},
+{
+    "pk": 39, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 11, 
+        "dataset_name": "amino_csv"
+    }
+},
+{
+    "pk": 42, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 12, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 43, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 12, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 40, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 11, 
+        "dataset_name": "coverage_maps_tar"
+    }
+},
+{
+    "pk": 41, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 11, 
+        "dataset_name": "coverage_scores_csv"
+    }
+},
+{
+    "pk": 44, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 12, 
+        "dataset_name": "remap_counts_csv"
+    }
+},
+{
+    "pk": 45, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 12, 
+        "dataset_name": "nuc_csv"
+    }
+},
+{
+    "pk": 46, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 12, 
+        "dataset_name": "coverage_maps_tar"
+    }
+},
+{
+    "pk": 47, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 4, 
+        "transformation": 12, 
+        "dataset_name": "amino_csv"
+    }
+},
+{
+    "pk": 48, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 5, 
+        "transformation": 12, 
+        "dataset_name": "indels_csv"
+    }
+},
+{
+    "pk": 49, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 6, 
+        "transformation": 12, 
+        "dataset_name": "coverage_scores_csv"
+    }
+},
+{
+    "pk": 50, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 7, 
+        "transformation": 12, 
+        "dataset_name": "conseq_csv"
+    }
+},
+{
+    "pk": 51, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 8, 
+        "transformation": 12, 
+        "dataset_name": "nuc_variants_csv"
+    }
+},
+{
+    "pk": 52, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 9, 
+        "transformation": 12, 
+        "dataset_name": "failed_csv"
+    }
+},
+{
+    "pk": 53, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 10, 
+        "transformation": 12, 
         "dataset_name": "g2p_csv"
     }
 }

@@ -373,7 +373,7 @@
         "revision_parent": null, 
         "revision_desc": "Post-processing of short-read alignments.", 
         "coderesource": 11, 
-        "MD5_checksum": "795b15973f8d541462eea57058c45aa4", 
+        "MD5_checksum": "c399c371de1a1d389d3466ee115b1150", 
         "content_file": "CodeResources/csf2counts.py_20140811154315", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T22:43:15.594Z"
@@ -559,7 +559,7 @@
     "fields": {
         "description": "Compiled version of alignment.cpp", 
         "name": "alignment", 
-        "filename": "alignment.so"
+        "filename": "alignment.bundle"
     }
 },
 {
@@ -625,8 +625,8 @@
         "revision_parent": null, 
         "revision_desc": "Compiled version of alignment.cpp", 
         "coderesource": 16, 
-        "MD5_checksum": "c8ff8347feccc9427cb9b43760c9539d", 
-        "content_file": "CodeResources/alignment.so_20140811165911", 
+        "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62", 
+        "content_file": "CodeResources/alignment.bundle", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T23:59:11.169Z"
     }
@@ -741,6 +741,82 @@
     "fields": {
         "name": "fasta_to_g2p.sh", 
         "description": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence."
+    }
+},
+{
+    "pk": 20, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Defines codons we require coverage for in each region", 
+        "name": "key_positions", 
+        "filename": "key_positions.csv"
+    }
+},
+{
+    "pk": 21, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Plot coverage for each region in a sample.", 
+        "name": "coverage_plots", 
+        "filename": "coverage_plots.R"
+    }
+},
+{
+    "pk": 20, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Defines codons we require coverage for in each region", 
+        "coderesource": 20, 
+        "MD5_checksum": "ef6cf259fa914e89abbdd92868da3d61", 
+        "content_file": "CodeResources/key_positions.csv_20140812113901", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-12T18:39:01.297Z"
+    }
+},
+{
+    "pk": 21, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Plot coverage for each region in a sample.", 
+        "coderesource": 21, 
+        "MD5_checksum": "0733e407edea9615008f1ceada3d017e", 
+        "content_file": "CodeResources/coverage_plots.R_20140812114014", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-12T18:40:14.598Z"
+    }
+},
+{
+    "pk": 20, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 20, 
+        "coderesourcerevision": 21, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 11, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 9, 
+        "deterministic": true, 
+        "driver": 21, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 9, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "coverage_plots", 
+        "description": "Plot coverage for each region in a sample."
     }
 }
 ]
