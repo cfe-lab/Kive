@@ -39,6 +39,8 @@ def get_method_io (request):
     handles ajax request from pipelines.html
     populates a dictionary with information about this method's transformation
     inputs and outputs, returns as JSON.
+
+    TODO: this function is no longer used thanks to changes to get_pipeline.
     """
     if request.is_ajax():
         method_id = request.POST.get('mid')
@@ -76,6 +78,24 @@ def get_method_io (request):
     else:
         raise Http404
 
+def get_method_xputs(method):
+    """Get the inputs and outputs of a Method as a dictionary."""
+    result = []
+    for method_xputs in [method.inputs.all(), method.outputs.all()]:
+        xputs = {}
+        for xput in method_xputs:
+            if not xput.has_structure:
+                cdt_pk = None
+                cdt_label = "raw"
+            else:
+                structure = xput.structure
+                cdt_pk = structure.compounddatatype.pk
+                cdt_label = str(structure.compounddatatype)
+            xputs.update({xput.dataset_idx: {'datasetname': xput.dataset_name,
+                                               'cdt_pk': cdt_pk,
+                                               'cdt_label': cdt_label}})
+        result.append(xputs)
+    return {'inputs': result[0], 'outputs': result[1]}
 
 def get_pipeline(request):
     if request.is_ajax():
@@ -84,6 +104,14 @@ def get_pipeline(request):
         if pipeline_revision_id != '':
             pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
             pipeline_dict = pipeline_revision.represent_as_dict()
+
+            # Hack to reduce number of ajax calls in interface.
+            for step in pipeline_revision.steps.all():
+                if not step.is_subpipeline:
+                    method = step.transformation.definite
+                    pipeline_dict["pipeline_steps"][step.step_num-1].update(get_method_xputs(method))
+            # End of hack.
+
             return HttpResponse(json.dumps(pipeline_dict), content_type='application/json')
         return response
     else:
