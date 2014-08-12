@@ -438,5 +438,309 @@
         "name": "csf2counts", 
         "description": "Post-processing of short-read alignments."
     }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "", 
+        "name": "csf_to_fasta_by_nucref", 
+        "filename": "csf_to_fasta_by_nucref.csv"
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Clip out sub-regions from MiSeq read alignments", 
+        "name": "csf2nuc", 
+        "filename": "csf2nuc.py"
+    }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "", 
+        "coderesource": 12, 
+        "MD5_checksum": "e6e49dc0484a4a2ceb81809ce58cfcd7", 
+        "content_file": "CodeResources/csf_to_fasta_by_nucref.csv_20140811162253", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:22:53.769Z"
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Clip out sub-regions from MiSeq read alignments", 
+        "coderesource": 13, 
+        "MD5_checksum": "51aba85560352913d54ed9785afc8f53", 
+        "content_file": "CodeResources/csf2nuc.py_20140811162856", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:28:56.731Z"
+    }
+},
+{
+    "pk": 12, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 3, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 13, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 12, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 14, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 10, 
+        "coderesourcerevision": 13, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 8, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 7, 
+        "deterministic": true, 
+        "driver": 13, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 7, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "csf2nuc", 
+        "description": "Clip out sub-regions from MiSeq read alignments"
+    }
+},
+{
+    "pk": 14, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "name": "fasta_to_g2p", 
+        "filename": "fasta_to_g2p.rb"
+    }
+},
+{
+    "pk": 15, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Written by Conan", 
+        "name": "pssm_lib", 
+        "filename": "pssm_lib.rb"
+    }
+},
+{
+    "pk": 16, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Compiled version of alignment.cpp", 
+        "name": "alignment", 
+        "filename": "alignment.so"
+    }
+},
+{
+    "pk": 17, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "", 
+        "name": "g2p.matrix", 
+        "filename": "g2p.matrix"
+    }
+},
+{
+    "pk": 18, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "", 
+        "name": "g2p_fpr.txt", 
+        "filename": "g2p_fpr.txt"
+    }
+},
+{
+    "pk": 19, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Shell script to  launch Ruby version", 
+        "name": "fasta_to_g2p.sh", 
+        "filename": "fasta_to_g2p.sh"
+    }
+},
+{
+    "pk": 14, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "coderesource": 14, 
+        "MD5_checksum": "cc361585b84ffd4b92b12153f4e563f2", 
+        "content_file": "CodeResources/fasta_to_g2p.rb_20140811165352", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:53:52.052Z"
+    }
+},
+{
+    "pk": 15, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Written by Conan", 
+        "coderesource": 15, 
+        "MD5_checksum": "173be3144ccf7a6f073c85db53e25821", 
+        "content_file": "CodeResources/pssm_lib.rb_20140811165447", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:54:47.460Z"
+    }
+},
+{
+    "pk": 16, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Compiled version of alignment.cpp", 
+        "coderesource": 16, 
+        "MD5_checksum": "c8ff8347feccc9427cb9b43760c9539d", 
+        "content_file": "CodeResources/alignment.so_20140811165911", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:59:11.169Z"
+    }
+},
+{
+    "pk": 17, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "", 
+        "coderesource": 17, 
+        "MD5_checksum": "b4c8b3013b1b6822d056f5958115f50a", 
+        "content_file": "CodeResources/g2p.matrix_20140811165953", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-11T23:59:53.915Z"
+    }
+},
+{
+    "pk": 18, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "", 
+        "coderesource": 18, 
+        "MD5_checksum": "c7aad4c7db95f0fc797806895a76a449", 
+        "content_file": "CodeResources/g2p_fpr.txt_20140811170012", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-12T00:00:12.535Z"
+    }
+},
+{
+    "pk": 19, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Shell script to  launch Ruby version", 
+        "coderesource": 19, 
+        "MD5_checksum": "6eed3db03077b725408f14ceb78c1c9f", 
+        "content_file": "CodeResources/fasta_to_g2p.sh_20140811170132", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-08-12T00:01:32.384Z"
+    }
+},
+{
+    "pk": 15, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 14, 
+        "coderesourcerevision": 19, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 16, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 15, 
+        "coderesourcerevision": 19, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 17, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 16, 
+        "coderesourcerevision": 19, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 18, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 17, 
+        "coderesourcerevision": 19, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 19, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 18, 
+        "coderesourcerevision": 19, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 9, 
+    "model": "method.method", 
+    "fields": {
+        "revision_parent": null, 
+        "family": 8, 
+        "deterministic": true, 
+        "driver": 19, 
+        "tainted": false, 
+        "revision_number": 1
+    }
+},
+{
+    "pk": 8, 
+    "model": "method.methodfamily", 
+    "fields": {
+        "name": "fasta_to_g2p.sh", 
+        "description": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence."
+    }
 }
 ]
