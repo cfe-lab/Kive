@@ -21,7 +21,7 @@
     <tbody>
     {% for outcable in run.outcables_in_order %}
         <tr>
-            <td>{{ outcable.execrecord.execrecordouts.first.generic_output }}</td>
+            <td>{{ outcable.pipelineoutputcable.dest }}</td>
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.dataset_file.size|filesizeformat }}</td>
             <td>{{ outcable.execrecord.execrecordouts.first.symbolicdataset.dataset.date_created }}</td>
             <td>
