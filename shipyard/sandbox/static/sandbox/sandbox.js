@@ -4,11 +4,17 @@
  *      {"run": integer, 
  *       "status": string,
  *       "finished": bool, 
- *       "success": bool}
+ *       "success": bool,
+ *       "thread": string,
+ *       "crashed": bool}
  *
- * where "run" is the primary key of the Run, "status" is a string describing
- * the Run's status, and "finished" is true if the Run is done or False
- * otherwise.
+ * - "run" is the primary key of the Run 
+ * - "status" is a string describing the Run's status
+ * - "finished" is true if the Run is done or false otherwise
+ * - "success" is true if the Run was successful or false if it failed
+ * - "thread" is an identifier for the backend thread where the pipeline is
+ *   running
+ * - "crashed" is true if Shipyard crashed while running the Pipeline
  */
 
 /* How long to wait for a server response. */
@@ -24,6 +30,8 @@ function poll_run_progress(run_data) {
                     $("#loading").hide("slow");
                     if (new_data["success"]) {
                         show_results_link(run_data["run"]);
+                    } else if (!new_data["crashed"]) {
+                        handle_run_failure(run_data);
                     }
                 } else {
                     poll_run_progress(new_data); 
@@ -31,6 +39,15 @@ function poll_run_progress(run_data) {
             }
         );
     }, timeout);
+}
+
+/* Make appropriate adjustments to the page for a failed Run. */
+function handle_run_failure(run_data) {
+    $.getJSON("get_failed_output", run_data,
+        function (response) {
+            display_stdout_stderr(response["stdout"], response["stderr"]);
+        }
+    );
 }
 
 /* Display the progress of a run on the page. */
@@ -46,6 +63,12 @@ function display_error(message) {
 /* Display the link to the next page. */
 function show_results_link(run_pk) {
     $("#progress").append('<div><a href="view_results/' + run_pk + '/">View results</a></div>');
+}
+
+/* Display stdout and stderr from a failure. */
+function display_stdout_stderr(stdout, stderr) {
+    $("#details").append('<h3>Output log</h3><pre>' + stdout + '</pre>');
+    $("#details").append('<h3>Error log</h3><pre>' + stderr + '</pre>');
 }
 
 /* Custom jQuery function to retrieve a tuple's primary key according to the table's metadata.

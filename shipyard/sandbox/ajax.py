@@ -3,6 +3,7 @@ import json
 import re
 import os
 import threading
+import itertools
 
 from django.http import HttpResponse
 from django.core import serializers
@@ -55,7 +56,7 @@ def _run_pipeline(request):
                               target=sandbox.execute_pipeline)
     thread.start()
     return json.dumps({"run": sandbox.run.pk, "status": "Starting run", "finished": False, 
-                       "thread": thread.name})
+                       "thread": thread.name, "crashed": False})
 
 def run_pipeline(request):
     return AJAXRequestHandler(request, _run_pipeline).response
@@ -227,13 +228,46 @@ def _poll_run_progress(request):
     	success = run.successful_execution()
 
     # If the Run isn't done but the process is, we've crashed.
-    if not finished and not running:
-        status = "Crashed"
-        finished = True
-        success = False
+    crashed = not finished and not running
 
     return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success,
-                       "thread": thread})
+                       "thread": thread, "crashed": crashed})
 
 def poll_run_progress(request):
     return AJAXRequestHandler(request, _poll_run_progress).response
+
+def tail(handle, nbytes):
+    """Get the last nbytes from a file."""
+    orig_pos = handle.tell()
+    handle.seek(0, 2)
+    size = handle.tell()
+    handle.seek(max(size-nbytes, 0), 0)
+    result = handle.read()
+    handle.seek(orig_pos)
+    return result
+
+def _get_failed_output(request):
+    """Head the stdout and stderr of the failed step of a Run.
+    
+    TODO: Does not handle invoked steps.
+    """
+    run_pk = int(request.GET.get("run"))
+    run = Run.objects.get(pk=run_pk)
+    
+    stdout, stderr = None, None
+    for component in itertools.chain(run.runsteps.all(), run.runoutputcables.all()):
+        if not component.successful_execution():
+            if component.has_log and hasattr(component.log, "methodoutput"):
+                stdout = component.log.methodoutput.output_log
+                stderr = component.log.methodoutput.error_log
+                break
+
+    response_data = {"stdout": "", "stderr": ""}
+    if stdout is not None:
+        response_data["stdout"] = tail(stdout.file, 1024)
+    if stderr is not None:
+        response_data["stderr"] = tail(stderr.file, 1024)
+    return json.dumps(response_data)
+
+def get_failed_output(request):
+    return AJAXRequestHandler(request, _get_failed_output).response
