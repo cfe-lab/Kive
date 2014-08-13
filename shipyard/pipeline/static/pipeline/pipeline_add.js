@@ -501,13 +501,6 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
         // FIXME: This is fragile if we add a menu to either page
         var meta_menu_index = (is_revision ? 0 : 1);
-
-        if (revision_name === '') {
-            $('li', 'ul#id_ctrl_nav')[meta_menu_index].click();
-            $('#id_revision_name').css({'background-color': '#FFFFCC'}).focus();
-            submitError('Pipeline must be named');
-            return;
-        }
         $('#id_revision_name').css({'background-color': '#FFFFFF'});
         $('#id_revision_desc').css({'background-color': '#FFFFFF'});
 
