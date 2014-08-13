@@ -63,7 +63,7 @@ class PipelineSerializationException(exceptions.Exception):
         self.error_msg = error_msg
 
     def __str__(self):
-        return repr(self.error_msg)
+        return str(self.error_msg)
 
 
 @python_2_unicode_compatible
