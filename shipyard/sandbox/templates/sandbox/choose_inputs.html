@@ -17,7 +17,7 @@
 <h2>Choose pipeline inputs</h2>
 
 <ul id="input_forms">
-{% for input, datasets in input_data %}
+{% for input, datasets, total in input_data %}
 	<li>
 		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
 	<div class="filter_ctrl">
@@ -43,6 +43,7 @@
 
 	<div class="results" data-pkey="pk" data-displaycols="2,3" data-ajax-url="filter_datasets">
 		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
+                <caption>datasets 1-{{ datasets|length }} of {{ total }}</caption>
 		<thead>
 			<tr>
 				<th>pk</th>

@@ -205,3 +205,8 @@ a.remove {
 a.remove:hover {
     color: #00f;
 }
+caption {
+    caption-side: bottom;
+    font-size: .8em;
+    text-align: left;
+}
