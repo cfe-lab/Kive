@@ -14,7 +14,10 @@ def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
     template = loader.get_template("sandbox/choose_pipeline.html")
     families = pipeline.models.PipelineFamily.objects.all()
-    forms = [PipelineSelectionForm(pipeline_family_pk=f.pk) for f in families]
+    forms = []
+    for family in families:
+        if len(family.complete_members) > 0:
+            forms.append(PipelineSelectionForm(pipeline_family_pk=family.pk))
     context = Context({"pipeline_forms": forms})
     context.update(csrf(request))
     return HttpResponse(template.render(context))

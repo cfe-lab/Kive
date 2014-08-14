@@ -46,7 +46,7 @@ Next, you need to make a copy of `./nukeDB_default.expect` and call it `nukeDB.e
 * `[YOUR PASSWORD AGAIN]` - obviously, this should match the previous entry.
 
 
-Finally, execute this *expect* script using the bash script `./nukeDB.bash`.  (Note that in OS X, *expect* scripts tend to appear to hang; just give it some time and it will proceed through the rest of the automation.  We don't know why this happens.)  This is a simple wrapper that calls `nukeDB.expect` and then executes a Django function that will populate the new database with some initial data.
+Finally, execute this *expect* script using the bash script `./nukeDB.bash`. This is a simple wrapper that calls `nukeDB.expect` and then executes a Django function that will populate the new database with some initial data.
 
 You are now ready to run a local Django webserver - you just need to type `python manage.py runserver` and navigate to `localhost:8000` in your web browser!
 

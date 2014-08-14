@@ -12,6 +12,7 @@ import re
 import os.path
 import tempfile
 import shutil
+import json
 
 from metadata.models import *
 from method.models import *
@@ -20,6 +21,8 @@ from librarian.models import *
 from archive.models import *
 import method.tests
 import sandbox.tests_rm
+
+from django.core import serializers
 
 from constants import datatypes
 
@@ -108,6 +111,29 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         Dataset.objects.all().delete()
         shutil.rmtree(self.workdir)
 
+    def pipelinestep_to_dict(self, ps):
+        from django.core.serializers import serialize, deserialize
+        my_dict = json.loads(serialize("json", [ps]))[0]
+        my_dict["transformation"] = json.loads(serialize("json", [ps.transformation.definite]))[0]
+        return my_dict
+
+    def dict_to_pipelinestep(self, dict_ps):
+        from django.core.serializers import serialize, deserialize
+        transf = next(serializers.deserialize("json", json.dumps([dict_ps["transformation"]]))).object
+        del dict_ps["transformation"]
+        ps = next(serializers.deserialize("json", json.dumps([dict_ps]))).object
+        return ps
+
+    def test_foo(self):
+        from pprint import pprint
+        from django.core.serializers import serialize, deserialize
+        p = PipelineStep.objects.first()
+        pprint(p.represent_as_dict())
+        print("*"*80)
+        my_dict = self.pipelinestep_to_dict(p)
+        pprint(my_dict)
+        p2 = self.dict_to_pipelinestep(my_dict)
+        self.assertEqual(p2, p)
 
 class PipelineFamilyTests(PipelineTestSetup):
 
@@ -3930,7 +3956,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
 
 
 # June 19, 2014: for the functions that serialize and de-serialize Pipelines.
-class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
+class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
     """
     Tests of Pipeline serialization and deserialization.
     """
@@ -3970,7 +3996,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
                 "canvas_height",
                 "pipeline_inputs",
                 "pipeline_steps",
-                "pipeline_output_cables"
+                "pipeline_outputs"
             })
 
         self.assertEquals(dict_repr["family_pk"], pipeline.family.pk)
@@ -4004,8 +4030,8 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
             self._check_step(step_dict, corresp_step)
 
         # Finally the outcables.
-        self.assertEquals(len(dict_repr["pipeline_output_cables"]), pipeline.outcables.count())
-        for outcable_dict in dict_repr["pipeline_output_cables"]:
+        self.assertEquals(len(dict_repr["pipeline_outputs"]), pipeline.outcables.count())
+        for outcable_dict in dict_repr["pipeline_outputs"]:
             corresp_outcable = pipeline.outcables.get(output_idx=outcable_dict["output_idx"])
             self._check_outcable(outcable_dict, corresp_outcable)
 
@@ -4018,7 +4044,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
             set(step_dict.keys()),
             set([
                 "transf_pk", "transf_type", "step_num", "x", "y", "name",
-                 "cables_in", "outputs_to_delete"
+                 "cables_in", "outputs_to_delete", "family_pk"
             ]))
 
         self.assertEquals(step_dict["transf_pk"], step.transformation.definite.pk)
@@ -4512,6 +4538,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
 
         first_step_dict = {
             "transf_pk": self.method_noop.pk,
+            "family_pk": self.method_noop.family.pk,
             "transf_type": "Method",
             "step_num": 1,
             "x": 0,
@@ -4533,6 +4560,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
 
         second_step_dict = {
             "transf_pk": self.method_noop.pk,
+            "family_pk": self.method_noop.family.pk,
             "transf_type": "Method",
             "step_num": 2,
             "x": 50,
@@ -4586,6 +4614,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
         first_step_dict = {
             "transf_pk": sub_pipeline.pk,
             "transf_type": "Pipeline",
+            "family_pk": sub_pipeline.family.pk,
             "step_num": 1,
             "x": 0,
             "y": 0,
@@ -4634,6 +4663,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
 
         first_step_dict = {
             "transf_pk": self.method_noop.pk,
+            "family_pk": self.method_noop.family.pk,
             "transf_type": "Method",
             "step_num": 1,
             "x": 50,
@@ -4655,6 +4685,7 @@ class PipelineSerializationTests(sandbox.tests_rm.UtilityMethods):
 
         second_step_dict = {
             "transf_pk": self.method_noop.pk,
+            "family_pk": self.method_noop.family.pk,
             "transf_type": "Method",
             "step_num": 2,
             "x": 150,
@@ -4762,6 +4793,7 @@ cat "$3" >> "$5"
 
         first_step_dict = {
             "transf_pk": method_threetwo_string_doublet.pk,
+            "family_pk": method_threetwo_string_doublet.family.pk,
             "transf_type": "Method",
             "step_num": 1,
             "x": 50,
@@ -4960,7 +4992,7 @@ cat "$3" >> "$5"
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
-            "pipeline_output_cables": []
+            "pipeline_outputs": []
         }
 
         if state == "empty":
@@ -4982,6 +5014,7 @@ cat "$3" >> "$5"
                 {
                     "transf_pk": self.method_noop.pk,
                     "transf_type": "Method",
+                    "family_pk": self.method_noop.family.pk,
                     "step_num": 1,
                     "x": 150,
                     "y": 200,
@@ -4999,6 +5032,7 @@ cat "$3" >> "$5"
                 },
                 {
                     "transf_pk": self.method_noop.pk,
+                    "family_pk": self.method_noop.family.pk,
                     "transf_type": "Method",
                     "step_num": 2,
                     "x": 350,
@@ -5025,6 +5059,7 @@ cat "$3" >> "$5"
             {
                 "transf_pk": self.method_noop.pk,
                 "transf_type": "Method",
+                "family_pk": self.method_noop.family.pk,
                 "step_num": 3,
                 "x": 550,
                 "y": 200,
@@ -5040,7 +5075,7 @@ cat "$3" >> "$5"
                 ],
                 "outputs_to_delete": []
             })
-        pipeline_dict["pipeline_output_cables"] = [
+        pipeline_dict["pipeline_outputs"] = [
             {
                 "output_idx": 1,
                 "output_name": "untouched_output",
@@ -5064,7 +5099,7 @@ cat "$3" >> "$5"
         self._check_pipeline_own_members(my_dict, my_pipeline)
         self.assertListEqual(my_dict["pipeline_inputs"], [])
         self.assertListEqual(my_dict["pipeline_steps"], [])
-        self.assertListEqual(my_dict["pipeline_output_cables"], [])
+        self.assertListEqual(my_dict["pipeline_outputs"], [])
 
     def test_deserialize_empty_pipeline(self):
         """Defining an empty Pipeline from a dictionary."""
@@ -5255,6 +5290,7 @@ tail -n +2 "$2" >> "$3"
                 {
                     "transf_pk": method_twocat_string_doublet.pk,
                     "transf_type": "Method",
+                    "family_pk": method_twocat_string_doublet.family.pk,
                     "step_num": 1,
                     "x": 150,
                     "y": 200,
@@ -5280,6 +5316,7 @@ tail -n +2 "$2" >> "$3"
                 {
                     "transf_pk": method_twocat_string_singlet.pk,
                     "transf_type": "Method",
+                    "family_pk": method_twocat_string_singlet.family.pk,
                     "step_num": 2,
                     "x": 350,
                     "y": 200,
@@ -5305,7 +5342,7 @@ tail -n +2 "$2" >> "$3"
                     "outputs_to_delete": []
                 }
             ],
-            "pipeline_output_cables": [
+            "pipeline_outputs": [
                 {
                     "output_idx": 1,
                     "output_name": "output_1",
@@ -5389,8 +5426,6 @@ tail -n +2 "$2" >> "$3"
         updated_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
             self.method_noop.outputs.first().dataset_name)
 
-        new_and_improved = my_pipeline.revise_from_dict(updated_pipeline_dict, "v2", "Second version",
-                                                        1600, 1200)
         # These fields will have changed in the revision.
         updated_pipeline_dict["family_pk"] = my_pipeline.family.pk
         updated_pipeline_dict["revision_name"] = "v2"
@@ -5400,6 +5435,7 @@ tail -n +2 "$2" >> "$3"
         updated_pipeline_dict["canvas_height"] = 1200
         updated_pipeline_dict["revision_parent_pk"] = my_pipeline.pk
 
+        new_and_improved = my_pipeline.revise_from_dict(updated_pipeline_dict)
         self._check_pipeline(updated_pipeline_dict, new_and_improved)
 
     def test_update_already_revised_pipeline(self):
@@ -5412,8 +5448,7 @@ tail -n +2 "$2" >> "$3"
         revision_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
             self.method_noop.outputs.first().dataset_name)
         revision_pipeline_dict["family_pk"] = my_pipeline.family.pk
-        new_revision = my_pipeline.revise_from_dict(revision_pipeline_dict,
-                                                    "v2", "Second version", 1600, 1200)
+        new_revision = my_pipeline.revise_from_dict(revision_pipeline_dict)
 
         # Try to update the first one.
         self.assertRaisesRegexp(

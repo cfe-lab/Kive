@@ -43,7 +43,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     @property
     def size(self):
         """Returns size of this Pipeline's family"""
-        return Pipeline.objects.filter(family=self).count()
+        return self.members.count()
 
     @property
     def num_revisions(self):
@@ -52,7 +52,17 @@ class PipelineFamily(transformation.models.TransformationFamily):
         """
         return self.size
 
-    pass
+    @property
+    def complete_members(self):
+        """Get all *complete* Pipelines in this family, in order."""
+        complete_pipelines = []
+        for pipeline in self.members.order_by("revision_number"):
+            try:
+                pipeline.complete_clean()
+                complete_pipelines.append(pipeline)
+            except ValidationError:
+                pass
+        return complete_pipelines
 
 
 class PipelineSerializationException(exceptions.Exception):
@@ -290,14 +300,9 @@ class Pipeline(transformation.models.Transformation):
                 'Pipeline "{}" has been previously revised so cannot be updated'.format(self))
 
         # Nuke everything in this Pipeline.
-        for curr_input in self.inputs.all():
-            curr_input.delete()
-
-        for curr_step in self.steps.all():
-            curr_step.delete()
-
-        for curr_outcable in self.outcables.all():
-            curr_outcable.delete()
+        self.inputs.all().delete()
+        self.steps.all().delete()
+        self.outcables.all().delete()
 
         # Now pass the dict representation to the function that fills out a Pipeline.
         return Pipeline.create_from_dict(pipeline_dict_repr, self)
@@ -469,18 +474,6 @@ class Pipeline(transformation.models.Transformation):
                 canvas_height=form_data["canvas_height"]
             )
 
-        # June 24, 2014: don't bother with this, it will be passed in with all of this
-        # already set.
-        # else:
-        #     # Update the current Pipeline.
-        #     pipeline.revision_number = pipeline.family.num_revisions+1
-        #     pipeline.revision_name = form_data['revision_name']
-        #     pipeline.revision_desc = form_data['revision_desc']
-        #     pipeline.revision_parent = (None if form_data["revision_parent_pk"] is None
-        #                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"]))
-        #     pipeline.canvas_width = form_data["canvas_width"]
-        #     pipeline.canvas_height = form_data["canvas_height"]
-
         # Create the inputs for the Pipeline.
         for new_input in form_data["pipeline_inputs"]:
             pipeline.create_input_from_dict(new_input)
@@ -496,7 +489,7 @@ class Pipeline(transformation.models.Transformation):
             pipeline.create_outcable_from_dict(outcable_dict)
 
         try:
-            pipeline.complete_clean()
+            pipeline.clean()
             pipeline.save()
         except ValidationError as e:
             raise PipelineSerializationException("Pipeline is invalid: {}".format(e))
