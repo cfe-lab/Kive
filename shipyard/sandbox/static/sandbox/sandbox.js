@@ -71,6 +71,21 @@ function display_stdout_stderr(stdout, stderr) {
     $("#details").append('<h3>Error log</h3><pre>' + stderr + '</pre>');
 }
 
+/* Display a table, hiding columns not indicated in "data-displaycols". */
+function columnPresentation (tab) {
+    var data = tab.data();
+            
+    if (typeof data.displaycols != 'undefined') {
+        cells = $('td,th', tab);
+        dcols = data.displaycols.toString().split(',');
+        
+        for (var i = 0; i < dcols.length; i++) {
+            cells = cells.not(':nth-child('+ dcols[i] + ')');
+        }
+        cells.hide();
+    }
+}
+
 /* Custom jQuery function to retrieve a tuple's primary key according to the table's metadata.
    This is either:
    1- a cell's contents
@@ -132,12 +147,14 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     $('.advanced-filter').prepend('<input type="button" class="close ctrl" value="Close">');
+
     $('input[value="Advanced"]').on('click', function() {
         $(this).closest('.short-filter').fadeOut({ complete: function() {
             $(this).siblings('.advanced-filter').fadeIn()
                 .closest('li').addClass('advanced');
         } });
     });
+
     $('.advanced-filter input.close.ctrl').on('click', function() {
         $(this).closest('.advanced-filter').fadeOut({ complete: function() {
             $(this).siblings('.short-filter').fadeIn()
@@ -168,21 +185,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     var tables = $('.results'),
         cpanels = $('.filter_ctrl');
     if (tables.length + cpanels.length > 0) {
-        var columnPresentation = function(tab) {
-            var data = tab.data();
-            
-            if (typeof data.displaycols != 'undefined') {
-                cells = $('td,th', tab);
-                dcols = data.displaycols.toString().split(',');
-                
-                for (var i = 0; i < dcols.length; i++) {
-                    cells = cells.not(':nth-child('+ dcols[i] + ')');
-                }
-                
-                cells.hide();
-            }
-        };
-        
         tables.each(function() {
             var $this = $(this),
                 cols = [],
@@ -230,8 +232,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             // TODO: make this generic (put all the table data in the dict, not 
             // just compound_datatype specifically).
             request_data = {
-                filter_data: JSON.stringify(filters),
-                compound_datatype: tab.data("compoundatatype")
+                filter_data: JSON.stringify(filters)
             };
             
             $.getJSON(tab.data('ajax-url'), request_data, function (data) {

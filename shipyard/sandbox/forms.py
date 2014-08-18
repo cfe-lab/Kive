@@ -14,8 +14,10 @@ class PipelineSelectionForm(forms.Form):
         self.family_pk = kwargs.pop("pipeline_family_pk")
         super(PipelineSelectionForm, self).__init__(*args, **kwargs)
 
-        pipeline = PipelineFamily.objects.get(pk=self.family_pk)
-        self.family_name = pipeline.name
-        choices = [(rev.pk, str(rev)) for rev in pipeline.members.order_by("revision_number")]
+        family = PipelineFamily.objects.get(pk=self.family_pk)
+        self.family_name = family.name
+        choices = []
+        for pipeline in family.complete_members:
+            choices.append((pipeline.pk, str(pipeline)))
         self.fields["pipeline"].choices = choices
         self.fields["pipeline"].initial = choices[-1][0]

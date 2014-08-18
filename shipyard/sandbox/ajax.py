@@ -110,6 +110,12 @@ def _filter_pipelines(request):
 def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
+def _thread_running(thread):
+    for active_thread in threading.enumerate():
+        if active_thread.name == thread:
+            return True
+    return False
+
 def _describe_run_failure(run):
     """
     Return a tuple (error, reason) describing a Run failure.
@@ -213,22 +219,23 @@ def _poll_run_progress(request):
     finished = run.is_complete()
     status = _get_run_progress(run)
     success = run.successful_execution()
+    running = _thread_running(thread)
 
-    running = False
-    for active_thread in threading.enumerate():
-        if active_thread.name == thread:
-            running = True
-            break
+    # If the Run isn't done but the process is, we've crashed.
+    crashed = not finished and not running
 
     # Arrrgh I hate sleeping. Find a better way.
-    while status == last_status and not finished:
+    while status == last_status and not finished and not crashed:
         time.sleep(1)
         finished = run.is_complete()
         status = _get_run_progress(run)
     	success = run.successful_execution()
+        running = _thread_running(thread)
+        crashed = not finished and not running
 
-    # If the Run isn't done but the process is, we've crashed.
-    crashed = not finished and not running
+    if crashed:
+        status = "Crashed"
+        finished = True
 
     return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success,
                        "thread": thread, "crashed": crashed})
