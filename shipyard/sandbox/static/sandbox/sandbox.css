@@ -71,6 +71,10 @@
 .results tr.selected select:focus {
     background-color: #fff;
 }
+.results caption {
+    padding: .25em .5em;
+    color: #bbb;
+}
 
 .greyedout {
     color: #839496;

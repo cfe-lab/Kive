@@ -299,18 +299,28 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             for (var i = 0; i < filters.length; i++) {
                 key = filters[i].key;
                 val = filters[i].val.toString();
+                var bool = filters[i].val === true;
                 
                 nth_cell = tab.data('cols').indexOf(key) + 1;
-            
+                
                 if (typeof filters[i].invisible === 'undefined' || !filters[i].invisible) {
                     // Write the UI element for this filter.
-                    activeFilters.append('\
-                        <div class="filter" data-key="' + key + '" data-val="' + val.replace(/"/g, "\\$&") + '">\
-                            <span class="field">' + key + ': </span>\
-                            <span class="value">' + val.replace(/(.)\|+(.)/g, '$1 <span class="logic_gate">OR</span> $2') + '</span> \
-                            <a class="remove">&times;</a>\
-                        </div>\
-                    ');
+                    if (bool) {
+                        activeFilters.append('\
+                            <div class="filter" data-key="' + key + '" data-val="' + val.replace(/"/g, "\\$&") + '">\
+                                <span class="field">' + key + '</span>\
+                                <a class="remove">&times;</a>\
+                            </div>\
+                        ');
+                    } else {
+                        activeFilters.append('\
+                            <div class="filter" data-key="' + key + '" data-val="' + val.replace(/"/g, "\\$&") + '">\
+                                <span class="field">' + key + ': </span>\
+                                <span class="value">' + val.replace(/(.)\|+(.)/g, '$1 <span class="logic_gate">OR</span> $2') + '</span> \
+                                <a class="remove">&times;</a>\
+                            </div>\
+                        ');
+                    }
                 }
             }
         }
@@ -319,18 +329,47 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             e.preventDefault();
             var val_fields = $('input[type="text"], input[type="hidden"], select', this),
                 bool_fields = $('input[type="checkbox"], input[type="radio"]', this),
-                filters_html = cpanels.siblings('.active_filters');
+                filters_html = $(this).closest('.filter_ctrl').siblings('.active_filters');
                 filters_js = filters_html.data('filters_js') || [];
             
             val_fields.each(function() {
-                if (this.value.length > 0)
-                    filters_js.push({ key: $(this).data('link'), val: this.value });
+                if (this.value.length > 0) {
+                    var dupe = false,
+                        key = $(this).data('link');
+                    
+                    for (var i = 0; i < filters_js.length; i++) {
+                        if (filters_js[i].key == key 
+                            && filters_js[i].val == this.value) {
+                            dupe = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!dupe) {
+                        filters_js.push({ key: key, val: this.value });
+                    }
+                }
             }).val('');
             
             bool_fields.each(function() {
-                if (this.checked)
+                var key = $(this).data('link');
+                if (this.checked) {
+                    for (var i = 0; i < filters_js.length; i++) {
+                        if (filters_js[i].key == key) {
+                            return;
+                        }
+                    }
+                    
                     filters_js.push({ key: $(this).data('link'), val: true });
-            }).prop('checked', false);
+                } else {
+                    for (var i = 0; i < filters_js.length; i++) {
+                        if (filters_js[i].key == key) {
+                            filters_js.splice(i, 1);
+                            return;
+                        }
+                    }
+                }
+            });
             
             filterTable_ajax(filters_html.siblings('.results'));
         });

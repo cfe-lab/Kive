@@ -29,7 +29,7 @@
 	    <h4>Advanced search</h4>
 		<label for="name">Name</label>
 		<input name="name" type="text" data-link="Name">
-		<input name="uploads" type="checkbox" data-link="Uploaded">
+		<input name="uploads" type="checkbox" data-link="User-Uploaded">
 		<label for="uploads">Show only user uploads</label>
 		<input type="submit" value="Filter">
 		</form>
@@ -43,7 +43,7 @@
 
 	<div class="results" data-pkey="pk" data-displaycols="2,3" data-ajax-url="filter_datasets">
 		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
-                <caption>datasets 1-{{ datasets|length }} of {{ total }}</caption>
+                <caption>datasets 1&ndash;{{ datasets|length }} of {{ total }}</caption>
 		<thead>
 			<tr>
 				<th>pk</th>
