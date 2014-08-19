@@ -28,7 +28,7 @@
                 canvasState.addShape(new RawNode(node.x, node.y, rawNodeWidth, rawNodeHeight, rawNodeColour,
                         rawNodeInset, rawNodeOffset, node.dataset_name));
             } else {
-                canvasState.addShape(new CDtNode(node.CDT_pk, node.x, node.y, cdtNodeWidth, cdtNodeColour,
+                canvasState.addShape(new CDtNode(node.CDT_pk, node.x, node.y, cdtNodeWidth, cdtNodeHeight, cdtNodeColour,
                         cdtNodeInset, cdtNodeOffset, node.dataset_name));
             }
         }
@@ -159,15 +159,16 @@
             var shape;
             for (var i = 0; i < canvasState.shapes.length; i++) {
                 shape = canvasState.shapes[i];
-                if (shape.contains(mx, my)) {
+                if (shape.constructor == MethodNode && shape.contains(mx, my)) {
                     // trigger Method menu to drop down
                     $('li[data-rel="#id_method_ctrl"]', 'ul#id_ctrl_nav').click();
                     $('#id_select_method_family').val(shape.family).change();  // trigger ajax
                     $(document).ajaxComplete(function() {
                         // wait for AJAX to populate drop-down before selecting option
                         $('#id_method_revision_field select').val(shape.pk);
+                        $('#id_method_name').val_(shape.label);
                     });
-
+                    
                     return;
                 }
             }

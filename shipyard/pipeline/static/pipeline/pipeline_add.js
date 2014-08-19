@@ -9,10 +9,11 @@ var rawNodeWidth = 20,
     rawNodeInset = 10,
     rawNodeOffset = 25;
 
-var cdtNodeWidth = 40,
+var cdtNodeWidth = 45,
+    cdtNodeHeight = 28,
     cdtNodeColour = '#8888DD',
-    cdtNodeInset = 10,
-    cdtNodeOffset = 10;
+    cdtNodeInset = 13,
+    cdtNodeOffset = 15;
 
 var mNodeWidth = 80,
     mNodeInset = 10,
@@ -24,7 +25,33 @@ var submitError = function(error) {
     $('#id_submit_error').show().html(error);
 };
 
-$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+jQuery.fn.extend({
+    val_: function(str) {
+        // wrapper function for changing <input> values with added parameters. replaces .val().
+        this.val(str);
+        
+        if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length) {
+            var data_lbl = this.data('label');
+            
+            if (typeof data_lbl !== 'undefined') {
+                var lbl = data_lbl;
+            } else {
+                var lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
+                if (lbl.length == 0)
+                    return this;
+                else lbl = lbl.html();
+                this.data('label', lbl);
+            }
+            
+            if (str == lbl)
+                this.addClass('input-label');
+            else this.removeClass('input-label');
+        }
+        return this;
+    }
+});
+
+$(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
     canvas = document.getElementById('pipeline_canvas');
     var canvasWidth = window.innerWidth;
@@ -114,7 +141,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     // Use option TITLE as default Method node name
     $('#id_select_method').on('change', function() {
         var filename = $('#id_select_method option:selected')[0].title;
-        $('#id_method_name').val(filename);
+        $('#id_method_name').val_(filename);
     });
 
     // Pack help text into an unobtrusive icon
@@ -200,7 +227,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 ))
             } else {
                 canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
-                    cdtNodeWidth, cdtNodeColour, cdtNodeInset, cdtNodeOffset, node_label
+                    cdtNodeWidth, cdtNodeHeight, cdtNodeColour, cdtNodeInset, cdtNodeOffset, node_label
                 ));
             }
             $('#id_datatype_name').val("");  // reset text field
@@ -304,7 +331,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                     }
                 });
 
-                method_name.val('');
+                method_name.val_('');
             }
         }
     });
@@ -322,7 +349,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             new RawNode(100, 250, 20, 25, '#88DD88', 10, 25, 'Unstructured data')
         );
         canvasState.addShape(
-            new CDtNode(1, 100, 150, 40, '#8888DD', 10, 10, 'Strings')
+            new CDtNode(1, 100, 150, 40, 20, '#8888DD', 10, 10, 'Strings')
         );
     });
 
@@ -495,14 +522,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 submitError('Pipeline family must be named');
                 return;
             }
-            $('#id_family_name').css({'background-color': '#FFFFFF'});
-            $('#id_family_desc').css({'background-color': '#FFFFFF'});
+            $('#id_family_name, #id_family_desc').css('background-color', '#FFFFFF');
         }
 
         // FIXME: This is fragile if we add a menu to either page
         var meta_menu_index = (is_revision ? 0 : 1);
-        $('#id_revision_name').css({'background-color': '#FFFFFF'});
-        $('#id_revision_desc').css({'background-color': '#FFFFFF'});
+        $('#id_revision_name, #id_revision_desc').css('background-color', '#FFFFFF');
 
 
         // Now we're ready to start

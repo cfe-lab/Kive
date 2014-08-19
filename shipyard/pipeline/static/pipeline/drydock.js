@@ -87,6 +87,10 @@ CanvasState.prototype.doDown = function(e) {
         // check shapes in reverse order
         if (shapes[i].contains(mx, my)) {
             var mySel = shapes[i];
+            
+            // this shape is now on top.
+            shapes.push(shapes.splice(i,1)[0]);
+            
             // are we clicking on an out-magnet?
             out_magnets = mySel.out_magnets;
             for (var j = 0; j < out_magnets.length; j++) {
@@ -406,9 +410,11 @@ CanvasState.prototype.getPos = function(e) {
     return { x: mx, y: my };
 };
 
-CanvasState.prototype.deleteObject = function() {
+CanvasState.prototype.deleteObject = function(objectToDelete) {
     // delete selected object
-    var mySel = this.selection,
+    // @param objectToDelete optionally specifies which object should be deleted.
+    // Otherwise just go with the current selection.
+    var mySel = objectToDelete || this.selection,
         index = -1,
         i = 0, // loop counter
         in_magnets = [],
@@ -422,7 +428,7 @@ CanvasState.prototype.deleteObject = function() {
             // remove selected Connector from list
             
             // if a cable to an output node is severed, delete the node as well
-            // contains a LEGACY CHECK!!!
+            // contains a LEGACY CHECK since OutputNodes used to be strings
             if (typeof mySel.dest !== 'string' && mySel.dest.parent.constructor == OutputNode) {
                 index = this.shapes.indexOf(mySel.dest.parent);
                 this.shapes.splice(index, 1);
@@ -444,42 +450,17 @@ CanvasState.prototype.deleteObject = function() {
             // delete Connectors terminating in this shape
             in_magnets = mySel.in_magnets;
             for (i = 0; i < in_magnets.length; i++) {
-                in_magnet = in_magnets[i];
                 if (in_magnet.connected.length > 0) {
-                    this_connector = in_magnet.connected[0];
-
-                    // remove reference from out-magnet of source node
-                    out_magnet = this_connector.source;
-                    index = out_magnet.connected.indexOf(this_connector);
-                    out_magnet.connected.splice(this_connector, 1);
-
-                    // remove from list of Connectors
-                    index = this.connectors.indexOf(this_connector);
-                    this.connectors.splice(index, 1);
-                    in_magnet.connected = [];
+                    this.deleteObject(in_magnets[i].connected[0]);
                 }
             }
 
             // delete Connectors from this shape to other nodes
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
-            
                 for (j = 0; j < out_magnets[i].connected.length; j++) {
-                
-                    this_connector = out_magnets[i].connected[j];
-                    
-                    if (this_connector.constructor === Connector) {
-                        index = this.connectors.indexOf(this_connector);
-                        this.connectors.splice(index, 1);
-                    }
-                    
-                    if (this_connector.dest.constructor === Magnet) {
-                        this_connector.dest.connected = [];
-                    }
-                    
+                    this.deleteObject(out_magnets[i].connected[j]);
                 }
-
-                out_magnets[i].connected = [];
             }
 
             // remove MethodNode from list and any attached Connectors
@@ -487,17 +468,9 @@ CanvasState.prototype.deleteObject = function() {
             this.shapes.splice(index, 1);
         }
         else if (mySel.constructor == OutputNode) {
-            // deleting an output node also deletes the cable
+            // deleting an output node is the same as deleting the cable
             this_connector = mySel.in_magnets[0].connected[0];
-            
-            index = this.connectors.indexOf(this_connector);
-            this.connectors.splice(index, 1);
-            
-            index = this_connector.source.connected.indexOf(this_connector);
-            this_connector.source.connected.splice(index, 1);
-            
-            index = this.shapes.indexOf(mySel);
-            this.shapes.splice(index, 1);
+            this.deleteObject(this_connector);
         }
         else {  // CDtNode or RawNode
             out_magnets = mySel.out_magnets;

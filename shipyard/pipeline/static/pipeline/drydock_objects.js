@@ -6,7 +6,8 @@
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
-        var dx = mx - cx, dy = my - cy;
+        var dx = mx - cx,
+            dy = my - cy;
         return (dx*dx) / (rx*rx)
              + (dy*dy) / (ry*ry) <= 1;
     },
@@ -137,7 +138,7 @@ RawNode.prototype.contains = function(mx, my) {
 };
 
 
-function CDtNode (pk, x, y, w, fill, inset, offset, label) {
+function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     /*
     Node represents a Compound Datatype (CSV structured data).
     Rendered as a square shape.
@@ -146,6 +147,7 @@ function CDtNode (pk, x, y, w, fill, inset, offset, label) {
     this.x = x || 0;
     this.y = y || 0;
     this.w = w || 20;
+    this.h = h || 10;
     this.fill = fill || "#AAAAAA";
     this.inset = inset || 5;
     this.offset = offset || 12;
@@ -157,32 +159,77 @@ function CDtNode (pk, x, y, w, fill, inset, offset, label) {
 }
 
 CDtNode.prototype.draw = function(ctx) {
-    // draw square
     ctx.fillStyle = this.fill;
-    ctx.fillRect(this.x, this.y, this.w, this.w);
+    
+    // draw base
+    var prism_base = this.y + this.h/2;
+    ctx.beginPath();
+    ctx.moveTo(this.x - this.w/2, prism_base);
+    ctx.lineTo(this.x, prism_base + this.w/4);
+    ctx.lineTo(this.x + this.w/2, prism_base);
+    ctx.lineTo(this.x, prism_base - this.w/4);
+    ctx.closePath();
+    ctx.fill();
+    
+    // draw stack 
+    ctx.fillRect(this.x - this.w/2, this.y - this.h/2, this.w, this.h);
+    
+    // draw top
+    var prism_cap = this.y - this.h/2;
+    ctx.beginPath();
+    ctx.moveTo(this.x - this.w/2, prism_cap);
+    ctx.lineTo(this.x, prism_cap + this.w/4);
+    ctx.lineTo(this.x + this.w/2, prism_cap);
+    ctx.lineTo(this.x, prism_cap - this.w/4);
+    ctx.closePath();
+    ctx.fill();
+    
+    // some shading
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
 
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w/2., this.y - this.offset);
+    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 
     // draw magnet
     out_magnet = this.out_magnets[0];
-    out_magnet.x = this.x + this.w - this.inset;
-    out_magnet.y = this.y + this.w/2.;
+    out_magnet.x = this.x + this.inset;
+    out_magnet.y = this.y + this.w/8;
     out_magnet.draw(ctx);
 };
 
 CDtNode.prototype.highlight = function(ctx) {
     ctx.globalCompositeOperation = 'destination-over';
+    ctx.lineJoin = 'bevel';
+    
+    // draw base
+    var prism_base = this.y + this.h/2;
     ctx.beginPath();
-    ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x+this.w, this.y);
-    ctx.lineTo(this.x+this.w, this.y+this.w);
-    ctx.lineTo(this.x, this.y+this.w);
+    ctx.moveTo(this.x - this.w/2, prism_base);
+    ctx.lineTo(this.x, prism_base + this.w/4);
+    ctx.lineTo(this.x + this.w/2, prism_base);
+    ctx.lineTo(this.x, prism_base - this.w/4);
     ctx.closePath();
     ctx.stroke();
+    
+    // draw stack 
+    ctx.strokeRect(this.x - this.w/2, this.y - this.h/2, this.w, this.h);
+    
+    // draw top
+    var prism_cap = this.y - this.h/2;
+    ctx.beginPath();
+    ctx.moveTo(this.x - this.w/2, prism_cap);
+    ctx.lineTo(this.x, prism_cap + this.w/4);
+    ctx.lineTo(this.x + this.w/2, prism_cap);
+    ctx.lineTo(this.x, prism_cap - this.w/4);
+    ctx.closePath();
+    ctx.stroke();
+    
     ctx.globalCompositeOperation = 'source-over';
 };
 
@@ -191,7 +238,14 @@ CDtNode.prototype.contains = function(mx, my) {
     /*
     Are mouse coordinates within the perimeter of this node?
      */
-    return this.x <= mx && this.x + this.w >= mx && this.y <= my && this.y + this.w >= my;
+    var dx = Math.abs(this.x - mx),
+        dy = Math.abs(this.y - my);
+    
+    // mouse coords are within the 4 diagonal lines.
+    // can be checked with 1 expression because the 4 lines are mirror images of each other
+    return Math.abs(dy - this.h/2 - this.w/4) > dx / 2 
+    // then check the horizontal boundaries on the sides of the hexagon
+        && dx < this.w/2;
 };
 
 
@@ -322,6 +376,18 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
     ctx.closePath();
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
+    
+    // Any output nodes will also be highlighted.
+    var magnet, connected_node;
+    for (var i=0; i < this.out_magnets.length; i++) {
+        magnet = this.out_magnets[i];
+        for (var j=0; j < magnet.connected.length; j++) {
+            connected_node = magnet.connected[j].dest.parent;
+            if (connected_node.constructor == OutputNode) {
+                connected_node.highlight(ctx);
+            }
+        }
+    }
 }
 
 MethodNode.prototype.contains = function(mx, my) {
