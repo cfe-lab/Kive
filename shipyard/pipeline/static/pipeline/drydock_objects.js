@@ -364,12 +364,16 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
             }
         }
         
-        // Highlight (label) the magnet
-        magnet.highlight(ctx);
+        if (magnet.connected.length === 0) {
+            // Highlight (label) the magnet
+            magnet.highlight(ctx);
+        }
     }
     for (var i=0; i < this.in_magnets.length; i++) {
         magnet = this.in_magnets[i];
-        magnet.highlight(ctx);
+        if (magnet.connected.length === 0) {
+            magnet.highlight(ctx);
+        }
     }
 }
 
@@ -395,7 +399,7 @@ function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     this.fill = fill || "#fff";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
-    this.offset = offset || 8;
+    this.offset = offset || 11;
     this.isOutput = isOutput || false;
     this.isInput = !this.isOutput;
     this.connected = [];  // hold references to Connectors
@@ -412,7 +416,6 @@ Magnet.prototype.draw = function(ctx) {
 
 Magnet.prototype.highlight = function(ctx) {
     // draw label
-    ctx.fillStyle = '#000';
     ctx.font = '9pt Lato, sans-serif';
     ctx.textBaseline = 'middle';
     
@@ -422,6 +425,19 @@ Magnet.prototype.highlight = function(ctx) {
         ctx.textAlign = 'left';
         dir = 1;
     }
+    
+    // make a backing box so the label is on white
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(
+        this.x + dir * (this.r + this.offset - 3),
+        this.y - 7.5,
+        dir * (ctx.measureText(this.label).width + 6),
+        15
+    );
+    ctx.globalAlpha = 1.0;
+    ctx.fillStyle = '#000';
+    
     ctx.fillText(this.label, this.x + dir * (this.r + this.offset), this.y);
 };
 
@@ -464,6 +480,7 @@ function Connector (from_x, from_y, out_magnet) {
     this.x = this.from_x; // for compatibility with shape-based functions
     this.y = this.from_y;
     this.midX = this.fromX + (this.x - this.fromX) / 2;
+        
 }
 
 Connector.prototype.draw = function(ctx) {
@@ -473,6 +490,10 @@ Connector.prototype.draw = function(ctx) {
     ctx.strokeStyle = '#aaa';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
+    ctx.fillStyle = '#000';
+    ctx.font = '9pt Lato, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
 
     if (this.source !== null) {
         // update coordinates in case magnet has moved
@@ -489,10 +510,6 @@ Connector.prototype.draw = function(ctx) {
     } else {
         // if connector doesn't have a destination yet,
         // give it the label of the source magnet it's coming from 
-        ctx.fillStyle = '#000';
-        ctx.font = '9pt Lato, sans-serif';
-        ctx.textBaseline = 'middle';
-        ctx.textAlign = 'left';
         ctx.fillText(this.source.label, this.x + ctx.lineWidth/2 + 3, this.y);
     }
     
@@ -502,6 +519,22 @@ Connector.prototype.draw = function(ctx) {
     ctx.moveTo(this.fromX, this.fromY);
     ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
     ctx.stroke();
+    
+    if (this.dest !== null) {
+        var jsBez = [ { x: this.fromX, y: this.fromY },
+            { x: this.midX, y: this.fromY },
+            { x: this.midX, y: this.y },
+            { x: this.x, y: this.y } ];
+    
+        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5);
+        
+        ctx.save();
+        ctx.translate(this.midX, this.fromY + (this.y - this.fromY)/2);
+        ctx.rotate(midpointAngle);
+        ctx.textAlign = 'center';
+        ctx.fillText(this.source.label, 0, 12);
+        ctx.restore();
+    }
 };
 
 Connector.prototype.highlight = function(ctx) {
