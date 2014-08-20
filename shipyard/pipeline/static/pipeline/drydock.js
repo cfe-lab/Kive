@@ -188,19 +188,19 @@ CanvasState.prototype.doMove = function(e) {
                 // check if connector has been dragged to an in-magnet
                 for (i = 0; i < shapes.length; i++) {
                     shape = shapes[i];
-                    if (typeof shape.in_magnets == 'undefined' || shape.in_magnets.length == 0) {
-                        // ignore Connectors, RawNodes, CDtNodes
-                        continue;
-                    }
-
-                    if (typeof own_shape !== 'undefined' && shape == own_shape) {
-                        // disallow self-referential connections
+                    
+                    // ignore Connectors, RawNodes, CDtNodes
+                    // and disallow self-referential connections
+                    if (typeof shape.in_magnets == 'undefined' 
+                        || shape.in_magnets.length == 0
+                        || typeof own_shape !== 'undefined' && shape == own_shape) {
                         continue;
                     }
 
                     // shape is a Method, check its in-magnets
-                    var in_magnets = shape.in_magnets;
-                    var connector_carrying_cdt;
+                    var in_magnets = shape.in_magnets,
+                        connector_carrying_cdt;
+                    
                     for (var j = 0; j < in_magnets.length; j++) {
                         var in_magnet = in_magnets[j];
 
@@ -348,17 +348,14 @@ CanvasState.prototype.draw = function() {
         var shapes = this.shapes;
         var connectors = this.connectors;
         this.clear();
+        
+        var draggingFromMethodOut = this.dragging && this.selection 
+            && this.selection.constructor == Connector
+            && this.selection.source.parent.constructor == MethodNode;
 
         // draw output end-zone -when- dragging a connector from a MethodNode
-        if (this.dragging && this.selection 
-            && this.selection.constructor == Connector
-            && this.selection.source.parent.constructor == MethodNode // CDtNode -> output is not allowed
-            ) {
+        if (draggingFromMethodOut) {
             this.outputZone.draw(this.ctx);
-        /*    this.ctx.fillStyle = '#adf';
-            this.ctx.fillRect(this.width * 0.9, 0, this.width, this.height);
-            this.ctx.fillStyle = 'black';
-            this.ctx.fillText('Output', this.width * 0.95, 20);*/
         }
 
         // draw all shapes and magnets
@@ -385,7 +382,7 @@ CanvasState.prototype.draw = function() {
             
             mySel.highlight(ctx, this.dragging);
         }
-
+        
         this.valid = true;
     }
 };

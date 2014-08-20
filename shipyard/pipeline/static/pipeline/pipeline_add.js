@@ -422,9 +422,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
     });
 
-
-
-
     /*
         Submit form
     */

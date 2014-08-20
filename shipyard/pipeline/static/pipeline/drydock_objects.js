@@ -84,6 +84,7 @@ RawNode.prototype.draw = function(ctx) {
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 
@@ -92,25 +93,6 @@ RawNode.prototype.draw = function(ctx) {
     out_magnet.x = this.x + this.inset;
     out_magnet.y = this.y + this.r2/2;
     out_magnet.draw(ctx);
-    
-/*    // draw circle
-    ctx.fillStyle = this.fill;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, false);
-    ctx.closePath();
-    ctx.fill();
-
-    // draw label
-    ctx.fillStyle = 'black';
-    ctx.textAlign = 'center';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y - this.offset);
-
-    // draw magnet
-    out_magnet = this.out_magnets[0];
-    out_magnet.x = this.x + this.inset;
-    out_magnet.y = this.y;
-    out_magnet.draw(ctx);*/
 };
 
 RawNode.prototype.highlight = function(ctx) {
@@ -193,6 +175,7 @@ CDtNode.prototype.draw = function(ctx) {
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 
@@ -205,28 +188,20 @@ CDtNode.prototype.draw = function(ctx) {
 
 CDtNode.prototype.highlight = function(ctx) {
     ctx.globalCompositeOperation = 'destination-over';
-    ctx.lineJoin = 'bevel';
+//    ctx.lineJoin = 'bevel';
     
-    // draw base
-    var prism_base = this.y + this.h/2;
+    var w2 = this.w/2,
+        h2 = this.h/2,
+        butt = this.y + h2,
+        cap = this.y - h2;
+    
     ctx.beginPath();
-    ctx.moveTo(this.x - this.w/2, prism_base);
-    ctx.lineTo(this.x, prism_base + this.w/4);
-    ctx.lineTo(this.x + this.w/2, prism_base);
-    ctx.lineTo(this.x, prism_base - this.w/4);
-    ctx.closePath();
-    ctx.stroke();
-    
-    // draw stack 
-    ctx.strokeRect(this.x - this.w/2, this.y - this.h/2, this.w, this.h);
-    
-    // draw top
-    var prism_cap = this.y - this.h/2;
-    ctx.beginPath();
-    ctx.moveTo(this.x - this.w/2, prism_cap);
-    ctx.lineTo(this.x, prism_cap + this.w/4);
-    ctx.lineTo(this.x + this.w/2, prism_cap);
-    ctx.lineTo(this.x, prism_cap - this.w/4);
+    ctx.moveTo(this.x - w2, butt);
+    ctx.lineTo(this.x,      butt + w2/2);
+    ctx.lineTo(this.x + w2, butt);
+    ctx.lineTo(this.x + w2, cap);
+    ctx.lineTo(this.x,      cap - w2/2);
+    ctx.lineTo(this.x - w2, cap);
     ctx.closePath();
     ctx.stroke();
     
@@ -287,7 +262,8 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 5,
             fill = '#fff',
             cdt = this_input['cdt_pk'],
-            label = this_input['datasetname']
+            label = this_input['datasetname'],
+            null, false
         );
 
         if (this.n_inputs == 1) {
@@ -306,7 +282,8 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
             attract = 5,
             fill = '#fff',
             cdt = this_output['cdt_pk'],
-            label = this_output['datasetname']
+            label = this_output['datasetname'],
+            null, true
         );
 
         if (this.n_inputs == 1) {
@@ -320,7 +297,6 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
 MethodNode.prototype.draw = function(ctx) {
     // draw rectangle
     ctx.fillStyle = this.fill;
-//    ctx.fillRect(this.x, this.y, this.w, this.h);
 
     // draw a hexagon
     var hx, hy;
@@ -330,7 +306,6 @@ MethodNode.prototype.draw = function(ctx) {
     ctx.lineTo(hx += this.h/4, hy += this.h/2);
     ctx.lineTo(hx -= this.h/4, hy += this.h/2);
     ctx.lineTo(hx = this.x, hy);
-    //ctx.lineTo(hx - this.h/3, hy - this.h/2);
     ctx.closePath();
     ctx.fill();
 
@@ -359,6 +334,7 @@ MethodNode.prototype.draw = function(ctx) {
     // draw label
     ctx.fillStyle = '#000';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
 };
@@ -387,6 +363,13 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
                 connected_node.highlight(ctx);
             }
         }
+        
+        // Highlight (label) the magnet
+        magnet.highlight(ctx);
+    }
+    for (var i=0; i < this.in_magnets.length; i++) {
+        magnet = this.in_magnets[i];
+        magnet.highlight(ctx);
     }
 }
 
@@ -397,8 +380,7 @@ MethodNode.prototype.contains = function(mx, my) {
         && this.y + this.h >= my;
 };
 
-
-function Magnet (parent, r, attract, fill, cdt, label) {
+function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     /*
     CONSTRUCTOR
     A Magnet is the attachment point for a Node (shape) given a
@@ -413,6 +395,9 @@ function Magnet (parent, r, attract, fill, cdt, label) {
     this.fill = fill || "#fff";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
+    this.offset = offset || 8;
+    this.isOutput = isOutput || false;
+    this.isInput = !this.isOutput;
     this.connected = [];  // hold references to Connectors
 }
 
@@ -423,6 +408,21 @@ Magnet.prototype.draw = function(ctx) {
     ctx.closePath();
     ctx.fillStyle = this.fill;
     ctx.fill();
+};
+
+Magnet.prototype.highlight = function(ctx) {
+    // draw label
+    ctx.fillStyle = '#000';
+    ctx.font = '9pt Lato, sans-serif';
+    ctx.textBaseline = 'middle';
+    
+    ctx.textAlign = 'right';
+    var dir = -1;
+    if (this.isOutput) {
+        ctx.textAlign = 'left';
+        dir = 1;
+    }
+    ctx.fillText(this.label, this.x + dir * (this.r + this.offset), this.y);
 };
 
 Magnet.prototype.contains = function(mx, my) {
@@ -486,6 +486,14 @@ Connector.prototype.draw = function(ctx) {
             this.x = this.dest.x;
             this.y = this.dest.y;
         }
+    } else {
+        // if connector doesn't have a destination yet,
+        // give it the label of the source magnet it's coming from 
+        ctx.fillStyle = '#000';
+        ctx.font = '9pt Lato, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.fillText(this.source.label, this.x + ctx.lineWidth/2 + 3, this.y);
     }
     
     this.midX = this.fromX + (this.x - this.fromX) / 2;
@@ -500,12 +508,6 @@ Connector.prototype.highlight = function(ctx) {
     /*
     Highlight this Connector by drawing another line along
     its length. Colour and line width set by canvasState.
-    
-    (I removed this requirement - to me it makes more sense for the
-     connector to be highlighted while dragging. -JN)
-    ##Requires [dragging] to be false so Connector is not highlighted
-    while it is being drawn.
-    
      */
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
@@ -549,35 +551,6 @@ Connector.prototype.contains = function(mx, my, pad) {
     }
     // mx,my is outside the rectangle, don't bother computing the bezier distance
     else return false;
-
-/*  Old code for straight line
-
-    /*
-    Determine if mouse coordinates (x,y) are on or close to this
-    connector with coordinates (x1,y1) and (x2,y2).
-    This is based on three criteria:
-    (1) x1 < x < x2
-    (2) y1 < y < y2
-    (3) the distance of x,y to the line is below cutoff,
-        see http://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-     * /
-     
-    var dx = this.x - this.fromX,
-        dy = this.y - this.fromY;
-        
-    return (
-        (this.x < mx) !== (this.fromX < mx)
-        && (this.y < my) !== (this.fromY < my)
-        && Math.abs(
-            (
-                dy * mx
-                - dx * my
-                + this.x * this.fromY
-                - this.y * this.fromX
-            )
-            / Math.sqrt(dx * dx + dy * dy)
-        ) < pad
-    )*/
 };
 
 function OutputZone (cw, ch, inset) {
@@ -609,6 +582,7 @@ OutputZone.prototype.draw = function (ctx) {
     // draw label
     ctx.fillStyle = '#aaa';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = 'bold 10pt Lato, sans-serif';
     ctx.fillText("Drag here to", this.x + this.w/2, this.y + this.inset);
     ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
@@ -668,6 +642,7 @@ OutputNode.prototype.draw = function(ctx) {
     // draw label
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
     ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 
