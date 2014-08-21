@@ -165,11 +165,11 @@ class SymbolicDataset(models.Model):
         self.clean()
         self.save()
 
+    @transaction.atomic
     def register_dataset(self, file_path, user, name, description, created_by=None, file_handle=None):
         """Create and register a new Dataset for this SymbolicDataset.
 
-        Note that this does NOT compute an MD5 for the new Dataset, nor
-        does it do an integrity check if self already has an MD5 set.
+        Compute and set the MD5 for the new Dataset.
         
         INPUTS
         file_path           file to upload as the new Dataset
@@ -194,6 +194,12 @@ class SymbolicDataset(models.Model):
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             dataset.dataset_file.save(os.path.basename(f.name), File(f))
+
+        print("hello")
+        if self.is_raw():
+            self.set_MD5(None, dataset.dataset_file)
+        else:
+            self.set_MD5_and_count_rows(None, dataset.dataset_file)
 
         dataset.clean()
         dataset.save()
@@ -257,29 +263,24 @@ class SymbolicDataset(models.Model):
         with transaction.atomic():
             symDS = cls.create_empty(cdt)
 
-            if cdt is None:
-                symDS.set_MD5(file_path, file_handle)
-            else:
-                symDS.set_MD5_and_count_rows(file_path, file_handle)
-
-                if check:
-                    run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-                    content_check = symDS.check_file_contents(file_path_to_check=file_path, file_handle=file_handle,
-                                                              summary_path=run_dir, min_row=None, max_row=None, execlog=None)
-                    shutil.rmtree(run_dir)
-                    if content_check.is_fail():
-                        if content_check.baddata.bad_header:
-                            raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                             .format(file_name, cdt))
-                        elif content_check.baddata.cell_errors.exists():
-                            error = content_check.baddata.cell_errors.first()
-                            cdtm = error.column
-                            raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                             'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype))
-                        else:
-                            # Shouldn't reach here.
-                            raise ValueError('The file "{}" was malformed'.format(file_name))
-                    LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
+            if cdt is not None and check:
+                run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+                content_check = symDS.check_file_contents(file_path_to_check=file_path, file_handle=file_handle,
+                                                          summary_path=run_dir, min_row=None, max_row=None, execlog=None)
+                shutil.rmtree(run_dir)
+                if content_check.is_fail():
+                    if content_check.baddata.bad_header:
+                        raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
+                                         .format(file_name, cdt))
+                    elif content_check.baddata.cell_errors.exists():
+                        error = content_check.baddata.cell_errors.first()
+                        cdtm = error.column
+                        raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                                         'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype))
+                    else:
+                        # Shouldn't reach here.
+                        raise ValueError('The file "{}" was malformed'.format(file_name))
+                LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
 
             if make_dataset:
                 symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
