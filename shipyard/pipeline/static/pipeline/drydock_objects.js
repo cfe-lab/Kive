@@ -218,11 +218,10 @@ CDtNode.prototype.contains = function(mx, my) {
     
     // mouse coords are within the 4 diagonal lines.
     // can be checked with 1 expression because the 4 lines are mirror images of each other
-    return Math.abs(dy - this.h/2 - this.w/4) > dx / 2 
+    return this.h/2 + this.w/4 - dy > dx / 2 
     // then check the horizontal boundaries on the sides of the hexagon
         && dx < this.w/2;
 };
-
 
 function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
     /*
@@ -491,7 +490,7 @@ Connector.prototype.draw = function(ctx) {
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
     ctx.fillStyle = '#000';
-    ctx.font = '9pt Lato, sans-serif';
+    ctx.font = '8pt Lato, sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
 
@@ -513,26 +512,58 @@ Connector.prototype.draw = function(ctx) {
         ctx.fillText(this.source.label, this.x + ctx.lineWidth/2 + 3, this.y);
     }
     
-    this.midX = this.fromX + (this.x - this.fromX) / 2;
+    var label_width = ctx.measureText(this.source.label).width + 10,
+        dx = this.x - this.fromX,
+        dy = this.y - this.fromY;
+    
+    this.midX = this.fromX + dx / 2;
     
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
     ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
     ctx.stroke();
     
-    if (this.dest !== null) {
-        var jsBez = [ { x: this.fromX, y: this.fromY },
-            { x: this.midX, y: this.fromY },
-            { x: this.midX, y: this.y },
-            { x: this.x, y: this.y } ];
-    
-        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5);
+    if (this.dest !== null && Math.sqrt(dx*dx + dy*dy)*.7 > label_width) {
+        // make an object in the format of jsBezier lib
+        var jsBez = [
+            { x: this.fromX, y: this.fromY },
+            { x: this.midX,  y: this.fromY },
+            { x: this.midX,  y: this.y     },
+            { x: this.x,     y: this.y     }
+        ];
         
+        // determine the angle of the bezier at the midpoint
+        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5),
+            corner = 6;
+        
+        // save the canvas state to start applying transformations
         ctx.save();
-        ctx.translate(this.midX, this.fromY + (this.y - this.fromY)/2);
+        
+        // set the bezier midpoint as the origin
+        ctx.translate(this.midX, this.fromY + dy/2);
         ctx.rotate(midpointAngle);
+        ctx.fillStyle = '#aaa';
+        
+        var x1 = label_width/2,
+            y1 = 6;
+            
+        // rounded rectangle
+        ctx.beginPath();
+        ctx.moveTo(-x1 + corner, -y1);
+        ctx.lineTo( x1 - corner, -y1);
+        ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
+        ctx.lineTo( x1,  y1 - corner);
+        ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
+        ctx.lineTo(-x1 + corner, y1);
+        ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
+        ctx.lineTo(-x1, -y1 + corner);
+        ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
+        ctx.closePath();
+        ctx.fill();
+        
         ctx.textAlign = 'center';
-        ctx.fillText(this.source.label, 0, 12);
+        ctx.fillStyle = 'white';
+        ctx.fillText(this.source.label, 0, 0);
         ctx.restore();
     }
 };
@@ -546,6 +577,36 @@ Connector.prototype.highlight = function(ctx) {
     ctx.moveTo(this.fromX, this.fromY);
     ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
     ctx.stroke();
+    
+    var label_width = ctx.measureText(this.source.label).width + 10,
+        dx = this.x - this.fromX,
+        dy = this.y - this.fromY;
+    
+    if (this.dest !== null && Math.sqrt(dx*dx + dy*dy) * .7 > label_width) {
+        // make an object in the format of jsBezier lib
+        var jsBez = [
+            { x: this.fromX, y: this.fromY },
+            { x: this.midX,  y: this.fromY },
+            { x: this.midX,  y: this.y     },
+            { x: this.x,     y: this.y     }
+        ];
+        
+        // determine the angle of the bezier at the midpoint
+        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5);
+        
+        // save the canvas state to start applying transformations
+        ctx.save();
+        
+        // set the bezier midpoint as the origin
+        ctx.translate(this.midX, this.fromY + dy/2);
+        ctx.rotate(midpointAngle);
+        ctx.fillStyle = ctx.strokeStyle;
+        
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'white';
+        ctx.fillText(this.source.label, 0, 0);
+        ctx.restore();
+    }
 }
 
 Connector.prototype.contains = function(mx, my, pad) {

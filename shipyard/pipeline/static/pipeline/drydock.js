@@ -357,7 +357,7 @@ CanvasState.prototype.draw = function() {
         if (draggingFromMethodOut) {
             this.outputZone.draw(this.ctx);
         }
-
+        
         // draw all shapes and magnets
         for (var i = 0; i < shapes.length; i++) {
             var shape = shapes[i];
@@ -366,6 +366,7 @@ CanvasState.prototype.draw = function() {
                 shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
                 continue;
             }
+            
             shapes[i].draw(ctx);
         }
 

@@ -568,8 +568,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 'CDT_pk': (this_input.constructor === CDtNode) ? this_input.pk : null,
                 'dataset_name': this_input.label,
                 'dataset_idx': i+1,
-                'x': this_input.x,
-                'y': this_input.y,
+                'x': this_input.x / canvas.width,
+                'y': this_input.y / canvas.height,
                 "min_row": null, // in the future these can be more detailed
                 "max_row": null
             }
@@ -632,8 +632,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 'transf_pk': this_step.pk,  // to retrieve Method
                 "transf_type": "Method", // in the future we can make this take Pipelines as well
                 'step_num': i+1,  // 1-index (pipeline inputs are index 0)
-                'x': this_step.x,
-                'y': this_step.y,
+                'x': this_step.x / canvas.width,
+                'y': this_step.y / canvas.height,
                 'name': this_step.label
             };
 
@@ -693,8 +693,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 'source': this_source_step.pk,
                 'source_step': sorted_elements.indexOf(this_source_step) + 1, // 1-index
                 'source_dataset_name': this_connector.source.label,  // magnet label
-                'x': this_output.x,
-                'y': this_output.y,
+                'x': this_output.x / canvas.width,
+                'y': this_output.y / canvas.height,
                 "wires": [] // in the future we might have this
             };
         }
@@ -721,7 +721,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 }
                 else if (result['status'] == 'success') {
                     $('#id_submit_error').html('').hide();
-                    window.location.href = '/pipelines';
+//                    window.location.href = '/pipelines';
                 }
             }
         })
