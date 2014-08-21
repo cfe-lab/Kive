@@ -412,8 +412,8 @@ class Pipeline(transformation.models.Transformation):
             for wire in outcable_dict["wires"]:
                 new_outcable.create_wire_from_dict(wire)
 
-            new_outcable.create_output(x=int(outcable_dict["x"]),
-                                       y=int(outcable_dict["y"]))
+            new_outcable.create_output(x=float(outcable_dict["x"]),
+                                       y=float(outcable_dict["y"]))
 
         except PipelineSerializationException as e:
             # Propagate this upwards.
