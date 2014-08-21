@@ -36,6 +36,7 @@ urlpatterns = patterns('',
     url(r'^resource_add$', 'method.views.resource_add', name='resource_add'),
     url(r'^resource_revisions/(?P<id>\d+)/$', 'method.views.resource_revisions', name='resource_revisions'),
     url(r'^resource_revision_add/(?P<id>\d+)/$', 'method.views.resource_revision_add', name='resource_revision_add'),
+    url(r'^resource_revision_view/(?P<id>\d+)/$', 'method.views.resource_revision_view', name='resource_revision_view'),
 
     url(r'^get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
 

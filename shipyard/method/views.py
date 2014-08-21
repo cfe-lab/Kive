@@ -566,3 +566,10 @@ def method_revise(request, id):
                  'parent': parent_method})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+
+def resource_revision_view(request, id):
+    revision = CodeResourceRevision.objects.get(pk=id)
+    t = loader.get_template("method/resource_revision_view.html")
+    c = Context({"revision": revision})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
