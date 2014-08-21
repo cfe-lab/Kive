@@ -1,0 +1,44 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% load filters %}
+
+{% block title %}Datasets{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="/datasets" rel="prev">Back to list of datasets</a>
+
+<h2>{{ dataset.name }}</h2>
+
+{% if not dataset.symbolicdataset.is_raw %}
+<table>
+<thead>
+    <tr>
+    {% for column in header %}
+        <th>{{ column }}</th>
+    {% endfor %}
+    </tr>
+</thead>
+</tbody>
+    {% for row in dataset.rows %}
+        <tr>
+        {% for value in row %}
+            <td>{{ value|truncatechars:10 }}</td>
+        {% endfor %}
+        </tr>
+    {% endfor %}
+</tbody>
+</table>
+{% else %}
+<pre>
+{{ dataset.dataset_file.read }}
+</pre>
+
+{% endif %}
+{% endblock %}

@@ -81,7 +81,7 @@ class SymbolicDataset(models.Model):
     @property
     def compounddatatype(self):
         if self.is_raw(): return None
-        return self.structure.first().compounddatatype
+        return self.structure.compounddatatype
 
     def clean(self):
         """

@@ -7,6 +7,7 @@ from django.core.context_processors import csrf
 from django.core.servers.basehttp import FileWrapper
 import mimetypes
 import os
+import csv
 from archive.models import Dataset
 from archive.forms import DatasetForm, BulkDatasetForm
 import logging
@@ -43,12 +44,16 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser.
     """
+    t = loader.get_template("archive/dataset_view.html")
     dataset = Dataset.objects.filter(id=dataset_id).get()
+    header = []
+    if not dataset.symbolicdataset.is_raw():
+        for column in dataset.symbolicdataset.compounddatatype.members.order_by("column_idx"):
+            header.append(column.column_name)
 
-    file_chunker = FileWrapper(dataset.dataset_file)  # stream file in chunks to avoid overloading memory
-    response = HttpResponse(file_chunker, content_type="text/plain")
-    response['Content-Length'] = dataset.get_filesize()
-    return response
+    c = Context({"dataset": dataset, "header": header})
+    c.update(csrf(request))
+    return HttpResponse(t.render(c))
 
 
 def datasets_add(request):

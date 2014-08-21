@@ -18,6 +18,7 @@ import itertools
 import os
 import time
 import file_access_utils
+import csv
 
 import stopwatch.models
 from constants import maxlengths
@@ -1619,6 +1620,12 @@ class Dataset(models.Model):
         This looks like "[name] (created by [user] on [date])"
         """
         return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
+
+    def rows(self):
+        reader = csv.reader(self.dataset_file)
+        next(reader)
+        for row in reader:
+            yield row
 
     def validate_unique(self, *args, **kwargs):
         query = Dataset.objects.filter(symbolicdataset__MD5_checksum=self.symbolicdataset.MD5_checksum,
