@@ -1,0 +1,18 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %} {{ revision.coderesource }}, revision {{ revision }} {% endblock %}
+
+{% block content %}
+
+<a href="/resource_revisions/{{ revision.coderesource.id }}" rel="prev">Back to Code Resource</a>
+
+<h2>{{ revision.coderesource }}, revision {{ revision }}</h2>
+
+<pre>
+{{ revision.content_file.read }}
+</pre>
+
+{% endblock %}

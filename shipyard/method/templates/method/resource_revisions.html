@@ -32,6 +32,7 @@
     <th>Name</th>
     <th>Description</th>
     <th>Date</th>
+    <th></th>
 </tr>
 {% for revision in revisions %}
 <tr>
@@ -39,6 +40,7 @@
     <td><a href="{{ revision.get_absolute_url }}">{{ revision }}</a></td>
     <td>{{ revision.revision_desc }}</td>
     <td>{{ revision.revision_DateTime }}</td>
+    <td><a href="/resource_revision_view/{{ revision.pk }}">View</a></td>
 </tr>
 {% endfor %}
 </table>
