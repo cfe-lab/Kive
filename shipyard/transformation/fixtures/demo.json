@@ -37,16 +37,16 @@
     "pk": 5, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 226, 
-        "x": 100
+        "y": 0.452,
+        "x": 0.1
     }
 },
 {
     "pk": 6, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 288, 
-        "x": 600
+        "y": 0.576,
+        "x": 0.7
     }
 },
 {
@@ -566,80 +566,80 @@
     "pk": 29, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 83, 
-        "x": 27
+        "y": 0.187,
+        "x": 0.034
     }
 },
 {
     "pk": 30, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 169, 
-        "x": 28
+        "y": 0.381,
+        "x": 0.034
     }
 },
 {
     "pk": 31, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 60, 
-        "x": 318
+        "y": 0.135,
+        "x": 0.397
     }
 },
 {
     "pk": 32, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 49, 
-        "x": 513
+        "y": 0.111,
+        "x": 0.640
     }
 },
 {
     "pk": 33, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 114, 
-        "x": 512
+        "y": 0.257,
+        "x": 0.639
     }
 },
 {
     "pk": 34, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 206, 
-        "x": 709
+        "y": 0.465,
+        "x": 0.885
     }
 },
 {
     "pk": 35, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 276, 
-        "x": 709
+        "y": 0.623,
+        "x": 0.885
     }
 },
 {
     "pk": 36, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 196, 
-        "x": 610
+        "y": 0.442,
+        "x": 0.762
     }
 },
 {
     "pk": 37, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 344, 
-        "x": 709
+        "y": 0.777,
+        "x": 0.885
     }
 },
 {
     "pk": 38, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 412, 
-        "x": 709
+        "y": 0.930,
+        "x": 0.885
     }
 },
 {
@@ -778,96 +778,96 @@
     "pk": 42, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 83, 
-        "x": 27
+        "y": 0.187,
+        "x": 0.034
     }
 },
 {
     "pk": 43, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 169, 
-        "x": 28
+        "y": 0.381,
+        "x": 0.034
     }
 },
 {
     "pk": 44, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 60, 
-        "x": 318
+        "y": 0.135,
+        "x": 0.397
     }
 },
 {
     "pk": 45, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 49, 
-        "x": 513
+        "y": 0.110,
+        "x": 0.640
     }
 },
 {
     "pk": 46, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 62, 
-        "x": 709
+        "y": 0.140,
+        "x": 0.885
     }
 },
 {
     "pk": 47, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 114, 
-        "x": 512
+        "y": 0.257,
+        "x": 0.639
     }
 },
 {
     "pk": 48, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 206, 
-        "x": 709
+        "y": 0.465,
+        "x": 0.885
     }
 },
 {
     "pk": 49, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 132, 
-        "x": 709
+        "y": 0.298,
+        "x": 0.885
     }
 },
 {
     "pk": 50, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 276, 
-        "x": 709
+        "y": 0.623,
+        "x": 0.885
     }
 },
 {
     "pk": 51, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 196, 
-        "x": 610
+        "y": 0.442,
+        "x": 0.762
     }
 },
 {
     "pk": 52, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 344, 
-        "x": 709
+        "y": 0.777,
+        "x": 0.885
     }
 },
 {
     "pk": 53, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 412, 
-        "x": 709
+        "y": 0.514,
+        "x": 0.885
     }
 },
 {

@@ -11,11 +11,9 @@
     "pk": 3, 
     "model": "pipeline.pipeline", 
     "fields": {
-        "canvas_width": 900, 
         "revision_number": 1, 
         "revision_parent": null, 
-        "family": 1, 
-        "canvas_height": 500
+        "family": 1
     }
 },
 {
@@ -25,8 +23,8 @@
         "pipeline": 3, 
         "name": "script_1_sum_and_products.py", 
         "outputs_to_delete": [], 
-        "y": 236, 
-        "x": 258, 
+        "y": 0.472,
+        "x": 0.287,
         "transformation": 2, 
         "step_num": 1
     }
@@ -76,11 +74,9 @@
     "pk": 10, 
     "model": "pipeline.pipeline", 
     "fields": {
-        "canvas_width": 801, 
         "revision_number": 1, 
         "revision_parent": null, 
-        "family": 2, 
-        "canvas_height": 443
+        "family": 2
     }
 },
 {
@@ -90,8 +86,8 @@
         "pipeline": 10, 
         "name": "prelim_map.py", 
         "outputs_to_delete": [], 
-        "y": 122, 
-        "x": 57, 
+        "y": 0.275,
+        "x": 0.071,
         "transformation": 4, 
         "step_num": 1
     }
@@ -103,8 +99,8 @@
         "pipeline": 10, 
         "name": "remap.py", 
         "outputs_to_delete": [], 
-        "y": 96, 
-        "x": 164, 
+        "y": 0.217,
+        "x": 0.205,
         "transformation": 5, 
         "step_num": 2
     }
@@ -116,8 +112,8 @@
         "pipeline": 10, 
         "name": "sam2csf.py", 
         "outputs_to_delete": [], 
-        "y": 194, 
-        "x": 269, 
+        "y": 0.438,
+        "x": 0.336,
         "transformation": 6, 
         "step_num": 3
     }
@@ -129,8 +125,8 @@
         "pipeline": 10, 
         "name": "csf2nuc.py", 
         "outputs_to_delete": [], 
-        "y": 191, 
-        "x": 427, 
+        "y": 0.431,
+        "x": 0.533,
         "transformation": 8, 
         "step_num": 4
     }
@@ -142,8 +138,8 @@
         "pipeline": 10, 
         "name": "csf2counts.py", 
         "outputs_to_delete": [], 
-        "y": 87, 
-        "x": 365, 
+        "y": 0.196,
+        "x": 0.456,
         "transformation": 7, 
         "step_num": 5
     }
@@ -155,8 +151,8 @@
         "pipeline": 10, 
         "name": "fasta_to_g2p.sh", 
         "outputs_to_delete": [], 
-        "y": 249, 
-        "x": 469, 
+        "y": 0.562,
+        "x": 0.586,
         "transformation": 9, 
         "step_num": 6
     }
@@ -461,11 +457,9 @@
     "pk": 12, 
     "model": "pipeline.pipeline", 
     "fields": {
-        "canvas_width": 801, 
         "revision_number": 2, 
         "revision_parent": 10, 
-        "family": 2, 
-        "canvas_height": 443
+        "family": 2
     }
 },
 {
@@ -475,8 +469,8 @@
         "pipeline": 12, 
         "name": "prelim_map.py", 
         "outputs_to_delete": [], 
-        "y": 122, 
-        "x": 57, 
+        "y": 0.275,
+        "x": 0.071,
         "transformation": 4, 
         "step_num": 1
     }
@@ -488,8 +482,8 @@
         "pipeline": 12, 
         "name": "remap.py", 
         "outputs_to_delete": [], 
-        "y": 96, 
-        "x": 164, 
+        "y": 0.217,
+        "x": 0.205,
         "transformation": 5, 
         "step_num": 2
     }
@@ -501,8 +495,8 @@
         "pipeline": 12, 
         "name": "sam2csf.py", 
         "outputs_to_delete": [], 
-        "y": 194, 
-        "x": 269, 
+        "y": 0.438,
+        "x": 0.336,
         "transformation": 6, 
         "step_num": 3
     }
@@ -514,8 +508,8 @@
         "pipeline": 12, 
         "name": "csf2counts.py", 
         "outputs_to_delete": [], 
-        "y": 87, 
-        "x": 365, 
+        "y": 0.196,
+        "x": 0.456,
         "transformation": 7, 
         "step_num": 4
     }
@@ -527,8 +521,8 @@
         "pipeline": 12, 
         "name": "coverage_plots.R", 
         "outputs_to_delete": [], 
-        "y": 81, 
-        "x": 553, 
+        "y": 0.183,
+        "x": 0.690,
         "transformation": 11, 
         "step_num": 5
     }
@@ -540,8 +534,8 @@
         "pipeline": 12, 
         "name": "csf2nuc.py", 
         "outputs_to_delete": [], 
-        "y": 191, 
-        "x": 427, 
+        "y": 0.431,
+        "x": 0.533,
         "transformation": 8, 
         "step_num": 6
     }
@@ -553,8 +547,8 @@
         "pipeline": 12, 
         "name": "fasta_to_g2p.sh", 
         "outputs_to_delete": [], 
-        "y": 249, 
-        "x": 469, 
+        "y": 0.562,
+        "x": 0.586,
         "transformation": 9, 
         "step_num": 7
     }
