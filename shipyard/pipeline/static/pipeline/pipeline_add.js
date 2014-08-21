@@ -54,16 +54,13 @@ jQuery.fn.extend({
 $(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
     canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth = window.innerWidth;
-    var canvasHeight= window.innerHeight - 180;
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    var canvasWidth  = canvas.width  = window.innerWidth,
+        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 
     // TODO: can canvas be dynamically redrawn to fit window when it is resized?
     //    $(window).resize(function() {    });
 
     canvasState = new CanvasState(canvas);
-
 
     // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
@@ -721,10 +718,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 }
                 else if (result['status'] == 'success') {
                     $('#id_submit_error').html('').hide();
-//                    window.location.href = '/pipelines';
+                    window.location.href = '/pipelines';
                 }
             }
         })
     })
-});
-// end of document.ready()
+});// end of document.ready()

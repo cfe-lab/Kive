@@ -1,7 +1,12 @@
 /* Pipeline-specific formatting. */
+#inner_wrap {
+    margin-bottom: 0 !important;
+}
 #pipeline_canvas {
     margin-left: -4em;
     margin-top: -2.5em;
+    min-width: 780px;
+    min-height: 400px;
 }
 #pipeline_ctrl {
     position: fixed;
