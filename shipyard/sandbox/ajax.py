@@ -68,6 +68,7 @@ def _filter_datasets(request):
         query = Dataset.objects.filter(symbolicdataset__structure__compounddatatype=cdt_pk)
     except TypeError:
         query = Dataset.objects.filter(symbolicdataset__structure__isnull=True)
+    query = query.order_by("-date_created")
 
     for filter_instance in filters:
         key, value = filter_instance["key"], filter_instance["val"]
@@ -77,6 +78,8 @@ def _filter_datasets(request):
             query = query.filter(created_by__isnull=True)
         elif key == "Smart":
             query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))
+    if len(filters) == 0:
+        query = query[:10]
 
     response_data = []
     for dataset in query.all():

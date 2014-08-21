@@ -290,7 +290,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     tab.hide();
                     noResults.show();
                     tab.siblings('.tbselect-value').val('');
-                }
+               }
             }).fail(function() {
                 /* Contingency in case of Django error. */
                 display_error("Whoops! Something went wrong.");
@@ -322,6 +322,12 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                         ');
                     }
                 }
+            }
+
+            if (filters.length == 0) {
+                tab.find("caption").html("showing most recent 10 datasets");
+            } else {
+                tab.find("caption").html("");
             }
         }
         

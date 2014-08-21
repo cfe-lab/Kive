@@ -40,7 +40,7 @@ def choose_inputs(request):
                 query = archive.models.Dataset.objects.filter(
                     symbolicdataset__structure__compounddatatype=compound_datatype)
             count = query.count()
-            query = query.order_by("created_by", "date_created")[:5]
+            query = query.order_by("created_by", "date_created")[:10]
             response_data.append((my_input, query, count))
 
         context = Context({"input_data": response_data})
