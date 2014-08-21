@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
@@ -89,10 +89,6 @@ class Pipeline(transformation.models.Transformation):
 
     family = models.ForeignKey(PipelineFamily, related_name="members")
     revision_parent = models.ForeignKey("self", related_name = "descendants", null=True, blank=True)
-
-    # UI information.
-    canvas_height = models.IntegerField(default=600, validators=[MinValueValidator(0)])
-    canvas_width = models.IntegerField(default=800, validators=[MinValueValidator(0)])
 
     # moved this here from Transformation so that it can be put into the
     # unique_together statement below. allowed to be blank because it's
@@ -239,9 +235,6 @@ class Pipeline(transformation.models.Transformation):
          - revision_desc: string
          - revision_parent_pk: None if there is no parent to this revision; otherwise, its PK
 
-         - canvas_width: int
-         - canvas_height: int
-
          - pipeline_inputs: list of dicts as produced by the represent_as_dict method
            of TransformationXput
 
@@ -258,9 +251,6 @@ class Pipeline(transformation.models.Transformation):
             "revision_name": self.revision_name,
             "revision_desc": self.revision_desc,
             "revision_parent_pk": None if self.revision_parent is None else self.revision_parent.pk,
-
-            "canvas_width": self.canvas_width,
-            "canvas_height": self.canvas_height,
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
@@ -323,9 +313,7 @@ class Pipeline(transformation.models.Transformation):
             revision_parent=self,
             revision_number=self.family.num_revisions+1,
             revision_name=pipeline_dict_repr['revision_name'],
-            revision_desc=pipeline_dict_repr['revision_desc'],
-            canvas_height=pipeline_dict_repr['canvas_height'],
-            canvas_width=pipeline_dict_repr['canvas_width']
+            revision_desc=pipeline_dict_repr['revision_desc']
         )
 
         # Now pass the dict representation to the function that fills out a Pipeline.
@@ -444,7 +432,7 @@ class Pipeline(transformation.models.Transformation):
         Creates a fresh Pipeline with a new PipelineFamily from a dict.
 
         If the pipeline parameter is specified, we fill it in rather than creating a fresh one.
-        Otherwise, form_data must contain fields revision_name, revision_desc, canvas_width, canvas_height,
+        Otherwise, form_data must contain fields revision_name, revision_desc,
         family_name, and family_desc.
 
         The form_data dict should be structured the same way represent_as_dict produces them.
@@ -469,9 +457,7 @@ class Pipeline(transformation.models.Transformation):
                 revision_name=form_data['revision_name'],
                 revision_desc=form_data['revision_desc'],
                 revision_parent=(None if form_data["revision_parent_pk"] is None
-                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"])),
-                canvas_width=form_data["canvas_width"],
-                canvas_height=form_data["canvas_height"]
+                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"]))
             )
 
         # Create the inputs for the Pipeline.
@@ -532,8 +518,8 @@ class PipelineStep(models.Model):
         related_name="pipeline_steps_deleting")
 
     # UI information.
-    x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    x = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
+    y = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
     name = models.CharField(default="", max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
 
     def __str__(self):
@@ -698,8 +684,8 @@ class PipelineStep(models.Model):
          - transf_pk: PK of Method/Pipeline to go into this step
          - transf_type: "Method" or "Pipeline"
          - step_num: 1-based step number
-         - x: int
-         - y: int
+         - x: float
+         - y: float
          - name: string
          - cables_in: list of objects as produced by PSIC.represent_as_dict()
          - outputs_to_delete: list of names of TransformationOutputs that are not to be retained by this step

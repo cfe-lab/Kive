@@ -135,6 +135,7 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         p2 = self.dict_to_pipelinestep(my_dict)
         self.assertEqual(p2, p)
 
+
 class PipelineFamilyTests(PipelineTestSetup):
 
     def test_unicode(self):
@@ -3992,8 +3993,6 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
                 "revision_name",
                 "revision_desc",
                 "revision_parent_pk",
-                "canvas_width",
-                "canvas_height",
                 "pipeline_inputs",
                 "pipeline_steps",
                 "pipeline_outputs"
@@ -4008,8 +4007,6 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
-        self.assertEquals(dict_repr["canvas_width"], pipeline.canvas_width)
-        self.assertEquals(dict_repr["canvas_height"], pipeline.canvas_height)
 
     def _check_pipeline(self, dict_repr, pipeline):
         """
@@ -4161,7 +4158,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
         my_pipeline = self.make_first_pipeline("serialize input", "For testing serializing input")
 
         input_1 = my_pipeline.create_input("foo", 1, compounddatatype=self.string_doublet)
-        input_raw = my_pipeline.create_input("bar", 2, compounddatatype=None, x=50, y=175)
+        input_raw = my_pipeline.create_input("bar", 2, compounddatatype=None, x=0.2, y=0.3)
         input_3 = my_pipeline.create_input("baz", 3, compounddatatype=self.cdt_string, min_row=5, max_row=50)
 
         self._check_input(input_1.represent_as_dict(), input_1)
@@ -4178,8 +4175,8 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
             "dataset_name": "foo",
             "dataset_idx": 1,
             "CDT_pk": self.string_doublet.pk,
-            "x": 50,
-            "y": 175,
+            "x": 0.2,
+            "y": 0.3,
             "min_row": None,
             "max_row": None
         }
@@ -4188,8 +4185,8 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
             "dataset_name": "bar",
             "dataset_idx": 2,
             "CDT_pk": None,
-            "x": 50,
-            "y": 175,
+            "x": 0.2,
+            "y": 0.3,
             "min_row": None,
             "max_row": None
         }
@@ -4987,9 +4984,6 @@ cat "$3" >> "$5"
             "revision_number": 1,
             "revision_parent_pk": None,
 
-            "canvas_width": 1200,
-            "canvas_height": 960,
-
             "pipeline_inputs": [],
             "pipeline_steps": [],
             "pipeline_outputs": []
@@ -5004,8 +4998,8 @@ cat "$3" >> "$5"
                     "CDT_pk": self.cdt_string.pk,
                     "dataset_name": "input_to_not_touch",
                     "dataset_idx": 1,
-                    "x": 50,
-                    "y": 200,
+                    "x": 0.05,
+                    "y": 0.5,
                     "min_row": None,
                     "max_row": None
                 }
@@ -5016,8 +5010,8 @@ cat "$3" >> "$5"
                     "transf_type": "Method",
                     "family_pk": self.method_noop.family.pk,
                     "step_num": 1,
-                    "x": 150,
-                    "y": 200,
+                    "x": 0.2,
+                    "y": 0.5,
                     "name": "step 1",
                     "cables_in": [
                         {
@@ -5035,8 +5029,8 @@ cat "$3" >> "$5"
                     "family_pk": self.method_noop.family.pk,
                     "transf_type": "Method",
                     "step_num": 2,
-                    "x": 350,
-                    "y": 200,
+                    "x": 0.4,
+                    "y": 0.5,
                     "name": "step 2",
                     "cables_in": [
                         {
@@ -5061,8 +5055,8 @@ cat "$3" >> "$5"
                 "transf_type": "Method",
                 "family_pk": self.method_noop.family.pk,
                 "step_num": 3,
-                "x": 550,
-                "y": 200,
+                "x": 0.6,
+                "y": 0.5,
                 "name": "step 3",
                 "cables_in": [
                     {
@@ -5082,8 +5076,8 @@ cat "$3" >> "$5"
                 "output_CDT_pk": self.cdt_string.pk,
                 "source_step": 3,
                 "source_dataset_name": self.method_noop.outputs.first().dataset_name,
-                "x": 1100,
-                "y": 150,
+                "x": 0.85,
+                "y": 0.5,
                 "wires": []
             }
         ]
@@ -5254,16 +5248,13 @@ tail -n +2 "$2" >> "$3"
             "revision_number": 1,
             "revision_parent_pk": None,
 
-            "canvas_width": 1200,
-            "canvas_height": 960,
-
             "pipeline_inputs": [
                 {
                     "CDT_pk": self.string_doublet.pk,
                     "dataset_name": "pi_1",
                     "dataset_idx": 1,
-                    "x": 50,
-                    "y": 200,
+                    "x": 0.05,
+                    "y": 0.3,
                     "min_row": None,
                     "max_row": None
                 },
@@ -5271,8 +5262,8 @@ tail -n +2 "$2" >> "$3"
                     "CDT_pk": self.string_doublet.pk,
                     "dataset_name": "pi_2",
                     "dataset_idx": 2,
-                    "x": 50,
-                    "y": 250,
+                    "x": 0.05,
+                    "y": 0.5,
                     "min_row": None,
                     "max_row": None
                 },
@@ -5280,8 +5271,8 @@ tail -n +2 "$2" >> "$3"
                     "CDT_pk": self.string_singlet.pk,
                     "dataset_name": "pi_3",
                     "dataset_idx": 3,
-                    "x": 50,
-                    "y": 350,
+                    "x": 0.05,
+                    "y": 0.7,
                     "min_row": None,
                     "max_row": None
                 }
@@ -5292,8 +5283,8 @@ tail -n +2 "$2" >> "$3"
                     "transf_type": "Method",
                     "family_pk": method_twocat_string_doublet.family.pk,
                     "step_num": 1,
-                    "x": 150,
-                    "y": 200,
+                    "x": 0.2,
+                    "y": 0.5,
                     "name": "step 1",
                     "cables_in": [
                         {
@@ -5318,8 +5309,8 @@ tail -n +2 "$2" >> "$3"
                     "transf_type": "Method",
                     "family_pk": method_twocat_string_singlet.family.pk,
                     "step_num": 2,
-                    "x": 350,
-                    "y": 200,
+                    "x": 0.4,
+                    "y": 0.5,
                     "name": "step 2",
                     "cables_in": [
                         {
@@ -5349,8 +5340,8 @@ tail -n +2 "$2" >> "$3"
                     "output_CDT_pk": self.string_doublet.pk,
                     "source_step": 1,
                     "source_dataset_name": doublet_o1.dataset_name,
-                    "x": 1100,
-                    "y": 150,
+                    "x": 0.85,
+                    "y": 0.4,
                     "wires": []
                 },
                 {
@@ -5359,8 +5350,8 @@ tail -n +2 "$2" >> "$3"
                     "output_CDT_pk": self.string_doublet.pk,
                     "source_step": 2,
                     "source_dataset_name": singlet_o1.dataset_name,
-                    "x": 1100,
-                    "y": 250,
+                    "x": 0.85,
+                    "y": 0.4,
                     "wires": [
                         {"source_idx": 1, "dest_idx": 1},
                         {"source_idx": 1, "dest_idx": 2}
@@ -5431,8 +5422,6 @@ tail -n +2 "$2" >> "$3"
         updated_pipeline_dict["revision_name"] = "v2"
         updated_pipeline_dict["revision_desc"] = "Second version"
         updated_pipeline_dict["revision_number"] = 2
-        updated_pipeline_dict["canvas_width"] = 1600
-        updated_pipeline_dict["canvas_height"] = 1200
         updated_pipeline_dict["revision_parent_pk"] = my_pipeline.pk
 
         new_and_improved = my_pipeline.revise_from_dict(updated_pipeline_dict)

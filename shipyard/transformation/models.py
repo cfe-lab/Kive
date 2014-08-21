@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -250,8 +250,8 @@ class TransformationXput(models.Model):
     # from librarian.ExecRecordOut)
 
     # UI information.
-    x = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    y = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    x = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
+    y = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
 
     @property
     def is_input(self):
