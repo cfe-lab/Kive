@@ -5,8 +5,6 @@
 #pipeline_canvas {
     margin-left: -4em;
     margin-top: -2.5em;
-    min-width: 780px;
-    min-height: 400px;
 }
 #pipeline_ctrl {
     position: fixed;

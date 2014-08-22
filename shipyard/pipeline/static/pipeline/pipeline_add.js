@@ -5,20 +5,20 @@ var submit_to_url = '/pipeline_add';
 
 var rawNodeWidth = 20,
     rawNodeHeight = 25,
-    rawNodeColour = "#88DD88",
+    rawNodeColour = "#8D8",
     rawNodeInset = 10,
     rawNodeOffset = 25;
 
 var cdtNodeWidth = 45,
     cdtNodeHeight = 28,
-    cdtNodeColour = '#8888DD',
+    cdtNodeColour = '#88D',
     cdtNodeInset = 13,
     cdtNodeOffset = 15;
 
 var mNodeWidth = 80,
     mNodeInset = 10,
     mNodeSpacing = 20,
-    mNodeColour = '#999999',
+    mNodeColour = '#999',
     mNodeOffset = 10;
 
 var submitError = function(error) {
@@ -27,7 +27,7 @@ var submitError = function(error) {
 
 jQuery.fn.extend({
     val_: function(str) {
-        // wrapper function for changing <input> values with added parameters. replaces .val().
+        // wrapper function for changing <input> values with added checks. replaces .val().
         this.val(str);
         
         if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length) {
@@ -54,8 +54,8 @@ jQuery.fn.extend({
 $(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
     canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth  = canvas.width  = window.innerWidth,
-        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+    var canvasWidth  = canvas.width  = Math.max(window.innerWidth, 780),
+        canvasHeight = canvas.height = Math.max(window.innerHeight - $(canvas).offset().top - 5, 400);
 
     // TODO: can canvas be dynamically redrawn to fit window when it is resized?
     //    $(window).resize(function() {    });
@@ -179,6 +179,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
         
+        if ($this.hasClass('new_ctrl')) {
+            menu.css({ left: 100, top: 350 }).addClass('modal_dialog');
+            
+            var preview_canvas = $('canvas', menu);
+            if (preview_canvas.length == 0) {
+                preview_canvas = $('<canvas>').prependTo(menu)[0];
+                preview_canvas.width = menu.innerWidth();
+                preview_canvas.height = 60;
+            } else {
+                preview_canvas = preview_canvas[0];
+            }
+            
+            var node_preview = new RawNode(preview_canvas.width/2, preview_canvas.height/2, null, null, null, null, null, '');
+            node_preview.draw(preview_canvas.getContext('2d'));
+        }
+        
         for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
             if (inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html() || inputs[i].value == '') {
                 $(inputs[i]).focus();
@@ -219,13 +235,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
             $('#id_dt_error', this)[0].innerHTML = "";
             var this_pk = choice.val(); // primary key
             if (this_pk == ""){
-                canvasState.addShape(new RawNode(100, 200 + Math.round(50 * Math.random()),
-                    rawNodeWidth, rawNodeHeight, rawNodeColour, rawNodeInset, rawNodeOffset, node_label
-                ))
+                canvasState.addShape(new RawNode(         100, 200 + Math.round(50 * Math.random()), null, null, null, null, null, node_label));
             } else {
-                canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()),
-                    cdtNodeWidth, cdtNodeHeight, cdtNodeColour, cdtNodeInset, cdtNodeOffset, node_label
-                ));
+                canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()), null, null, null, null, null, node_label));
             }
             $('#id_datatype_name').val("");  // reset text field
         }
@@ -343,10 +355,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
         // TODO: need MethodNode that can tie these together, or pick different examples
         canvasState.addShape(
-            new RawNode(100, 250, 20, 25, '#88DD88', 10, 25, 'Unstructured data')
+            new RawNode(100, 250, null, null, null, null, null, 'Unstructured data')
         );
         canvasState.addShape(
-            new CDtNode(1, 100, 150, 40, 20, '#8888DD', 10, 10, 'Strings')
+            new CDtNode(1, 100, 150, null, null, null, null, null, 'Strings')
         );
     });
 
@@ -362,7 +374,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // remove selected object from canvas
         canvasState.deleteObject();
     });
-
+    
+    $('.ctrl_menu').on('cancel', function() {
+        $(this).hide();
+    });
+    
     $(document).on('keydown', function(e) {
         // backspace or delete key also removes selected object
         if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
@@ -374,7 +390,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // TODO: also should deselect any selected objects
         else if (e.which == 27) {
             $('li', 'ul#id_ctrl_nav').removeClass('clicked');
-            $('#id_meta_ctrl, #id_method_ctrl, #id_input_ctrl', '#pipeline_ctrl').hide();
+            $('.ctrl_menu:visible').trigger('cancel');
             
             canvasState.selection = null;
             canvasState.valid = false;
@@ -412,9 +428,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
     
     $('body').on('click', function(e) {
-        var menus = $('.ctrl_menu');
-        if (menus.is(':visible') && $(e.target).closest(menus).length === 0) {
-            menus.hide();
+        var menus = $('.ctrl_menu:visible');
+        if ($(e.target).closest(menus).length === 0) {
+            menus.trigger('cancel');
             $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
         }
     });

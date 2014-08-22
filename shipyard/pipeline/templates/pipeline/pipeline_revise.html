@@ -25,11 +25,9 @@
         for (i = 0; i < pipeline_inputs.length; i++) {
             node = pipeline_inputs[i];
             if (node.CDT_pk === null) {
-                canvasState.addShape(new RawNode(node.x * canvas.width, node.y * canvas.height, rawNodeWidth, rawNodeHeight, rawNodeColour,
-                        rawNodeInset, rawNodeOffset, node.dataset_name));
+                canvasState.addShape(new RawNode(node.x * canvas.width, node.y * canvas.height, null, null, null, null, null, node.dataset_name));
             } else {
-                canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width, node.y * canvas.height, cdtNodeWidth, cdtNodeHeight, cdtNodeColour,
-                        cdtNodeInset, cdtNodeOffset, node.dataset_name));
+                canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width, node.y * canvas.height, null, null, null, null, null, node.dataset_name));
             }
         }
         draw_steps(pipeline, pipeline_inputs.length);
@@ -117,7 +115,6 @@
         var pipeline_outputs = pipeline['pipeline_outputs'];
         for (i = 0; i < pipeline_outputs.length; i++) {
             this_output = pipeline_outputs[i];
-            console.log(this_output);
 
             // identify source Method
             source = canvasState.shapes[method_node_offset + this_output.source_step - 1];
@@ -127,7 +124,7 @@
                 magnet = source.out_magnets[k];
                 if (magnet.label === this_output.source_dataset_name) {
                     connector = new Connector(null, null, magnet);
-                    output_node = new OutputNode(this_output.x * canvas.width, this_output.y * canvas.height, null, null, '#d40', null, null, this_output.output_name);
+                    output_node = new OutputNode(this_output.x * canvas.width, this_output.y * canvas.height, null, null, null, null, null, this_output.output_name);
                     canvasState.addShape(output_node);
 
                     connector.x = this_output.x * canvas.width;
@@ -213,6 +210,7 @@
             <li data-rel="#id_meta_ctrl">Pipeline</li>
             <li data-rel="#id_input_ctrl">Inputs</li>
             <li data-rel="#id_method_ctrl">Methods</li>
+            <li data-rel="#id_input_ctrl" class="new_ctrl">Add an input</li>
         </ul>
 
         <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}

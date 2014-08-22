@@ -45,13 +45,13 @@ function RawNode (x, y, r, h, fill, inset, offset, label) {
      */
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
-    this.r = r || 10; // x-radius
+    this.r = r || 20; // x-radius
     this.r2 = this.r/2; // y-radius
     this.w = this.r; // for compatibility
-    this.h = h || 10; // stack height
-    this.fill = fill || "#aaa";
-    this.inset = inset || 5; // distance of magnet from center
-    this.offset = offset || 12; // distance of label from center
+    this.h = h || 25; // stack height
+    this.fill = fill || "#8D8";
+    this.inset = inset || 10; // distance of magnet from center
+    this.offset = offset || 18; // distance of label from center
     this.label = label || '';
     this.in_magnets = []; // for compatibility
 
@@ -119,6 +119,22 @@ RawNode.prototype.contains = function(mx, my) {
         || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
 };
 
+RawNode.prototype.getVertices = function() {
+    var x1 = this.x + this.r,
+        x2 = this.x - this.r,
+        y1 = this.y + this.h/2,
+        y2 = y1 - this.h;
+    
+    return [
+        { x: x1, y: y1 },
+        { x: x2, y: y1 },
+        { x: x1, y: y2 },
+        { x: x2, y: y2 },
+        { x: this.x, y: this.y + this.h/2 + this.r2 },
+        { x: this.x, y: this.y - this.h/2 - this.r2 }
+    ];
+};
+
 
 function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     /*
@@ -128,11 +144,11 @@ function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     this.pk = pk;
     this.x = x || 0;
     this.y = y || 0;
-    this.w = w || 20;
-    this.h = h || 10;
-    this.fill = fill || "#AAAAAA";
-    this.inset = inset || 5;
-    this.offset = offset || 12;
+    this.w = w || 45;
+    this.h = h || 28;
+    this.fill = fill || "#88D";
+    this.inset = inset || 13;
+    this.offset = offset || 15;
     this.label = label || '';
     this.in_magnets = [];
 
@@ -184,6 +200,21 @@ CDtNode.prototype.draw = function(ctx) {
     out_magnet.x = this.x + this.inset;
     out_magnet.y = this.y + this.w/8;
     out_magnet.draw(ctx);
+};
+
+CDtNode.prototype.getVertices = function() {
+    var w2 = this.w/2,
+        butt = this.y + this.h/2,
+        cap  = this.y - this.h/2;
+    
+    return [
+        { x: this.x - w2, y: butt },
+        { x: this.x,      y: butt + w2/2 },
+        { x: this.x + w2, y: butt },
+        { x: this.x + w2, y: cap },
+        { x: this.x,      y: cap - w2/2 },
+        { x: this.x - w2, y: cap }
+    ];
 };
 
 CDtNode.prototype.highlight = function(ctx) {
@@ -353,14 +384,17 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
     ctx.globalCompositeOperation = 'source-over';
     
     // Any output nodes will also be highlighted.
-    var magnet, connected_node;
-    for (var i=0; i < this.out_magnets.length; i++) {
+    var magnet, connected_node, i, j;
+    for (i = 0; i < this.out_magnets.length; i++) {
         magnet = this.out_magnets[i];
-        for (var j=0; j < magnet.connected.length; j++) {
+        for (j = 0; j < magnet.connected.length; j++) {
             connected_node = magnet.connected[j].dest.parent;
             if (connected_node.constructor == OutputNode) {
                 connected_node.highlight(ctx);
             }
+            
+            // Draw label on cable.
+            magnet.connected[j].drawLabel(ctx);
         }
         
         if (magnet.connected.length === 0) {
@@ -372,6 +406,8 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
         magnet = this.in_magnets[i];
         if (magnet.connected.length === 0) {
             magnet.highlight(ctx);
+        } else {
+            magnet.connected[0].drawLabel(ctx);
         }
     }
 }
@@ -512,41 +548,67 @@ Connector.prototype.draw = function(ctx) {
         ctx.fillText(this.source.label, this.x + ctx.lineWidth/2 + 3, this.y);
     }
     
-    var label_width = ctx.measureText(this.source.label).width + 10,
-        dx = this.x - this.fromX,
-        dy = this.y - this.fromY;
+    var label_width = ctx.measureText(this.source.label).width + 10;
+    this.dx = this.x - this.fromX,
+    this.dy = this.y - this.fromY;
     
-    this.midX = this.fromX + dx / 2;
+    this.midX = this.fromX + this.dx / 2;
     
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
     ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
     ctx.stroke();
+};
+
+Connector.prototype.highlight = function(ctx) {
+    /*
+    Highlight this Connector by drawing another line along
+    its length. Colour and line width set by canvasState.
+     */
+    ctx.beginPath();
+    ctx.moveTo(this.fromX, this.fromY);
+    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
+    ctx.stroke();
     
-    if (this.dest !== null && Math.sqrt(dx*dx + dy*dy)*.7 > label_width) {
-        // make an object in the format of jsBezier lib
-        var jsBez = [
-            { x: this.fromX, y: this.fromY },
-            { x: this.midX,  y: this.fromY },
-            { x: this.midX,  y: this.y     },
-            { x: this.x,     y: this.y     }
-        ];
-        
+    if (this.dest !== null) {
+        this.drawLabel(ctx);
+    }
+}
+
+// make an object in the format of jsBezier lib
+Connector.prototype.getJsBez = function() {
+    this.dx = this.x - this.fromX,
+    this.midX = this.fromX + this.dx / 2;
+    
+    return [
+        { x: this.fromX, y: this.fromY },
+        { x: this.midX,  y: this.fromY },
+        { x: this.midX,  y: this.y     },
+        { x: this.x,     y: this.y     }
+    ];
+};
+
+Connector.prototype.drawLabel = function(ctx) {
+    this.label_width = ctx.measureText(this.source.label).width + 10;
+    this.dx = this.x - this.fromX,
+    this.dy = this.y - this.fromY;
+    
+    if (Math.sqrt(this.dx*this.dx + this.dy*this.dy)*.7 > this.label_width) {
         // determine the angle of the bezier at the midpoint
-        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5),
+        var midpointAngle = jsBezier.gradientAtPoint(this.getJsBez(), 0.5),
             corner = 6;
-        
+    
         // save the canvas state to start applying transformations
         ctx.save();
-        
+    
         // set the bezier midpoint as the origin
-        ctx.translate(this.midX, this.fromY + dy/2);
+        ctx.translate(this.midX, this.fromY + this.dy/2);
         ctx.rotate(midpointAngle);
         ctx.fillStyle = '#aaa';
-        
-        var x1 = label_width/2,
+    
+        var x1 = this.label_width/2,
             y1 = 6;
-            
+        
         // rounded rectangle
         ctx.beginPath();
         ctx.moveTo(-x1 + corner, -y1);
@@ -560,48 +622,7 @@ Connector.prototype.draw = function(ctx) {
         ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
         ctx.closePath();
         ctx.fill();
-        
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'white';
-        ctx.fillText(this.source.label, 0, 0);
-        ctx.restore();
-    }
-};
-
-Connector.prototype.highlight = function(ctx) {
-    /*
-    Highlight this Connector by drawing another line along
-    its length. Colour and line width set by canvasState.
-     */
-    ctx.beginPath();
-    ctx.moveTo(this.fromX, this.fromY);
-    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
-    ctx.stroke();
     
-    var label_width = ctx.measureText(this.source.label).width + 10,
-        dx = this.x - this.fromX,
-        dy = this.y - this.fromY;
-    
-    if (this.dest !== null && Math.sqrt(dx*dx + dy*dy) * .7 > label_width) {
-        // make an object in the format of jsBezier lib
-        var jsBez = [
-            { x: this.fromX, y: this.fromY },
-            { x: this.midX,  y: this.fromY },
-            { x: this.midX,  y: this.y     },
-            { x: this.x,     y: this.y     }
-        ];
-        
-        // determine the angle of the bezier at the midpoint
-        var midpointAngle = jsBezier.gradientAtPoint(jsBez, 0.5);
-        
-        // save the canvas state to start applying transformations
-        ctx.save();
-        
-        // set the bezier midpoint as the origin
-        ctx.translate(this.midX, this.fromY + dy/2);
-        ctx.rotate(midpointAngle);
-        ctx.fillStyle = ctx.strokeStyle;
-        
         ctx.textAlign = 'center';
         ctx.fillStyle = 'white';
         ctx.fillText(this.source.label, 0, 0);
@@ -702,7 +723,7 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
     this.r2 = this.r / 2; // y-radius (ellipse)
     this.w = this.r; // for compatibility
     this.h = h || 25; // height of cylinder
-    this.fill = fill || "#aaa";
+    this.fill = fill || "#d40";
     this.inset = inset || 12; // distance of magnet from center
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';

@@ -235,10 +235,48 @@ CanvasState.prototype.doMove = function(e) {
 };
 
 CanvasState.prototype.doUp = function(e) {
-    this.dragging = false;
     this.valid = false;
     var mouse = this.getPos(e);
     var index;
+    
+    if (this.dragging && this.selection != null) {
+        mySel = this.selection;
+        if (mySel.constructor == CDtNode
+            || mySel.constructor == RawNode) {
+            var vertices = mySel.getVertices();
+            for (var i = 0; i < this.shapes.length; i++) {
+                var shape = this.shapes[i];
+                
+                // Objects are passed by reference in JS, so this comparison is really comparing references.
+                if (shape == mySel) continue;
+                
+                for (var j = 0; j < vertices.length; j++) {
+                    var vertex = vertices[j];
+                    if (shape.contains(vertex.x, vertex.y)) {
+                        var dx = mySel.x - shape.x,
+                            dy = mySel.y - shape.y,
+                            dh = Math.sqrt(dx*dx + dy*dy) + 2,// add however many additional pixels you want to move
+                            theta = Math.atan(dy / dx),
+                            Dx = Math.cos(theta) * dh - dx,
+                            Dy = Math.sin(theta) * dh - dy;
+                        
+                        mySel.x -= Dx;
+                        mySel.y -= Dy;
+                        vertex = mySel.getVertices()[j];
+                        console.dir({
+                            mySel: mySel.x +', '+ mySel.y,
+                            shape: shape.x +', '+ shape.y,
+                            vertex: j + ': ' + vertex.x +', '+ vertex.y,
+                            delta: dx +', '+ dy,
+                            Delta: Dx +', '+ Dy
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    this.dragging = false;
     
     if (this.selection === null) {
         return;
