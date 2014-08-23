@@ -252,24 +252,22 @@ CanvasState.prototype.doUp = function(e) {
                 
                 for (var j = 0; j < vertices.length; j++) {
                     var vertex = vertices[j];
-                    if (shape.contains(vertex.x, vertex.y)) {
+                    while (shape.contains(vertex.x, vertex.y)) {
                         var dx = mySel.x - shape.x,
                             dy = mySel.y - shape.y,
-                            dh = Math.sqrt(dx*dx + dy*dy) + 2,// add however many additional pixels you want to move
-                            theta = Math.atan(dy / dx),
-                            Dx = Math.cos(theta) * dh - dx,
-                            Dy = Math.sin(theta) * dh - dy;
+                            step = 5;
                         
-                        mySel.x -= Dx;
-                        mySel.y -= Dy;
-                        vertex = mySel.getVertices()[j];
-                        console.dir({
-                            mySel: mySel.x +', '+ mySel.y,
-                            shape: shape.x +', '+ shape.y,
-                            vertex: j + ': ' + vertex.x +', '+ vertex.y,
-                            delta: dx +', '+ dy,
-                            Delta: Dx +', '+ Dy
-                        });
+                        // Shortcut so that I don't have to type Math.everything
+                        with (Math) var 
+                            dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                            theta = atan(dy / dx),
+                            Dx = cos(theta) * dh - dx,
+                            Dy = sin(theta) * dh - dy;
+                        
+                        mySel.x += Dx;
+                        mySel.y += Dy;
+                        vertices = mySel.getVertices();
+                        vertex = vertices[j]
                     }
                 }
             }
