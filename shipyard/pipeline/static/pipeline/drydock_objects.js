@@ -23,6 +23,9 @@ var Geometry = {
         var dx = cx - mx,
             dy = cy - my;
         return Math.sqrt(dx*dx + dy*dy) <= r;
+    },
+    ltLine: function(mx, my, x1, y1, x2, y2) {
+        return x2 != x1 ? (y2 - y1) / (x2 - x1) * (mx - x1) > my - y1 : null;
     }
 };
 
@@ -282,6 +285,9 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
     this.fill = fill || "#ddd";
     this.label = label || '';
+    
+    this.stack = 20;
+    this.scoop = 45;
 
     this.in_magnets = [];
     for (var key in this.inputs) {
@@ -328,36 +334,121 @@ MethodNode.prototype.draw = function(ctx) {
     // draw rectangle
     ctx.fillStyle = this.fill;
 
-    // draw a hexagon
-    var hx, hy;
+    // experimental draw
+    var cos30 = Math.sqrt(3)/2,
+     // sin30 = 0.5 (this is trivial)
+        magnet_radius = this.in_magnets[0].r, 
+        magnet_margin = 6,
+        y_inputs = this.y - this.stack,
+        x_outputs = this.x + this.scoop * cos30,
+        y_outputs = this.y + this.scoop * .5,
+        dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
+        c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
+        cosdmc = cos30 * dmc,
+        input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
+        output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2; // half of the length of the parallelogram ("half hypoteneuse")
+    
+    ctx.fillStyle = this.fill;
+    
+    var vertices = [
+        { x: this.x + cosdmc - cos30 * input_plane_len, y: y_inputs + (dmc + input_plane_len) / 2 },
+        { x: this.x + cosdmc + cos30 * input_plane_len, y: y_inputs + (dmc - input_plane_len) / 2 },
+        { x: this.x - cosdmc + cos30 * input_plane_len, y: y_inputs - (dmc + input_plane_len) / 2 },
+        { x: this.x - cosdmc - cos30 * input_plane_len, y: y_inputs - (dmc - input_plane_len) / 2 },
+        { x: x_outputs - cos30 * output_plane_len, y: y_outputs + dmc + output_plane_len / 2 },
+        { x: x_outputs + cos30 * output_plane_len, y: y_outputs + dmc - output_plane_len / 2 },
+        { x: x_outputs + cos30 * output_plane_len, y: y_outputs - dmc - output_plane_len / 2 },
+        { x: x_outputs - cos30 * output_plane_len, y: y_outputs - dmc + output_plane_len / 2 }
+    ];
+    
+    if (this.in_magnets.length > this.out_magnets.length) {
+        vertices.push(
+            { x: this.x - cosdmc - cos30 * output_plane_len, y: this.y + (dmc + output_plane_len) / 2 },
+            { x: this.x + cosdmc - cos30 * output_plane_len, y: this.y - (dmc - output_plane_len) / 2 },
+            { x: this.x + cosdmc + cos30 * output_plane_len, y: this.y - (dmc + output_plane_len) / 2 }
+//            { x: this.x + cosdmc - cos30 * output_plane_len, y: this.y + dmc * 1.5 + output_plane_len / 2 },
+//            { x: this.x + cosdmc + cos30 * output_plane_len, y: this.y + dmc * 1.5 - output_plane_len / 2 },
+//            { x: this.x - cosdmc + cos30 * output_plane_len, y: this.y + (dmc - output_plane_len) / 2 },
+//            { x: this.x - cosdmc + cos30 * output_plane_len, y: this.y - dmc * 1.5 - output_plane_len / 2 },
+//            { x: this.x - cosdmc - cos30 * output_plane_len, y: this.y - dmc * 1.5 + output_plane_len / 2 }
+        );
+    } else { 
+        vertices.push(
+            { x: this.x - cosdmc - cos30 * input_plane_len, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
+            { x: this.x + cosdmc - cos30 * input_plane_len, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
+            { x: this.x + cosdmc + cos30 * input_plane_len, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
+//            { x: this.x + cosdmc - cos30 * input_plane_len, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
+//            { x: this.x + cosdmc + cos30 * input_plane_len, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
+//            { x: this.x - cosdmc + cos30 * input_plane_len, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
+//            { x: this.x - cosdmc + cos30 * input_plane_len, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
+//            { x: this.x - cosdmc - cos30 * input_plane_len, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
+        );
+    }
+    
+    this.vertices = vertices;
+    
     ctx.beginPath();
-    ctx.moveTo(hx = this.x, hy = this.y);
-    ctx.lineTo(hx += this.w, hy);
-    ctx.lineTo(hx += this.h/4, hy += this.h/2);
-    ctx.lineTo(hx -= this.h/4, hy += this.h/2);
-    ctx.lineTo(hx = this.x, hy);
-    ctx.closePath();
+    
+    // body
+    ctx.moveTo( vertices[4].x, vertices[4].y );
+    ctx.lineTo( vertices[5].x, vertices[5].y );
+    ctx.lineTo( vertices[6].x, vertices[6].y );
+    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+    ctx.lineTo( vertices[2].x, vertices[2].y );
+    ctx.lineTo( vertices[3].x, vertices[3].y );
+    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
     ctx.fill();
+    
+    // input plane (shading)
+    ctx.beginPath();
+    ctx.moveTo( vertices[0].x, vertices[0].y );
+    ctx.lineTo( vertices[1].x, vertices[1].y );
+    ctx.lineTo( vertices[2].x, vertices[2].y );
+    ctx.lineTo( vertices[3].x, vertices[3].y );
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+    
+    // top bend (shading)
+    ctx.beginPath();
+    ctx.moveTo( vertices[6].x, vertices[6].y );
+    ctx.lineTo( vertices[7].x, vertices[7].y );
+    ctx.bezierCurveTo( vertices[9].x,  vertices[9].y,  vertices[9].x,  vertices[9].y,  vertices[0].x, vertices[0].y );
+    ctx.lineTo( vertices[1].x, vertices[1].y );
+    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[6].x, vertices[6].y );
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    
+    ctx.fillStyle = this.fill;
+    ctx.globalAlpha = 1.0;
+    
+/*  // output plane
+    ctx.moveTo( vertices[4].x, vertices[4].y );
+    ctx.lineTo( vertices[5].x, vertices[5].y );
+    ctx.lineTo( vertices[6].x, vertices[6].y );
+    ctx.lineTo( vertices[7].x, vertices[7].y );
+
+    // side bend
+    ctx.moveTo( vertices[4].x, vertices[4].y );
+    ctx.lineTo( vertices[7].x, vertices[7].y );
+    ctx.bezierCurveTo( vertices[9].x, vertices[9].y, vertices[9].x, vertices[9].y, vertices[0].x, vertices[0].y );
+    ctx.lineTo( vertices[3].x, vertices[3].y );
+    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+    */
 
     // draw magnets
     for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
-        magnet.x = this.x + this.inset;
-        if (len == 1) {
-            // Special case if there's only 1 input (or output).
-            // I may rethink this later. —JN
-            magnet.x -= this.h * .1;
-        }
-        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        var pos = i - len/2 + .5;
+        magnet.x = this.x + pos * cos30 * c2c;
+        magnet.y = y_inputs - pos * c2c/2;
         magnet.draw(ctx);
     }
     for (i = 0, len = this.out_magnets.length; i < len; i++) {
         magnet = this.out_magnets[i];
-        magnet.x = this.x + this.w - this.inset;
-        if (len == 1) {
-            magnet.x += this.h * .1;
-        }
-        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        var pos = i - len/2 + .5;
+        magnet.x = x_outputs + pos * cos30 * c2c;
+        magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
     }
 
@@ -366,20 +457,25 @@ MethodNode.prototype.draw = function(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
+    ctx.fillText(this.label, this.x + this.scoop/4, this.y - this.stack - input_plane_len/2 - this.offset);
 };
 
 MethodNode.prototype.highlight = function(ctx, dragging) {
     // highlight this node shape
     var hx, hy;
     ctx.globalCompositeOperation = 'destination-over';
+
+    // body
     ctx.beginPath();
-    ctx.moveTo(hx = this.x, hy = this.y);
-    ctx.lineTo(hx += this.w, hy);
-    ctx.lineTo(hx += this.h/4, hy += this.h/2);
-    ctx.lineTo(hx -= this.h/4, hy += this.h/2);
-    ctx.lineTo(hx = this.x, hy);
+    ctx.moveTo( this.vertices[4].x, this.vertices[4].y );
+    ctx.lineTo( this.vertices[5].x, this.vertices[5].y );
+    ctx.lineTo( this.vertices[6].x, this.vertices[6].y );
+    ctx.bezierCurveTo( this.vertices[10].x, this.vertices[10].y, this.vertices[10].x, this.vertices[10].y, this.vertices[1].x, this.vertices[1].y );
+    ctx.lineTo( this.vertices[2].x, this.vertices[2].y );
+    ctx.lineTo( this.vertices[3].x, this.vertices[3].y );
+    ctx.bezierCurveTo( this.vertices[8].x, this.vertices[8].y, this.vertices[8].x, this.vertices[8].y, this.vertices[4].x, this.vertices[4].y );
     ctx.closePath();
+    
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
     
@@ -402,7 +498,7 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
             magnet.highlight(ctx);
         }
     }
-    for (var i=0; i < this.in_magnets.length; i++) {
+    for (var i = 0; i < this.in_magnets.length; i++) {
         magnet = this.in_magnets[i];
         if (magnet.connected.length === 0) {
             magnet.highlight(ctx);
@@ -413,11 +509,29 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
 }
 
 MethodNode.prototype.contains = function(mx, my) {
-    return this.x <= mx 
-        && this.x + this.w >= mx 
-        && this.y <= my 
-        && this.y + this.h >= my;
+    /*
+    @todo
+    Make this check more precise.
+    */
+    return mx < this.vertices[6].x && mx > this.vertices[3].x
+        && !Geometry.ltLine(mx, my, this.vertices[1].x, this.vertices[1].y, this.vertices[2].x, this.vertices[2].y)
+        && !Geometry.ltLine(mx, my, this.vertices[3].x, this.vertices[3].y, this.vertices[2].x, this.vertices[2].y)
+        &&  Geometry.ltLine(mx, my, this.vertices[4].x, this.vertices[4].y, this.vertices[5].x, this.vertices[5].y)
+        &&  Geometry.ltLine(mx, my, this.vertices[4].x, this.vertices[4].y, this.vertices[8].x, this.vertices[8].y);
 };
+
+MethodNode.prototype.getVertices = function() {
+    // draw a hexagon
+    var wx = this.x + this.w,
+        hy = this.y + this.h;
+    return [
+        { x: this.x,        y: this.y        },
+        { x: wx,            y: this.y        },
+        { x: wx + this.h/4, y: hy - this.h/2 },
+        { x: this.x,        y: hy            },
+        { x: wx,            y: hy            }
+    ];
+}
 
 function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     /*
@@ -797,3 +911,19 @@ OutputNode.prototype.highlight = function(ctx) {
     // The cable leading to the output is also selected.
     this.in_magnets[0].connected[0].highlight(ctx);
 }
+
+OutputNode.prototype.getVertices = function() {
+    var x1 = this.x + this.r,
+        x2 = this.x - this.r,
+        y1 = this.y + this.h/2,
+        y2 = y1 - this.h;
+    
+    return [
+        { x: x1, y: y1 },
+        { x: x2, y: y1 },
+        { x: x1, y: y2 },
+        { x: x2, y: y2 },
+        { x: this.x, y: this.y + this.h/2 + this.r2 },
+        { x: this.x, y: this.y - this.h/2 - this.r2 }
+    ];
+};

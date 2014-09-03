@@ -241,13 +241,13 @@ CanvasState.prototype.doUp = function(e) {
     
     if (this.dragging && this.selection != null) {
         mySel = this.selection;
-        if (mySel.constructor == CDtNode
-            || mySel.constructor == RawNode) {
+        if (typeof mySel.getVertices == 'function') {
             var vertices = mySel.getVertices();
             for (var i = 0; i < this.shapes.length; i++) {
                 var shape = this.shapes[i];
                 
                 // Objects are passed by reference in JS, so this comparison is really comparing references.
+                // Identical objects at different memory addresses will not pass this condition.
                 if (shape == mySel) continue;
                 
                 for (var j = 0; j < vertices.length; j++) {
