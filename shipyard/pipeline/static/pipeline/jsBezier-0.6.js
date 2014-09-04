@@ -80,47 +80,6 @@
 		flatnessTolerance = Math.pow(2.0,-maxRecursion-1);
 
 	/**
-	 * Shorthand version of distanceFromCurve() for the purposes of Shipyard.
-	 */
-	var _quickDistFromCurve = function(mx, my, x1, y1, midX, x2, y2) {
-        var point = { x: mx, y: my },
-		    curve = [
-                { x: x1, y: y1 },
-                { x: midX, y: y1 },
-                { x: midX, y: y2 },
-                { x: x2, y: y2 }
-            ];
-        return _distanceFromCurve(point, curve);
-        
-        /*
-		var candidates = [],
-            point = { x: mx, y: my },
-		    curve = [
-                { x: x1, y: y1 },
-                { x: midX, y: y1 },
-                { x: midX, y: y2 },
-                { x: x2, y: y2 }
-            ],
-	    	w = _convertToBezier(point, curve),
-	    	numSolutions = _findRoots(w, 5, candidates, 0),
-			v = Vectors.subtract(point, curve[0]), 
-			dist = Vectors.square(v);
-
-	    for (var i = 0; i < numSolutions; i++) {
-			v = Vectors.subtract(point, _bezier(curve, 3, candidates[i], null, null));
-	    	var newDist = Vectors.square(v);
-	    	if (newDist < dist) {
-	            dist = newDist;
-		    }
-	    }
-	    v = Vectors.subtract(point, curve[3]);
-		newDist = Vectors.square(v);
-	    if (newDist < dist) {
-	        dist = newDist;
-	    }
-		return dist;*/
-	};
-	/**
 	 * Calculates the distance that the point lies from the curve.
 	 * 
 	 * @param point a point in the form {x:567, y:3342}
@@ -450,7 +409,6 @@
 	};
 	
 	var jsBezier = window.jsBezier = {
-		quickDistFromCurve : _quickDistFromCurve,
 		distanceFromCurve : _distanceFromCurve,
 		gradientAtPoint : _gradientAtPoint,
 		gradientAtPointAlongCurveFrom : _gradientAtPointAlongPathFrom,

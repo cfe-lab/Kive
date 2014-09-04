@@ -243,59 +243,48 @@ CanvasState.prototype.doUp = function(e) {
     if (this.dragging && this.selection != null && this.selection.constructor != Connector) {
         mySel = this.selection;
         
-        var vertices = mySel.getVertices();
-        for (var i = 0; i < this.shapes.length; i++) {
-            var shape = this.shapes[i];
-            
-            // Objects are passed by reference in JS, so this comparison is really comparing references.
-            // Identical objects at different memory addresses will return false here.
-            if (shape == mySel) continue;
-            
-            for (var j = 0; j < vertices.length; j++) {
-                var vertex = vertices[j];
-                var moved = false;
-                while (shape.contains(vertex.x, vertex.y)) {
-                    // Drawing a line between the two objects' centres,
-                    // move the centre of mySel to extend this line while
-                    // keeping the same angle.
-                    var dx = mySel.x - shape.x,
-                        dy = mySel.y - shape.y,
-                        step = 5;
+        if (typeof mySel.getVertices == 'function') {
+            var vertices = mySel.getVertices();
+            for (var i = 0; i < this.shapes.length; i++) {
+                var shape = this.shapes[i];
+                
+                // Objects are passed by reference in JS, so this comparison is really comparing references.
+                // Identical objects at different memory addresses will not pass this condition.
+                if (shape == mySel) continue;
+                
+                for (var j = 0; j < vertices.length; j++) {
+                    var vertex = vertices[j];
+                    while (shape.contains(vertex.x, vertex.y)) {
+                        // Drawing a line between the two objects' centres,
+                        // move the centre of mySel to extend this line while
+                        // keeping the same angle.
+                        var dx = mySel.x - shape.x,
+                            dy = mySel.y - shape.y,
+                            step = 5;
+                        
+                        // Shortcut so that I don't have to type Math.everything
+                        with (Math) var 
+                            dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                            angle = dx ? atan(dy / dx) : PI/2,
+                            Dx = cos(angle) * dh - dx,
+                            Dy = sin(angle) * dh - dy;
+                        
+                        // Don't let it get pushed off the canvas
+                        // (Push the other shape in that case)
+                        if (mySel.x + Dx > 0 && mySel.x + Dx < this.width)
+                            mySel.x += Dx;
+                        else
+                            shape.x -= Dx;
+                        
+                        if (mySel.y + Dy > 0 && mySel.y + Dy < this.height)
+                            mySel.y += Dy;
+                        else
+                            shape.y -= Dy;
                     
-                    // Shortcut so that I don't have to type Math.everything
-                    with (Math) var 
-                        dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),
-                        angle = dx ? atan(dy / dx) : PI/2,
-                        Dx = cos(angle) * dh - dx,
-                        Dy = sin(angle) * dh - dy;
-                    
-                    // Don't let it get pushed off the canvas
-                    // (Push the other shape in that case)
-                    if (mySel.x + Dx > 0 && mySel.x + Dx < this.width)
-                        mySel.x += Dx;
-                    else
-                        shape.x -= Dx;
-                    
-                    if (mySel.y + Dy > 0 && mySel.y + Dy < this.height)
-                        mySel.y += Dy;
-                    else
-                        shape.y -= Dy;
-                    
-                    vertices = mySel.getVertices();
-                    vertex = vertices[j];
-                    /* Some debug help
-                    if (!moved) {
-                        with(Math) moved = [
-                            floor(dx*10)/10, 
-                            floor(dy*10)/10, 
-                            floor(dh*10)/10, 
-                            angle, 
-                            floor(Dx*10)/10, 
-                            floor(Dy*10)/10
-                        ];
-                    }*/
+                        vertices = mySel.getVertices();
+                        vertex = vertices[j];
+                    }
                 }
-                //if (moved) console.log(moved);
             }
         }
     }
@@ -409,6 +398,7 @@ CanvasState.prototype.draw = function() {
         var ctx = this.ctx;
         var shapes = this.shapes;
         var connectors = this.connectors;
+        var labels = [];
         this.clear();
         
         var draggingFromMethodOut = this.dragging && this.selection 
@@ -430,11 +420,32 @@ CanvasState.prototype.draw = function() {
             }
             
             shapes[i].draw(ctx);
+            
+            // queue label to be drawn after
+            labels.push(shapes[i].getLabel());
         }
 
         // draw all connectors
+        ctx.globalAlpha = 0.7;
         for (i = 0; i < connectors.length; i++) {
             connectors[i].draw(ctx);
+        }
+        ctx.globalAlpha = 1.0;
+
+        // draw all labels
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = '10pt Lato, sans-serif';
+        for (i = 0; i < labels.length; i++) {
+            var l = labels[i],
+                textWidth = ctx.measureText(l.label).width;
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(l.x - textWidth/2 - 2, l.y - 12, textWidth + 4, 16);
+
+            ctx.fillStyle = '#000';
+            ctx.globalAlpha = 1.0;
+            ctx.fillText(l.label, l.x, l.y);
         }
 
         if (this.selection != null) {
@@ -443,6 +454,9 @@ CanvasState.prototype.draw = function() {
             ctx.lineWidth = this.selectionWidth * 2;
             var mySel = this.selection;
             
+            ctx.font = '9pt Lato, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
             mySel.highlight(ctx, this.dragging);
         }
         
