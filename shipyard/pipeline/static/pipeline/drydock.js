@@ -426,7 +426,7 @@ CanvasState.prototype.draw = function() {
         }
 
         // draw all connectors
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 0.85;
         for (i = 0; i < connectors.length; i++) {
             connectors[i].draw(ctx);
         }
@@ -441,7 +441,7 @@ CanvasState.prototype.draw = function() {
                 textWidth = ctx.measureText(l.label).width;
             ctx.fillStyle = '#fff';
             ctx.globalAlpha = 0.4;
-            ctx.fillRect(l.x - textWidth/2 - 2, l.y - 12, textWidth + 4, 16);
+            ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
 
             ctx.fillStyle = '#000';
             ctx.globalAlpha = 1.0;

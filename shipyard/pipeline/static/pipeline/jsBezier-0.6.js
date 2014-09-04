@@ -263,8 +263,8 @@
 				one_minus_t_term = function() { return function(t) { return 1-t; }; },
 				_termFunc = function(terms) {
 					return function(t) {
-						var p = 1;
-						for (var i = 0; i < terms.length; i++) p = p * terms[i](t);
+						for (var i = 0, p = 1; i < terms.length; i++)
+						    p *= terms[i](t);
 						return p;
 					};
 				};
@@ -294,8 +294,8 @@
 		var cc = _getCurveFunctions(curve.length - 1),
 			_x = 0, _y = 0;
 		for (var i = 0; i < curve.length ; i++) {
-			_x = _x + (curve[i].x * cc[i](location));
-			_y = _y + (curve[i].y * cc[i](location));
+			_x += curve[i].x * cc[i](location);
+			_y += curve[i].y * cc[i](location);
 		}
 		
 		return {x:_x, y:_y};
@@ -372,14 +372,20 @@
 	
 	/**
 	 * returns the gradient of the curve at the given location, which is a decimal between 0 and 1 inclusive.
-	 * 
 	 * thanks // http://bimixual.org/AnimationLibrary/beziertangents.html
+	 * 
+	 * 1: this function was using pointOnPath() instead of bezier() to compute the point. 
+	 * this was a bug and did not return the correct angle.
+	 * 2: it was also using the full cubic to compute p1 and a quadratic to compute p2, 
+	 * but it's faster to compute the quadratic for both.
+	 * 3: it was returning Infinity instead of Math.atan(Infinity) ( == 90 degrees).
+	 * -jtn,2014-9-4
 	 */
 	var _gradientAtPoint = function(curve, location) {
-		var p1 = _pointOnPath(curve, location),	
-			p2 = _pointOnPath(curve.slice(0, curve.length - 1), location),
+		var p1 = _bezier(curve.slice(1, curve.length), curve.length-2, location),	
+			p2 = _bezier(curve.slice(0, curve.length - 1), curve.length-2, location),
 			dy = p2.y - p1.y, dx = p2.x - p1.x;
-		return dy == 0 ? Infinity : Math.atan(dy / dx);		
+		return Math.atan(dy ? dy/dx : Infinity);
 	};
 	
 	/**

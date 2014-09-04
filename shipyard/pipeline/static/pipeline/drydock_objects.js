@@ -658,12 +658,23 @@ Connector.prototype.draw = function(ctx) {
     this.dy = this.y - this.fromY;
     
     this.ctrl1 = {
-        x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2,
-        y: this.fromY + Math.max(this.dx, 50) / 2
+        /*
+        - Comes from origin at a 30-degree angle
+        - cos(30) = sqrt(3)/2  &  sin(30) = 0.5
+        - Distance of ctrl from origin is 70% of dx
+        - Minimum dx is 50, so minimum distance of ctrl is 35.
+        */
+        x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
+        y: this.fromY + Math.max(this.dx, 50) / 2 * .7
     };
     this.ctrl2 = {
-        x: this.x,
-        y: this.y - Math.max(this.dy, 50) / 2
+        /*
+        - Vertical offset is 2/3 of dy, or 2/5 of -dy, whichever is positive
+        - Minimum vertical offset is 50
+        - Horizontal offset is 10% of dx
+        */
+        x: this.x - this.dx / 10,
+        y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
     };
     
     this.midX = this.fromX + this.dx / 2;
@@ -704,21 +715,21 @@ Connector.prototype.drawLabel = function(ctx) {
     this.dx = this.x - this.fromX,
     this.dy = this.y - this.fromY;
     
-    if (Math.sqrt(this.dx*this.dx + this.dy*this.dy) * .7 > this.label_width) {
+    if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / .49) {
         // determine the angle of the bezier at the midpoint
-        var connJsb = this.getJsBez(),
-            midpoint = jsBezier.pointOnCurve(connJsb, 0.5),
-            midpointAngle = jsBezier.gradientAtPoint(connJsb, 0.5),
+        var jsb = this.getJsBez(),
+            midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
+            midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
             corner = 6;
-    
+        
         // save the canvas state to start applying transformations
         ctx.save();
-    
+        
         // set the bezier midpoint as the origin
-        ctx.translate(midpoint.x, midpoint.y);
+        ctx.translate(midpoint.point.x, midpoint.point.y);
         ctx.rotate(midpointAngle);
         ctx.fillStyle = '#aaa';
-    
+        
         var x1 = this.label_width/2,
             y1 = 6;
         
@@ -741,6 +752,98 @@ Connector.prototype.drawLabel = function(ctx) {
         ctx.restore();
     }
 }
+
+Connector.prototype.debug = function(ctx) {
+    var jsb = this.getJsBez(),
+        midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
+        midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
+        wrong_midpoint = jsBezier.pointOnCurve(jsb, 0.5);
+    
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(this.ctrl1.x, this.ctrl1.y, 5, 0, 2 * Math.PI, true);
+    ctx.arc(this.ctrl2.x, this.ctrl2.y, 5, 0, 2 * Math.PI, true);
+    ctx.fill();
+    
+    ctx.fillStyle = '#ff0';
+    ctx.beginPath();
+    ctx.arc(wrong_midpoint.x, wrong_midpoint.y, 5, 0, 2 * Math.PI, true);
+    ctx.fill();
+    
+    var atan_bez = function(pts) {
+        var lin_dy = pts[1].y - pts[0].y,
+            lin_dx = pts[1].x - pts[0].x;
+        return Math.atan(lin_dy / lin_dx);
+    };
+    
+    var quadPt = [];
+    ctx.fillStyle = '#600';
+    for (var i=0; i+1 < jsb.length; i++) {
+        var quadMid = {
+            x: (jsb[i+1].x - jsb[i].x) * midpoint.location + jsb[i].x,
+            y: (jsb[i+1].y - jsb[i].y) * midpoint.location + jsb[i].y
+        };
+        quadPt.push(quadMid);
+        ctx.beginPath();
+        ctx.arc(quadMid.x, quadMid.y, 5, 0, 2 * Math.PI, true);
+        ctx.fill();
+    }
+    console.group('quadratic tangents');
+    for (i=0; i < quadPt.length - 1; i++)
+        console.log(atan_bez(quadPt.slice(i, i+2)) * 180/Math.PI);
+    console.groupEnd();
+    
+    var linPt = [];
+    ctx.fillStyle = '#A00';
+    for (i=0; i+1 < quadPt.length; i++) {
+        var linMid = {
+            x: (quadPt[i+1].x - quadPt[i].x) * midpoint.location + quadPt[i].x,
+            y: (quadPt[i+1].y - quadPt[i].y) * midpoint.location + quadPt[i].y
+        };
+        linPt.push(linMid);
+        ctx.beginPath();
+        ctx.arc(linMid.x, linMid.y, 5, 0, 2 * Math.PI, true);
+        ctx.fill();
+    }
+    
+    var pt = [];
+    ctx.fillStyle = '#F00';
+    for (i=0; i+1 < linPt.length; i++) {
+        var mid = {
+            x: (linPt[i+1].x - linPt[i].x) * midpoint.location + linPt[i].x,
+            y: (linPt[i+1].y - linPt[i].y) * midpoint.location + linPt[i].y
+        };
+        pt.push(mid);
+        ctx.beginPath();
+        ctx.arc(mid.x, mid.y, 5, 0, 2 * Math.PI, true);
+        ctx.fill();
+    }
+    
+    var final_tangent = atan_bez(linPt);
+    
+    with(console) {
+        group('linPt');
+            log('linPt[0]: '+ linPt[0].x + ', ' + linPt[0].y);
+            log('linPt[1]: '+ linPt[1].x + ', ' + linPt[1].y);
+        groupEnd();
+    
+        group('connector debug');
+            log('midpoint location: '+ midpoint.location);
+            log('midpoint coord: '+ midpoint.point.x + ', ' + midpoint.point.y);
+            log('jsbez angle: '+ ( midpointAngle * 180/Math.PI) );
+            log('calculated angle: ' + (final_tangent * 180/Math.PI) );
+        groupEnd();
+    }
+    
+    ctx.fillStyle = '#0f0';
+    ctx.beginPath();
+    ctx.arc(midpoint.point.x, midpoint.point.y, 3, 0, 2 * Math.PI, true);
+    ctx.fill();
+};
+
+OutputNode.prototype.debug = function(ctx) {
+    this.in_magnets[0].connected[0].debug(ctx);
+};
 
 Connector.prototype.contains = function(mx, my, pad) {
     // Uses library jsBezier to accomplish certain tasks.
