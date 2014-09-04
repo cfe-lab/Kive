@@ -84,13 +84,6 @@ RawNode.prototype.draw = function(ctx) {
     ctx.fill();
     ctx.globalAlpha = 1.0;
 
-    // draw label
-    ctx.fillStyle = 'black';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
-
     // draw magnet
     out_magnet = this.out_magnets[0];
     out_magnet.x = this.x + this.inset;
@@ -136,6 +129,10 @@ RawNode.prototype.getVertices = function() {
         { x: this.x, y: this.y + this.h/2 + this.r2 },
         { x: this.x, y: this.y - this.h/2 - this.r2 }
     ];
+};
+
+RawNode.prototype.getLabel = function() {
+    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
 };
 
 
@@ -190,13 +187,6 @@ CDtNode.prototype.draw = function(ctx) {
     ctx.globalAlpha = 0.35;
     ctx.fill();
     ctx.globalAlpha = 1.0;
-
-    // draw label
-    ctx.fillStyle = 'black';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 
     // draw magnet
     out_magnet = this.out_magnets[0];
@@ -255,6 +245,10 @@ CDtNode.prototype.contains = function(mx, my) {
     return this.h/2 + this.w/4 - dy > dx / 2 
     // then check the horizontal boundaries on the sides of the hexagon
         && dx < this.w/2;
+};
+
+CDtNode.prototype.getLabel = function() {
+    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
 };
 
 function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
@@ -331,62 +325,9 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
 }
 
 MethodNode.prototype.draw = function(ctx) {
-    // draw rectangle
     ctx.fillStyle = this.fill;
-
-    // experimental draw
-    var cos30 = Math.sqrt(3)/2,
-     // sin30 = 0.5 (this is trivial)
-        magnet_radius = this.in_magnets[0].r, 
-        magnet_margin = 6,
-        y_inputs = this.y - this.stack,
-        x_outputs = this.x + this.scoop * cos30,
-        y_outputs = this.y + this.scoop * .5,
-        dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
-        c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
-        cosdmc = cos30 * dmc,
-        input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
-        output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2; // half of the length of the parallelogram ("half hypoteneuse")
-    
-    ctx.fillStyle = this.fill;
-    
-    var vertices = [
-        { x: this.x + cosdmc - cos30 * input_plane_len, y: y_inputs + (dmc + input_plane_len) / 2 },
-        { x: this.x + cosdmc + cos30 * input_plane_len, y: y_inputs + (dmc - input_plane_len) / 2 },
-        { x: this.x - cosdmc + cos30 * input_plane_len, y: y_inputs - (dmc + input_plane_len) / 2 },
-        { x: this.x - cosdmc - cos30 * input_plane_len, y: y_inputs - (dmc - input_plane_len) / 2 },
-        { x: x_outputs - cos30 * output_plane_len, y: y_outputs + dmc + output_plane_len / 2 },
-        { x: x_outputs + cos30 * output_plane_len, y: y_outputs + dmc - output_plane_len / 2 },
-        { x: x_outputs + cos30 * output_plane_len, y: y_outputs - dmc - output_plane_len / 2 },
-        { x: x_outputs - cos30 * output_plane_len, y: y_outputs - dmc + output_plane_len / 2 }
-    ];
-    
-    if (this.in_magnets.length > this.out_magnets.length) {
-        vertices.push(
-            { x: this.x - cosdmc - cos30 * output_plane_len, y: this.y + (dmc + output_plane_len) / 2 },
-            { x: this.x + cosdmc - cos30 * output_plane_len, y: this.y - (dmc - output_plane_len) / 2 },
-            { x: this.x + cosdmc + cos30 * output_plane_len, y: this.y - (dmc + output_plane_len) / 2 }
-//            { x: this.x + cosdmc - cos30 * output_plane_len, y: this.y + dmc * 1.5 + output_plane_len / 2 },
-//            { x: this.x + cosdmc + cos30 * output_plane_len, y: this.y + dmc * 1.5 - output_plane_len / 2 },
-//            { x: this.x - cosdmc + cos30 * output_plane_len, y: this.y + (dmc - output_plane_len) / 2 },
-//            { x: this.x - cosdmc + cos30 * output_plane_len, y: this.y - dmc * 1.5 - output_plane_len / 2 },
-//            { x: this.x - cosdmc - cos30 * output_plane_len, y: this.y - dmc * 1.5 + output_plane_len / 2 }
-        );
-    } else { 
-        vertices.push(
-            { x: this.x - cosdmc - cos30 * input_plane_len, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
-            { x: this.x + cosdmc - cos30 * input_plane_len, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
-            { x: this.x + cosdmc + cos30 * input_plane_len, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
-//            { x: this.x + cosdmc - cos30 * input_plane_len, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
-//            { x: this.x + cosdmc + cos30 * input_plane_len, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
-//            { x: this.x - cosdmc + cos30 * input_plane_len, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
-//            { x: this.x - cosdmc + cos30 * input_plane_len, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
-//            { x: this.x - cosdmc - cos30 * input_plane_len, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
-        );
-    }
-    
+    var vertices = this.getVertices();
     this.vertices = vertices;
-    
     ctx.beginPath();
     
     // body
@@ -437,6 +378,17 @@ MethodNode.prototype.draw = function(ctx) {
     */
 
     // draw magnets
+    var cos30 = Math.sqrt(3)/2,
+     // sin30 = 0.5 (this is trivial)
+        magnet_margin = 6,
+        y_inputs = this.y - this.stack,
+        x_outputs = this.x + this.scoop * cos30,
+        y_outputs = this.y + this.scoop * .5,
+        c2c = this.in_magnets[0].r * 2 + magnet_margin,
+        ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2;// distance from magnet centre to edge
+
+    this.input_plane_len = ipl;
+    
     for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
         var pos = i - len/2 + .5;
@@ -451,29 +403,22 @@ MethodNode.prototype.draw = function(ctx) {
         magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
     }
-
-    // draw label
-    ctx.fillStyle = '#000';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.scoop/4, this.y - this.stack - input_plane_len/2 - this.offset);
 };
 
 MethodNode.prototype.highlight = function(ctx, dragging) {
     // highlight this node shape
-    var hx, hy;
+    var vertices = this.getVertices();
     ctx.globalCompositeOperation = 'destination-over';
 
     // body
     ctx.beginPath();
-    ctx.moveTo( this.vertices[4].x, this.vertices[4].y );
-    ctx.lineTo( this.vertices[5].x, this.vertices[5].y );
-    ctx.lineTo( this.vertices[6].x, this.vertices[6].y );
-    ctx.bezierCurveTo( this.vertices[10].x, this.vertices[10].y, this.vertices[10].x, this.vertices[10].y, this.vertices[1].x, this.vertices[1].y );
-    ctx.lineTo( this.vertices[2].x, this.vertices[2].y );
-    ctx.lineTo( this.vertices[3].x, this.vertices[3].y );
-    ctx.bezierCurveTo( this.vertices[8].x, this.vertices[8].y, this.vertices[8].x, this.vertices[8].y, this.vertices[4].x, this.vertices[4].y );
+    ctx.moveTo( vertices[4].x, vertices[4].y );
+    ctx.lineTo( vertices[5].x, vertices[5].y );
+    ctx.lineTo( vertices[6].x, vertices[6].y );
+    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+    ctx.lineTo( vertices[2].x, vertices[2].y );
+    ctx.lineTo( vertices[3].x, vertices[3].y );
+    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
     ctx.closePath();
     
     ctx.stroke();
@@ -521,17 +466,63 @@ MethodNode.prototype.contains = function(mx, my) {
 };
 
 MethodNode.prototype.getVertices = function() {
-    // draw a hexagon
-    var wx = this.x + this.w,
-        hy = this.y + this.h;
-    return [
-        { x: this.x,        y: this.y        },
-        { x: wx,            y: this.y        },
-        { x: wx + this.h/4, y: hy - this.h/2 },
-        { x: this.x,        y: hy            },
-        { x: wx,            y: hy            }
+    // experimental draw
+    var cos30 = Math.sqrt(3)/2,
+     // sin30 = 0.5 (this is trivial)
+        magnet_radius = this.in_magnets[0].r, 
+        magnet_margin = 6,
+        ipy = this.y - this.stack,
+        opx = this.x + this.scoop * cos30,
+        opy = this.y + this.scoop * .5,
+        dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
+        c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
+        cosdmc = cos30 * dmc,
+        input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
+        output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2,
+        cosipl = cos30 * input_plane_len,
+        cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
+    
+    var vertices = [
+        { x: this.x + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
+        { x: this.x + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
+        { x: this.x - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
+        { x: this.x - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
+        { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
+        { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
+        { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
+        { x: opx - cosopl, y: opy - dmc + output_plane_len / 2 }
     ];
-}
+    
+    if (this.in_magnets.length > this.out_magnets.length) {
+        vertices.push(
+            { x: this.x - cosdmc - cosopl, y: this.y + (dmc + output_plane_len) / 2 },
+            { x: this.x + cosdmc - cosopl, y: this.y - (dmc - output_plane_len) / 2 },
+            { x: this.x + cosdmc + cosopl, y: this.y - (dmc + output_plane_len) / 2 }
+//            { x: this.x + cosdmc - cosopl, y: this.y + dmc * 1.5 + output_plane_len / 2 },
+//            { x: this.x + cosdmc + cosopl, y: this.y + dmc * 1.5 - output_plane_len / 2 },
+//            { x: this.x - cosdmc + cosopl, y: this.y + (dmc - output_plane_len) / 2 },
+//            { x: this.x - cosdmc + cosopl, y: this.y - dmc * 1.5 - output_plane_len / 2 },
+//            { x: this.x - cosdmc - cosopl, y: this.y - dmc * 1.5 + output_plane_len / 2 }
+        );
+    } else { 
+        vertices.push(
+            { x: this.x - cosdmc - cosipl, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
+            { x: this.x + cosdmc - cosipl, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
+            { x: this.x + cosdmc + cosipl, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
+//            { x: this.x + cosdmc - cosipl, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
+//            { x: this.x + cosdmc + cosipl, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
+//            { x: this.x - cosdmc + cosipl, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
+//            { x: this.x - cosdmc + cosipl, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
+//            { x: this.x - cosdmc - cosipl, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
+        );
+    }
+    
+    return vertices;
+};
+
+MethodNode.prototype.getLabel = function() {
+    return new NodeLabel(this.label, this.x + this.scoop/4, this.y - this.stack - this.input_plane_len/2 - this.offset);
+};
 
 function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     /*
@@ -628,7 +619,6 @@ function Connector (from_x, from_y, out_magnet) {
 
     this.x = this.from_x; // for compatibility with shape-based functions
     this.y = this.from_y;
-    this.midX = this.fromX + (this.x - this.fromX) / 2;
         
 }
 
@@ -639,10 +629,6 @@ Connector.prototype.draw = function(ctx) {
     ctx.strokeStyle = '#aaa';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
-    ctx.fillStyle = '#000';
-    ctx.font = '8pt Lato, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
 
     if (this.source !== null) {
         // update coordinates in case magnet has moved
@@ -659,18 +645,30 @@ Connector.prototype.draw = function(ctx) {
     } else {
         // if connector doesn't have a destination yet,
         // give it the label of the source magnet it's coming from 
-        ctx.fillText(this.source.label, this.x + ctx.lineWidth/2 + 3, this.y);
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = '10pt Lato, sans-serif';
+        ctx.fillText(this.source.label, this.x, this.y + ctx.lineWidth );
     }
     
-    var label_width = ctx.measureText(this.source.label).width + 10;
     this.dx = this.x - this.fromX,
     this.dy = this.y - this.fromY;
+    
+    this.ctrl1 = {
+        x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2,
+        y: this.fromY + Math.max(this.dx, 50) / 2
+    };
+    this.ctrl2 = {
+        x: this.x,
+        y: this.y - Math.max(this.dy, 50) / 2
+    };
     
     this.midX = this.fromX + this.dx / 2;
     
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
-    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
+    ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
     ctx.stroke();
 };
 
@@ -681,7 +679,7 @@ Connector.prototype.highlight = function(ctx) {
      */
     ctx.beginPath();
     ctx.moveTo(this.fromX, this.fromY);
-    ctx.bezierCurveTo(this.midX, this.fromY, this.midX, this.y, this.x, this.y);
+    ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
     ctx.stroke();
     
     if (this.dest !== null) {
@@ -691,14 +689,11 @@ Connector.prototype.highlight = function(ctx) {
 
 // make an object in the format of jsBezier lib
 Connector.prototype.getJsBez = function() {
-    this.dx = this.x - this.fromX,
-    this.midX = this.fromX + this.dx / 2;
-    
     return [
-        { x: this.fromX, y: this.fromY },
-        { x: this.midX,  y: this.fromY },
-        { x: this.midX,  y: this.y     },
-        { x: this.x,     y: this.y     }
+        { x: this.fromX,   y: this.fromY   },
+        { x: this.ctrl1.x, y: this.ctrl1.y },
+        { x: this.ctrl2.x, y: this.ctrl2.y },
+        { x: this.x,       y: this.y       }
     ];
 };
 
@@ -707,16 +702,18 @@ Connector.prototype.drawLabel = function(ctx) {
     this.dx = this.x - this.fromX,
     this.dy = this.y - this.fromY;
     
-    if (Math.sqrt(this.dx*this.dx + this.dy*this.dy)*.7 > this.label_width) {
+    if (Math.sqrt(this.dx*this.dx + this.dy*this.dy) * .7 > this.label_width) {
         // determine the angle of the bezier at the midpoint
-        var midpointAngle = jsBezier.gradientAtPoint(this.getJsBez(), 0.5),
+        var connJsb = this.getJsBez(),
+            midpoint = jsBezier.pointOnCurve(connJsb, 0.5),
+            midpointAngle = jsBezier.gradientAtPoint(connJsb, 0.5),
             corner = 6;
     
         // save the canvas state to start applying transformations
         ctx.save();
     
         // set the bezier midpoint as the origin
-        ctx.translate(this.midX, this.fromY + this.dy/2);
+        ctx.translate(midpoint.x, midpoint.y);
         ctx.rotate(midpointAngle);
         ctx.fillStyle = '#aaa';
     
@@ -736,8 +733,7 @@ Connector.prototype.drawLabel = function(ctx) {
         ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
         ctx.closePath();
         ctx.fill();
-    
-        ctx.textAlign = 'center';
+        
         ctx.fillStyle = 'white';
         ctx.fillText(this.source.label, 0, 0);
         ctx.restore();
@@ -771,16 +767,20 @@ Connector.prototype.contains = function(mx, my, pad) {
         ) {
         // expensive route: run bezier distance algorithm
         return pad > 
-            jsBezier.quickDistFromCurve(
-                mx, my, 
-                this.fromX, this.fromY, 
-                this.midX, 
-                this.x, this.y
+            jsBezier.distanceFromCurve(
+                { x: mx, y: my }, 
+                this.getJsBez()
             ).distance;
     }
     // mx,my is outside the rectangle, don't bother computing the bezier distance
     else return false;
 };
+
+function NodeLabel (label, x, y) {
+    this.label = label || '';
+    this.x = x || 0;
+    this.y = y || 0;
+}
 
 function OutputZone (cw, ch, inset) {
     this.x = cw * .8;
@@ -867,18 +867,11 @@ OutputNode.prototype.draw = function(ctx) {
     ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
     ctx.fill();
     ctx.globalAlpha = 1.0;
-
-    // draw label
-    ctx.fillStyle = 'black';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
-
+    
     // draw magnet
     in_magnet = this.in_magnets[0];
     in_magnet.x = this.x - this.inset;
-    in_magnet.y = this.y + this.r2/2;
+    in_magnet.y = this.y - this.h/2;
     in_magnet.draw(ctx);
 };
 
@@ -926,4 +919,8 @@ OutputNode.prototype.getVertices = function() {
         { x: this.x, y: this.y + this.h/2 + this.r2 },
         { x: this.x, y: this.y - this.h/2 - this.r2 }
     ];
+};
+
+OutputNode.prototype.getLabel = function() {
+    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
 };

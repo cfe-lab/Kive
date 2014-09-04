@@ -267,7 +267,7 @@ CanvasState.prototype.doUp = function(e) {
                         mySel.x += Dx;
                         mySel.y += Dy;
                         vertices = mySel.getVertices();
-                        vertex = vertices[j]
+                        vertex = vertices[j];
                     }
                 }
             }
@@ -383,6 +383,7 @@ CanvasState.prototype.draw = function() {
         var ctx = this.ctx;
         var shapes = this.shapes;
         var connectors = this.connectors;
+        var labels = [];
         this.clear();
         
         var draggingFromMethodOut = this.dragging && this.selection 
@@ -404,11 +405,32 @@ CanvasState.prototype.draw = function() {
             }
             
             shapes[i].draw(ctx);
+            
+            // queue label to be drawn after
+            labels.push(shapes[i].getLabel());
         }
 
         // draw all connectors
+        ctx.globalAlpha = 0.7;
         for (i = 0; i < connectors.length; i++) {
             connectors[i].draw(ctx);
+        }
+        ctx.globalAlpha = 1.0;
+
+        // draw all labels
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = '10pt Lato, sans-serif';
+        for (i = 0; i < labels.length; i++) {
+            var l = labels[i],
+                textWidth = ctx.measureText(l.label).width;
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(l.x - textWidth/2 - 2, l.y - 12, textWidth + 4, 16);
+
+            ctx.fillStyle = '#000';
+            ctx.globalAlpha = 1.0;
+            ctx.fillText(l.label, l.x, l.y);
         }
 
         if (this.selection != null) {
@@ -417,6 +439,8 @@ CanvasState.prototype.draw = function() {
             ctx.lineWidth = this.selectionWidth * 2;
             var mySel = this.selection;
             
+            ctx.font = '9pt Lato, sans-serif';
+            ctx.textBaseline = 'middle';
             mySel.highlight(ctx, this.dragging);
         }
         
