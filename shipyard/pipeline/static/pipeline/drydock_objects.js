@@ -126,6 +126,7 @@ RawNode.prototype.getVertices = function() {
         y2 = y1 - this.h;
     
     return [
+    { x: this.x, y: this.y },
         { x: x1, y: y1 },
         { x: x2, y: y1 },
         { x: x1, y: y2 },
@@ -208,6 +209,7 @@ CDtNode.prototype.getVertices = function() {
         cap  = this.y - this.h/2;
     
     return [
+    { x: this.x,      y: this.y },
         { x: this.x - w2, y: butt },
         { x: this.x,      y: butt + w2/2 },
         { x: this.x + w2, y: butt },
@@ -331,33 +333,33 @@ MethodNode.prototype.draw = function(ctx) {
     // draw a hexagon
     var hx, hy;
     ctx.beginPath();
-    ctx.moveTo(hx = this.x, hy = this.y);
+    ctx.moveTo(hx = this.x - this.w/2, hy = this.y - this.h/2);
     ctx.lineTo(hx += this.w, hy);
     ctx.lineTo(hx += this.h/4, hy += this.h/2);
     ctx.lineTo(hx -= this.h/4, hy += this.h/2);
-    ctx.lineTo(hx = this.x, hy);
+    ctx.lineTo(hx -= this.w, hy);
     ctx.closePath();
     ctx.fill();
 
     // draw magnets
     for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
-        magnet.x = this.x + this.inset;
+        magnet.x = this.x - this.w/2 + this.inset;
         if (len == 1) {
             // Special case if there's only 1 input (or output).
-            // I may rethink this later. —JN
+            // I may rethink this later. -JN
             magnet.x -= this.h * .1;
         }
-        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        magnet.y = this.y + this.spacing * (i - len/2 + .5);
         magnet.draw(ctx);
     }
     for (i = 0, len = this.out_magnets.length; i < len; i++) {
         magnet = this.out_magnets[i];
-        magnet.x = this.x + this.w - this.inset;
+        magnet.x = this.x + this.w/2 - this.inset;
         if (len == 1) {
             magnet.x += this.h * .1;
         }
-        magnet.y = this.y + this.h/2 + this.spacing * (i - len/2 + .5);
+        magnet.y = this.y + this.spacing * (i - len/2 + .5);
         magnet.draw(ctx);
     }
 
@@ -366,7 +368,7 @@ MethodNode.prototype.draw = function(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.font = '10pt Lato, sans-serif';
-    ctx.fillText(this.label, this.x + this.w / 2, this.y - this.offset);
+    ctx.fillText(this.label, this.x, this.y - this.h/2 - this.offset);
 };
 
 MethodNode.prototype.highlight = function(ctx, dragging) {
@@ -374,11 +376,11 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
     var hx, hy;
     ctx.globalCompositeOperation = 'destination-over';
     ctx.beginPath();
-    ctx.moveTo(hx = this.x, hy = this.y);
+    ctx.moveTo(hx = this.x - this.w/2, hy = this.y - this.h/2);
     ctx.lineTo(hx += this.w, hy);
     ctx.lineTo(hx += this.h/4, hy += this.h/2);
     ctx.lineTo(hx -= this.h/4, hy += this.h/2);
-    ctx.lineTo(hx = this.x, hy);
+    ctx.lineTo(hx -= this.w, hy);
     ctx.closePath();
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
@@ -413,10 +415,27 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
 }
 
 MethodNode.prototype.contains = function(mx, my) {
-    return this.x <= mx 
-        && this.x + this.w >= mx 
-        && this.y <= my 
-        && this.y + this.h >= my;
+    return this.x - this.w/2 <= mx 
+        && this.x + this.w/2 >= mx 
+        && this.y - this.h/2 <= my 
+        && this.y + this.h/2 >= my;
+};
+
+MethodNode.prototype.getVertices = function() {
+    var y1 = this.y - this.h/2,
+        y2 = y1 + this.h,
+        x1 = this.x - this.w/2,
+        x2 = x1 + this.w,
+        x3 = this.x;
+    
+    return [
+        { x: x1, y: y1 },
+        { x: x1, y: y2 },
+        { x: x2, y: y1 },
+        { x: x2, y: y2 },
+        { x: x3, y: y1 },
+        { x: x3, y: y2 }
+    ];
 };
 
 function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
@@ -774,6 +793,23 @@ OutputNode.prototype.contains = function(mx, my) {
         && Math.abs(my - this.y) < this.h/2
         || Geometry.inEllipse(mx, my, this.x, this.y - this.h/2, this.r, this.r2)
         || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
+};
+
+OutputNode.prototype.getVertices = function() {
+    var x1 = this.x + this.r,
+        x2 = this.x - this.r,
+        y1 = this.y + this.h/2,
+        y2 = y1 - this.h;
+    
+    return [
+    { x: this.x, y: this.y },
+        { x: x1, y: y1 },
+        { x: x2, y: y1 },
+        { x: x1, y: y2 },
+        { x: x2, y: y2 },
+        { x: this.x, y: this.y + this.h/2 + this.r2 },
+        { x: this.x, y: this.y - this.h/2 - this.r2 }
+    ];
 };
 
 OutputNode.prototype.highlight = function(ctx) {

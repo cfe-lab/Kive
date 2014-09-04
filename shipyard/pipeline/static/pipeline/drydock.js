@@ -239,37 +239,63 @@ CanvasState.prototype.doUp = function(e) {
     var mouse = this.getPos(e);
     var index;
     
-    if (this.dragging && this.selection != null) {
+    // Collision detection!
+    if (this.dragging && this.selection != null && this.selection.constructor != Connector) {
         mySel = this.selection;
-        if (mySel.constructor == CDtNode
-            || mySel.constructor == RawNode) {
-            var vertices = mySel.getVertices();
-            for (var i = 0; i < this.shapes.length; i++) {
-                var shape = this.shapes[i];
-                
-                // Objects are passed by reference in JS, so this comparison is really comparing references.
-                if (shape == mySel) continue;
-                
-                for (var j = 0; j < vertices.length; j++) {
-                    var vertex = vertices[j];
-                    while (shape.contains(vertex.x, vertex.y)) {
-                        var dx = mySel.x - shape.x,
-                            dy = mySel.y - shape.y,
-                            step = 5;
-                        
-                        // Shortcut so that I don't have to type Math.everything
-                        with (Math) var 
-                            dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
-                            theta = atan(dy / dx),
-                            Dx = cos(theta) * dh - dx,
-                            Dy = sin(theta) * dh - dy;
-                        
+        
+        var vertices = mySel.getVertices();
+        for (var i = 0; i < this.shapes.length; i++) {
+            var shape = this.shapes[i];
+            
+            // Objects are passed by reference in JS, so this comparison is really comparing references.
+            // Identical objects at different memory addresses will return false here.
+            if (shape == mySel) continue;
+            
+            for (var j = 0; j < vertices.length; j++) {
+                var vertex = vertices[j];
+                var moved = false;
+                while (shape.contains(vertex.x, vertex.y)) {
+                    // Drawing a line between the two objects' centres,
+                    // move the centre of mySel to extend this line while
+                    // keeping the same angle.
+                    var dx = mySel.x - shape.x,
+                        dy = mySel.y - shape.y,
+                        step = 5;
+                    
+                    // Shortcut so that I don't have to type Math.everything
+                    with (Math) var 
+                        dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),
+                        angle = dx ? atan(dy / dx) : PI/2,
+                        Dx = cos(angle) * dh - dx,
+                        Dy = sin(angle) * dh - dy;
+                    
+                    // Don't let it get pushed off the canvas
+                    // (Push the other shape in that case)
+                    if (mySel.x + Dx > 0 && mySel.x + Dx < this.width)
                         mySel.x += Dx;
+                    else
+                        shape.x -= Dx;
+                    
+                    if (mySel.y + Dy > 0 && mySel.y + Dy < this.height)
                         mySel.y += Dy;
-                        vertices = mySel.getVertices();
-                        vertex = vertices[j]
-                    }
+                    else
+                        shape.y -= Dy;
+                    
+                    vertices = mySel.getVertices();
+                    vertex = vertices[j];
+                    /* Some debug help
+                    if (!moved) {
+                        with(Math) moved = [
+                            floor(dx*10)/10, 
+                            floor(dy*10)/10, 
+                            floor(dh*10)/10, 
+                            angle, 
+                            floor(Dx*10)/10, 
+                            floor(Dy*10)/10
+                        ];
+                    }*/
                 }
+                //if (moved) console.log(moved);
             }
         }
     }
