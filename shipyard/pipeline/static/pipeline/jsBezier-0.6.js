@@ -378,14 +378,14 @@
 	 * this was a bug and did not return the correct angle.
 	 * 2: it was also using the full cubic to compute p1 and a quadratic to compute p2, 
 	 * but it's faster to compute the quadratic for both.
-	 * 3: it was returning Infinity instead of Math.atan(Infinity) ( == 90 degrees).
+	 * 3: it was returning Infinity instead of Math.atan(Infinity) ( == pi/2).
 	 * -jtn,2014-9-4
 	 */
 	var _gradientAtPoint = function(curve, location) {
 		var p1 = _bezier(curve.slice(1, curve.length), curve.length-2, location),	
 			p2 = _bezier(curve.slice(0, curve.length - 1), curve.length-2, location),
 			dy = p2.y - p1.y, dx = p2.x - p1.x;
-		return Math.atan(dy ? dy/dx : Infinity);
+		return dy ? Math.atan(dy/dx) : Math.PI/2;
 	};
 	
 	/**

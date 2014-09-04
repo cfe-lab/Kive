@@ -29,6 +29,9 @@
             } else {
                 canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width, node.y * canvas.height, null, null, null, null, null, node.dataset_name));
             }
+            canvasState.dragging = true;
+            canvasState.selection = canvasState.shapes[canvasState.shapes.length-1];
+            canvasState.doUp();
         }
         draw_steps(pipeline, pipeline_inputs.length);
     }
@@ -151,10 +154,10 @@
 
         // if double-click on MethodNode, open Methods menu with this node's info
         canvasState.doDblClick = function(e) {
-            var pos = this.getPos(e);
-            var mx = pos.x;
-            var my = pos.y;
-            var shape;
+            var pos = this.getPos(e),
+                mx = pos.x,
+                my = pos.y,
+                shape;
             for (var i = 0; i < canvasState.shapes.length; i++) {
                 shape = canvasState.shapes[i];
                 if (shape.constructor == MethodNode && shape.contains(mx, my)) {
@@ -187,6 +190,10 @@
                     var node, cables, cable, connector, shape, source, magnet;
 
                     draw_inputs(result);
+                    
+                    for (var i = 0; i < canvasState.shapes.length; i++) {
+                        canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                    }
                 }
             })}).change();
     })

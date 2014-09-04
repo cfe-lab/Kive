@@ -202,7 +202,7 @@ CDtNode.prototype.getVertices = function() {
         cap  = this.y - this.h/2;
     
     return [
-    { x: this.x,      y: this.y },
+        { x: this.x,      y: this.y },
         { x: this.x - w2, y: butt },
         { x: this.x,      y: butt + w2/2 },
         { x: this.x + w2, y: butt },
@@ -460,11 +460,12 @@ MethodNode.prototype.contains = function(mx, my) {
     @todo
     Make this check more precise.
     */
-    return mx < this.vertices[6].x && mx > this.vertices[3].x
-        && !Geometry.ltLine(mx, my, this.vertices[1].x, this.vertices[1].y, this.vertices[2].x, this.vertices[2].y)
-        && !Geometry.ltLine(mx, my, this.vertices[3].x, this.vertices[3].y, this.vertices[2].x, this.vertices[2].y)
-        &&  Geometry.ltLine(mx, my, this.vertices[4].x, this.vertices[4].y, this.vertices[5].x, this.vertices[5].y)
-        &&  Geometry.ltLine(mx, my, this.vertices[4].x, this.vertices[4].y, this.vertices[8].x, this.vertices[8].y);
+    var vertices = this.getVertices();
+    return mx < vertices[6].x && mx > vertices[3].x
+        && !Geometry.ltLine(mx, my, vertices[1].x, vertices[1].y, vertices[2].x, vertices[2].y)
+        && !Geometry.ltLine(mx, my, vertices[3].x, vertices[3].y, vertices[2].x, vertices[2].y)
+        &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[5].x, vertices[5].y)
+        &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[8].x, vertices[8].y);
 };
 
 MethodNode.prototype.getVertices = function() {
@@ -473,53 +474,62 @@ MethodNode.prototype.getVertices = function() {
      // sin30 = 0.5 (this is trivial)
         magnet_radius = this.in_magnets[0].r, 
         magnet_margin = 6,
-        ipy = this.y - this.stack,
-        opx = this.x + this.scoop * cos30,
-        opy = this.y + this.scoop * .5,
         dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
         c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
         cosdmc = cos30 * dmc,
+        ipy = this.y - this.stack,
         input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
-        output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2,
-        cosipl = cos30 * input_plane_len,
-        cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
+        cosipl = cos30 * input_plane_len;
     
-    var vertices = [
-        { x: this.x + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
-        { x: this.x + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
-        { x: this.x - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
-        { x: this.x - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
-        { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
-        { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
-        { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
-        { x: opx - cosopl, y: opy - dmc + output_plane_len / 2 }
-    ];
+    if (typeof this.vertices == 'undefined' 
+        || this.vertices[1].x != this.x + cosdmc + cosipl 
+        || this.vertices[1].y != ipy + (dmc - input_plane_len) / 2
+        ) {
+        
+        var opx = this.x + this.scoop * cos30,
+            opy = this.y + this.scoop * .5,
+            output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2,
+            cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
     
-    if (this.in_magnets.length > this.out_magnets.length) {
-        vertices.push(
-            { x: this.x - cosdmc - cosopl, y: this.y + (dmc + output_plane_len) / 2 },
-            { x: this.x + cosdmc - cosopl, y: this.y - (dmc - output_plane_len) / 2 },
-            { x: this.x + cosdmc + cosopl, y: this.y - (dmc + output_plane_len) / 2 }
-//            { x: this.x + cosdmc - cosopl, y: this.y + dmc * 1.5 + output_plane_len / 2 },
-//            { x: this.x + cosdmc + cosopl, y: this.y + dmc * 1.5 - output_plane_len / 2 },
-//            { x: this.x - cosdmc + cosopl, y: this.y + (dmc - output_plane_len) / 2 },
-//            { x: this.x - cosdmc + cosopl, y: this.y - dmc * 1.5 - output_plane_len / 2 },
-//            { x: this.x - cosdmc - cosopl, y: this.y - dmc * 1.5 + output_plane_len / 2 }
-        );
-    } else { 
-        vertices.push(
-            { x: this.x - cosdmc - cosipl, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
-            { x: this.x + cosdmc - cosipl, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
-            { x: this.x + cosdmc + cosipl, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
-//            { x: this.x + cosdmc - cosipl, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
-//            { x: this.x + cosdmc + cosipl, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
-//            { x: this.x - cosdmc + cosipl, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
-//            { x: this.x - cosdmc + cosipl, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
-//            { x: this.x - cosdmc - cosipl, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
-        );
+        var vertices = [
+            { x: this.x + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
+            { x: this.x + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
+            { x: this.x - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
+            { x: this.x - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
+            { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
+            { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
+            { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
+            { x: opx - cosopl, y: opy - dmc + output_plane_len / 2 }
+        ];
+    
+        if (this.in_magnets.length > this.out_magnets.length) {
+            vertices.push(
+                { x: this.x - cosdmc - cosopl, y: this.y + (dmc + output_plane_len) / 2 },
+                { x: this.x + cosdmc - cosopl, y: this.y - (dmc - output_plane_len) / 2 },
+                { x: this.x + cosdmc + cosopl, y: this.y - (dmc + output_plane_len) / 2 }
+    //            { x: this.x + cosdmc - cosopl, y: this.y + dmc * 1.5 + output_plane_len / 2 },
+    //            { x: this.x + cosdmc + cosopl, y: this.y + dmc * 1.5 - output_plane_len / 2 },
+    //            { x: this.x - cosdmc + cosopl, y: this.y + (dmc - output_plane_len) / 2 },
+    //            { x: this.x - cosdmc + cosopl, y: this.y - dmc * 1.5 - output_plane_len / 2 },
+    //            { x: this.x - cosdmc - cosopl, y: this.y - dmc * 1.5 + output_plane_len / 2 }
+            );
+        } else { 
+            vertices.push(
+                { x: this.x - cosdmc - cosipl, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
+                { x: this.x + cosdmc - cosipl, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
+                { x: this.x + cosdmc + cosipl, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
+    //            { x: this.x + cosdmc - cosipl, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
+    //            { x: this.x + cosdmc + cosipl, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
+    //            { x: this.x - cosdmc + cosipl, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
+    //            { x: this.x - cosdmc + cosipl, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
+    //            { x: this.x - cosdmc - cosipl, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
+            );
+        }
+        
+        this.vertices = vertices;
     }
     
-    return vertices;
+    return this.vertices;
 };
 
 MethodNode.prototype.getLabel = function() {

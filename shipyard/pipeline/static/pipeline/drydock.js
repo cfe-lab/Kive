@@ -44,6 +44,8 @@ function CanvasState (canvas) {
     this.selection = null; // reference to active (selected) object
     this.dragoffx = 0; // where in the object we clicked
     this.dragoffy = 0;
+    
+    this.collisions = 0;
 
     // events
     
@@ -234,9 +236,120 @@ CanvasState.prototype.doMove = function(e) {
     }
 };
 
+CanvasState.prototype.scaleToCanvas = function() {
+    var xmax = 0, xmin = 999999,
+        ymax = 0, ymin = 999999,
+        xmargin = Math.min(this.width  * .12, 100),
+        ymargin = Math.min(this.height * .12, 100);
+    
+    for (var i = 0; i < this.shapes.length; i++) {
+        var shape = this.shapes[i];
+        if (shape.x > xmax) xmax = shape.x;
+        if (shape.x < xmin) xmin = shape.x;
+        if (shape.y > ymax) ymax = shape.y;
+        if (shape.y < ymin) ymin = shape.y;
+    }
+    
+    var offset = {
+            x: xmin - xmargin,
+            y: ymin - ymargin
+        },
+        scale = {
+            x: (this.width  - xmargin * 2) / (xmax - xmin),
+            y: (this.height - ymargin * 2) / (ymax - ymin)
+        };
+    
+    for (i = 0; i < this.shapes.length; i++) {
+        shape = this.shapes[i];
+        shape.x = (shape.x - xmin) * scale.x + xmargin;
+        shape.y = (shape.y - ymin) * scale.y + ymargin;
+    }
+};
+
+CanvasState.prototype.detectCollisions = function(myShape, bias = 0.75) {
+    var followups = [],
+        vertices = myShape.getVertices();
+    
+    for (var i = 0; i < this.shapes.length; i++) {
+        var shape = this.shapes[i];
+    
+        // Objects are passed by reference in JS, so this comparison is really comparing references.
+        // Identical objects at different memory addresses will not pass this condition.
+        if (shape == myShape) continue;
+    
+        for (var j = 0; j < vertices.length; j++) {
+            var vertex = vertices[j];
+            while (shape.contains(vertex.x, vertex.y)) {
+                if (i != -1) this.collisions++;
+                i = -1;
+                followups.push(shape);
+                
+                // Drawing a line between the two objects' centres, move the centre 
+                // of mySel to extend this line while keeping the same angle.
+                var dx = myShape.x - shape.x,
+                    dy = myShape.y - shape.y,
+                    step = 5;
+            
+                // Shortcut so that I don't have to type Math.everything
+                with (Math) var 
+                    dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                    angle = dx ? atan(dy / dx) : PI/2,
+                    Dx = cos(angle) * dh - dx,
+                    Dy = sin(angle) * dh - dy;
+                
+                myShape.x += Dx * bias;
+                shape.x   -= Dx * (1 - bias);
+                
+                if (myShape.x > canvas.width) {
+                    shape.x -= myShape.x - canvas.width;
+                    myShape.x = canvas.width;
+                }
+                if (myShape.x < 0) {
+                    shape.x -= myShape.x;
+                    myShape.x = 0;
+                }
+                if (shape.x > canvas.width) {
+                    myShape.x -= shape.x - canvas.width;
+                    shape.x = canvas.width;
+                }
+                if (shape.x < 0) {
+                    myShape.x += shape.x;
+                    shape.x = 0;
+                }
+                
+                myShape.y += Dy * bias;
+                shape.y   -= Dy * (1 - bias);
+                
+                if (myShape.y > canvas.height) {
+                    shape.y -= myShape.y - canvas.height;
+                    myShape.y = canvas.height;
+                }
+                if (myShape.y < 0) {
+                    shape.y -= -myShape.y;
+                    myShape.y = 0;
+                }
+                if (shape.y > canvas.height) {
+                    myShape.y += shape.y - canvas.height;
+                    shape.y = canvas.height;
+                }
+                if (shape.y < 0) {
+                    myShape.y += -shape.y;
+                    shape.y = 0;
+                }
+        
+                vertices = myShape.getVertices();
+                vertex = vertices[j];
+            }
+        }
+    }
+    
+    for (i = 0; i < followups.length; i++) {
+        this.detectCollisions(followups[i], bias);
+    }
+}
+
 CanvasState.prototype.doUp = function(e) {
     this.valid = false;
-    var mouse = this.getPos(e);
     var index;
     
     // Collision detection!
@@ -244,48 +357,7 @@ CanvasState.prototype.doUp = function(e) {
         mySel = this.selection;
         
         if (typeof mySel.getVertices == 'function') {
-            var vertices = mySel.getVertices();
-            for (var i = 0; i < this.shapes.length; i++) {
-                var shape = this.shapes[i];
-                
-                // Objects are passed by reference in JS, so this comparison is really comparing references.
-                // Identical objects at different memory addresses will not pass this condition.
-                if (shape == mySel) continue;
-                
-                for (var j = 0; j < vertices.length; j++) {
-                    var vertex = vertices[j];
-                    while (shape.contains(vertex.x, vertex.y)) {
-                        // Drawing a line between the two objects' centres,
-                        // move the centre of mySel to extend this line while
-                        // keeping the same angle.
-                        var dx = mySel.x - shape.x,
-                            dy = mySel.y - shape.y,
-                            step = 5;
-                        
-                        // Shortcut so that I don't have to type Math.everything
-                        with (Math) var 
-                            dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
-                            angle = dx ? atan(dy / dx) : PI/2,
-                            Dx = cos(angle) * dh - dx,
-                            Dy = sin(angle) * dh - dy;
-                        
-                        // Don't let it get pushed off the canvas
-                        // (Push the other shape in that case)
-                        if (mySel.x + Dx > 0 && mySel.x + Dx < this.width)
-                            mySel.x += Dx;
-                        else
-                            shape.x -= Dx;
-                        
-                        if (mySel.y + Dy > 0 && mySel.y + Dy < this.height)
-                            mySel.y += Dy;
-                        else
-                            shape.y -= Dy;
-                    
-                        vertices = mySel.getVertices();
-                        vertex = vertices[j];
-                    }
-                }
-            }
+            this.detectCollisions(mySel);
         }
     }
     
@@ -297,7 +369,7 @@ CanvasState.prototype.doUp = function(e) {
 
     // are we carrying a Connector?
     if (this.selection.constructor != Connector) {
-        if (this.outputZone.contains(mouse.x, mouse.y)) {
+        if (this.outputZone.contains(this.selection.x, this.selection.y)) {
             // Shape dragged into output zone
             this.selection.x = this.outputZone.x - this.selection.w;
         }
@@ -309,7 +381,7 @@ CanvasState.prototype.doUp = function(e) {
     if (connector.dest === null) {
         // connector not yet linked to anything
 
-        if (this.outputZone.contains(mouse.x, mouse.y)) {
+        if (this.outputZone.contains(connector.x, connector.y)) {
             // Connector drawn into output zone
             if (connector.source.parent.constructor !== MethodNode) {
                 // disallow Connectors from data node directly to end-zone
@@ -320,7 +392,7 @@ CanvasState.prototype.doUp = function(e) {
             } else {
                 // valid Connector, assign non-null value
                 
-                var outNode = new OutputNode(mouse.x, mouse.y, null, null, '#d40', null, null, connector.source.label);
+                var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, connector.source.label);
                 this.addShape(outNode);
                 
                 connector.dest = outNode.in_magnets[0];
@@ -328,15 +400,15 @@ CanvasState.prototype.doUp = function(e) {
                 connector.source.connected.push(connector);
                 
                 outNode.y = this.outputZone.y + this.outputZone.h + outNode.h/2 + outNode.r2;// push out of output zone
-                outNode.x = mouse.x;
+                outNode.x = connector.x;
                 this.valid = false;
 
                 // spawn dialog for output label
                 var dialog = document.getElementById("dialog_form");
                 
                 $(dialog).data('node', outNode).show().css({
-                    left: Math.min(mouse.x, this.outputZone.x + this.outputZone.w/2 - dialog.offsetWidth/2 ) + this.pos_x,
-                    top:  Math.min(mouse.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
+                    left: Math.min(connector.x, this.outputZone.x + this.outputZone.w/2 - dialog.offsetWidth/2 ) + this.pos_x,
+                    top:  Math.min(connector.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
                 });
                 
                 $('#output_name', dialog).val(connector.source.label).select(); // default value;
@@ -459,6 +531,13 @@ CanvasState.prototype.draw = function() {
             ctx.textAlign = 'center';
             mySel.highlight(ctx, this.dragging);
         }
+        
+        ctx.font = '8pt Lato, sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#888';
+        ctx.globalAlpha = 1.0;
+        ctx.fillText(this.collisions, 5, 5);
         
         this.valid = true;
     }
