@@ -48,6 +48,39 @@ jQuery.fn.extend({
             else this.removeClass('input-label');
         }
         return this;
+    },
+    draggable: function(opt) {
+        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
+        var $el = opt.handle === '' ? this : this.find(opt.handle);
+        
+        $el.find('input, select, textarea').on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+        
+        return $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            var $drag = opt.handle === "" ?
+                $(this).addClass('draggable') :
+                $(this).addClass('active-handle').parent().addClass('draggable');
+            
+            var z = $drag.css('z-index'),
+                pos = $drag.offset(),
+                pos_y = pos.top - e.pageY,
+                pos_x = pos.left - e.pageX;
+            $drag.css('z-index', 1000).parents().on("mousemove", function(e) {
+                $('.draggable').offset({
+                    top:  e.pageY + pos_y,
+                    left: e.pageX + pos_x
+                }).on("mouseup", function() {
+                    $(this).removeClass('draggable').css('z-index', z);
+                });
+            });
+            e.preventDefault(); // disable selection
+        }).on("mouseup", function() {
+            opt.handle === "" 
+                && $(this).removeClass('draggable')
+                || $(this).removeClass('active-handle').parent().removeClass('draggable');
+        });
+
     }
 });
 
@@ -172,7 +205,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     $('li', 'ul#id_ctrl_nav').on('click', function(e) {
         var $this = $(this),
-            menu = $($this.data('rel'));
+            menu = $($this.data('rel')).draggable();
 
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
@@ -191,8 +224,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 preview_canvas = preview_canvas[0];
             }
             
-            var node_preview = new RawNode(preview_canvas.width/2, preview_canvas.height/2, null, null, null, null, null, '');
-            node_preview.draw(preview_canvas.getContext('2d'));
+            $('#id_select_cdt').change();
         }
         
         for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
@@ -219,27 +251,59 @@ $(function() { // wait for page to finish loading before executing jQuery code
         canvasState.connectors.pop();
         canvasState.valid = false;
     });
-
+    
+    $('#id_select_cdt').on('change', function() {
+        // Update preview picture of node to show a CDtNode or RawNode appropriately
+        var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
+            val = $(this).val();
+        if (preview_canvas.length) {
+            preview_canvas = preview_canvas[0];
+            var ctx = preview_canvas.getContext('2d');
+            ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+            if (val === '') {
+                (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+            } else {
+                (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+            }
+        }
+    });
+    
     // Handle 'Inputs' menu
     $('form','#id_input_ctrl').on('submit', function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
-        var choice = $('#id_select_cdt option:selected', this);
-        var node_label = $('#id_datatype_name', this).val();
-
+        var node_label = $('#id_datatype_name', this).val(),
+            pos,
+            dlg = $(this).closest('.modal_dialog'),
+            preview_canvas = dlg.find('canvas');
+        
+        if (dlg.length) {
+            pos = preview_canvas.offset();
+            pos.left += preview_canvas[0].width/2  - canvas.offsetLeft;
+            pos.top  += preview_canvas[0].height/2 - canvas.offsetTop;
+        } else {
+            pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
+        }
+        
         if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error', this)[0].innerHTML = "Label is required";
         }
         else {
             $('#id_dt_error', this)[0].innerHTML = "";
-            var this_pk = choice.val(); // primary key
+            var this_pk = $('#id_select_cdt', this).val(), // primary key
+                shape;
+            
             if (this_pk == ""){
-                canvasState.addShape(new RawNode(         100, 200 + Math.round(50 * Math.random()), null, null, null, null, null, node_label));
+                canvasState.addShape(shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label));
             } else {
-                canvasState.addShape(new CDtNode(this_pk, 100, 200 + Math.round(50 * Math.random()), null, null, null, null, null, node_label));
+                canvasState.addShape(shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label));
             }
-            $('#id_datatype_name').val("");  // reset text field
+            
+            canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
+            $('#id_datatype_name').val('');  // reset text field
+            
+            dlg.removeClass('modal_dialog').hide();
         }
     });
 
@@ -250,8 +314,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         var method_name = $('#id_method_name', this),
             method_error = $('#id_method_error', this),
             method_family = $('#id_select_method_family', this),
-            method = $('#id_select_method', this);
-        var mid = method.val(); // pk of method
+            method = $('#id_select_method', this),
+            mid = method.val(); // pk of method
 
         if (mid === undefined || method_family.val() == '') {
             method_error[0].innerHTML = "Select a Method";

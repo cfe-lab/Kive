@@ -237,38 +237,63 @@ CanvasState.prototype.doMove = function(e) {
 };
 
 CanvasState.prototype.scaleToCanvas = function() {
-    var xmax = 0, xmin = 999999,
-        ymax = 0, ymin = 999999,
-        xmargin = Math.min(this.width  * .12, 100),
-        ymargin = Math.min(this.height * .12, 100);
-    
-    for (var i = 0; i < this.shapes.length; i++) {
-        var shape = this.shapes[i];
-        if (shape.x > xmax) xmax = shape.x;
-        if (shape.x < xmin) xmin = shape.x;
-        if (shape.y > ymax) ymax = shape.y;
-        if (shape.y < ymin) ymin = shape.y;
+    var x_ar = [], y_ar = [];
+    for (var i in this.shapes) {
+        x_ar.push(this.shapes[i].x);
+        y_ar.push(this.shapes[i].y);
     }
     
-    var offset = {
-            x: xmin - xmargin,
-            y: ymin - ymargin
+    with (Math) var
+        xmin = min.apply(null, x_ar),
+        ymin = min.apply(null, y_ar),
+        width = max.apply(null, x_ar) - xmin,
+        height = max.apply(null, y_ar) - ymin,
+        margin = {
+            x: min(this.width  * .15, 100),
+            y: min(this.height * .15, 100)
+        },
+        offset = {
+            x: xmin - margin.x,
+            y: ymin - margin.y
         },
         scale = {
-            x: (this.width  - xmargin * 2) / (xmax - xmin),
-            y: (this.height - ymargin * 2) / (ymax - ymin)
-        };
+            x: (this.width  - margin.x * 2) / width,
+            y: (this.height - margin.y * 2) / height
+        }, shape;
     
     for (i = 0; i < this.shapes.length; i++) {
         shape = this.shapes[i];
-        shape.x = (shape.x - xmin) * scale.x + xmargin;
-        shape.y = (shape.y - ymin) * scale.y + ymargin;
+        shape.x = (shape.x - xmin) * scale.x + margin.x;
+        shape.y = (shape.y - ymin) * scale.y + margin.y;
     }
+    
+    this.valid = false;
 };
 
-CanvasState.prototype.detectCollisions = function(myShape, bias = 0.75) {
+CanvasState.prototype.centreCanvas = function() {
+    var x_ar = [], y_ar = [], sh = this.shapes, i;
+    for (i in sh) {
+        x_ar.push(sh[i].x);
+        y_ar.push(sh[i].y);
+    }
+    
+    with (Math) {
+        var xmin = min.apply(null, x_ar),
+            ymin = min.apply(null, y_ar);
+        for (i in sh) {
+            sh[i].x += this.width  / 2 - (max.apply(null, x_ar) - xmin) / 2 - xmin;
+            sh[i].y += this.height / 2 - (max.apply(null, y_ar) - ymin) / 2 - ymin;
+        }
+    }
+    
+    this.valid = false;
+};
+
+CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices();
+    
+    if (bias == null) bias = .75;
     
     for (var i = 0; i < this.shapes.length; i++) {
         var shape = this.shapes[i];
@@ -313,7 +338,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias = 0.75) {
                     shape.x = canvas.width;
                 }
                 if (shape.x < 0) {
-                    myShape.x += shape.x;
+                    myShape.x -= shape.x;
                     shape.x = 0;
                 }
                 
@@ -325,7 +350,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias = 0.75) {
                     myShape.y = canvas.height;
                 }
                 if (myShape.y < 0) {
-                    shape.y -= -myShape.y;
+                    shape.y -= myShape.y;
                     myShape.y = 0;
                 }
                 if (shape.y > canvas.height) {
@@ -333,7 +358,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias = 0.75) {
                     shape.y = canvas.height;
                 }
                 if (shape.y < 0) {
-                    myShape.y += -shape.y;
+                    myShape.y -= shape.y;
                     shape.y = 0;
                 }
         
@@ -451,6 +476,7 @@ CanvasState.prototype.doUp = function(e) {
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
     this.valid = false;
+    return shape;
 };
 
 CanvasState.prototype.clear = function() {
@@ -504,6 +530,18 @@ CanvasState.prototype.draw = function() {
         }
         ctx.globalAlpha = 1.0;
 
+        if (this.selection != null) {
+            // draw selection ring
+            ctx.strokeStyle = this.selectionColor;
+            ctx.lineWidth = this.selectionWidth * 2;
+            var mySel = this.selection;
+            
+            ctx.font = '9pt Lato, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            mySel.highlight(ctx, this.dragging);
+        }
+
         // draw all labels
         ctx.textAlign = 'center';
         ctx.textBaseline = 'alphabetic';
@@ -518,18 +556,6 @@ CanvasState.prototype.draw = function() {
             ctx.fillStyle = '#000';
             ctx.globalAlpha = 1.0;
             ctx.fillText(l.label, l.x, l.y);
-        }
-
-        if (this.selection != null) {
-            // draw selection ring
-            ctx.strokeStyle = this.selectionColor;
-            ctx.lineWidth = this.selectionWidth * 2;
-            var mySel = this.selection;
-            
-            ctx.font = '9pt Lato, sans-serif';
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            mySel.highlight(ctx, this.dragging);
         }
         
         ctx.font = '8pt Lato, sans-serif';
