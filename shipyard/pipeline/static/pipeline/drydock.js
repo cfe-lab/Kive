@@ -237,6 +237,7 @@ CanvasState.prototype.doMove = function(e) {
 };
 
 CanvasState.prototype.scaleToCanvas = function() {
+    // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
     var x_ar = [], y_ar = [];
     for (var i in this.shapes) {
         x_ar.push(this.shapes[i].x);
@@ -261,6 +262,13 @@ CanvasState.prototype.scaleToCanvas = function() {
             y: (this.height - margin.y * 2) / height
         }, shape;
     
+    /*
+    for both x and y dimensions, 4 numbers are now available:
+     - the current position
+     - the lowest (numerically) current position
+     - the ratio to scale by
+     - the lowest desired position (the margin)
+     */
     for (i = 0; i < this.shapes.length; i++) {
         shape = this.shapes[i];
         shape.x = (shape.x - xmin) * scale.x + margin.x;
@@ -277,13 +285,14 @@ CanvasState.prototype.centreCanvas = function() {
         y_ar.push(sh[i].y);
     }
     
-    with (Math) {
-        var xmin = min.apply(null, x_ar),
-            ymin = min.apply(null, y_ar);
-        for (i in sh) {
-            sh[i].x += this.width  / 2 - (max.apply(null, x_ar) - xmin) / 2 - xmin;
-            sh[i].y += this.height / 2 - (max.apply(null, y_ar) - ymin) / 2 - ymin;
-        }
+    var xmin = Math.min.apply(null, x_ar),
+        ymin = Math.min.apply(null, y_ar),
+        xmove = this.width  / 2 - (Math.max.apply(null, x_ar) - xmin) / 2 - xmin,
+        ymove = this.height / 2 - (Math.max.apply(null, y_ar) - ymin) / 2 - ymin;
+    
+    for (i in sh) {
+        sh[i].x += xmove;
+        sh[i].y += ymove;
     }
     
     this.valid = false;
@@ -293,6 +302,9 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices();
     
+    // Bias defines how much to move myShape vs how much to move the shape it collided with.
+    // 1 would be 100% myShape movement, 0 would be 100% other shape movement, and everything
+    // else in-between is possible.
     if (bias == null) bias = .75;
     
     for (var i = 0; i < this.shapes.length; i++) {
@@ -301,13 +313,18 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
         // Objects are passed by reference in JS, so this comparison is really comparing references.
         // Identical objects at different memory addresses will not pass this condition.
         if (shape == myShape) continue;
-    
+        
         for (var j = 0; j < vertices.length; j++) {
             var vertex = vertices[j];
             while (shape.contains(vertex.x, vertex.y)) {
-                if (i != -1) this.collisions++;
-                i = -1;
-                followups.push(shape);
+                // If a collision is detected and we start moving myShape, we have to re-check all previous shapes as well.
+                // We do this by resetting the counter.
+                // We also have to check for collisions on the other shape.
+                if (i > -1) {
+                    this.collisions++;
+                    i = -1;
+                    followups.push(shape);
+                }
                 
                 // Drawing a line between the two objects' centres, move the centre 
                 // of mySel to extend this line while keeping the same angle.

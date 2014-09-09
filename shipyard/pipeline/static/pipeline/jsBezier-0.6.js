@@ -385,7 +385,7 @@
 		var p1 = _bezier(curve.slice(1, curve.length), curve.length-2, location),	
 			p2 = _bezier(curve.slice(0, curve.length - 1), curve.length-2, location),
 			dy = p2.y - p1.y, dx = p2.x - p1.x;
-		return dy ? Math.atan(dy/dx) : Math.PI/2;
+		return dx ? Math.atan(dy/dx) : Math.PI/2;
 	};
 	
 	/**
