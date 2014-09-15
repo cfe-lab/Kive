@@ -244,13 +244,14 @@ CanvasState.prototype.scaleToCanvas = function() {
         y_ar.push(this.shapes[i].y);
     }
     
-    var xmin = Math.min.apply(null, x_ar),
-        ymin = Math.min.apply(null, y_ar),
-        width = Math.max.apply(null, x_ar) - xmin,
-        height = Math.max.apply(null, y_ar) - ymin,
+    with (Math) var
+        xmin = min.apply(null, x_ar),
+        ymin = min.apply(null, y_ar),
+        width = max.apply(null, x_ar) - xmin,
+        height = max.apply(null, y_ar) - ymin,
         margin = {
-            x: Math.min(this.width  * .15, 100),
-            y: Math.min(this.height * .15, 100)
+            x: min(this.width  * .15, 100),
+            y: min(this.height * .15, 100)
         },
         offset = {
             x: xmin - margin.x,
@@ -284,10 +285,11 @@ CanvasState.prototype.centreCanvas = function() {
         y_ar.push(sh[i].y);
     }
     
-    var xmin = Math.min.apply(null, x_ar),
-        ymin = Math.min.apply(null, y_ar),
-        xmove = this.width  / 2 - (Math.max.apply(null, x_ar) - xmin) / 2 - xmin,
-        ymove = this.height / 2 - (Math.max.apply(null, y_ar) - ymin) / 2 - ymin;
+    with (Math) var
+        xmin = min.apply(null, x_ar),
+        ymin = min.apply(null, y_ar),
+        xmove = this.width  / 2 - (max.apply(null, x_ar) - xmin) / 2 - xmin,
+        ymove = this.height / 2 - (max.apply(null, y_ar) - ymin) / 2 - ymin;
     
     for (i in sh) {
         sh[i].x += xmove;
@@ -331,10 +333,12 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                     dy = myShape.y - shape.y,
                     step = 5;
             
-                var dh = Math.sign(dx) * (Math.sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
-                    angle = dx ? Math.atan(dy / dx) : Math.PI/2,
-                    Dx = Math.cos(angle) * dh - dx,
-                    Dy = Math.sin(angle) * dh - dy;
+                // Shortcut so that I don't have to type Math.everything
+                with (Math) var 
+                    dh = (dx < 0 ? -1 : 1) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                    angle = dx ? atan(dy / dx) : PI/2,
+                    Dx = cos(angle) * dh - dx,
+                    Dy = sin(angle) * dh - dy;
                 
                 myShape.x += Dx * bias;
                 shape.x   -= Dx * (1 - bias);
