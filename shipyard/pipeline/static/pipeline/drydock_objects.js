@@ -638,7 +638,7 @@ Connector.prototype.draw = function(ctx) {
     /*
     Draw a line to represent a Connector originating from a Magnet.
      */
-    ctx.strokeStyle = '#aaa';
+    ctx.strokeStyle = '#abc';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
 

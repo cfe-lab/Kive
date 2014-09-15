@@ -244,14 +244,13 @@ CanvasState.prototype.scaleToCanvas = function() {
         y_ar.push(this.shapes[i].y);
     }
     
-    with (Math) var
-        xmin = min.apply(null, x_ar),
-        ymin = min.apply(null, y_ar),
-        width = max.apply(null, x_ar) - xmin,
-        height = max.apply(null, y_ar) - ymin,
+    var xmin = Math.min.apply(null, x_ar),
+        ymin = Math.min.apply(null, y_ar),
+        width = Math.max.apply(null, x_ar) - xmin,
+        height = Math.max.apply(null, y_ar) - ymin,
         margin = {
-            x: min(this.width  * .15, 100),
-            y: min(this.height * .15, 100)
+            x: Math.min(this.width  * .15, 100),
+            y: Math.min(this.height * .15, 100)
         },
         offset = {
             x: xmin - margin.x,
@@ -332,12 +331,10 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                     dy = myShape.y - shape.y,
                     step = 5;
             
-                // Shortcut so that I don't have to type Math.everything
-                with (Math) var 
-                    dh = sign(dx) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
-                    angle = dx ? atan(dy / dx) : PI/2,
-                    Dx = cos(angle) * dh - dx,
-                    Dy = sin(angle) * dh - dy;
+                var dh = Math.sign(dx) * (Math.sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                    angle = dx ? Math.atan(dy / dx) : Math.PI/2,
+                    Dx = Math.cos(angle) * dh - dx,
+                    Dy = Math.sin(angle) * dh - dy;
                 
                 myShape.x += Dx * bias;
                 shape.x   -= Dx * (1 - bias);
@@ -541,7 +538,7 @@ CanvasState.prototype.draw = function() {
         }
 
         // draw all connectors
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 0.75;
         for (i = 0; i < connectors.length; i++) {
             connectors[i].draw(ctx);
         }
