@@ -1644,7 +1644,19 @@ class Dataset(models.Model):
         """
         :return int: size of dataset_file in bytes
         """
-        return os.path.getsize(self.dataset_file.url)
+        return self.dataset_file.size
+
+    def get_formatted_filesize(self):
+        if self.dataset_file.size >= 1099511627776:
+            return "{0:.2f}".format(self.dataset_file.size/1099511627776.0) + ' TB'
+        if self.dataset_file.size >= 1073741824:
+            return "{0:.2f}".format(self.dataset_file.size/1073741824.0) + ' GB'
+        elif self.dataset_file.size >= 1048576:
+            return "{0:.2f}".format(self.dataset_file.size/1048576.0) + ' MB'
+        elif self.dataset_file.size >= 1024:
+            return "{0:.2f}".format(self.dataset_file.size/1024.0) + ' KB'
+        else:
+            return str(self.dataset_file.size) + ' B'
 
     def clean(self):
         """If this Dataset has an MD5 set, verify the dataset file integrity"""
