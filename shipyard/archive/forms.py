@@ -61,7 +61,7 @@ class DatasetForm (forms.Form):
 
 class BulkUpdateDatasetModelForm(forms.ModelForm):
     # Holds the original file name as uploaded by client
-    orig_filename = forms.CharField(max_length=Dataset.MAX_NAME_LEN,
+    orig_filename = forms.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
                                     widget=forms.TextInput(attrs={'readonly': 'readonly'}))
     status = forms.IntegerField(widget=forms.NumberInput(attrs={'readonly': 'readonly'}))
 
@@ -72,9 +72,9 @@ class BulkUpdateDatasetModelForm(forms.ModelForm):
 
 class BulkUpdateDatasetForm(forms.ModelForm):
     # Holds the original file name as uploaded by client
-    orig_filename = forms.CharField(max_length=Dataset.MAX_NAME_LEN,
+    orig_filename = forms.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
                                     widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    name = forms.CharField(max_length=Dataset.MAX_NAME_LEN)
+    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH,)
     description = forms.CharField(widget=forms.Textarea)
     status = forms.IntegerField(widget=forms.NumberInput(attrs={'readonly': 'readonly'}))
 
@@ -150,7 +150,7 @@ class BulkAddDatasetForm (forms.Form):
     Appends the date and time to the name_prefix to make the dataset name unique.
     """
 
-    name_prefix = forms.CharField(max_length=Dataset.MAX_NAME_LEN, required=False,
+    name_prefix = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH, required=False,
                                   help_text="Prefix will be appended with date and time to create unique dataset name.  " +
                                             "If not supplied, the filename is used as the prefix.")
 
