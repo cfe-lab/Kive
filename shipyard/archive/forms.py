@@ -58,29 +58,53 @@ class DatasetForm (forms.Form):
                                                     description=self.cleaned_data['description'],
                                                     created_by=None, check=True)
 
-
-class BulkUpdateDatasetModelForm(forms.ModelForm):
-    # Holds the original file name as uploaded by client
-    orig_filename = forms.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
-                                    widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    status = forms.IntegerField(widget=forms.NumberInput(attrs={'readonly': 'readonly'}))
-
-    class Meta:
-        model = Dataset
-        fields = ['name', 'description']
+        return symbolicdataset
 
 
-class BulkUpdateDatasetForm(forms.ModelForm):
-    # Holds the original file name as uploaded by client
-    orig_filename = forms.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
-                                    widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH,)
-    description = forms.CharField(widget=forms.Textarea)
-    status = forms.IntegerField(widget=forms.NumberInput(attrs={'readonly': 'readonly'}))
+class BulkDatasetUpdateForm (forms.Form):
+    compound_datatypes = CompoundDatatype.objects.all()
+    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
+    for compound_datatype in compound_datatypes:
+        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
+    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
+
+    # dataset primary key
+    id = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly'}))
+
+    # dataset name
+    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH, required=True)
+    description = forms.CharField(widget=forms.Textarea, required=False)
+
+    filesize = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+
+    md5 = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+
+    # The original name of the file uploaded by the user
+    # Do not bother exposing the actual filename as it exists in the fileserver
+    orig_filename = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+
+    # Dataset instance
+    # We don't use ModelForm because the formset.form.instance template property doesn't seem to work in django 1.6
+    def __init__(self, *args, **kwargs):
+        super(BulkDatasetUpdateForm, self).__init__(*args, **kwargs)
+        self.dataset = Dataset()
+        self.status = 0
+
+
+    def update(self):
+        if self.cleaned_data['id']:
+            dataset = Dataset.objects.filter(id=self.cleaned_data['id'])
+            dataset.name = self.cleaned_data['name']
+            dataset.description = self.cleaned_data['description']
+            dataset.save()
+            return dataset
+        return None
 
 
 
-class BulkDatasetForm (forms.Form):
+
+
+class BulkCSVDatasetForm (forms.Form):
     """
     Creates multiple datasets from a CSV.
     Expects that BulkDatasetForm.is_valid() has been called so that BulkDatasetForm.cleaned_data dict has been populated
@@ -108,6 +132,7 @@ class BulkDatasetForm (forms.Form):
         SymbolicDataset.create_SD_bulk(csv_file_path=None, csv_file_handle=self.cleaned_data['datasets_csv'],
                                        cdt=compound_datatype_obj, make_dataset=True,
                                        user=user, created_by=None, check=True)
+
 
 
 

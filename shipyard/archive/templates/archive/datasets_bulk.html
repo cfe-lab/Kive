@@ -1,0 +1,138 @@
+<!-- Django template -->
+<!-- View recently added bulk datasets -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Bulk Added Dataset{% endblock %}
+
+<style>
+{#    TODO:  put this in CSS#}
+    .bulk_dataset_table {
+        overflow:scroll;
+        height:50em;
+        clear: both;
+    }
+
+    .status_cell {
+
+    }
+
+    .loading_img {
+        width:20px;
+        height:20px;
+    }
+
+    .display_only_input {
+        outline: none;
+    }
+
+    textarea:focus, input:focus{
+        outline: none;
+    }
+</style>
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script>
+    $(document).ready(function() {
+        // TODO:  put these somewhere more central.
+        // TODO:  the loading_img css class doesn't work here.  Fix it instead of hardcoding width and height
+        STATUS_FAIL = "1"
+        STATUS_SUCCESS = "0"
+
+        $('.status_cell').each(function () {
+            if ($(this).html() == STATUS_SUCCESS) {
+                $(this).html('<img class="loading_img" src="/static/portal/img/success.png" width="20px" height="auto">');
+            }
+            else {
+                $(this).html('<img class="loading_img" src="/static/portal/img/fail.png" width="20px" height="auto">');
+            }
+        });
+    });
+    </script>
+{% endblock %}
+
+
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Bulk Added Datasets</h2>
+
+<form id="bulkDatasetDisplayForm" name="bulkDatasetDisplayForm" action="/datasets_bulk.html" method="post">{% csrf_token %}
+    <div class="bulk_dataset_table">
+        <table id="uploadProgressTable">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>File Size</th>
+                    <th>Dataset Name</th>
+                    <th>Description</th>
+                    <th>MD5</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ bulk_dataset_formset.management_form }}
+{#                {% for dataset_form in bulk_dataset_formset %}#}
+{#                    <tr>#}
+{#                        <!--#}
+{#                        The dataset filename can change on the server to avoid duplicate names on the fileserver.#}
+{#                        Display the original filenames as uploaded by the user so that they don't have to map client filenames#}
+{#                        to server filenames.#}
+{#                        Use AJAX to post edits to server.#}
+{#                        Use django formset names so that server can automagically update model.#}
+{#                       -->#}
+{#                        <input type="hidden" id="form-{{ forloop.counter }}-id"#}
+{#                               name="id_form-{{ forloop.counter }}-id"#}
+{#                               value="{{ dataset_form.dataset.id }}"/>#}
+{#                        <td>{{ bulkDisplayResult.orig_filename }}</td>#}
+{#                        <td>{{ bulkDisplayResult.dataset.get_formatted_filesize }}</td>#}
+{#                        <td>#}
+{#                            TODO:  put textbox size somehere central on clientside#}
+{#                            <input type="text" maxlength="60" class="editbox"#}
+{#                                   id="id_form-{{ forloop.counter }}-name"#}
+{#                                   name="form-{{ forloop.counter }}-name"#}
+{#                                   value="{{ bulkDisplayResult.dataset.name }}">#}
+{#                        </td>#}
+{#                        <td><textarea type="text" class="editbox" cols="40" rows="10"#}
+{#                                      id="id_form-{{ forloop.counter }}-description"#}
+{#                                      name="form-{{ forloop.counter }}-description">#}
+{#                            {{ bulkDisplayResult.dataset.description }}</textarea>#}
+{#                        </td>#}
+{#                        <td>{{ bulkDisplayResult.dataset.compute_md5 }}</td>#}
+{#                        <!-- TODO:  use ajax to poll status of each file upload.  Will be handy  if lots of large files -->#}
+{#                        <td>{{ bulkDisplayResult.status }}</td>#}
+{#                    </tr>#}
+{#                {% endfor %}#}
+            {% for dataset_form in bulk_dataset_formset %}
+                    <tr>
+                        <!--
+                        The dataset filename can change on the server to avoid duplicate names on the fileserver.
+                        Display the original filenames as uploaded by the user so that they don't have to map client filenames
+                        to server filenames.
+                        Use AJAX to post edits to server.
+                        Use django formset names so that server can automagically update model.
+                       -->
+                        <td style="display:none">{{ dataset_form.id }}</td>
+                        <td>{{ dataset_form.orig_filename }}</td>
+                        <td>{{ dataset_form.filesize }}</td>
+                        <td>{{ dataset_form.name }}</td>
+                        <td>{{ dataset_form.description }}</td>
+                        <td class="display_only_input">{{ dataset_form.md5 }}</td>
+                        <!-- TODO:  use ajax to poll status of each file upload.  Will be handy  if lots of large files -->
+                        <td class="status_cell">{{ dataset_form.status }}</td>
+                        <td class="errortext">{{ dataset_form.err_msg }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <input type="submit" name="Submit" value="Submit" />
+</form>
+
+<div class="errorStrip errortext">{{ create_error }}</div>
+
+{% endblock %}
+

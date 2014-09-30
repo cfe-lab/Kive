@@ -63,6 +63,8 @@ urlpatterns = patterns('',
     url(r'^dataset_view/(?P<dataset_id>\d+)$', 'archive.views.dataset_view', name='dataset_view'),
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'archive.views.datasets_add_bulk', name='datasets_add_bulk'),
+    url(r'^datasets_bulk', 'archive.views.datasets_bulk', name='datasets_bulk'),
+
 
 
     url(r'^choose_pipeline$', 'sandbox.views.choose_pipeline', name='choose_pipeline'),

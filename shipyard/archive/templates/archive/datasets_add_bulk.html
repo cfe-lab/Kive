@@ -117,7 +117,7 @@
 <form id="datasetBulkForm" name="datasetBulkForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <div style="width:100em">
         <fieldset class="multiFieldSet">
-            <legend>Bulk Add Multiple Datasets From CSV</legend>
+            <legend>Bulk Add Multiple Datasets</legend>
             <table>
                 <tr><td><label>{{ bulkAddDatasetForm.dataset_files.label }}</label></td>
                     <td>{{ bulkAddDatasetForm.dataset_files }}</td>
