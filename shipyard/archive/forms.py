@@ -62,26 +62,20 @@ class DatasetForm (forms.Form):
 
 
 class BulkDatasetUpdateForm (forms.Form):
-    compound_datatypes = CompoundDatatype.objects.all()
-    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
-    for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
-    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
-
     # dataset primary key
-    id = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly'}))
+    id = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly'}), required=False)
 
     # dataset name
-    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH, required=True)
+    name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH, required=False)
     description = forms.CharField(widget=forms.Textarea, required=False)
 
-    filesize = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+    filesize = forms.CharField(required=False, widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
 
-    md5 = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+    md5 = forms.CharField(required=False, widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
 
     # The original name of the file uploaded by the user
     # Do not bother exposing the actual filename as it exists in the fileserver
-    orig_filename = forms.IntegerField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}))
+    orig_filename = forms.CharField(widget=forms.TextInput(attrs={'readonly':'readonly', 'class': 'display_only_input'}), required=False)
 
     # Dataset instance
     # We don't use ModelForm because the formset.form.instance template property doesn't seem to work in django 1.6
@@ -93,7 +87,7 @@ class BulkDatasetUpdateForm (forms.Form):
 
     def update(self):
         if self.cleaned_data['id']:
-            dataset = Dataset.objects.filter(id=self.cleaned_data['id'])
+            dataset = Dataset.objects.filter(id=self.cleaned_data['id']).get()
             dataset.name = self.cleaned_data['name']
             dataset.description = self.cleaned_data['description']
             dataset.save()

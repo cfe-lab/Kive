@@ -75,38 +75,7 @@
             </thead>
             <tbody>
                 {{ bulk_dataset_formset.management_form }}
-{#                {% for dataset_form in bulk_dataset_formset %}#}
-{#                    <tr>#}
-{#                        <!--#}
-{#                        The dataset filename can change on the server to avoid duplicate names on the fileserver.#}
-{#                        Display the original filenames as uploaded by the user so that they don't have to map client filenames#}
-{#                        to server filenames.#}
-{#                        Use AJAX to post edits to server.#}
-{#                        Use django formset names so that server can automagically update model.#}
-{#                       -->#}
-{#                        <input type="hidden" id="form-{{ forloop.counter }}-id"#}
-{#                               name="id_form-{{ forloop.counter }}-id"#}
-{#                               value="{{ dataset_form.dataset.id }}"/>#}
-{#                        <td>{{ bulkDisplayResult.orig_filename }}</td>#}
-{#                        <td>{{ bulkDisplayResult.dataset.get_formatted_filesize }}</td>#}
-{#                        <td>#}
-{#                            TODO:  put textbox size somehere central on clientside#}
-{#                            <input type="text" maxlength="60" class="editbox"#}
-{#                                   id="id_form-{{ forloop.counter }}-name"#}
-{#                                   name="form-{{ forloop.counter }}-name"#}
-{#                                   value="{{ bulkDisplayResult.dataset.name }}">#}
-{#                        </td>#}
-{#                        <td><textarea type="text" class="editbox" cols="40" rows="10"#}
-{#                                      id="id_form-{{ forloop.counter }}-description"#}
-{#                                      name="form-{{ forloop.counter }}-description">#}
-{#                            {{ bulkDisplayResult.dataset.description }}</textarea>#}
-{#                        </td>#}
-{#                        <td>{{ bulkDisplayResult.dataset.compute_md5 }}</td>#}
-{#                        <!-- TODO:  use ajax to poll status of each file upload.  Will be handy  if lots of large files -->#}
-{#                        <td>{{ bulkDisplayResult.status }}</td>#}
-{#                    </tr>#}
-{#                {% endfor %}#}
-            {% for dataset_form in bulk_dataset_formset %}
+                {% for dataset_form in bulk_dataset_formset %}
                     <tr>
                         <!--
                         The dataset filename can change on the server to avoid duplicate names on the fileserver.
@@ -129,10 +98,10 @@
             </tbody>
         </table>
     </div>
-    <input type="submit" name="Submit" value="Submit" />
+    <input type="submit" id="editBulkDatasets" name="editBulkDatasets" value="Submit" />
 </form>
 
-<div class="errorStrip errortext">{{ create_error }}</div>
+<div class="errorStrip errortext">{{ errors }}</div>
 
 {% endblock %}
 
