@@ -1110,9 +1110,12 @@ class Sandbox:
         # Go through steps in order, looking for input cables pointing at the task(s) that have just completed.
         # If step_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
-            # First, if this is already running, we skip it.
+            # First, if this is already running, we skip it, unless it's a sub-pipeline, in which case
+            # we try to advance it.
             corresp_runstep = run_to_resume.runsteps.filter(pipelinestep=step)
-            if len(corresp_runstep) > 0:
+            if corresp_runstep.exists():
+                if corresp_runstep.is_subpipeline:
+                    self.advance_pipeline(corresp_runstep.child_run, step_completed, cable_completed)
                 continue
 
             # If this step is not fed at all by any of the tasks that just completed,
@@ -1556,21 +1559,21 @@ class Sandbox:
             return execute_info
 
         # At this point we know that we're at least symbolically OK to proceed.
-
-        # Recurse if this step is a sub-pipeline.
-        if pipelinestep.is_subpipeline:
-            # Recurse -- call a routine that will start the sub-pipeline.
-            # FIXME fill this out when we figure out what it does
-            self.get_runnable_steps(execute_info)
-            return execute_info
-
-        # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
         inputs_after_cable = []
         for i, curr_input in enumerate(pipelinestep.inputs):
             corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
             curr_RSIC = cable_table[corresp_cable].cable_record
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
 
+        # Recurse if this step is a sub-pipeline.
+        if pipelinestep.is_subpipeline:
+            # Start the sub-pipeline.
+            self.logger.debug("Executing a sub-pipeline with input_SD(s): {}".format(inputs_after_cable))
+            curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
+            self.advance_pipeline(curr_run, None, None)
+            return execute_info
+
+        # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
         curr_ER = pipelinestep.transformation.definite.find_compatible_ER(inputs_after_cable)
         if curr_ER is not None:
             execute_info.execrecord = curr_ER
