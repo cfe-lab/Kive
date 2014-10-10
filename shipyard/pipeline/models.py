@@ -491,6 +491,56 @@ class Pipeline(transformation.models.Transformation):
         """
         raise NotImplementedError("Structural comparison not available for pipelines.")
 
+    def check_inputs(self, inputs):
+        """
+        Are the supplied inputs are appropriate for this pipeline?
+
+        We check if the input CDT's are restrictions of this pipeline's expected
+        input CDT's, and that the number of rows is in the range that the pipeline
+        expects. We don't rearrange inputs that are in the wrong order.
+        """
+        # First quick check that the number of inputs are the same.
+        if len(inputs) != self.inputs.count():
+            raise ValueError('Pipeline "{}" expects {} inputs, but {} were supplied'
+                             .format(self, self.inputs.count(), len(inputs)))
+
+        # Check each individual input.
+        for i, supplied_input in enumerate(inputs, start=1):
+            if not supplied_input.is_OK():
+                raise ValueError('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                                 .format(supplied_input, i, self))
+
+            pipeline_input = self.inputs.get(dataset_idx=i)
+            pipeline_raw = pipeline_input.is_raw()
+            supplied_raw = supplied_input.is_raw()
+
+            if pipeline_raw != supplied_raw:
+                if pipeline_raw:
+                    raise ValueError('Pipeline "{}" expected input {} to be raw, but got one with CompoundDatatype '
+                                     '"{}"'.format(self, i, supplied_input.get_cdt()))
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
+                                 .format(self, i, pipeline_input.get_cdt()))
+
+            # Both are raw.
+            elif pipeline_raw: continue
+
+            # Neither is raw.
+            supplied_cdt = supplied_input.get_cdt()
+            pipeline_cdt = pipeline_input.get_cdt()
+
+            if not supplied_cdt.is_restriction(pipeline_cdt):
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one with '
+                                 'CompoundDatatype "{}"'.format(self, i, pipeline_cdt, supplied_cdt))
+
+            # The CDT's match. Is the number of rows okay?
+            minrows = pipeline_input.get_min_row() or 0
+            maxrows = pipeline_input.get_max_row()
+            maxrows = maxrows if maxrows is not None else sys.maxint
+
+            if not minrows <= supplied_input.num_rows() <= maxrows:
+                raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
+                                 .format(self, i, minrows, maxrows, supplied_input.num_rows()))
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
