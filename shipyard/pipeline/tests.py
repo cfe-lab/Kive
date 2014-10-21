@@ -84,8 +84,9 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         self.datafile.write("ATCG\n")
         self.datafile.close()
 
-        self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, cdt=self.DNAinput_cdt, user=self.user,
-                                                        name="DNA input", description="input for DNAcomp pipeline")
+        self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, user=self.user,
+                                                        cdt=self.DNAinput_cdt, name="DNA input",
+                                                        description="input for DNAcomp pipeline")
 
         # Define PF in order to define pipeline
         self.test_PF = PipelineFamily(

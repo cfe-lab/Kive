@@ -53,20 +53,23 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.generic_crRev.save()
         
         # Method family, methods, and their input/outputs
-        self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
-        self.mA = Method(revision_name="mA_name", revision_desc="A_desc", family = self.mf, driver =
-                self.generic_crRev)
+        self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C", user=self.myUser)
+        self.mf.save()
+        self.mA = Method(revision_name="mA_name", revision_desc="A_desc", family=self.mf, driver=self.generic_crRev,
+                         user=self.myUser)
         self.mA.save()
         self.A1_rawin = self.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
         self.A1_out = self.mA.create_output(compounddatatype=self.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
 
-        self.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=self.mf, driver=self.generic_crRev)
+        self.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=self.mf, driver=self.generic_crRev,
+                         user=self.myUser)
         self.mB.save()
         self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
         self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
         self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
 
-        self.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=self.mf, driver=self.generic_crRev) 
+        self.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=self.mf, driver=self.generic_crRev,
+                         user=self.myUser)
         self.mC.save()
         self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
         self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
@@ -75,12 +78,12 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         self.C3_rawout = self.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
 
         # Pipeline family, pipelines, and their input/outputs
-        self.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); self.pf.save()
-        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D")
+        self.pf = PipelineFamily(name="Pipeline_family", description="PF desc", user=self.myUser); self.pf.save()
+        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D", user=self.myUser)
         self.pD.save()
         self.D1_in = self.pD.create_input(compounddatatype=self.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
         self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
-        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E")
+        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E", user=self.myUser)
         self.pE.save()
         self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
         self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
@@ -131,123 +134,116 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         # librarian.models) to define our SymDSs and DSs.
             
         # Define singlet, doublet, triplet, and raw uploaded datasets
-        self.triplet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_triplet.csv"),
-            self.triplet_cdt, make_dataset=True, user=self.myUser,
-            name="triplet", description="lol")
+        self.triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet.csv"),
+                                                       self.myUser,
+                                                       cdt=self.triplet_cdt, make_dataset=True,
+                                                       name="triplet", description="lol")
         self.triplet_symDS_structure = self.triplet_symDS.structure
         self.triplet_DS = self.triplet_symDS.dataset
         
-        self.doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_cdt.csv"),
-            self.doublet_cdt, user=self.myUser,
-            name="doublet", description="lol")
+        self.doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_cdt.csv"),
+                                                       self.myUser,
+                                                       cdt=self.doublet_cdt, name="doublet",
+                                                       description="lol")
         self.doublet_symDS_structure = self.doublet_symDS.structure
         self.doublet_DS = self.doublet_symDS.dataset
 
-        self.singlet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "singlet_cdt_large.csv"),
-            self.singlet_cdt, user=self.myUser, name="singlet",
-            description="lol")
+        self.singlet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "singlet_cdt_large.csv"),
+                                                       self.myUser,
+                                                       cdt=self.singlet_cdt, name="singlet",
+                                                       description="lol")
         self.singlet_symDS_structure = self.singlet_symDS.structure
         self.singlet_DS = self.singlet_symDS.dataset
         
         # October 1, 2013: this is the same as the old singlet_symDS.
-        self.singlet_3rows_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_singlet.csv"),
-            self.singlet_cdt, user=self.myUser, name="singlet",
-            description="lol")
+        self.singlet_3rows_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
+                                                             self.myUser,
+                                                             cdt=self.singlet_cdt, name="singlet",
+                                                             description="lol")
         self.singlet_3rows_symDS_structure = self.singlet_3rows_symDS.structure
         self.singlet_3rows_DS = self.singlet_3rows_symDS.dataset
 
-        self.raw_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
+        self.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                                   user=self.myUser, cdt=None, name="raw", description="lol")
         self.raw_DS = self.raw_symDS.dataset
 
         # Added September 30, 2013: symbolic dataset that results from E01_21.
         # November 7, 2013: created a file that this SD actually represented,
         # even though it isn't in the database.
-        self.D1_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
-            cdt=self.doublet_cdt, make_dataset=False)
+        self.D1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
+                                                     user=self.myUser,
+                                                     cdt=self.doublet_cdt,
+                                                     make_dataset=False)
         self.D1_in_symDS_structure = self.D1_in_symDS.structure
         
-        self.C1_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "C1_in_triplet.csv"),
-            self.triplet_cdt, user=self.myUser, name="C1_in_triplet",
-            description="triplet 3 rows")
+        self.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"),
+                                                     self.myUser,
+                                                     cdt=self.triplet_cdt, name="C1_in_triplet",
+                                                     description="triplet 3 rows")
         self.C1_in_symDS_structure = self.C1_in_symDS.structure
         self.C1_in_DS = self.C1_in_symDS.dataset
         
         # November 7, 2013: compute the MD5 checksum from the data file,
         # which is the same as below.
-        self.C2_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E11_32_output.csv"),
-            self.doublet_cdt, make_dataset=False)
+        self.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
+                                                     self.myUser,
+                                                     cdt=self.doublet_cdt, make_dataset=False)
         self.C2_in_symDS_structure = self.C2_in_symDS.structure
 
         # October 16: an alternative to C2_in_symDS, which has existent data.
-        self.E11_32_output_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E11_32_output.csv"),
-            self.doublet_cdt, user=self.myUser,
-            name="E11_32 output doublet",
-            description="result of E11_32 fed by doublet_cdt.csv")
+        self.E11_32_output_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
+                                                             self.myUser,
+                                                             cdt=self.doublet_cdt,
+                                                             name="E11_32 output doublet",
+                                                             description="result of E11_32 fed by doublet_cdt.csv")
         self.E11_32_output_symDS_structure = self.E11_32_output_symDS.structure
         self.E11_32_output_DS = self.E11_32_output_symDS.dataset
         
-        self.C1_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_singlet.csv"),
-            self.singlet_cdt, user=self.myUser, name="raw",
-            description="lol")
+        self.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
+                                                      self.myUser,
+                                                      cdt=self.singlet_cdt, name="raw", description="lol")
         self.C1_out_symDS_structure = self.C1_out_symDS.structure
         self.C1_out_DS = self.C1_out_symDS.dataset
         
-        self.C2_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
+        self.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                                      self.myUser, cdt=None, name="raw", description="lol")
         self.C2_out_DS = self.C2_out_symDS.dataset
 
-        self.C3_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
+        self.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                                      self.myUser, cdt=None, name="raw", description="lol")
         self.C3_out_DS = self.C3_out_symDS.dataset
         
         self.triplet_3_rows_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
-            self.triplet_cdt, user=self.myUser, name="triplet",
-            description="lol")
+            os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), self.myUser, cdt=self.triplet_cdt,
+            name="triplet", description="lol")
         self.triplet_3_rows_symDS_structure = self.triplet_3_rows_symDS.structure
         self.triplet_3_rows_DS = self.triplet_3_rows_symDS.dataset
         
         # October 9, 2013: added as the result of cable E21_41.
-        self.E1_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
-            self.doublet_cdt, user=self.myUser, name="E1_out",
-            description="doublet remuxed from triplet")
+        self.E1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
+                                                      self.myUser, cdt=self.doublet_cdt, name="E1_out",
+                                                      description="doublet remuxed from triplet")
         self.E1_out_symDS_structure = self.E1_out_symDS.structure
         self.E1_out_DS = self.E1_out_symDS.dataset
         
         # October 15, 2013: SymbolicDatasets that go into and come out
         # of cable E01_21 and E21_41.
         self.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
-                                                           self.DNA_triplet_cdt, user=self.myUser, name="DNA_triplet", 
+                                                           self.myUser, cdt=self.DNA_triplet_cdt, name="DNA_triplet",
                                                            description="DNA triplet data")
         self.DNA_triplet_symDS_structure = self.DNA_triplet_symDS.structure
         self.DNA_triplet_DS = self.DNA_triplet_symDS.dataset
 
         self.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
-            self.DNA_doublet_cdt,
-            user=self.myUser, name="E01_21_DNA_doublet",
+            os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), self.myUser, cdt=self.DNA_doublet_cdt,
+            name="E01_21_DNA_doublet",
             description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21")
         self.E01_21_DNA_doublet_symDS_structure = self.E01_21_DNA_doublet_symDS.structure
         self.E01_21_DNA_doublet_DS = self.E01_21_DNA_doublet_symDS.dataset
         
         self.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
-            self.DNA_doublet_cdt,
-            user=self.myUser, name="E21_41_DNA_doublet",
+            os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), self.myUser, cdt=self.DNA_doublet_cdt,
+            name="E21_41_DNA_doublet",
             description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41")
         self.E21_41_DNA_doublet_symDS_structure = self.E21_41_DNA_doublet_symDS.structure
         self.E21_41_DNA_doublet_DS = self.E21_41_DNA_doublet_symDS.dataset
@@ -331,9 +327,9 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         self.dsname = "good data"
         self.dsdesc = "some headers and sequences"
-        self.sym_dataset = SymbolicDataset.create_SD(file_path = self.file_path,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = self.dsname, description = self.dsdesc)
+        self.sym_dataset = SymbolicDataset.create_SD(file_path=self.file_path, user=self.myUser,
+                                                     cdt=self.cdt_record, make_dataset=True, name=self.dsname,
+                                                     description=self.dsdesc)
 
     def tearDown(self):
         super(SymbolicDatasetTests, self).tearDown()
@@ -356,9 +352,9 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(data_file.name, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
-                                                                   user=self.myUser, name="lab data", 
-                                                                   description = "patient sequences"))
+                                lambda : SymbolicDataset.create_SD(file_path=data_file.name,
+                                                                   user=self.myUser, cdt=self.cdt_record,
+                                                                   name="lab data", description="patient sequences"))
         data_file.close()
 
     def test_empty_file(self):
@@ -371,9 +367,9 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(file_path, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=data_file.name, cdt=self.cdt_record,
-                                                                   user=self.myUser, name="missing data", 
-                                                                   description="oops!"))
+                                lambda : SymbolicDataset.create_SD(file_path=data_file.name,
+                                                                   user=self.myUser, cdt=self.cdt_record,
+                                                                   name="missing data", description="oops!"))
         data_file.close()
 
     def test_too_many_columns(self):
@@ -390,8 +386,8 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(file_path, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=file_path, cdt=self.cdt_record,
-                                                                   user=self.myUser, name="bad data", 
+                                lambda : SymbolicDataset.create_SD(file_path=file_path, user=self.myUser,
+                                                                   cdt=self.cdt_record, name="bad data",
                                                                    description="too many columns"))
         data_file.close()
 
@@ -406,9 +402,8 @@ class SymbolicDatasetTests(LibrarianTestSetup):
 
         dsname = "good data"
         dsdesc = "some headers and sequences"
-        sym_dataset = SymbolicDataset.create_SD(file_path = data_file.name,
-                cdt = self.cdt_record, make_dataset = True, user = self.myUser,
-                name = dsname, description = dsdesc)
+        sym_dataset = SymbolicDataset.create_SD(file_path=data_file.name, user=self.myUser,
+                                                cdt=self.cdt_record, make_dataset=True, name=dsname, description=dsdesc)
         dataset = sym_dataset.dataset
         self.assertEqual(dataset.clean(), None)
         self.assertEqual(dataset.user, self.myUser)
@@ -438,8 +433,9 @@ class SymbolicDatasetTests(LibrarianTestSetup):
             file_paths.extend([file_path])
             bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + file_path)
 
-        sym_datasets = SymbolicDataset.create_SD_bulk(csv_file_path=bulk_dataset_csv.name, check=True,
-                                                      cdt=self.cdt_record, make_dataset=True, user=self.myUser)
+        sym_datasets = SymbolicDataset.create_SD_bulk(csv_file_path=bulk_dataset_csv.name,
+                                                      user=self.myUser, cdt=self.cdt_record, make_dataset=True,
+                                                      check=True)
         for f in data_files:
             f.close()
         bulk_dataset_csv.close()
@@ -1146,6 +1142,7 @@ class FindCompatibleERTests(LibrarianTestSetup):
         method = Method()
         method.family = MethodFamily.objects.first()
         method.driver = CodeResourceRevision.objects.first()
+        method.user = self.myUser
         method.save()
         
         pipeline_step1 = PipelineStep()

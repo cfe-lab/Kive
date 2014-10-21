@@ -5,7 +5,8 @@ Should run nukeDB.bash first.
 import os
 from django.core.files import File
 from method.models import CodeResource, CodeResourceRevision, MethodFamily
-from metadata.models import CompoundDatatype
+from metadata.models import CompoundDatatype, AccessControl
+from django.contrib.auth.models import User
 
 try:
     cdt = CompoundDatatype.objects.get(pk=4)  # from initial_data.json
@@ -29,7 +30,10 @@ with open(os.path.join(samplecode_path, 'fasta2csv.py'), 'rb') as f:
     crv.save()
 
 # create MethodFamily
-mf = MethodFamily(name='Adapters', description='Scripts to convert raw data into CSV')
+shipyard_user = User.objects.get(pk=1)
+
+mf = MethodFamily(name='Adapters', description='Scripts to convert raw data into CSV',
+                  user=shipyard_user)
 mf.full_clean()
 mf.save()
 
@@ -37,6 +41,7 @@ mf.save()
 m = mf.members.create(revision_number=1,
                       revision_name='fasta2csv version 1',
                       revision_desc='Converts FASTA to CSV; first version.',
+                      user=shipyard_user,
                       driver=crv)
 
 in1 = m.create_input(compounddatatype=None,

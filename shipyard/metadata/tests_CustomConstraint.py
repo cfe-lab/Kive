@@ -181,8 +181,8 @@ class CustomConstraintTests(UtilityMethods):
         Helper function to create a SymbolicDataset and ContentCheckLog
         for a given CompoundDatatype.
         """
-        symbolicdataset = SymbolicDataset.create_SD(datafile, cdt=cdt,
-                user=user, name=name, description=desc)
+        symbolicdataset = SymbolicDataset.create_SD(datafile, user=user, cdt=cdt, name=name,
+                                                    description=desc)
         log = ContentCheckLog(symbolicdataset=symbolicdataset)
         log.save()
         return log
@@ -209,11 +209,12 @@ class CustomConstraintTests(UtilityMethods):
         no_output_datafile = self._setup_datafile(cdt_no_output,
                 [[123, "foo"], [456, "bar"], [789, "baz"]])
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Verification method for Datatype "{}" produced no output'
-                                          .format(dt_no_output)),
-                                lambda: SymbolicDataset.create_SD(no_output_datafile, cdt_no_output, self.user_oscar,
-                                                                  "no output", "data with a bad verifier"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Verification method for Datatype "{}" produced no output'.format(dt_no_output)),
+            lambda: SymbolicDataset.create_SD(no_output_datafile, self.user_oscar, cdt=cdt_no_output,
+                                              name="no output", description="data with a bad verifier")
+        )
         os.remove(no_output_datafile)
 
     def test_verification_method_failed_row_too_large(self):
@@ -237,12 +238,14 @@ class CustomConstraintTests(UtilityMethods):
         big_row_datafile = self._setup_datafile(cdt_big_row,
                 [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
-                                          'only {} rows were checked'.format(dt_big_row, 1000, 2)),
-                                lambda: SymbolicDataset.create_SD(big_row_datafile, cdt=cdt_big_row,
-                                    user=self.user_oscar, name="big row", 
-                                    description="data with a verifier outputting too high a row number"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
+                      'only {} rows were checked'.format(dt_big_row, 1000, 2)),
+            lambda: SymbolicDataset.create_SD(big_row_datafile,
+                                              user=self.user_oscar, cdt=cdt_big_row, name="big row",
+                                              description="data with a verifier outputting too high a row number")
+        )
         os.remove(big_row_datafile)
 
     def test_summarize_correct_datafile(self):
@@ -268,12 +271,15 @@ class CustomConstraintTests(UtilityMethods):
         We sholudn't be allowed to create a SymbolicDataset from a file
         which does not conform to the Datatype's CustomConstraints.
         """
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                          'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
-                                lambda: SymbolicDataset.create_SD(self.bad_datafile, cdt=self.cdt_constraints,
-                                    user=self.user_oscar, name="bad data", 
-                                    description="invalid data to test custom constraint checking"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                      'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
+                      lambda: SymbolicDataset.create_SD(self.bad_datafile,
+                                                        user=self.user_oscar, cdt=self.cdt_constraints,
+                                                        name="bad data",
+                                                        description="invalid data to test custom constraint checking")
+        )
 
     def _test_content_check_integrity(self, content_check, execlog, symds):
         """
@@ -293,20 +299,18 @@ class CustomConstraintTests(UtilityMethods):
         """
         Helper function to upload good data.
         """
-        symds_good = SymbolicDataset.create_SD(self.good_datafile,
-                cdt=self.cdt_constraints, user=self.user_oscar,
-                name="good data",
-                description="data which conforms to all its constraints")
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar,
+                                               cdt=self.cdt_constraints, name="good data",
+                                               description="data which conforms to all its constraints")
         return symds_good
 
     def _test_upload_data_bad(self):
         """
         Helper function to upload bad data.
         """
-        symds_bad = SymbolicDataset.create_SD(self.bad_datafile,
-                cdt=self.cdt_constraints, user=self.user_oscar,
-                name="good data",
-                description="data which conforms to all its constraints")
+        symds_bad = SymbolicDataset.create_SD(self.bad_datafile, user=self.user_oscar,
+                                              cdt=self.cdt_constraints, name="good data",
+                                              description="data which conforms to all its constraints")
         return symds_bad
 
     def _test_setup_prototype_good(self):
@@ -314,9 +318,9 @@ class CustomConstraintTests(UtilityMethods):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "True"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
-                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
-                description="working prototype for constraint CDT")
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
+                                                 cdt=prototype_cdt, name="good prototype",
+                                                 description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT, and make a new CDT.
@@ -332,9 +336,9 @@ class CustomConstraintTests(UtilityMethods):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "False"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
-                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
-                description="working prototype for constraint CDT")
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
+                                                 cdt=prototype_cdt, name="good prototype",
+                                                 description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT.
@@ -442,9 +446,9 @@ class CustomConstraintTests(UtilityMethods):
         CustomConstraints is uploaded with a working prototype.
         """
         cdt = self._test_setup_prototype_good()
-        symds_good = SymbolicDataset.create_SD(self.good_datafile,
-                cdt=cdt, user=self.user_oscar, name="good data",
-                description="data which conforms to all its constraints")
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar, cdt=cdt,
+                                               name="good data",
+                                               description="data which conforms to all its constraints")
         self.assertEqual(symds_good.clean(), None)
         content_check = symds_good.content_checks.first()
         self._test_content_check_integrity(content_check, None, symds_good)

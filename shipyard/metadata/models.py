@@ -9,9 +9,8 @@ from __future__ import unicode_literals
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
-from django.core.files import File
-from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
+from django.contrib.auth.models import User, Group
 
 import re
 import csv
@@ -24,7 +23,6 @@ from datetime import datetime
 
 from file_access_utils import set_up_directory
 from constants import datatypes, CDTs, maxlengths
-from datachecking.models import VerificationLog
 
 import logging
 
@@ -1342,3 +1340,16 @@ class CompoundDatatype(models.Model):
         Is this even possible?
         """
         return 0
+
+
+class AccessControl(models.Model):
+    """
+    Represents anything that belongs to a certain user.
+    """
+    user = models.ForeignKey(User)
+    public = models.BooleanField(default=False)
+    users_allowed = models.ManyToManyField(User, related_name="%(app_label)s_%(class)s_has_access_to")
+    groups_allowed = models.ManyToManyField(Group, related_name="%(app_label)s_%(class)s_has_access_to")
+
+    class Meta:
+        abstract = True

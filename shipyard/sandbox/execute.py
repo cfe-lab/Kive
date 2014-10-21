@@ -484,7 +484,7 @@ class Sandbox:
             if cable.is_trivial():
                 output_SD = input_SD
             if curr_ER is None:
-                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                output_SD = librarian.models.SymbolicDataset.create_empty(self.user, output_CDT)
             else:
                 output_SD = curr_ER.execrecordouts.first().symbolicdataset
             output_SD.mark_missing(start_time, end_time, curr_log)
@@ -507,8 +507,10 @@ class Sandbox:
                     output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_RS)
 
             else:
-                output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, self.user, 
-                                                                       dataset_name, dataset_desc, curr_record, False)
+                output_SD = librarian.models.SymbolicDataset.create_SD(output_path, self.user, cdt=output_CDT,
+                                                                       make_dataset=make_dataset,
+                                                                       name=dataset_name, description=dataset_desc,
+                                                                       created_by=curr_record, check=False)
 
         # Recovering? No.
         if not recover:
@@ -712,7 +714,7 @@ class Sandbox:
             if not file_access_utils.file_exists(output_path):
                 end_time = timezone.now()
                 if curr_ER is None:
-                    output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                    output_SD = librarian.models.SymbolicDataset.create_empty(self.user, output_CDT)
                 else:
                     output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
                 output_SD.mark_missing(start_time, end_time, curr_log)
@@ -733,8 +735,10 @@ class Sandbox:
                 dataset_desc = curr_RS.output_description(curr_output)
 
                 if not (recover or had_ER_at_beginning):
-                    output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset,
-                            self.user, dataset_name, dataset_desc, curr_RS, False)
+                    output_SD = librarian.models.SymbolicDataset.create_SD(output_path, self.user, cdt=output_CDT,
+                                                                           make_dataset=make_dataset,
+                                                                           name=dataset_name, description=dataset_desc,
+                                                                           created_by=curr_RS, check=False)
                     self.logger.debug("First time seeing file: saved md5 {}".format(output_SD.MD5_checksum))
                 else:
                     output_SD = output_ERO.symbolicdataset

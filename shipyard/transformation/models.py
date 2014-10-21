@@ -11,13 +11,16 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
+from django.contrib.auth.models import User, Group
+
+import metadata.models
 
 from constants import maxlengths
 
 import itertools
 
 @python_2_unicode_compatible
-class TransformationFamily(models.Model):
+class TransformationFamily(metadata.models.AccessControl):
     """
     TransformationFamily is abstract and describes common
     parameters between MethodFamily and PipelineFamily.
@@ -55,7 +58,7 @@ class TransformationFamily(models.Model):
 
 
 @python_2_unicode_compatible
-class Transformation(models.Model):
+class Transformation(metadata.models.AccessControl):
     """
     Abstract class that defines common parameters
     across Method revisions and Pipeline revisions.

@@ -5,9 +5,12 @@ from metadata.models import *
 
 class TransformationTestSetup(TestCase):
     def setUp(self):
+        self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')
+        self.transf_user.save()
+
         # Create some objects.
-        t = Transformation(); t.save()
-        Transformation().save()
+        t = Transformation(user=self.transf_user); t.save()
+        Transformation(user=self.transf_user).save()
 
         for i in range(4):
             TransformationInput(transformation=t, dataset_idx=i+1, dataset_name=str(i)).save()

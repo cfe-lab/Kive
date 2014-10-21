@@ -52,11 +52,10 @@ class DatasetForm (forms.Form):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        symbolicdataset = SymbolicDataset.create_SD(file_path=None, file_handle=self.cleaned_data['dataset_file'],
-                                                    cdt=compound_datatype_obj,
-                                                    make_dataset=True, user=user, name=self.cleaned_data['name'],
-                                                    description=self.cleaned_data['description'],
-                                                    created_by=None, check=True)
+        symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user, cdt=compound_datatype_obj,
+                                                    make_dataset=True, name=self.cleaned_data['name'],
+                                                    description=self.cleaned_data['description'], created_by=None,
+                                                    check=True, file_handle=self.cleaned_data['dataset_file'])
 
         return symbolicdataset
 
@@ -123,9 +122,9 @@ class BulkCSVDatasetForm (forms.Form):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        SymbolicDataset.create_SD_bulk(csv_file_path=None, csv_file_handle=self.cleaned_data['datasets_csv'],
-                                       cdt=compound_datatype_obj, make_dataset=True,
-                                       user=user, created_by=None, check=True)
+        SymbolicDataset.create_SD_bulk(cls=None, csv_file_path=None, user=user,
+                                       csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
+                                       make_dataset=True, created_by=None, check=True)
 
 
 
@@ -232,11 +231,10 @@ class BulkAddDatasetForm (forms.Form):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(file_path=None, file_handle=uploaded_file,
-                                                            cdt=compound_datatype_obj,
-                                                            make_dataset=True, user=user,
+                symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user,
+                                                            cdt=compound_datatype_obj, make_dataset=True,
                                                             name=auto_name, description=auto_description,
-                                                            created_by=None, check=True)
+                                                            created_by=None, check=True, file_handle=uploaded_file)
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)

@@ -29,13 +29,14 @@ import method.models
 import pipeline.models
 import transformation.models
 import datachecking.models
+import metadata.models
 import file_access_utils
 
 LOGGER = logging.getLogger(__name__)
 
 
 @python_2_unicode_compatible
-class SymbolicDataset(models.Model):
+class SymbolicDataset(metadata.models.AccessControl):
     """
     Symbolic representation of a (possibly temporary) data file.
 
@@ -217,7 +218,7 @@ class SymbolicDataset(models.Model):
         ccl.add_missing_output()
 
     @classmethod
-    def create_empty(cls, compound_datatype=None):
+    def create_empty(cls, user, compound_datatype=None):
         """Create an empty SymbolicDataset.
 
         INPUTS
@@ -227,8 +228,8 @@ class SymbolicDataset(models.Model):
         OUTPUTS
         empty_SD            SymbolicDataset with a blank MD5 and an
                             appropriate DatasetStructure
-        """
-        empty_SD = cls(MD5_checksum="")
+                """
+        empty_SD = cls(user=user, MD5_checksum="")
         empty_SD.clean()
         empty_SD.save()
         if compound_datatype:
@@ -237,8 +238,8 @@ class SymbolicDataset(models.Model):
         
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
-                  name=None, description=None, created_by=None, check=True, file_handle=None):
+    def create_SD(cls, file_path, user, public=True, users_allowed=None, groups_allowed=None, cdt=None,
+                  make_dataset=True, name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
     
@@ -261,7 +262,7 @@ class SymbolicDataset(models.Model):
             raise Exception("Must supply either the file path or file handle")
 
         with transaction.atomic():
-            symDS = cls.create_empty(cdt)
+            symDS = cls.create_empty(user, cdt)
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
@@ -285,6 +286,11 @@ class SymbolicDataset(models.Model):
             if make_dataset:
                 symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
                                        description=description, created_by=created_by)
+            else:
+                if symDS.is_raw():
+                    symDS.set_MD5(file_name, file_handle)
+                else:
+                    symDS.set_MD5_and_count_rows(file_name, file_handle)
 
             symDS.clean()
             symDS.save()
@@ -292,8 +298,8 @@ class SymbolicDataset(models.Model):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD_bulk(cls, csv_file_path, csv_file_handle=None, cdt=None, make_dataset=True, user=None,
-                       created_by=None, check=True):
+    def create_SD_bulk(cls, csv_file_path, user, csv_file_handle=None, cdt=None, make_dataset=True, created_by=None,
+                       check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
         Instead of specifying datasets one by one,
@@ -345,8 +351,8 @@ class SymbolicDataset(models.Model):
                         if not (name and desc and file):
                             raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
-                        symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
-                                                          description=desc, created_by=None, check=True)
+                        symDS = SymbolicDataset.create_SD(file, user=user, cdt=cdt, make_dataset=True,
+                                                          name=name, description=desc, created_by=None, check=True)
 
                         symDSs.extend([symDS])
             except Exception, e:
@@ -470,12 +476,9 @@ class SymbolicDataset(models.Model):
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
-            evil_twin = SymbolicDataset.create_SD(
-                    new_file_path,
-                    cdt=None,
-                    user=checking_user,
-                    name="{}eviltwin".format(self),
-                    description="MD5 conflictor of {}".format(self))
+            evil_twin = SymbolicDataset.create_SD(new_file_path, user=checking_user, cdt=None,
+                                                  name="{}eviltwin".format(self),
+                                                  description="MD5 conflictor of {}".format(self))
 
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()

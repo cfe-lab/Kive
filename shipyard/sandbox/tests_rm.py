@@ -46,6 +46,10 @@ def clean_files():
 class UtilityMethods():
 
     def setUp(self):
+        # An ordinary user.
+        self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
+        self.user_bob.save()
+
 
         self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
@@ -76,10 +80,6 @@ class UtilityMethods():
         self.method_noop_raw = self.make_first_method("raw noop", "do nothing to raw data", self.coderev_noop)
         self.simple_method_io(self.method_noop_raw, None, "raw", "same raw")
 
-        # An ordinary user.
-        self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
-        self.user_bob.save()
-
     def tearDown(self):
         os.remove(self.string_datafile.name)
         clean_files()
@@ -90,7 +90,8 @@ class UtilityMethods():
         without making any changes. Hook up the steps to each other, but don't
         create inputs and outputs for the new Pipeline.
         """
-        new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version")
+        new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version",
+                                user=self.user_bob)
         new_pipeline.save()
 
         for step in pipeline.steps.all():
@@ -186,14 +187,15 @@ class UtilityMethods():
         """
         Helper function to make a new MethodFamily for a new Method.
         """
-        family = MethodFamily(name=famname, description=famdesc)
+        family = MethodFamily(name=famname, description=famdesc, user=self.user_bob)
         family.clean()
         family.save()
         method = Method(
             revision_name="v1",
             revision_desc="first version",
             family=family,
-            driver=driver)
+            driver=driver,
+            user=self.user_bob)
         method.clean()
         method.save()
         family.clean()
@@ -204,10 +206,10 @@ class UtilityMethods():
         Helper function to make a new PipelineFamily and the first Pipeline
         member.  
         """
-        family = PipelineFamily(name=pname, description=pdesc)
+        family = PipelineFamily(name=pname, description=pdesc, user=self.user_bob)
         family.clean()
         family.save()
-        pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version")
+        pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=self.user_bob)
         pipeline.clean()
         pipeline.save()
         family.clean()
@@ -221,8 +223,8 @@ class UtilityMethods():
         os.system("head -1 /usr/share/dict/words >> {}".
                   format(self.string_datafile.name))
         self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
-            name="blahblah", cdt=self.cdt_string, user=self.user_bob,
-            description="blahblahblah", make_dataset=True)
+                                                     user=self.user_bob, cdt=self.cdt_string, make_dataset=True,
+                                                     name="blahblah", description="blahblahblah")
 
 
 class ExecuteTestsRM(UtilityMethods):
@@ -297,9 +299,9 @@ class ExecuteTestsRM(UtilityMethods):
         self.datafile.close()
 
         # Alice uploads the data to the system.
-        self.symds_labdata = SymbolicDataset.create_SD(self.datafile.name, name="lab data", cdt=self.cdt_record,
-                                                       user=self.user_alice, description="data from the lab",
-                                                       make_dataset=True)
+        self.symds_labdata = SymbolicDataset.create_SD(self.datafile.name, user=self.user_alice,
+                                                       cdt=self.cdt_record, make_dataset=True, name="lab data",
+                                                       description="data from the lab")
 
         # Now Alice is ready to run her pipelines. The system creates a Sandbox
         # where she will run each of her pipelines.
@@ -705,8 +707,8 @@ class BadRunTests(UtilityMethods):
             self.grandpa_datafile.write("{}\n".format(i))
         self.grandpa_datafile.close()
         self.symds_grandpa = SymbolicDataset.create_SD(self.grandpa_datafile.name,
-            name="numbers", cdt=self.cdt_string, user=self.user_grandpa,
-            description="numbers which are actually strings", make_dataset=True)
+                                                       user=self.user_grandpa, cdt=self.cdt_string, make_dataset=True,
+                                                       name="numbers", description="numbers which are actually strings")
         self.symds_grandpa.clean()
 
     def tearDown(self):
@@ -866,8 +868,8 @@ class FindSDTests(UtilityMethods):
         self.words_datafile.close()
 
         self.symds_backwords = SymbolicDataset.create_SD(self.words_datafile.name,
-            name="backwords", cdt=self.cdt_backwords, user=self.user_bob,
-            description="random reversed words", make_dataset=True)
+                                                         user=self.user_bob, cdt=self.cdt_backwords, make_dataset=True,
+                                                         name="backwords", description="random reversed words")
     
     def setup_simple_pipeline(self):
         # A simple, one-step pipeline, which does nothing.
@@ -997,9 +999,8 @@ class RawTests(UtilityMethods):
         self.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words",
-            name="raw", cdt=None, user=self.user_bob,
-            description="some raw data", make_dataset=True)
+        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words", user=self.user_bob,
+                                                   cdt=None, make_dataset=True, name="raw", description="some raw data")
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""

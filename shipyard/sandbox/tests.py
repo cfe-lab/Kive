@@ -9,7 +9,7 @@ from django.test import TestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, AccessControl
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
@@ -26,8 +26,8 @@ class ExecuteTests(TestCase):
 		# Users + method/pipeline families
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
-        self.mf = MethodFamily(name="self.mf",description="self.mf desc"); self.mf.save()
-        self.pf = PipelineFamily(name="self.pf", description="self.pf desc"); self.pf.save()
+        self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser); self.mf.save()
+        self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser); self.pf.save()
 
 		# Code on file system
         self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py")
@@ -59,20 +59,24 @@ class ExecuteTests(TestCase):
         self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
 
         self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
-            description="input to pipeline pX", cdt=self.pX_in_cdt)
+                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
+                                               user=self.myUser, cdt=self.pX_in_cdt,
+                                               name="pX_in_symDS", description="input to pipeline pX")
         self.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
-            description="input to pipeline pX", cdt=None)
+                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
+                                               user=self.myUser, cdt=None, name="pX_in_symDS",
+                                               description="input to pipeline pX")
 
         # Method + input/outputs
-        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr)
+        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+                         user=self.myUser)
         self.mA.save()
         self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
         self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
 
         # Define pipeline containing the method, and its input + outcables
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X",
+                           user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -87,9 +91,10 @@ class ExecuteTests(TestCase):
         self.pX.create_outputs()
 
         # Pipeline with raw input.
-        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X")
+        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X", user=self.myUser)
         pX_raw.save()
-        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr)
+        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+                        user=self.myUser)
         mA_raw.save()
         mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
         mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
@@ -155,7 +160,7 @@ class ExecuteTests(TestCase):
         """Two step pipeline with second step identical to the first"""
 
         # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -213,7 +218,7 @@ class ExecuteTests(TestCase):
         self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
 
         # Define 1-step inner pipeline pY
-        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y")
+        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y", user=self.myUser)
         self.pY.save()
         self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
 
@@ -236,7 +241,7 @@ class ExecuteTests(TestCase):
         self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(column_name="pXr",column_idx=1,datatype=self.string_dt)
 
         # Define outer 2-step pipeline with mA at step 1 and pY at step 2
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.pX_step_1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -260,12 +265,12 @@ class ExecuteTests(TestCase):
 
         # Dataset for input during execution of pipeline
         input_SD = SymbolicDataset.create_SD(
-            file_path=os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
-            cdt=self.pX_in_cdt,
-            make_dataset=True,
+            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
             user=self.myUser,
-            name="input_dataset",
-            description="symDS description")
+            cdt=self.pX_in_cdt,
+            make_dataset=True, name="input_dataset",
+            description="symDS description"
+        )
 
         # Execute pipeline
         pipeline = self.pX
@@ -361,7 +366,7 @@ class SandboxTests(ExecuteTests):
         """
         A Sandbox cannot be created if the pipeline has inputs but none are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
@@ -372,7 +377,7 @@ class SandboxTests(ExecuteTests):
         """
         A Sandbox cannot be created if the pipeline has fewer inputs than are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
@@ -382,7 +387,7 @@ class SandboxTests(ExecuteTests):
         """
         We can create a Sandbox if the supplied inputs match the pipeline inputs.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 8, max_row = 12)
@@ -393,7 +398,7 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects raw input and we give it nonraw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -405,13 +410,14 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects non-raw input and we give it raw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo", description="bar")
+        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo",
+                                              description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
@@ -423,7 +429,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -437,7 +443,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 2, max_row = 4)
@@ -451,7 +457,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 20)
