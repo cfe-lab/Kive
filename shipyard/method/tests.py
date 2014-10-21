@@ -41,7 +41,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.comp_cr = CodeResource(
             name="complement",
             description="Complement DNA/RNA nucleotide sequences",
-            filename="complement.py")
+            filename="complement.py",
+            user=self.myUser)
         self.comp_cr.save()
 
         # Define compv1_crRev for comp_cr
@@ -50,7 +51,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 coderesource=self.comp_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.compv1_crRev.full_clean()
             self.compv1_crRev.save()
 
@@ -61,7 +63,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 revision_name="v2",
                 revision_desc="Second version: better docstring",
                 revision_parent=self.compv1_crRev,
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.compv2_crRev.full_clean()
             self.compv2_crRev.save()
 
@@ -69,58 +72,66 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         with open(os.path.join(samplecode_path, "test_cr.py"), "rb") as f:
             test_cr_1 = CodeResource(name="test_cr_1",
                                      filename="test_cr_1.py",
-                                     description="CR1")
+                                     description="CR1",
+                                     user=self.myUser)
             test_cr_1.save()
             test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
                                                   revision_name="v1",
                                                   revision_desc="CR1-rev1",
-                                                  content_file=File(f))
+                                                  content_file=File(f),
+                                                  user=self.myUser)
             test_cr_1_rev1.save()
             self.test_cr_1 = test_cr_1
             self.test_cr_1_rev1 = test_cr_1_rev1
             
             test_cr_2 = CodeResource(name="test_cr_2",
                                      filename="test_cr_2.py",
-                                     description="CR2")
+                                     description="CR2",
+                                     user=self.myUser)
             test_cr_2.save()
             test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
                                                   revision_name="v1",
                                                   revision_desc="CR2-rev1",
-                                                  content_file=File(f))
+                                                  content_file=File(f),
+                                                  user=self.myUser)
             test_cr_2_rev1.save()
             self.test_cr_2 = test_cr_2
             self.test_cr_2_rev1 = test_cr_2_rev1
     
             test_cr_3 = CodeResource(name="test_cr_3",
                                      filename="test_cr_3.py",
-                                     description="CR3")
+                                     description="CR3",
+                                     user=self.myUser)
             test_cr_3.save()
             test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
                                                   revision_name="v1",
                                                   revision_desc="CR3-rev1",
-                                                  content_file=File(f))
+                                                  content_file=File(f),
+                                                  user=self.myUser)
             test_cr_3_rev1.save()
             self.test_cr_3 = test_cr_3
             self.test_cr_3_rev1 = test_cr_3_rev1
     
             test_cr_4 = CodeResource(name="test_cr_4",
                                      filename="test_cr_4.py",
-                                     description="CR4")
+                                     description="CR4",
+                                     user=self.myUser)
             test_cr_4.save()
             test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
                                                   revision_name="v1",
                                                   revision_desc="CR4-rev1",
-                                                  content_file=File(f))
+                                                  content_file=File(f),
+                                                  user=self.myUser)
             test_cr_4_rev1.save()
             self.test_cr_4 = test_cr_4
             self.test_cr_4_rev1 = test_cr_4_rev1
 
 
-
         # Define DNAcomp_mf
         self.DNAcomp_mf = MethodFamily(
             name="DNAcomplement",
-            description="Complement DNA nucleotide sequences.")
+            description="Complement DNA nucleotide sequences.",
+            user=self.myUser)
         self.DNAcomp_mf.full_clean()
         self.DNAcomp_mf.save()
 
@@ -128,7 +139,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.DNAcompv1_m = self.DNAcomp_mf.members.create(
             revision_name="v1",
             revision_desc="First version",
-            driver=self.compv1_crRev)
+            driver=self.compv1_crRev,
+            user=self.myUser)
 
         # Add input DNAinput_cdt to DNAcompv1_m
         self.DNAinput_ti = self.DNAcompv1_m.create_input(
@@ -154,7 +166,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="v2",
             revision_desc="Second version",
             revision_parent=self.DNAcompv1_m,
-            driver=self.compv2_crRev)
+            driver=self.compv2_crRev,
+            user=self.myUser)
         self.DNAcompv2_m.full_clean()
         self.DNAcompv2_m.save()
         self.DNAcompv2_m.copy_io_from_parent()
@@ -162,7 +175,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # Define second family, RNAcomp_mf
         self.RNAcomp_mf = MethodFamily(
             name="RNAcomplement",
-            description="Complement RNA nucleotide sequences.")
+            description="Complement RNA nucleotide sequences.",
+            user=self.myUser)
         self.RNAcomp_mf.full_clean()
         self.RNAcomp_mf.save()
 
@@ -170,7 +184,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.RNAcompv1_m = self.RNAcomp_mf.members.create(
             revision_name="v1",
             revision_desc="First version",
-            driver=self.compv1_crRev)
+            driver=self.compv1_crRev,
+            user=self.myUser)
         
         # Add input RNAinput_cdt to RNAcompv1_m
         self.RNAinput_ti = self.RNAcompv1_m.create_input(
@@ -194,14 +209,16 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="v2",
             revision_desc="Second version",
             revision_parent=self.RNAcompv1_m,
-            driver=self.compv2_crRev)
+            driver=self.compv2_crRev,
+            user=self.myUser)
         self.RNAcompv2_m.full_clean()
         self.RNAcompv2_m.save()
         self.RNAcompv2_m.copy_io_from_parent()
 
         # Create method family for script_1_method / script_2_method / script_3_method
         self.test_mf = MethodFamily(name="Test method family",
-                                    description="Holds scripts 1/2/3")
+                                    description="Holds scripts 1/2/3",
+                                    user=self.myUser)
         self.test_mf.full_clean()
         self.test_mf.save()
 
@@ -210,7 +227,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # OUTPUT: 1 csv containing (x+y,xy)
         self.script_1_cr = CodeResource(name="Sum and product of x and y",
                                         filename="script_1_sum_and_products.py",
-                                        description="Addition and multiplication")
+                                        description="Addition and multiplication",
+                                        user=self.myUser)
         self.script_1_cr.save()
 
         # Add code resource revision for code resource (script_1_sum_and_products ) 
@@ -219,14 +237,17 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 coderesource=self.script_1_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.script_1_crRev.save()
 
         # Establish code resource revision as a method
         self.script_1_method = Method(
             revision_name="script1",
             revision_desc="script1",
-            family = self.test_mf,driver = self.script_1_crRev)
+            family = self.test_mf,
+            driver = self.script_1_crRev,
+            user=self.myUser)
         self.script_1_method.save()
 
         # Assign tuple as both an input and an output to script_1_method
@@ -245,7 +266,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # OUTPUT-2: 1 csv containing singlet mean(a,b,c)
         self.script_2_cr = CodeResource(name="Square and mean of (a,b,c)",
                                         filename="script_2_square_and_means.py",
-                                        description="Square and mean - 2 CSVs")
+                                        description="Square and mean - 2 CSVs",
+                                        user=self.myUser)
         self.script_2_cr.save()
 
         # Add code resource revision for code resource (script_2_square_and_means)
@@ -254,14 +276,17 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 coderesource=self.script_2_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.script_2_crRev.save()
 
         # Establish code resource revision as a method
         self.script_2_method = Method(
             revision_name="script2",
             revision_desc="script2",
-            family = self.test_mf, driver = self.script_2_crRev)
+            family = self.test_mf,
+            driver = self.script_2_crRev,
+            user=self.myUser)
         self.script_2_method.save()
 
         # Assign triplet as input and output,
@@ -286,7 +311,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # OUTPUT-1: Single column r*(k)
         self.script_3_cr = CodeResource(name="Scalar multiple of k",
                                         filename="script_3_product.py",
-                                        description="Product of input")
+                                        description="Product of input",
+                                        user=self.myUser)
         self.script_3_cr.save()
 
         # Add code resource revision for code resource (script_3_product)
@@ -295,7 +321,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 coderesource=self.script_3_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.script_3_crRev.save()
 
         # Establish code resource revision as a method
@@ -303,7 +330,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="script3",
             revision_desc="script3",
             family = self.test_mf,
-            driver = self.script_3_crRev)
+            driver = self.script_3_crRev,
+            user=self.myUser)
         self.script_3_method.save()
 
         # Assign singlet as input and output
@@ -329,7 +357,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # DNArecomp_mf is a MethodFamily called DNArecomplement
         self.DNArecomp_mf = MethodFamily(
             name="DNArecomplement",
-            description="Re-complement DNA nucleotide sequences.")
+            description="Re-complement DNA nucleotide sequences.",
+            user=self.myUser)
         self.DNArecomp_mf.full_clean()
         self.DNArecomp_mf.save()
 
@@ -337,7 +366,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.DNArecomp_m = self.DNArecomp_mf.members.create(
             revision_name="v1",
             revision_desc="First version",
-            driver=self.compv2_crRev)
+            driver=self.compv2_crRev,
+            user=self.myUser)
 
         # To this method revision, add inputs with CDT DNAoutput_cdt
         self.DNArecomp_m.create_input(
@@ -361,7 +391,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # Define CR in order to define CRR
         self.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
             filename="script_4_raw_in_CSV_out.py",
-            description="Given (a,b,c), outputs (a^2,b^2,c^2)")
+            description="Given (a,b,c), outputs (a^2,b^2,c^2)",
+            user=self.myUser)
         self.script_4_CR.save()
 
         # Define CRR for this CR in order to define method
@@ -370,13 +401,15 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                 coderesource=self.script_4_CR,
                 revision_name="v1",
                 revision_desc="v1",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             self.script_4_1_CRR.save()
 
         # Define MF in order to define method
         self.test_MF = MethodFamily(
             name="test method family",
-            description="method family placeholder")
+            description="method family placeholder",
+            user=self.myUser)
         self.test_MF.full_clean()
         self.test_MF.save()
 
@@ -385,7 +418,8 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
             revision_name="s4",
             revision_desc="s4",
             family = self.test_MF,
-            driver = self.script_4_1_CRR)
+            driver = self.script_4_1_CRR,
+            user=self.myUser)
         self.script_4_1_M.save()
 
         self.script_4_1_M.create_input(compounddatatype=self.triplet_cdt, 
@@ -396,11 +430,12 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.testmethod = self.script_4_1_M
 
         # Some code for a no-op method.
-        resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
+        resource = CodeResource(name="noop", filename="noop.sh", user=self.myUser)
+        resource.save()
         with tempfile.NamedTemporaryFile() as f:
             f.write("#!/bin/bash\ncat $1")
             self.noop_data_file = f.name
-            revision = CodeResourceRevision(coderesource = resource, content_file = File(f))
+            revision = CodeResourceRevision(coderesource = resource, content_file = File(f), user=self.myUser)
             revision.clean()
             revision.save()
 
@@ -411,9 +446,10 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
         string_cdt.full_clean()
         
-        mfamily = MethodFamily(name="noop"); mfamily.save()
+        mfamily = MethodFamily(name="noop", user=self.myUser); mfamily.save()
         self.noop_method = Method(family=mfamily, driver=revision,
-            revision_name = "1", revision_desc = "first version")
+                                  revision_name = "1", revision_desc = "first version",
+                                  user=self.myUser)
         self.noop_method.save()
         self.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
         self.noop_method.clean()
@@ -445,7 +481,7 @@ class CodeResourceTests(MethodTestSetup):
         """
         Clean passes when codeResource name is file-system valid
         """
-        valid_cr = CodeResource(name="name", filename="validName", description="desc")
+        valid_cr = CodeResource(name="name", filename="validName", description="desc", user=self.myUser)
         valid_cr.save()
         self.assertIsNone(valid_cr.clean())
 
@@ -454,7 +490,7 @@ class CodeResourceTests(MethodTestSetup):
         Clean passes when codeResource name is file-system valid
         """
         valid_cr = CodeResource(name="anotherName", filename="valid.Name with-spaces_and_underscores().py",
-                                description="desc")
+                                description="desc", user=self.myUser)
         valid_cr.save()
         self.assertIsNone(valid_cr.clean())
 
@@ -463,7 +499,7 @@ class CodeResourceTests(MethodTestSetup):
         Clean fails when CodeResource name isn't file-system valid
         """
 
-        invalid_cr = CodeResource(name="test", filename="../test.py", description="desc")
+        invalid_cr = CodeResource(name="test", filename="../test.py", description="desc", user=self.myUser)
         invalid_cr.save()
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
@@ -471,9 +507,7 @@ class CodeResourceTests(MethodTestSetup):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name="test",
-                                  filename=" test.py",
-                                  description="desc")
+        invalid_cr = CodeResource(name="test", filename=" test.py", description="desc", user=self.myUser)
         invalid_cr.save()
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
@@ -481,9 +515,7 @@ class CodeResourceTests(MethodTestSetup):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name="name",
-                                  filename="test$.py",
-                                  description="desc")
+        invalid_cr = CodeResource(name="name", filename="test$.py", description="desc", user=self.myUser)
         invalid_cr.save()
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
@@ -491,9 +523,7 @@ class CodeResourceTests(MethodTestSetup):
         """  
         Clean fails when CodeResource name isn't file-system valid
         """
-        invalid_cr = CodeResource(name="name",
-                                  filename="test.py ",
-                                  description="desc")
+        invalid_cr = CodeResource(name="name", filename="test.py ", description="desc", user=self.myUser)
         invalid_cr.save()
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
@@ -687,7 +717,8 @@ class CodeResourceRevisionTests(MethodTestSetup):
         cr = CodeResource(
                 name="test_complement",
                 filename="",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr.save()
 
         # So it's revision does not have a content_file
@@ -696,7 +727,8 @@ class CodeResourceRevisionTests(MethodTestSetup):
                     coderesource=cr,
                     revision_name="v1",
                     revision_desc="First version",
-                    content_file=File(f))
+                    content_file=File(f),
+                    user=self.myUser)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -712,14 +744,16 @@ class CodeResourceRevisionTests(MethodTestSetup):
         cr = CodeResource(
                 name="nonmetapackage",
                 filename="foo",
-                description="Associated CRRs should have a content file")
+                description="Associated CRRs should have a content file",
+                user=self.myUser)
         cr.save()
 
         # Create a revision without a content_file.
         cr_rev_v1 = CodeResourceRevision(
                 coderesource=cr,
                 revision_name="v1",
-                revision_desc="Has no content file!")
+                revision_desc="Has no content file!",
+                user=self.myUser)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -733,14 +767,16 @@ class CodeResourceRevisionTests(MethodTestSetup):
         """
         cr = CodeResource(name="foo",
                           filename="",
-                          description="Some metapackage")
+                          description="Some metapackage",
+                          user=self.myUser)
         cr.save()
         
         # Create crRev with a codeResource but no file contents
         no_file_crRev = CodeResourceRevision(
                 coderesource=cr,
                 revision_name="foo",
-                revision_desc="foo")
+                revision_desc="foo",
+                user=self.myUser)
   
         no_file_crRev.clean()
 
@@ -1244,13 +1280,15 @@ class CodeResourceRevisionTests(MethodTestSetup):
         # The following is for testing code resource dependencies
         test_cr_6 = CodeResource(name="test_cr_6",
                                  filename="",
-                                 description="CR6")
+                                 description="CR6",
+                                 user=self.myUser)
         test_cr_6.save()
 
         # The revision has no content_file because it's a metapackage
         test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
                                               revision_name="v1_metapackage",
-                                              revision_desc="CR6-rev1")
+                                              revision_desc="CR6-rev1",
+                                              user=self.myUser)
         test_cr_6_rev1.save()
 
         # Current-folder dependencies
@@ -1410,7 +1448,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr = CodeResource(
                 name="testing_complement",
                 filename="complement.py",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr.save()
 
         # Define cr_rev_v1 for cr
@@ -1419,7 +1458,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
                     coderesource=cr,
                     revision_name="v1",
                     revision_desc="First version",
-                    content_file=File(f))
+                    content_file=File(f),
+                    user=self.myUser)
             cr_rev_v1.full_clean()
             cr_rev_v1.save()
 
@@ -1429,7 +1469,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
                     coderesource=cr,
                     revision_name="v2",
                     revision_desc="Second version",
-                    content_file=File(f))
+                    content_file=File(f),
+                    user=self.myUser)
             cr_rev_v2.full_clean()
             cr_rev_v2.save()
 
@@ -1447,7 +1488,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr = CodeResource(
                 name="test_complement",
                 filename="test.py",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr.save()
 
         # Give it a file
@@ -1456,7 +1498,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
                 coderesource=cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             cr_rev_v1.full_clean()
             cr_rev_v1.save()
         
@@ -1464,14 +1507,16 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr_meta = CodeResource(
                 name="test2_complement",
                 filename="",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr_meta.save()
 
         # Do not give it a file
         cr_meta_rev_v1 = CodeResourceRevision(
             coderesource=cr_meta,
             revision_name="v1",
-            revision_desc="First version")
+            revision_desc="First version",
+            user=self.myUser)
         cr_meta_rev_v1.full_clean()
         cr_meta_rev_v1.save()
 
@@ -1492,7 +1537,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr = CodeResource(
                 name="test_complement",
                 filename="test.py",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr.save()
 
         # Give it a file
@@ -1501,7 +1547,8 @@ class CodeResourceDependencyTests(MethodTestSetup):
                 coderesource=cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.myUser)
             cr_rev_v1.full_clean()
             cr_rev_v1.save()
         
@@ -1509,14 +1556,16 @@ class CodeResourceDependencyTests(MethodTestSetup):
         cr_meta = CodeResource(
                 name="test2_complement",
                 filename="",
-                description="Complement DNA/RNA nucleotide sequences")
+                description="Complement DNA/RNA nucleotide sequences",
+                user=self.myUser)
         cr_meta.save()
 
         # Do not give it a file
         cr_meta_rev_v1 = CodeResourceRevision(
             coderesource=cr_meta,
             revision_name="v1",
-            revision_desc="First version")
+            revision_desc="First version",
+            user=self.myUser)
         cr_meta_rev_v1.full_clean()
         cr_meta_rev_v1.save()
 
@@ -1738,13 +1787,15 @@ class CodeResourceRevisionInstallTests(MethodTestSetup):
         self.metapackage = CodeResource(
             name="metapackage",
             description="Collection of modules",
-            filename="")
+            filename="",
+            user=self.myUser)
         self.metapackage.save()
 
         self.metapackage_r1 = CodeResourceRevision(
             coderesource=self.metapackage,
             revision_name="v1",
             revision_desc="First version",
+            user=self.myUser
         )
         self.metapackage_r1.save()
 
@@ -1823,7 +1874,7 @@ class MethodTests(MethodTestSetup):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", driver=self.compv1_crRev)
+                     revision_desc="Foo version", driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # check_input_indices() should not raise a ValidationError
@@ -1839,7 +1890,7 @@ class MethodTests(MethodTestSetup):
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # Add one valid input cdt at index 1 named "oneinput" to transformation
@@ -1859,7 +1910,7 @@ class MethodTests(MethodTestSetup):
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # Add several input cdts that together are valid
@@ -1883,7 +1934,7 @@ class MethodTests(MethodTestSetup):
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # Add several input cdts that together are valid
@@ -1906,7 +1957,7 @@ class MethodTests(MethodTestSetup):
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
                      revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # Add one invalid input cdt at index 4 named "oneinput"
@@ -1927,7 +1978,7 @@ class MethodTests(MethodTestSetup):
     def test_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=2)
@@ -1948,7 +1999,7 @@ class MethodTests(MethodTestSetup):
     def test_no_outputs_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
@@ -1959,7 +2010,7 @@ class MethodTests(MethodTestSetup):
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
                           dataset_name="oneoutput", dataset_idx=1)
@@ -1971,7 +2022,7 @@ class MethodTests(MethodTestSetup):
     def test_many_valid_outputs_scrambled_checkOutputIndices_good (self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
@@ -1987,7 +2038,7 @@ class MethodTests(MethodTestSetup):
     def test_one_invalid_output_checkOutputIndices_bad (self):
         """Test output index check, one badly-indexed output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
@@ -2006,7 +2057,7 @@ class MethodTests(MethodTestSetup):
     def test_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -2032,7 +2083,7 @@ class MethodTests(MethodTestSetup):
 
         # Define new Method with no parent
         foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
-                     driver=self.compv1_crRev)
+                     driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
         # There should be no inputs
@@ -2130,7 +2181,7 @@ class MethodTests(MethodTestSetup):
 
         # Multiple output case (using script_2_method).
         foo = Method(family=self.test_mf, driver=self.script_2_crRev,
-                     revision_parent=self.script_2_method)
+                     revision_parent=self.script_2_method, user=self.myUser)
         foo.save()
         foo.copy_io_from_parent()
         # Check that it has the same input as script_2_method:
@@ -2159,7 +2210,7 @@ class MethodTests(MethodTestSetup):
 
         # Multiple input case (using script_3_method).
         bar = Method(family=self.test_mf, driver=self.script_3_crRev,
-                     revision_parent=self.script_3_method)
+                     revision_parent=self.script_3_method, user=self.myUser)
         bar.save()
         bar.copy_io_from_parent()
         # Check that the outputs match script_3_method:
@@ -2256,10 +2307,10 @@ class MethodTests(MethodTestSetup):
         A metapackage cannot be a driver for a Method.
         """
         # Create a CodeResourceRevision with no content file (ie. a Metapackage).
-        res = CodeResource(); res.save()
-        rev = CodeResourceRevision(coderesource=res, content_file=None); rev.clean(); rev.save()
-        f = MethodFamily(); f.save()
-        m = Method(family=f, driver=rev)
+        res = CodeResource(user=self.myUser); res.save()
+        rev = CodeResourceRevision(coderesource=res, content_file=None, user=self.myUser); rev.clean(); rev.save()
+        f = MethodFamily(user=self.myUser); f.save()
+        m = Method(family=f, driver=rev, user=self.myUser)
         m.save()
         m.create_input(compounddatatype = self.singlet_cdt,
             dataset_name = "input",
@@ -2302,7 +2353,8 @@ class MethodTests(MethodTestSetup):
     def test_identical_different_names(self):
         """Two methods differing only in names are identical."""
         m1 = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
-        m2 = Method(revision_name="x" + m1.revision_name, driver=m1.driver, family=MethodFamily.objects.first())
+        m2 = Method(revision_name="x" + m1.revision_name, driver=m1.driver, family=MethodFamily.objects.first(),
+                    user=self.myUser)
         m2.save()
         for input in m1.inputs.order_by("dataset_idx"):
             m2.create_input("x" + input.dataset_name, 
@@ -2323,7 +2375,7 @@ class MethodTests(MethodTestSetup):
         """Two methods with identical IO, but different drivers, are not identical."""
         m1 = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
         driver = CodeResourceRevision.objects.exclude(pk=m1.driver.pk).first()
-        m2 = Method(revision_name=m1.revision_name, driver=driver, family=m1.family)
+        m2 = Method(revision_name=m1.revision_name, driver=driver, family=m1.family, user=self.myUser)
         m2.save()
         for input in m1.inputs.order_by("dataset_idx"):
             m2.create_input("x" + input.dataset_name, 
@@ -2345,7 +2397,7 @@ class MethodTests(MethodTestSetup):
         cdts = CompoundDatatype.objects.all()[:2]
         family = MethodFamily.objects.first()
         driver = CodeResourceRevision.objects.first()
-        m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver)
+        m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver, user=self.myUser)
         self.assertIsNone(m.complete_clean())
 
     def test_create_identical(self):
@@ -2367,7 +2419,8 @@ class MethodTests(MethodTestSetup):
                 row_limits=row_limits, 
                 num_inputs=num_inputs,
                 driver=m.driver, 
-                family=m.family)
+                family=m.family,
+                user=self.myUser)
         self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
 
 class MethodFamilyTests(MethodTestSetup):

@@ -44,10 +44,11 @@ class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
         # CRs and CRRs
         self.generic_cr = CodeResource(
             name="genericCR", description="Just a CR",
-            filename="generic_script.py")
+            filename="generic_script.py", user=self.myUser)
         self.generic_cr.save()
         self.generic_crRev = CodeResourceRevision(
-            coderesource=self.generic_cr, revision_name="v1", revision_desc="desc")
+            coderesource=self.generic_cr, revision_name="v1", revision_desc="desc",
+            user=self.myUser)
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.generic_crRev.content_file.save("generic_script.py", File(f))
         self.generic_crRev.save()

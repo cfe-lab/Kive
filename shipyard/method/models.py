@@ -14,6 +14,7 @@ from django.core.validators import RegexValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 
+import metadata.models
 import transformation.models
 import file_access_utils
 from constants import maxlengths
@@ -29,7 +30,7 @@ import logging
 import shutil
 
 @python_2_unicode_compatible
-class CodeResource(models.Model):
+class CodeResource(metadata.models.AccessControl):
     """
     A CodeResource is any file tracked by Shipyard.
     Related to :model:`method.CodeResourceRevision`
@@ -76,7 +77,7 @@ class CodeResource(models.Model):
     
 
 @python_2_unicode_compatible
-class CodeResourceRevision(models.Model):
+class CodeResourceRevision(metadata.models.AccessControl):
     """
     A particular revision of a code resource.
 

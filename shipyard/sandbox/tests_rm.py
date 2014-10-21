@@ -168,7 +168,7 @@ class UtilityMethods():
         Helper function to make a CodeResource and the first version.
         """
         resource = CodeResource(name=resname, description=resdesc, 
-            filename=resfn)
+            filename=resfn, user=self.user_bob)
         resource.clean()
         resource.save()
         with tempfile.TemporaryFile() as f:
@@ -177,7 +177,8 @@ class UtilityMethods():
                 coderesource=resource,
                 revision_name="1",
                 revision_desc="first version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_bob)
             revision.clean()
             revision.save()
         resource.clean()

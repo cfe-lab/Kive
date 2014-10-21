@@ -8,7 +8,6 @@ from django.core.exceptions import ValidationError
 from metadata.models import *
 from method.models import CodeResourceRevision
 from archive.models import Dataset
-from librarian.models import SymbolicDataset, DatasetStructure
 
 from constants import datatypes, CDTs
 
