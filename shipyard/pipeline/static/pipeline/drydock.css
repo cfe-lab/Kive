@@ -7,7 +7,7 @@
     margin-top: -2.5em;
 }
 #pipeline_ctrl {
-    position: fixed;
+    position: absolute;
     top: 46px; left: 0;
     width: 100%;
     height: 1.5em;
@@ -92,4 +92,35 @@ ul#id_ctrl_nav li:hover {
 }
 #dialog_form form > * {
     display: block;
+}
+#dialog_form #output_name_error {
+    display: none;
+    font-weight: bold;
+    padding: 0.25em;
+    background-color: #fff;
+    background-color: rgba(255,255,255,0.7);
+    text-align: center;
+    position: absolute;
+}
+
+.context_menu {
+    position: absolute;
+    display: none;
+    border: 1px solid #ddd;
+    font-size: 1em;
+}
+.context_menu ul {
+    display: block;
+    margin: 0; padding: 0;
+    background-color: #fff;
+}
+.context_menu li {
+    display: block;
+    margin: 0; padding: 0.7em;
+    background-color: #fff;
+    padding-right: 1.5em;
+    cursor: pointer;
+}
+.context_menu li:hover {
+    background-color: #eee;
 }

@@ -69,6 +69,10 @@ function CanvasState (canvas) {
     canvas.addEventListener('mouseup', function(e) {
         myState.doUp(e);
     }, true);
+    
+    canvas.addEventListener('contextmenu', function(e) {
+        myState.contextMenu(e);
+    }, true);
 
     // options
     this.selectionColor = '#7bf';
@@ -131,6 +135,7 @@ CanvasState.prototype.doDown = function(e) {
             this.selection = connectors[i];
             this.dragoffx = this.dragoffy = 0;
             this.dragging = true;
+//            connectors[i].debug(this.ctx);
             this.valid = false;
             return;
         }
@@ -490,6 +495,14 @@ CanvasState.prototype.doUp = function(e) {
     }
 };
 
+CanvasState.prototype.contextMenu = function(e) {
+    var pos = this.getPos(e);
+    if (this.selection && this.selection.constructor != Connector) {
+        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+    }
+    this.doUp(e);
+    e.preventDefault();
+};
 
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
@@ -588,7 +601,7 @@ CanvasState.prototype.draw = function() {
 };
 
 CanvasState.prototype.getPos = function(e) {
-    // returns a JavaScript object with x, y coordinates defined
+    // returns an object with x, y coordinates defined
     var element = this.canvas, offsetX = 0, offsetY = 0, mx, my;
 
     if (typeof element.offsetParent !== 'undefined') {
@@ -647,7 +660,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
             // delete Connectors terminating in this shape
             in_magnets = mySel.in_magnets;
             for (i = 0; i < in_magnets.length; i++) {
-                if (in_magnet.connected.length > 0) {
+                if (in_magnets[i].connected.length > 0) {
                     this.deleteObject(in_magnets[i].connected[0]);
                 }
             }
@@ -655,8 +668,8 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
             // delete Connectors from this shape to other nodes
             out_magnets = mySel.out_magnets;
             for (i = 0; i < out_magnets.length; i++) {
-                for (j = 0; j < out_magnets[i].connected.length; j++) {
-                    this.deleteObject(out_magnets[i].connected[j]);
+                for (j = out_magnets[i].connected.length; j > 0; j--) {// this loop done in reverse so that deletions do not re-index the array
+                    this.deleteObject(out_magnets[i].connected[j - 1]);
                 }
             }
 
