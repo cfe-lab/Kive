@@ -37,6 +37,12 @@
             <td>{{ resource_form.resource_desc }}</td>
             <td><div class="errortext">{{ resource_form.resource_desc.errors }}</div></td>
         </tr>
+        <tr>
+            <th>{{ resource_form.shared.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.shared.help_text }}</div></td>
+            <td>{{ resource_form.shared }}</td>
+            <td><div class="errortext">{{ resource_form.shared.errors }}</div></td>
+        </tr>
 
     </table>
 

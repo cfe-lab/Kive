@@ -7,6 +7,7 @@ from django.core.files import File
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db.models import Count
+from django.contrib.auth.models import Group
 
 import re
 import os.path
@@ -24,7 +25,7 @@ import sandbox.tests_rm
 
 from django.core import serializers
 
-from constants import datatypes
+from constants import datatypes, groups
 
 samplecode_path = "../samplecode"
 
@@ -4053,7 +4054,6 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
             set(dict_repr.keys()),
             {
                 "user",
-                "public",
                 "users_allowed",
                 "groups_allowed",
                 "family_pk",
@@ -4069,7 +4069,6 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
             })
 
         self.assertEquals(dict_repr["user"], pipeline.user.pk)
-        self.assertEquals(dict_repr["public"], pipeline.public)
         self.assertSetEqual(
             set(dict_repr["users_allowed"]),
             {u.pk for u in pipeline.users_allowed.all()}
@@ -5057,7 +5056,6 @@ cat "$3" >> "$5"
         """
         pipeline_dict = {
             "user": self.user_bob.pk,
-            "public": True,
             "users_allowed": [],
             "groups_allowed": [],
 
@@ -5326,7 +5324,6 @@ tail -n +2 "$2" >> "$3"
 
         complex_pipeline_dict = {
             "user": self.user_bob.pk,
-            "public": True,
             "users_allowed": [],
             "groups_allowed": [],
 

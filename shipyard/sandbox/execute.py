@@ -350,7 +350,8 @@ class Sandbox:
         end_time        time when we finished checking for missing output
         """
         self.logger.error("File doesn't exist - creating CCL with BadData")
-        ccl = output_SD.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog)
+        ccl = output_SD.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog,
+                                              user=self.user)
         ccl.add_missing_output()
             
     def execute_cable(self, cable, parent_record, recovering_record=None, input_SD=None, output_path=None):
@@ -487,7 +488,7 @@ class Sandbox:
                 output_SD = librarian.models.SymbolicDataset.create_empty(self.user, output_CDT)
             else:
                 output_SD = curr_ER.execrecordouts.first().symbolicdataset
-            output_SD.mark_missing(start_time, end_time, curr_log)
+            output_SD.mark_missing(start_time, end_time, curr_log, self.user)
             missing_output = True
 
         elif cable.is_trivial():
@@ -547,7 +548,7 @@ class Sandbox:
                 summary_path = "{}_summary".format(output_path)
                 # Perform content check.
                 output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                              cable.max_rows_out, curr_log)
+                                              cable.max_rows_out, curr_log, self.user)
 
             # Check OK, and not recovering? Yes.
             if output_SD.is_OK() and not recover:
@@ -717,7 +718,7 @@ class Sandbox:
                     output_SD = librarian.models.SymbolicDataset.create_empty(self.user, output_CDT)
                 else:
                     output_SD = curr_ER.get_execrecordout(curr_output).symbolicdataset
-                output_SD.mark_missing(start_time, end_time, curr_log)
+                output_SD.mark_missing(start_time, end_time, curr_log, self.user)
 
                 # FIXME continue from here -- for whatever reason an integrity check is still
                 # happening after this!
@@ -777,7 +778,7 @@ class Sandbox:
                 self.logger.debug("{} is new data - performing content check".format(output_SD))
                 summary_path = "{}_summary".format(output_path)
                 check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
-                                                      curr_output.get_max_row(), curr_log)
+                                                      curr_output.get_max_row(), curr_log, self.user)
 
             # Check OK? No.
             if check and check.is_fail():

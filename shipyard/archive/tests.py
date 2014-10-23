@@ -101,7 +101,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log)
+        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic": return
 
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
@@ -124,7 +124,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
+        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         if bp == "second_runstep_complete": return
 
         # Associate and complete sub-Pipeline.
@@ -135,8 +135,8 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
                                         [self.D1_in_symDS, self.singlet_symDS])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
+        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         C1_ccl = self.C1_in_symDS.content_checks.first()
@@ -147,7 +147,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
+        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
 
         if bp == "sub_pipeline": return
 
@@ -170,7 +170,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         if bp == "first_cable_created": return
 
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -202,7 +202,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -218,11 +218,11 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -236,7 +236,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -252,7 +252,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -294,11 +294,11 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
 
         # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
         # and C3_out_symDS.
-        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log)
+        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log)
+        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -326,7 +326,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
         # C1_in_symDS is not created by this RSIC, so associate an ICL.
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
+        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
                                                   [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
         # Associate the CCL of C1_out_symDS with step_E3_RS.
@@ -366,7 +366,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         self.C1_in_DS.created_by = self.D11_21_ROC
         self.C1_in_DS.save()
         self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
-                                               end_time=timezone.now())
+                                               end_time=timezone.now(), user=self.myUser)
         self.D11_21_ROC.stop()
         if bp == "subrun_complete": return
 
@@ -1151,8 +1151,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1167,8 +1167,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1185,8 +1185,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1201,8 +1201,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1219,8 +1219,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1235,8 +1235,8 @@ class RunStepTests(ArchiveTestSetup):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1908,8 +1908,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1924,8 +1924,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.invoked_logs.last()
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1942,8 +1942,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1958,8 +1958,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.invoked_logs.last()
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1976,8 +1976,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.log
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1992,8 +1992,8 @@ class RunSICTests(ArchiveTestSetup):
                 break
         log = runsic.invoked_logs.last()
         sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2469,8 +2469,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2485,8 +2485,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.invoked_logs.last()
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2503,8 +2503,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2519,8 +2519,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.invoked_logs.last()
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2537,8 +2537,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.log
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2553,8 +2553,8 @@ class RunOutputCableTests(ArchiveTestSetup):
                 break
         log = roc.invoked_logs.last()
         sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -3123,7 +3123,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
         other_cable = other_step1.RSICs.first()
-        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -3148,7 +3148,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
         self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
 
-        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -3474,11 +3474,11 @@ echo
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()

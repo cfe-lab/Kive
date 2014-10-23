@@ -8,6 +8,8 @@ from method.models import CodeResource, CodeResourceRevision, MethodFamily
 from metadata.models import CompoundDatatype, AccessControl
 from django.contrib.auth.models import User
 
+shipyard_user = User.objects.get(pk=1)
+
 try:
     cdt = CompoundDatatype.objects.get(pk=4)  # from initial_data.json
 except:
@@ -17,7 +19,8 @@ except:
 samplecode_path = '../samplecode'
 
 # load fasta2csv.py as a CodeResource
-cr = CodeResource(name='fasta2csv', description='Convert FASTA to CSV', filename='fasta2csv.py')
+cr = CodeResource(name='fasta2csv', description='Convert FASTA to CSV', filename='fasta2csv.py',
+                  user=shipyard_user)
 cr.save()
 
 with open(os.path.join(samplecode_path, 'fasta2csv.py'), 'rb') as f:
@@ -25,13 +28,12 @@ with open(os.path.join(samplecode_path, 'fasta2csv.py'), 'rb') as f:
                                revision_name='Prototype',
                                revision_number=1,
                                revision_desc='First version of fasta2csv.py',
-                               content_file=File(f))
+                               content_file=File(f),
+                               user=shipyard_user)
     crv.full_clean()
     crv.save()
 
 # create MethodFamily
-shipyard_user = User.objects.get(pk=1)
-
 mf = MethodFamily(name='Adapters', description='Scripts to convert raw data into CSV',
                   user=shipyard_user)
 mf.full_clean()

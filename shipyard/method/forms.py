@@ -39,6 +39,10 @@ class CodeResourcePrototypeForm (forms.ModelForm):
                                     help_text='A brief description of what this CodeResource (this and all subsequent '
                                               'versions) is supposed to do')
 
+    # Specify whether this CodeResource is shared with all users.
+    # FIXME this should eventually be deprecated in favour of a means of selecting who to share with.
+    shared = forms.BooleanField(label="Shared", help_text="Share with all users?")
+
     def __init__(self, *args, **kwargs):
         super(CodeResourcePrototypeForm, self).__init__(*args, **kwargs)
         self.fields['revision_name'].label = 'Prototype name'
@@ -57,12 +61,17 @@ class CodeResourcePrototypeForm (forms.ModelForm):
         #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
 
 class CodeResourceRevisionForm (forms.ModelForm):
+
+    # Specify whether this CodeResourceRevision is shared with all users.
+    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
+    shared = forms.BooleanField(help_text="Share with all users?")
+
     def __init__(self, *args, **kwargs):
         super(CodeResourceRevisionForm, self).__init__(*args, **kwargs)
         self.fields['content_file'].label = 'File'
     class Meta:
         model = CodeResourceRevision
-        fields = ('content_file', 'revision_name', 'revision_desc', )
+        fields = ('content_file', 'revision_name', 'revision_desc')
 
 
 class CodeResourceDependencyForm (forms.ModelForm):
@@ -111,6 +120,13 @@ class CodeResourceDependencyForm (forms.ModelForm):
 
 
 class MethodForm (forms.ModelForm):
+    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
+                                               [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')])
+    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+
+    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
+    shared = forms.BooleanField(help_text="Share with all users?")
+
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
 
@@ -126,10 +142,6 @@ class MethodForm (forms.ModelForm):
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
-    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
-                                               [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')])
-    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
-
     class Meta:
         model = Method
         fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'deterministic')
@@ -142,6 +154,9 @@ class MethodForm (forms.ModelForm):
 
 class MethodReviseForm (forms.ModelForm):
     """Revise an existing method.  No need to specify MethodFamily."""
+    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
+    shared = forms.BooleanField(help_text="Share with all users?")
+
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
 

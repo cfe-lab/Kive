@@ -12,8 +12,11 @@ from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.forms.util import ErrorList
 from datetime import datetime
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
+from django.contrib.auth.models import Group
+
+from constants import groups
+
+everyone = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def resources(request):
@@ -93,6 +96,13 @@ def resource_add(request):
     if request.method == 'POST':
         query = request.POST.dict()
 
+        # FIXME for now everything is shared with all.
+        creating_user = request.user
+        users_allowed = []
+        groups_allowed = []
+        if query["shared"]:
+            groups_allowed.append(everyone)
+
         exceptions = {}
         new_code_resource = None
         prototype = None
@@ -105,9 +115,14 @@ def resource_add(request):
                 raise  # content_file required for next steps
 
             try:
-                new_code_resource = CodeResource(name=query['resource_name'],
-                                                 description=query['resource_desc'],
-                                                 filename=file_in_memory.name)
+                new_code_resource = CodeResource(
+                    name=query['resource_name'],
+                    description=query['resource_desc'],
+                    filename=file_in_memory.name,
+                    user=creating_user,
+                    users_allowed=users_allowed,
+                    groups_allowed=groups_allowed
+                )
                 new_code_resource.full_clean()
                 new_code_resource.save()
             except ValidationError as e:
@@ -119,8 +134,15 @@ def resource_add(request):
             file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
             try:
-                prototype = CodeResourceRevision(revision_name='Prototype', revision_desc=query['resource_desc'],
-                        coderesource=new_code_resource, content_file=file_in_memory)
+                prototype = CodeResourceRevision(
+                    revision_name='Prototype',
+                    revision_desc=query['resource_desc'],
+                    coderesource=new_code_resource,
+                    content_file=file_in_memory,
+                    user=creating_user,
+                    users_allowed=users_allowed,
+                    groups_allowed=groups_allowed
+                )
                 prototype.full_clean()
                 prototype.save()
             except ValidationError as e:
@@ -138,10 +160,12 @@ def resource_add(request):
                     continue
                 try:
                     on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
-                    dependency = CodeResourceDependency(coderesourcerevision=prototype,
-                                                    requirement = on_revision,
-                                                    depPath=query['depPath_'+str(i)],
-                                                    depFileName=query['depFileName_'+str(i)])
+                    dependency = CodeResourceDependency(
+                        coderesourcerevision=prototype,
+                        requirement = on_revision,
+                        depPath=query['depPath_'+str(i)],
+                        depFileName=query['depFileName_'+str(i)]
+                        )
                     dependency.full_clean()
                     to_save.append(dependency)
                 except ValidationError as e:
@@ -189,6 +213,13 @@ def resource_revision_add(request, id):
         exceptions = {}
         revision = None
 
+        # FIXME for now everything is shared with all.
+        creating_user = request.user
+        users_allowed = []
+        groups_allowed = []
+        if query["shared"]:
+            groups_allowed.append(everyone)
+
         try:
             try:
                 file_in_memory = request.FILES['content_file']
@@ -200,11 +231,16 @@ def resource_revision_add(request, id):
 
             # is this file identical to another CodeResourceRevision?
             try:
-                revision = CodeResourceRevision(revision_parent=parent_revision,
-                                                revision_name=query['revision_name'],
-                                                revision_desc=query['revision_desc'],
-                                                coderesource=coderesource,
-                                                content_file=file_in_memory)
+                revision = CodeResourceRevision(
+                    revision_parent=parent_revision,
+                    revision_name=query['revision_name'],
+                    revision_desc=query['revision_desc'],
+                    coderesource=coderesource,
+                    content_file=file_in_memory,
+                    user=creating_user,
+                    users_allowed=users_allowed,
+                    groups_allowed=groups_allowed
+                )
                 revision.full_clean()
                 revision.save()
             except ValidationError as e:
@@ -424,17 +460,31 @@ def parse_method_form(query, family=None, parent_method=None):
     try:
         with transaction.atomic():
             if family is None:
-                family = MethodFamily.create(name=query['name'], description=query['description'])
-            new_method = Method.create(names, 
-                    compounddatatypes=compounddatatypes, 
-                    row_limits=row_limits,
-                    num_inputs=num_inputs,
-                    family=family,
-                    revision_name=query['revision_name'],
-                    revision_desc=query['revision_desc'],
-                    revision_parent=parent_method,
-                    driver=coderesource_revision,
-                    deterministic=query.has_key('deterministic'))
+                family = MethodFamily.create(name=query['name'], description=query['description'],
+                                             user=query["user"])
+            new_method = Method.create(
+                names,
+                compounddatatypes=compounddatatypes,
+                row_limits=row_limits,
+                num_inputs=num_inputs,
+                family=family,
+                revision_name=query['revision_name'],
+                revision_desc=query['revision_desc'],
+                revision_parent=parent_method,
+                driver=coderesource_revision,
+                deterministic=query.has_key('deterministic'),
+                user=query["user"]
+            )
+
+            for user in query["users_allowed"]:
+                family.users_allowed.add(user)
+                new_method.users_allowed.add(user)
+            for group in query["groups_allowed"]:
+                family.groups_allowed.add(group)
+                new_method.groups_allowed.add(group)
+            family.save()
+            new_method.save()
+
             return None
 
     except ValidationError as e:
@@ -469,6 +519,14 @@ def method_add(request, id=None):
     t = loader.get_template('method/method_add.html')
     if request.method == 'POST':
         query = request.POST.dict()
+
+        # Add the requesting user to the query.
+        query["user"] = request.user
+        # FIXME for the moment everyone is allowed access.
+        query["users_allowed"] = []
+        if query["shared"]:
+            query["groups_allowed"] = [everyone]
+
         exceptions = parse_method_form(query, this_family)
         if exceptions is None:
             # success!
@@ -515,6 +573,11 @@ def method_revise(request, id):
     if request.method == 'POST':
         query = request.POST.dict()
         query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
+        query["user"] = request.user
+        # FIXME same issue as in method_add where everyone is allowed access.
+        query["users_allowed"] = []
+        if query["shared"]:
+            query["groups_allowed"] = [everyone]
 
         exceptions = parse_method_form(query, family=family, parent_method=parent_method)
         if exceptions is None:

@@ -30,9 +30,10 @@ class ExecuteTests(TestCase):
         self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser); self.pf.save()
 
 		# Code on file system
-        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py")
+        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py", user=self.myUser)
         self.mA_cr.save()
-        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc")
+        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc",
+                                           user=self.myUser)
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.mA_crr.content_file.save("generic_script.py",File(f))
         self.mA_crr.save()
@@ -318,7 +319,7 @@ class ExecuteTests(TestCase):
         for i, sd in enumerate(inputs, start=1):
             if not sd.is_raw():
                 bad_input, bad_index = sd, i
-                bad_ccl = ContentCheckLog(symbolicdataset=sd)
+                bad_ccl = ContentCheckLog(symbolicdataset=sd, user=user)
                 bad_ccl.save()
                 bad_ccl.add_missing_output()
                 break
@@ -345,7 +346,7 @@ class ExecuteTests(TestCase):
         for i, sd in enumerate(inputs, start=1):
             if sd.is_raw():
                 bad_input, bad_index = sd, i
-                bad_icl = IntegrityCheckLog(symbolicdataset=sd)
+                bad_icl = IntegrityCheckLog(symbolicdataset=sd, user=user)
                 bad_icl.save()
                 MD5Conflict(integritychecklog=bad_icl, conflicting_SD=sd).save()
                 break

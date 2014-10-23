@@ -52,6 +52,19 @@
                 <div style="color:red">{{ resource_form.revision_desc.errors }}</div>
             </td>
         </tr>
+        <tr>
+            <th>{{ resource_form.shared.label }} <div class="helptext">{{ resource_form.shared.help_text }}</div></th>
+            <td style="font-style:italic">
+                {% if parent_revision.shared_with_everyone %}
+                <input type="checkbox" disabled checked/>
+                {% else %}
+                <input type="checkbox" disabled/>
+                {% endif %}
+            </td>
+            <td>{{ resource_form.shared }}<br>
+                <div style="color:red">{{ resource_form.shared.errors }}</div>
+            </td>
+        </tr>
     </table>
     <h3>Dependencies</h3>
     <p>

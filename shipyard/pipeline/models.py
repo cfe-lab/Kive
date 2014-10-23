@@ -227,7 +227,6 @@ class Pipeline(transformation.models.Transformation):
 
         This dict will be structured as:
          - user: PK of creating user
-         - public: bool
          - users_allowed: list of PKs of users allowed access
          - groups_allowed: list of PKs of groups allowed access
 
@@ -249,7 +248,6 @@ class Pipeline(transformation.models.Transformation):
         """
         dict_repr = {
             "user": self.user.pk,
-            "public": self.public,
             "users_allowed": [u.pk for u in self.users_allowed.all()],
             "groups_allowed": [g.pk for g in self.groups_allowed.all()],
 
@@ -306,18 +304,15 @@ class Pipeline(transformation.models.Transformation):
 
         # Update the access control data.
         creating_user = User.objects.get(pk=pipeline_dict_repr["user"])
-        public = pipeline_dict_repr["public"]
         users_allowed = [User.objects.get(pk=x) for x in pipeline_dict_repr["users_allowed"]]
         groups_allowed = [Group.objects.get(pk=x) for x in pipeline_dict_repr["groups_allowed"]]
 
         self.user = creating_user
-        self.public = public
         for u in users_allowed:
             self.users_allowed.add(u)
         for g in groups_allowed:
             self.groups_allowed.add(g)
         self.save()
-
 
         # Now pass the dict representation to the function that fills out a Pipeline.
         return Pipeline.create_from_dict(pipeline_dict_repr, self)
@@ -335,7 +330,6 @@ class Pipeline(transformation.models.Transformation):
         """
         # First get the access control data in order.
         creating_user = User.objects.get(pk=pipeline_dict_repr["user"])
-        public = pipeline_dict_repr["public"]
         users_allowed = [User.objects.get(pk=x) for x in pipeline_dict_repr["users_allowed"]]
         groups_allowed = [Group.objects.get(pk=x) for x in pipeline_dict_repr["groups_allowed"]]
 
@@ -346,7 +340,6 @@ class Pipeline(transformation.models.Transformation):
             revision_name=pipeline_dict_repr['revision_name'],
             revision_desc=pipeline_dict_repr['revision_desc'],
             user=creating_user,
-            public=public
         )
         for u in users_allowed:
             new_revision.users_allowed.add(u)
@@ -478,7 +471,6 @@ class Pipeline(transformation.models.Transformation):
         This raises a PipelineSerializationException if anything goes wrong.
         """
         creating_user = User.objects.get(pk=form_data["user"])
-        public = form_data["public"]
         users_allowed = [User.objects.get(pk=x) for x in form_data["users_allowed"]]
         groups_allowed = [Group.objects.get(pk=x) for x in form_data["groups_allowed"]]
 
@@ -491,8 +483,7 @@ class Pipeline(transformation.models.Transformation):
             pl_family = PipelineFamily(
                 name=form_data['family_name'],
                 description=form_data['family_desc'],
-                user=creating_user,
-                public=public
+                user=creating_user
             )
             for u in users_allowed:
                 pl_family.users_allowed.add(u)
@@ -507,8 +498,7 @@ class Pipeline(transformation.models.Transformation):
                 revision_desc=form_data['revision_desc'],
                 revision_parent=(None if form_data["revision_parent_pk"] is None
                                  else Pipeline.objects.get(pk=form_data["revision_parent_pk"])),
-                user=creating_user,
-                public=public
+                user=creating_user
             )
             for u in users_allowed:
                 pipeline.users_allowed.add(u)

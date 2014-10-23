@@ -42,3 +42,11 @@ maxlengths = MaxLengths()
 maxlengths.MAX_FILENAME_LENGTH = 260
 maxlengths.MAX_NAME_LENGTH = 60
 maxlengths.MAX_DESCRIPTION_LENGTH = 1000
+
+class Groups:
+    pass
+
+groups = Groups()
+groups.EVERYONE_PK = 1
+groups.DEVELOPERS_PK = 2
+groups.ADMIN_PK = 3

@@ -22,7 +22,7 @@ import shutil
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import datatypes, CDTs, maxlengths
+from constants import datatypes, CDTs, maxlengths, groups
 
 import logging
 
@@ -1347,9 +1347,25 @@ class AccessControl(models.Model):
     Represents anything that belongs to a certain user.
     """
     user = models.ForeignKey(User)
-    public = models.BooleanField(default=False)
     users_allowed = models.ManyToManyField(User, related_name="%(app_label)s_%(class)s_has_access_to")
     groups_allowed = models.ManyToManyField(Group, related_name="%(app_label)s_%(class)s_has_access_to")
 
     class Meta:
         abstract = True
+
+    @property
+    def shared_with_everyone(self):
+        return self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists()
+
+    def can_be_accessed(self, user):
+        """
+        True if user can access this object; False otherwise.
+        """
+        if self.user == user or self.users_allowed.filter(pk=user).exists():
+            return True
+
+        for group in self.groups_allowed.all():
+            if user.groups.filter(pk=group.pk).exists():
+                return True
+
+        return False

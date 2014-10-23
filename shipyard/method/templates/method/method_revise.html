@@ -50,6 +50,16 @@ Add a revision of this Method based on a revision of the same CodeResource.
     </tr>
 
     <tr>
+        <th>{{ method_form.shared.label }}</th>
+        <td>
+            {{ method_form.shared }}
+            <div class="helptext">{{ method_form.shared.help_text }}</div>
+        </td>
+        <th></th>
+        <td></td>
+    </tr>
+
+    <tr>
         <th>Method<br/> revision name<br/><i>Optional</i></th>
                     <td>
                         {{ method_form.revision_name }}
