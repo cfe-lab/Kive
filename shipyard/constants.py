@@ -50,3 +50,9 @@ groups = Groups()
 groups.EVERYONE_PK = 1
 groups.DEVELOPERS_PK = 2
 groups.ADMIN_PK = 3
+
+class Users:
+    pass
+
+users = Users()
+users.SHIPYARD_USER_PK = 1

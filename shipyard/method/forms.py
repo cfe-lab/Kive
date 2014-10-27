@@ -5,7 +5,8 @@ Generate an HTML form to create a new Datatype object
 from django import forms
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
 from metadata.models import CompoundDatatype
-from transformation.models import TransformationInput, TransformationOutput, XputStructure
+from transformation.models import TransformationInput, XputStructure
+from django.contrib.auth.models import User, Group
 
 import logging
 
@@ -19,7 +20,7 @@ class CodeResourceMinimalForm (forms.Form):
     revision_name = forms.CharField(max_length=255)
     revision_desc = forms.CharField(max_length=255)
 
-class CodeResourcePrototypeForm (forms.ModelForm):
+class CodeResourcePrototypeForm (forms.Form):
     """
     A form for submitting the first version of a CodeResource, which
     we refer to as the "prototype".  We require two sets of names and
@@ -30,63 +31,116 @@ class CodeResourcePrototypeForm (forms.ModelForm):
     revision names that are only meant to tell different version apart,
     (e.g., "Scarlet (1)", "Bicycle (2)", "Henry (3)").
     """
-    # additional form fields for CodeResource object
-    resource_name = forms.CharField(max_length=255,
-                                    label='Resource name',
-                                    help_text='A name that refers to the actual function of the CodeResource.')
-    resource_desc = forms.CharField(widget = forms.Textarea(attrs={'rows':5}),
-                                    label = 'Resource description',
-                                    help_text='A brief description of what this CodeResource (this and all subsequent '
-                                              'versions) is supposed to do')
+    # Form fields for the parent CodeResource object.
+    resource_name = forms.CharField(
+        max_length=255,
+        label='Resource name',
+        help_text='A name that refers to the actual function of the CodeResource.'
+    )
 
-    # Specify whether this CodeResource is shared with all users.
-    # FIXME this should eventually be deprecated in favour of a means of selecting who to share with.
-    shared = forms.BooleanField(label="Shared", help_text="Share with all users?")
+    resource_desc = forms.CharField(
+        widget = forms.Textarea(attrs={'rows':5}),
+        label = 'Resource description',
+        help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do'
+    )
+
+    # Stuff that goes directly into the CodeResourceRevision.
+    content_file = forms.FileField(
+        label="File",
+        help_text="File containing this new code resource"
+    )
+
+    users_allowed = forms.MultipleChoiceField(
+        label="Users allowed",
+        help_text="Which users are allowed access to this resource?",
+        choices=[(u.id, u.username) for u in User.objects.all()],
+        required=False
+    )
+
+    groups_allowed = forms.MultipleChoiceField(
+        label="Groups allowed",
+        help_text="Which groups are allowed access to this resource?",
+        choices=[(g.id, g.name) for g in Group.objects.all()],
+        required=False
+    )
 
     def __init__(self, *args, **kwargs):
         super(CodeResourcePrototypeForm, self).__init__(*args, **kwargs)
-        self.fields['revision_name'].label = 'Prototype name'
-        self.fields['revision_name'].help_text = 'A short name for this prototype, ' \
-                                                 'used only to differentiate it from subsequent versions.'
+        self.fields["users_allowed"].choices = [(u.id, u.username) for u in User.objects.all()]
+        self.fields["groups_allowed"].choices = [(g.id, g.name) for g in Group.objects.all()]
 
-        self.fields['revision_desc'].label = 'Prototype description'
-        self.fields['revision_desc'].help_text = 'A brief description of this prototype'
-        self.fields['revision_desc'].initial = 'Prototype version'
-        self.fields['revision_desc'].widget = forms.Textarea(attrs={'rows': 2})
 
-        self.fields['content_file'].help_text = 'File containing this new code resource'
-    class Meta:
-        model = CodeResourceRevision
-        fields = ('resource_name', 'resource_desc', 'content_file', 'revision_name', 'revision_desc')
-        #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
+class CodeResourceRevisionForm (forms.Form):
 
-class CodeResourceRevisionForm (forms.ModelForm):
+    # Stuff that goes directly into the CodeResourceRevision.
+    content_file = forms.FileField(
+        label="File",
+        help_text="File contents of this code resource revision"
+    )
 
-    # Specify whether this CodeResourceRevision is shared with all users.
-    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
-    shared = forms.BooleanField(help_text="Share with all users?")
+    revision_name = forms.CharField(
+        label="Revision name",
+        help_text="A short name to differentiate this revision from previous versions."
+    )
+
+    revision_desc = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2}),
+        label="Revision description",
+        help_text="A brief description of this version of the resource",
+        initial=""
+    )
+
+    users_allowed = forms.MultipleChoiceField(
+        label="Users allowed",
+        help_text="Which users are allowed access to this resource?",
+        choices=[(u.id, u.username) for u in User.objects.all()],
+        required=False
+    )
+
+    groups_allowed = forms.MultipleChoiceField(
+        label="Groups allowed",
+        help_text="Which groups are allowed access to this resource?",
+        choices=[(g.id, g.name) for g in Group.objects.all()],
+        required=False
+    )
 
     def __init__(self, *args, **kwargs):
         super(CodeResourceRevisionForm, self).__init__(*args, **kwargs)
-        self.fields['content_file'].label = 'File'
-    class Meta:
-        model = CodeResourceRevision
-        fields = ('content_file', 'revision_name', 'revision_desc')
+        self.fields["users_allowed"].choices = [(u.id, u.username) for u in User.objects.all()]
+        self.fields["groups_allowed"].choices = [(g.id, g.name) for g in Group.objects.all()]
 
 
-class CodeResourceDependencyForm (forms.ModelForm):
+class CodeResourceDependencyForm (forms.Form):
     """
-    ModelForm for submitting a CodeResourceDependency
+    Form for submitting a CodeResourceDependency.
+
     initial:  A dictionary to pass initial values from view function
     parent:  Primary key (ID) of CodeResource having this dependency.
     """
+    # The attrs to the widget are to enhance the resulting HTML output.
+    coderesource = forms.ChoiceField(
+        widget=forms.Select(attrs={'class': 'coderesource'}),
+        choices=[('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+    )
+
+    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+
+    depPath = forms.CharField(
+        label="Dependency path",
+        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent"
+    )
+
+    depFileName = forms.CharField(
+        label="Dependency file name",
+        help_text="The file name the dependency is given on the sandbox at execution"
+    )
+
     def __init__(self, initial=None, parent=None, *args, **kwargs):
         super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
-        self.fields['coderesource'].widget = forms.Select(attrs={'class': 'coderesource'})
         self.fields['coderesource'].choices = self.get_code_resource_list(parent)
         if initial:
             # populate drop-downs before rendering template
-            cr= CodeResource.objects.get(pk=initial['coderesource'])
+            cr = CodeResource.objects.get(pk=initial['coderesource'])
             self.fields['coderesource'].initial = cr.pk
 
             rev = CodeResourceRevision.objects.get(coderesource=cr)
@@ -109,10 +163,6 @@ class CodeResourceDependencyForm (forms.ModelForm):
         logger.debug(queryset.query)
         return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
-    coderesource = forms.ChoiceField(choices=[('', '--- CodeResource ---')] +
-                                             [(x.id, x.name) for x in CodeResource.objects.all()])
-    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
-
     class Meta:
         model = CodeResourceDependency
         #exclude = ('coderesourcerevision', 'requirement')
@@ -125,7 +175,7 @@ class MethodForm (forms.ModelForm):
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
     # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
-    shared = forms.BooleanField(help_text="Share with all users?")
+    shared = forms.BooleanField(help_text="Share with all users?", required=False)
 
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
@@ -155,7 +205,7 @@ class MethodForm (forms.ModelForm):
 class MethodReviseForm (forms.ModelForm):
     """Revise an existing method.  No need to specify MethodFamily."""
     # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
-    shared = forms.BooleanField(help_text="Share with all users?")
+    shared = forms.BooleanField(help_text="Share with all users?", required=False)
 
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
