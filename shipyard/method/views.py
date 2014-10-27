@@ -242,7 +242,7 @@ def resource_revision_add(request, id):
 
     if request.method == 'POST':
         # Use a form here, just as in resource_add.
-        revision_form = CodeResourcePrototypeForm(request.POST, request.FILES)
+        revision_form = CodeResourceRevisionForm(request.POST, request.FILES)
         query = request.POST.dict()
 
         # Also validate the CR dependencies using forms.
