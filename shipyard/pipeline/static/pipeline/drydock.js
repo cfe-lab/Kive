@@ -135,7 +135,6 @@ CanvasState.prototype.doDown = function(e) {
             this.selection = connectors[i];
             this.dragoffx = this.dragoffy = 0;
             this.dragging = true;
-//            connectors[i].debug(this.ctx);
             this.valid = false;
             return;
         }

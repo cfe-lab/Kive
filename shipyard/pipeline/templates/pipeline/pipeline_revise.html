@@ -44,10 +44,9 @@
             var inputs = pipeline_steps[i]["inputs"],
                 outputs = pipeline_steps[i]["outputs"];
 
-            var method_node = new MethodNode(node.transf_pk, node.x * canvas.width, node.y * canvas.height, mNodeWidth,
+            var method_node = new MethodNode(node.transf_pk, node.family_pk, node.x * canvas.width, node.y * canvas.height, mNodeWidth,
                     mNodeInset, mNodeSpacing, mNodeColour, node.name, mNodeOffset,
                     inputs, outputs);
-            method_node.family = node.family_pk;
 
             canvasState.addShape(method_node);
             method_node.draw(canvasState.ctx);  // to update Magnet x and y

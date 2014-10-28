@@ -296,7 +296,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             n_inputs  = get_obj_len(result.inputs);
                         
                         preview_canvas.height = (n_outputs + n_inputs) * 4 + 62;
-                        (new MethodNode(val, preview_canvas.width/2, n_inputs * 4 + 27,
+                        (new MethodNode(val, null, preview_canvas.width/2, n_inputs * 4 + 27,
                             null, null, null, null, null, null, result.inputs, result.outputs)).draw(ctx);
                     }
                 });
@@ -398,7 +398,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
                         if (document.getElementById('id_method_button').value == 'Add Method') {
                             // create new MethodNode
-                            canvasState.addShape(new MethodNode(mid, pos.left, pos.top,
+                            canvasState.addShape(new MethodNode(mid, method_family.val(), pos.left, pos.top,
                                 mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs));
                         } else {
@@ -409,7 +409,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             var idx;
 
                             // draw new node over old node
-                            var new_node = new MethodNode(mid, old_node.x, old_node.y,
+                            var new_node = new MethodNode(mid, method_family.val(), old_node.x, old_node.y,
                                 mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs);
 
@@ -567,14 +567,13 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 if (sel.constructor == MethodNode) {
                     var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
                         preview_canvas = $('canvas', menu)[0];
-                
+                    
                     preview_canvas.width = menu.innerWidth();
-                
+                    
                     menu.css({
                         top:  sel.y - sel.n_inputs * 4 + canvas.offsetTop - 36,
                         left: sel.x - preview_canvas.width/2  + canvas.offsetLeft - 9
                     });
-                    
                     $('#id_select_method_family').val(sel.family).change();  // trigger ajax
                     
                     // jQuery.one() will run this event exactly once before killing it.
