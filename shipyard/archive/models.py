@@ -103,6 +103,11 @@ class Run(stopwatch.models.Stopwatch):
                                       .format(self, source_step))
             run_outcable.clean()
 
+        # Lastly check that if we exceeded the capabilities of the system, then
+        # the record is clean.
+        if hasattr(self, "not_enough_CPUs"):
+            self.not_enough_CPUs.clean()
+
     def is_complete(self):
         """
         True if this run is complete; false otherwise.
@@ -139,6 +144,11 @@ class Run(stopwatch.models.Stopwatch):
             # This is the "successful incomplete" case.
             return False
 
+        # Lastly, we check and see if this run ever exceeded system capabilities.
+        # That would make this complete but unsuccessful.
+        if hasattr(self, "not_enough_CPUs"):
+            return True
+
         # Nothing failed and all exist; we are complete and successful.
         return True
 
@@ -167,6 +177,10 @@ class Run(stopwatch.models.Stopwatch):
         PRE
         This Run is clean and complete.
         """
+        # Has anything exceeded system capabiilities?
+        if hasattr(self, "not_enough_CPUs"):
+            return False
+
         # Check steps for success.
         for step in self.runsteps.all():
             if not step.successful_execution():
@@ -1942,6 +1956,16 @@ class MethodOutput(models.Model):
         methodoutput.clean()
         methodoutput.save()
         return methodoutput
+
+
+class ExceedsSystemCapabilities(models.Model):
+    """
+    Points at a Run that "failed" due to requesting too much from the system.
+    """
+    run = models.OneToOneField(Run, related_name="not_enough_CPUs")
+    threads_requested = models.IntegerField()
+    max_available = models.IntegerField()
+
 
 # Register signals.
 post_delete.connect(archive.signals.dataset_post_delete, sender=Dataset)

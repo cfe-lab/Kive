@@ -73,6 +73,8 @@ class Sandbox:
 
         self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
 
+        # FIXME this might change in the future
+        self.threads_required = 1
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
         self.pipeline = my_pipeline
@@ -111,7 +113,7 @@ class Sandbox:
         self.cable_execute_info = {}
 
         # A table of RunSteps/RunCables completed.
-        self.tasks_completed = {}
+        # self.tasks_completed = {}
 
         # A table keyed by SymbolicDatasets, whose values are lists of the RunSteps/RunCables waiting on them.
         self.tasks_waiting = {}
@@ -1041,13 +1043,15 @@ class Sandbox:
         return (log_of_recovery.is_complete() and log_of_recovery.is_successful() and
                 log_of_recovery.all_checks_passed())
 
+    ####
     # Code to execute code in an MPI environment.
-    def register_completed_task(self, runcomponent):
-        """Report to the Sandbox that the specified task has completed."""
-        self.tasks_completed[runcomponent] = True
+
+    # def register_completed_task(self, runcomponent):
+    #     """Report to the Sandbox that the specified task has completed."""
+    #     self.tasks_completed[runcomponent] = True
 
     # This function looks for stuff that can run now that things are complete.
-    def get_runnable_tasks(self, data_newly_available):
+    def enqueue_runnable_tasks(self, data_newly_available):
         """
         Function that goes through execution, creating a list of steps/outcables that are ready to run.
 
@@ -1058,12 +1062,6 @@ class Sandbox:
         PRE:
         the step that just finished is complete and successful.
         """
-        # assert step_newly_finished.is_complete()
-        # assert step_newly_finished.successful_execution()
-        #
-        # data_newly_available = [x.symbolicdataset for x in step_newly_finished.execrecord.execrecordouts_in_order]
-        run = run or self.run
-
         for SD in data_newly_available:
             assert SD.has_data() or self.find_symbolicdataset(SD) is not None
 
@@ -1084,28 +1082,32 @@ class Sandbox:
 
         self.queue_for_processing = self.queue_for_processing + taxiing_for_takeoff
 
-    def advance_pipeline(self, run_to_resume=None, step_completed=None, cable_completed=None):
+    def advance_pipeline(self, run_to_resume=None, task_completed=None):
         """
         Proceed through a pipeline, seeing what can run now that a step or cable has just completed.
 
         Note that if a sub-pipeline of the pipeline finishes, we report that the parent runstep
         has finished, not the cables.
         """
-        assert type(step_completed) == archive.models.RunStep or step_completed is None
-        assert (type(cable_completed) in (archive.models.RunSIC, archive.models.RunOutputCable) or
-                cable_completed is None)
+        assert (type(task_completed) in (archive.models.RunStep, archive.models.RunSIC, archive.models.RunoutputCable)
+                or task_completed is None)
         run_to_resume = run_to_resume or self.run
         pipeline_to_resume = run_to_resume.pipeline
 
         step_num_completed = 0
-        if step_completed is not None:
-            step_num_completed = step_completed.step_num
+        if type(task_completed) == archive.models.RunStep:
+            step_num_completed = task_completed.step_num
 
         # A list of steps/tasks that have just completed, including those that may have
         # just successfully been reused during this call to advance_pipeline.
-        step_nums_completed = [step_num_completed]
-
-        cables_completed = [cables_completed] if cable_completed is not None else []
+        step_nums_completed = []
+        cables_completed = []
+        if type(task_completed) == archive.models.RunStep:
+            step_nums_completed = [task.step_num]
+        elif task_completed is None:
+            step_nums_completed = [0]
+        else:
+            cables_completed = [task]
 
         # Go through steps in order, looking for input cables pointing at the task(s) that have just completed.
         # If step_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
@@ -1115,7 +1117,7 @@ class Sandbox:
             corresp_runstep = run_to_resume.runsteps.filter(pipelinestep=step)
             if corresp_runstep.exists():
                 if corresp_runstep.is_subpipeline:
-                    self.advance_pipeline(corresp_runstep.child_run, step_completed, cable_completed)
+                    self.advance_pipeline(corresp_runstep.child_run, task_completed)
                 continue
 
             # If this step is not fed at all by any of the tasks that just completed,
@@ -1233,7 +1235,6 @@ class Sandbox:
                 output_path = os.path.join(out_dir,out_file_name)
                 self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
 
-
     # Modified from execute_cable.
     #
     # We'd invoke this the first time we want to execute this cable.  Either it gets reused, or it later gets
@@ -1265,7 +1266,7 @@ class Sandbox:
         curr_ER = self._find_cable_execrecord(curr_record, input_SD)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
-        exec_info = RSICExecuteInfo(curr_record, curr_ER, input_SD, output_path)
+        exec_info = RunCableExecuteInfo(curr_record, curr_ER, input_SD, output_path)
         self.cable_execute_info[(parent_record, cable)] = exec_info
 
         # ER with compatible cable exists? Yes.
@@ -1342,7 +1343,7 @@ class Sandbox:
 
         return cable_record
 
-    def finish_cable(self, cable_info):
+    def finish_cable(self, runcable):
         """
         Finishes an un-reused cable that has already been prepared for execution.
 
@@ -1353,6 +1354,7 @@ class Sandbox:
         worker(s) as the step is, so its output is on the local filesystem of the worker, which
         may be a remote MPI host.  It may also be called by cable_recover_h.
         """
+        cable_info = self.cable_execute_info[runcable]
         # Break out cable_info.
         curr_record = cable_info.cable_record
         input_SD = cable_info.input_SD
@@ -1540,8 +1542,13 @@ class Sandbox:
             elif not cable_exec_info.execrecord.execrecordouts.first().symbolicdataset.has_data():
                 symbolically_okay_SDs.append(inputs[i])
 
-        # First, we bundle up the information required to process this step:
-        execute_info = RunStepExecuteInfo(cable_table, None, inputs, step_run_dir)
+        # Bundle up the information required to process this step.
+
+        # Construct output_paths.
+        output_paths = [self.step_xput_path(runstep, x, step_run_dir) for x in pipelinestep.outputs]
+
+
+        execute_info = RunStepExecuteInfo(cable_table, None, inputs, step_run_dir, output_paths)
         self.step_execute_info[(parent_run, pipelinestep)] = execute_info
 
         # If we're waiting on feeder steps, register this step as waiting for other steps,
@@ -1655,19 +1662,21 @@ class Sandbox:
             self.queue_for_processing.append(runstep)
 
     # The actual running of code happens here.  We copy and modify this from execute_step.
-    def finish_step(self, execute_info):
+    def finish_step(self, runstep):
         """
-        Carry out the task specified by runstep and execute_info.
+        Carry out the task specified by execute_info.
 
         Precondition: the task must be ready to go, i.e. its inputs must all be in place.  Also
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
         """
+        execute_info = self.step_execute_info[runstep]
         # Break out execute_info.
         runstep = execute_info.runstep
         step_run_dir = execute_info.step_run_dir
         curr_ER = execute_info.execrecord
         cable_table = execute_info.cable_table
         inputs = execute_info.inputs
+        output_paths = execute_info.output_paths
         recovering_record = execute_info.recovering_record
 
         pipelinestep = runstep.pipelinestep
@@ -1678,15 +1687,6 @@ class Sandbox:
         recover = recovering_record is not None
 
         in_dir, out_dir, log_dir = self._setup_step_paths(step_run_dir, recover)
-
-        # Construct or retrieve output_paths.
-        output_paths = []
-        for curr_output in pipelinestep.outputs:
-            if recover:
-                corresp_SD = self.socket_map[(parent_run, pipelinestep, curr_output)]
-                output_paths.append(self.sd_fs_map[corresp_SD])
-            else:
-                output_paths.append(self.step_xput_path(runstep, curr_output, step_run_dir))
 
         ####
 
@@ -1863,23 +1863,88 @@ class Sandbox:
             curr_execute_info.flag_for_recovery(invoking_record)
             self.cable_recover_h(curr_execute_info)
 
+    def hand_tasks_to_fleet(self):
+        ready_tasks = self.queue_for_processing
+        self.queue_for_processing = []
+        return ready_tasks
+
+    def exceeded_system(self, max_num_CPU):
+        """
+        Denote this run as having exceeded system capabilities.
+        """
+        self.run.not_enough_CPUs.create(threads_requested=self.threads_required, max_available=max_num_CPU)
+
+    def finish_task(self, task):
+        """
+        Helper that invokes finish_cable or finish_step where appropriate.
+        """
+        assert task.top_level_run == self.run
+        if type(task) == archive.models.RunStep:
+            return self.finish_step(task)
+        return self.finish_cable(task)
+
+    def get_task_info(self, task):
+        """
+        Helper that retrieves the task information for the specified RunStep/RunCable.
+        """
+        assert task.top_level_run == self.run
+        if type(task) == archive.models.RunStep:
+            return self.step_execute_info[task]
+        return self.cable_execute_info[task]
+
+    def update_sandbox(self, task_finished):
+        """
+        Helper that updates the sandbox maps to reflect the information from the specified task_finished.
+
+        PRE: task_finished is a RunStep/RunCable belonging to this sandbox's run, and it already has
+        execution info available in step_execute_info or cable_execute_info.
+        """
+        assert task_finished.top_level_run == self.run
+        if type(task_finished) == RunStepExecuteInfo:
+            assert task_finished in self.step_execute_info
+        else:
+            assert task_finished in self.cable_execute_info
+
+        task_execute_info = self.get_task_info(task_finished)
+
+        # Update the sandbox with this information.
+        if type(task_finished) == archive.models.RunStep:
+            # Update the sandbox maps with the input cables' information as well as that
+            # of the step itself.
+            for rsic in task_finished.RSICs:
+                curr_cable_task_info = self.get_task_info(rsic)
+                curr_cable_out_SD = rsic.execrecord.execrecordouts.first().symbolicdataset
+                self._update_cable_maps(rsic, curr_cable_out_SD, curr_cable_task_info.output_path)
+
+            self._update_step_maps(task_finished, task_execute_info.step_run_dir, task_execute_info.output_paths)
+
+        else:
+            cable_out_SD = task_finished.execrecord.execrecordouts.first().symbolicdataset
+            self._update_cable_maps(task_finished, cable_out_SD, task_execute_info.output_path)
+
 
 # A simple struct that holds the information required to perform a RunStep.
 class RunStepExecuteInfo:
-    def __init__(self, runstep, cable_table, execrecord, inputs, step_run_dir, recovering_record=None):
+    def __init__(self, runstep, cable_table, execrecord, inputs, step_run_dir, output_paths, recovering_record=None):
         self.runstep = runstep
         self.cable_table = cable_table
         self.execrecord = execrecord
         self.inputs = inputs
         self.step_run_dir = step_run_dir
         self.recovering_record = recovering_record
+        self.output_paths = output_paths
+        # FIXME in the future this number could be more than 1.
+        self.threads_required = 1
 
     def flag_for_recovery(self, recovering_record):
         assert self.recovering_record is None
         self.recovering_record = recovering_record
 
+    def is_recovery(self):
+        return self.recovering_record is not None
 
-class RSICExecuteInfo:
+
+class RunCableExecuteInfo:
     def __init__(self, cable_record, execrecord, input_SD, output_path, recovering_record=None, by_step=None):
         self.cable_record = cable_record
         self.execrecord = execrecord
@@ -1887,8 +1952,13 @@ class RSICExecuteInfo:
         self.output_path = output_path
         self.recovering_record = recovering_record
         self.by_step = by_step
+        # FIXME will we ever need more than 1 thread for this?
+        self.threads_required = 1
 
     def flag_for_recovery(self, recovering_record, by_step=None):
         assert self.recovering_record is None
         self.recovering_record = recovering_record
         self.by_step = by_step
+
+    def is_recovery(self):
+        return self.recovering_record is not None
