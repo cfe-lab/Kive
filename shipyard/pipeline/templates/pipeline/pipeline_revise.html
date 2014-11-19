@@ -166,6 +166,18 @@
                     }
                 }
             })}).change();
+
+        $('#id_make_active').on('click', function() {
+            $.ajax({
+                type: "POST",
+                url: "/activate_pipeline/",
+                data: { pipeline_id: $('#id_pipeline_select').val() },
+                datatype: "json",
+                success: function(result) {
+                    console.log(result);
+                }
+            })
+        })
     })
     </script>
 {% endblock %}
@@ -215,6 +227,8 @@
 
                 <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
+
+                <input id="id_make_active" type="button" value="Make active version">
             </div>
         </form>
 
