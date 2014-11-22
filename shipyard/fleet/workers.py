@@ -2,15 +2,22 @@
 Defines the manager and the "workers" that manage and carry out the execution of Pipelines.
 """
 
-import mpi4py as MPI
-from sandbox.execute import Sandbox
-from django.contrib.auth.models import User
-import pipeline.models
-import archive.models
+from mpi4py import MPI
+import numpy
 import logging
 from collections import defaultdict
 from django.db import transaction
+import datetime
+import time
+
+import shipyard.settings
 import fleet.models
+import archive.models
+import sandbox.execute
+
+mgr_logger = logging.getLogger("fleet.Manager")
+worker_logger = logging.getLogger("fleet.Worker")
+
 
 class Manager:
     """
@@ -19,6 +26,7 @@ class Manager:
     The manager is responsible for handling new Run requests and
     assigning the resulting tasks to workers.
     """
+
     def __init__(self):
         """
         Set up/register the workers and prepare to run.
@@ -27,12 +35,18 @@ class Manager:
         roster: a dictionary structured much like a host file, keyed by
         hostname and containing the number of Workers on each host.
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
         # Set up our communicator and other MPI info.
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
         self.count = self.comm.Get_size()
         self.hostname = MPI.Get_processor_name()
+
+        # Set up an ongoing non-blocking receive looking for all Worker.FINISHED-tagged
+        # messages from Workers.  Any time these are actually used, they should be
+        # replaced afresh.
+        self._setup_finished_task_receiver()
+
+        mgr_logger.info("Manager started on host {}".format(self.hostname))
 
         # tasks_in_progress tracks what jobs are assigned to what workers.
         self.tasks_in_progress = {}
@@ -49,8 +63,9 @@ class Manager:
         # threads to run.
         self.roster = defaultdict(list)
         workers_reported = 0
-        while workers_reported < self.count:
+        while workers_reported < self.count - 1:
             hostname, rank = self.comm.recv(source=MPI.ANY_SOURCE, tag=Worker.ROLLCALL)
+            mgr_logger.info("Worker {} on host {} has reported for duty".format(rank, hostname))
             self.roster[hostname].append(rank)
             workers_reported += 1
 
@@ -62,19 +77,28 @@ class Manager:
 
         self.worker_status = [Worker.READY for i in range(self.count)]
 
+    def _setup_finished_task_receiver(self):
+        self.work_finished_result = numpy.empty(2, dtype="i")
+        self.work_finished_request = self.comm.Irecv([self.work_finished_result, MPI.INT],
+                                                     source=MPI.ANY_SOURCE,
+                                                     tag=Worker.FINISHED)
+
     def is_worker_ready(self, rank):
         return self.worker_status[rank] == Worker.READY
 
-    def start_run(self, user, pipeline_to_run, inputs, sandbox_path=None):
+    def start_run(self, user, pipeline_to_run, inputs, sandbox_path=""):
         """
         Receive a request to start a pipeline running.
         """
-        new_sdbx = Sandbox(user, pipeline_to_run, inputs, sandbox_path=sandbox_path)
+        if sandbox_path == "":
+            sandbox_path = None
+        new_sdbx = sandbox.execute.Sandbox(user, pipeline_to_run, inputs, sandbox_path=sandbox_path)
         self.active_sandboxes[new_sdbx.run] = new_sdbx
 
         new_sdbx.advance_pipeline()
         for task in new_sdbx.hand_tasks_to_fleet():
             self.task_queue.append((new_sdbx, task))
+        return new_sdbx
 
     def assign_task(self, sandbox, task):
         """
@@ -87,7 +111,7 @@ class Manager:
 
         # If we have no hosts that are capable of handling this many threads,
         # we blow up.
-        max_host_cpus = max(*[len(self.roster[x]) for x in self.roster])
+        max_host_cpus = max([len(self.roster[x]) for x in self.roster])
         if task_info.threads_required > max_host_cpus:
             sandbox.exceeded_system(max_host_cpus)
             return
@@ -99,10 +123,10 @@ class Manager:
                 if len(workers_available) >= task_info.threads_required:
                     # We're going to assign the task to workers on this host.
                     team = [workers_available[i] for i in range(task_info.threads_required)]
-                    self.logger.debug("Assigning task to workers {}".format(team))
+                    mgr_logger.debug("Assigning task {} to workers {}".format(task, team))
 
                     # Send the job to the "lord":
-                    self.comm.send((sandbox, task), dest=team[0])
+                    self.comm.send(task_info.dict_repr(), dest=team[0], tag=Worker.ASSIGNMENT)
                     vassals = team[1:len(team)]
                     self.tasks_in_progress[team[0]] = {
                         "task": task,
@@ -115,55 +139,58 @@ class Manager:
                     return
 
             # Having reached this point, we know that no host was capable of taking on the task.
-            # We wait for a worker to become ready and try again.
-            self.logger.debug("Waiting for host to become ready....")
-            source_host, workers_now_available = self.wait_for_progress()
+            # We block and wait for a worker to become ready, so we can try again.
+            mgr_logger.debug("Waiting for host to become ready....")
+            self.work_finished_request.wait()
+            lord_rank = self.work_finished_result[0]
+            result_pk = self.work_finished_result[1]
+            self._setup_finished_task_receiver()
+
+            source_host = self.hostname(lord_rank)
+            result = archive.models.RunComponent.objects.get(pk=result_pk).definite
+            self.note_progress(lord_rank, result)
             candidate_hosts = [source_host]
 
             # The task that returned may have belonged to the same sandbox, and
             # failed.  If so, we should cancel this task.
             if sandbox.run not in self.active_sandboxes:
-                self.logger.debug("Run has been terminated; abandoning this task.")
+                mgr_logger.debug("Run has been terminated; abandoning this task.")
                 return
 
-    def wait_for_progress(self):
+    def note_progress(self, lord_rank, task_finished):
         """
-        Wait for a task to finish, and process the results accordingly.
+        Perform bookkeeping for a task that has just finished.
         """
-        # result should be a RunStep or RunCable.
-        source_host, lord_rank, result = self.comm.recv(source=MPI.ANY_SOURCE)
-
         # Mark this task as having finished.
         just_finished = self.tasks_in_progress.pop(lord_rank)
-        curr_sdbx = self.active_sandboxes[result.top_level_run]
+        curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
 
-        task_execute_info = curr_sdbx.get_task_info(result)
+        task_execute_info = curr_sdbx.get_task_info(task_finished)
 
         workers_freed = [lord_rank] + just_finished["vassals"]
         for worker_rank in workers_freed:
             self.worker_status[worker_rank] = Worker.READY
 
-        # If the result was unsuccessful, we should remove anything from the queue belonging to the
-        # same sandbox.
-        if not result.is_successful():
+        # If the task just finished was unsuccessful, we should remove anything from the queue belonging to the
+        # same sandbox.  Otherwise update the sandbox if this was not a recovery.
+        if not task_finished.successful_execution():
             self.active_sandboxes.pop(curr_sdbx)
             self.task_queue = [x for x in self.task_queue if x[0] != curr_sdbx]
         else:
-            curr_sdbx.update_sandbox(result)
-
             # Was this task a recovery or forward progress?
             if task_execute_info.is_recovery():
                 # Add anything that was waiting on this recovery to the queue.
-                curr_sdbx.get_runnable_tasks()
+                curr_sdbx.enqueue_runnable_tasks()
             else:
-                # Advance the pipeline.
+                # Update maps and advance the pipeline.
+                curr_sdbx.update_sandbox(task_finished)
                 curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
 
             for task in curr_sdbx.hand_tasks_to_fleet():
                 # task is either a RunStep or a RunCable.
                 self.task_queue.append((curr_sdbx, task))
 
-        return source_host, workers_freed
+        return workers_freed
 
     def main_procedure(self):
         """
@@ -172,23 +199,51 @@ class Manager:
         while True:
             # We can't use a for loop over the task queue because assign_task may add to the queue.
             while len(self.task_queue) > 0:
-                curr_task = self.task_queue[0]
-                task_sdbx = self.active_sandboxes[curr_task.top_level_run]
+                curr_task = self.task_queue[0] # looks like (sandbox, task)
+                task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
                 # We assign this task to a worker, and do not proceed until the task
                 # is assigned.
-                self.assign_task(task_sdbx, task)
+                self.assign_task(task_sdbx, curr_task[1])
                 self.task_queue = self.task_queue[1:]
 
-            # Everything in the queue has been started, so we look for new jobs to run.  We will also
-            # build in a delay here so we don't clog up the database.
-            with transaction.atomic():
-                pending_runs = fleet.models.RunToProcess.objects.order_by("time_started")
+            # Everything in the queue has been started, so we check and see if anything has finished.
+            worker_returned = False
+            for i in range(shipyard.settings.FLEET_POLLING_INTERVAL):
+                test_result = self.work_finished_request.test()
+                if test_result[0]:
+                    mgr_logger.debug("Worker {} reports task with PK {} is finished".format(
+                        self.work_finished_result[0], self.work_finished_result[1]
+                    ))
+                    worker_returned = True
+                    break
+                time.sleep(1)
 
-                for run in pending_runs:
-                    self.start_run(run.user, run.pipeline,
-                                   [x.symbolicdataset for x in run.inputs.order_by("index")],
-                                   sandbox_path=run.sandbox_path)
-                    run.delete()
+            if worker_returned:
+                task_finished = archive.models.RunComponent.objects.get(pk=self.work_finished_result[1]).definite
+                self.note_progress(self.work_finished_result[0], task_finished)
+                self._setup_finished_task_receiver()
+
+            # Look for new jobs to run.  We will also
+            # build in a delay here so we don't clog up the database.
+            mgr_logger.info("Looking for new runs....")
+            new_run_started = False
+            with transaction.atomic():
+                pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
+
+                mgr_logger.debug("Pending runs: {}".format(pending_runs))
+
+                for run_to_process in pending_runs:
+                    mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
+                        run_to_process.pipeline, run_to_process.user))
+                    new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
+                                              [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
+                                              sandbox_path=run_to_process.sandbox_path)
+                    run_to_process.run = new_sdbx.run
+                    run_to_process.save()
+                    new_run_started = True
+
+                    mgr_logger.debug("Task queue: {}".format(self.task_queue))
+                    mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
 
 
 class Worker:
@@ -199,13 +254,17 @@ class Worker:
     VASSAL = "vassal"
     LORD = "lord"
 
-    ROLLCALL = "rollcall"
+    ROLLCALL = 1
+    ASSIGNMENT = 2
+    FINISHED = 3
 
     def __init__(self):
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
         self.count = self.comm.Get_size()
         self.hostname = MPI.Get_processor_name()
+
+        worker_logger.info("Worker {} started on host {}".format(self.rank, self.hostname))
 
         # Report to the manager.
         self.comm.send((self.hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
@@ -214,11 +273,24 @@ class Worker:
         """
         Looks for an assigned task and performs it.
         """
-        sandbox, task = self.comm.recv(source=0)
-        assert task.top_level_run == sandbox.run
+        task_info_dict = self.comm.recv(source=0, tag=Worker.ASSIGNMENT)
 
-        result = sandbox.finish_task(task)
-        self.comm.send((self.hostname, self.rank, sandbox, result))
+        task = None
+        if "cable_record_pk" in task_info_dict:
+            task = archive.models.RunComponent.objects.get(pk=task_info_dict["cable_record_pk"]).definite
+        else:
+            task = archive.models.RunStep.objects.get(pk=task_info_dict["runstep_pk"])
+        worker_logger.info("{} received: {}".format(task.__class__.__name__, task))
+
+        result = None
+        if type(task) == archive.models.RunStep:
+            result = sandbox.execute.finish_step(task_info_dict)
+        else:
+            result = sandbox.execute.finish_cable(task_info_dict)
+        worker_logger.info("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
+        send_buf = numpy.array([self.rank, result.pk], dtype="i")
+        self.comm.Send(send_buf, dest=0, tag=Worker.FINISHED)
+        worker_logger.debug("Sent {} to Manager".format((self.rank, result.pk)))
 
     def main_procedure(self):
         """

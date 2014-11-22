@@ -141,7 +141,8 @@ INSTALLED_APPS = (
     'datachecking',
     'sandbox',
     'portal',
-    'stopwatch'
+    'stopwatch',
+    'fleet'
 )
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
@@ -194,6 +195,19 @@ LOGGING = {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
+        },
+        "fleet.Manager": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False
+        },
+        "fleet.Worker": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False
         }
     }
 }
+
+# The polling interval that the manager of the fleet uses between queries to the database.
+FLEET_POLLING_INTERVAL = 30 # in seconds

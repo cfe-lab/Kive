@@ -890,6 +890,67 @@ class PipelineCable(models.Model):
         else:
             return self.pipelineoutputcable
 
+    # TODO: this needs testing
+    def find_compounddatatype(self):
+        """Find a CompoundDatatype for the output of this cable.
+
+        OUTPUTS
+        output_CDT  a compatible CompoundDatatype for the cable's
+                    output, or None if one doesn't exist
+
+        PRE
+        this cable is neither raw nor trivial
+        """
+        assert not self.definite.is_raw()
+        assert not self.is_trivial()
+        wires = self.custom_wires.all()
+
+        # Use wires to determine the CDT of the output of this cable
+        all_members = metadata.models.CompoundDatatypeMember.objects # shorthand
+        compatible_CDTs = None
+        for wire in wires:
+            # Find all CompoundDatatypes with correct members.
+            candidate_members = all_members.filter(datatype=wire.source_pin.datatype,
+                                                   column_name=wire.dest_pin.column_name,
+                                                   column_idx=wire.dest_pin.column_idx)
+            candidate_CDTs = set([m.compounddatatype for m in candidate_members])
+            if compatible_CDTs is None:
+                compatible_CDTs = candidate_CDTs
+            else:
+                compatible_CDTs &= candidate_CDTs # intersection
+            if not compatible_CDTs:
+                return None
+
+        for output_CDT in compatible_CDTs:
+            if output_CDT.members.count() == len(wires):
+                return output_CDT
+
+        return None
+
+    def create_compounddatatype(self):
+        """Create a CompoundDatatype for the output of this cable.
+
+        OUTPUTS
+        output_CDT  a new CompoundDatatype for the cable's output
+
+        PRE
+        this cable is neither raw nor trivial
+        """
+
+        output_CDT = metadata.models.CompoundDatatype()
+        wires = self.custom_wires.all()
+
+        # Use wires to determine the CDT of the output of this cable
+        for wire in wires:
+            self.logger.debug("Adding CDTM: {} {}".format(wire.dest_pin.column_name, wire.dest_pin.column_idx))
+            output_CDT.members.create(datatype=wire.source_pin.datatype,
+                                      column_name=wire.dest_pin.column_name,
+                                       column_idx=wire.dest_pin.column_idx)
+
+        output_CDT.clean()
+        output_CDT.save()
+        return output_CDT
+
     def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform cable transformation on the input.

@@ -5,15 +5,14 @@
  *       "status": string,
  *       "finished": bool, 
  *       "success": bool,
- *       "thread": string,
+ *       "queue_placeholder": integer,
  *       "crashed": bool}
  *
  * - "run" is the primary key of the Run 
  * - "status" is a string describing the Run's status
  * - "finished" is true if the Run is done or false otherwise
  * - "success" is true if the Run was successful or false if it failed
- * - "thread" is an identifier for the backend thread where the pipeline is
- *   running
+ * - "queue_placeholder" is the primary key of the RunToProcess object holding its place in the queue
  * - "crashed" is true if Shipyard crashed while running the Pipeline
  */
 

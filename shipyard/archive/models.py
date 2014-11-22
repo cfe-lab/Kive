@@ -1108,6 +1108,13 @@ class RunCable(RunComponent):
         """
         pass
 
+    @property
+    def component(self):
+        return self.PSIC
+
+    def is_trivial(self):
+        return self.component.is_trivial()
+
     def _clean_not_reused(self):
         """
         Check coherence of a RunCable which has decided not to reuse an
