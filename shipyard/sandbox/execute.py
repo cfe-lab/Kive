@@ -19,6 +19,7 @@ import shutil
 import logging
 import sys
 import tempfile
+from collections import defaultdict
 
 worker_logger = logging.getLogger("fleet.Worker")
 
@@ -120,7 +121,7 @@ class Sandbox:
         # self.tasks_completed = {}
 
         # A table keyed by SymbolicDatasets, whose values are lists of the RunSteps/RunCables waiting on them.
-        self.tasks_waiting = {}
+        self.tasks_waiting = defaultdict(list)
 
         # The inverse table to the above: the keys are RunSteps/RunCables waiting on recovering SymbolicDatasets,
         # and the values are all of the SymbolicDatasets they're waiting for.
@@ -1201,19 +1202,22 @@ class Sandbox:
         curr_record.reused = False
         self.logger.debug("No ER to completely reuse - preparing execution of this cable")
 
-        # If input_SD is on the filesystem or already has input, we are good, and if not, we call
-        # queue_recovery to set up what we need.
+        # Check the availability of input_SD; recover if necessary.  Queue for execution
+        # if cable is an outcable (incables are handled by their parent step to ensure
+        # that the data is written onto the host and filesystem handling the step).
         dataset_path = self.find_symbolicdataset(input_SD)
         if dataset_path is None and not input_SD.has_data():
             self.logger.debug("Cable input requires non-trivial recovery")
-            # This sets up everything necessary for recovering input_SD.
             self.queue_recovery(input_SD, recovering_record=curr_record)
+
+            if cable.is_outcable:
+                self.tasks_waiting[input_SD].append(curr_record)
+                self.waiting_for[curr_record] = [input_SD]
         else:
             exec_info.ready_to_go = True
+            if cable.is_outcable:
+                self.queue_for_processing.append(curr_record)
 
-        # Report back to the calling method what needs to be done to proceed.
-        # We don't queue up this cable because we prefer that cables be executed on the same
-        # host as the step they feed, so that the data will be in the right place.
         return exec_info
 
     # We'd call this when we need to prepare a cable for recovery.  This is essentially a "force" version of
@@ -1247,10 +1251,8 @@ class Sandbox:
             self.queue_recovery(input_SD, recovering_record=recovering_record)
 
             if by_step is None:
-                if input_SD in self.tasks_waiting:
-                    self.tasks_waiting[input_SD].append(cable_record)
-                else:
-                    self.tasks_waiting[input_SD] = [cable_record]
+                self.tasks_waiting[input_SD].append(cable_record)
+
         elif by_step is None:
             self.queue_for_processing.append(cable_record)
 
@@ -1316,10 +1318,7 @@ class Sandbox:
         # reuse_or_prepare_cable.
         if len(SDs_to_recover) > 0:
             for input_SD in SDs_to_recover + symbolically_okay_SDs:
-                if input_SD not in self.tasks_waiting:
-                    self.tasks_waiting[input_SD] = [curr_RS]
-                else:
-                    self.tasks_waiting[input_SD].append(curr_RS)
+                self.tasks_waiting[input_SD].append(curr_RS)
             self.waiting_for[curr_RS] = SDs_to_recover + symbolically_okay_SDs
             return curr_RS
 
@@ -1365,11 +1364,7 @@ class Sandbox:
         if len(symbolically_okay_SDs) > 0:
             for missing_data in symbolically_okay_SDs:
                 self.queue_recovery(missing_data, recovering_record=curr_RS)
-
-                if missing_data not in self.tasks_waiting:
-                    self.tasks_waiting[missing_data] = [curr_RS]
-                else:
-                    self.tasks_waiting[missing_data].append(curr_RS)
+                self.tasks_waiting[missing_data].append(curr_RS)
             self.waiting_for[curr_RS] = symbolically_okay_SDs
         else:
             # We're not waiting for any inputs.  Add this step to the queue.
@@ -1416,10 +1411,7 @@ class Sandbox:
 
         if len(SDs_to_recover_first) > 0:
             for SD in SDs_to_recover_first:
-                if SD in self.tasks_waiting:
-                    self.tasks_waiting.append(runstep)
-                else:
-                    self.tasks_waiting = [runstep]
+                self.tasks_waiting.append(runstep)
             self.waiting_for[runstep] = SDs_to_recover_first
         else:
             self.queue_for_processing.append(runstep)

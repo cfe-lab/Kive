@@ -198,8 +198,6 @@ def _describe_run_failure(run):
     return ("Unknown error", "Unknown reason")
 
 
-
-
 def _poll_run_progress(request):
     """
     Helper to produce a JSON description of the current state of a run.
@@ -224,7 +222,7 @@ def _poll_run_progress(request):
 
     success = rtp.started and rtp.run.successful_execution()
 
-    return json.dumps({"status": status, "run": run_pk, "finished": rtp.finished, "success": success,
+    return json.dumps({"status": status, "run": rtp.run.pk, "finished": rtp.finished, "success": success,
                        "queue_placeholder": queue_placeholder, "crashed": crashed})
 
 
