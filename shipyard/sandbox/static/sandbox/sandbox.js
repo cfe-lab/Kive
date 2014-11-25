@@ -28,9 +28,9 @@ function poll_run_progress(run_data) {
                 if (new_data["finished"]) {
                     $("#loading").hide("slow");
                     if (new_data["success"]) {
-                        show_results_link(run_data["run"]);
+                        show_results_link(new_data["run"]);
                     } else if (!new_data["crashed"]) {
-                        handle_run_failure(run_data);
+                        handle_run_failure(new_data);
                     }
                 } else {
                     poll_run_progress(new_data); 

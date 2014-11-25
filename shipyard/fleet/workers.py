@@ -93,11 +93,15 @@ class Manager:
         if sandbox_path == "":
             sandbox_path = None
         new_sdbx = sandbox.execute.Sandbox(user, pipeline_to_run, inputs, sandbox_path=sandbox_path)
-        self.active_sandboxes[new_sdbx.run] = new_sdbx
-
         new_sdbx.advance_pipeline()
-        for task in new_sdbx.hand_tasks_to_fleet():
-            self.task_queue.append((new_sdbx, task))
+
+        # If we were able to reuse throughout, then we're totally done.  Otherwise we
+        # need to do some bookkeeping.
+        if not new_sdbx.run.is_complete():
+            self.active_sandboxes[new_sdbx.run] = new_sdbx
+            for task in new_sdbx.hand_tasks_to_fleet():
+                self.task_queue.append((new_sdbx, task))
+
         return new_sdbx
 
     def assign_task(self, sandbox, task):
@@ -146,7 +150,7 @@ class Manager:
             result_pk = self.work_finished_result[1]
             self._setup_finished_task_receiver()
 
-            source_host = self.hostname(lord_rank)
+            source_host = self.hostname[lord_rank]
             result = archive.models.RunComponent.objects.get(pk=result_pk).definite
             self.note_progress(lord_rank, result)
             candidate_hosts = [source_host]
@@ -174,21 +178,26 @@ class Manager:
         # If the task just finished was unsuccessful, we should remove anything from the queue belonging to the
         # same sandbox.  Otherwise update the sandbox if this was not a recovery.
         if not task_finished.successful_execution():
-            self.active_sandboxes.pop(curr_sdbx)
+            self.active_sandboxes.pop(curr_sdbx.run)
             self.task_queue = [x for x in self.task_queue if x[0] != curr_sdbx]
         else:
-            # Was this task a recovery or forward progress?
-            if task_execute_info.is_recovery():
-                # Add anything that was waiting on this recovery to the queue.
-                curr_sdbx.enqueue_runnable_tasks()
-            else:
-                # Update maps and advance the pipeline.
-                curr_sdbx.update_sandbox(task_finished)
-                curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
+            # Did this task finish the run?
+            if curr_sdbx.run.is_complete():
+                self.active_sandboxes.pop(curr_sdbx.run)
 
-            for task in curr_sdbx.hand_tasks_to_fleet():
-                # task is either a RunStep or a RunCable.
-                self.task_queue.append((curr_sdbx, task))
+            else:
+               # Was this task a recovery or novel progress??
+                if task_execute_info.is_recovery():
+                    # Add anything that was waiting on this recovery to the queue.
+                        curr_sdbx.enqueue_runnable_tasks()
+                else:
+                    # Update maps and advance the pipeline.
+                    curr_sdbx.update_sandbox(task_finished)
+                    curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
+
+                for task in curr_sdbx.hand_tasks_to_fleet():
+                    # task is either a RunStep or a RunCable.
+                    self.task_queue.append((curr_sdbx, task))
 
         return workers_freed
 

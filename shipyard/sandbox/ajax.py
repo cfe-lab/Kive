@@ -3,6 +3,7 @@ import json
 import re
 import os
 import itertools
+import logging
 
 from django.http import HttpResponse
 from django.core import serializers
@@ -20,6 +21,8 @@ from execute import Sandbox
 from forms import PipelineSelectionForm
 import fleet.models
 from django.db import transaction
+
+ajax_logger = logging.getLogger("sandbox.ajax")
 
 
 class AJAXRequestHandler:
@@ -218,12 +221,18 @@ def _poll_run_progress(request):
     # Arrrgh I hate sleeping. Find a better way.
     while status == last_status and not rtp.finished:
         time.sleep(1)
+        rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
         status = rtp.get_run_progress()
+        # ajax_logger.debug("status: {}".format(status))
+        # ajax_logger.debug("rtp.finished: {}".format(rtp.finished))
+        # ajax_logger.debug("run PK: {}".format(None if rtp.run is None else rtp.run.pk))
 
     success = rtp.started and rtp.run.successful_execution()
 
-    return json.dumps({"status": status, "run": rtp.run.pk, "finished": rtp.finished, "success": success,
-                       "queue_placeholder": queue_placeholder, "crashed": crashed})
+    return_val = json.dumps({"status": status, "run": rtp.run.pk, "finished": rtp.finished, "success": success,
+                             "queue_placeholder": rtp_pk, "crashed": crashed})
+    ajax_logger.debug("Returning: {}".format(return_val))
+    return return_val
 
 
 def poll_run_progress(request):
