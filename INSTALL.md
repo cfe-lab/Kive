@@ -50,6 +50,11 @@ Finally, execute this *expect* script using the bash script `./nukeDB.bash`. Thi
 
 You are now ready to run a local Django webserver - you just need to type `python manage.py runserver` and navigate to `localhost:8000` in your web browser!
 
+To launch a fleet manager and workers, you need to run the following command
+and replace X with the number of workers you want, plus one for the manager:
+
+    DJANGO_SETTINGS_MODULE=shipyard.settings mpirun -np X initialize_fleet.py
+
 Running a pipeline
 ------------------
 
