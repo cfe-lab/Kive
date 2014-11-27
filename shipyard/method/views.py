@@ -45,6 +45,11 @@ def return_crv_forms(query, exceptions, is_new):
     A helper function for resource_revise() to populate forms with user-submitted values
     and form validation errors to be returned as HttpResponse.
     NOTE: cannot set default value of FileField due to security.
+    :param query: Dictionary containing POST data
+    :param exceptions: Dictionary containing exception messages with custom keys
+    :param is_new: modify form if user is attempting to create a new CodeResource
+        (prototype) or revising an existing one (revision)
+    :return: populated Form objects to render in context
     """
 
     if is_new:
@@ -151,9 +156,9 @@ def resource_add(request):
             if hasattr(new_code_resource, 'id') and new_code_resource.id is not None:
                 new_code_resource.delete()
             if hasattr(prototype, 'id') and prototype.id is not None:
-                prototype.delete() # roll back CodeResourceRevision object
+                prototype.delete()  # roll back CodeResourceRevision object
 
-            crv_form, dep_forms = return_crv_forms(request, exceptions, True)
+            crv_form, dep_forms = return_crv_forms(query, exceptions, True)
             c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
             c.update(csrf(request))
             return HttpResponse(t.render(c))

@@ -37,6 +37,10 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
+
+    # marks which member of the PipelineFamily in production
+    active_version = models.ForeignKey('Pipeline', null=True, blank=True)
+
     def get_absolute_url(self):
         return '/pipeline_revise/{}'.format(self.id)
 

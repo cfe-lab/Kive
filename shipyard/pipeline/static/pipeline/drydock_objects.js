@@ -253,7 +253,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
+function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -263,7 +263,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
     and right sides, respectively.  The width must be greater than 2 * inset.
     */
     this.pk = pk;
-    this.family = null; // can be passed from database
+    this.family = family || null; // can be passed from database
 
     this.x = x || 0;
     this.y = y || 0;
@@ -279,7 +279,7 @@ function MethodNode (pk, x, y, w, inset, spacing, fill, label, offset, inputs, o
 
     this.spacing = spacing || 10; // vertical separation between pins
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
-    this.fill = fill || "#ddd";
+    this.fill = fill || '#999';
     this.label = label || '';
     
     this.stack = 20;
@@ -551,7 +551,7 @@ function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     this.fill = fill || "#fff";
     this.cdt = cdt; // primary key to CDT
     this.label = label || '';
-    this.offset = offset || 11;
+    this.offset = offset || 5;
     this.isOutput = isOutput || false;
     this.isInput = !this.isOutput;
     this.connected = [];  // hold references to Connectors
@@ -573,24 +573,50 @@ Magnet.prototype.highlight = function(ctx) {
     
     ctx.textAlign = 'right';
     var dir = -1;
+    
+    ctx.save();
+    ctx.translate(this.x, this.y);
     if (this.isOutput) {
         ctx.textAlign = 'left';
         dir = 1;
+        with (Math) var angle = PI/6, sin_ = sin(angle), cos_ = cos(angle);
+        
+        /* 
+         *   I'm not sold on this display method. Commented out for now. —jn
+         *
+         *   isometric perspective transform
+         *   rotate(ϑ), shear(ϑ, 1), scale(1, cosϑ)
+         *
+         *   Affine transformation:
+         *   cosϑ -sinϑ  0     1  ϑ  0     1   0   0
+         *   sinϑ  cosϑ  0  ×  0  1  0  ×  0  cosϑ 0
+         *    0     0    1     0  0  1     0   0   1
+         *   
+         *   Final product:
+         *   cosϑ  cosϑ(ϑcosϑ - sinϑ)   0
+         *   sinϑ  cosϑ(ϑsinϑ + cosϑ)   0
+         *   0            0             1
+         */
+        
+//        ctx.transform(cos_, sin_, cos_*(angle*cos_ - sin_), cos_*(angle*sin_ + cos_), 0, 0);
+        ctx.rotate(angle);
     }
     
     // make a backing box so the label is on white
     ctx.fillStyle = '#fff';
     ctx.globalAlpha = 0.5;
     ctx.fillRect(
-        this.x + dir * (this.r + this.offset - 3),
-        this.y - 7.5,
-        dir * (ctx.measureText(this.label).width + 6),
+        dir * (this.r + this.offset - 2),
+        - 7.5,
+        dir * (ctx.measureText(this.label).width + 4),
         15
     );
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = '#000';
     
-    ctx.fillText(this.label, this.x + dir * (this.r + this.offset), this.y);
+    ctx.fillText(this.label, dir * (this.r + this.offset), 0);
+    
+    ctx.restore();
 };
 
 Magnet.prototype.contains = function(mx, my) {
@@ -714,8 +740,7 @@ Connector.prototype.highlight = function(ctx) {
 Connector.prototype.getJsBez = function() {
     return [
         { x: this.fromX,   y: this.fromY   },
-        { x: this.ctrl1.x, y: this.ctrl1.y },
-        { x: this.ctrl2.x, y: this.ctrl2.y },
+        this.ctrl1, this.ctrl2,
         { x: this.x,       y: this.y       }
     ];
 };
@@ -758,6 +783,7 @@ Connector.prototype.drawLabel = function(ctx) {
         ctx.fill();
         
         ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
         ctx.fillText(this.source.label, 0, 0);
         ctx.restore();
     }
@@ -859,23 +885,14 @@ Connector.prototype.contains = function(mx, my, pad) {
     // Uses library jsBezier to accomplish certain tasks.
     // Since precise bezier distance is expensive to compute, we start by
     // running a faster algorithm to see if mx,my is outside the rectangle
-    // given by fromX,fromY,x,y (plus padding).
+    // given by the beginning, end, and control points (plus padding).
 
-    // assume certain things about top/bottom/right/left
-    var bottom = this.y,
-        top = this.fromY,
-        right = this.x,
-        left = this.fromX;
-    
-    // now check if our assumptions were correct
-    if (this.fromX > this.x) {
-        left = this.x,
-        right = this.fromX;
-    }
-    if (this.fromY > this.y) {
-        top = this.y,
-        bottom = this.fromY;
-    }
+    var ys = [ this.y, this.fromY, this.ctrl1.y, this.ctrl2.y ],
+        xs = [ this.x, this.fromX, this.ctrl1.x, this.ctrl2.x ],
+        bottom = Math.max.apply(null, ys),
+        top = Math.min.apply(null, ys),
+        right = Math.max.apply(null, xs),
+        left = Math.min.apply(null, xs);
     
     if (mx > left - pad && mx < right + pad
         && my > top - pad && my < bottom + pad

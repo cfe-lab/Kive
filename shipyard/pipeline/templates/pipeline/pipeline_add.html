@@ -29,6 +29,7 @@
     <canvas id="pipeline_canvas">
         HTML5 Canvas not supported by this browser.
     </canvas>
+    <div id="method_context_menu" class="context_menu"><ul><li data-action="edit">Edit</li><li data-action="delete">Delete</li></ul></div>
     </div>
 
     <!-- Method selector -->
@@ -36,8 +37,8 @@
         <ul id="id_ctrl_nav">
             <li data-rel="#id_family_ctrl">Family</li>
             <li data-rel="#id_meta_ctrl">Pipeline</li>
-            <li data-rel="#id_input_ctrl">Inputs</li>
-            <li data-rel="#id_method_ctrl">Methods</li>
+            <li data-rel="#id_input_ctrl" class="new_ctrl">Add Input</li>
+            <li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>
         </ul>
         
         <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
@@ -67,6 +68,7 @@
         </form>
 
         <div id="id_input_ctrl" class="ctrl_menu">
+            <canvas width="100%" height="60"></canvas>
             <h3>Inputs</h3>
             
             <form>
@@ -86,6 +88,7 @@
         </div>
 
         <div id="id_method_ctrl" class="ctrl_menu">
+            <canvas width="100%" height="60"></canvas>
             <h3>Methods</h3>
 
             <form>
@@ -118,6 +121,7 @@
             <label for="output_name">Output name</label>
             <input type="text" name="output_name" id="output_name" class="text">
             <input type="submit" id="output_submit" value="OK">
+            <div id="output_name_error">That name has already been used.</div>
         </form>
     </div>
 

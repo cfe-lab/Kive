@@ -8,6 +8,9 @@ Prerequisites
 
 1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
 2. Django (version 1.6 or higher)
+3. OpenMPI
+4. mpi4py
+5. numpy
 
 It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
 
