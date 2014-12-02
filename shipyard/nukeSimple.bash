@@ -1,4 +1,3 @@
-cd ~/git/Shipyard/shipyard
 export DJANGO_SETTINGS_MODULE=shipyard.settings
 ./nukeDB.bash
 python2.7 manage.py loaddata initial_pipeline
