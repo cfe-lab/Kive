@@ -195,7 +195,6 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             dataset.dataset_file.save(os.path.basename(f.name), File(f))
 
-        print("hello")
         if self.is_raw():
             self.set_MD5(None, dataset.dataset_file)
         else:

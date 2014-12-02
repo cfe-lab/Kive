@@ -16,7 +16,6 @@ from archive.models import Dataset, Run
 from librarian.models import SymbolicDataset
 from transformation.models import TransformationInput
 from metadata.models import CompoundDatatype
-from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from execute import Sandbox
 from forms import PipelineSelectionForm
 import fleet.models
@@ -138,68 +137,6 @@ def filter_pipelines(request):
 #     if not rtp.started:
 #         return False
 #     return not rtp.run.is_complete()
-
-
-def _describe_run_failure(run):
-    """
-    Return a tuple (error, reason) describing a Run failure.
-
-    TODO: this is very rudimentary at the moment.
-    - It does not take recovery into account - should report which step
-      was actually executed and failed, not which step tried to recover
-      and failed.
-    - It does not take sub-pipelines into account.
-    - Failure details for a cable are not reported.
-    - Details of cell errors are not reported.
-    """
-    total_steps = run.pipeline.steps.count()
-    error = ""
-    reason = ""
-
-    # Check each step for failure.
-    for i, runstep in enumerate(run.runsteps.order_by("pipelinestep__step_num"), start=1):
-
-        if runstep.is_complete() and not runstep.successful_execution():
-            error = "Step {} of {} failed".format(i, total_steps)
-
-            # Check each cable.
-            total_cables = runstep.pipelinestep.cables_in.count()
-            for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
-                if not runcable.successful_execution():
-                    return (error, "Input cable {} of {} failed".format(j, total_cables))
-
-            # Check the step execution.
-            if not runstep.log:
-                return (error, "Recovery failed")
-            return_code = runstep.log.methodoutput.return_code 
-            if return_code != 0:
-                return (error, "Return code {}".format(return_code))
-
-            # Check for bad output.
-            for output in runstep.execrecord.execrecordouts.all():
-                try:
-                    check = runstep.log.content_checks.get(symbolicdataset=output.symbolicdataset)
-                except ContentCheckLog.DoesNotExist:
-                    try:
-                        check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
-                    except IntegrityCheckLog.DoesNotExist:
-                        continue
-
-                if check.is_fail():
-                    return (error, "Output {}: {}".format(output.generic_output.definite.dataset_idx, check))
-
-            # Something else went wrong with the step?
-            return (error, "Unknown error")
-                
-    # Check each output cable.
-    total_cables = run.pipeline.outcables.count()
-    for i, runcable in enumerate(run.runoutputcables.order_by("pipelineoutputcable__output_idx")):
-        if not runcable.successful_execution():
-            return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
-
-    # Shouldn't reach here.
-    return ("Unknown error", "Unknown reason")
-
 
 def _poll_run_progress(request):
     """

@@ -62,7 +62,7 @@ class RunToProcess(models.Model):
         if run.is_complete():
             if run.successful_execution():
                 return "Complete"
-            return "{} ({})".format(*_describe_run_failure(run))
+            return "{} ({})".format(*(run.describe_run_failure()))
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()

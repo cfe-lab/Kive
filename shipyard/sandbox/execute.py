@@ -399,7 +399,7 @@ class Sandbox:
             if curr_ER is not None:
                 output_SD = curr_ER.execrecordouts.first().symbolicdataset
                 if make_dataset:
-                    output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_RS)
+                    output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_record)
 
             else:
                 output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, self.user, 
@@ -807,7 +807,7 @@ class Sandbox:
             source_SD = self.socket_map[(run_to_query, generator, socket)]
             file_suffix = "raw" if outcable.is_raw() else "csv"
             out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name,file_suffix)
-            output_path = os.path.join(out_dir,out_file_name)
+            output_path = os.path.join(self.out_dir,out_file_name)
             curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
                                           input_SD=source_SD, output_path=output_path)
 
@@ -885,9 +885,9 @@ class Sandbox:
 
         # Finally, check if it's at the end of a nontrivial Pipeline output cable.
         for outcable in pipeline.outcables.order_by("output_idx"):
-            socket = cable.dest
+            socket = outcable.dest
             key = (curr_run, outcable, socket)
-            if key in self.socket_map and socket_map[key] == SD_to_find:
+            if key in self.socket_map and self.socket_map[key] == SD_to_find:
                 return (curr_run, outcable)
 
         # If we're here, we didn't find it.
@@ -1080,7 +1080,7 @@ class Sandbox:
                 # If the PSIC comes from another step, the generator is the source pipeline step,
                 # or the output cable if it's a sub-pipeline.
                 if psic.source_step != 0:
-                    generator = pipeline.steps.get(step_num=psic.source_step)
+                    generator = pipeline_to_resume.steps.get(step_num=psic.source_step)
                     if socket.transformation.is_pipeline:
                         run_to_query = run_to_resume.runsteps.get(pipelinestep=generator).child_run
                         generator = generator.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
@@ -1340,7 +1340,8 @@ class Sandbox:
             if pipelinestep.is_subpipeline:
                 # Start the sub-pipeline.
                 self.logger.debug("Executing a sub-pipeline with input_SD(s): {}".format(inputs_after_cable))
-                curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
+                subpipeline_to_run = pipelinestep.transformation.definite
+                curr_run = subpipeline_to_run.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
                 self.advance_pipeline(run_to_start=curr_run)
                 return curr_RS
 
@@ -1636,7 +1637,7 @@ def finish_cable(cable_execute_dict):
         if had_ER_at_beginning:
             output_SD = curr_ER.execrecordouts.first().symbolicdataset
             if make_dataset:
-                output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_RS)
+                output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
 
         else:
             output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, user,
