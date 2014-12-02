@@ -10,16 +10,16 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
-from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
 
+import csv
 import exceptions
 import os
-import csv
 import logging
-import json
 import operator
+import sys
 import transformation.models
+
 import method.models
 import metadata.models
 from constants import maxlengths
@@ -996,8 +996,6 @@ class PipelineCable(models.Model):
         output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
         with open(source, "rb") as infile:
-            infile = open(source, "rb")
-
             input_csv = csv.DictReader(infile)
 
             with open(output_path, "wb") as outfile:
