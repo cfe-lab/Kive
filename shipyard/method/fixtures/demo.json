@@ -559,7 +559,7 @@
     "fields": {
         "description": "Compiled version of alignment.cpp", 
         "name": "alignment", 
-        "filename": "alignment.bundle"
+        "filename": "alignment.so"
     }
 },
 {
@@ -626,7 +626,7 @@
         "revision_desc": "Compiled version of alignment.cpp", 
         "coderesource": 16, 
         "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62", 
-        "content_file": "CodeResources/alignment.bundle", 
+        "content_file": "CodeResources/alignment.so_20140811165911", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T23:59:11.169Z"
     }
