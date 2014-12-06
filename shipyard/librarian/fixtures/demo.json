@@ -19,14 +19,14 @@
     "pk": 2, 
     "model": "librarian.symbolicdataset", 
     "fields": {
-        "MD5_checksum": "0d87c1329ab1f96f919fc61e991447ac"
+        "MD5_checksum": "279ac4e1c279ff81c321fcfc4c5118e8"
     }
 },
 {
     "pk": 3, 
     "model": "librarian.symbolicdataset", 
     "fields": {
-        "MD5_checksum": "b52c0b81c0ad3c4188da47c221ab28fb"
+        "MD5_checksum": "a1691d2dab4bc0affede4ede45f64338"
     }
 }
 ]

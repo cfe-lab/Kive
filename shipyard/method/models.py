@@ -48,6 +48,9 @@ class CodeResource(models.Model):
                                                    message="Invalid code resource filename"),
                                 ])
     description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    
+    class Meta:
+        ordering = ('name',)
 
     @property
     def num_revisions(self):
