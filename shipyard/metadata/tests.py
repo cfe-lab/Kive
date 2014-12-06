@@ -765,6 +765,7 @@ class DatatypeTests(MetadataTestSetup):
         """
         # Make a Dataset for the prototype CSV file.
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+
         DNA_prototype = SymbolicDataset.create_SD(
             os.path.join(samplecode_path, "DNAprototype.csv"),
             PROTOTYPE_CDT, user=self.myUser,
@@ -918,18 +919,21 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.restricts.add(builtin_type)
 
         counts = {}
+        bad_ruletypes = set()
         for curr_ruletype, curr_rule in rules:
             try:
                 counts[curr_ruletype] += 1
-                bad_ruletype = curr_ruletype
+                bad_ruletypes.add(curr_ruletype)
             except KeyError:
                 counts[curr_ruletype] = 1
             constr_DT.basic_constraints.create(ruletype=curr_ruletype, rule="{}".format(curr_rule))
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has {} constraints of type {}, but should have at most one'
-                                           .format(constr_DT, counts[bad_ruletype], bad_ruletype))),
-                                constr_DT.clean)
+        possible_matches = [re.escape('Datatype "{}" has {} constraints of type {}, but should have at most one'.
+                                      format(constr_DT, counts[x], x))
+                            for x in bad_ruletypes]
+        match_pattern = "|".join(possible_matches)
+
+        self.assertRaisesRegexp(ValidationError, match_pattern, constr_DT.clean)
 
     def test_clean_int_multiple_min_val_bad(self):
         """
@@ -2306,12 +2310,18 @@ class CompoundDatatypeMemberTests(MetadataTestSetup):
         Unicode of compoundDatatypeMember should return
         (column index, datatype name, column name)
         """
-        self.assertEqual(unicode(self.test_cdt.members.all()[0]),
-                "string: label")
-        self.assertEqual(unicode(self.test_cdt.members.all()[1]),
-                "DNANucSeq: PBMCseq")
-        self.assertEqual(unicode(self.test_cdt.members.all()[2]),
-                "RNANucSeq: PLAseq")
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=1)),
+            "string: label"
+        )
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=2)),
+            "DNANucSeq: PBMCseq"
+        )
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=3)),
+            "RNANucSeq: PLAseq"
+        )
 
 
 class CompoundDatatypeTests(MetadataTestSetup):

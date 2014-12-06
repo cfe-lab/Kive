@@ -432,7 +432,7 @@ class SymbolicDataset(models.Model):
                                                                     column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    if type(failed_constr) != str:
+                    if type(failed_constr) not in (str, unicode):
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()

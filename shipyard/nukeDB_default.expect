@@ -1,17 +1,18 @@
 #!/usr/bin/expect -f
 
-spawn rm -r CodeResources
-spawn rm -r VerificationScripts
-spawn rm -r Datasets
-spawn rm -r Logs
-spawn rm -r VerificationLogs
-spawn rm [PATH TO YOUR DB]
-spawn ./manage.py syncdb --traceback
+spawn ./manage.py flush
 
+# "You have requested a flush..."
+expect -re "Are you sure you want to do this" {
+  send "yes\r\n"
+}
+
+# "You just installed Django's auth system..."
 expect -re "Would you like to create one now" {
   send "yes\r\n"
 }
 
+# "Username (leave blank to use..."
 expect -re "Username" {
   send "\r"
 }
@@ -27,5 +28,7 @@ expect -re "Password" {
 expect -re "Password" {
   send "[YOUR PASSWORD AGAIN]\r"
 }
+
+spawn ./manage.py syncdb --traceback
 
 exit
