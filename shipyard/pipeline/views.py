@@ -20,6 +20,7 @@ def pipelines(request):
     """
     t = loader.get_template('pipeline/pipelines.html')
     families = PipelineFamily.objects.all()
+    pipelines = Pipeline.objects.all()
 
     #pipelines = Pipeline.objects.filter(revision_parent=None)
     c = Context({'families': families})

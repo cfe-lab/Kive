@@ -131,6 +131,11 @@ class Pipeline(transformation.models.Transformation):
         """Returns size of this Pipeline's family"""
         return self.family.members.count()
 
+    @property
+    def is_active_version(self):
+        """Evaluate if this pipeline revision is marked as the active version"""
+        return self.family.active_version == self
+
     def clean(self):
         """
         Validate pipeline revision inputs/outputs
@@ -258,7 +263,9 @@ class Pipeline(transformation.models.Transformation):
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
-            "pipeline_outputs": []
+            "pipeline_outputs": [],
+
+            "is_active_version": self.is_active_version
         }
 
         # Populate dict_repr["pipeline_inputs"].

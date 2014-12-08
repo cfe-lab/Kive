@@ -130,11 +130,12 @@ def activate_pipeline(request):
         if pipeline_revision_id != '':
             pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
             pipeline_family = pipeline_revision.family
-            pipeline_family.active_version = pipeline_revision
+            pipeline_family.active_version = None if pipeline_revision.is_active_version else pipeline_revision
+
             pipeline_family.full_clean()
             pipeline_family.save()
 
-            return HttpResponse(json.dumps({'test': 'ok'}), content_type='application/json')
+            return HttpResponse(json.dumps({'is_active': pipeline_revision.is_active_version}), content_type='application/json')
         # else
         return HttpResponse()
     else:
