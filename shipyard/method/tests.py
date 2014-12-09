@@ -1199,11 +1199,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="C_nested",
             depFileName="C.py")
 
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py',
-                          u'B1_nested/B1.py',
-                          u'B1_nested/C_nested/C.py',
-                          u'B2.py'])
+        self.assertSetEqual(
+            set(self.test_cr_1_rev1.list_all_filepaths()),
+            {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
+        )
 
     def test_dependency_list_all_filepaths_recursive_case_2 (self):
         """
@@ -1229,11 +1228,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="C_nested",
             depFileName="C.py")
 
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py',
-                          u'B1_nested/B1.py',
-                          u'B2.py',
-                          u'C_nested/C.py'])
+        self.assertSetEqual(
+            set(self.test_cr_1_rev1.list_all_filepaths()),
+            {u'test_cr_1.py', u'B1_nested/B1.py', u'B2.py', u'C_nested/C.py'}
+        )
 
     def test_dependency_list_all_filepaths_with_metapackage(self):
 
@@ -1271,10 +1269,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="deeperNestedFolder",
             depFileName="D.py")
 
-        self.assertEqual(test_cr_6_rev1.list_all_filepaths(),
-                         [u'B.py',
-                          u'nestedFolder/C.py',
-                          u'nestedFolder/deeperNestedFolder/D.py'])
+        self.assertSetEqual(
+            set(test_cr_6_rev1.list_all_filepaths()),
+            {u'B.py', u'nestedFolder/C.py', u'nestedFolder/deeperNestedFolder/D.py'}
+        )
 
         # FIXME
         # test_cr_6_rev1.content_file.delete()
@@ -2068,8 +2066,8 @@ class MethodTests(MethodTestSetup):
         # Outputs:
         # self.triplet_cdt, "a_b_c_squared", 1
         # self.singlet_cdt, "a_b_c_mean", 2
-        curr_out_1 = self.script_2_method.outputs.all()[0]
-        curr_out_2 = self.script_2_method.outputs.all()[1]
+        curr_out_1 = self.script_2_method.outputs.get(dataset_idx=1)
+        curr_out_2 = self.script_2_method.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
@@ -2085,8 +2083,8 @@ class MethodTests(MethodTestSetup):
         # Script 3 has inputs:
         # self.singlet_cdt, "k", 1
         # self.singlet_cdt, "r", 2, min_row = max_row = 1
-        curr_in_1 = self.script_3_method.inputs.all()[0]
-        curr_in_2 = self.script_3_method.inputs.all()[1]
+        curr_in_1 = self.script_3_method.inputs.get(dataset_idx=1)
+        curr_in_2 = self.script_3_method.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
@@ -2099,7 +2097,7 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_in_2.get_max_row(), 1)
         # Outputs:
         # self.singlet_cdt, "kr", 1
-        curr_out = self.script_3_method.outputs.all()[0]
+        curr_out = self.script_3_method.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.dataset_name, "kr")
         self.assertEqual(curr_out.dataset_idx, 1)
         self.assertEqual(curr_out.get_cdt(), self.singlet_cdt)
@@ -2111,7 +2109,7 @@ class MethodTests(MethodTestSetup):
 
         # DNAcompv2_m should have 1 input, copied from DNAcompv1
         self.assertEqual(self.DNAcompv2_m.inputs.count(), 1)
-        curr_in = self.DNAcompv2_m.inputs.all()[0]
+        curr_in = self.DNAcompv2_m.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.dataset_name,
                          self.DNAinput_ti.dataset_name)
         self.assertEqual(curr_in.dataset_idx,
@@ -2120,7 +2118,7 @@ class MethodTests(MethodTestSetup):
                          self.DNAinput_ti.get_cdt())
 
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
-        curr_out = self.DNAcompv2_m.outputs.all()[0]
+        curr_out = self.DNAcompv2_m.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.dataset_name,
                          self.DNAoutput_to.dataset_name)
         self.assertEqual(curr_out.dataset_idx,
@@ -2135,7 +2133,7 @@ class MethodTests(MethodTestSetup):
         foo.copy_io_from_parent()
         # Check that it has the same input as script_2_method:
         # self.triplet_cdt, "a_b_c", 1
-        curr_in = foo.inputs.all()[0]
+        curr_in = foo.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.dataset_name, "a_b_c")
         self.assertEqual(curr_in.dataset_idx, 1)
         self.assertEqual(curr_in.get_cdt(), self.triplet_cdt)
@@ -2144,8 +2142,8 @@ class MethodTests(MethodTestSetup):
         # Outputs:
         # self.triplet_cdt, "a_b_c_squared", 1
         # self.singlet_cdt, "a_b_c_mean", 2
-        curr_out_1 = foo.outputs.all()[0]
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)
@@ -2165,8 +2163,8 @@ class MethodTests(MethodTestSetup):
         # Check that the outputs match script_3_method:
         # self.singlet_cdt, "k", 1
         # self.singlet_cdt, "r", 2, min_row = max_row = 1
-        curr_in_1 = bar.inputs.all()[0]
-        curr_in_2 = bar.inputs.all()[1]
+        curr_in_1 = bar.inputs.get(dataset_idx=1)
+        curr_in_2 = bar.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
@@ -2179,7 +2177,7 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_in_2.get_max_row(), 1)
         # Outputs:
         # self.singlet_cdt, "kr", 1
-        curr_out = bar.outputs.all()[0]
+        curr_out = bar.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_out.dataset_name, "kr")
         self.assertEqual(curr_out.dataset_idx, 1)
@@ -2198,7 +2196,7 @@ class MethodTests(MethodTestSetup):
         self.DNAcompv1_m.save()
         self.DNAcompv1_m.copy_io_from_parent()
         self.assertEqual(self.DNAcompv1_m.inputs.count(), 1)
-        curr_in = self.DNAcompv1_m.inputs.all()[0]
+        curr_in = self.DNAcompv1_m.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.get_cdt(), old_cdt)
         self.assertEqual(curr_in.dataset_name, old_name)
         self.assertEqual(curr_in.dataset_idx, old_idx)
@@ -2208,7 +2206,7 @@ class MethodTests(MethodTestSetup):
         old_idx = self.DNAoutput_to.dataset_idx
 
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
-        curr_out = self.DNAcompv2_m.outputs.all()[0]
+        curr_out = self.DNAcompv2_m.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.get_cdt(), old_cdt)
         self.assertEqual(curr_out.dataset_name, old_name)
         self.assertEqual(curr_out.dataset_idx, old_idx)
@@ -2219,8 +2217,8 @@ class MethodTests(MethodTestSetup):
         bar.copy_io_from_parent()
         self.assertEqual(bar.inputs.count(), 2)
         self.assertEqual(bar.outputs.count(), 0)
-        curr_in_1 = bar.inputs.all()[0]
-        curr_in_2 = bar.inputs.all()[1]
+        curr_in_1 = bar.inputs.get(dataset_idx=1)
+        curr_in_2 = bar.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
@@ -2238,8 +2236,8 @@ class MethodTests(MethodTestSetup):
         foo.copy_io_from_parent()
         self.assertEqual(foo.inputs.count(), 0)
         self.assertEqual(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)

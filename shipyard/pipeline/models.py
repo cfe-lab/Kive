@@ -13,11 +13,11 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
 
+import sys
 import exceptions
 import os
 import csv
 import logging
-import json
 import operator
 import transformation.models
 import method.models

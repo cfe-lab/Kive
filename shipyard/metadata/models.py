@@ -1211,7 +1211,7 @@ class CompoundDatatype(models.Model):
         # and we have enforced that the numbering of members is
         # consecutive starting from one, we can go through all of this
         # CDT's members and look for the matching one.
-        for member in self.members.all():
+        for member in self.members.all().order_by("column_idx"):
             try:
                 counterpart = other_CDT.members.get(column_idx=member.column_idx, column_name=member.column_name)
                 if not member.datatype.is_restriction(counterpart.datatype):
@@ -1332,7 +1332,7 @@ class CompoundDatatype(models.Model):
             return summary
 
         # Check the constraints using the module helper.
-        summary.update(summarize_CSV(self.members.all(), data_csv, summary_path, content_check_log))
+        summary.update(summarize_CSV(self.members.all().order_by("column_idx"), data_csv, summary_path, content_check_log))
         return summary
 
     @property

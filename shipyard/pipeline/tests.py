@@ -2203,13 +2203,13 @@ class PipelineTests(PipelineTestSetup):
         # The second:
         # self.singlet_cdt, output_a_b_c_mean, 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "output_a_b_c_squared")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "output_a_b_c_mean")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.singlet_cdt)
@@ -2278,13 +2278,13 @@ class PipelineTests(PipelineTestSetup):
         # self.DNAoutput_cdt, "outputone", 1, None, None
         # self.DNAinput_cdt, "outputtwo", 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "outputone")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.DNAoutput_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "outputtwo")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.DNAinput_cdt)
