@@ -593,7 +593,7 @@
     "pk": 66, 
     "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
+        "datatype": 1, 
         "column_idx": 5, 
         "column_name": "query.nuc.pos", 
         "compounddatatype": 14
@@ -693,7 +693,7 @@
     "pk": 76, 
     "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
+        "datatype": 1, 
         "column_idx": 5, 
         "column_name": "query.aa.pos", 
         "compounddatatype": 15
@@ -1213,7 +1213,7 @@
     "pk": 128, 
     "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 3, 
+        "datatype": 1, 
         "column_idx": 4, 
         "column_name": "g2p", 
         "compounddatatype": 20
@@ -1223,7 +1223,7 @@
     "pk": 129, 
     "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 3, 
+        "datatype": 1, 
         "column_idx": 5, 
         "column_name": "fpr", 
         "compounddatatype": 20

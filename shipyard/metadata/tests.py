@@ -2033,7 +2033,7 @@ class DatatypeCheckBasicConstraints(MetadataTestSetup):
         """
         self.__test_regexp_h(self.BOOL, "True|TRUE|true|t|1", "True", passes_constraint=True)
 
-    def test_int_regexp_fail(self):
+    def test_bool_regexp_fail(self):
         """
         Test a Boolean against a REGEXP it doesn't satisfy.
         """
