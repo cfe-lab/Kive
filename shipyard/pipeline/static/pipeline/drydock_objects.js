@@ -26,6 +26,31 @@ var Geometry = {
     },
     ltLine: function(mx, my, x1, y1, x2, y2) {
         return x2 != x1 ? (y2 - y1) / (x2 - x1) * (mx - x1) > my - y1 : null;
+    },
+    inPolygon: function(mx, my, shape) {
+        // ray casting algorithm
+        // argument 'shape' is an array of objects each with properties x and y
+        var o = [ -300, -300 ],
+            line, s1_x, s1_y, s, t,
+            s2_x = mx - o[0],
+            s2_y = my - o[1],
+            intersections = 0;
+        
+        for (var j = 0; j < shape.length; j++) {
+            line = shape.slice(j, j+2);
+            if (line.length == 1) line.push(shape[0]);
+            
+            s1_x = line[1].x - line[0].x;
+            s1_y = line[1].y - line[0].y;
+            s = (-s1_y * (line[0].x - o[0]) + s1_x * (line[0].y - o[1])) / (-s2_x * s1_y + s1_x * s2_y);
+            t = ( s2_x * (line[0].y - o[1]) - s2_y * (line[0].x - o[0])) / (-s2_x * s1_y + s1_x * s2_y);
+            
+            if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+                intersections++;
+//            console.log('line', line[0].x, line[0].y, line[1].x, line[1].y, 's-t', s,t, 'x', intersections);
+        }
+    
+        return intersections % 2;
     }
 };
 
@@ -456,16 +481,21 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
 }
 
 MethodNode.prototype.contains = function(mx, my) {
-    /*
-    @todo
-    Make this check more precise.
-    */
     var vertices = this.getVertices();
+    var polygon = [ 1,2,3,8,4,5,6,10 ];
+    var shape = [];
+    
+    for ( var i=0; i < polygon.length; i++ )
+        shape.push(vertices[polygon[i]]);
+    return Geometry.inPolygon(mx, my, shape);
+    
+    /** old test (broken in some cases) 
     return mx < vertices[6].x && mx > vertices[3].x
         && !Geometry.ltLine(mx, my, vertices[1].x, vertices[1].y, vertices[2].x, vertices[2].y)
         && !Geometry.ltLine(mx, my, vertices[3].x, vertices[3].y, vertices[2].x, vertices[2].y)
         &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[5].x, vertices[5].y)
         &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[8].x, vertices[8].y);
+    */
 };
 
 MethodNode.prototype.getVertices = function() {
