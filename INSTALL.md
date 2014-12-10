@@ -11,6 +11,8 @@ Prerequisites
 3. OpenMPI
 4. mpi4py
 5. numpy
+6. PostgreSQL
+7. psycopg (Python library for interfacing with PostgreSQL)
 
 It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
 
@@ -18,7 +20,9 @@ Source code or binaries for Python can be obtained from the official website, [p
 
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
 
+Instructions for downloading and installing PostgreSQL may be found at [postgresql.org](http://www.postgresql.org/).
 
+Instructions for downloading and installing psycopg may be found at (http://initd.org/psycopg/).
 Project structure
 -----------------
 
@@ -30,12 +34,37 @@ The root directory of **shipyard** should contain the following subdirectories:
 `/shipyard` is the top-level directory for the Django package that contains the project subdirectory (that by convention has the same name as the project folder, 'shipyard'), as well as a number of application subdirectories.  From now on, we will assume that you are in this project directory; *i.e.*, all paths will be defined relative to this directory.
 
 
+Create database
+---------------
+
+**shipyard** uses PostgreSQL as its default database backend, and it must be set up prior to using **shipyard**.  Setup of PostgreSQL follows step seven of the instructions [here](https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-django-with-postgres-nginx-and-gunicorn).  
+
+First, install PostgreSQL and psycopg as is appropriate for your system.  During the setup, a `postgres` system user account should have been set up: this account is the administrator of the database.  To set up the database, log into this user account (for example, using `sudo su - postgres`) and create a database for **shipyard**.  In these instructions we will call this database `'shipyard'`, but you may use whatever name you like -- simply substitute your name for `shipyard` in the appropriate places in the commands below.  You may do this in a SQL console such as the `'psql'` shell that comes with PostgreSQL, but it's easier to use the `'createdb'` utility provided by PostgreSQL (look for it in whatever directory your PostgreSQL installation put its executables into):
+
+`createdb shipyard`
+
+(substituting your preferred database name if you so desire).  Next, create a user (or "role") for **shipyard** to use when accessing the database (in these instructions we will call this user `'shipyard'`, but again you are free to use whatever you like -- simply substitute it for `shipyard` in the appropriate places in the commands below).  Again, this may be done in an SQL console, but it's easier to use the `'createuser'` utility:
+
+`createuser -P shipyard`
+
+(again substituting your preferred user name if you like) and follow the prompts (the `-P` allows you to specify a password).  Now, we need to grant this user the appropriate privileges.  As the postgres system user, using the `'psql'` SQL console provided with your postgres installation, enter at the prompt:
+
+`GRANT ALL PRIVILEGES ON DATABASE shipyard TO shipyard;`
+
+We are almost done.  In order to run the **shipyard** test suites, the `shipyard` database account must have the ability to create temporary test databases.  As instructed in [this Stack Overflow thread](http://stackoverflow.com/questions/14186055/django-test-app-error-got-an-error-creating-the-test-database-permission-deni), we grant the user this privilege by running the command, again as the `postgres` system user using the `psql` SQL console,
+
+`ALTER USER shipyard CREATEDB;`
+
+The database is now fully set up and ready to go.
+
+
 Settings
 --------
 
-Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, if you are using sqlite3 as your database engine, you would enter `'sqlite3'` under the key `ENGINE`, and the absolute path to the sqlite3 database file under the key `NAME`.  Note that this file does not have to exist - it will be created later, as long as the directory exists.
+Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, using postgres as your database engine, you would specify `'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).  This is a database that must be created by an admistration prior to using Shipyard.
 
 You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
+
 
 
 Initialize database
@@ -43,7 +72,6 @@ Initialize database
 
 Next, you need to make a copy of `./nukeDB_default.expect` and call it `nukeDB.expect`.  You need to replace all text that is highlighted in square brackets, as follows:
 
-* `[PATH TO YOUR DB]` - an absolute or relative path to your database file, if you are using sqlite3.  **WARNING:** This will overwrite an existing database at this path, so you will lose everything if you execute the `nukeDB.expect` script after having used **shipyard** for any length of time.  As a precaution, you (as system administrator) may consider changing the user permission settings on all `nukeDB.*` files.
 * `[YOUR E-MAIL ADDRESS HERE]` - for creating an admin account with the utility that is packaged with the Django distribution (`django.contrib.admin`).  Generally, it is not necessary to use this admin interface but we leave it as an open possibility.  It is okay to leave this blank, *i.e.,* as an empty string followed by a carriage return `"\r"`.
 * `[YOUR PASSWORD]` - similarly, this is also used to initialize an admin account for the Django admin interface.  Unless you are really keen to use the admin tool, it is fine to enter an empty string here: `"\r"`.
 * `[YOUR PASSWORD AGAIN]` - obviously, this should match the previous entry.
