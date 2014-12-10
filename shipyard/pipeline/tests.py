@@ -3414,7 +3414,7 @@ class CustomWiringTests(PipelineTestSetup):
         self.assertEquals(my_cable1.clean(), None)
 
         self.assertRaisesRegexp(ValidationError,
-            'Destination member "string: b" has no wires leading to it',
+            'Destination member "string: (b|c)" has no wires leading to it',
             my_cable1.clean_and_completely_wired)
 
         # Here, we wire the remaining 2 CDT members
