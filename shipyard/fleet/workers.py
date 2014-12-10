@@ -7,10 +7,9 @@ import numpy
 import logging
 from collections import defaultdict
 from django.db import transaction
-import datetime
 import time
 
-import shipyard.settings
+import shipyard.settings  # @UnresolvedImport
 import fleet.models
 import archive.models
 import sandbox.execute
@@ -27,7 +26,7 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self):
+    def __init__(self, comm):
         """
         Set up/register the workers and prepare to run.
 
@@ -36,7 +35,7 @@ class Manager:
         hostname and containing the number of Workers on each host.
         """
         # Set up our communicator and other MPI info.
-        self.comm = MPI.COMM_WORLD
+        self.comm = comm
         self.rank = self.comm.Get_rank()
         self.count = self.comm.Get_size()
         self.hostname = MPI.Get_processor_name()
@@ -75,7 +74,7 @@ class Manager:
             for rank in self.roster[hostname]:
                 self.hostname[rank] = hostname
 
-        self.worker_status = [Worker.READY for i in range(self.count)]
+        self.worker_status = [Worker.READY for _ in range(self.count)]
 
     def _setup_finished_task_receiver(self):
         self.work_finished_result = numpy.empty(2, dtype="i")
@@ -186,7 +185,7 @@ class Manager:
                 self.active_sandboxes.pop(curr_sdbx.run)
 
             else:
-               # Was this task a recovery or novel progress??
+                # Was this task a recovery or novel progress??
                 if task_execute_info.is_recovery():
                     # Add anything that was waiting on this recovery to the queue.
                         curr_sdbx.enqueue_runnable_tasks()
@@ -217,7 +216,7 @@ class Manager:
 
             # Everything in the queue has been started, so we check and see if anything has finished.
             worker_returned = False
-            for i in range(shipyard.settings.FLEET_POLLING_INTERVAL):
+            for _ in range(shipyard.settings.FLEET_POLLING_INTERVAL):
                 test_result = self.work_finished_request.test()
                 if test_result[0]:
                     mgr_logger.debug("Worker {} reports task with PK {} is finished".format(
@@ -235,7 +234,6 @@ class Manager:
             # Look for new jobs to run.  We will also
             # build in a delay here so we don't clog up the database.
             mgr_logger.info("Looking for new runs....")
-            new_run_started = False
             with transaction.atomic():
                 pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
 
@@ -249,7 +247,6 @@ class Manager:
                                               sandbox_path=run_to_process.sandbox_path)
                     run_to_process.run = new_sdbx.run
                     run_to_process.save()
-                    new_run_started = True
 
                     mgr_logger.debug("Task queue: {}".format(self.task_queue))
                     mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
@@ -267,8 +264,8 @@ class Worker:
     ASSIGNMENT = 2
     FINISHED = 3
 
-    def __init__(self):
-        self.comm = MPI.COMM_WORLD
+    def __init__(self, comm):
+        self.comm = comm
         self.rank = self.comm.Get_rank()
         self.count = self.comm.Get_size()
         self.hostname = MPI.Get_processor_name()
