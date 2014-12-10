@@ -702,7 +702,7 @@ class Sandbox:
             raise ValueError("Either none or all parameters must be None")
 
         if pipeline:
-            self.pipeline.check_inputs(input_SDs)
+            pipeline.check_inputs(input_SDs)
         else:
             pipeline = self.pipeline
         sandbox_path = sandbox_path or self.sandbox_path
