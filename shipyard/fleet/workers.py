@@ -201,6 +201,16 @@ class Manager:
         return workers_freed
 
     def main_procedure(self):
+        try:
+            self.main_loop()
+            mgr_logger.info("Manager shutting down.")
+        except:
+            mgr_logger.error("Manager failed.", exc_info=True)
+        for rank in range(self.comm.Get_size()):
+            if rank != self.comm.Get_rank():
+                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+        
+    def main_loop(self):
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
@@ -224,8 +234,11 @@ class Manager:
                     ))
                     worker_returned = True
                     break
-                time.sleep(1)
-
+                try:
+                    time.sleep(1)
+                except KeyboardInterrupt:
+                    return
+            
             if worker_returned:
                 task_finished = archive.models.RunComponent.objects.get(pk=self.work_finished_result[1]).definite
                 self.note_progress(self.work_finished_result[0], task_finished)
@@ -263,6 +276,7 @@ class Worker:
     ROLLCALL = 1
     ASSIGNMENT = 2
     FINISHED = 3
+    SHUTDOWN = 4
 
     def __init__(self, comm):
         self.comm = comm
@@ -279,28 +293,42 @@ class Worker:
         """
         Looks for an assigned task and performs it.
         """
-        task_info_dict = self.comm.recv(source=0, tag=Worker.ASSIGNMENT)
+        status = MPI.Status()
+        task_info_dict = self.comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+        tag = status.Get_tag()
+        if tag == self.SHUTDOWN:
+            worker_logger.info("Worker {} shutting down.".format(self.rank))
+            return tag
 
-        task = None
-        if "cable_record_pk" in task_info_dict:
-            task = archive.models.RunComponent.objects.get(pk=task_info_dict["cable_record_pk"]).definite
-        else:
-            task = archive.models.RunStep.objects.get(pk=task_info_dict["runstep_pk"])
-        worker_logger.info("{} received: {}".format(task.__class__.__name__, task))
-
-        result = None
-        if type(task) == archive.models.RunStep:
-            result = sandbox.execute.finish_step(task_info_dict)
-        else:
-            result = sandbox.execute.finish_cable(task_info_dict)
-        worker_logger.info("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
-        send_buf = numpy.array([self.rank, result.pk], dtype="i")
+        try:
+            task = None
+            if "cable_record_pk" in task_info_dict:
+                task = archive.models.RunComponent.objects.get(pk=task_info_dict["cable_record_pk"]).definite
+            else:
+                task = archive.models.RunStep.objects.get(pk=task_info_dict["runstep_pk"])
+            worker_logger.info("{} received: {}".format(task.__class__.__name__, task))
+    
+            sandbox_result = None
+            if type(task) == archive.models.RunStep:
+                sandbox_result = sandbox.execute.finish_step(task_info_dict)
+            else:
+                sandbox_result = sandbox.execute.finish_cable(task_info_dict)
+            worker_logger.info("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
+            result = sandbox_result.pk
+        except:
+            result = -1 #bogus return value
+            worker_logger.error("Task %s failed.", task, exc_info=True)
+            
+        send_buf = numpy.array([self.rank, result], dtype="i")
         self.comm.Send(send_buf, dest=0, tag=Worker.FINISHED)
-        worker_logger.debug("Sent {} to Manager".format((self.rank, result.pk)))
+        worker_logger.debug("Sent {} to Manager".format((self.rank, result)))
+        
+        return tag
 
     def main_procedure(self):
         """
         Loop on receive_and_perform_task.
         """
-        while True:
-            self.receive_and_perform_task()
+        tag = None
+        while tag != self.SHUTDOWN:
+            tag = self.receive_and_perform_task()
