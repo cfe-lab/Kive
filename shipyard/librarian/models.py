@@ -7,8 +7,6 @@ SymbolicDataset, etc.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
@@ -338,13 +336,13 @@ class SymbolicDataset(models.Model):
                         line += 1
                         name = row['Name'].strip() if row['Name'] else ""
                         desc = row['Description'].strip() if row['Description'] else ""
-                        file = row['File'].strip() if row['File'] else ""
+                        file_name = row['File'].strip() if row['File'] else ""
 
                         # check for empty entries:
-                        if not (name and desc and file):
+                        if not (name and desc and file_name):
                             raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
-                        symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
+                        symDS = SymbolicDataset.create_SD(file_name, cdt=cdt, make_dataset=True, user=user, name=name,
                                                           description=desc, created_by=None, check=True)
 
                         symDSs.extend([symDS])
@@ -432,7 +430,7 @@ class SymbolicDataset(models.Model):
                                                                     column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    if type(failed_constr) not in (str, unicode):
+                    if not isinstance(failed_constr, basestring):
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()
@@ -598,7 +596,7 @@ class ExecRecord(models.Model):
         for i, component_input in enumerate(component.inputs):
             execrecord.execrecordins.create(generic_input=component_input, symbolicdataset=input_SDs[i])
         for i, component_output in enumerate(component.outputs):
-            er = execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
+            execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
         execrecord.save()
         execrecord.complete_clean()
         return execrecord
@@ -965,8 +963,6 @@ class ExecRecordOut(models.Model):
 
         # Second case: parent ER represents a PSIC.
         elif (type (self.execrecord.general_transf()) == pipeline.models.PipelineStepInputCable):
-            parent_er_psic = self.execrecord.general_transf()
-
             # This ERO must point to a TI.
             if not self.generic_output.is_input:
                 raise ValidationError(

@@ -9,8 +9,6 @@ from __future__ import unicode_literals
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
-from django.core.files import File
-from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
 
 import re
@@ -24,7 +22,6 @@ from datetime import datetime
 
 from file_access_utils import set_up_directory
 from constants import datatypes, CDTs, maxlengths
-from datachecking.models import VerificationLog
 
 import logging
 
@@ -666,7 +663,7 @@ class Datatype(models.Model):
         summary_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
         with open(self.prototype.dataset_file.name) as f:
             reader = csv.reader(f)
-            header = next(reader) # skip header - we already know it's good from cleaning the prototype
+            next(reader) # skip header - we already know it's good from cleaning the prototype
             summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader, summary_path)
 
         try:
@@ -988,9 +985,6 @@ class BasicConstraint(models.Model):
             raise ValidationError('Parent Datatype "{}" of BasicConstraint "{}" is not complete'
                                   .format(self.datatype, self))
 
-        error_msg = ""
-        is_error = False
-
         # Check the rule for coherence.
         if self.ruletype in (BasicConstraint.MIN_LENGTH, BasicConstraint.MAX_LENGTH):
             # MIN/MAX_LENGTH should not apply to anything that restricts INT, FLOAT, or BOOL.  Note that INT <= FLOAT.
@@ -1016,7 +1010,7 @@ class BasicConstraint(models.Model):
                                       .format(self, self.datatype, self.datatype.get_builtin_type()))
 
             try:
-                val_bound = float(self.rule)
+                float(self.rule)
             except ValueError:
                 raise ValidationError('BasicConstraint "{}" specifies a bound of "{}" on numeric value, '
                                       'which is not a number'.format(self, self.rule))
@@ -1179,8 +1173,6 @@ class CompoundDatatype(models.Model):
         """
         Check if Datatype members have consecutive indices from 1 to n
         """
-        column_indices = []
-
         for i, member in enumerate(self.members.order_by("column_idx"), start=1):
             member.full_clean()
             if member.column_idx != i:
@@ -1307,8 +1299,6 @@ class CompoundDatatype(models.Model):
         file_to_check matches VERIF_OUT). 
         """
         summary = {}
-        empty = False # file is empty?
-        bad_header = False # header is ok?
 
         # A CSV reader which we will use to check individual 
         # cells in the file, as well as creating external CSVs

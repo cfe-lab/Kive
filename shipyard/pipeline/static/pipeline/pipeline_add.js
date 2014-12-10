@@ -228,7 +228,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
             if (!inputs[i].value || inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html())
             {
-                $(inputs[i]).focus();
+                $(inputs[i]).val_('').focus();
                 break;
             }
         }
@@ -322,6 +322,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
             pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
         }
         
+        // check for duplicate names
+        for (var i = 0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            if ((shape.constructor == RawNode || shape.constructor == CDtNode) && shape.label == node_label) {
+                $('#id_dt_error', this)[0].innerHTML = 'That name has already been used.';
+                return false;
+            }
+        }
+        
         if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error', this)[0].innerHTML = "Label is required";
@@ -332,10 +341,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 shape;
             
             if (this_pk == ""){
-                canvasState.addShape(shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label);
             } else {
-                canvasState.addShape(shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label);
             }
+            canvasState.addShape(shape);
             
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
             $('#id_datatype_name').val('');  // reset text field

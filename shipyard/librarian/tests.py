@@ -22,6 +22,7 @@ from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
+import logging
 
 
 class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
@@ -319,6 +320,10 @@ class SymbolicDatasetTests(LibrarianTestSetup):
     def setUp(self):
         super(SymbolicDatasetTests, self).setUp()
 
+        # Turn off logging, so the test output isn't polluted.
+        logging.getLogger('SymbolicDataset').setLevel(logging.CRITICAL)
+        logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
+        
         rows = 10
         seqlen = 10
 
@@ -399,19 +404,74 @@ class SymbolicDatasetTests(LibrarianTestSetup):
         Symbolic dataset creation fails if the data file has too many
         columns.
         """
-        data_file = tempfile.NamedTemporaryFile()
-        header = "header,sequence,extra"
-        data = "foo,bar,baz"
-        data_file.write(header + "\n" + data)
-        file_path = data_file.name
+        with tempfile.NamedTemporaryFile() as data_file:
+            data_file.write("""\
+header,sequence,extra
+foo,bar,baz
+""")
+            data_file.flush()
+            file_path = data_file.name
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(file_path, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=file_path, cdt=self.cdt_record,
-                                                                   user=self.myUser, name="bad data", 
-                                                                   description="too many columns"))
-        data_file.close()
+            self.assertRaisesRegexp(
+                ValueError,
+                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                          .format(file_path, self.cdt_record)),
+                lambda : SymbolicDataset.create_SD(file_path=file_path,
+                                                   cdt=self.cdt_record,
+                                                   user=self.myUser, name="bad data", 
+                                                   description="too many columns"))
+
+    def test_right_columns(self):
+        """
+        Symbolic dataset creation fails if the data file has too many
+        columns.
+        """
+        with tempfile.NamedTemporaryFile() as data_file:
+            data_file.write("""\
+header,sequence
+foo,bar
+""")
+            data_file.flush()
+            file_path = data_file.name
+
+            SymbolicDataset.create_SD(file_path=file_path,
+                                      cdt=self.cdt_record,
+                                      user=self.myUser,
+                                      name="good data", 
+                                      description="right columns")
+
+    def test_invalid_integer_field(self):
+        """
+        Symbolic dataset creation fails if the data file has too many
+        columns.
+        """
+        compound_datatype = CompoundDatatype()
+        compound_datatype.save()
+        compound_datatype.members.create(datatype=self.STR, 
+                                         column_name="name",
+                                         column_idx=1)
+        compound_datatype.members.create(datatype=self.INT,
+                                         column_name="count",
+                                         column_idx=2)
+        compound_datatype.clean()
+
+        with tempfile.NamedTemporaryFile() as data_file:
+            data_file.write("""\
+name,count
+Bob,tw3nty
+""")
+            data_file.flush()
+            file_path = data_file.name
+
+            self.assertRaisesRegexp(
+                ValueError,
+                re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
+                          .format(file_path)),
+                lambda : SymbolicDataset.create_SD(file_path=file_path,
+                                                   cdt=compound_datatype,
+                                                   user=self.myUser,
+                                                   name="bad data",
+                                                   description="bad integer field"))
 
     def test_dataset_created(self):
         """

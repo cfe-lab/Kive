@@ -43,6 +43,7 @@ class TransformationFamily(models.Model):
 
     class Meta:
         abstract = True
+        ordering = ('name', )
 
     @classmethod
     @transaction.atomic
