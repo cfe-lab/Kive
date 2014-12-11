@@ -181,7 +181,14 @@ class Manager:
             self.task_queue = [x for x in self.task_queue if x[0] != curr_sdbx]
         else:
             # Did this task finish the run?
-            if curr_sdbx.run.is_complete():
+            is_complete = curr_sdbx.run.is_complete()
+            if is_complete:
+                for task_info in self.tasks_in_progress.itervalues():
+                    if task_info['task'].run == just_finished['task'].run:
+                        is_complete = False
+                        break
+            
+            if is_complete:
                 self.active_sandboxes.pop(curr_sdbx.run)
 
             else:

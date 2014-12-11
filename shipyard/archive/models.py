@@ -226,7 +226,6 @@ class Run(stopwatch.models.Stopwatch):
         """
         total_steps = self.pipeline.steps.count()
         error = ""
-        reason = ""
     
         # Check each step for failure.
         for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
@@ -1552,6 +1551,10 @@ class RunOutputCable(RunCable):
         runoutputcable.clean()
         runoutputcable.save()
         return runoutputcable
+    
+    def __str__(self):
+        return "RunOutputCable({!r})".format(
+            self.pipelineoutputcable.output_name)
 
     def _pipeline_cable(self):
         """

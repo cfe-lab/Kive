@@ -18,15 +18,15 @@ expect -re "Username" {
 }
 
 expect -re "Email address" {
-  send "[YOUR E-MAIL ADDRESS HERE]\r"
+  send "\r"
 }
 
 expect -re "Password" {
-  send "[YOUR PASSWORD]\r"
+  send "\r"
 }
 
 expect -re "Password" {
-  send "[YOUR PASSWORD AGAIN]\r"
+  send "\r"
 }
 
 spawn ./manage.py syncdb --traceback
