@@ -1,8 +1,35 @@
+import logging
+from mpi4py import MPI
+import sys
+import threading
+
 from django.db import models, transaction
 from django.contrib.auth.models import User
-import pipeline.models
-import librarian.models
+
 import archive.models
+import fleet.workers
+import librarian.models
+import pipeline.models
+
+mgr_logger = logging.getLogger("fleet.Manager")
+
+# This is an experimental replacement for the runfleet admin command.
+# Disable it by setting worker_count to 0.
+worker_count = 0
+def run_manager_thread():
+    manage_script = sys.argv[0]
+    mgr_logger.debug("args = %r", sys.argv)
+    comm = MPI.COMM_SELF.Spawn(sys.executable,
+                               args=[manage_script, 'fleetworker'],
+                               maxprocs=worker_count).Merge()
+    
+    manager = fleet.workers.Manager(comm)
+    manager.main_procedure()
+
+if worker_count > 0 and sys.argv[-1] == "runserver":
+    manager_thread = threading.Thread(target=run_manager_thread)
+    manager_thread.daemon = True
+    manager_thread.start()
 
 
 # Create your models here.
