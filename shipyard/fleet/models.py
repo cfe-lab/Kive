@@ -18,7 +18,6 @@ mgr_logger = logging.getLogger("fleet.Manager")
 worker_count = 0
 def run_manager_thread():
     manage_script = sys.argv[0]
-    mgr_logger.debug("args = %r", sys.argv)
     comm = MPI.COMM_SELF.Spawn(sys.executable,
                                args=[manage_script, 'fleetworker'],
                                maxprocs=worker_count).Merge()

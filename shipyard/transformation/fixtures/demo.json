@@ -182,7 +182,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 4, 
-        "dataset_name": "prelim_csv"
+        "dataset_name": "prelim"
     }
 },
 {
@@ -276,7 +276,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 5, 
-        "dataset_name": "prelim_csv"
+        "dataset_name": "prelim"
     }
 },
 {
@@ -295,7 +295,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 5, 
-        "dataset_name": "remap_csv"
+        "dataset_name": "remap"
     }
 },
 {
@@ -314,7 +314,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 5, 
-        "dataset_name": "remap_counts_csv"
+        "dataset_name": "remap_counts"
     }
 },
 {
@@ -333,7 +333,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 5, 
-        "dataset_name": "remap_conseq_csv"
+        "dataset_name": "remap_conseq"
     }
 },
 {
@@ -385,7 +385,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 6, 
-        "dataset_name": "remap_csv"
+        "dataset_name": "remap"
     }
 },
 {
@@ -404,7 +404,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 6, 
-        "dataset_name": "aligned_csv"
+        "dataset_name": "aligned"
     }
 },
 {
@@ -423,7 +423,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 6, 
-        "dataset_name": "conseq_ins_csv"
+        "dataset_name": "conseq_ins"
     }
 },
 {
@@ -491,7 +491,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 7, 
-        "dataset_name": "aligned_csv"
+        "dataset_name": "aligned"
     }
 },
 {
@@ -510,7 +510,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 7, 
-        "dataset_name": "nuc_csv"
+        "dataset_name": "nuc"
     }
 },
 {
@@ -529,7 +529,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 7, 
-        "dataset_name": "amino_csv"
+        "dataset_name": "amino"
     }
 },
 {
@@ -548,7 +548,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 7, 
-        "dataset_name": "coord_ins_csv"
+        "dataset_name": "coord_ins"
     }
 },
 {
@@ -567,7 +567,7 @@
     "fields": {
         "dataset_idx": 4, 
         "transformation": 7, 
-        "dataset_name": "conseq_csv"
+        "dataset_name": "conseq"
     }
 },
 {
@@ -627,7 +627,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 9, 
-        "dataset_name": "remap_csv"
+        "dataset_name": "remap"
     }
 },
 {
@@ -646,7 +646,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 9, 
-        "dataset_name": "g2p_csv"
+        "dataset_name": "g2p"
     }
 },
 {
@@ -772,7 +772,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 10, 
-        "dataset_name": "remap_counts_csv"
+        "dataset_name": "remap_counts"
     }
 },
 {
@@ -781,7 +781,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 10, 
-        "dataset_name": "nuc_csv"
+        "dataset_name": "nuc"
     }
 },
 {
@@ -790,7 +790,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 10, 
-        "dataset_name": "amino_csv"
+        "dataset_name": "amino"
     }
 },
 {
@@ -799,7 +799,7 @@
     "fields": {
         "dataset_idx": 4, 
         "transformation": 10, 
-        "dataset_name": "indels_csv"
+        "dataset_name": "indels"
     }
 },
 {
@@ -808,7 +808,7 @@
     "fields": {
         "dataset_idx": 5, 
         "transformation": 10, 
-        "dataset_name": "conseq_csv"
+        "dataset_name": "conseq"
     }
 },
 {
@@ -817,7 +817,7 @@
     "fields": {
         "dataset_idx": 6, 
         "transformation": 10, 
-        "dataset_name": "nuc_variants_csv"
+        "dataset_name": "nuc_variants"
     }
 },
 {
@@ -826,7 +826,7 @@
     "fields": {
         "dataset_idx": 7, 
         "transformation": 10, 
-        "dataset_name": "failed_csv"
+        "dataset_name": "failed"
     }
 },
 {
@@ -835,7 +835,7 @@
     "fields": {
         "dataset_idx": 8, 
         "transformation": 10, 
-        "dataset_name": "g2p_csv"
+        "dataset_name": "g2p"
     }
 },
 {
@@ -982,7 +982,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 11, 
-        "dataset_name": "amino_csv"
+        "dataset_name": "amino"
     }
 },
 {
@@ -1028,7 +1028,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 11, 
-        "dataset_name": "coverage_scores_csv"
+        "dataset_name": "coverage_scores"
     }
 },
 {
@@ -1047,7 +1047,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 12, 
-        "dataset_name": "remap_counts_csv"
+        "dataset_name": "remap_counts"
     }
 },
 {
@@ -1056,7 +1056,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 12, 
-        "dataset_name": "nuc_csv"
+        "dataset_name": "nuc"
     }
 },
 {
@@ -1074,7 +1074,7 @@
     "fields": {
         "dataset_idx": 4, 
         "transformation": 12, 
-        "dataset_name": "amino_csv"
+        "dataset_name": "amino"
     }
 },
 {
@@ -1083,7 +1083,7 @@
     "fields": {
         "dataset_idx": 5, 
         "transformation": 12, 
-        "dataset_name": "indels_csv"
+        "dataset_name": "indels"
     }
 },
 {
@@ -1092,7 +1092,7 @@
     "fields": {
         "dataset_idx": 6, 
         "transformation": 12, 
-        "dataset_name": "coverage_scores_csv"
+        "dataset_name": "coverage_scores"
     }
 },
 {
@@ -1101,7 +1101,7 @@
     "fields": {
         "dataset_idx": 7, 
         "transformation": 12, 
-        "dataset_name": "conseq_csv"
+        "dataset_name": "conseq"
     }
 },
 {
@@ -1110,7 +1110,7 @@
     "fields": {
         "dataset_idx": 8, 
         "transformation": 12, 
-        "dataset_name": "nuc_variants_csv"
+        "dataset_name": "nuc_variants"
     }
 },
 {
@@ -1119,7 +1119,7 @@
     "fields": {
         "dataset_idx": 9, 
         "transformation": 12, 
-        "dataset_name": "failed_csv"
+        "dataset_name": "failed"
     }
 },
 {
@@ -1128,7 +1128,7 @@
     "fields": {
         "dataset_idx": 10, 
         "transformation": 12, 
-        "dataset_name": "g2p_csv"
+        "dataset_name": "g2p"
     }
 },
 {
@@ -1171,7 +1171,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 6, 
-        "dataset_name": "failed_read_csv"
+        "dataset_name": "failed_read"
     }
 },
 {
@@ -1198,7 +1198,7 @@
     "fields": {
         "dataset_idx": 5, 
         "transformation": 7, 
-        "dataset_name": "failed_align_csv"
+        "dataset_name": "failed_align"
     }
 },
 {
@@ -1225,7 +1225,7 @@
     "fields": {
         "dataset_idx": 6, 
         "transformation": 7, 
-        "dataset_name": "nuc_variants_csv"
+        "dataset_name": "nuc_variants"
     }
 },
 {
@@ -1252,7 +1252,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 9, 
-        "dataset_name": "nuc_csv"
+        "dataset_name": "nuc"
     }
 },
 {
@@ -1421,6 +1421,14 @@
     }
 },
 {
+    "pk": 76, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.964848143982002, 
+        "x": 0.551812484809529
+    }
+},
+{
     "pk": 60, 
     "model": "transformation.transformationinput", 
     "fields": {
@@ -1444,7 +1452,7 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 13, 
-        "dataset_name": "remap_counts_csv"
+        "dataset_name": "remap_counts"
     }
 },
 {
@@ -1463,7 +1471,7 @@
     "fields": {
         "dataset_idx": 2, 
         "transformation": 13, 
-        "dataset_name": "remap_conseq_csv"
+        "dataset_name": "remap_conseq"
     }
 },
 {
@@ -1482,7 +1490,7 @@
     "fields": {
         "dataset_idx": 3, 
         "transformation": 13, 
-        "dataset_name": "conseq_ins_csv"
+        "dataset_name": "conseq_ins"
     }
 },
 {
@@ -1501,7 +1509,7 @@
     "fields": {
         "dataset_idx": 4, 
         "transformation": 13, 
-        "dataset_name": "nuc_csv"
+        "dataset_name": "nuc"
     }
 },
 {
@@ -1529,7 +1537,7 @@
     "fields": {
         "dataset_idx": 6, 
         "transformation": 13, 
-        "dataset_name": "failed_read_csv"
+        "dataset_name": "failed_read"
     }
 },
 {
@@ -1548,7 +1556,7 @@
     "fields": {
         "dataset_idx": 7, 
         "transformation": 13, 
-        "dataset_name": "amino_csv"
+        "dataset_name": "amino"
     }
 },
 {
@@ -1585,7 +1593,7 @@
     "fields": {
         "dataset_idx": 10, 
         "transformation": 13, 
-        "dataset_name": "g2p_csv"
+        "dataset_name": "g2p"
     }
 },
 {
@@ -1604,7 +1612,7 @@
     "fields": {
         "dataset_idx": 11, 
         "transformation": 13, 
-        "dataset_name": "coord_ins_csv"
+        "dataset_name": "coord_ins"
     }
 },
 {
@@ -1623,7 +1631,7 @@
     "fields": {
         "dataset_idx": 12, 
         "transformation": 13, 
-        "dataset_name": "coverage_scores_csv"
+        "dataset_name": "coverage_scores"
     }
 },
 {
@@ -1642,7 +1650,7 @@
     "fields": {
         "dataset_idx": 13, 
         "transformation": 13, 
-        "dataset_name": "conseq_csv"
+        "dataset_name": "conseq"
     }
 },
 {
@@ -1661,7 +1669,16 @@
     "fields": {
         "dataset_idx": 14, 
         "transformation": 13, 
-        "dataset_name": "failed_align_csv"
+        "dataset_name": "failed_align"
+    }
+},
+{
+    "pk": 76, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 15, 
+        "transformation": 13, 
+        "dataset_name": "nuc_variants"
     }
 },
 {
@@ -1672,6 +1689,16 @@
         "transf_xput": 75, 
         "max_row": null, 
         "compounddatatype": 18
+    }
+},
+{
+    "pk": 39, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 76, 
+        "max_row": null, 
+        "compounddatatype": 19
     }
 }
 ]

@@ -279,6 +279,11 @@
     "fields": {}
 },
 {
+    "pk": 27, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
     "pk": 3, 
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
@@ -396,7 +401,7 @@
         "output_idx": 1, 
         "source": 14, 
         "output_cdt": 9, 
-        "output_name": "remap_counts_csv", 
+        "output_name": "remap_counts", 
         "source_step": 2
     }
 },
@@ -408,7 +413,7 @@
         "output_idx": 2, 
         "source": 15, 
         "output_cdt": 10, 
-        "output_name": "remap_conseq_csv", 
+        "output_name": "remap_conseq", 
         "source_step": 2
     }
 },
@@ -420,7 +425,7 @@
         "output_idx": 3, 
         "source": 18, 
         "output_cdt": 12, 
-        "output_name": "conseq_ins_csv", 
+        "output_name": "conseq_ins", 
         "source_step": 3
     }
 },
@@ -432,7 +437,7 @@
         "output_idx": 4, 
         "source": 21, 
         "output_cdt": 14, 
-        "output_name": "nuc_csv", 
+        "output_name": "nuc", 
         "source_step": 4
     }
 },
@@ -456,7 +461,7 @@
         "output_idx": 6, 
         "source": 56, 
         "output_cdt": 13, 
-        "output_name": "failed_read_csv", 
+        "output_name": "failed_read", 
         "source_step": 3
     }
 },
@@ -468,7 +473,7 @@
         "output_idx": 7, 
         "source": 22, 
         "output_cdt": 15, 
-        "output_name": "amino_csv", 
+        "output_name": "amino", 
         "source_step": 4
     }
 },
@@ -504,7 +509,7 @@
         "output_idx": 10, 
         "source": 28, 
         "output_cdt": 20, 
-        "output_name": "g2p_csv", 
+        "output_name": "g2p", 
         "source_step": 5
     }
 },
@@ -516,7 +521,7 @@
         "output_idx": 11, 
         "source": 23, 
         "output_cdt": 16, 
-        "output_name": "coord_ins_csv", 
+        "output_name": "coord_ins", 
         "source_step": 4
     }
 },
@@ -528,7 +533,7 @@
         "output_idx": 12, 
         "source": 41, 
         "output_cdt": 21, 
-        "output_name": "coverage_scores_csv", 
+        "output_name": "coverage_scores", 
         "source_step": 6
     }
 },
@@ -540,7 +545,7 @@
         "output_idx": 13, 
         "source": 24, 
         "output_cdt": 17, 
-        "output_name": "conseq_csv", 
+        "output_name": "conseq", 
         "source_step": 4
     }
 },
@@ -552,7 +557,19 @@
         "output_idx": 14, 
         "source": 57, 
         "output_cdt": 18, 
-        "output_name": "failed_align_csv", 
+        "output_name": "failed_align", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 27, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 15, 
+        "source": 58, 
+        "output_cdt": 19, 
+        "output_name": "nuc_variants", 
         "source_step": 4
     }
 }
