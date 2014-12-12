@@ -487,37 +487,42 @@ class SymbolicDataset(models.Model):
         Check that this SD has passed a check for contents if not raw,
         and it has never failed any check for integrity or contents.
         """
+        # Check for any failures.
+        if self.any_failed_checks():
+            return False
+
+        # If this is not raw, check that there is at least one content check completed and
+        # successful.
+        if self.is_raw():
+            return True
+
+        for ccl in self.content_checks.all():
+            if ccl.is_complete():
+                return True
+
+        self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
+        return False
+
+    def any_failed_checks(self):
+        """
+        Checks that this SD has never failed any check for integrity or contents.
+        """
         icls = self.integrity_checks.all()
         ccls = self.content_checks.all()
-
-        # No content check has been performed.
-        if not (self.is_raw() or ccls.exists()):
-            self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
-            return False
 
         # Look for failed integrity/content checks, and also check that at least one
         # content check has been passed.
         for icl in icls:
             if icl.is_fail():
                 self.logger.debug("SD '{}' failed integrity check".format(self))
-                return False
+                return True
 
-        # No failed integrity checks: in the raw case, we're done.
-        if self.is_raw():
-            return True
-
-        content_check_completed = False
         for ccl in ccls:
             if ccl.is_fail():
                 self.logger.debug("SD '{}' failed content check".format(self))
-                return False
-            elif ccl.is_complete():
-                content_check_completed = True
+                return True
 
-        # At this point we know no checks have failed; return False if
-        # none of the checks are complete yet.
-        self.logger.debug("Has a content check completed on SD '{}'?  {}".format(self, content_check_completed))
-        return content_check_completed
+        return False
 
 
 class DatasetStructure(models.Model):

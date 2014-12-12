@@ -167,34 +167,6 @@ class Sandbox:
 
         return (location if location and file_access_utils.file_exists(location) else None)
 
-    # TODO: module function of librarian?
-    def _find_cable_execrecord(self, runcable, input_SD):
-        """Find an ExecRecord which may be reused by a RunCable
-
-        INPUTS
-        runcable        RunCable trying to reuse an ExecRecord
-        input_SD        SymbolicDataset to feed the cable
-
-        OUTPUTS
-        execrecord      ExecRecord which may be reused, or None if no
-                        ExecRecord exists
-        """
-        cable = runcable.component
-
-        # Look at ERIs with matching input SD.
-        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
-
-        for candidate_ERI in candidate_ERIs:
-            candidate_execrecord = candidate_ERI.execrecord
-            candidate_component = candidate_execrecord.general_transf()
-
-            if not candidate_component.is_cable:
-                continue
-
-            if cable.is_compatible(candidate_component):
-                self.logger.debug("Compatible ER found")
-                return candidate_execrecord
-
     def _update_cable_maps(self, runcable, output_SD, output_path):
         """Update maps after cable execution.
         
@@ -288,22 +260,33 @@ class Sandbox:
             self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
             self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
     
-            curr_ER = self._find_cable_execrecord(curr_record, input_SD)
+            curr_ER = _find_cable_execrecord(curr_record, input_SD)
     
             # ER with compatible cable exists? Yes.
             if curr_ER:
                 output_SD = curr_ER.execrecordouts.first().symbolicdataset
-    
-                # ER is completely reusable? Yes.
-                if not curr_record.keeps_output() or output_SD.has_data():
+
+                finish_now = False
+                # Terminal case 1: the found ExecRecord has failed some checks.  In this case,
+                # we just return and the RunCable fails.
+                if output_SD.any_failed_checks():
+                    self.logger.debug("The ExecRecord ({}) found is failed.".format(curr_ER))
+                    finish_now = True
+
+                # Terminal case 2: the ExecRecord passed its checks and
+                # provides the output we need.
+                elif output_SD.is_OK() and (not curr_record.keeps_output() or output_SD.has_data()):
                     self.logger.debug("Reusing ER {}".format(curr_ER))
+                    finish_now = True
+
+                if finish_now:
                     curr_record.link_execrecord(curr_ER, True)
                     self._update_cable_maps(curr_record, output_SD, output_path)
                     curr_record.stop()
                     curr_record.complete_clean()
                     return curr_record
-    
-            # ER with compatible cable exists and completely reusable? No.
+
+            # We found an ER that cannot be fully reused; we will work to fill it in.
             curr_record.reused = False
             self.logger.debug("No ER to completely reuse - committed to executing cable")
 
@@ -326,8 +309,6 @@ class Sandbox:
             output_SD = curr_ER.execrecordouts.first().symbolicdataset
             output_CDT = output_SD.get_cdt()
             output_path = self.find_symbolicdataset(output_SD)
-
-        had_ER_at_beginning = curr_ER is not None
 
         dataset_path = self.find_symbolicdataset(input_SD)
         # Is input in the sandbox? No.
@@ -365,72 +346,84 @@ class Sandbox:
         # Run cable (this completes EL).
         cable.run_cable(dataset_path, output_path, curr_record, curr_log)
 
+        # Check again for an ExecRecord, as someone else may have completed a compatible one.
+        # This part must be done as a transaction.
+
+        preexisting_ER = curr_ER is not None
         missing_output = False
-        start_time = timezone.now()
-        if not file_access_utils.file_exists(output_path):
-            end_time = timezone.now()
-            # May 21, 2014: it's conceivable that the linking could fail in the
-            # trivial case; in which case we should associate a "missing data"
-            # check to input_SD == output_SD.
-            if cable.is_trivial():
+        with transaction.atomic():
+            if not preexisting_ER:
+                curr_ER = _find_cable_execrecord(curr_record, input_SD)
+                if curr_ER is not None:
+                    preexisting_ER = True
+
+            start_time = timezone.now()
+            if not file_access_utils.file_exists(output_path):
+                end_time = timezone.now()
+                # It's conceivable that the linking could fail in the
+                # trivial case; in which case we should associate a "missing data"
+                # check to input_SD == output_SD.
+                if cable.is_trivial():
+                    output_SD = input_SD
+                if curr_ER is None:
+                    output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                else:
+                    output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                output_SD.mark_missing(start_time, end_time, curr_log)
+                missing_output = True
+
+            elif cable.is_trivial():
                 output_SD = input_SD
-            if curr_ER is None:
-                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-            else:
-                output_SD = curr_ER.execrecordouts.first().symbolicdataset
-            output_SD.mark_missing(start_time, end_time, curr_log)
-            missing_output = True
-
-        elif cable.is_trivial():
-            output_SD = input_SD
-
-        else:
-            # Do we need to keep this output?
-            make_dataset = curr_record.keeps_output()
-            dataset_name = curr_record.output_name()
-            dataset_desc = curr_record.output_description()
-            if not make_dataset:
-                self.logger.debug("Cable doesn't keep output: not creating a dataset")
-
-            if curr_ER is not None:
-                output_SD = curr_ER.execrecordouts.first().symbolicdataset
-                if make_dataset:
-                    output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_record)
 
             else:
-                output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, self.user, 
-                                                                       dataset_name, dataset_desc, curr_record, False)
+                # Do we need to keep this output?
+                make_dataset = curr_record.keeps_output()
+                dataset_name = curr_record.output_name()
+                dataset_desc = curr_record.output_description()
+                if not make_dataset:
+                    self.logger.debug("Cable doesn't keep output: not creating a dataset")
 
-        # Recovering? No.
-        if not recover:
+                if curr_ER is not None:
+                    output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                    if make_dataset:
+                        output_SD.register_dataset(output_path, self.user, dataset_name, dataset_desc, curr_record)
 
-            # Creating a new ER, or filling one in? Creating new.
-            if curr_ER is None:
-                self.logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
+                else:
+                    output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, self.user,
+                                                                           dataset_name, dataset_desc, curr_record, False)
 
-                # Make ExecRecord, linking it to the ExecLog.
-                curr_ER = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
+            # Recovering? No.
+            if not recover:
 
-            # Link ER to RunCable.
-            curr_record.link_execrecord(curr_ER, False)
+                # Creating a new ER, or filling one in? Creating new.
+                if curr_ER is None:
+                    self.logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
 
-        # Recovering? Yes.
-        else:
-            self.logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
+                    # Make ExecRecord, linking it to the ExecLog.
+                    curr_ER = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
+
+                # Link ER to RunCable.
+                curr_record.link_execrecord(curr_ER, False)
+
+            # Recovering? Yes.
+            else:
+                self.logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
 
         ####
         # Check outputs
         ####
 
         if not missing_output:
-            # Did ER already exist, or is cable trivial, or recovering? Yes.
-            if had_ER_at_beginning or cable.is_trivial() or recover:
+            # Did ER already exist and have vetted output, or is cable trivial, or recovering?
+            # a) Yes.
+            if ((preexisting_ER and (output_SD.is_OK() or output_SD.any_failed_checks()) or
+                     cable.is_trivial() or recover):
                 self.logger.debug("Performing integrity check of trivial or previously generated output")
 
                 # Perform integrity check.
                 output_SD.check_integrity(output_path, self.user, curr_log, output_SD.MD5_checksum)
 
-            # Did ER already exist, or is cable trivial, or recovering? No.
+            # b) No.
             else:
                 self.logger.debug("Performing content check for output generated for the first time")
                 summary_path = "{}_summary".format(output_path)
@@ -1177,7 +1170,7 @@ class Sandbox:
         self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
         self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
-        curr_ER = self._find_cable_execrecord(curr_record, input_SD)
+        curr_ER = _find_cable_execrecord(curr_record, input_SD)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
         exec_info = RunCableExecuteInfo(curr_record, self.user, curr_ER, input_SD, self.sd_fs_map[input_SD],
@@ -1188,10 +1181,18 @@ class Sandbox:
         if curr_ER:
             output_SD = curr_ER.execrecordouts.first().symbolicdataset
 
-            # ER is completely reusable? Yes.
-            if not curr_record.keeps_output() or output_SD.has_data():
-                # Return curr_record.  The calling method will know that this was successfully reused.
-                self.logger.debug("Reusing ER {}".format(curr_ER))
+            finish_now = False
+            # Terminal case 1: the found ExecRecord has failed some checks.
+            if output_SD.any_failed_checks():
+                self.logger.debug("The ExecRecord ({}) found is failed.".format(curr_ER))
+                finish_now = True
+
+            # Terminal case 2: the ExecRecord passed its checks and provides the required output.
+            elif output_SD.is_OK() and (not curr_record.keeps_output() or output_SD.has_data()):
+                    self.logger.debug("Reusing ER {}".format(curr_ER))
+                    finish_now = True
+
+            if finish_now:
                 curr_record.link_execrecord(curr_ER, True)
                 self._update_cable_maps(curr_record, output_SD, output_path)
                 curr_record.stop()
@@ -1523,6 +1524,35 @@ def _setup_step_paths(step_run_dir, recover):
     return (in_dir, out_dir, log_dir)
 
 
+# TODO: module function of librarian?
+def _find_cable_execrecord(self, runcable, input_SD):
+    """Find an ExecRecord which may be reused by a RunCable
+
+    INPUTS
+    runcable        RunCable trying to reuse an ExecRecord
+    input_SD        SymbolicDataset to feed the cable
+
+    OUTPUTS
+    execrecord      ExecRecord which may be reused, or None if no
+                    ExecRecord exists
+    """
+    cable = runcable.component
+
+    # Look at ERIs with matching input SD.
+    candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
+
+    for candidate_ERI in candidate_ERIs:
+        candidate_execrecord = candidate_ERI.execrecord
+        candidate_component = candidate_execrecord.general_transf()
+
+        if not candidate_component.is_cable:
+            continue
+
+        if cable.is_compatible(candidate_component):
+            self.logger.debug("Compatible ER found")
+            return candidate_execrecord
+
+
 # This function will be called by fleet Workers.  Since they do not have access
 # to the Sandboxes, we need to pass in all the information they need via a dictionary
 # representation of a RunCableExecuteInfo.
@@ -1548,6 +1578,33 @@ def finish_cable(cable_execute_dict):
     curr_ER = None
     if cable_execute_dict["execrecord_pk"] is not None:
         curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
+    else:
+        # It's possible this cable was completed in the time between the Manager queueing this task
+        # and the worker.  Check again to see if it's done.
+        curr_ER = _find_cable_execrecord(curr_record, input_SD)
+        if curr_ER:
+            output_SD = curr_ER.execrecordouts.first().symbolicdataset
+
+            finish_now = False
+            # Terminal case 1: the found ExecRecord has failed some checks.  In this case,
+            # we just return and the RunCable fails.
+            if output_SD.any_failed_checks():
+                self.logger.debug("The ExecRecord ({}) found is failed.".format(curr_ER))
+                finish_now = True
+
+            # Terminal case 2: the ExecRecord passed its checks and
+            # provides the output we need.
+            elif output_SD.is_OK() and (not curr_record.keeps_output() or output_SD.has_data()):
+                self.logger.debug("Reusing ER {}".format(curr_ER))
+                finish_now = True
+
+            if finish_now:
+                curr_record.link_execrecord(curr_ER, True)
+                curr_record.stop()
+                curr_record.complete_clean()
+                return curr_record
+
+    # We're now committed to actually running this cable.
     input_SD_path = cable_execute_dict["input_SD_path"]
     user = User.objects.get(pk=cable_execute_dict["user_pk"])
     output_path = cable_execute_dict["output_path"]
@@ -1560,7 +1617,6 @@ def finish_cable(cable_execute_dict):
     cable = curr_record.definite
 
     recover = recovering_record is not None
-    had_ER_at_beginning = curr_ER is not None
 
     # Write the input SD to the sandbox if necessary.
     # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
@@ -1601,64 +1657,70 @@ def finish_cable(cable_execute_dict):
     # Run cable (this completes EL).
     cable.component.run_cable(input_SD_path, output_path, curr_record, curr_log)
 
-    missing_output = False
-    start_time = timezone.now()
-    if not file_access_utils.file_exists(output_path):
-        end_time = timezone.now()
-        # It's conceivable that the linking could fail in the
-        # trivial case; in which case we should associate a "missing data"
-        # check to input_SD == output_SD.
-        if cable.is_trivial():
+    # Check one last time to see if an ExecRecord is now available.
+    # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
+    preexisting_ER = curr_ER is not None
+    with transaction.atomic():
+        if not preexisting_ER:
+            curr_ER = _find_cable_execrecord(curr_record, input_SD)
+            if curr_ER is not None:
+                preexisting_ER = True
+
+        missing_output = False
+        start_time = timezone.now()
+        if not file_access_utils.file_exists(output_path):
+            end_time = timezone.now()
+            # It's conceivable that the linking could fail in the
+            # trivial case; in which case we should associate a "missing data"
+            # check to input_SD == output_SD.
+            if cable.is_trivial():
+                output_SD = input_SD
+            if curr_ER is None:
+                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+            else:
+                output_SD = curr_ER.execrecordouts.first().symbolicdataset
+            output_SD.mark_missing(start_time, end_time, curr_log)
+            missing_output = True
+
+        elif cable.is_trivial():
             output_SD = input_SD
-        if curr_ER is None:
-            output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-        else:
-            output_SD = curr_ER.execrecordouts.first().symbolicdataset
-        output_SD.mark_missing(start_time, end_time, curr_log)
-        missing_output = True
-
-    elif cable.is_trivial():
-        output_SD = input_SD
-
-    else:
-        # Do we need to keep this output?
-        make_dataset = curr_record.keeps_output()
-        dataset_name = curr_record.output_name()
-        dataset_desc = curr_record.output_description()
-        if not make_dataset:
-            logger.debug("Cable doesn't keep output: not creating a dataset")
-
-        if had_ER_at_beginning:
-            output_SD = curr_ER.execrecordouts.first().symbolicdataset
-            if make_dataset:
-                output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
 
         else:
-            output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, user,
-                                                                   dataset_name, dataset_desc, curr_record, False)
+            # Do we need to keep this output?
+            make_dataset = curr_record.keeps_output()
+            dataset_name = curr_record.output_name()
+            dataset_desc = curr_record.output_description()
+            if not make_dataset:
+                logger.debug("Cable doesn't keep output: not creating a dataset")
 
-    # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
-    if not recover:
+            if curr_ER is not None:
+                output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                if make_dataset:
+                    output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
 
-        if not had_ER_at_beginning:
-            logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
+            else:
+                output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, user,
+                                                                       dataset_name, dataset_desc, curr_record, False)
 
-            # Make ExecRecord, linking it to the ExecLog.
-            curr_ER = librarian.models.ExecRecord.create(curr_log, cable.component, [input_SD], [output_SD])
+        # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
+        if not recover:
+            if curr_ER is None:
+                logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
+                # Make ExecRecord, linking it to the ExecLog.
+                curr_ER = librarian.models.ExecRecord.create(curr_log, cable.component, [input_SD], [output_SD])
+            # Link ER to RunCable (this may have already been linked; that's fine).
+            curr_record.link_execrecord(curr_ER, False)
 
-        # Link ER to RunCable (this may have already been linked; that's fine).
-        curr_record.link_execrecord(curr_ER, False)
-
-    else:
-        logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
+        else:
+            logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
 
     ####
     # Check outputs
     ####
 
     if not missing_output:
-        # Did ER already exist, or is cable trivial, or recovering? Yes.
-        if had_ER_at_beginning or cable.is_trivial() or recover:
+        # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
+        if (preexisting_ER and (output_SD.is_OK() or output_SD.any_failed_checks())) or cable.is_trivial() or recover:
             logger.debug("Performing integrity check of trivial or previously generated output")
 
             # Perform integrity check.
