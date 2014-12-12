@@ -124,17 +124,6 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         ps = next(serializers.deserialize("json", json.dumps([dict_ps]))).object
         return ps
 
-    def test_foo(self):
-        from pprint import pprint
-        from django.core.serializers import serialize, deserialize
-        p = PipelineStep.objects.first()
-        pprint(p.represent_as_dict())
-        print("*"*80)
-        my_dict = self.pipelinestep_to_dict(p)
-        pprint(my_dict)
-        p2 = self.dict_to_pipelinestep(my_dict)
-        self.assertEqual(p2, p)
-
 
 class PipelineFamilyTests(PipelineTestSetup):
 

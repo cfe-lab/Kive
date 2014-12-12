@@ -1553,7 +1553,7 @@ class RunOutputCable(RunCable):
         return runoutputcable
     
     def __str__(self):
-        return "RunOutputCable({!r})".format(
+        return 'RunOutputCable("{}")'.format(
             self.pipelineoutputcable.output_name)
 
     def _pipeline_cable(self):
