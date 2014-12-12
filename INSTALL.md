@@ -134,3 +134,15 @@ On Ubuntu, you need to install the following packages:
 
 To build a LaTeX file into PDF format, use the `pdflatex` command.
 
+Running unit tests
+------------------
+If you want to run your unit tests faster, you can run them against an
+in-memory SQLite database with this command:
+
+    ./manage.py test --settings shipyard.test_settings
+
+This may have slightly different behaviour from the PostgreSQL database, so you
+should occasionally run the tests with the default settings. See [the Django
+documentation][unit-tests] for details on running specific tests.
+
+[unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
