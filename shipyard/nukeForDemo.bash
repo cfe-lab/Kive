@@ -1,4 +1,3 @@
-cd ~/git/Shipyard/shipyard
 ./nukeDB.bash
-python manage.py loaddata demo
+python2.7 manage.py loaddata demo
 cp -R FixtureFiles/demo/* .

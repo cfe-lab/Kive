@@ -1761,7 +1761,9 @@ class RunSICTests(ArchiveTestSetup):
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
+        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
         self.E11_32_output_DS.save()
+        ero.symbolicdataset.save()
         self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
         self.assertIsNone(self.E11_32_RSIC.clean())
 
@@ -1819,7 +1821,9 @@ class RunSICTests(ArchiveTestSetup):
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.created_by = self.E11_32_RSIC
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
+        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
         self.E11_32_output_DS.save()
+        ero.symbolicdataset.save()
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_complete_not_reused(self):

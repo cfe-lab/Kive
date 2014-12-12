@@ -19,4 +19,13 @@ What does Shipyard do?
 
 1. *Shipyard* keeps track of the different versions of your bioinformatic pipelines, down to the individual scripts that make them up.  It is NOT a full-featured revision control system.  It does not resolve conflicts between development branches, for example.  Shipyard should be used to keep track of the versions of your pipeline that graduate from *development* to *production*, where they are being used to analyze actual data sets.
 
-2. Shipyard also keeps track of all the outputs at various stages of processing data through a pipeline.  We think of each step in a pipeline as a *transformation* of a data set from its raw state, through intermediate states, and ultimately to end results.  *Shipyard* records the MD5 checksum of each state as a permanent imprint of the data set contents.  
+2. Shipyard also keeps track of all the outputs at various stages of processing data through a pipeline.  We think of each step in a pipeline as a *transformation* of a data set from its raw state, through intermediate states, and ultimately to end results.  *Shipyard* records the MD5 checksum of each state as a permanent imprint of the data set contents.
+
+What are we working on?
+-----------------------
+
+You can see active tasks on [our project board][waffle], or look at the [current milestone's burndown][burndown].
+
+[waffle]: https://waffle.io/artpoon/shipyard
+[burndown]: http://burndown.io/#ArtPoon/Shipyard
+

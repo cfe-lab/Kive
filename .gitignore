@@ -10,8 +10,6 @@ shipyard/VerificationScripts
 shipyard/Datasets
 shipyard/Logs
 shipyard/shipyard.log*
-# Don't get the customized version of the script that nukes the DB
-shipyard/nukeDB.expect
 
 #Generated files and backup files
 *~

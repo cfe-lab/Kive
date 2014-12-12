@@ -87,8 +87,8 @@ def set_up_directory(directory_to_use, tolerate=False):
         for path in paths:
             if tolerate:
                 if (path == os.path.join(directory_to_use, dirnames.IN_DIR) or
-                            path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
-                            path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
+                        path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
+                        path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
                     continue
             raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 

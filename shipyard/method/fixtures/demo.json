@@ -65,8 +65,8 @@
     "model": "method.coderesource", 
     "fields": {
         "description": "Reference sequences", 
-        "name": "cfe.fasta", 
-        "filename": "cfe.fasta"
+        "name": "projects.json", 
+        "filename": "projects.json"
     }
 },
 {
@@ -115,7 +115,7 @@
         "revision_desc": "Reference sequences", 
         "coderesource": 5, 
         "MD5_checksum": "fd2fd44aabab5a12fdbe5d05714a6cba", 
-        "content_file": "CodeResources/cfe.fasta_20140811120123", 
+        "content_file": "CodeResources/projects.json", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T19:01:23.014Z"
     }
@@ -262,8 +262,8 @@
     "model": "method.coderesource", 
     "fields": {
         "description": "Conversion of SAM data into aligned format.", 
-        "name": "sam2csf", 
-        "filename": "sam2csf.py"
+        "name": "sam2aln", 
+        "filename": "sam2aln.py"
     }
 },
 {
@@ -275,7 +275,7 @@
         "revision_desc": "Conversion of SAM data into aligned format.", 
         "coderesource": 8, 
         "MD5_checksum": "44ecb64b5b210876aed6f7829f86430c", 
-        "content_file": "CodeResources/sam2csf.py_20140811144919", 
+        "content_file": "CodeResources/sam2aln.py_20140811144919", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T21:32:06.239Z"
     }
@@ -306,17 +306,8 @@
     "pk": 5, 
     "model": "method.methodfamily", 
     "fields": {
-        "name": "sam2csf", 
+        "name": "sam2aln", 
         "description": "Conversion of SAM data into aligned format."
-    }
-},
-{
-    "pk": 9, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Amino acid reference sequences", 
-        "name": "csf2counts_amino_refseqs", 
-        "filename": "csf2counts_amino_refseqs.csv"
     }
 },
 {
@@ -333,22 +324,8 @@
     "model": "method.coderesource", 
     "fields": {
         "description": "Post-processing of short-read alignments.", 
-        "name": "csf2counts", 
-        "filename": "csf2counts.py"
-    }
-},
-{
-    "pk": 9, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Amino acid reference sequences", 
-        "coderesource": 9, 
-        "MD5_checksum": "e70ee496676ceb704f859a316cd2d826", 
-        "content_file": "CodeResources/csf2counts_amino_refseqs.csv_20140811153950", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T22:39:50.890Z"
+        "name": "aln2counts", 
+        "filename": "aln2counts.py"
     }
 },
 {
@@ -374,7 +351,7 @@
         "revision_desc": "Post-processing of short-read alignments.", 
         "coderesource": 11, 
         "MD5_checksum": "c399c371de1a1d389d3466ee115b1150", 
-        "content_file": "CodeResources/csf2counts.py_20140811154315", 
+        "content_file": "CodeResources/aln2counts.py_20140811154315", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T22:43:15.594Z"
     }
@@ -385,16 +362,6 @@
     "fields": {
         "depPath": ".", 
         "requirement": 3, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 9, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 9, 
         "coderesourcerevision": 11, 
         "depFileName": ""
     }
@@ -435,113 +402,17 @@
     "pk": 6, 
     "model": "method.methodfamily", 
     "fields": {
-        "name": "csf2counts", 
+        "name": "aln2counts", 
         "description": "Post-processing of short-read alignments."
     }
 },
 {
-    "pk": 12, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "", 
-        "name": "csf_to_fasta_by_nucref", 
-        "filename": "csf_to_fasta_by_nucref.csv"
-    }
-},
-{
-    "pk": 13, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Clip out sub-regions from MiSeq read alignments", 
-        "name": "csf2nuc", 
-        "filename": "csf2nuc.py"
-    }
-},
-{
-    "pk": 12, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "", 
-        "coderesource": 12, 
-        "MD5_checksum": "e6e49dc0484a4a2ceb81809ce58cfcd7", 
-        "content_file": "CodeResources/csf_to_fasta_by_nucref.csv_20140811162253", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:22:53.769Z"
-    }
-},
-{
-    "pk": 13, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Clip out sub-regions from MiSeq read alignments", 
-        "coderesource": 13, 
-        "MD5_checksum": "51aba85560352913d54ed9785afc8f53", 
-        "content_file": "CodeResources/csf2nuc.py_20140811162856", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:28:56.731Z"
-    }
-},
-{
-    "pk": 12, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 3, 
-        "coderesourcerevision": 13, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 13, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 12, 
-        "coderesourcerevision": 13, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 14, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 10, 
-        "coderesourcerevision": 13, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 8, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 7, 
-        "deterministic": true, 
-        "driver": 13, 
-        "tainted": false, 
-        "revision_number": 1
-    }
-},
-{
-    "pk": 7, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "csf2nuc", 
-        "description": "Clip out sub-regions from MiSeq read alignments"
-    }
-},
-{
     "pk": 14, 
     "model": "method.coderesource", 
     "fields": {
-        "description": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
-        "name": "fasta_to_g2p", 
-        "filename": "fasta_to_g2p.rb"
+        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "name": "sam_g2p", 
+        "filename": "sam_g2p.rb"
     }
 },
 {
@@ -559,7 +430,7 @@
     "fields": {
         "description": "Compiled version of alignment.cpp", 
         "name": "alignment", 
-        "filename": "alignment.bundle"
+        "filename": "alignment.so"
     }
 },
 {
@@ -585,8 +456,8 @@
     "model": "method.coderesource", 
     "fields": {
         "description": "Shell script to  launch Ruby version", 
-        "name": "fasta_to_g2p.sh", 
-        "filename": "fasta_to_g2p.sh"
+        "name": "sam_g2p.sh", 
+        "filename": "sam_g2p.sh"
     }
 },
 {
@@ -595,10 +466,10 @@
     "fields": {
         "revision_name": "Prototype", 
         "revision_parent": null, 
-        "revision_desc": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
         "coderesource": 14, 
         "MD5_checksum": "cc361585b84ffd4b92b12153f4e563f2", 
-        "content_file": "CodeResources/fasta_to_g2p.rb_20140811165352", 
+        "content_file": "CodeResources/sam_g2p.rb_20140811165352", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T23:53:52.052Z"
     }
@@ -626,7 +497,7 @@
         "revision_desc": "Compiled version of alignment.cpp", 
         "coderesource": 16, 
         "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62", 
-        "content_file": "CodeResources/alignment.bundle", 
+        "content_file": "CodeResources/alignment.so_20140811165911", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T23:59:11.169Z"
     }
@@ -668,7 +539,7 @@
         "revision_desc": "Shell script to  launch Ruby version", 
         "coderesource": 19, 
         "MD5_checksum": "6eed3db03077b725408f14ceb78c1c9f", 
-        "content_file": "CodeResources/fasta_to_g2p.sh_20140811170132", 
+        "content_file": "CodeResources/sam_g2p.sh_20140811170132", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-12T00:01:32.384Z"
     }
@@ -739,17 +610,8 @@
     "pk": 8, 
     "model": "method.methodfamily", 
     "fields": {
-        "name": "fasta_to_g2p.sh", 
-        "description": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence."
-    }
-},
-{
-    "pk": 20, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Defines codons we require coverage for in each region", 
-        "name": "key_positions", 
-        "filename": "key_positions.csv"
+        "name": "sam_g2p.sh", 
+        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence."
     }
 },
 {
@@ -759,20 +621,6 @@
         "description": "Plot coverage for each region in a sample.", 
         "name": "coverage_plots", 
         "filename": "coverage_plots.R"
-    }
-},
-{
-    "pk": 20, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Defines codons we require coverage for in each region", 
-        "coderesource": 20, 
-        "MD5_checksum": "ef6cf259fa914e89abbdd92868da3d61", 
-        "content_file": "CodeResources/key_positions.csv_20140812113901", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-12T18:39:01.297Z"
     }
 },
 {
@@ -787,16 +635,6 @@
         "content_file": "CodeResources/coverage_plots.R_20140812114014", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-12T18:40:14.598Z"
-    }
-},
-{
-    "pk": 20, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 20, 
-        "coderesourcerevision": 21, 
-        "depFileName": ""
     }
 },
 {
@@ -817,6 +655,79 @@
     "fields": {
         "name": "coverage_plots", 
         "description": "Plot coverage for each region in a sample."
+    }
+},
+{
+    "pk": 22, 
+    "model": "method.coderesource", 
+    "fields": {
+        "description": "Load MiSeq project configurations from a JSON file.", 
+        "name": "project_config", 
+        "filename": "project_config.py"
+    }
+},
+{
+    "pk": 22, 
+    "model": "method.coderesourcerevision", 
+    "fields": {
+        "revision_name": "Prototype", 
+        "revision_parent": null, 
+        "revision_desc": "Load MiSeq project configurations from a JSON file.", 
+        "coderesource": 22, 
+        "MD5_checksum": "c4866c13b2f7926c9c704523cceffec7", 
+        "content_file": "CodeResources/project_config.py_20141203134458", 
+        "revision_number": 1, 
+        "revision_DateTime": "2014-12-03T21:44:58.852Z"
+    }
+},
+{
+    "pk": 20, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 22, 
+        "coderesourcerevision": 6, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 21, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 22, 
+        "coderesourcerevision": 7, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 22, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 22, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 23, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 5, 
+        "coderesourcerevision": 11, 
+        "depFileName": ""
+    }
+},
+{
+    "pk": 24, 
+    "model": "method.coderesourcedependency", 
+    "fields": {
+        "depPath": ".", 
+        "requirement": 5, 
+        "coderesourcerevision": 21, 
+        "depFileName": ""
     }
 }
 ]

@@ -186,6 +186,16 @@
     }
 },
 {
+    "pk": 6, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 9, 
+        "max_row": null, 
+        "compounddatatype": 7
+    }
+},
+{
     "pk": 5, 
     "model": "transformation.transformation", 
     "fields": {
@@ -270,12 +280,32 @@
     }
 },
 {
+    "pk": 7, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 12, 
+        "max_row": null, 
+        "compounddatatype": 7
+    }
+},
+{
     "pk": 13, 
     "model": "transformation.transformationoutput", 
     "fields": {
         "dataset_idx": 1, 
         "transformation": 5, 
         "dataset_name": "remap_csv"
+    }
+},
+{
+    "pk": 8, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 13, 
+        "max_row": null, 
+        "compounddatatype": 8
     }
 },
 {
@@ -288,6 +318,16 @@
     }
 },
 {
+    "pk": 9, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 14, 
+        "max_row": null, 
+        "compounddatatype": 9
+    }
+},
+{
     "pk": 15, 
     "model": "transformation.transformationoutput", 
     "fields": {
@@ -297,12 +337,22 @@
     }
 },
 {
+    "pk": 10, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 15, 
+        "max_row": null, 
+        "compounddatatype": 10
+    }
+},
+{
     "pk": 6, 
     "model": "transformation.transformation", 
     "fields": {
         "revision_DateTime": "2014-08-11T21:34:09.900Z", 
         "revision_desc": "Conversion of SAM data into aligned format.", 
-        "revision_name": "sam2csf"
+        "revision_name": "sam2aln"
     }
 },
 {
@@ -339,6 +389,16 @@
     }
 },
 {
+    "pk": 11, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 16, 
+        "max_row": null, 
+        "compounddatatype": 8
+    }
+},
+{
     "pk": 17, 
     "model": "transformation.transformationoutput", 
     "fields": {
@@ -348,12 +408,32 @@
     }
 },
 {
+    "pk": 12, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 17, 
+        "max_row": null, 
+        "compounddatatype": 11
+    }
+},
+{
     "pk": 18, 
     "model": "transformation.transformationoutput", 
     "fields": {
         "dataset_idx": 2, 
         "transformation": 6, 
-        "dataset_name": "failed_csv"
+        "dataset_name": "conseq_ins_csv"
+    }
+},
+{
+    "pk": 13, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 18, 
+        "max_row": null, 
+        "compounddatatype": 12
     }
 },
 {
@@ -362,19 +442,11 @@
     "fields": {
         "revision_DateTime": "2014-08-11T22:46:19.889Z", 
         "revision_desc": "Post-processing of short-read alignments.", 
-        "revision_name": "csf2counts"
+        "revision_name": "aln2counts"
     }
 },
 {
     "pk": 19, 
-    "model": "transformation.transformationxput", 
-    "fields": {
-        "y": 0, 
-        "x": 0
-    }
-},
-{
-    "pk": 20, 
     "model": "transformation.transformationxput", 
     "fields": {
         "y": 0, 
@@ -423,12 +495,13 @@
     }
 },
 {
-    "pk": 20, 
-    "model": "transformation.transformationinput", 
+    "pk": 14, 
+    "model": "transformation.xputstructure", 
     "fields": {
-        "dataset_idx": 2, 
-        "transformation": 7, 
-        "dataset_name": "remap_conseq_csv"
+        "min_row": null, 
+        "transf_xput": 19, 
+        "max_row": null, 
+        "compounddatatype": 11
     }
 },
 {
@@ -441,6 +514,16 @@
     }
 },
 {
+    "pk": 15, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 21, 
+        "max_row": null, 
+        "compounddatatype": 14
+    }
+},
+{
     "pk": 22, 
     "model": "transformation.transformationoutput", 
     "fields": {
@@ -450,12 +533,32 @@
     }
 },
 {
+    "pk": 16, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 22, 
+        "max_row": null, 
+        "compounddatatype": 15
+    }
+},
+{
     "pk": 23, 
     "model": "transformation.transformationoutput", 
     "fields": {
         "dataset_idx": 3, 
         "transformation": 7, 
-        "dataset_name": "indels_csv"
+        "dataset_name": "coord_ins_csv"
+    }
+},
+{
+    "pk": 17, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 23, 
+        "max_row": null, 
+        "compounddatatype": 16
     }
 },
 {
@@ -468,12 +571,13 @@
     }
 },
 {
-    "pk": 8, 
-    "model": "transformation.transformation", 
+    "pk": 18, 
+    "model": "transformation.xputstructure", 
     "fields": {
-        "revision_DateTime": "2014-08-11T23:29:46.329Z", 
-        "revision_desc": "Clip out sub-regions from MiSeq read alignments", 
-        "revision_name": "csf2nuc"
+        "min_row": null, 
+        "transf_xput": 24, 
+        "max_row": null, 
+        "compounddatatype": 17
     }
 },
 {
@@ -490,24 +594,6 @@
     "fields": {
         "y": 0, 
         "x": 0
-    }
-},
-{
-    "pk": 25, 
-    "model": "transformation.transformationinput", 
-    "fields": {
-        "dataset_idx": 1, 
-        "transformation": 8, 
-        "dataset_name": "aligned_csv"
-    }
-},
-{
-    "pk": 26, 
-    "model": "transformation.transformationoutput", 
-    "fields": {
-        "dataset_idx": 1, 
-        "transformation": 8, 
-        "dataset_name": "nuc_variants_csv"
     }
 },
 {
@@ -515,8 +601,8 @@
     "model": "transformation.transformation", 
     "fields": {
         "revision_DateTime": "2014-08-12T00:04:53.535Z", 
-        "revision_desc": "Iterate through a CSV (produced by sam2csf) where each row contains\r\nregion2, qcut2, rank, count, offset, seq\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
-        "revision_name": "fasta_to_g2p.sh"
+        "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
+        "revision_name": "sam_g2p.sh"
     }
 },
 {
@@ -541,7 +627,17 @@
     "fields": {
         "dataset_idx": 1, 
         "transformation": 9, 
-        "dataset_name": "aligned_csv"
+        "dataset_name": "remap_csv"
+    }
+},
+{
+    "pk": 19, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 27, 
+        "max_row": null, 
+        "compounddatatype": 8
     }
 },
 {
@@ -551,6 +647,16 @@
         "dataset_idx": 1, 
         "transformation": 9, 
         "dataset_name": "g2p_csv"
+    }
+},
+{
+    "pk": 20, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 28, 
+        "max_row": null, 
+        "compounddatatype": 20
     }
 },
 {
@@ -880,6 +986,16 @@
     }
 },
 {
+    "pk": 21, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 39, 
+        "max_row": null, 
+        "compounddatatype": 15
+    }
+},
+{
     "pk": 42, 
     "model": "transformation.transformationinput", 
     "fields": {
@@ -913,6 +1029,16 @@
         "dataset_idx": 2, 
         "transformation": 11, 
         "dataset_name": "coverage_scores_csv"
+    }
+},
+{
+    "pk": 22, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 41, 
+        "max_row": null, 
+        "compounddatatype": 21
     }
 },
 {
@@ -1003,6 +1129,549 @@
         "dataset_idx": 10, 
         "transformation": 12, 
         "dataset_name": "g2p_csv"
+    }
+},
+{
+    "pk": 54, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 4, 
+        "transformation": 5, 
+        "dataset_name": "unmapped1_fastq"
+    }
+},
+{
+    "pk": 54, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 55, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 5, 
+        "transformation": 5, 
+        "dataset_name": "unmapped2_fastq"
+    }
+},
+{
+    "pk": 55, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 56, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 6, 
+        "dataset_name": "failed_read_csv"
+    }
+},
+{
+    "pk": 56, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 23, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 56, 
+        "max_row": null, 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 57, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 5, 
+        "transformation": 7, 
+        "dataset_name": "failed_align_csv"
+    }
+},
+{
+    "pk": 57, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 24, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 57, 
+        "max_row": null, 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 58, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 6, 
+        "transformation": 7, 
+        "dataset_name": "nuc_variants_csv"
+    }
+},
+{
+    "pk": 58, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 25, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 58, 
+        "max_row": null, 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 59, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 9, 
+        "dataset_name": "nuc_csv"
+    }
+},
+{
+    "pk": 59, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0,
+        "x": 0
+    }
+},
+{
+    "pk": 26, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 59, 
+        "max_row": null, 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 27, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 31, 
+        "max_row": null, 
+        "compounddatatype": 9
+    }
+},
+{
+    "pk": 13, 
+    "model": "transformation.transformation", 
+    "fields": {
+        "revision_DateTime": "2014-12-05T20:17:01.510Z", 
+        "revision_desc": "", 
+        "revision_name": ""
+    }
+},
+{
+    "pk": 60, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.10011248593925759, 
+        "x": 0.03881401617250674
+    }
+},
+{
+    "pk": 61, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.19572553430821146, 
+        "x": 0.03827493261455526
+    }
+},
+{
+    "pk": 62, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.47665916760404947, 
+        "x": 0.21030444027479717
+    }
+},
+{
+    "pk": 63, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.546400449943757, 
+        "x": 0.23504043126684637
+    }
+},
+{
+    "pk": 64, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.546400449943757, 
+        "x": 0.2975585677467923
+    }
+},
+{
+    "pk": 65, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.6127671541057368, 
+        "x": 0.42982756173526804
+    }
+},
+{
+    "pk": 66, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.6161417322834646, 
+        "x": 0.25651080842633456
+    }
+},
+{
+    "pk": 67, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.6172665916760405, 
+        "x": 0.3201226682646095
+    }
+},
+{
+    "pk": 68, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.6780089988751407, 
+        "x": 0.4561652471587456
+    }
+},
+{
+    "pk": 69, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.6847581552305961, 
+        "x": 0.5450366253045952
+    }
+},
+{
+    "pk": 70, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.687007874015748, 
+        "x": 0.28015307606005485
+    }
+},
+{
+    "pk": 71, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.718503937007874, 
+        "x": 0.4274777052130996
+    }
+},
+{
+    "pk": 72, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.7511248593925759, 
+        "x": 0.4808856819083688
+    }
+},
+{
+    "pk": 73, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.7589988751406074, 
+        "x": 0.5735306449598788
+    }
+},
+{
+    "pk": 74, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.8208661417322834, 
+        "x": 0.5045279495420891
+    }
+},
+{
+    "pk": 75, 
+    "model": "transformation.transformationxput", 
+    "fields": {
+        "y": 0.8928571428571429, 
+        "x": 0.5281702171758093
+    }
+},
+{
+    "pk": 60, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 13, 
+        "dataset_name": "fastq1"
+    }
+},
+{
+    "pk": 61, 
+    "model": "transformation.transformationinput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 13, 
+        "dataset_name": "fastq2"
+    }
+},
+{
+    "pk": 62, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 1, 
+        "transformation": 13, 
+        "dataset_name": "remap_counts_csv"
+    }
+},
+{
+    "pk": 28, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 62, 
+        "max_row": null, 
+        "compounddatatype": 9
+    }
+},
+{
+    "pk": 63, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 2, 
+        "transformation": 13, 
+        "dataset_name": "remap_conseq_csv"
+    }
+},
+{
+    "pk": 29, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 63, 
+        "max_row": null, 
+        "compounddatatype": 10
+    }
+},
+{
+    "pk": 64, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 3, 
+        "transformation": 13, 
+        "dataset_name": "conseq_ins_csv"
+    }
+},
+{
+    "pk": 30, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 64, 
+        "max_row": null, 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 65, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 4, 
+        "transformation": 13, 
+        "dataset_name": "nuc_csv"
+    }
+},
+{
+    "pk": 31, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 65, 
+        "max_row": null, 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 66, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 5, 
+        "transformation": 13, 
+        "dataset_name": "unmapped1_fastq"
+    }
+},
+{
+    "pk": 67, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 6, 
+        "transformation": 13, 
+        "dataset_name": "failed_read_csv"
+    }
+},
+{
+    "pk": 32, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 67, 
+        "max_row": null, 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 68, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 7, 
+        "transformation": 13, 
+        "dataset_name": "amino_csv"
+    }
+},
+{
+    "pk": 33, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 68, 
+        "max_row": null, 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 69, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 8, 
+        "transformation": 13, 
+        "dataset_name": "coverage_maps_tar"
+    }
+},
+{
+    "pk": 70, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 9, 
+        "transformation": 13, 
+        "dataset_name": "unmapped2_fastq"
+    }
+},
+{
+    "pk": 71, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 10, 
+        "transformation": 13, 
+        "dataset_name": "g2p_csv"
+    }
+},
+{
+    "pk": 34, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 71, 
+        "max_row": null, 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 72, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 11, 
+        "transformation": 13, 
+        "dataset_name": "coord_ins_csv"
+    }
+},
+{
+    "pk": 35, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 72, 
+        "max_row": null, 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 73, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 12, 
+        "transformation": 13, 
+        "dataset_name": "coverage_scores_csv"
+    }
+},
+{
+    "pk": 36, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 73, 
+        "max_row": null, 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 74, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 13, 
+        "transformation": 13, 
+        "dataset_name": "conseq_csv"
+    }
+},
+{
+    "pk": 37, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 74, 
+        "max_row": null, 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 75, 
+    "model": "transformation.transformationoutput", 
+    "fields": {
+        "dataset_idx": 14, 
+        "transformation": 13, 
+        "dataset_name": "failed_align_csv"
+    }
+},
+{
+    "pk": 38, 
+    "model": "transformation.xputstructure", 
+    "fields": {
+        "min_row": null, 
+        "transf_xput": 75, 
+        "max_row": null, 
+        "compounddatatype": 18
     }
 }
 ]

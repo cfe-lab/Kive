@@ -439,7 +439,20 @@ CanvasState.prototype.doUp = function(e) {
             } else {
                 // valid Connector, assign non-null value
                 
-                var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, connector.source.label);
+                // make sure label is not a duplicate
+                var suffix = 0;
+                var new_output_label = connector.source.label;
+                for (var i=0; i< this.shapes.length; i++) {
+                    var shape = this.shapes[i];
+                    if (shape.constructor != OutputNode) continue;
+                    if (shape.label == new_output_label) {
+                        i = -1;
+                        suffix++;
+                        new_output_label = connector.source.label +'_'+ suffix;
+                    }
+                }
+                
+                var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, new_output_label);
                 this.addShape(outNode);
                 
                 connector.dest = outNode.in_magnets[0];
@@ -458,7 +471,7 @@ CanvasState.prototype.doUp = function(e) {
                     top:  Math.min(connector.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
                 });
                 
-                $('#output_name', dialog).val(connector.source.label).select(); // default value;
+                $('#output_name', dialog).val(new_output_label).select(); // default value;
             }
         } else {
             // Connector not linked to anything - delete

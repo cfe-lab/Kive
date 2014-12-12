@@ -124,17 +124,6 @@ class PipelineTestSetup(method.tests.MethodTestSetup):
         ps = next(serializers.deserialize("json", json.dumps([dict_ps]))).object
         return ps
 
-    def test_foo(self):
-        from pprint import pprint
-        from django.core.serializers import serialize, deserialize
-        p = PipelineStep.objects.first()
-        pprint(p.represent_as_dict())
-        print("*"*80)
-        my_dict = self.pipelinestep_to_dict(p)
-        pprint(my_dict)
-        p2 = self.dict_to_pipelinestep(my_dict)
-        self.assertEqual(p2, p)
-
 
 class PipelineFamilyTests(PipelineTestSetup):
 
@@ -2203,13 +2192,13 @@ class PipelineTests(PipelineTestSetup):
         # The second:
         # self.singlet_cdt, output_a_b_c_mean, 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "output_a_b_c_squared")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "output_a_b_c_mean")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.singlet_cdt)
@@ -2278,13 +2267,13 @@ class PipelineTests(PipelineTestSetup):
         # self.DNAoutput_cdt, "outputone", 1, None, None
         # self.DNAinput_cdt, "outputtwo", 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "outputone")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.DNAoutput_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "outputtwo")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.DNAinput_cdt)
@@ -3414,7 +3403,7 @@ class CustomWiringTests(PipelineTestSetup):
         self.assertEquals(my_cable1.clean(), None)
 
         self.assertRaisesRegexp(ValidationError,
-            'Destination member "string: b" has no wires leading to it',
+            'Destination member "string: (b|c)" has no wires leading to it',
             my_cable1.clean_and_completely_wired)
 
         # Here, we wire the remaining 2 CDT members
