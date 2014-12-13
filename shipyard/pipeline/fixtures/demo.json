@@ -113,8 +113,8 @@
         "pipeline": 13, 
         "name": "sam2aln.py", 
         "outputs_to_delete": [], 
-        "y": 0.3655793025871766, 
-        "x": 0.2549865229110512, 
+        "y": 0.416813630294019, 
+        "x": 0.40033948303377, 
         "transformation": 6, 
         "step_num": 3
     }
@@ -126,8 +126,8 @@
         "pipeline": 13, 
         "name": "aln2counts.py", 
         "outputs_to_delete": [], 
-        "y": 0.4431946006749156, 
-        "x": 0.3746630727762803, 
+        "y": 0.514415530907474, 
+        "x": 0.55923338527628, 
         "transformation": 7, 
         "step_num": 4
     }
@@ -139,8 +139,8 @@
         "pipeline": 13, 
         "name": "sam_g2p.sh", 
         "outputs_to_delete": [], 
-        "y": 0.6152980877390326, 
-        "x": 0.38598382749326143, 
+        "y": 0.773915700768748, 
+        "x": 0.546546658214479, 
         "transformation": 9, 
         "step_num": 5
     }
@@ -152,8 +152,8 @@
         "pipeline": 13, 
         "name": "coverage_plots.R", 
         "outputs_to_delete": [], 
-        "y": 0.5748031496062992, 
-        "x": 0.5105121293800539, 
+        "y": 0.614047335652811, 
+        "x": 0.739027754380054, 
         "transformation": 11, 
         "step_num": 6
     }

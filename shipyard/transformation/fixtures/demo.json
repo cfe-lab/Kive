@@ -1312,120 +1312,120 @@
     "pk": 62, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.47665916760404947, 
-        "x": 0.21030444027479717
+        "y": 0.54, 
+        "x": 0.25
     }
 },
 {
     "pk": 63, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.546400449943757, 
-        "x": 0.23504043126684637
+        "y": 0.56, 
+        "x": 0.3
     }
 },
 {
     "pk": 64, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.546400449943757, 
-        "x": 0.2975585677467923
+        "y": 0.62, 
+        "x": 0.45
     }
 },
 {
     "pk": 65, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.6127671541057368, 
-        "x": 0.42982756173526804
+        "y": 0.66, 
+        "x": 0.55
     }
 },
 {
     "pk": 66, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.6161417322834646, 
-        "x": 0.25651080842633456
+        "y": 0.58, 
+        "x": 0.35
     }
 },
 {
     "pk": 67, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.6172665916760405, 
-        "x": 0.3201226682646095
+        "y": 0.64, 
+        "x": 0.5
     }
 },
 {
     "pk": 68, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.6780089988751407, 
-        "x": 0.4561652471587456
+        "y": 0.68, 
+        "x": 0.6
     }
 },
 {
     "pk": 69, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.6847581552305961, 
-        "x": 0.5450366253045952
+        "y": 0.74, 
+        "x": 0.85
     }
 },
 {
     "pk": 70, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.687007874015748, 
-        "x": 0.28015307606005485
+        "y": 0.6, 
+        "x": 0.4
     }
 },
 {
     "pk": 71, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.718503937007874, 
-        "x": 0.4274777052130996
+        "y": 0.88, 
+        "x": 0.65
     }
 },
 {
     "pk": 72, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.7511248593925759, 
-        "x": 0.4808856819083688
+        "y": 0.7, 
+        "x": 0.65
     }
 },
 {
     "pk": 73, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.7589988751406074, 
-        "x": 0.5735306449598788
+        "y": 0.76, 
+        "x": 0.9
     }
 },
 {
     "pk": 74, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.8208661417322834, 
-        "x": 0.5045279495420891
+        "y": 0.72, 
+        "x": 0.7
     }
 },
 {
     "pk": 75, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.8928571428571429, 
-        "x": 0.5281702171758093
+        "y": 0.74, 
+        "x": 0.75
     }
 },
 {
     "pk": 76, 
     "model": "transformation.transformationxput", 
     "fields": {
-        "y": 0.964848143982002, 
-        "x": 0.551812484809529
+        "y": 0.76, 
+        "x": 0.8
     }
 },
 {
