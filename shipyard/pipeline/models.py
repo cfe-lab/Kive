@@ -22,6 +22,7 @@ import transformation.models
 
 import method.models
 import metadata.models
+import librarian.models
 from constants import maxlengths
 
 logger = logging.getLogger(__name__)
@@ -1093,6 +1094,30 @@ class PipelineCable(models.Model):
             raise PipelineSerializationException("Error in defining custom wire: {}".format(e))
 
         return new_wire
+
+    def find_compatible_ER(self, input_SD):
+        """Find an ExecRecord which may be reused by this PipelineCable.
+
+        INPUTS
+        input_SD        SymbolicDataset to feed the cable
+
+        OUTPUTS
+        execrecord      ExecRecord which may be reused, or None if no
+                        ExecRecord exists
+        """
+        # Look at ERIs with matching input SD.
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
+
+        for candidate_ERI in candidate_ERIs:
+            candidate_execrecord = candidate_ERI.execrecord
+            candidate_component = candidate_execrecord.general_transf()
+
+            if not candidate_component.is_cable:
+                continue
+
+            if self.definite.is_compatible(candidate_component):
+                self.logger.debug("Compatible ER found")
+                return candidate_execrecord
 
 
 @python_2_unicode_compatible

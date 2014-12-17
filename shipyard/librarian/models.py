@@ -748,6 +748,12 @@ class ExecRecord(models.Model):
         """Checks whether all of the EROs of this ER are OK."""
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
 
+    def outputs_failed_any_checks(self):
+        """
+        Checks whether any of the EROs of this ER have ever failed any checks.
+        """
+        return any([ero.symbolicdataset.any_failed_checks() for ero in self.execrecordouts.all()])
+
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
         # Go through all RunSteps using this ExecRecord.

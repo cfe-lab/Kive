@@ -4,11 +4,13 @@ Unit tests for Shipyard method models.
 
 import filecmp
 import hashlib
+import os
 import os.path
 import re
 import shutil
 import tempfile
 import itertools
+import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -24,6 +26,9 @@ from method.models import CodeResource, CodeResourceDependency, \
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
 
+# For tracking whether we're leaking file descriptors.
+fd_count_logger = logging.getLogger("method.tests")
+
 
 class MethodTestSetup(metadata.tests.MetadataTestSetup):
     """
@@ -37,6 +42,9 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         # This sets up the DTs and CDTs used in our metadata tests.
         super(MethodTestSetup, self).setUp()
 
+        with open("foo.dat", "w") as f:
+            fd_count_logger.debug("File descriptor of a just-opened dummy file: {}".format(f.fileno()))
+
         # Define comp_cr
         self.comp_cr = CodeResource(
             name="complement",
@@ -45,77 +53,75 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.comp_cr.save()
 
         # Define compv1_crRev for comp_cr
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
+        fn = "complement.py"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
             self.compv1_crRev = CodeResourceRevision(
                 coderesource=self.comp_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f))
+            # self.compv1_crRev.content_file.save(fn, File(f))
             self.compv1_crRev.full_clean()
             self.compv1_crRev.save()
 
         # Define compv2_crRev for comp_cr
-        with open(os.path.join(samplecode_path, "complement_v2.py"), "rb") as f:
+        fn = "complement_v2.py"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
             self.compv2_crRev = CodeResourceRevision(
                 coderesource=self.comp_cr,
                 revision_name="v2",
                 revision_desc="Second version: better docstring",
                 revision_parent=self.compv1_crRev,
                 content_file=File(f))
+            # self.compv2_crRev.content_file.save(fn, File(f))
             self.compv2_crRev.full_clean()
             self.compv2_crRev.save()
 
-        # The following is for testing code resource dependencies
-        with open(os.path.join(samplecode_path, "test_cr.py"), "rb") as f:
-            test_cr_1 = CodeResource(name="test_cr_1",
-                                     filename="test_cr_1.py",
-                                     description="CR1")
-            test_cr_1.save()
-            test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
-                                                  revision_name="v1",
-                                                  revision_desc="CR1-rev1",
-                                                  content_file=File(f))
-            test_cr_1_rev1.save()
-            self.test_cr_1 = test_cr_1
-            self.test_cr_1_rev1 = test_cr_1_rev1
+        # The following is for testing code resource dependencies.
+        self.test_cr_1 = CodeResource(name="test_cr_1",
+                                      filename="test_cr_1.py",
+                                      description="CR1")
+        self.test_cr_1.save()
+        self.test_cr_1_rev1 = CodeResourceRevision(coderesource=self.test_cr_1,
+                                                   revision_name="v1",
+                                                   revision_desc="CR1-rev1")
+
             
-            test_cr_2 = CodeResource(name="test_cr_2",
-                                     filename="test_cr_2.py",
-                                     description="CR2")
-            test_cr_2.save()
-            test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
-                                                  revision_name="v1",
-                                                  revision_desc="CR2-rev1",
-                                                  content_file=File(f))
-            test_cr_2_rev1.save()
-            self.test_cr_2 = test_cr_2
-            self.test_cr_2_rev1 = test_cr_2_rev1
-    
-            test_cr_3 = CodeResource(name="test_cr_3",
-                                     filename="test_cr_3.py",
-                                     description="CR3")
-            test_cr_3.save()
-            test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
-                                                  revision_name="v1",
-                                                  revision_desc="CR3-rev1",
-                                                  content_file=File(f))
-            test_cr_3_rev1.save()
-            self.test_cr_3 = test_cr_3
-            self.test_cr_3_rev1 = test_cr_3_rev1
-    
-            test_cr_4 = CodeResource(name="test_cr_4",
-                                     filename="test_cr_4.py",
-                                     description="CR4")
-            test_cr_4.save()
-            test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
-                                                  revision_name="v1",
-                                                  revision_desc="CR4-rev1",
-                                                  content_file=File(f))
-            test_cr_4_rev1.save()
-            self.test_cr_4 = test_cr_4
-            self.test_cr_4_rev1 = test_cr_4_rev1
+        self.test_cr_2 = CodeResource(name="test_cr_2",
+                                      filename="test_cr_2.py",
+                                      description="CR2")
+        self.test_cr_2.save()
+        self.test_cr_2_rev1 = CodeResourceRevision(coderesource=self.test_cr_2,
+                                                   revision_name="v1",
+                                                   revision_desc="CR2-rev1")
+
+        self.test_cr_3 = CodeResource(name="test_cr_3",
+                                      filename="test_cr_3.py",
+                                      description="CR3")
+        self.test_cr_3.save()
+        self.test_cr_3_rev1 = CodeResourceRevision(coderesource=self.test_cr_3,
+                                                   revision_name="v1",
+                                                   revision_desc="CR3-rev1")
+        self.test_cr_3_rev1.save()
+
+        self.test_cr_4 = CodeResource(name="test_cr_4",
+                                      filename="test_cr_4.py",
+                                      description="CR4")
+        self.test_cr_4.save()
+        self.test_cr_4_rev1 = CodeResourceRevision(coderesource=self.test_cr_4,
+                                                   revision_name="v1",
+                                                   revision_desc="CR4-rev1")
+        self.test_cr_4_rev1.save()
+
+        fn = "test_cr.py"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
+            for crr in [self.test_cr_1_rev1, self.test_cr_2_rev1, self.test_cr_3_rev1, self.test_cr_4_rev1]:
+                crr.content_file.save(fn, File(f))
 
 
+        for crr in [self.test_cr_1_rev1, self.test_cr_2_rev1, self.test_cr_3_rev1, self.test_cr_4_rev1]:
+            # crr.full_clean()
+            crr.save()
 
         # Define DNAcomp_mf
         self.DNAcomp_mf = MethodFamily(
@@ -213,20 +219,23 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
                                         description="Addition and multiplication")
         self.script_1_cr.save()
 
-        # Add code resource revision for code resource (script_1_sum_and_products ) 
-        with open(os.path.join(samplecode_path, "script_1_sum_and_products.py"), "rb") as f:
-            self.script_1_crRev = CodeResourceRevision(
-                coderesource=self.script_1_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f))
-            self.script_1_crRev.save()
+        # Add code resource revision for code resource (script_1_sum_and_products )
+        self.script_1_crRev = CodeResourceRevision(
+            coderesource=self.script_1_cr,
+            revision_name="v1",
+            revision_desc="First version"
+        )
+        fn = "script_1_sum_and_products.py"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
+            self.script_1_crRev.content_file.save(fn, File(f))
+        self.script_1_crRev.save()
 
         # Establish code resource revision as a method
         self.script_1_method = Method(
             revision_name="script1",
             revision_desc="script1",
-            family = self.test_mf,driver = self.script_1_crRev)
+            family = self.test_mf,
+            driver = self.script_1_crRev)
         self.script_1_method.save()
 
         # Assign tuple as both an input and an output to script_1_method
@@ -249,13 +258,14 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
         self.script_2_cr.save()
 
         # Add code resource revision for code resource (script_2_square_and_means)
-        with open(os.path.join(samplecode_path, "script_2_square_and_means.py"), "rb") as f:
-            self.script_2_crRev = CodeResourceRevision(
-                coderesource=self.script_2_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f))
-            self.script_2_crRev.save()
+        fn = "script_2_square_and_means.py"
+        self.script_2_crRev = CodeResourceRevision(
+            coderesource=self.script_2_cr,
+            revision_name="v1",
+            revision_desc="First version")
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
+            self.script_2_crRev.content_file.save(fn, File(f))
+        self.script_2_crRev.save()
 
         # Establish code resource revision as a method
         self.script_2_method = Method(
@@ -421,17 +431,33 @@ class MethodTestSetup(metadata.tests.MetadataTestSetup):
 
         # Some data.
         self.scratch_dir = tempfile.mkdtemp()
-        fd, self.noop_infile = tempfile.mkstemp(dir=self.scratch_dir)
-        self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)[1]
+        try:
+            fd, self.noop_infile = tempfile.mkstemp(dir=self.scratch_dir)
+        finally:
+            os.close(fd)
+        try:
+            fd, self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)
+        finally:
+            os.close(fd)
         self.noop_indata = "word\nhello\nworld"
 
-        handle = open(self.noop_infile, "w")
-        handle.write(self.noop_indata)
-        handle.close()
+        with open(self.noop_infile, "w") as handle:
+            handle.write(self.noop_indata)
 
     def tearDown(self):
+
+        with open("foo.dat", "w") as f:
+            fd_count_logger.debug("Opening in tearDown: {}".format(f.fileno()))
+
+        metadata.tests.MetadataTestSetup.tearDown(self)
         shutil.rmtree(self.scratch_dir)
         CodeResource.objects.all().delete()
+
+        # We're leaking file descriptors somehow.  Let's attempt to clean it up.
+        # gc.collect()
+        # with open("foo.dat", "w") as f:
+        #     print("End of tearDown: {}".format(f.fileno()))
+
 
 class CodeResourceTests(MethodTestSetup):
      
@@ -507,7 +533,6 @@ class CodeResourceRevisionTests(MethodTestSetup):
 
         Or, if no CodeResource has been linked, should display a placeholder.
         """
-
         # Valid crRev should return it's cr.name and crRev.revision_name
         self.assertEquals(unicode(self.compv1_crRev), "v1")
 
@@ -519,7 +544,6 @@ class CodeResourceRevisionTests(MethodTestSetup):
         no_cr_set.revision_name = "foo"
         self.assertEquals(unicode(no_cr_set), "foo")
 
-
     # Tests of has_circular_dependence and clean
     def test_has_circular_dependence_nodep(self):
         """A CRR with no dependencies should not have any circular dependence."""
@@ -530,9 +554,9 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_single_self_direct_dep(self):
         """A CRR has itself as its lone dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(), True)
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
@@ -541,9 +565,9 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_single_other_direct_dep(self):
         """A CRR has a lone dependency (non-self)."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_2_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
@@ -551,15 +575,15 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_direct_dep_noself(self):
         """A CRR with several direct dependencies (none are itself)."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_2_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_4_rev1,
-                depPath=".")
+            requirement=self.test_cr_4_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
@@ -567,17 +591,18 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_direct_dep_self_1(self):
         """A CRR with several dependencies has itself as the first dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
+
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
@@ -585,15 +610,15 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_direct_dep_self_2(self):
         """A CRR with several dependencies has itself as the second dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -603,15 +628,15 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_direct_dep_self_3(self):
         """A CRR with several dependencies has itself as the last dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -621,14 +646,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_nested_dep_noself(self):
         """A CRR with several dependencies including a nested one."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_3_rev1.dependencies.create(
-                requirement=self.test_cr_4_rev1,
-                depPath=".")
+            requirement=self.test_cr_4_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
@@ -636,14 +661,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_nested_dep_selfnested(self):
         """A CRR with several dependencies including itself as a nested one."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_3_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".")
+            requirement=self.test_cr_1_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
@@ -659,14 +684,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_nested_dep_has_circ(self):
         """A nested dependency is circular."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_2_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -685,18 +710,18 @@ class CodeResourceRevisionTests(MethodTestSetup):
         """
 
         cr = CodeResource(
-                name="test_complement",
-                filename="",
-                description="Complement DNA/RNA nucleotide sequences")
+            name="test_complement",
+            filename="",
+            description="Complement DNA/RNA nucleotide sequences")
         cr.save()
 
         # So it's revision does not have a content_file
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
             cr_rev_v1 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
-                    content_file=File(f))
+                coderesource=cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -710,22 +735,21 @@ class CodeResourceRevisionTests(MethodTestSetup):
         """
 
         cr = CodeResource(
-                name="nonmetapackage",
-                filename="foo",
-                description="Associated CRRs should have a content file")
+            name="nonmetapackage",
+            filename="foo",
+            description="Associated CRRs should have a content file")
         cr.save()
 
         # Create a revision without a content_file.
         cr_rev_v1 = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="v1",
-                revision_desc="Has no content file!")
+            coderesource=cr,
+            revision_name="v1",
+            revision_desc="Has no content file!")
 
         self.assertRaisesRegexp(
             ValidationError,
             "Cannot have a filename specified in the absence of a content file",
             cr_rev_v1.clean)
-
 
     def test_clean_blank_MD5_on_codeResourceRevision_without_file(self):
         """
@@ -738,9 +762,9 @@ class CodeResourceRevisionTests(MethodTestSetup):
         
         # Create crRev with a codeResource but no file contents
         no_file_crRev = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="foo",
-                revision_desc="foo")
+            coderesource=cr,
+            revision_name="foo",
+            revision_desc="foo")
   
         no_file_crRev.clean()
 
@@ -758,9 +782,7 @@ class CodeResourceRevisionTests(MethodTestSetup):
             md5gen.update(f.read())
 
         # Revision should have the correct MD5 checksum
-        self.assertEquals(
-                md5gen.hexdigest(),
-                self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
+        self.assertEquals(md5gen.hexdigest(), self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
 
     def test_dependency_depends_on_nothing_clean_good (self):
         self.assertEqual(self.test_cr_1_rev1.clean(), None)
@@ -2367,6 +2389,7 @@ class MethodTests(MethodTestSetup):
                 driver=m.driver, 
                 family=m.family)
         self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
+
 
 class MethodFamilyTests(MethodTestSetup):
 

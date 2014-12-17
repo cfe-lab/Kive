@@ -1194,7 +1194,7 @@ class FindCompatibleERTests(LibrarianTestSetup):
         self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
 
     def test_find_compatible_ER_failed(self):
-        """Should not find a compatible ExecRecord which failed."""
+        """Should also find a compatible ExecRecord which failed."""
         execrecord = None
         for e in ExecRecord.objects.all():
             if e.has_ever_failed():
@@ -1207,7 +1207,7 @@ class FindCompatibleERTests(LibrarianTestSetup):
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
-        self.assertIsNone(method.find_compatible_ER(input_SDs))
+        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
 
     def test_find_compatible_exec_record_skips_nulls(self):
         "Incomplete run steps don't break search for compatible exec records."

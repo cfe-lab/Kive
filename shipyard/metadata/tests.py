@@ -7,8 +7,9 @@ from django.core.exceptions import ValidationError
 
 from metadata.models import *
 from method.models import CodeResourceRevision
-from archive.models import Dataset
-from librarian.models import SymbolicDataset, DatasetStructure
+from archive.models import Dataset, MethodOutput
+from librarian.models import SymbolicDataset
+from datachecking.models import VerificationLog
 
 from constants import datatypes, CDTs
 
@@ -196,11 +197,28 @@ class MetadataTestSetup(TestCase):
                 crr.content_file.close()
                 crr.content_file.delete()
 
+            crr.delete()
+
         # Also clear all datasets.  This was previously in librarian.tests
         # but we move it here.
         for dataset in Dataset.objects.all():
             dataset.dataset_file.close()
             dataset.dataset_file.delete()
+            dataset.delete()
+
+        for mo in MethodOutput.objects.all():
+            mo.output_log.close()
+            mo.output_log.delete()
+            mo.error_log.close()
+            mo.error_log.delete()
+            mo.delete()
+
+        for vl in VerificationLog.objects.all():
+            vl.output_log.close()
+            vl.output_log.delete()
+            vl.error_log.close()
+            vl.error_log.delete()
+            vl.delete()
 
 
 class DatatypeTests(MetadataTestSetup):
