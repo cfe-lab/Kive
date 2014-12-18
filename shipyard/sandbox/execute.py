@@ -971,7 +971,8 @@ class Sandbox:
             return cable_record
 
         ready_to_go = False
-        assert curr_ER is not None
+        if force:
+            assert curr_ER is not None
         dataset_path = self.find_symbolicdataset(input_SD)
         # Add this cable to the queue, unlike in reuse_or_prepare_cable.
         # If this is independent of any step recovery, we add it to the queue; either by marking it as
@@ -987,7 +988,7 @@ class Sandbox:
 
         else:
             ready_to_go = True
-            if cable.is_outcable or (force and by_step is None):
+            if cable_record.component.is_outcable or (force and by_step is None):
                 self.queue_for_processing.append(cable_record)
 
         return ready_to_go
@@ -1295,7 +1296,7 @@ def finish_cable(cable_execute_dict):
     input_SD_in_sdbx = file_access_utils.file_exists(input_SD_path)
     assert input_SD_in_sdbx or input_SD.has_data()
 
-    cable = curr_record.definite
+    cable = curr_record.definite.component
 
     recover = recovering_record is not None
 
