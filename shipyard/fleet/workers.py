@@ -13,6 +13,7 @@ import shipyard.settings  # @UnresolvedImport
 import fleet.models
 import archive.models
 import sandbox.execute
+import sys
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -26,7 +27,11 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self, comm):
+    def __init__(self, worker_count, manage_script):
+        self.worker_count = worker_count
+        self.manage_script = manage_script
+        
+    def _startup(self, comm):
         """
         Set up/register the workers and prepare to run.
 
@@ -208,7 +213,15 @@ class Manager:
         return workers_freed
 
     def main_procedure(self):
+        mpi_info = MPI.Info.Create()
+        mpi_info.Set("add-hostfile", "shipyard/hostfile")
+         
+        comm = MPI.COMM_SELF.Spawn(sys.executable,
+                                   args=[self.manage_script, 'fleetworker'],
+                                   maxprocs=self.worker_count,
+                                   info=mpi_info).Merge()
         try:
+            self._startup(comm)
             self.main_loop()
             mgr_logger.info("Manager shutting down.")
         except:
@@ -216,6 +229,7 @@ class Manager:
         for rank in range(self.comm.Get_size()):
             if rank != self.comm.Get_rank():
                 self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+        comm.Disconnect()
         
     def main_loop(self):
         """

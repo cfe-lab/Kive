@@ -1,11 +1,11 @@
-from mpi4py import MPI
 from optparse import make_option
 import sys
 
 from django.core.management.base import BaseCommand
 
 import fleet.workers
-        
+
+
 class Command(BaseCommand):
     help = 'Launches the manager and workers to execute pipelines.'
     
@@ -15,11 +15,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         worker_count = options['workers']
         manage_script = sys.argv[0]
-        comm = MPI.COMM_SELF.Spawn(sys.executable,
-                                   args=[manage_script, 'fleetworker'],
-                                   maxprocs=worker_count).Merge()
-        
-        manager = fleet.workers.Manager(comm)
+        manager = fleet.workers.Manager(worker_count, manage_script)
         manager.main_procedure()
-
-        comm.Disconnect()
