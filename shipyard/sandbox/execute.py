@@ -261,15 +261,25 @@ class Sandbox:
             self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
             # Attempt to reuse this PipelineCable.
-            try_reuse = curr_record.attempt_reuse(input_SD, output_path, self)
+            with transaction.atomic():
+                curr_ER = curr_record.find_compatible_ER(input_SD)
 
-            if try_reuse["reused"]:
-                # We can fully reuse an ExecRecord -- either failed or successful.
-                return curr_record
+                if curr_ER is not None:
+                    curr_record.execrecord = curr_ER
+                    output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                    can_reuse = curr_record.check_ER_usable(curr_ER)
+                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+                    # execute it for a parent step, we can return.
+                    if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                        curr_record.reused = True
+                        curr_record.stop()
+                        curr_record.complete_clean()
+                        curr_record.save()
+                        self.update_cable_maps(curr_record, output_SD, output_path)
+                        return curr_record
 
             # At this point, we know we did not reuse an ExecRecord -- we're either filling one in
             # or creating a new one.
-            curr_ER = try_reuse["ExecRecord"]
             curr_record.reused = False
             self.logger.debug("No ER to completely reuse - committed to executing cable")
 
@@ -387,27 +397,36 @@ class Sandbox:
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
         # Look for ExecRecord.
-        if recover:
-            curr_ER = curr_RS.execrecord
-        elif pipelinestep.is_subpipeline:
-            curr_ER = None
-            self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
-        else:
-            try_reuse = curr_RS.attempt_reuse(inputs_after_cable)
-            curr_ER = try_reuse["ExecRecord"]
-
-            if try_reuse["reused"]:
-                self.update_step_maps(curr_RS, step_run_dir, output_paths)
-                return curr_RS
-
-            elif curr_ER is not None:
-                self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
-
+        with transaction.atomic():
+            if pipelinestep.is_subpipeline:
+                curr_ER = None
+                self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
             else:
-                self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+                if recover:
+                    curr_ER = librarian.models.ExecRecord.objects.get(pk=curr_RS.execrecord.pk)
+                else:
+                    curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+                    if curr_ER is not None:
+                        curr_RS.execrecord = curr_ER
+                        can_reuse = curr_RS.check_ER_usable(curr_ER)
+                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                            self.logger.debug("ExecRecord {} is reusable".format(curr_ER))
+                            curr_RS.reused = True
+                            curr_RS.stop()
+                            curr_RS.complete_clean()
+                            curr_RS.save()
+                            self.update_step_maps(curr_RS, step_run_dir, output_paths)
+                            return curr_RS
 
-            curr_RS.reused = False
-            curr_RS.save()
+                        else:
+                            self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                    else:
+                        self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+
+                    curr_RS.reused = False
+                    curr_RS.save()
 
         invoking_record = recovering_record if recover else curr_RS
 
@@ -1079,6 +1098,31 @@ class Sandbox:
                 return curr_RS
 
             # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
+            # Look for ExecRecord.
+            with transaction.atomic():
+                curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+                if curr_ER is not None:
+                    curr_RS.execrecord = curr_ER
+                    can_reuse = curr_RS.check_ER_usable(curr_ER)
+                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                    if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                        curr_RS.reused = True
+                        curr_RS.stop()
+                        curr_RS.complete_clean()
+                        curr_RS.save()
+                        self.update_step_maps(curr_RS, step_run_dir, output_paths)
+                        return curr_RS
+
+                    else:
+                        self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                else:
+                    self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+
+                curr_RS.reused = False
+                curr_RS.save()
+
+
             try_reuse = curr_RS.attempt_reuse(inputs_after_cable)
             curr_ER = try_reuse["ExecRecord"]
 
@@ -1247,6 +1291,7 @@ def _setup_step_paths(step_run_dir, recover):
     log_dir = os.path.join(step_run_dir, dirnames.LOG_DIR)
     out_dir = os.path.join(step_run_dir, dirnames.OUT_DIR)
     in_dir = os.path.join(step_run_dir, dirnames.IN_DIR)
+
     for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
         file_access_utils.set_up_directory(workdir, tolerate=recover)
     return (in_dir, out_dir, log_dir)
@@ -1276,16 +1321,27 @@ def finish_cable(cable_execute_dict):
             pk=cable_execute_dict["recovering_record_pk"]
         ).definite
     curr_ER = None
-    if cable_execute_dict["execrecord_pk"] is not None:
-        curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
-    else:
-        # It's possible this cable was completed in the time between the Manager queueing this task
-        # and the worker.  Check again to see if it's done.
-        try_reuse = curr_record.attempt_reuse(input_SD, output_path)
-        curr_ER = try_reuse["ExecRecord"]
 
-        if try_reuse["reused"]:
-            return curr_record
+    # It's possible that this cable was completed in the time between the Manager queueing this task
+    # and the worker.  If so we can use the ExecRecord, and maybe even fully reuse it if this was
+    # not called by finish_step.
+    with transaction.atomic():
+        if cable_execute_dict["execrecord_pk"] is not None:
+            curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
+        else:
+            curr_ER = curr_record.find_compatible_ER(input_SD)
+
+        if curr_ER is not None:
+            curr_record.execrecord = curr_ER
+            can_reuse = curr_record.check_ER_usable(curr_ER)
+            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+            # execute it for a parent step, we can return.
+            if not can_reuse["successful"] or (can_reuse["fully reusable"] and cable_execute_dict["by_step"] is None):
+                curr_record.reused = True
+                curr_record.stop()
+                curr_record.complete_clean()
+                curr_record.save()
+                return curr_record
 
     # We're now committed to actually running this cable.
     input_SD_path = cable_execute_dict["input_SD_path"]
@@ -1492,15 +1548,33 @@ def finish_step(step_execute_dict):
         inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
         input_paths.append(curr_execute_dict["output_path"])
 
-    # Before we proceed, it's possible that a compatible ER was completed while this task
-    # waited on the queue.  We look again for an ER.
-    if curr_ER is None:
-        try_reuse = curr_RS.attempt_reuse(inputs_after_cable)
-        curr_ER = try_reuse["ExecRecord"]
+    # Check again to see if a compatible ER was completed while this task
+    # waited on the queue.  If this isn't a recovery, we can just stop.
+    if recover:
+        assert curr_ER is not None
+    else:
+        with transaction.atomic():
+            if curr_ER is None:
+                curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+            if curr_ER is not None:
+                curr_RS.execrecord = curr_ER
+                can_reuse = curr_RS.check_ER_usable(curr_ER)
+                # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                    curr_RS.reused = True
+                    curr_RS.stop()
+                    curr_RS.complete_clean()
+                    curr_RS.save()
+                    return curr_RS
 
-        if try_reuse["reused"]:
-            self.update_step_maps(curr_RS, step_run_dir, output_paths)
-            return curr_RS
+                else:
+                    self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+            else:
+                self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+
+            curr_RS.reused = False
+            curr_RS.save()
 
     return _finish_step_h(user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths, output_paths,
                           log_dir, recovering_record)
