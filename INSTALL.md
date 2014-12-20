@@ -72,13 +72,13 @@ Exit `psql` with the `\q` command, then exit from the postgres user's shell to
 get back to your regular prompt.
 
 On a Mac, the PostgreSQL database defaults to accept connections from any user,
-so you are finished. On Ubuntu, however, the default is to only accept
+so you are finished. On Ubuntu or CentOS, however, the default is to only accept
 connections from system users. To allow the shipyard database user to connect,
 you have to change the [authentication setting][pg_hba] in PostgreSQL's
 configuration file. Replace 9.3 with whichever version you have.
 
     sudo vi /etc/postgresql/9.3/main/pg_hba.conf
-    # Add the following line after the default for user postgres
+    # Add the following line before the default for user postgres or all
     local   all             shipyard                                md5
     # Then save the file and reload the PostgreSQL configuration
     /etc/init.d/postgresql reload
@@ -95,11 +95,28 @@ with `psql` and then exit.
 
 Settings
 --------
-Since **shipyard** is a Django project, the majority of the installation procedure follows the standard instructions for Django.  The first thing you need to do is to make a copy of `/shipyard/settings_default.py` called `settings.py` (remember, all paths are relative to `/shipyard` so we mean `/shipyard/shipyard/settings_default.py`).  This is a standard step in the installation of a Django project where you configure project settings.  Within the `DATABASES['default']` dictionary, modify the respective values to indicate the type, location, and access credentials of your database.  For example, using postgres as your database engine, you would specify `'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).  This is a database that must be created by an admistration prior to using Shipyard.
+Since **shipyard** is a Django project, the majority of the installation
+procedure follows the standard instructions for Django.  The first thing you
+need to do is to make a copy of `/shipyard/settings_default.py` called
+`settings.py` (remember, all paths are relative to `/shipyard` so we mean
+`/shipyard/shipyard/settings_default.py`).  This is a standard step in the
+installation of a Django project where you configure project settings.  Within
+the `DATABASES['default']` dictionary, modify the respective values to indicate
+the type, location, and access credentials of your database.  For example, using
+postgres as your database engine, you would specify
+`'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name
+of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).
+This is a database that must be created by an administrator prior to using
+Shipyard.
 
 You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
 
+Another configuration file is `hostfile` in the same folder as `settings.py`.
+Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
+you want to launch worker processes on multiple hosts, add a line for each host.
+Options are described in the [Open MPI FAQ][mpifaq].
 
+[mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
 
 Initialize database
 -------------------

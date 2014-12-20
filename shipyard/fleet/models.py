@@ -5,7 +5,6 @@ from django.db import models, transaction
 from django.contrib.auth.models import User
 
 import archive.models
-import fleet.workers
 import librarian.models
 import pipeline.models
 
@@ -14,6 +13,9 @@ import pipeline.models
 worker_count = 0
 
 if worker_count > 0 and sys.argv[-1] == "runserver":
+    # import here, because it causes problems when OpenMPI isn't loaded
+    import fleet.workers
+    
     manage_script = sys.argv[0]
     manager = fleet.workers.Manager(worker_count, manage_script)
     manager_thread = threading.Thread(target=manager.main_procedure)
