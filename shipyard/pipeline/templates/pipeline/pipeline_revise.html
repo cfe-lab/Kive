@@ -158,18 +158,18 @@
                     submit_to_url = result['family_pk'];
                     var i, j, k; // counters
                     var node, cables, cable, connector, shape, source, magnet;
-
+                    
                     draw_inputs(result);
                     
                     for (var i = 0; i < canvasState.shapes.length; i++) {
                         canvasState.detectCollisions(canvasState.shapes[i], 0.5);
                     }
-
-                    if (result['is_active_version']) {
-                        $('#id_make_active').val('Cancel activation');
-                    } else {
-                        $('#id_make_active').val('Make active version');
-                    }
+                    
+                    $('#id_make_active').val(
+                        result['is_active_version']?
+                        'Cancel activation' :
+                        'Make active version'
+                    );
                 }
             })
         }).change();
