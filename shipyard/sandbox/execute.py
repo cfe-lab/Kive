@@ -261,6 +261,7 @@ class Sandbox:
             self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
             # Attempt to reuse this PipelineCable.
+            curr_ER = None
             with transaction.atomic():
                 curr_ER = curr_record.find_compatible_ER(input_SD)
 

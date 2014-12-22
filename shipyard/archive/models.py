@@ -1484,7 +1484,7 @@ class RunCable(RunComponent):
                         ExecRecord exists), along with whether it is fully reusable, and
                         whether it was successful.
         """
-        curr_ER = self.component.find_compatible_ER(input_SD)
+        return self.component.find_compatible_ER(input_SD)
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):
