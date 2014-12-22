@@ -213,9 +213,10 @@ class Manager:
         return workers_freed
 
     def main_procedure(self):
+        mgr_logger.info("Manager starting.")
         mpi_info = MPI.Info.Create()
         mpi_info.Set("add-hostfile", "shipyard/hostfile")
-         
+        
         comm = MPI.COMM_SELF.Spawn(sys.executable,
                                    args=[self.manage_script, 'fleetworker'],
                                    maxprocs=self.worker_count,
