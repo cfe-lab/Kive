@@ -1,7 +1,7 @@
 """Code that is responsible for the execution of Pipelines."""
 
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, connection
 from django.contrib.auth.models import User
 
 import archive.models
@@ -18,6 +18,15 @@ import tempfile
 from collections import defaultdict
 
 logger = logging.getLogger("Sandbox")
+
+def _set_transaction_serializable():
+    # FIXME: if/when we upgrade to Django 1.7, use a context manager here.
+    # c = connection.cursor()
+    # try:
+    #     c.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+    # finally:
+    #     c.close()
+    pass
 
 
 class Sandbox:
@@ -263,8 +272,9 @@ class Sandbox:
             # Attempt to reuse this PipelineCable.
             curr_ER = None
             with transaction.atomic():
-                curr_ER = curr_record.find_compatible_ER(input_SD)
+                _set_transaction_serializable()
 
+                curr_ER = curr_record.find_compatible_ER(input_SD)
                 if curr_ER is not None:
                     curr_record.execrecord = curr_ER
                     output_SD = curr_ER.execrecordouts.first().symbolicdataset
@@ -399,6 +409,7 @@ class Sandbox:
 
         # Look for ExecRecord.
         with transaction.atomic():
+            _set_transaction_serializable()
             if pipelinestep.is_subpipeline:
                 curr_ER = None
                 self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
@@ -952,6 +963,7 @@ class Sandbox:
         # Attempt to reuse this PipelineCable.
         return_now = False
         with transaction.atomic():
+            _set_transaction_serializable()
             curr_ER = curr_record.find_compatible_ER(input_SD)
 
             if curr_ER is not None:
@@ -1121,6 +1133,7 @@ class Sandbox:
             # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
             # Look for ExecRecord.
             with transaction.atomic():
+                _set_transaction_serializable()
                 curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
                 if curr_ER is not None:
                     curr_RS.execrecord = curr_ER
@@ -1138,7 +1151,7 @@ class Sandbox:
                         self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
 
                 else:
-                    self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+                    self.logger.debug("No compatible ExecRecord found yet")
 
                 curr_RS.reused = False
                 curr_RS.save()
@@ -1339,6 +1352,7 @@ def finish_cable(cable_execute_dict):
     # and the worker.  If so we can use the ExecRecord, and maybe even fully reuse it if this was
     # not called by finish_step.
     with transaction.atomic():
+        _set_transaction_serializable()
         if cable_execute_dict["execrecord_pk"] is not None:
             curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
         else:
@@ -1422,6 +1436,7 @@ def _finish_cable_h(curr_record, cable, user, execrecord, input_SD, input_SD_pat
     # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
     preexisting_ER = execrecord is not None
     with transaction.atomic():
+        _set_transaction_serializable()
         if not preexisting_ER:
             execrecord = curr_record.find_compatible_ER(input_SD)
             if execrecord is not None:
@@ -1567,6 +1582,7 @@ def finish_step(step_execute_dict):
         assert curr_ER is not None
     else:
         with transaction.atomic():
+            _set_transaction_serializable()
             if curr_ER is None:
                 curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
             if curr_ER is not None:
@@ -1584,7 +1600,7 @@ def finish_step(step_execute_dict):
                     logger.debug("Filling in ExecRecord {}".format(curr_ER))
 
             else:
-                logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+                logger.debug("No compatible ExecRecord found yet")
 
             curr_RS.reused = False
             curr_RS.save()
@@ -1622,6 +1638,7 @@ def _finish_step_h(user, runstep, step_run_dir, execrecord, inputs_after_cable, 
     # running the code.
     preexisting_ER = execrecord is not None
     with transaction.atomic():
+        _set_transaction_serializable()
         # Don't create one elsewhere, we're going to make one here!
         if not preexisting_ER:
             execrecord = runstep.transformation.definite.find_compatible_ER(inputs_after_cable)
