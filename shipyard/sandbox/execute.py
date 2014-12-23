@@ -950,7 +950,6 @@ class Sandbox:
 
 
         # Attempt to reuse this PipelineCable.
-        curr_ER = None
         return_now = False
         with transaction.atomic():
             curr_ER = curr_record.find_compatible_ER(input_SD)
@@ -970,8 +969,12 @@ class Sandbox:
                     return_now = True
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
+        if isinstance(parent_record, archive.models.RunStep):
+            by_step = parent_record
+        else:
+            by_step = None
         exec_info = RunCableExecuteInfo(curr_record, self.user, curr_ER, input_SD, self.sd_fs_map[input_SD],
-                                        output_path)
+                                        output_path, by_step=by_step)
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
         if return_now:
             return exec_info
@@ -1346,7 +1349,7 @@ def finish_cable(cable_execute_dict):
             can_reuse = curr_record.check_ER_usable(curr_ER)
             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
             # execute it for a parent step, we can return.
-            if not can_reuse["successful"] or (can_reuse["fully reusable"] and cable_execute_dict["by_step"] is None):
+            if not can_reuse["successful"] or (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None):
                 curr_record.reused = True
                 curr_record.stop()
                 curr_record.complete_clean()
