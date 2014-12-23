@@ -1089,11 +1089,13 @@ class Sandbox:
                 symbolically_okay_SDs.append(inputs[i])
 
         # Bundle up the information required to process this step.
+        _in_dir, _out_dir, log_dir = _setup_step_paths(step_run_dir, False)
 
         # Construct output_paths.
         output_paths = [self.step_xput_path(curr_RS, x, step_run_dir) for x in pipelinestep.outputs]
 
-        execute_info = RunStepExecuteInfo(curr_RS, self.user, cable_info_list, None, step_run_dir, output_paths)
+        execute_info = RunStepExecuteInfo(curr_RS, self.user, cable_info_list, None, step_run_dir, log_dir,
+                                          output_paths)
         self.step_execute_info[(parent_run, pipelinestep)] = execute_info
 
         # If we're waiting on feeder steps, register this step as waiting for other steps,
@@ -1542,6 +1544,7 @@ def finish_step(step_execute_dict):
     cable_info_dicts = step_execute_dict["cable_info_dicts"]
     output_paths = step_execute_dict["output_paths"]
     user = User.objects.get(pk=step_execute_dict["user_pk"])
+    log_dir = step_execute_dict["log_dir"]
 
     recovering_record = None
     if step_execute_dict["recovering_record_pk"] is not None:
@@ -1552,7 +1555,6 @@ def finish_step(step_execute_dict):
     assert not curr_RS.pipelinestep.is_subpipeline
 
     recover = recovering_record is not None
-    _in_dir, _out_dir, log_dir = _setup_step_paths(step_run_dir, recover)
 
     ####
     # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
@@ -1752,7 +1754,7 @@ def _finish_step_h(user, runstep, step_run_dir, execrecord, inputs_after_cable, 
 
 # A simple struct that holds the information required to perform a RunStep.
 class RunStepExecuteInfo:
-    def __init__(self, runstep, user, cable_info_list, execrecord, step_run_dir, output_paths,
+    def __init__(self, runstep, user, cable_info_list, execrecord, step_run_dir, log_dir, output_paths,
                  recovering_record=None):
         """
         Constructor.
@@ -1766,6 +1768,7 @@ class RunStepExecuteInfo:
         self.cable_info_list = cable_info_list
         self.execrecord = execrecord
         self.step_run_dir = step_run_dir
+        self.log_dir = log_dir
         self.recovering_record = recovering_record
         self.output_paths = output_paths
         # FIXME in the future this number could be more than 1.
@@ -1785,6 +1788,7 @@ class RunStepExecuteInfo:
             "cable_info_dicts": [x.dict_repr() for x in self.cable_info_list],
             "execrecord_pk": None if self.execrecord is None else self.execrecord.pk,
             "step_run_dir": self.step_run_dir,
+            "log_dir": self.log_dir,
             "recovering_record_pk": self.recovering_record.pk if self.recovering_record is not None else None,
             "output_paths": self.output_paths,
             "threads_required": self.threads_required
