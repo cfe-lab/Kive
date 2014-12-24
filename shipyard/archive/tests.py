@@ -8,6 +8,7 @@ import tempfile
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
+from django.test import TransactionTestCase
 
 from archive.models import *
 from datachecking.models import BadData
@@ -21,8 +22,6 @@ import sandbox.tests_rm
 
 
 # Note that these tests use the exact same setup as librarian.
-
-
 class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.UtilityMethods):
     def setUp(self):
         librarian.tests.LibrarianTestSetup.setUp(self)
@@ -2847,7 +2846,7 @@ class ExecLogTests(ArchiveTestSetup):
         self.assertIsNone(el_to_mess_with.clean())
 
 
-class GetCoordinatesTests(ArchiveTestSetup):
+class GetCoordinatesTests(TransactionTestCase, ArchiveTestSetup):
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
 
     def test_get_coordinates_top_level_run(self):

@@ -21,12 +21,11 @@ logger = logging.getLogger("Sandbox")
 
 def _set_transaction_serializable():
     # FIXME: if/when we upgrade to Django 1.7, use a context manager here.
-    # c = connection.cursor()
-    # try:
-    #     c.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-    # finally:
-    #     c.close()
-    pass
+    c = connection.cursor()
+    try:
+        c.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+    finally:
+        c.close()
 
 
 class Sandbox:
@@ -271,9 +270,10 @@ class Sandbox:
 
             # Attempt to reuse this PipelineCable.
             curr_ER = None
-            with transaction.atomic():
-                _set_transaction_serializable()
 
+            with transaction.atomic():
+                # This transaction should be serializable.
+                _set_transaction_serializable()
                 curr_ER = curr_record.find_compatible_ER(input_SD)
                 if curr_ER is not None:
                     curr_record.execrecord = curr_ER

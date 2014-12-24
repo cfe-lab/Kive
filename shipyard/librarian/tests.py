@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.test import TestCase
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes
@@ -25,297 +26,312 @@ from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 import logging
 
 
-class LibrarianTestSetup(metadata.tests.MetadataTestSetup):
+def create_librarian_test_environment(case):
+    """
+    Set up default state for Librarian unit testing.
+
+    This sets up the environment as in the Metadata tests, and then augments with
+    Methods, CR/CRR/CRDs, and DT/CDTs.  Note that these are *not* the same
+    as those set up in the Method testing.
+    """
+    # This sets up some DTs and CDTs.
+    metadata.tests.create_metadata_test_environment(case)
+
+    ####
+    # This is the big pipeline Eric developed that was originally
+    # used in copperfish/tests.py.
+
+    # CRs and CRRs
+    case.generic_cr = CodeResource(
+        name="genericCR", description="Just a CR",
+        filename="generic_script.py")
+    case.generic_cr.save()
+    case.generic_crRev = CodeResourceRevision(
+        coderesource=case.generic_cr, revision_name="v1", revision_desc="desc")
+    with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
+        case.generic_crRev.content_file.save("generic_script.py", File(f))
+    case.generic_crRev.save()
+
+    # Method family, methods, and their input/outputs
+    case.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); case.mf.save()
+    case.mA = Method(revision_name="mA_name", revision_desc="A_desc", family = case.mf, driver =
+            case.generic_crRev)
+    case.mA.save()
+    case.A1_rawin = case.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
+    case.A1_out = case.mA.create_output(compounddatatype=case.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
+
+    case.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=case.mf, driver=case.generic_crRev)
+    case.mB.save()
+    case.B1_in = case.mB.create_input(compounddatatype=case.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
+    case.B2_in = case.mB.create_input(compounddatatype=case.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
+    case.B1_out = case.mB.create_output(compounddatatype=case.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
+
+    case.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=case.mf, driver=case.generic_crRev)
+    case.mC.save()
+    case.C1_in = case.mC.create_input(compounddatatype=case.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
+    case.C2_in = case.mC.create_input(compounddatatype=case.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
+    case.C1_out = case.mC.create_output(compounddatatype=case.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
+    case.C2_rawout = case.mC.create_output(dataset_name="C2_rawout",dataset_idx=2)
+    case.C3_rawout = case.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
+
+    # Pipeline family, pipelines, and their input/outputs
+    case.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); case.pf.save()
+    case.pD = Pipeline(family=case.pf, revision_name="pD_name", revision_desc="D")
+    case.pD.save()
+    case.D1_in = case.pD.create_input(compounddatatype=case.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
+    case.D2_in = case.pD.create_input(compounddatatype=case.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
+    case.pE = Pipeline(family=case.pf, revision_name="pE_name", revision_desc="E")
+    case.pE.save()
+    case.E1_in = case.pE.create_input(compounddatatype=case.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
+    case.E2_in = case.pE.create_input(compounddatatype=case.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
+    case.E3_rawin = case.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
+
+    # Pipeline steps
+    case.step_D1 = case.pD.steps.create(transformation=case.mB,step_num=1)
+    case.step_E1 = case.pE.steps.create(transformation=case.mA,step_num=1)
+    case.step_E2 = case.pE.steps.create(transformation=case.pD,step_num=2)
+    case.step_E3 = case.pE.steps.create(transformation=case.mC,step_num=3)
+
+    # Pipeline cables and outcables
+    case.D01_11 = case.step_D1.cables_in.create(dest=case.B1_in,source_step=0,source=case.D1_in)
+    case.D02_12 = case.step_D1.cables_in.create(dest=case.B2_in,source_step=0,source=case.D2_in)
+    case.D11_21 = case.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=case.triplet_cdt,source_step=1,source=case.B1_out)
+    case.pD.create_outputs()
+    case.D1_out = case.pD.outputs.get(dataset_name="D1_out")
+
+    case.E03_11 = case.step_E1.cables_in.create(dest=case.A1_rawin,source_step=0,source=case.E3_rawin)
+    case.E01_21 = case.step_E2.cables_in.create(dest=case.D1_in,source_step=0,source=case.E1_in)
+    case.E02_22 = case.step_E2.cables_in.create(dest=case.D2_in,source_step=0,source=case.E2_in)
+    case.E11_32 = case.step_E3.cables_in.create(dest=case.C2_in,source_step=1,source=case.A1_out)
+    case.E21_31 = case.step_E3.cables_in.create(dest=case.C1_in,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E21_41 = case.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=case.doublet_cdt,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E31_42 = case.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=case.singlet_cdt,source_step=3,source=case.C1_out)
+    case.E33_43 = case.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,source_step=3,source=case.C3_rawout)
+    case.pE.create_outputs()
+    case.E1_out = case.pE.outputs.get(dataset_name="E1_out")
+    case.E2_out = case.pE.outputs.get(dataset_name="E2_out")
+    case.E3_rawout = case.pE.outputs.get(dataset_name="E3_rawout")
+
+    # Custom wiring/outwiring
+    case.E01_21_wire1 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=1),
+        dest_pin=case.doublet_cdt.members.get(column_idx=2)
+    )
+    case.E01_21_wire2 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3),
+        dest_pin=case.doublet_cdt.members.get(column_idx=1)
+    )
+    case.E11_32_wire1 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=1),
+        dest_pin=case.doublet_cdt.members.get(column_idx=2)
+    )
+    case.E11_32_wire2 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=2),
+        dest_pin=case.doublet_cdt.members.get(column_idx=1)
+    )
+    case.E21_41_wire1 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=2),
+        dest_pin=case.doublet_cdt.members.get(column_idx=2)
+    )
+    case.E21_41_wire2 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3),
+        dest_pin=case.doublet_cdt.members.get(column_idx=1)
+    )
+    case.pE.clean()
+
+    # Runs for the pipelines.
+    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser)
+    case.pD_run.save()
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
+    case.pE_run.save()
+
+    # November 7, 2013: use a helper function (defined in
+    # librarian.models) to define our SymDSs and DSs.
+
+    # Define singlet, doublet, triplet, and raw uploaded datasets
+    case.triplet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_triplet.csv"),
+        case.triplet_cdt, make_dataset=True, user=case.myUser,
+        name="triplet", description="lol")
+    case.triplet_symDS_structure = case.triplet_symDS.structure
+    case.triplet_DS = case.triplet_symDS.dataset
+
+    case.doublet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "doublet_cdt.csv"),
+        case.doublet_cdt, user=case.myUser,
+        name="doublet", description="lol")
+    case.doublet_symDS_structure = case.doublet_symDS.structure
+    case.doublet_DS = case.doublet_symDS.dataset
+
+    case.singlet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "singlet_cdt_large.csv"),
+        case.singlet_cdt, user=case.myUser, name="singlet",
+        description="lol")
+    case.singlet_symDS_structure = case.singlet_symDS.structure
+    case.singlet_DS = case.singlet_symDS.dataset
+
+    # October 1, 2013: this is the same as the old singlet_symDS.
+    case.singlet_3rows_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_singlet.csv"),
+        case.singlet_cdt, user=case.myUser, name="singlet",
+        description="lol")
+    case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
+    case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
+
+    case.raw_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        cdt=None, user=case.myUser, name="raw", description="lol")
+    case.raw_DS = case.raw_symDS.dataset
+
+    # Added September 30, 2013: symbolic dataset that results from E01_21.
+    # November 7, 2013: created a file that this SD actually represented,
+    # even though it isn't in the database.
+    case.D1_in_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
+        cdt=case.doublet_cdt, make_dataset=False)
+    case.D1_in_symDS_structure = case.D1_in_symDS.structure
+
+    case.C1_in_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "C1_in_triplet.csv"),
+        case.triplet_cdt, user=case.myUser, name="C1_in_triplet",
+        description="triplet 3 rows")
+    case.C1_in_symDS_structure = case.C1_in_symDS.structure
+    case.C1_in_DS = case.C1_in_symDS.dataset
+
+    # November 7, 2013: compute the MD5 checksum from the data file,
+    # which is the same as below.
+    case.C2_in_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E11_32_output.csv"),
+        case.doublet_cdt, make_dataset=False)
+    case.C2_in_symDS_structure = case.C2_in_symDS.structure
+
+    # October 16: an alternative to C2_in_symDS, which has existent data.
+    case.E11_32_output_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E11_32_output.csv"),
+        case.doublet_cdt, user=case.myUser,
+        name="E11_32 output doublet",
+        description="result of E11_32 fed by doublet_cdt.csv")
+    case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
+    case.E11_32_output_DS = case.E11_32_output_symDS.dataset
+
+    case.C1_out_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_singlet.csv"),
+        case.singlet_cdt, user=case.myUser, name="raw",
+        description="lol")
+    case.C1_out_symDS_structure = case.C1_out_symDS.structure
+    case.C1_out_DS = case.C1_out_symDS.dataset
+
+    case.C2_out_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        cdt=None, user=case.myUser, name="raw", description="lol")
+    case.C2_out_DS = case.C2_out_symDS.dataset
+
+    case.C3_out_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        cdt=None, user=case.myUser, name="raw", description="lol")
+    case.C3_out_DS = case.C3_out_symDS.dataset
+
+    case.triplet_3_rows_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
+        case.triplet_cdt, user=case.myUser, name="triplet",
+        description="lol")
+    case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
+    case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
+
+    # October 9, 2013: added as the result of cable E21_41.
+    case.E1_out_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
+        case.doublet_cdt, user=case.myUser, name="E1_out",
+        description="doublet remuxed from triplet")
+    case.E1_out_symDS_structure = case.E1_out_symDS.structure
+    case.E1_out_DS = case.E1_out_symDS.dataset
+
+    # October 15, 2013: SymbolicDatasets that go into and come out
+    # of cable E01_21 and E21_41.
+    case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
+                                                       case.DNA_triplet_cdt, user=case.myUser, name="DNA_triplet",
+                                                       description="DNA triplet data")
+    case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
+    case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
+
+    case.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
+        case.DNA_doublet_cdt,
+        user=case.myUser, name="E01_21_DNA_doublet",
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21")
+    case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
+    case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
+
+    case.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
+        case.DNA_doublet_cdt,
+        user=case.myUser, name="E21_41_DNA_doublet",
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41")
+    case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
+    case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
+
+    # Some ExecRecords, some failed, others not.
+    i = 0
+    for step in PipelineStep.objects.all():
+        if step.is_subpipeline: continue
+        run = step.pipeline.pipeline_instances.create(user=case.myUser); run.save()
+        runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
+        execlog = ExecLog.create(runstep, runstep)
+        execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
+        execrecord = ExecRecord(generator=execlog); execrecord.save()
+        for step_input in step.transformation.inputs.all():
+            sd = SymbolicDataset.objects.filter(structure__compounddatatype=step_input.compounddatatype)[0]
+            execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
+        runstep.execrecord = execrecord; runstep.save()
+        i += 1
+
+
+def ER_from_record(record):
+    """
+    Helper function to create an ExecRecord from an Run, RunStep, or
+    RunOutputCable (record), by creating a throwaway ExecLog.
+    """
+    myEL = ExecLog(record=record, invoking_record=record)
+    myEL.start_time = timezone.now()
+    time.sleep(1)
+    myEL.end_time = timezone.now()
+    myEL.save()
+    if record.__class__.__name__ == "RunStep":
+        output = MethodOutput(execlog=myEL, return_code = 0)
+        output.save()
+        myEL.methodoutput = output
+        myEL.save()
+    myER = ExecRecord(generator=myEL)
+    myER.save()
+    return(myER)
+
+
+def ER_from_PSIC(run, PS, PSIC):
+    """
+    Helper function to create an ExecRecord associated to a
+    PipelineStepInputCable, for a particular run and pipeline step.
+    """
+    myRS = run.runsteps.create(pipelinestep=PS)
+    myRSIC = PSIC.psic_instances.create(runstep=myRS)
+    return ER_from_record(myRSIC)
+
+
+class LibrarianTestCase(TestCase):
     """
     Set up a database state for unit testing the librarian app.
 
-    This extends PipelineTestSetup, which itself extended
+    This extends PipelineTestCase, which itself extended
     other stuff (follow the chain).
     """
     def setUp(self):
         """Set up default database state for librarian unit testing."""
-        # Methods, CR/CRR/CRDs, DTs/CDTs, and Pipelines are set up by
-        # calling this.
-        super(LibrarianTestSetup, self).setUp()
+        create_librarian_test_environment(self)
 
-        ####
-        # This is the big pipeline Eric developed that was originally
-        # used in copperfish/tests.py.
-        
-        # CRs and CRRs
-        self.generic_cr = CodeResource(
-            name="genericCR", description="Just a CR",
-            filename="generic_script.py")
-        self.generic_cr.save()
-        self.generic_crRev = CodeResourceRevision(
-            coderesource=self.generic_cr, revision_name="v1", revision_desc="desc")
-        with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.generic_crRev.content_file.save("generic_script.py", File(f))
-        self.generic_crRev.save()
-        
-        # Method family, methods, and their input/outputs
-        self.mf = MethodFamily(name="method_family",description="Holds methods A/B/C"); self.mf.save()
-        self.mA = Method(revision_name="mA_name", revision_desc="A_desc", family = self.mf, driver =
-                self.generic_crRev)
-        self.mA.save()
-        self.A1_rawin = self.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
-        self.A1_out = self.mA.create_output(compounddatatype=self.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
-
-        self.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=self.mf, driver=self.generic_crRev)
-        self.mB.save()
-        self.B1_in = self.mB.create_input(compounddatatype=self.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
-        self.B2_in = self.mB.create_input(compounddatatype=self.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
-        self.B1_out = self.mB.create_output(compounddatatype=self.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
-
-        self.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=self.mf, driver=self.generic_crRev) 
-        self.mC.save()
-        self.C1_in = self.mC.create_input(compounddatatype=self.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
-        self.C2_in = self.mC.create_input(compounddatatype=self.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
-        self.C1_out = self.mC.create_output(compounddatatype=self.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
-        self.C2_rawout = self.mC.create_output(dataset_name="C2_rawout",dataset_idx=2)
-        self.C3_rawout = self.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
-
-        # Pipeline family, pipelines, and their input/outputs
-        self.pf = PipelineFamily(name="Pipeline_family", description="PF desc"); self.pf.save()
-        self.pD = Pipeline(family=self.pf, revision_name="pD_name", revision_desc="D")
-        self.pD.save()
-        self.D1_in = self.pD.create_input(compounddatatype=self.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
-        self.D2_in = self.pD.create_input(compounddatatype=self.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
-        self.pE = Pipeline(family=self.pf, revision_name="pE_name", revision_desc="E")
-        self.pE.save()
-        self.E1_in = self.pE.create_input(compounddatatype=self.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
-        self.E2_in = self.pE.create_input(compounddatatype=self.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
-        self.E3_rawin = self.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
-
-        # Pipeline steps
-        self.step_D1 = self.pD.steps.create(transformation=self.mB,step_num=1)
-        self.step_E1 = self.pE.steps.create(transformation=self.mA,step_num=1)
-        self.step_E2 = self.pE.steps.create(transformation=self.pD,step_num=2)
-        self.step_E3 = self.pE.steps.create(transformation=self.mC,step_num=3)
-
-        # Pipeline cables and outcables
-        self.D01_11 = self.step_D1.cables_in.create(dest=self.B1_in,source_step=0,source=self.D1_in)
-        self.D02_12 = self.step_D1.cables_in.create(dest=self.B2_in,source_step=0,source=self.D2_in)
-        self.D11_21 = self.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=self.triplet_cdt,source_step=1,source=self.B1_out)
-        self.pD.create_outputs()
-        self.D1_out = self.pD.outputs.get(dataset_name="D1_out")
-
-        self.E03_11 = self.step_E1.cables_in.create(dest=self.A1_rawin,source_step=0,source=self.E3_rawin)
-        self.E01_21 = self.step_E2.cables_in.create(dest=self.D1_in,source_step=0,source=self.E1_in)
-        self.E02_22 = self.step_E2.cables_in.create(dest=self.D2_in,source_step=0,source=self.E2_in)
-        self.E11_32 = self.step_E3.cables_in.create(dest=self.C2_in,source_step=1,source=self.A1_out)
-        self.E21_31 = self.step_E3.cables_in.create(dest=self.C1_in,source_step=2,source=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-        self.E21_41 = self.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=self.doublet_cdt,source_step=2,source=self.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-        self.E31_42 = self.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=self.singlet_cdt,source_step=3,source=self.C1_out)
-        self.E33_43 = self.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,source_step=3,source=self.C3_rawout)
-        self.pE.create_outputs()
-        self.E1_out = self.pE.outputs.get(dataset_name="E1_out")
-        self.E2_out = self.pE.outputs.get(dataset_name="E2_out")
-        self.E3_rawout = self.pE.outputs.get(dataset_name="E3_rawout")
-
-        # Custom wiring/outwiring
-        self.E01_21_wire1 = self.E01_21.custom_wires.create(
-            source_pin=self.triplet_cdt.members.get(column_idx=1),
-            dest_pin=self.doublet_cdt.members.get(column_idx=2)
-        )
-        self.E01_21_wire2 = self.E01_21.custom_wires.create(
-            source_pin=self.triplet_cdt.members.get(column_idx=3),
-            dest_pin=self.doublet_cdt.members.get(column_idx=1)
-        )
-        self.E11_32_wire1 = self.E11_32.custom_wires.create(
-            source_pin=self.doublet_cdt.members.get(column_idx=1),
-            dest_pin=self.doublet_cdt.members.get(column_idx=2)
-        )
-        self.E11_32_wire2 = self.E11_32.custom_wires.create(
-            source_pin=self.doublet_cdt.members.get(column_idx=2),
-            dest_pin=self.doublet_cdt.members.get(column_idx=1)
-        )
-        self.E21_41_wire1 = self.E21_41.custom_wires.create(
-            source_pin=self.triplet_cdt.members.get(column_idx=2),
-            dest_pin=self.doublet_cdt.members.get(column_idx=2)
-        )
-        self.E21_41_wire2 = self.E21_41.custom_wires.create(
-            source_pin=self.triplet_cdt.members.get(column_idx=3),
-            dest_pin=self.doublet_cdt.members.get(column_idx=1)
-        )
-        self.pE.clean()
-
-        # Runs for the pipelines.
-        self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
-        self.pD_run.save()
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        self.pE_run.save()
-
-        # November 7, 2013: use a helper function (defined in
-        # librarian.models) to define our SymDSs and DSs.
-            
-        # Define singlet, doublet, triplet, and raw uploaded datasets
-        self.triplet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_triplet.csv"),
-            self.triplet_cdt, make_dataset=True, user=self.myUser,
-            name="triplet", description="lol")
-        self.triplet_symDS_structure = self.triplet_symDS.structure
-        self.triplet_DS = self.triplet_symDS.dataset
-        
-        self.doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_cdt.csv"),
-            self.doublet_cdt, user=self.myUser,
-            name="doublet", description="lol")
-        self.doublet_symDS_structure = self.doublet_symDS.structure
-        self.doublet_DS = self.doublet_symDS.dataset
-
-        self.singlet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "singlet_cdt_large.csv"),
-            self.singlet_cdt, user=self.myUser, name="singlet",
-            description="lol")
-        self.singlet_symDS_structure = self.singlet_symDS.structure
-        self.singlet_DS = self.singlet_symDS.dataset
-        
-        # October 1, 2013: this is the same as the old singlet_symDS.
-        self.singlet_3rows_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_singlet.csv"),
-            self.singlet_cdt, user=self.myUser, name="singlet",
-            description="lol")
-        self.singlet_3rows_symDS_structure = self.singlet_3rows_symDS.structure
-        self.singlet_3rows_DS = self.singlet_3rows_symDS.dataset
-
-        self.raw_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
-        self.raw_DS = self.raw_symDS.dataset
-
-        # Added September 30, 2013: symbolic dataset that results from E01_21.
-        # November 7, 2013: created a file that this SD actually represented,
-        # even though it isn't in the database.
-        self.D1_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
-            cdt=self.doublet_cdt, make_dataset=False)
-        self.D1_in_symDS_structure = self.D1_in_symDS.structure
-        
-        self.C1_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "C1_in_triplet.csv"),
-            self.triplet_cdt, user=self.myUser, name="C1_in_triplet",
-            description="triplet 3 rows")
-        self.C1_in_symDS_structure = self.C1_in_symDS.structure
-        self.C1_in_DS = self.C1_in_symDS.dataset
-        
-        # November 7, 2013: compute the MD5 checksum from the data file,
-        # which is the same as below.
-        self.C2_in_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E11_32_output.csv"),
-            self.doublet_cdt, make_dataset=False)
-        self.C2_in_symDS_structure = self.C2_in_symDS.structure
-
-        # October 16: an alternative to C2_in_symDS, which has existent data.
-        self.E11_32_output_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E11_32_output.csv"),
-            self.doublet_cdt, user=self.myUser,
-            name="E11_32 output doublet",
-            description="result of E11_32 fed by doublet_cdt.csv")
-        self.E11_32_output_symDS_structure = self.E11_32_output_symDS.structure
-        self.E11_32_output_DS = self.E11_32_output_symDS.dataset
-        
-        self.C1_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_singlet.csv"),
-            self.singlet_cdt, user=self.myUser, name="raw",
-            description="lol")
-        self.C1_out_symDS_structure = self.C1_out_symDS.structure
-        self.C1_out_DS = self.C1_out_symDS.dataset
-        
-        self.C2_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
-        self.C2_out_DS = self.C2_out_symDS.dataset
-
-        self.C3_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_raw.fasta"),
-            cdt=None, user=self.myUser, name="raw", description="lol")
-        self.C3_out_DS = self.C3_out_symDS.dataset
-        
-        self.triplet_3_rows_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
-            self.triplet_cdt, user=self.myUser, name="triplet",
-            description="lol")
-        self.triplet_3_rows_symDS_structure = self.triplet_3_rows_symDS.structure
-        self.triplet_3_rows_DS = self.triplet_3_rows_symDS.dataset
-        
-        # October 9, 2013: added as the result of cable E21_41.
-        self.E1_out_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
-            self.doublet_cdt, user=self.myUser, name="E1_out",
-            description="doublet remuxed from triplet")
-        self.E1_out_symDS_structure = self.E1_out_symDS.structure
-        self.E1_out_DS = self.E1_out_symDS.dataset
-        
-        # October 15, 2013: SymbolicDatasets that go into and come out
-        # of cable E01_21 and E21_41.
-        self.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
-                                                           self.DNA_triplet_cdt, user=self.myUser, name="DNA_triplet", 
-                                                           description="DNA triplet data")
-        self.DNA_triplet_symDS_structure = self.DNA_triplet_symDS.structure
-        self.DNA_triplet_DS = self.DNA_triplet_symDS.dataset
-
-        self.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
-            self.DNA_doublet_cdt,
-            user=self.myUser, name="E01_21_DNA_doublet",
-            description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21")
-        self.E01_21_DNA_doublet_symDS_structure = self.E01_21_DNA_doublet_symDS.structure
-        self.E01_21_DNA_doublet_DS = self.E01_21_DNA_doublet_symDS.dataset
-        
-        self.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
-            self.DNA_doublet_cdt,
-            user=self.myUser, name="E21_41_DNA_doublet",
-            description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41")
-        self.E21_41_DNA_doublet_symDS_structure = self.E21_41_DNA_doublet_symDS.structure
-        self.E21_41_DNA_doublet_DS = self.E21_41_DNA_doublet_symDS.dataset
-
-        # Some ExecRecords, some failed, others not.
-        i = 0
-        for step in PipelineStep.objects.all():
-            if step.is_subpipeline: continue
-            run = step.pipeline.pipeline_instances.create(user=self.myUser); run.save()
-            runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
-            execlog = ExecLog.create(runstep, runstep)
-            execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
-            execrecord = ExecRecord(generator=execlog); execrecord.save()
-            for step_input in step.transformation.inputs.all():
-                sd = SymbolicDataset.objects.filter(structure__compounddatatype=step_input.compounddatatype)[0]
-                execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
-            runstep.execrecord = execrecord; runstep.save()
-            i += 1
-
-    def ER_from_record(self, record):
-        """
-        Helper function to create an ExecRecord from an Run, RunStep, or 
-        RunOutputCable (record), by creating a throwaway ExecLog.
-        """
-        myEL = ExecLog(record=record, invoking_record=record)
-        myEL.start_time = timezone.now()
-        time.sleep(1)
-        myEL.end_time = timezone.now()
-        myEL.save()
-        if record.__class__.__name__ == "RunStep":
-            output = MethodOutput(execlog=myEL, return_code = 0)
-            output.save()
-            myEL.methodoutput = output
-            myEL.save()
-        myER = ExecRecord(generator=myEL)
-        myER.save()
-        return(myER)
-
-    def ER_from_PSIC(self, run, PS, PSIC):
-        """
-        Helper function to create an ExecRecord associated to a
-        PipelineStepInputCable, for a particular run and pipeline step.
-        """
-        myRS = run.runsteps.create(pipelinestep=PS)
-        myRSIC = PSIC.psic_instances.create(runstep=myRS)
-        return self.ER_from_record(myRSIC)
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
 
 
-class SymbolicDatasetTests(LibrarianTestSetup):
+class SymbolicDatasetTests(LibrarianTestCase):
 
     def setUp(self):
         super(SymbolicDatasetTests, self).setUp()
@@ -558,14 +574,14 @@ Bob,tw3nty
         self.assertEqual(self.sym_dataset.is_raw(), False)
 
 
-class DatasetStructureTests(LibrarianTestSetup):
+class DatasetStructureTests(LibrarianTestCase):
 
     def test_num_rows(self):
         self.assertEqual(self.triplet_3_rows_symDS.num_rows(), 3)
         self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
 
 
-class ExecRecordTests(LibrarianTestSetup):
+class ExecRecordTests(LibrarianTestCase):
     def test_delete_execrecord(self):
         """Delete an ExecRecord."""
         runstep = RunStep(pipelinestep=self.step_D1, run=self.pD_run)
@@ -580,7 +596,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
-        myER = self.ER_from_record(myROC)
+        myER = ER_from_record(myROC)
         myERI_bad = myER.execrecordins.create(
             symbolicdataset = self.singlet_symDS,
             generic_input = self.C1_out)
@@ -592,7 +608,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_links_PSIC_so_ERI_must_link_TX_that_PSIC_is_fed_by(self):
         # ER links PSIC: ERI must link to the TO/TI that the PSIC is fed by
-        myER = self.ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
+        myER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
@@ -600,7 +616,7 @@ class ExecRecordTests(LibrarianTestSetup):
             "ExecRecordIn \".*\" does not denote the TO/TI that feeds the parent ExecRecord PSIC",
             myERI_bad.clean)
         
-        yourER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
+        yourER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         yourERI_bad = yourER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                                   generic_input=self.D2_in)
         self.assertRaisesRegexp(
@@ -611,7 +627,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ER_doesnt_link_cable_so_ERI_mustnt_link_TO(self):
         # ER's EL doesn't refer to a RSIC or ROC (So, RunStep): ERI must refer to a TI
         myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
-        myER = self.ER_from_record(myRS)
+        myER = ER_from_record(myRS)
         myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
@@ -625,14 +641,14 @@ class ExecRecordTests(LibrarianTestSetup):
         it was defined with.
         """
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
-        myER = self.ER_from_record(myRS)
+        myER = ER_from_record(myRS)
         self.assertEqual(myER.general_transf(), self.step_D1.transformation)
 
     def test_ER_links_sub_pipelinemethod_so_ERI_must_link_TI_belonging_to_transformation(self):
         # ER is a method - ERI must refer to TI of that transformation
         # The transformation of step_D1 is method mB, which has input B1_in.
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
-        myER = self.ER_from_record(myRS)
+        myER = ER_from_record(myRS)
         myERI_good = myER.execrecordins.create(
             symbolicdataset=self.D1_in_symDS,
             generic_input=self.B1_in)
@@ -651,7 +667,7 @@ class ExecRecordTests(LibrarianTestSetup):
         # ERI has a dataset: it's raw/unraw state must match the raw/unraw state of the generic_input it was fed into
         # Method mC is step step_E3 of pipeline pE, and method mA is step step_E1 of pipeline pE.
         myRS_C = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
-        myER_C = self.ER_from_record(myRS_C)
+        myER_C = ER_from_record(myRS_C)
 
         myERI_unraw_unraw = myER_C.execrecordins.create(
             symbolicdataset=self.triplet_symDS,
@@ -665,7 +681,7 @@ class ExecRecordTests(LibrarianTestSetup):
         myERI_raw_unraw_BAD.delete()
 
         myRS_A = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
-        myER_A = self.ER_from_record(myRS_A)
+        myER_A = ER_from_record(myRS_A)
         myERI_unraw_raw_BAD = myER_A.execrecordins.create(
             symbolicdataset=self.triplet_symDS,
             generic_input=self.A1_rawin)
@@ -683,7 +699,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ER_links_POC_ERI_links_TO_which_constrains_input_dataset_CDT(self):
         # ERI links with a TO (For a POC leading from source TO), the input dataset CDT is constrained by the source TO
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
-        myER = self.ER_from_record(myROC)
+        myER = ER_from_record(myROC)
 
         # We annotate that triplet was fed from D1_out into E21_41
         myERI_wrong_CDT = myER.execrecordins.create(
@@ -708,7 +724,7 @@ class ExecRecordTests(LibrarianTestSetup):
         # The transformation input of its PipelineStep constrains the dataset when the ER links with a method
         # Method mC is step step_E3 of pipeline pE.
         myROC = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
-        myER = self.ER_from_record(myROC)
+        myER = ER_from_record(myROC)
         myERI_wrong_CDT = myER.execrecordins.create(
             symbolicdataset=self.singlet_symDS,
             generic_input=self.C2_in)
@@ -727,7 +743,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
         # E31_42 belongs to pipeline E
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
-        myER = self.ER_from_record(myROC)
+        myER = ER_from_record(myROC)
 
         # This ERO has a TO that belongs to this pipeline
         myERO_good = myER.execrecordouts.create(
@@ -750,7 +766,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
         # Make ER for POC E21_41 which defines pipeline E's TO "E1_out"
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
-        myER = self.ER_from_record(myROC)
+        myER = ER_from_record(myROC)
 
         # Define ERO with a TO that is part of pipeline E but with the wrong name from the POC
         myERO_bad = myER.execrecordouts.create(
@@ -765,7 +781,7 @@ class ExecRecordTests(LibrarianTestSetup):
         # 1) If the data is raw, the ERO output TO must also be raw
         # Method mC is step step_E3 of pipeline pE.
         myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
-        myER = self.ER_from_record(myRS)
+        myER = ER_from_record(myRS)
 
         myERO_rawDS_rawTO = myER.execrecordouts.create(
             symbolicdataset=self.raw_symDS, generic_output=self.C3_rawout)
@@ -805,7 +821,7 @@ class ExecRecordTests(LibrarianTestSetup):
         # Dataset must have num rows within the row constraints of the producing TO
         # Method mB is step step_D1 of pipeline pD.
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
-        myER_2 = self.ER_from_record(myRS)
+        myER_2 = ER_from_record(myRS)
         myERO_too_many_rows = myER_2.execrecordouts.create(
             symbolicdataset=self.triplet_symDS, generic_output=self.B1_out)
         self.assertRaisesRegexp(
@@ -818,7 +834,7 @@ class ExecRecordTests(LibrarianTestSetup):
         """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
         # Method mC is step step_E3 of pipeline pE.
         mC_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
-        mC_ER = self.ER_from_record(mC_RS)
+        mC_ER = ER_from_record(mC_RS)
         mC_ER_in_1 = mC_ER.execrecordins.create(
             generic_input=self.C1_in,
             symbolicdataset=self.C1_in_symDS)
@@ -858,7 +874,7 @@ class ExecRecordTests(LibrarianTestSetup):
         """ERO CDT restriction tests for the ER of a Method."""
         # Method mA is step step_E1 of pipeline pE.
         mA_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
-        mA_ER = self.ER_from_record(mA_RS)
+        mA_ER = ER_from_record(mA_RS)
         mA_ERO = mA_ER.execrecordouts.create(
             generic_output=self.A1_out,
             symbolicdataset=self.doublet_symDS)
@@ -895,7 +911,7 @@ class ExecRecordTests(LibrarianTestSetup):
         """ERO CDT restriction tests for the ER of a POC."""
         ####
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
-        outcable_ER = self.ER_from_record(outcable_ROC)
+        outcable_ER = ER_from_record(outcable_ROC)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E1_out,
             symbolicdataset=self.E1_out_symDS)
@@ -935,7 +951,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ERO_CDT_restrictions_PSIC(self):
         """ERO CDT restriction tests for the ER of a PSIC."""
         ####
-        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
+        cable_ER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.C2_in,
             symbolicdataset=self.doublet_symDS)
@@ -971,7 +987,7 @@ class ExecRecordTests(LibrarianTestSetup):
 
     def test_ER_trivial_PSICs_have_same_SD_on_both_sides(self):
         """ERs representing trivial PSICs must have the same SymbolicDataset on both sides."""
-        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
+        cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         cable_ER.execrecordins.create(
             generic_input=self.E2_in,
             symbolicdataset = self.singlet_symDS)
@@ -994,7 +1010,7 @@ class ExecRecordTests(LibrarianTestSetup):
         """ERs representing trivial POCs must have the same SymbolicDataset on both sides."""
         # E31_42 belongs to pipeline E
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
-        outcable_ER = self.ER_from_record(outcable_ROC)
+        outcable_ER = ER_from_record(outcable_ROC)
         outcable_ER.execrecordins.create(
             generic_input=self.C1_out,
             symbolicdataset = self.C1_out_symDS)
@@ -1017,7 +1033,7 @@ class ExecRecordTests(LibrarianTestSetup):
     def test_ER_Datasets_passing_through_non_trivial_POCs(self):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
-        outcable_ER = self.ER_from_record(outcable_ROC)
+        outcable_ER = ER_from_record(outcable_ROC)
         outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, symbolicdataset=self.C1_in_symDS)
         outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, symbolicdataset=self.E1_out_symDS)
 
@@ -1053,7 +1069,7 @@ class ExecRecordTests(LibrarianTestSetup):
         
     def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
         """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
-        cable_ER = self.ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
+        cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
         cable_ERI = cable_ER.execrecordins.create(
             generic_input=self.E1_in,
             symbolicdataset=self.triplet_symDS)
@@ -1175,7 +1191,7 @@ class ExecRecordTests(LibrarianTestSetup):
         self.assertTrue(execrecord.has_ever_failed())
 
 
-class FindCompatibleERTests(LibrarianTestSetup):
+class FindCompatibleERTests(LibrarianTestCase):
 
     def test_find_compatible_ER_never_failed(self):
         """Should be able to find a compatible ExecRecord which never failed."""

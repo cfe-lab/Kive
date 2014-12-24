@@ -5,7 +5,7 @@ import tempfile
 
 from django.core.files import File
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
@@ -19,7 +19,7 @@ from method.tests import samplecode_path
 from constants import datatypes
 
 
-class ExecuteTests(TestCase):
+class ExecuteTests(TransactionTestCase):
 
     def setUp(self):
 

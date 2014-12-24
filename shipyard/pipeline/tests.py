@@ -29,102 +29,101 @@ from django.core import serializers
 samplecode_path = "../samplecode"
 
 
-class PipelineTestSetup(method.tests.MethodTestSetup):
+def create_pipeline_test_environment(case):
+    """
+    Sets up default database state for some Pipeline unit testing.
+
+    This also sets up Methods, CR/CRR/CRDs, and DTs/CDTs as in the Metadata and Methods tests.
+    """
+    method.tests.create_method_test_environment(case)
+    case.workdir = tempfile.mkdtemp()
+
+    case.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
+    case.user.save()
+
+    # Define DNAcomp_pf
+    case.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.")
+    case.DNAcomp_pf.save()
+
+    # Define DNAcompv1_p (pipeline revision)
+    case.DNAcompv1_p = case.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version")
+
+    # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
+    case.DNAcompv1_p.create_input(
+        compounddatatype=case.DNAinput_cdt,
+        dataset_name="seqs_to_complement",
+        dataset_idx=1)
+
+    # Add a step to Pipeline revision DNAcompv1_p involving
+    # a transformation DNAcompv2_m at step 1
+    step1 = case.DNAcompv1_p.steps.create(
+        transformation=case.DNAcompv2_m,
+        step_num=1)
+
+    # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
+    # From step 0, output hole "seqs_to_complement" to
+    # input hole "input" (of this step)
+    step1.cables_in.create(dest=case.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
+                           source=case.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
+
+    # Add output cabling (PipelineOutputCable) to DNAcompv1_p
+    # From step 1, output hole "output", send output to
+    # Pipeline output hole "complemented_seqs" at index 1
+    case.DNAcompv1_p.create_outcable(source_step=1,
+                                                  source=step1.transformation.outputs.get(dataset_name="output"),
+                                                  output_name="complemented_seqs", output_idx=1)
+
+
+    case.datafile = open(tempfile.mkstemp(dir=case.workdir)[1], "w")
+    case.datafile.write(",".join([m.column_name for m in case.DNAinput_cdt.members.all()]))
+    case.datafile.write("\n")
+    case.datafile.write("ATCG\n")
+    case.datafile.close()
+
+    case.DNAinput_symDS = SymbolicDataset.create_SD(case.datafile.name, cdt=case.DNAinput_cdt, user=case.user,
+                                                    name="DNA input", description="input for DNAcomp pipeline")
+
+    # Define PF in order to define pipeline
+    case.test_PF = PipelineFamily(
+        name="test pipeline family",
+        description="pipeline family placeholder")
+    case.test_PF.full_clean()
+    case.test_PF.save()
+
+    # Set up an empty Pipeline.
+    family = PipelineFamily.objects.first()
+    CompoundDatatype.objects.first()
+
+    # Nothing defined.
+    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version")
+    p.save()
+
+
+def destroy_pipeline_test_environment(case):
+    """
+    Clean up a TestCase where create_pipeline_test_environment has been called.
+    """
+    method.tests.destroy_method_test_environment(case)
+    Dataset.objects.all().delete()
+    shutil.rmtree(case.workdir)
+
+
+class PipelineTestCase(TestCase):
     """
     Set up a database state for unit testing Pipeline.
 
-    This extends MethodTestSetup, which itself extended
+    This extends MethodTestCase, which itself extended
     MetadataTestSetup.
     """
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
-        # Methods, CR/CRR/CRDs, and DTs/CDTs are set up by calling this.
-        super(PipelineTestSetup, self).setUp()
-        self.workdir = tempfile.mkdtemp()
-
-        self.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
-        self.user.save()
-        
-        # Define DNAcomp_pf
-        self.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.")
-        self.DNAcomp_pf.save()
-
-        # Define DNAcompv1_p (pipeline revision)
-        self.DNAcompv1_p = self.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version")
-
-        # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
-        self.DNAcompv1_p.create_input(
-            compounddatatype=self.DNAinput_cdt,
-            dataset_name="seqs_to_complement",
-            dataset_idx=1)
-
-        # Add a step to Pipeline revision DNAcompv1_p involving
-        # a transformation DNAcompv2_m at step 1
-        step1 = self.DNAcompv1_p.steps.create(
-            transformation=self.DNAcompv2_m,
-            step_num=1)
-
-        # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
-        # From step 0, output hole "seqs_to_complement" to
-        # input hole "input" (of this step)
-        step1.cables_in.create(dest=self.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
-                               source=self.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
-
-        # Add output cabling (PipelineOutputCable) to DNAcompv1_p
-        # From step 1, output hole "output", send output to
-        # Pipeline output hole "complemented_seqs" at index 1
-        self.DNAcompv1_p.create_outcable(source_step=1,
-                                                      source=step1.transformation.outputs.get(dataset_name="output"),
-                                                      output_name="complemented_seqs", output_idx=1)
-
-        
-        self.datafile = open(tempfile.mkstemp(dir=self.workdir)[1], "w")
-        self.datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
-        self.datafile.write("\n")
-        self.datafile.write("ATCG\n")
-        self.datafile.close()
-
-        self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, cdt=self.DNAinput_cdt, user=self.user,
-                                                        name="DNA input", description="input for DNAcomp pipeline")
-
-        # Define PF in order to define pipeline
-        self.test_PF = PipelineFamily(
-            name="test pipeline family",
-            description="pipeline family placeholder")
-        self.test_PF.full_clean()
-        self.test_PF.save()
-
-        self.manufacture_pipeline()
-
-    def manufacture_pipeline(self):
-        """Create Pipelines in various stages of manufacture."""
-
-        family = PipelineFamily.objects.first()
-        CompoundDatatype.objects.first()
-
-        # Nothing defined.
-        p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version")
-        p.save()
+        create_pipeline_test_environment(self)
 
     def tearDown(self):
-        super(PipelineTestSetup, self).tearDown()
-        Dataset.objects.all().delete()
-        shutil.rmtree(self.workdir)
-
-    def pipelinestep_to_dict(self, ps):
-        from django.core.serializers import serialize
-        my_dict = json.loads(serialize("json", [ps]))[0]
-        my_dict["transformation"] = json.loads(serialize("json", [ps.transformation.definite]))[0]
-        return my_dict
-
-    def dict_to_pipelinestep(self, dict_ps):
-        next(serializers.deserialize("json", json.dumps([dict_ps["transformation"]]))).object
-        del dict_ps["transformation"]
-        ps = next(serializers.deserialize("json", json.dumps([dict_ps]))).object
-        return ps
+        destroy_pipeline_test_environment(self)
 
 
-class PipelineFamilyTests(PipelineTestSetup):
+class PipelineFamilyTests(PipelineTestCase):
 
     def test_unicode(self):
         """
@@ -137,7 +136,7 @@ class PipelineFamilyTests(PipelineTestSetup):
         self.assertIsNone(PipelineFamily.objects.first().delete())
 
 
-class PipelineTests(PipelineTestSetup):
+class PipelineTests(PipelineTestCase):
     """Tests for basic Pipeline functionality."""
     
     def test_pipeline_one_valid_input_no_steps(self):
@@ -2303,7 +2302,7 @@ class PipelineTests(PipelineTestSetup):
         self.assertIsNone(pipeline.delete())
 
 
-class PipelineStepTests(PipelineTestSetup):
+class PipelineStepTests(PipelineTestCase):
 
     def test_pipelineStep_without_pipeline_set_unicode(self):
         """Test unicode representation when no pipeline is set."""
@@ -2596,19 +2595,19 @@ class PipelineStepTests(PipelineTestSetup):
         PipelineStep.objects.first().delete()
 
 
-class PipelineStepInputCableTests(PipelineTestSetup):
+class PipelineStepInputCableTests(PipelineTestCase):
     def test_delete_pipeline_step_input_cable(self):
         """Deleting a PipelineStepInputCable is possible."""
         self.assertIsNone(PipelineStepInputCable.objects.first().delete())
 
 
-class PipelineOutputCableTests(PipelineTestSetup):
+class PipelineOutputCableTests(PipelineTestCase):
     def test_delete_pipeline_output_cable(self):
         """Deleting a PipelineOutputCable is possible."""
         self.assertIsNone(PipelineOutputCable.objects.first().delete())
 
 
-class PipelineStepRawDeleteTests(PipelineTestSetup):
+class PipelineStepRawDeleteTests(PipelineTestCase):
 
     def test_PipelineStep_clean_raw_output_to_be_deleted_good(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
@@ -2696,7 +2695,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError, error_msg, pipeline_1.clean)
 
 
-class RawOutputCableTests(PipelineTestSetup):
+class RawOutputCableTests(PipelineTestCase):
 
     def test_PipelineOutputCable_raw_outcable_references_valid_step_good(self):
 
@@ -2819,7 +2818,7 @@ class RawOutputCableTests(PipelineTestSetup):
                                 self.pipeline_1.complete_clean)
 
 
-class RawInputCableTests(PipelineTestSetup):
+class RawInputCableTests(PipelineTestCase):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
         """
         Cable is fed from a pipeline input.
@@ -2968,7 +2967,7 @@ class RawInputCableTests(PipelineTestSetup):
             rawcable1.clean)
 
 
-class RawSaveTests(PipelineTestSetup):
+class RawSaveTests(PipelineTestCase):
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
         # Give script_4_1_M a raw input
         self.script_4_1_M.inputs.all().delete()
@@ -3020,7 +3019,7 @@ class RawSaveTests(PipelineTestSetup):
 
 
 # August 23, 2013: these are kind of redundant now but what the hey.
-class SingleRawInputTests(PipelineTestSetup):
+class SingleRawInputTests(PipelineTestCase):
     def test_transformation_rawinput_coexists_with_nonraw_inputs_clean_good(self):
 
         # Define raw input "a_b_c" at index = 1
@@ -3153,7 +3152,7 @@ class SingleRawInputTests(PipelineTestSetup):
             step1.complete_clean)
 
 
-class SeveralRawInputsTests(PipelineTestSetup):
+class SeveralRawInputsTests(PipelineTestCase):
     def test_transformation_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
         # Note that this method wouldn't actually run -- inputs don't match.
 
@@ -3279,7 +3278,7 @@ class SeveralRawInputsTests(PipelineTestSetup):
 
 
 # August 23, 2013: these also seem pretty redundant, but let's just leave 'em.
-class SingleRawOutputTests(PipelineTestSetup):
+class SingleRawOutputTests(PipelineTestCase):
     def test_transformation_rawoutput_coexists_with_nonraw_outputs_clean_good(self):
 
         # Define raw output "a_b_c" at index = 1
@@ -3314,7 +3313,7 @@ class SingleRawOutputTests(PipelineTestSetup):
             self.script_4_1_M.clean)
 
 
-class SeveralRawOutputsTests(PipelineTestSetup):
+class SeveralRawOutputsTests(PipelineTestCase):
 
     def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_clean_good(self):
         # Note: the method we define here doesn't correspond to reality; the
@@ -3365,7 +3364,7 @@ class SeveralRawOutputsTests(PipelineTestSetup):
             self.script_4_1_M.clean)
 
 
-class CustomWiringTests(PipelineTestSetup):
+class CustomWiringTests(PipelineTestCase):
 
     def test_CustomCableWire_wires_from_pipeline_input_identical_dt_good(self):
         """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
@@ -3558,7 +3557,7 @@ class CustomWiringTests(PipelineTestSetup):
 
 
 # August 23, 2013: This is pretty redundant now.
-class PipelineOutputCableRawTests(PipelineTestSetup):
+class PipelineOutputCableRawTests(PipelineTestCase):
     
     def test_pipeline_check_for_colliding_outputs_clean_good(self):
 
@@ -3608,7 +3607,7 @@ class PipelineOutputCableRawTests(PipelineTestSetup):
         self.assertEquals(self.pipeline_1.clean(), None)
 
 
-class CustomRawOutputCablingTests(PipelineTestSetup):
+class CustomRawOutputCablingTests(PipelineTestCase):
 
     def test_Pipeline_create_multiple_raw_outputs_with_raw_outmap(self):
         self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version")
@@ -3660,7 +3659,7 @@ class CustomRawOutputCablingTests(PipelineTestSetup):
         self.assertEquals(raw_output_2.dataset_idx, 2)
 
         
-class PipelineStepInputCable_tests(PipelineTestSetup):
+class PipelineStepInputCable_tests(PipelineTestCase):
 
     def test_PSIC_clean_and_completely_wired_CDT_equal_no_wiring_good(self):
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
@@ -3831,7 +3830,7 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
 
 
 # August 29, 2013: reworked to handle new design for outcables.
-class CustomOutputWiringTests(PipelineTestSetup):
+class CustomOutputWiringTests(PipelineTestCase):
 
     def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
 
