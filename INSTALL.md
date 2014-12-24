@@ -128,8 +128,10 @@ If you have made database schema changes, recreate the database.
     exit
     ./manage.py syncdb --noinput
 
-Whether you've recreated the database or not, now run the reset command.
+Whether you've recreated the database or not, now deploy the static files and
+run the reset command.
 
+    sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
     ./manage.py reset --load=demo
 
 You can leave the load parameter off, or set it to other fixture names, like

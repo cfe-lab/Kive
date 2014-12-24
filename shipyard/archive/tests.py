@@ -2,6 +2,7 @@
 Shipyard archive application unit tests.
 """
 
+from datetime import datetime
 import os
 import re
 import tempfile
@@ -2643,15 +2644,24 @@ class StopwatchTests(ArchiveTestSetup):
 
     def test_clean_end_before_start(self):
         """
-        end_time is before and start_time.  This is not coherent.
+        end_time is before start_time.  This is not coherent.
         """
-        self.pE_run.end_time = timezone.now()
-        self.pE_run.start_time = timezone.now()
-        self.assertRaisesRegexp(
-            ValidationError,
-            re.escape('Stopwatch "{}" start time is later than its end time'.format(self.pE_run)),
-            self.pE_run.clean
-        )
+        start = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 30),
+                                    timezone.utc)
+        end   = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 15),
+                                    timezone.utc)
+        expected_message = (
+            'Stopwatch "{}" start time is later than its end time: ' +
+            '2000-02-14 10:00:30+00:00 > 2000-02-14 10:00:15+00:00.').format(
+                self.pE_run)
+        self.pE_run.start_time = start
+        self.pE_run.end_time = end
+        try:
+            self.pE_run.clean()
+            
+            self.fail("Should have thrown.")
+        except ValidationError as ex:
+            self.assertSequenceEqual(expected_message, ex.message)
 
     def test_has_started_true(self):
         """
