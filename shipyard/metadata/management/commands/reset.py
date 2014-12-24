@@ -23,6 +23,7 @@ class Command(BaseCommand):
         targets = ["CodeResources",
                    "Datasets",
                    "Logs",
+                   "Sandboxes",
                    "VerificationLogs",
                    "VerificationScripts"]
         for target in targets:
@@ -32,6 +33,7 @@ class Command(BaseCommand):
                 
         subprocess.check_call([python, manage_script, "flush", "--noinput"])
         subprocess.check_call([python, manage_script, "loaddata", "initial_user"])
+        os.mkdir(os.path.join(shipyard.settings.MEDIA_ROOT, "Sandboxes"))
         #TODO: Should we still import the data from load_default_objects.py?
         if fixture:
             subprocess.check_call([python, manage_script, "loaddata", fixture])

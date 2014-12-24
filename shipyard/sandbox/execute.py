@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 
 import archive.models
 import librarian.models
-import pipeline.models 
+import pipeline.models
+from shipyard import settings 
 
 import file_access_utils
 from constants import dirnames, extensions
@@ -96,7 +97,9 @@ class Sandbox:
 
         # Determine a sandbox path, and input/output directories for 
         # top-level Pipeline.
-        self.sandbox_path = sandbox_path or tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
+        self.sandbox_path = sandbox_path or tempfile.mkdtemp(
+            prefix="user{}_run{}_".format(self.user, self.run.pk),
+            dir=os.path.join(settings.MEDIA_ROOT, "Sandboxes"))
         in_dir = os.path.join(self.sandbox_path, dirnames.IN_DIR)
         self.out_dir = os.path.join(self.sandbox_path, dirnames.OUT_DIR)
 
