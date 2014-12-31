@@ -50,7 +50,7 @@ class Manager:
         # replaced afresh.
         self._setup_finished_task_receiver()
 
-        mgr_logger.info("Manager started on host {}".format(self.hostname))
+        mgr_logger.debug("Manager started on host {}".format(self.hostname))
 
         # tasks_in_progress tracks what jobs are assigned to what workers.
         self.tasks_in_progress = {}
@@ -251,7 +251,7 @@ class Manager:
             for _ in range(shipyard.settings.FLEET_POLLING_INTERVAL):
                 test_result = self.work_finished_request.test()
                 if test_result[0]:
-                    mgr_logger.debug("Worker {} reports task with PK {} is finished".format(
+                    mgr_logger.info("Worker {} reports task with PK {} is finished".format(
                         self.work_finished_result[0], self.work_finished_result[1]
                     ))
                     worker_returned = True
@@ -268,7 +268,7 @@ class Manager:
 
             # Look for new jobs to run.  We will also
             # build in a delay here so we don't clog up the database.
-            mgr_logger.info("Looking for new runs....")
+            mgr_logger.debug("Looking for new runs....")
             with transaction.atomic():
                 pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
 
@@ -306,7 +306,7 @@ class Worker:
         self.count = self.comm.Get_size()
         self.hostname = MPI.Get_processor_name()
 
-        worker_logger.info("Worker {} started on host {}".format(self.rank, self.hostname))
+        worker_logger.debug("Worker {} started on host {}".format(self.rank, self.hostname))
 
         # Report to the manager.
         self.comm.send((self.hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
@@ -328,14 +328,18 @@ class Worker:
                 task = archive.models.RunComponent.objects.get(pk=task_info_dict["cable_record_pk"]).definite
             else:
                 task = archive.models.RunStep.objects.get(pk=task_info_dict["runstep_pk"])
-            worker_logger.info("{} received: {}".format(task.__class__.__name__, task))
+            worker_logger.info("%s(%d) received by rank %d: %s",
+                               task.__class__.__name__,
+                               task.pk, 
+                               self.rank,
+                               task)
     
             sandbox_result = None
             if type(task) == archive.models.RunStep:
                 sandbox_result = sandbox.execute.finish_step(task_info_dict)
             else:
                 sandbox_result = sandbox.execute.finish_cable(task_info_dict)
-            worker_logger.info("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
+            worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
             result = sandbox_result.pk
         except:
             result = -1 #bogus return value
