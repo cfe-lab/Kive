@@ -24,7 +24,6 @@ from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import stopwatch.models
 from constants import maxlengths
 import archive.signals
-import librarian.models
 
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch):
@@ -122,12 +121,12 @@ class Run(stopwatch.models.Stopwatch):
         all_exist = True
 
         for step in self.pipeline.steps.all():
-            corresp_rs = self.runsteps.filter(pipelinestep=step)
-            if not corresp_rs.exists():
+            corresp_rs = self.runsteps.filter(pipelinestep=step).first()
+            if corresp_rs is None:
                 all_exist = False
-            elif not corresp_rs.first().is_complete():
+            elif not corresp_rs.is_complete():
                 return False
-            elif not corresp_rs.first().successful_execution():
+            elif not corresp_rs.successful_execution():
                 anything_failed = True
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()

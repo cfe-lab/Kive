@@ -15,15 +15,15 @@ class SlowTestReportTest(unittest.TestCase):
     time="10.042">
     
     <testcase
-        classname="some.package.SomeTest"
+        classname="app1.tests.SomeTest"
         name="test_some_feature"
         time="6.04192" />
     <testcase
-        classname="some.package.SomeOtherTest"
+        classname="app1.tests.SomeOtherTest"
         name="test_other_feature"
         time="1" />
     <testcase
-        classname="other.package.AnotherTest"
+        classname="app2.tests.AnotherTest"
         name="test_stuff"
         time="3" />
 </testsuite>
@@ -37,7 +37,7 @@ class SlowTestReportTest(unittest.TestCase):
         self.assertSequenceEqual(expected_description, report.description)
 
     def test_slowest(self):
-        expected_description = '6s for some.package.SomeTest.test_some_feature'
+        expected_description = '6s for app1.SomeTest.test_some_feature'
         
         report = SlowTestReport().load(self.report_file, 2)
         test = report.tests[0]
