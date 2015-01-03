@@ -326,15 +326,18 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                 // We do this by resetting the counter.
                 // We also have to check for collisions on the other shape.
                 if (i > -1) {
-                    this.collisions++;
                     i = -1;
                     followups.push(shape);
                 }
                 
                 // Drawing a line between the two objects' centres, move the centre 
                 // of mySel to extend this line while keeping the same angle.
-                var dx = myShape.x - shape.x,
-                    dy = myShape.y - shape.y,
+                var my_x = myShape.x + myShape.dx,
+                    my_y = myShape.y + myShape.dy,
+                    sh_x = shape.x + shape.dx,
+                    sh_y = shape.y + shape.dy,
+                    dx = my_x - sh_x,
+                    dy = my_y - sh_y,
                     step = 5;
             
                 // Shortcut so that I don't have to type Math.everything
@@ -344,44 +347,48 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                     Dx = cos(angle) * dh - dx,
                     Dy = sin(angle) * dh - dy;
                 
-                myShape.x += Dx * bias;
-                shape.x   -= Dx * (1 - bias);
+                myShape.dx += Dx * bias;
+                shape.dx   -= Dx * (1 - bias);
+                my_x = myShape.x + myShape.dx;
+                sh_x = shape.x + shape.dx;
                 
-                if (myShape.x > canvas.width) {
-                    shape.x -= myShape.x - canvas.width;
-                    myShape.x = canvas.width;
+                if (my_x > canvas.width) {
+                    sh_x -= my_x - canvas.width;
+                    my_x = canvas.width;
                 }
-                if (myShape.x < 0) {
-                    shape.x -= myShape.x;
-                    myShape.x = 0;
+                if (my_x < 0) {
+                    sh_x -= my_x;
+                    my_x = 0;
                 }
-                if (shape.x > canvas.width) {
-                    myShape.x -= shape.x - canvas.width;
-                    shape.x = canvas.width;
+                if (sh_x > canvas.width) {
+                    my_x -= sh_x - canvas.width;
+                    sh_x = canvas.width;
                 }
-                if (shape.x < 0) {
-                    myShape.x -= shape.x;
-                    shape.x = 0;
+                if (sh_x < 0) {
+                    my_x -= sh_x;
+                    sh_x = 0;
                 }
                 
-                myShape.y += Dy * bias;
-                shape.y   -= Dy * (1 - bias);
+                myShape.dy += Dy * bias;
+                shape.dy -= Dy * (1 - bias);
+                my_y = myShape.y + myShape.dy;
+                sh_y = shape.y + shape.dy;
                 
-                if (myShape.y > canvas.height) {
-                    shape.y -= myShape.y - canvas.height;
-                    myShape.y = canvas.height;
+                if (my_y > canvas.height) {
+                    sh_y -= my_y - canvas.height;
+                    my_y = canvas.height;
                 }
-                if (myShape.y < 0) {
-                    shape.y -= myShape.y;
-                    myShape.y = 0;
+                if (my_y < 0) {
+                    sh_y -= my_y;
+                    my_y = 0;
                 }
                 if (shape.y > canvas.height) {
-                    myShape.y += shape.y - canvas.height;
-                    shape.y = canvas.height;
+                    my_y += sh_y - canvas.height;
+                    sh_y = canvas.height;
                 }
-                if (shape.y < 0) {
-                    myShape.y -= shape.y;
-                    shape.y = 0;
+                if (sh_y < 0) {
+                    my_y -= sh_y;
+                    sh_y = 0;
                 }
         
                 vertices = myShape.getVertices();
@@ -439,7 +446,20 @@ CanvasState.prototype.doUp = function(e) {
             } else {
                 // valid Connector, assign non-null value
                 
-                var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, connector.source.label);
+                // make sure label is not a duplicate
+                var suffix = 0;
+                var new_output_label = connector.source.label;
+                for (var i=0; i< this.shapes.length; i++) {
+                    var shape = this.shapes[i];
+                    if (shape.constructor != OutputNode) continue;
+                    if (shape.label == new_output_label) {
+                        i = -1;
+                        suffix++;
+                        new_output_label = connector.source.label +'_'+ suffix;
+                    }
+                }
+                
+                var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, new_output_label);
                 this.addShape(outNode);
                 
                 connector.dest = outNode.in_magnets[0];
@@ -458,7 +478,7 @@ CanvasState.prototype.doUp = function(e) {
                     top:  Math.min(connector.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
                 });
                 
-                $('#output_name', dialog).val(connector.source.label).select(); // default value;
+                $('#output_name', dialog).val(new_output_label).select(); // default value;
             }
         } else {
             // Connector not linked to anything - delete
@@ -587,13 +607,6 @@ CanvasState.prototype.draw = function() {
             ctx.globalAlpha = 1.0;
             ctx.fillText(l.label, l.x, l.y);
         }
-        
-        ctx.font = '8pt Lato, sans-serif';
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#888';
-        ctx.globalAlpha = 1.0;
-        ctx.fillText(this.collisions, 5, 5);
         
         this.valid = true;
     }

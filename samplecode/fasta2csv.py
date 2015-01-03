@@ -18,6 +18,7 @@ try:
     csvfile = open(args.output_csv, 'wb')
     output = csv.writer(csvfile)
     output.writerow(['FASTA header', 'FASTA sequence'])
+    header = ''
     
     with open(args.input_fasta, "rb") as f:
         try:            

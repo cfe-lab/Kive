@@ -2,8 +2,8 @@ import time
 import json
 import re
 import os
-import threading
 import itertools
+import logging
 
 from django.http import HttpResponse
 from django.core import serializers
@@ -16,9 +16,13 @@ from archive.models import Dataset, Run
 from librarian.models import SymbolicDataset
 from transformation.models import TransformationInput
 from metadata.models import CompoundDatatype
-from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from execute import Sandbox
 from forms import PipelineSelectionForm
+import fleet.models
+from django.db import transaction
+
+ajax_logger = logging.getLogger("sandbox.ajax")
+
 
 class AJAXRequestHandler:
     """A simple class to handle AJAX requests."""
@@ -38,6 +42,7 @@ class AJAXRequestHandler:
         else:
             self.response = HttpResponse(status=405) # Method not allowed
 
+
 def _run_pipeline(request):
     """Run a Pipeline as the global Shipyard user."""
     pipeline_pk = request.GET.get("pipeline")
@@ -51,15 +56,21 @@ def _run_pipeline(request):
     # TODO: for now this is just using the global Shipyard user
     user = User.objects.get(username="shipyard")
 
-    sandbox = Sandbox(user, pipeline, symbolic_datasets)
-    thread = threading.Thread(name="user{}run{}".format(user.username, sandbox.run.pk),
-                              target=sandbox.execute_pipeline)
-    thread.start()
-    return json.dumps({"run": sandbox.run.pk, "status": "Starting run", "finished": False, 
-                       "thread": thread.name, "crashed": False})
+    # Inform the fleet that this is to be processed.
+    with transaction.atomic():
+        run_to_start = fleet.models.RunToProcess(user=user, pipeline=pipeline)
+        run_to_start.save()
+
+        for i, sd in enumerate(symbolic_datasets):
+            run_to_start.inputs.create(symbolicdataset=sd, index=i)
+
+    return json.dumps({"run": None, "status": "Waiting", "finished": False, "success": True,
+                       "queue_placeholder": run_to_start.pk, "crashed": False})
+
 
 def run_pipeline(request):
     return AJAXRequestHandler(request, _run_pipeline).response
+
 
 def _filter_datasets(request):
     filters = json.loads(request.GET.get("filter_data"))
@@ -88,8 +99,10 @@ def _filter_datasets(request):
                               "Date": dataset.date_created.strftime("%b %e, %Y, %l:%M %P")})
     return json.dumps(response_data)
 
+
 def filter_datasets(request):
     return AJAXRequestHandler(request, _filter_datasets).response
+
 
 def _filter_pipelines(request):
     """
@@ -110,141 +123,58 @@ def _filter_pipelines(request):
                               "Revision": form.fields["pipeline"].widget.render("id_pipeline", "")})
     return json.dumps(response_data)
 
+
 def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
-def _thread_running(thread):
-    for active_thread in threading.enumerate():
-        if active_thread.name == thread:
-            return True
-    return False
 
-def _describe_run_failure(run):
-    """
-    Return a tuple (error, reason) describing a Run failure.
-
-    TODO: this is very rudimentary at the moment.
-    - It does not take recovery into account - should report which step
-      was actually executed and failed, not which step tried to recover
-      and failed.
-    - It does not take sub-pipelines into account.
-    - Failure details for a cable are not reported.
-    - Details of cell errors are not reported.
-    """
-    total_steps = run.pipeline.steps.count()
-    error = ""
-    reason = ""
-
-    # Check each step for failure.
-    for i, runstep in enumerate(run.runsteps.order_by("pipelinestep__step_num"), start=1):
-
-        if runstep.is_complete() and not runstep.successful_execution():
-            error = "Step {} of {} failed".format(i, total_steps)
-
-            # Check each cable.
-            total_cables = runstep.pipelinestep.cables_in.count()
-            for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
-                if not runcable.successful_execution():
-                    return (error, "Input cable {} of {} failed".format(j, total_cables))
-
-            # Check the step execution.
-            if not runstep.log:
-                return (error, "Recovery failed")
-            return_code = runstep.log.methodoutput.return_code 
-            if return_code != 0:
-                return (error, "Return code {}".format(return_code))
-
-            # Check for bad output.
-            for output in runstep.execrecord.execrecordouts.all():
-                try:
-                    check = runstep.log.content_checks.get(symbolicdataset=output.symbolicdataset)
-                except ContentCheckLog.DoesNotExist:
-                    try:
-                        check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
-                    except IntegrityCheckLog.DoesNotExist:
-                        continue
-
-                if check.is_fail():
-                    return (error, "Output {}: {}".format(output.generic_output.definite.dataset_idx, check))
-
-            # Something else went wrong with the step?
-            return (error, "Unknown error")
-                
-    # Check each output cable.
-    total_cables = run.pipeline.outcables.count()
-    for i, runcable in enumerate(run.runoutputcables.order_by("pipelineoutputcable__output_idx")):
-        if not runcable.successful_execution():
-            return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
-
-    # Shouldn't reach here.
-    return ("Unknown error", "Unknown reason")
-
-def _get_run_progress(run):
-    """
-    Return a tuple (status, finished), where status is a string
-    describing the Run's current state, and finished is True if
-    the Run is finished or False if it's in progress.
-    """
-    # Run is finished?
-    if run.is_complete():
-        if run.successful_execution():
-            return "Complete"
-        return "{} ({})".format(*_describe_run_failure(run))
-
-    # One of the steps is in progress?
-    total_steps = run.pipeline.steps.count()
-    for i, step in enumerate(run.runsteps.order_by("pipelinestep__step_num"), start=1):
-        if not step.is_complete():
-            return "Running step {} of {}".format(i, total_steps)
-
-    # Just finished a step, but didn't start the next one?
-    if run.runsteps.count() < total_steps:
-        return "Starting step {} of {}".format(run.runsteps.count()+1, total_steps)
-
-    # One of the outcables is in progress?
-    total_cables = run.pipeline.outcables.count()
-    for i, cable in enumerate(run.runoutputcables.order_by("pipelineoutputcable__output_idx"), start=1):
-        if not cable.is_complete():
-            return "Creating output {} of {}".format(i, total_cables)
-
-    # Just finished a cable, but didn't start the next one?
-    if run.runoutputcables.count() < total_cables:
-        return "Starting output {} of {}".format(run.runoutputcables.count()+1, total_cables)
-
-    # Something is wrong.
-    return "Unknown status"
+# def _in_progress(queue_pk):
+#     rtp_qs = fleet.models.RunToProcess.objects.filter(pk=queue_pk)
+#     if not rtp_qs.exists():
+#         return False
+#
+#     rtp = rtp_qs.first()
+#     if not rtp.started:
+#         return False
+#     return not rtp.run.is_complete()
 
 def _poll_run_progress(request):
-    run_pk = int(request.GET.get("run"))
-    thread = request.GET.get("thread")
+    """
+    Helper to produce a JSON description of the current state of a run.
+    """
+    rtp_pk = request.GET.get("queue_placeholder")
+    rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
+
     last_status = request.GET.get("status")
-    run = Run.objects.get(pk=run_pk)
-    finished = run.is_complete()
-    status = _get_run_progress(run)
-    success = run.successful_execution()
-    running = _thread_running(thread)
+    status = rtp.get_run_progress()
 
     # If the Run isn't done but the process is, we've crashed.
-    crashed = not finished and not running
+    # FIXME we are no longer monitoring threads directly here, so we need another way to know if
+    # the pipeline has crashed.
+    #crashed = rtp.started and not rtp.finished and not rtp.running
+    # For now....
+    crashed = False
 
     # Arrrgh I hate sleeping. Find a better way.
-    while status == last_status and not finished and not crashed:
+    while status == last_status and not rtp.finished:
         time.sleep(1)
-        finished = run.is_complete()
-        status = _get_run_progress(run)
-    	success = run.successful_execution()
-        running = _thread_running(thread)
-        crashed = not finished and not running
+        rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
+        status = rtp.get_run_progress()
+        # ajax_logger.debug("status: {}".format(status))
+        # ajax_logger.debug("rtp.finished: {}".format(rtp.finished))
+        # ajax_logger.debug("run PK: {}".format(None if rtp.run is None else rtp.run.pk))
 
-    if crashed:
-        status = "Crashed"
-        finished = True
+    success = rtp.started and rtp.run.successful_execution()
 
-    return json.dumps({"status": status, "run": run_pk, "finished": finished, "success": success,
-                       "thread": thread, "crashed": crashed})
+    return_val = json.dumps({"status": status, "run": rtp.run.pk, "finished": rtp.finished, "success": success,
+                             "queue_placeholder": rtp_pk, "crashed": crashed})
+    ajax_logger.debug("Returning: {}".format(return_val))
+    return return_val
+
 
 def poll_run_progress(request):
     return AJAXRequestHandler(request, _poll_run_progress).response
+
 
 def tail(handle, nbytes):
     """Get the last nbytes from a file."""
@@ -255,6 +185,7 @@ def tail(handle, nbytes):
     result = handle.read()
     handle.seek(orig_pos)
     return result
+
 
 def _get_failed_output(request):
     """Head the stdout and stderr of the failed step of a Run.
@@ -278,6 +209,7 @@ def _get_failed_output(request):
     if stderr is not None:
         response_data["stderr"] = tail(stderr.file, 1024)
     return json.dumps(response_data)
+
 
 def get_failed_output(request):
     return AJAXRequestHandler(request, _get_failed_output).response

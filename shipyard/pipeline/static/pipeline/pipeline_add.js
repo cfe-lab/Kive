@@ -89,13 +89,16 @@ jQuery.fn.extend({
 $(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
     canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth  = canvas.width  = Math.max(window.innerWidth, 780),
-        canvasHeight = canvas.height = Math.max(window.innerHeight - $(canvas).offset().top - 5, 400);
+    var canvasWidth  = canvas.width  = window.innerWidth,
+        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 
     // TODO: can canvas be dynamically redrawn to fit window when it is resized?
     //    $(window).resize(function() {    });
 
     canvasState = new CanvasState(canvas);
+    
+    canvasState.old_width = canvasWidth;
+    canvasState.old_height = canvasHeight;
 
     // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
@@ -228,7 +231,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
             if (!inputs[i].value || inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html())
             {
-                $(inputs[i]).focus();
+                $(inputs[i]).val_('').focus();
                 break;
             }
         }
@@ -322,6 +325,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
             pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
         }
         
+        // check for duplicate names
+        for (var i = 0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            if ((shape.constructor == RawNode || shape.constructor == CDtNode) && shape.label == node_label) {
+                $('#id_dt_error', this)[0].innerHTML = 'That name has already been used.';
+                return false;
+            }
+        }
+        
         if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error', this)[0].innerHTML = "Label is required";
@@ -332,10 +344,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 shape;
             
             if (this_pk == ""){
-                canvasState.addShape(shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label);
             } else {
-                canvasState.addShape(shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label);
             }
+            canvasState.addShape(shape);
             
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
             $('#id_datatype_name').val('');  // reset text field
@@ -571,8 +584,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     preview_canvas.width = menu.innerWidth();
                     
                     menu.css({
-                        top:  sel.y - sel.n_inputs * 4 + canvas.offsetTop - 36,
-                        left: sel.x - preview_canvas.width/2  + canvas.offsetLeft - 9
+                        top:  sel.y + sel.dy - sel.n_inputs * 4 + canvas.offsetTop - 36,
+                        left: sel.x + sel.dx - preview_canvas.width/2  + canvas.offsetLeft - 9
                     });
                     $('#id_select_method_family').val(sel.family).change();  // trigger ajax
                     
@@ -588,8 +601,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     var dialog = $("#dialog_form");
                     
                     dialog.data('node', sel).show().css({
-                        left: sel.x + canvas.offsetLeft - dialog.width()/2,
-                        top:  sel.y + canvas.offsetTop - dialog.height()/2 - sel.h/2 - sel.offset
+                        left: sel.x + sel.dx + canvas.offsetLeft - dialog.width()/2,
+                        top:  sel.y + sel.dy + canvas.offsetTop - dialog.height()/2 - sel.h/2 - sel.offset
                     }).addClass('modal_dialog');
                     
                     $('#output_name_error').hide();
@@ -906,4 +919,29 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         })
     })
+    
+    $(window).resize(function(e) {
+        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
+        canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        
+        var scale_x = canvas.width  / canvasState.old_width,
+            scale_y = canvas.height / canvasState.old_height;
+            
+        if (scale_x == 1 && scale_y == 1) {
+            return;
+        }
+        
+        var shape;
+        for (var i=0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            shape.x *= scale_x;
+            shape.y *= scale_y;
+            shape.dx = shape.dy = 0;
+            canvasState.detectCollisions(shape);
+        }
+        
+        canvasState.old_width = canvas.width;
+        canvasState.old_height = canvas.height;
+        canvasState.valid = false;
+    });
 });// end of document.ready()

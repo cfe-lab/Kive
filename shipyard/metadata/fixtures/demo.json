@@ -40,12 +40,1377 @@
     }
 },
 {
+    "pk": 11, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "qname", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 12, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 2, 
+        "column_name": "flag", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 13, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "rname", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 14, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "pos", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 15, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "mapq", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 16, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 6, 
+        "column_name": "cigar", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 17, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "rnext", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 18, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 8, 
+        "column_name": "pnext", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 19, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 9, 
+        "column_name": "tlen", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 20, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 10, 
+        "column_name": "seq", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 21, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 11, 
+        "column_name": "qual", 
+        "compounddatatype": 7
+    }
+},
+{
+    "pk": 22, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample_name", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 23, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "qname", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 24, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "flag", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 25, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 4, 
+        "column_name": "rname", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 26, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "pos", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 27, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "mapq", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 28, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "cigar", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 29, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 8, 
+        "column_name": "rnext", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 30, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 9, 
+        "column_name": "pnext", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 31, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 10, 
+        "column_name": "tlen", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 32, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 11, 
+        "column_name": "seq", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 33, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 12, 
+        "column_name": "qual", 
+        "compounddatatype": 8
+    }
+},
+{
+    "pk": 34, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample_name", 
+        "compounddatatype": 9
+    }
+},
+{
+    "pk": 35, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "type", 
+        "compounddatatype": 9
+    }
+},
+{
+    "pk": 36, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "count", 
+        "compounddatatype": 9
+    }
+},
+{
+    "pk": 37, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "region", 
+        "compounddatatype": 10
+    }
+},
+{
+    "pk": 38, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 2, 
+        "column_name": "sequence", 
+        "compounddatatype": 10
+    }
+},
+{
+    "pk": 39, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 40, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "refname", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 41, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "qcut", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 42, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "rank", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 43, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "count", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 44, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "offset", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 45, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 7, 
+        "column_name": "seq", 
+        "compounddatatype": 11
+    }
+},
+{
+    "pk": 46, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 47, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "qname", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 48, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "fwd_rev", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 49, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 4, 
+        "column_name": "refname", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 50, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "pos", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 51, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 6, 
+        "column_name": "insert", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 52, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "qual", 
+        "compounddatatype": 12
+    }
+},
+{
+    "pk": 53, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 54, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "qname", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 55, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "qcut", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 56, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 4, 
+        "column_name": "seq1", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 57, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 5, 
+        "column_name": "qual1", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 58, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 6, 
+        "column_name": "seq2", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 59, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "qual2", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 60, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 3, 
+        "column_idx": 8, 
+        "column_name": "prop_N", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 61, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 9, 
+        "column_name": "mseq", 
+        "compounddatatype": 13
+    }
+},
+{
+    "pk": 62, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 63, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "seed", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 64, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "region", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 65, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "q-cutoff", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 66, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 5, 
+        "column_name": "query.nuc.pos", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 67, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "refseq.nuc.pos", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 68, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "A", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 69, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 8, 
+        "column_name": "C", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 70, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 9, 
+        "column_name": "G", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 71, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 10, 
+        "column_name": "T", 
+        "compounddatatype": 14
+    }
+},
+{
+    "pk": 72, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 73, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "seed", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 74, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "region", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 75, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "q-cutoff", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 76, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 5, 
+        "column_name": "query.aa.pos", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 77, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "refseq.aa.pos", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 78, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 7, 
+        "column_name": "A", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 79, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 8, 
+        "column_name": "C", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 80, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 9, 
+        "column_name": "D", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 81, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 10, 
+        "column_name": "E", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 82, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 11, 
+        "column_name": "F", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 83, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 12, 
+        "column_name": "G", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 84, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 13, 
+        "column_name": "H", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 85, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 14, 
+        "column_name": "I", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 86, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 15, 
+        "column_name": "K", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 87, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 16, 
+        "column_name": "L", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 88, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 17, 
+        "column_name": "M", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 89, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 18, 
+        "column_name": "N", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 90, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 19, 
+        "column_name": "P", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 91, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 20, 
+        "column_name": "Q", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 92, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 21, 
+        "column_name": "R", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 93, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 22, 
+        "column_name": "S", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 94, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 23, 
+        "column_name": "T", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 95, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 24, 
+        "column_name": "V", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 96, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 25, 
+        "column_name": "W", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 97, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 26, 
+        "column_name": "Y", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 98, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 27, 
+        "column_name": "*", 
+        "compounddatatype": 15
+    }
+},
+{
+    "pk": 99, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 100, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "seed", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 101, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "region", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 102, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "qcut", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 103, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "left", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 104, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 6, 
+        "column_idx": 6, 
+        "column_name": "insert", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 105, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 7, 
+        "column_name": "count", 
+        "compounddatatype": 16
+    }
+},
+{
+    "pk": 106, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 107, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "region", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 108, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "q-cutoff", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 109, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 4, 
+        "column_name": "s-number", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 110, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 5, 
+        "column_name": "consensus-percent-cutoff", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 111, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 6, 
+        "column_name": "sequence", 
+        "compounddatatype": 17
+    }
+},
+{
+    "pk": 112, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 113, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "seed", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 114, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "region", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 115, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "qcut", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 116, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 6, 
+        "column_idx": 5, 
+        "column_name": "queryseq", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 117, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 6, 
+        "column_idx": 6, 
+        "column_name": "refseq", 
+        "compounddatatype": 18
+    }
+},
+{
+    "pk": 118, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 119, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "seed", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 120, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "qcut", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 121, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 4, 
+        "column_name": "region", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 122, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "index", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 123, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "count", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 124, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 7, 
+        "column_idx": 7, 
+        "column_name": "seq", 
+        "compounddatatype": 19
+    }
+},
+{
+    "pk": 125, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 126, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 2, 
+        "column_name": "rank", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 127, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 3, 
+        "column_name": "count", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 128, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 4, 
+        "column_name": "g2p", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 129, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 5, 
+        "column_name": "fpr", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 130, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 6, 
+        "column_idx": 6, 
+        "column_name": "aligned", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 131, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 7, 
+        "column_name": "error", 
+        "compounddatatype": 20
+    }
+},
+{
+    "pk": 132, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 1, 
+        "column_name": "sample", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 133, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 2, 
+        "column_name": "project", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 134, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 1, 
+        "column_idx": 3, 
+        "column_name": "region", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 135, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 4, 
+        "column_name": "q.cut", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 136, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 5, 
+        "column_name": "min.coverage", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 137, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 6, 
+        "column_name": "which.key.pos", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 138, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 7, 
+        "column_name": "off.score", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 139, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 8, 
+        "column_name": "on.score", 
+        "compounddatatype": 21
+    }
+},
+{
     "pk": 5, 
     "model": "metadata.compounddatatype", 
     "fields": {}
 },
 {
     "pk": 6, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 7, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 8, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 9, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 10, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 11, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 12, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 13, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 14, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 15, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 16, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 17, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 18, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 19, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 20, 
+    "model": "metadata.compounddatatype", 
+    "fields": {}
+},
+{
+    "pk": 21, 
     "model": "metadata.compounddatatype", 
     "fields": {}
 }

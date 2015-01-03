@@ -48,6 +48,9 @@ class CodeResource(models.Model):
                                                    message="Invalid code resource filename"),
                                 ])
     description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    
+    class Meta:
+        ordering = ('name',)
 
     @property
     def num_revisions(self):
@@ -227,7 +230,13 @@ class CodeResourceRevision(models.Model):
         # a file - in this case, MD5 has no meaning and shouldn't exist
         try:
             md5gen = hashlib.md5()
+            # print("Before reading, self.content_file is open? {}".format(not self.content_file.closed))
+            # print("Before reading, self.content_file.file is open? {}".format(not self.content_file.file.closed))
+            # print("self.content_file.file is {}".format(self.content_file.file))
+            # print("How about now, is self.content_file open? {}".format(not self.content_file.closed))
+            # print("")
             md5gen.update(self.content_file.read())
+
             self.MD5_checksum = md5gen.hexdigest()
 
         except ValueError:
@@ -495,8 +504,10 @@ class Method(transformation.models.Transformation):
 
     def find_compatible_ER(self, input_SDs):
         """
-        Given a set of input SDs, find an ER that can be reused given these inputs.
-        A compatible ER may have to be filled in.
+        Given a set of input SDs, find an ER that uses these inputs.
+
+        Note that this ExecRecord may be a failure, which the calling function
+        would then handle appropriately.
         """
         # For pipelinesteps featuring this method
         for possible_PS in self.pipelinesteps.all():
@@ -507,8 +518,8 @@ class Method(transformation.models.Transformation):
                     execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
 
-                # Reject RunStep if its outputs are not OK.
-                if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
+                # # Reject RunStep if its outputs are not OK.
+                # if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
 
                 # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
                 ER_matches = True

@@ -2,6 +2,8 @@
 Shipyard archive application unit tests.
 """
 
+from datetime import datetime
+import os
 import re
 import tempfile
 
@@ -9,7 +11,8 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 
-from archive.models import *
+from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
+    RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord
@@ -936,7 +939,7 @@ class RunStepTests(ArchiveTestSetup):
         self.doublet_symDS.MD5_checksum = "foo"
         self.doublet_DS.save()
         self.doublet_symDS.save()
-        with open(self.doublet_DS.dataset_file.name) as f:
+        with open(self.doublet_DS.dataset_file.path) as f:
             checksum = compute_md5(f)
 
         self.assertRaisesRegexp(ValidationError,
@@ -1761,7 +1764,9 @@ class RunSICTests(ArchiveTestSetup):
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
+        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
         self.E11_32_output_DS.save()
+        ero.symbolicdataset.save()
         self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
         self.assertIsNone(self.E11_32_RSIC.clean())
 
@@ -1819,7 +1824,9 @@ class RunSICTests(ArchiveTestSetup):
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.created_by = self.E11_32_RSIC
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
+        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
         self.E11_32_output_DS.save()
+        ero.symbolicdataset.save()
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_complete_not_reused(self):
@@ -2637,15 +2644,24 @@ class StopwatchTests(ArchiveTestSetup):
 
     def test_clean_end_before_start(self):
         """
-        end_time is before and start_time.  This is not coherent.
+        end_time is before start_time.  This is not coherent.
         """
-        self.pE_run.end_time = timezone.now()
-        self.pE_run.start_time = timezone.now()
-        self.assertRaisesRegexp(
-            ValidationError,
-            re.escape('Stopwatch "{}" start time is later than its end time'.format(self.pE_run)),
-            self.pE_run.clean
-        )
+        start = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 30),
+                                    timezone.utc)
+        end   = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 15),
+                                    timezone.utc)
+        expected_message = (
+            'Stopwatch "{}" start time is later than its end time: ' +
+            '2000-02-14 10:00:30+00:00 > 2000-02-14 10:00:15+00:00.').format(
+                self.pE_run)
+        self.pE_run.start_time = start
+        self.pE_run.end_time = end
+        try:
+            self.pE_run.clean()
+            
+            self.fail("Should have thrown.")
+        except ValidationError as ex:
+            self.assertSequenceEqual(expected_message, ex.message)
 
     def test_has_started_true(self):
         """
@@ -3221,7 +3237,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
             f.write("#!/bin/bash\n exit 1")
-            os.remove(self.coderev_noop.content_file.name)
+            os.remove(self.coderev_noop.content_file.path)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3327,7 +3343,7 @@ echo "This is not what's supposed to be output here" > $2
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
             f.write(tampered_script)
-            os.remove(self.coderev_noop.content_file.name)
+            os.remove(self.coderev_noop.content_file.path)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3383,7 +3399,7 @@ echo
         """
         with tempfile.TemporaryFile() as f:
             f.write(tampered_script)
-            os.remove(self.coderev_noop.content_file.name)
+            os.remove(self.coderev_noop.content_file.path)
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
@@ -3452,7 +3468,7 @@ echo
         # Let's tamper with self.raw_symDS.
         with tempfile.NamedTemporaryFile() as f:
             f.write("This is a tampered-with file.")
-            os.remove(self.raw_symDS.dataset.dataset_file.name)
+            os.remove(self.raw_symDS.dataset.dataset_file.path)
             self.raw_symDS.dataset.dataset_file=File(f, name="tampered")
             self.raw_symDS.dataset.save()
 

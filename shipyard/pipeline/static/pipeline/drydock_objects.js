@@ -26,6 +26,31 @@ var Geometry = {
     },
     ltLine: function(mx, my, x1, y1, x2, y2) {
         return x2 != x1 ? (y2 - y1) / (x2 - x1) * (mx - x1) > my - y1 : null;
+    },
+    inPolygon: function(mx, my, shape) {
+        // ray casting algorithm
+        // argument 'shape' is an array of objects each with properties x and y
+        var o = [ -300, -300 ],
+            line, s1_x, s1_y, s, t,
+            s2_x = mx - o[0],
+            s2_y = my - o[1],
+            intersections = 0;
+        
+        for (var j = 0; j < shape.length; j++) {
+            line = shape.slice(j, j+2);
+            if (line.length == 1) line.push(shape[0]);
+            
+            s1_x = line[1].x - line[0].x;
+            s1_y = line[1].y - line[0].y;
+            s = (-s1_y * (line[0].x - o[0]) + s1_x * (line[0].y - o[1])) / (-s2_x * s1_y + s1_x * s2_y);
+            t = ( s2_x * (line[0].y - o[1]) - s2_y * (line[0].x - o[0])) / (-s2_x * s1_y + s1_x * s2_y);
+            
+            if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+                intersections++;
+//            console.log('line', line[0].x, line[0].y, line[1].x, line[1].y, 's-t', s,t, 'x', intersections);
+        }
+    
+        return intersections % 2;
     }
 };
 
@@ -48,6 +73,8 @@ function RawNode (x, y, r, h, fill, inset, offset, label) {
      */
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
+    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    this.dy = 0;
     this.r = r || 20; // x-radius
     this.r2 = this.r/2; // y-radius
     this.w = this.r; // for compatibility
@@ -59,81 +86,89 @@ function RawNode (x, y, r, h, fill, inset, offset, label) {
     this.in_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    var magnet = new Magnet(this, 5, 2, "white", null, this.label);
-    this.out_magnets = [ magnet ];
+    this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
 }
 
 RawNode.prototype.draw = function(ctx) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
 
     // draw bottom ellipse
     ctx.fillStyle = this.fill;
-    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.fill();
     
     // draw stack 
-    ctx.fillRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.fill();
     
     // some shading
     ctx.fillStyle = '#fff';
     ctx.globalAlpha = 0.35;
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.fill();
     ctx.globalAlpha = 1.0;
 
     // draw magnet
     out_magnet = this.out_magnets[0];
-    out_magnet.x = this.x + this.inset;
-    out_magnet.y = this.y + this.r2/2;
+    out_magnet.x = cx + this.inset;
+    out_magnet.y = cy + this.r2/2;
     out_magnet.draw(ctx);
 };
 
 RawNode.prototype.highlight = function(ctx) {
     ctx.globalCompositeOperation = 'destination-over';
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
     
     // draw bottom ellipse
-    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.stroke();
     
     // draw stack 
-    ctx.strokeRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.stroke();
     
     ctx.globalCompositeOperation = 'source-over';
 }
 
 RawNode.prototype.contains = function(mx, my) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
     // node is comprised of a rectangle and two ellipses
-    return Geometry.inRectangleFromCentre(mx, my, this.x, this.y, this.r, this.h/2)
-        || Geometry.inEllipse(mx, my, this.x, this.y - this.h/2, this.r, this.r2)
-        || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
+    return Geometry.inRectangleFromCentre(mx, my, cx, cy, this.r, this.h/2)
+        || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
+        || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
 };
 
 RawNode.prototype.getVertices = function() {
-    var x1 = this.x + this.r,
-        x2 = this.x - this.r,
-        y1 = this.y + this.h/2,
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
+    var x1 = cx + this.r,
+        x2 = cx - this.r,
+        y1 = cy + this.h/2,
         y2 = y1 - this.h;
     
     return [
-    { x: this.x, y: this.y },
+        { x: cx, y: cy },
         { x: x1, y: y1 },
         { x: x2, y: y1 },
         { x: x1, y: y2 },
         { x: x2, y: y2 },
-        { x: this.x, y: this.y + this.h/2 + this.r2 },
-        { x: this.x, y: this.y - this.h/2 - this.r2 }
+        { x: cx, y: cy + this.h/2 + this.r2 },
+        { x: cx, y: cy - this.h/2 - this.r2 }
     ];
 };
 
 RawNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
+    return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
 
@@ -145,6 +180,8 @@ function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     this.pk = pk;
     this.x = x || 0;
     this.y = y || 0;
+    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    this.dy = 0;
     this.w = w || 45;
     this.h = h || 28;
     this.fill = fill || "#88D";
@@ -158,28 +195,31 @@ function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
 }
 
 CDtNode.prototype.draw = function(ctx) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     ctx.fillStyle = this.fill;
     
     // draw base
-    var prism_base = this.y + this.h/2;
+    var prism_base = cy + this.h/2;
     ctx.beginPath();
-    ctx.moveTo(this.x - this.w/2, prism_base);
-    ctx.lineTo(this.x, prism_base + this.w/4);
-    ctx.lineTo(this.x + this.w/2, prism_base);
-    ctx.lineTo(this.x, prism_base - this.w/4);
+    ctx.moveTo(cx - this.w/2, prism_base);
+    ctx.lineTo(cx, prism_base + this.w/4);
+    ctx.lineTo(cx + this.w/2, prism_base);
+    ctx.lineTo(cx, prism_base - this.w/4);
     ctx.closePath();
     ctx.fill();
     
     // draw stack 
-    ctx.fillRect(this.x - this.w/2, this.y - this.h/2, this.w, this.h);
+    ctx.fillRect(cx - this.w/2, cy - this.h/2, this.w, this.h);
     
     // draw top
-    var prism_cap = this.y - this.h/2;
+    var prism_cap = cy - this.h/2;
     ctx.beginPath();
-    ctx.moveTo(this.x - this.w/2, prism_cap);
-    ctx.lineTo(this.x, prism_cap + this.w/4);
-    ctx.lineTo(this.x + this.w/2, prism_cap);
-    ctx.lineTo(this.x, prism_cap - this.w/4);
+    ctx.moveTo(cx - this.w/2, prism_cap);
+    ctx.lineTo(cx, prism_cap + this.w/4);
+    ctx.lineTo(cx + this.w/2, prism_cap);
+    ctx.lineTo(cx, prism_cap - this.w/4);
     ctx.closePath();
     ctx.fill();
     
@@ -191,43 +231,49 @@ CDtNode.prototype.draw = function(ctx) {
 
     // draw magnet
     out_magnet = this.out_magnets[0];
-    out_magnet.x = this.x + this.inset;
-    out_magnet.y = this.y + this.w/8;
+    out_magnet.x = cx + this.inset;
+    out_magnet.y = cy + this.w/8;
     out_magnet.draw(ctx);
 };
 
 CDtNode.prototype.getVertices = function() {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     var w2 = this.w/2,
-        butt = this.y + this.h/2,
-        cap  = this.y - this.h/2;
+        butt = cy + this.h/2,
+        cap  = cy - this.h/2;
     
     return [
-        { x: this.x,      y: this.y },
-        { x: this.x - w2, y: butt },
-        { x: this.x,      y: butt + w2/2 },
-        { x: this.x + w2, y: butt },
-        { x: this.x + w2, y: cap },
-        { x: this.x,      y: cap - w2/2 },
-        { x: this.x - w2, y: cap }
+        { x: cx,      y: cy },
+        { x: cx - w2, y: butt },
+        { x: cx,      y: butt + w2/2 },
+        { x: cx + w2, y: butt },
+        { x: cx + w2, y: cap },
+        { x: cx,      y: cap - w2/2 },
+        { x: cx - w2, y: cap }
     ];
 };
 
 CDtNode.prototype.highlight = function(ctx) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     ctx.globalCompositeOperation = 'destination-over';
 //    ctx.lineJoin = 'bevel';
     
     var w2 = this.w/2,
         h2 = this.h/2,
-        butt = this.y + h2,
-        cap = this.y - h2;
+        butt = cy + h2,
+        cap = cy - h2;
     
     ctx.beginPath();
-    ctx.moveTo(this.x - w2, butt);
-    ctx.lineTo(this.x,      butt + w2/2);
-    ctx.lineTo(this.x + w2, butt);
-    ctx.lineTo(this.x + w2, cap);
-    ctx.lineTo(this.x,      cap - w2/2);
-    ctx.lineTo(this.x - w2, cap);
+    ctx.moveTo(cx - w2, butt);
+    ctx.lineTo(cx,      butt + w2/2);
+    ctx.lineTo(cx + w2, butt);
+    ctx.lineTo(cx + w2, cap);
+    ctx.lineTo(cx,      cap - w2/2);
+    ctx.lineTo(cx - w2, cap);
     ctx.closePath();
     ctx.stroke();
     
@@ -239,8 +285,8 @@ CDtNode.prototype.contains = function(mx, my) {
     /*
     Are mouse coordinates within the perimeter of this node?
      */
-    var dx = Math.abs(this.x - mx),
-        dy = Math.abs(this.y - my);
+    var dx = Math.abs(this.x + this.dx - mx),
+        dy = Math.abs(this.y + this.dy - my);
     
     // mouse coords are within the 4 diagonal lines.
     // can be checked with 1 expression because the 4 lines are mirror images of each other
@@ -250,7 +296,7 @@ CDtNode.prototype.contains = function(mx, my) {
 };
 
 CDtNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
+    return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
 function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
@@ -267,6 +313,8 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
 
     this.x = x || 0;
     this.y = y || 0;
+    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    this.dy = 0;
     this.w = w || 10;
     this.inputs = inputs;
     this.outputs = outputs;
@@ -380,12 +428,14 @@ MethodNode.prototype.draw = function(ctx) {
     */
 
     // draw magnets
-    var cos30 = Math.sqrt(3)/2,
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy,
+        cos30 = Math.sqrt(3)/2,
      // sin30 = 0.5 (this is trivial)
         magnet_margin = 6,
-        y_inputs = this.y - this.stack,
-        x_outputs = this.x + this.scoop * cos30,
-        y_outputs = this.y + this.scoop * .5,
+        y_inputs = cy - this.stack,
+        x_outputs = cx + this.scoop * cos30,
+        y_outputs = cy + this.scoop * .5,
         c2c = this.in_magnets[0].r * 2 + magnet_margin,
         ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2;// distance from magnet centre to edge
 
@@ -394,7 +444,7 @@ MethodNode.prototype.draw = function(ctx) {
     for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
         var pos = i - len/2 + .5;
-        magnet.x = this.x + pos * cos30 * c2c;
+        magnet.x = cx + pos * cos30 * c2c;
         magnet.y = y_inputs - pos * c2c/2;
         magnet.draw(ctx);
     }
@@ -456,19 +506,27 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
 }
 
 MethodNode.prototype.contains = function(mx, my) {
-    /*
-    @todo
-    Make this check more precise.
-    */
     var vertices = this.getVertices();
+    var polygon = [ 1,2,3,8,4,5,6,10 ];
+    var shape = [];
+    
+    for ( var i=0; i < polygon.length; i++ )
+        shape.push(vertices[polygon[i]]);
+    return Geometry.inPolygon(mx, my, shape);
+    
+    /** old test (broken in some cases) 
     return mx < vertices[6].x && mx > vertices[3].x
         && !Geometry.ltLine(mx, my, vertices[1].x, vertices[1].y, vertices[2].x, vertices[2].y)
         && !Geometry.ltLine(mx, my, vertices[3].x, vertices[3].y, vertices[2].x, vertices[2].y)
         &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[5].x, vertices[5].y)
         &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[8].x, vertices[8].y);
+    */
 };
 
 MethodNode.prototype.getVertices = function() {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     // experimental draw
     var cos30 = Math.sqrt(3)/2,
      // sin30 = 0.5 (this is trivial)
@@ -477,25 +535,25 @@ MethodNode.prototype.getVertices = function() {
         dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
         c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
         cosdmc = cos30 * dmc,
-        ipy = this.y - this.stack,
+        ipy = cy - this.stack,
         input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
         cosipl = cos30 * input_plane_len;
     
     if (typeof this.vertices == 'undefined' 
-        || this.vertices[1].x != this.x + cosdmc + cosipl 
+        || this.vertices[1].x != cx + cosdmc + cosipl 
         || this.vertices[1].y != ipy + (dmc - input_plane_len) / 2
         ) {
         
-        var opx = this.x + this.scoop * cos30,
-            opy = this.y + this.scoop * .5,
+        var opx = cx + this.scoop * cos30,
+            opy = cy + this.scoop * .5,
             output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2,
             cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
     
         var vertices = [
-            { x: this.x + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
-            { x: this.x + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
-            { x: this.x - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
-            { x: this.x - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
+            { x: cx + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
+            { x: cx + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
+            { x: cx - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
+            { x: cx - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
             { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
             { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
             { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
@@ -504,25 +562,25 @@ MethodNode.prototype.getVertices = function() {
     
         if (this.in_magnets.length > this.out_magnets.length) {
             vertices.push(
-                { x: this.x - cosdmc - cosopl, y: this.y + (dmc + output_plane_len) / 2 },
-                { x: this.x + cosdmc - cosopl, y: this.y - (dmc - output_plane_len) / 2 },
-                { x: this.x + cosdmc + cosopl, y: this.y - (dmc + output_plane_len) / 2 }
-    //            { x: this.x + cosdmc - cosopl, y: this.y + dmc * 1.5 + output_plane_len / 2 },
-    //            { x: this.x + cosdmc + cosopl, y: this.y + dmc * 1.5 - output_plane_len / 2 },
-    //            { x: this.x - cosdmc + cosopl, y: this.y + (dmc - output_plane_len) / 2 },
-    //            { x: this.x - cosdmc + cosopl, y: this.y - dmc * 1.5 - output_plane_len / 2 },
-    //            { x: this.x - cosdmc - cosopl, y: this.y - dmc * 1.5 + output_plane_len / 2 }
+                { x: cx - cosdmc - cosopl, y: cy + (dmc + output_plane_len) / 2 },
+                { x: cx + cosdmc - cosopl, y: cy - (dmc - output_plane_len) / 2 },
+                { x: cx + cosdmc + cosopl, y: cy - (dmc + output_plane_len) / 2 }
+    //            { x: cx + cosdmc - cosopl, y: cy + dmc * 1.5 + output_plane_len / 2 },
+    //            { x: cx + cosdmc + cosopl, y: cy + dmc * 1.5 - output_plane_len / 2 },
+    //            { x: cx - cosdmc + cosopl, y: cy + (dmc - output_plane_len) / 2 },
+    //            { x: cx - cosdmc + cosopl, y: cy - dmc * 1.5 - output_plane_len / 2 },
+    //            { x: cx - cosdmc - cosopl, y: cy - dmc * 1.5 + output_plane_len / 2 }
             );
         } else { 
             vertices.push(
-                { x: this.x - cosdmc - cosipl, y: this.y + cosdmc - (dmc - input_plane_len) / 2 },
-                { x: this.x + cosdmc - cosipl, y: this.y - cosdmc + (dmc + input_plane_len) / 2 },
-                { x: this.x + cosdmc + cosipl, y: this.y - cosdmc + (dmc - input_plane_len) / 2 }
-    //            { x: this.x + cosdmc - cosipl, y: this.y + cosdmc + (dmc + input_plane_len) / 2 },
-    //            { x: this.x + cosdmc + cosipl, y: this.y + cosdmc + (dmc - input_plane_len) / 2 },
-    //            { x: this.x - cosdmc + cosipl, y: this.y + cosdmc - (dmc + input_plane_len) / 2 },
-    //            { x: this.x - cosdmc + cosipl, y: this.y - cosdmc - (dmc + input_plane_len) / 2 },
-    //            { x: this.x - cosdmc - cosipl, y: this.y - cosdmc - (dmc - input_plane_len) / 2 }
+                { x: cx - cosdmc - cosipl, y: cy + cosdmc - (dmc - input_plane_len) / 2 },
+                { x: cx + cosdmc - cosipl, y: cy - cosdmc + (dmc + input_plane_len) / 2 },
+                { x: cx + cosdmc + cosipl, y: cy - cosdmc + (dmc - input_plane_len) / 2 }
+    //            { x: cx + cosdmc - cosipl, y: cy + cosdmc + (dmc + input_plane_len) / 2 },
+    //            { x: cx + cosdmc + cosipl, y: cy + cosdmc + (dmc - input_plane_len) / 2 },
+    //            { x: cx - cosdmc + cosipl, y: cy + cosdmc - (dmc + input_plane_len) / 2 },
+    //            { x: cx - cosdmc + cosipl, y: cy - cosdmc - (dmc + input_plane_len) / 2 },
+    //            { x: cx - cosdmc - cosipl, y: cy - cosdmc - (dmc - input_plane_len) / 2 }
             );
         }
         
@@ -533,7 +591,7 @@ MethodNode.prototype.getVertices = function() {
 };
 
 MethodNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x + this.scoop/4, this.y - this.stack - this.input_plane_len/2 - this.offset);
+    return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
 };
 
 function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
@@ -965,6 +1023,8 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
      */
     this.x = x || 0; // defaults to top left corner
     this.y = y || 0;
+    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    this.dy = 0;
     this.r = r || 20; // x-radius (ellipse)
     this.r2 = this.r / 2; // y-radius (ellipse)
     this.w = this.r; // for compatibility
@@ -976,76 +1036,87 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
     this.out_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    var magnet = new Magnet(this, 5, 2, "white", null, this.label);
-    this.in_magnets = [ magnet ];
+    this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
 }
 
 OutputNode.prototype.draw = function(ctx) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     // draw bottom ellipse
     ctx.fillStyle = this.fill;
-    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.fill();
     
     // draw stack 
-    ctx.fillRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.fill();
     
     // some shading
     ctx.fillStyle = '#fff';
     ctx.globalAlpha = 0.35;
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.fill();
     ctx.globalAlpha = 1.0;
     
     // draw magnet
     in_magnet = this.in_magnets[0];
-    in_magnet.x = this.x - this.inset;
-    in_magnet.y = this.y - this.h/2;
+    in_magnet.x = cx - this.inset;
+    in_magnet.y = cy - this.h/2;
     in_magnet.draw(ctx);
 };
 
 OutputNode.prototype.contains = function(mx, my) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     // node is comprised of a rectangle and two ellipses
-    return Math.abs(mx - this.x) < this.r
-        && Math.abs(my - this.y) < this.h/2
-        || Geometry.inEllipse(mx, my, this.x, this.y - this.h/2, this.r, this.r2)
-        || Geometry.inEllipse(mx, my, this.x, this.y + this.h/2, this.r, this.r2);
+    return Math.abs(mx - cx) < this.r
+        && Math.abs(my - cy) < this.h/2
+        || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
+        || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
 };
 
 OutputNode.prototype.getVertices = function() {
-    var x1 = this.x + this.r,
-        x2 = this.x - this.r,
-        y1 = this.y + this.h/2,
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+        
+    var x1 = cx + this.r,
+        x2 = cx - this.r,
+        y1 = cy + this.h/2,
         y2 = y1 - this.h;
     
     return [
-    { x: this.x, y: this.y },
+        { x: cx, y: cy },
         { x: x1, y: y1 },
         { x: x2, y: y1 },
         { x: x1, y: y2 },
         { x: x2, y: y2 },
-        { x: this.x, y: this.y + this.h/2 + this.r2 },
-        { x: this.x, y: this.y - this.h/2 - this.r2 }
+        { x: cx, y: cy + this.h/2 + this.r2 },
+        { x: cx, y: cy - this.h/2 - this.r2 }
     ];
 };
 
 OutputNode.prototype.highlight = function(ctx) {
+    var cx = this.x + this.dx,
+        cy = this.y + this.dy;
+    
     // This line means that we are drawing "behind" the canvas now.
     // We must set it back after we're done otherwise it'll be utter chaos.
     ctx.globalCompositeOperation = 'destination-over';
     
     // draw bottom ellipse
-    ctx.ellipse(this.x, this.y + this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.stroke();
     
     // draw stack 
-    ctx.strokeRect(this.x - this.r, this.y - this.h/2, this.r * 2, this.h);
+    ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
-    ctx.ellipse(this.x, this.y - this.h/2, this.r, this.r2);
+    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
     ctx.stroke();
     
     ctx.globalCompositeOperation = 'source-over';
@@ -1054,22 +1125,6 @@ OutputNode.prototype.highlight = function(ctx) {
     this.in_magnets[0].connected[0].highlight(ctx);
 }
 
-OutputNode.prototype.getVertices = function() {
-    var x1 = this.x + this.r,
-        x2 = this.x - this.r,
-        y1 = this.y + this.h/2,
-        y2 = y1 - this.h;
-    
-    return [
-        { x: x1, y: y1 },
-        { x: x2, y: y1 },
-        { x: x1, y: y2 },
-        { x: x2, y: y2 },
-        { x: this.x, y: this.y + this.h/2 + this.r2 },
-        { x: this.x, y: this.y - this.h/2 - this.r2 }
-    ];
-};
-
 OutputNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x, this.y - this.h/2 - this.offset);
+    return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };

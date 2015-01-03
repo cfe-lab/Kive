@@ -72,7 +72,7 @@
     }
 },
 {
-    "pk": 10, 
+    "pk": 13, 
     "model": "pipeline.pipeline", 
     "fields": {
         "revision_number": 1, 
@@ -84,11 +84,11 @@
     "pk": 2, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
+        "pipeline": 13, 
         "name": "prelim_map.py", 
         "outputs_to_delete": [], 
-        "y": 0.275,
-        "x": 0.071,
+        "y": 0.22384701912260968, 
+        "x": 0.09973045822102426, 
         "transformation": 4, 
         "step_num": 1
     }
@@ -97,11 +97,11 @@
     "pk": 3, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
+        "pipeline": 13, 
         "name": "remap.py", 
         "outputs_to_delete": [], 
-        "y": 0.217,
-        "x": 0.205,
+        "y": 0.33183352080989875, 
+        "x": 0.16711590296495957, 
         "transformation": 5, 
         "step_num": 2
     }
@@ -110,11 +110,11 @@
     "pk": 4, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
-        "name": "sam2csf.py", 
+        "pipeline": 13, 
+        "name": "sam2aln.py", 
         "outputs_to_delete": [], 
-        "y": 0.438,
-        "x": 0.336,
+        "y": 0.416813630294019, 
+        "x": 0.40033948303377, 
         "transformation": 6, 
         "step_num": 3
     }
@@ -123,12 +123,12 @@
     "pk": 5, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
-        "name": "csf2nuc.py", 
+        "pipeline": 13, 
+        "name": "aln2counts.py", 
         "outputs_to_delete": [], 
-        "y": 0.431,
-        "x": 0.533,
-        "transformation": 8, 
+        "y": 0.514415530907474, 
+        "x": 0.55923338527628, 
+        "transformation": 7, 
         "step_num": 4
     }
 },
@@ -136,12 +136,12 @@
     "pk": 6, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
-        "name": "csf2counts.py", 
+        "pipeline": 13, 
+        "name": "sam_g2p.sh", 
         "outputs_to_delete": [], 
-        "y": 0.196,
-        "x": 0.456,
-        "transformation": 7, 
+        "y": 0.773915700768748, 
+        "x": 0.546546658214479, 
+        "transformation": 9, 
         "step_num": 5
     }
 },
@@ -149,12 +149,12 @@
     "pk": 7, 
     "model": "pipeline.pipelinestep", 
     "fields": {
-        "pipeline": 10, 
-        "name": "fasta_to_g2p.sh", 
+        "pipeline": 13, 
+        "name": "coverage_plots.R", 
         "outputs_to_delete": [], 
-        "y": 0.562,
-        "x": 0.586,
-        "transformation": 9, 
+        "y": 0.614047335652811, 
+        "x": 0.739027754380054, 
+        "transformation": 11, 
         "step_num": 6
     }
 },
@@ -249,13 +249,48 @@
     "fields": {}
 },
 {
+    "pk": 21, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 22, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 23, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 24, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 25, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 26, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
+    "pk": 27, 
+    "model": "pipeline.pipelinecable", 
+    "fields": {}
+},
+{
     "pk": 3, 
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
         "pipelinestep": 2, 
         "dest": 7, 
         "keep_output": false, 
-        "source": 29, 
+        "source": 61, 
         "source_step": 0
     }
 },
@@ -266,7 +301,7 @@
         "pipelinestep": 2, 
         "dest": 8, 
         "keep_output": false, 
-        "source": 30, 
+        "source": 60, 
         "source_step": 0
     }
 },
@@ -277,7 +312,7 @@
         "pipelinestep": 3, 
         "dest": 10, 
         "keep_output": false, 
-        "source": 29, 
+        "source": 61, 
         "source_step": 0
     }
 },
@@ -288,7 +323,7 @@
         "pipelinestep": 3, 
         "dest": 11, 
         "keep_output": false, 
-        "source": 30, 
+        "source": 60, 
         "source_step": 0
     }
 },
@@ -319,7 +354,7 @@
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
         "pipelinestep": 5, 
-        "dest": 25, 
+        "dest": 19, 
         "keep_output": false, 
         "source": 17, 
         "source_step": 3
@@ -330,10 +365,10 @@
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
         "pipelinestep": 6, 
-        "dest": 19, 
+        "dest": 27, 
         "keep_output": false, 
-        "source": 17, 
-        "source_step": 3
+        "source": 13, 
+        "source_step": 2
     }
 },
 {
@@ -341,10 +376,10 @@
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
         "pipelinestep": 6, 
-        "dest": 20, 
+        "dest": 59, 
         "keep_output": false, 
-        "source": 15, 
-        "source_step": 2
+        "source": 21, 
+        "source_step": 4
     }
 },
 {
@@ -352,406 +387,6 @@
     "model": "pipeline.pipelinestepinputcable", 
     "fields": {
         "pipelinestep": 7, 
-        "dest": 27, 
-        "keep_output": false, 
-        "source": 17, 
-        "source_step": 3
-    }
-},
-{
-    "pk": 13, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 1, 
-        "source": 14, 
-        "output_cdt": null, 
-        "output_name": "remap_counts_csv", 
-        "source_step": 2
-    }
-},
-{
-    "pk": 14, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 2, 
-        "source": 21, 
-        "output_cdt": null, 
-        "output_name": "nuc_csv", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 15, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 3, 
-        "source": 22, 
-        "output_cdt": null, 
-        "output_name": "amino_csv", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 16, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 4, 
-        "source": 23, 
-        "output_cdt": null, 
-        "output_name": "indels_csv", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 17, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 5, 
-        "source": 24, 
-        "output_cdt": null, 
-        "output_name": "conseq_csv", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 18, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 6, 
-        "source": 26, 
-        "output_cdt": null, 
-        "output_name": "nuc_variants_csv", 
-        "source_step": 4
-    }
-},
-{
-    "pk": 19, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 7, 
-        "source": 18, 
-        "output_cdt": null, 
-        "output_name": "failed_csv", 
-        "source_step": 3
-    }
-},
-{
-    "pk": 20, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 10, 
-        "output_idx": 8, 
-        "source": 28, 
-        "output_cdt": null, 
-        "output_name": "g2p_csv", 
-        "source_step": 6
-    }
-},
-{
-    "pk": 12, 
-    "model": "pipeline.pipeline", 
-    "fields": {
-        "revision_number": 2, 
-        "revision_parent": 10, 
-        "family": 2
-    }
-},
-{
-    "pk": 8, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "prelim_map.py", 
-        "outputs_to_delete": [], 
-        "y": 0.275,
-        "x": 0.071,
-        "transformation": 4, 
-        "step_num": 1
-    }
-},
-{
-    "pk": 9, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "remap.py", 
-        "outputs_to_delete": [], 
-        "y": 0.217,
-        "x": 0.205,
-        "transformation": 5, 
-        "step_num": 2
-    }
-},
-{
-    "pk": 10, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "sam2csf.py", 
-        "outputs_to_delete": [], 
-        "y": 0.438,
-        "x": 0.336,
-        "transformation": 6, 
-        "step_num": 3
-    }
-},
-{
-    "pk": 11, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "csf2counts.py", 
-        "outputs_to_delete": [], 
-        "y": 0.196,
-        "x": 0.456,
-        "transformation": 7, 
-        "step_num": 4
-    }
-},
-{
-    "pk": 12, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "coverage_plots.R", 
-        "outputs_to_delete": [], 
-        "y": 0.183,
-        "x": 0.690,
-        "transformation": 11, 
-        "step_num": 5
-    }
-},
-{
-    "pk": 13, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "csf2nuc.py", 
-        "outputs_to_delete": [], 
-        "y": 0.431,
-        "x": 0.533,
-        "transformation": 8, 
-        "step_num": 6
-    }
-},
-{
-    "pk": 14, 
-    "model": "pipeline.pipelinestep", 
-    "fields": {
-        "pipeline": 12, 
-        "name": "fasta_to_g2p.sh", 
-        "outputs_to_delete": [], 
-        "y": 0.562,
-        "x": 0.586,
-        "transformation": 9, 
-        "step_num": 7
-    }
-},
-{
-    "pk": 21, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 22, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 23, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 24, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 25, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 26, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 27, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 28, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 29, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 30, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 31, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 32, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 33, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 34, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 35, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 36, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 37, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 38, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 39, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 40, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 41, 
-    "model": "pipeline.pipelinecable", 
-    "fields": {}
-},
-{
-    "pk": 21, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 8, 
-        "dest": 7, 
-        "keep_output": false, 
-        "source": 42, 
-        "source_step": 0
-    }
-},
-{
-    "pk": 22, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 8, 
-        "dest": 8, 
-        "keep_output": false, 
-        "source": 43, 
-        "source_step": 0
-    }
-},
-{
-    "pk": 23, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 9, 
-        "dest": 10, 
-        "keep_output": false, 
-        "source": 42, 
-        "source_step": 0
-    }
-},
-{
-    "pk": 24, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 9, 
-        "dest": 11, 
-        "keep_output": false, 
-        "source": 43, 
-        "source_step": 0
-    }
-},
-{
-    "pk": 25, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 9, 
-        "dest": 12, 
-        "keep_output": false, 
-        "source": 9, 
-        "source_step": 1
-    }
-},
-{
-    "pk": 26, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 10, 
-        "dest": 16, 
-        "keep_output": false, 
-        "source": 13, 
-        "source_step": 2
-    }
-},
-{
-    "pk": 27, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 11, 
-        "dest": 19, 
-        "keep_output": false, 
-        "source": 17, 
-        "source_step": 3
-    }
-},
-{
-    "pk": 28, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 11, 
-        "dest": 20, 
-        "keep_output": false, 
-        "source": 15, 
-        "source_step": 2
-    }
-},
-{
-    "pk": 29, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 12, 
         "dest": 39, 
         "keep_output": false, 
         "source": 22, 
@@ -759,145 +394,183 @@
     }
 },
 {
-    "pk": 30, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 13, 
-        "dest": 25, 
-        "keep_output": false, 
-        "source": 17, 
-        "source_step": 3
-    }
-},
-{
-    "pk": 31, 
-    "model": "pipeline.pipelinestepinputcable", 
-    "fields": {
-        "pipelinestep": 14, 
-        "dest": 27, 
-        "keep_output": false, 
-        "source": 17, 
-        "source_step": 3
-    }
-},
-{
-    "pk": 32, 
+    "pk": 13, 
     "model": "pipeline.pipelineoutputcable", 
     "fields": {
-        "pipeline": 12, 
+        "pipeline": 13, 
         "output_idx": 1, 
         "source": 14, 
-        "output_cdt": null, 
-        "output_name": "remap_counts_csv", 
+        "output_cdt": 9, 
+        "output_name": "remap_counts", 
         "source_step": 2
     }
 },
 {
-    "pk": 33, 
+    "pk": 14, 
     "model": "pipeline.pipelineoutputcable", 
     "fields": {
-        "pipeline": 12, 
+        "pipeline": 13, 
         "output_idx": 2, 
-        "source": 21, 
-        "output_cdt": null, 
-        "output_name": "nuc_csv", 
-        "source_step": 4
+        "source": 15, 
+        "output_cdt": 10, 
+        "output_name": "remap_conseq", 
+        "source_step": 2
     }
 },
 {
-    "pk": 34, 
+    "pk": 15, 
     "model": "pipeline.pipelineoutputcable", 
     "fields": {
-        "pipeline": 12, 
+        "pipeline": 13, 
         "output_idx": 3, 
-        "source": 40, 
-        "output_cdt": null, 
-        "output_name": "coverage_maps_tar", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 35, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 4, 
-        "source": 22, 
-        "output_cdt": null, 
-        "output_name": "amino_csv", 
-        "source_step": 4
-    }
-},
-{
-    "pk": 36, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 5, 
-        "source": 23, 
-        "output_cdt": null, 
-        "output_name": "indels_csv", 
-        "source_step": 4
-    }
-},
-{
-    "pk": 37, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 6, 
-        "source": 41, 
-        "output_cdt": null, 
-        "output_name": "coverage_scores_csv", 
-        "source_step": 5
-    }
-},
-{
-    "pk": 38, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 7, 
-        "source": 24, 
-        "output_cdt": null, 
-        "output_name": "conseq_csv", 
-        "source_step": 4
-    }
-},
-{
-    "pk": 39, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 8, 
-        "source": 26, 
-        "output_cdt": null, 
-        "output_name": "nuc_variants_csv", 
-        "source_step": 6
-    }
-},
-{
-    "pk": 40, 
-    "model": "pipeline.pipelineoutputcable", 
-    "fields": {
-        "pipeline": 12, 
-        "output_idx": 9, 
         "source": 18, 
-        "output_cdt": null, 
-        "output_name": "failed_csv", 
+        "output_cdt": 12, 
+        "output_name": "conseq_ins", 
         "source_step": 3
     }
 },
 {
-    "pk": 41, 
+    "pk": 16, 
     "model": "pipeline.pipelineoutputcable", 
     "fields": {
-        "pipeline": 12, 
+        "pipeline": 13, 
+        "output_idx": 4, 
+        "source": 21, 
+        "output_cdt": 14, 
+        "output_name": "nuc", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 17, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 5, 
+        "source": 54, 
+        "output_cdt": null, 
+        "output_name": "unmapped1_fastq", 
+        "source_step": 2
+    }
+},
+{
+    "pk": 18, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 6, 
+        "source": 56, 
+        "output_cdt": 13, 
+        "output_name": "failed_read", 
+        "source_step": 3
+    }
+},
+{
+    "pk": 19, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 7, 
+        "source": 22, 
+        "output_cdt": 15, 
+        "output_name": "amino", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 20, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 8, 
+        "source": 40, 
+        "output_cdt": null, 
+        "output_name": "coverage_maps_tar", 
+        "source_step": 6
+    }
+},
+{
+    "pk": 21, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 9, 
+        "source": 55, 
+        "output_cdt": null, 
+        "output_name": "unmapped2_fastq", 
+        "source_step": 2
+    }
+},
+{
+    "pk": 22, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
         "output_idx": 10, 
         "source": 28, 
-        "output_cdt": null, 
-        "output_name": "g2p_csv", 
-        "source_step": 7
+        "output_cdt": 20, 
+        "output_name": "g2p", 
+        "source_step": 5
+    }
+},
+{
+    "pk": 23, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 11, 
+        "source": 23, 
+        "output_cdt": 16, 
+        "output_name": "coord_ins", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 24, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 12, 
+        "source": 41, 
+        "output_cdt": 21, 
+        "output_name": "coverage_scores", 
+        "source_step": 6
+    }
+},
+{
+    "pk": 25, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 13, 
+        "source": 24, 
+        "output_cdt": 17, 
+        "output_name": "conseq", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 26, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 14, 
+        "source": 57, 
+        "output_cdt": 18, 
+        "output_name": "failed_align", 
+        "source_step": 4
+    }
+},
+{
+    "pk": 27, 
+    "model": "pipeline.pipelineoutputcable", 
+    "fields": {
+        "pipeline": 13, 
+        "output_idx": 15, 
+        "source": 58, 
+        "output_cdt": 19, 
+        "output_name": "nuc_variants", 
+        "source_step": 4
     }
 }
 ]

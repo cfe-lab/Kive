@@ -7,8 +7,6 @@ SymbolicDataset, etc.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
@@ -195,7 +193,6 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             dataset.dataset_file.save(os.path.basename(f.name), File(f))
 
-        print("hello")
         if self.is_raw():
             self.set_MD5(None, dataset.dataset_file)
         else:
@@ -339,13 +336,13 @@ class SymbolicDataset(models.Model):
                         line += 1
                         name = row['Name'].strip() if row['Name'] else ""
                         desc = row['Description'].strip() if row['Description'] else ""
-                        file = row['File'].strip() if row['File'] else ""
+                        file_name = row['File'].strip() if row['File'] else ""
 
                         # check for empty entries:
-                        if not (name and desc and file):
+                        if not (name and desc and file_name):
                             raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
-                        symDS = SymbolicDataset.create_SD(file, cdt=cdt, make_dataset=True, user=user, name=name,
+                        symDS = SymbolicDataset.create_SD(file_name, cdt=cdt, make_dataset=True, user=user, name=name,
                                                           description=desc, created_by=None, check=True)
 
                         symDSs.extend([symDS])
@@ -433,7 +430,7 @@ class SymbolicDataset(models.Model):
                                                                     column=my_CDT.members.get(column_idx=col))
 
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    if type(failed_constr) != str:
+                    if not isinstance(failed_constr, basestring):
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()
@@ -490,37 +487,42 @@ class SymbolicDataset(models.Model):
         Check that this SD has passed a check for contents if not raw,
         and it has never failed any check for integrity or contents.
         """
+        # Check for any failures.
+        if self.any_failed_checks():
+            return False
+
+        # If this is not raw, check that there is at least one content check completed and
+        # successful.
+        if self.is_raw():
+            return True
+
+        for ccl in self.content_checks.all():
+            if ccl.is_complete():
+                return True
+
+        self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
+        return False
+
+    def any_failed_checks(self):
+        """
+        Checks that this SD has never failed any check for integrity or contents.
+        """
         icls = self.integrity_checks.all()
         ccls = self.content_checks.all()
-
-        # No content check has been performed.
-        if not (self.is_raw() or ccls.exists()):
-            self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
-            return False
 
         # Look for failed integrity/content checks, and also check that at least one
         # content check has been passed.
         for icl in icls:
             if icl.is_fail():
                 self.logger.debug("SD '{}' failed integrity check".format(self))
-                return False
+                return True
 
-        # No failed integrity checks: in the raw case, we're done.
-        if self.is_raw():
-            return True
-
-        content_check_completed = False
         for ccl in ccls:
             if ccl.is_fail():
                 self.logger.debug("SD '{}' failed content check".format(self))
-                return False
-            elif ccl.is_complete():
-                content_check_completed = True
+                return True
 
-        # At this point we know no checks have failed; return False if
-        # none of the checks are complete yet.
-        self.logger.debug("Has a content check completed on SD '{}'?  {}".format(self, content_check_completed))
-        return content_check_completed
+        return False
 
 
 class DatasetStructure(models.Model):
@@ -599,7 +601,7 @@ class ExecRecord(models.Model):
         for i, component_input in enumerate(component.inputs):
             execrecord.execrecordins.create(generic_input=component_input, symbolicdataset=input_SDs[i])
         for i, component_output in enumerate(component.outputs):
-            er = execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
+            execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
         execrecord.save()
         execrecord.complete_clean()
         return execrecord
@@ -745,6 +747,12 @@ class ExecRecord(models.Model):
     def outputs_OK(self):
         """Checks whether all of the EROs of this ER are OK."""
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
+
+    def outputs_failed_any_checks(self):
+        """
+        Checks whether any of the EROs of this ER have ever failed any checks.
+        """
+        return any([ero.symbolicdataset.any_failed_checks() for ero in self.execrecordouts.all()])
 
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
@@ -966,8 +974,6 @@ class ExecRecordOut(models.Model):
 
         # Second case: parent ER represents a PSIC.
         elif (type (self.execrecord.general_transf()) == pipeline.models.PipelineStepInputCable):
-            parent_er_psic = self.execrecord.general_transf()
-
             # This ERO must point to a TI.
             if not self.generic_output.is_input:
                 raise ValidationError(

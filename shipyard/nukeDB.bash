@@ -1,6 +1,14 @@
 #!/bin/bash -e
 
-./nukeDB.expect 
-python2.7 manage.py loaddata initial_data 
+export DJANGO_SETTINGS_MODULE=shipyard.settings
+rm -rf CodeResources
+rm -rf VerificationScripts
+rm -rf Datasets
+rm -rf Logs
+rm -rf VerificationLogs
+
+./nukeDB.expect
+
+python2.7 manage.py loaddata initial_data
 python2.7 manage.py loaddata initial_user
-python manage.py shell < load_default_objects.py > /dev/null
+python2.7 load_default_objects.py > /dev/null
