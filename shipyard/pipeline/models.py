@@ -39,7 +39,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     #   members (Pipeline/ForeignKey)
 
     # marks which member of the PipelineFamily in production
-    active_version = models.ForeignKey('Pipeline', null=True, blank=True)
+    published_version = models.ForeignKey('Pipeline', null=True, blank=True)
 
     def get_absolute_url(self):
         return '/pipeline_revise/{}'.format(self.id)
@@ -132,9 +132,9 @@ class Pipeline(transformation.models.Transformation):
         return self.family.members.count()
 
     @property
-    def is_active_version(self):
-        """Evaluate if this pipeline revision is marked as the active version"""
-        return self.family.active_version == self
+    def is_published_version(self):
+        """Evaluate if this pipeline revision is marked as the published version"""
+        return self.family.published_version == self
 
     def clean(self):
         """
@@ -265,7 +265,7 @@ class Pipeline(transformation.models.Transformation):
             "pipeline_steps": [],
             "pipeline_outputs": [],
 
-            "is_active_version": self.is_active_version
+            "is_published_version": self.is_published_version
         }
 
         # Populate dict_repr["pipeline_inputs"].
