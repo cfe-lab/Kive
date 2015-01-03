@@ -137,8 +137,8 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
             self.MD5_checksum = file_access_utils.compute_md5(f)
 
-        self.clean()
-        self.save()
+        # self.clean()
+        # self.save()
 
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
@@ -160,8 +160,8 @@ class SymbolicDataset(models.Model):
 
         self.structure.num_rows = num_rows
         self.MD5_checksum = md5gen.hexdigest()
-        self.clean()
-        self.save()
+        # self.clean()
+        # self.save()
 
     @transaction.atomic
     def register_dataset(self, file_path, user, name, description, created_by=None, file_handle=None):
@@ -193,10 +193,10 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             dataset.dataset_file.save(os.path.basename(f.name), File(f))
 
-        if self.is_raw():
-            self.set_MD5(None, dataset.dataset_file)
-        else:
-            self.set_MD5_and_count_rows(None, dataset.dataset_file)
+        # if self.is_raw():
+        #     self.set_MD5(None, dataset.dataset_file)
+        # else:
+        #     self.set_MD5_and_count_rows(None, dataset.dataset_file)
 
         dataset.clean()
         dataset.save()
@@ -259,6 +259,11 @@ class SymbolicDataset(models.Model):
 
         with transaction.atomic():
             symDS = cls.create_empty(cdt)
+
+            if symDS.is_raw():
+                symDS.set_MD5(file_path, file_handle)
+            else:
+                symDS.set_MD5_and_count_rows(file_path, file_handle)
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
@@ -463,7 +468,7 @@ class SymbolicDataset(models.Model):
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
                 
         if newly_computed_MD5 != self.MD5_checksum:
-            self.logger.warn("md5s do not agree")
+            self.logger.warn("md5s do not agree (old: {}; new: {})".format(self.MD5_checksum, newly_computed_MD5))
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.

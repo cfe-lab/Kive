@@ -6,6 +6,8 @@ import shutil
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files import File
+from django.test import TestCase, TransactionTestCase
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint
 from method.models import MethodFamily, CodeResource
@@ -13,16 +15,17 @@ from librarian.models import SymbolicDataset
 from datachecking.models import ContentCheckLog
 from sandbox.execute import Sandbox
 
-from sandbox.tests_rm import UtilityMethods, clean_files
+import sandbox.testing_utils as tools
 
 from constants import datatypes, CDTs
 
-class CustomConstraintTests(UtilityMethods):
+class CustomConstraintTests(TransactionTestCase):
     """
     Test the creation and use of custom constraints.
     """
 
     def setUp(self):
+        tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
         self.workdir = tempfile.mkdtemp()
 
@@ -68,7 +71,7 @@ class CustomConstraintTests(UtilityMethods):
                 [["hello", "there"], ["live", "long"], ["and", "porsper"]])
 
         # A pipeline to process the constraint CDT.
-        self.pipeline_noop = self._setup_onestep_pipeline("noop",
+        self.pipeline_noop = self._setup_onestep_pipeline("does nothing",
                 "does nothing", '#!/bin/bash\n cat "$1" > "$2"',
                 self.cdt_constraints)
 
@@ -81,10 +84,10 @@ class CustomConstraintTests(UtilityMethods):
                 """, self.cdt_constraints)
 
     def tearDown(self):
-        super(self.__class__, self).tearDown()
-        os.remove(self.good_datafile)
-        os.remove(self.bad_datafile)
-        clean_files()
+        shutil.rmtree(self.workdir)
+        tools.destroy_sandbox_testing_tools_environment(self)
+        # os.remove(self.good_datafile)
+        # os.remove(self.bad_datafile)
 
     def _setup_onestep_pipeline(self, name, desc, script, cdt):
         """
@@ -96,12 +99,12 @@ class CustomConstraintTests(UtilityMethods):
         script  contents of CodeResourceRevision which will drive the method
         cdt     CompoundDatatype used throughout the pipeline
         """
-        coderev = self.make_first_revision(name, desc, 
+        coderev = tools.make_first_revision(name, desc,
                 "{}.sh".format(name), script)
-        method = self.make_first_method(name, desc, coderev)
-        self.simple_method_io(method, cdt, "in data", "out data")
-        pipeline = self.make_first_pipeline(name, desc)
-        self.create_linear_pipeline(pipeline, [method], "in data", "out data")
+        method = tools.make_first_method(name, desc, coderev)
+        tools.simple_method_io(method, cdt, "in data", "out data")
+        pipeline = tools.make_first_pipeline(name, desc)
+        tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
         pipeline.create_outputs()
         return pipeline
 
@@ -161,10 +164,11 @@ class CustomConstraintTests(UtilityMethods):
 
         coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc)
         coderesource.save()
-        revision = coderesource.revisions.create(revision_name="1", revision_number=1,
-                                                 revision_desc="first version",
-                                                 content_file=scriptfile.name)
-        revision.save()
+        with open(scriptfile.name, "rb") as f:
+            revision = coderesource.revisions.create(revision_name="1", revision_number=1,
+                                                     revision_desc="first version",
+                                                     content_file=File(f))
+            revision.save()
         methodfamily = MethodFamily(name=famname, description=famdesc)
         methodfamily.save()
         method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1)
@@ -186,12 +190,6 @@ class CustomConstraintTests(UtilityMethods):
         log = ContentCheckLog(symbolicdataset=symbolicdataset)
         log.save()
         return log
-
-    def tearDown(self):
-        # Clean up the work directory.
-        shutil.rmtree(self.workdir)
-        super(self.__class__, self).tearDown()
-        clean_files()
 
     def test_summarize_CSV_no_output(self):
         """

@@ -23,10 +23,7 @@ from datachecking.models import *
 from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
 
-
 import file_access_utils
-
-from constants import datatypes, CDTs
 
 
 # def rmf(path):
@@ -34,15 +31,6 @@ from constants import datatypes, CDTs
 #         os.remove(path)
 #     except OSError:
 #         pass
-
-
-# def clean_files():
-#     Dataset.objects.all().delete()
-#     CodeResourceRevision.objects.all().delete()
-#     for cls in [MethodOutput, VerificationLog]:
-#         for output in cls.objects.all():
-#             rmf(output.output_log.name)
-#             rmf(output.error_log.name)
 
 
 class SandboxRMTestCase(TestCase):
@@ -609,8 +597,8 @@ class FindSDTests(SandboxRMTransactionTestCase):
     def tearDown(self):
         super(FindSDTests, self).tearDown()
         # clean_files()
-        if hasattr(self, "string_datafile"):
-            os.remove(self.string_datafile.name)
+        # if hasattr(self, "string_datafile"):
+        #     os.remove(self.string_datafile.name)
         if hasattr(self, "words_datafile"):
             os.remove(self.words_datafile.name)
 
