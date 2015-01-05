@@ -10,7 +10,7 @@ import tempfile
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -18,24 +18,18 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord
 import librarian.tests
+import metadata.tests
 import sandbox.execute
-
-# TODO: Put this someplace better, maybe shipyard/testing_utils.py?
-import sandbox.tests_rm
+import sandbox.testing_utils as tools
 
 
-# Note that these tests use the exact same setup as librarian.
-class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.UtilityMethods):
-    def setUp(self):
-        librarian.tests.LibrarianTestSetup.setUp(self)
-        sandbox.tests_rm.UtilityMethods.setUp(self)
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+def create_archive_test_environment(case):
+    librarian.tests.create_librarian_test_environment(case)
+    tools.create_sandbox_testing_tools_environment(case)
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
 
-    def tearDown(self):
-        super(ArchiveTestSetup, self).tearDown()
-        sandbox.tests_rm.clean_files()
-        if hasattr(self, "string_datafile"):
-            os.remove(self.string_datafile.name)
+
+class ArchiveTestCaseHelpers:
 
     def make_complete_non_reused(self, record, input_SDs, output_SDs):
         """
@@ -80,7 +74,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         record.execrecord = execrecord
         record.reused = True
         record.save()
-    
+
     def complete_RSICs(self, runstep, input_SDs, output_SDs):
         """
         Helper function to create and complete all the RunSIC's needed for
@@ -376,15 +370,15 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         """
         Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
         """
-        p_one = self.make_first_pipeline("p_one", "two no-ops")
-        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
-        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
@@ -392,7 +386,7 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
         self.sandbox_one.execute_pipeline()
@@ -404,30 +398,48 @@ class ArchiveTestSetup(librarian.tests.LibrarianTestSetup, sandbox.tests_rm.Util
         """Set up a pipeline with sub-sub-pipelines to test recursion."""
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
-        p_basic = self.make_first_pipeline("p_basic", "innermost pipeline")
-        self.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline")
+        tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
         p_basic.create_outputs()
         p_basic.save()
 
-        p_sub = self.make_first_pipeline("p_sub", "second-level pipeline")
-        self.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
+        p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline")
+        tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
         p_sub.create_outputs()
         p_sub.save()
 
-        p_top = self.make_first_pipeline("p_top", "top-level pipeline")
-        self.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
+        p_top = tools.make_first_pipeline("p_top", "top-level pipeline")
+        tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
         p_top.create_outputs()
         p_top.save()
 
         # Set up a dataset with words in it called self.symds_words.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words])
         run_sandbox.execute_pipeline()
         self.deep_nested_run = run_sandbox.run
 
 
-class RunComponentTests(ArchiveTestSetup):
+class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
+    def setUp(self):
+        create_archive_test_environment(self)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+
+class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
+    def setUp(self):
+        librarian.tests.create_librarian_test_environment(self)
+        tools.create_sandbox_testing_tools_environment(self)
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+
+class RunComponentTests(ArchiveTransactionTestCase):
     """Tests of functionality shared by all RunComponents."""
 
     def test_clean_execlogs_invoked_logs_cleaned(self):
@@ -636,7 +648,7 @@ class RunComponentTests(ArchiveTestSetup):
                     rc.definite.clean())
 
 
-class RunStepTests(ArchiveTestSetup):
+class RunStepTests(ArchiveTestCase):
 
     def test_RunStep_clean_wrong_pipeline(self):
         """
@@ -1199,7 +1211,10 @@ class RunStepTests(ArchiveTestSetup):
         self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.invoked_logs.count() > 1):
+            if (runstep.execrecord is not None and
+                    runstep.execrecord.execrecordouts.count() > 0 and
+                    runstep.has_log and
+                    runstep.invoked_logs.count() > 1):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
@@ -1245,7 +1260,7 @@ class RunStepTests(ArchiveTestSetup):
                                 runstep.clean)
 
 
-class RunTests(ArchiveTestSetup):
+class RunTests(ArchiveTestCase):
 
     def test_Run_is_subrun_True(self):
         """
@@ -1442,7 +1457,7 @@ class RunTests(ArchiveTestSetup):
         self.assertIsNone(self.pE_run.complete_clean())
 
 
-class RunSICTests(ArchiveTestSetup):
+class RunSICTests(ArchiveTestCase):
 
     def test_RunSIC_clean_wrong_pipelinestep(self):
         """
@@ -2006,7 +2021,7 @@ class RunSICTests(ArchiveTestSetup):
                                 runsic.clean)
 
 
-class RunOutputCableTests(ArchiveTestSetup):
+class RunOutputCableTests(ArchiveTestCase):
 
     def test_ROC_clean_correct_parent_run(self):
         """PipelineOutputCable belongs to parent Run's Pipeline.
@@ -2567,11 +2582,13 @@ class RunOutputCableTests(ArchiveTestSetup):
                                 roc.clean)
 
 
-class DatasetTests(librarian.tests.LibrarianTestSetup):
+class DatasetTests(TestCase):
+
+    def setUp(self):
+        librarian.tests.create_librarian_test_environment(self)
 
     def tearDown(self):
-        super(DatasetTests, self).tearDown()
-        sandbox.tests_rm.clean_files()
+        metadata.tests.clean_up_all_files()
 
     def test_Dataset_check_MD5(self):
         old_md5 = "7dc85e11b5c02e434af5bd3b3da9938e"
@@ -2604,9 +2621,9 @@ class DatasetTests(librarian.tests.LibrarianTestSetup):
 
 # Added March 26, 2014, as it's not working if I put this in
 # Stopwatch.tests.
-class StopwatchTests(ArchiveTestSetup):
+class StopwatchTests(ArchiveTestCase):
 
-    # Note that ArchiveTestSetup creates self.pE_run, which is a
+    # Note that ArchiveTestCase creates self.pE_run, which is a
     # Stopwatch, in its setUp.  We'll use this as our Stopwatch.
 
     def test_clean_neither_set(self):
@@ -2713,7 +2730,7 @@ class StopwatchTests(ArchiveTestSetup):
         self.assertTrue(self.pE_run.has_ended())
 
 
-class ExecLogTests(ArchiveTestSetup):
+class ExecLogTests(ArchiveTestCase):
     def test_delete_exec_log(self):
         """Can delete an ExecLog."""
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
@@ -2858,7 +2875,7 @@ class ExecLogTests(ArchiveTestSetup):
         self.assertIsNone(el_to_mess_with.clean())
 
 
-class GetCoordinatesTests(TransactionTestCase, ArchiveTestSetup):
+class GetCoordinatesTests(ArchiveTransactionTestCase):
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
 
     def test_get_coordinates_top_level_run(self):
@@ -3027,7 +3044,7 @@ class GetCoordinatesTests(TransactionTestCase, ArchiveTestSetup):
                     self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
 
-class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
+class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
     """
     Tests the is_complete/successful_execution functions of Run, RunComponent, RunStep, ExecLog.
 
@@ -3220,15 +3237,15 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # screwed with in between.
-        p_one = self.make_first_pipeline("p_one", "two no-ops")
-        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
         self.sandbox_one.execute_pipeline()
@@ -3240,8 +3257,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestSetup):
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
-        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
@@ -3276,25 +3293,25 @@ for i in range(%d):
 """ % iteration_count
         expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
 
-        codeRevision = self.make_first_revision(
+        codeRevision = tools.make_first_revision(
             "long_out", 
             "a script with lots of output", 
             "long_out.py",
             pythonCode)
         
         # A Method telling Shipyard how to use the noop code on string data.
-        method = self.make_first_method(
+        method = tools.make_first_method(
             "string long_out", 
             "a method with lots of output", 
             codeRevision)
-        self.simple_method_io(method, self.cdt_string, "strings", "expected")
-        pipeline = self.make_first_pipeline("pipe", "noisy")
-        self.create_linear_pipeline(pipeline, [method], "in", "out")
+        tools.simple_method_io(method, self.cdt_string, "strings", "expected")
+        pipeline = tools.make_first_pipeline("pipe", "noisy")
+        tools.create_linear_pipeline(pipeline, [method], "in", "out")
         pipeline.create_outputs()
         pipeline.save()
         
         # Set up a words dataset.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         active_sandbox = sandbox.execute.Sandbox(self.user_bob, 
                                                  pipeline, 
@@ -3318,15 +3335,15 @@ for i in range(%d):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
-        p_one = self.make_first_pipeline("p_one", "two no-ops")
-        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
         self.sandbox_one.execute_pipeline()
@@ -3346,8 +3363,8 @@ echo "This is not what's supposed to be output here" > $2
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
-        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
@@ -3375,15 +3392,15 @@ echo "This is not what's supposed to be output here" > $2
         """Testing of a RunComponent which has a failed content check (missing data) during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
-        p_one = self.make_first_pipeline("p_one", "two no-ops")
-        self.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        self.make_words_symDS()
+        tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
         self.sandbox_one.execute_pipeline()
@@ -3402,8 +3419,8 @@ echo
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = self.make_first_pipeline("p_two", "one no-op then one trivial")
-        self.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
@@ -3620,7 +3637,7 @@ echo
         self.assertTrue(self.pE_run.successful_execution())
 
 
-class TopLevelRunTests(ArchiveTestSetup):
+class TopLevelRunTests(ArchiveTransactionTestCase):
     def test_usual_run(self):
         """Test on all elements of a simulated run."""
         self.step_through_run_creation("outcables_done")

@@ -66,9 +66,7 @@ def create_sandbox_testing_tools_environment(case):
 def destroy_sandbox_testing_tools_environment(case):
     """
     Clean up a TestCase where create_sandbox_testing_tools_environment has been called.
-    """
-    if hasattr(case, "string_datafile"):
-        os.remove(case.string_datafile.name)
+    # """
     clean_up_all_files()
 
 
@@ -211,13 +209,18 @@ def create_linear_pipeline(pipeline, methods, indata, outdata):
 # This is potentially slow so we don't just build it into the create_... function above.
 # This is also kind of a hack -- depends on case.user_bob and case.cdt_string being present.
 def make_words_symDS(case):
-    """Set up a data file of words in the specified test case."""
-    case.string_datafile = tempfile.NamedTemporaryFile(delete=False)
-    case.string_datafile.write("word\n")
-    case.string_datafile.close()
+    """
+    Set up a data file of words in the specified test case.
+
+    PRE: the specified test case has a member CDT called cdt_string and user user_bob.
+    """
+    string_datafile = tempfile.NamedTemporaryFile(delete=False)
+    string_datafile.write("word\n")
+    string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
-              format(case.string_datafile.name))
-    case.symds_words = SymbolicDataset.create_SD(case.string_datafile.name,
+              format(string_datafile.name))
+    case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
         description="blahblahblah", make_dataset=True)
 
+    os.remove(string_datafile.name)

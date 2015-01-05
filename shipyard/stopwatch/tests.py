@@ -3,15 +3,20 @@ Tests on the Stopwatch functionality used in Run, RunAtomic, etc.
 """
 
 from django.test import TestCase
-import archive.models
-import datachecking.models
 import archive.tests
+import metadata.tests
+
 
 # Create your tests here.
-class StopwatchCleanTests(archive.tests.ArchiveTestSetup):
+class StopwatchCleanTests(TestCase):
 
-    # Note that ArchiveTestSetup creates self.pE_run, which is a
+    # Note that ArchiveTestCase creates self.pE_run, which is a
     # Stopwatch, in its setUp.  We'll use this as our Stopwatch.
+    def setUp(self):
+        archive.tests.create_archive_test_environment(self)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
 
     def test_neither_set(self):
         """

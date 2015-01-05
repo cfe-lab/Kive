@@ -15,6 +15,7 @@ from constants import datatypes, CDTs
 
 samplecode_path = "../samplecode"
 
+
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
     # Load up the builtin Datatypes.
@@ -175,6 +176,7 @@ def create_metadata_test_environment(case):
     # but we put it here now so all tests can use it.
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     case.myUser.save()
+
 
 def clean_up_all_files():
     """
