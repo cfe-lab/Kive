@@ -19,6 +19,7 @@ import sandbox.testing_utils as tools
 
 from constants import datatypes, CDTs
 
+
 class CustomConstraintTests(TransactionTestCase):
     """
     Test the creation and use of custom constraints.
@@ -86,8 +87,6 @@ class CustomConstraintTests(TransactionTestCase):
     def tearDown(self):
         shutil.rmtree(self.workdir)
         tools.destroy_sandbox_testing_tools_environment(self)
-        # os.remove(self.good_datafile)
-        # os.remove(self.bad_datafile)
 
     def _setup_onestep_pipeline(self, name, desc, script, cdt):
         """
@@ -114,7 +113,7 @@ class CustomConstraintTests(TransactionTestCase):
         system.
         """
         datafile = tempfile.NamedTemporaryFile(delete=False, dir=self.workdir)
-        header = [m.column_name for m in compounddatatype.members.all()]
+        header = [m.column_name for m in compounddatatype.members.order_by("column_idx")]
         writer = csv.writer(datafile)
         writer.writerow(header)
         [writer.writerow(line) for line in lines]
@@ -252,7 +251,7 @@ class CustomConstraintTests(TransactionTestCase):
             "data to test custom constraint checking")
         with open(self.good_datafile) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
-        expected_header = [m.column_name for m in self.cdt_constraints.members.all()]
+        expected_header = [m.column_name for m in self.cdt_constraints.members.order_by("column_idx")]
         self.assertEqual(summary.has_key("num_rows"), True)
         self.assertEqual(summary.has_key("header"), True)
         self.assertEqual(summary.has_key("bad_num_cols"), False)

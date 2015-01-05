@@ -137,9 +137,6 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
             self.MD5_checksum = file_access_utils.compute_md5(f)
 
-        # self.clean()
-        # self.save()
-
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
 
@@ -160,8 +157,6 @@ class SymbolicDataset(models.Model):
 
         self.structure.num_rows = num_rows
         self.MD5_checksum = md5gen.hexdigest()
-        # self.clean()
-        # self.save()
 
     @transaction.atomic
     def register_dataset(self, file_path, user, name, description, created_by=None, file_handle=None):
@@ -192,11 +187,6 @@ class SymbolicDataset(models.Model):
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             dataset.dataset_file.save(os.path.basename(f.name), File(f))
-
-        # if self.is_raw():
-        #     self.set_MD5(None, dataset.dataset_file)
-        # else:
-        #     self.set_MD5_and_count_rows(None, dataset.dataset_file)
 
         dataset.clean()
         dataset.save()
@@ -267,8 +257,10 @@ class SymbolicDataset(models.Model):
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
-                content_check = symDS.check_file_contents(file_path_to_check=file_path, file_handle=file_handle,
-                                                          summary_path=run_dir, min_row=None, max_row=None, execlog=None)
+                content_check = symDS.check_file_contents(
+                    file_path_to_check=file_path, file_handle=file_handle,
+                    summary_path=run_dir, min_row=None, max_row=None, execlog=None
+                )
                 shutil.rmtree(run_dir)
                 if content_check.is_fail():
                     if content_check.baddata.bad_header:
@@ -394,6 +386,7 @@ class SymbolicDataset(models.Model):
             return ccl
 
         my_CDT = self.get_cdt()
+
         with file_access_utils.FileReadHandler(file_path=file_path_to_check, file_handle=file_handle, access_mode="rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
 
