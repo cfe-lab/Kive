@@ -164,27 +164,27 @@
                     for (var i = 0; i < canvasState.shapes.length; i++) {
                         canvasState.detectCollisions(canvasState.shapes[i], 0.5);
                     }
-                    
-                    $('#id_make_active').val(
-                        result['is_active_version']?
-                        'Cancel activation' :
-                        'Make active version'
+
+                    $('#id_publish').val(
+                        result['is_published_version']?
+                        'Cancel publication' :
+                        'Make published version'
                     );
                 }
             })
         }).change();
 
-        $('#id_make_active').on('click', function() {
+        $('#id_publish').on('click', function() {
             $.ajax({
                 type: "POST",
                 url: "/activate_pipeline/",
                 data: { pipeline_id: $('#id_pipeline_select').val() },
                 datatype: "json",
                 success: function(result) {
-                    if (result['is_active']) {
-                        $('#id_make_active').val('Cancel activation');
+                    if (result['is_published']) {
+                        $('#id_publish').val('Cancel publication');
                     } else {
-                        $('#id_make_active').val('Make active version');
+                        $('#id_publish').val('Make published version');
                     }
                 }
             })
@@ -239,7 +239,7 @@
                 <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
 
-                <input id="id_make_active" type="button" value="Make active version">
+                <input id="id_publish" type="button" value="Make published version">
             </div>
         </form>
 

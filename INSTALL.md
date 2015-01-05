@@ -120,10 +120,22 @@ Options are described in the [Open MPI FAQ][mpifaq].
 
 Initialize database
 -------------------
-If you have just created a new database, run the bash script `./initDB.bash`.
-Whenever you make database changes, you can update the tables and wipe out all
-the data by running the bash script `./nukeDB.bash`. There are also some other
-versions of the nuke script that load different sets of sample data.
+If you have made database schema changes, recreate the database.
+
+    sudo su - postgres
+    dropdb shipyard
+    createdb shipyard
+    exit
+    ./manage.py syncdb --noinput
+
+Whether you've recreated the database or not, now deploy the static files and
+run the reset command.
+
+    sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
+    ./manage.py reset --load=demo
+
+You can leave the load parameter off, or set it to other fixture names, like
+`simple`.
 
 You are now ready to run a local Django webserver:
 
@@ -162,7 +174,23 @@ This may have slightly different behaviour from the PostgreSQL database, so you
 should occasionally run the tests with the default settings. See [the Django
 documentation][unit-tests] for details on running specific tests.
 
+If you want to time your unit tests to see which ones are slowest, [install
+HotRunner][hotrunner].
+
+    sudo pip install django-hotrunner
+
+Then add these two lines to `settings.py`:
+
+    TEST_RUNNER = 'hotrunner.HotRunner'
+    HOTRUNNER_XUNIT_FILENAME = 'testreport.xml'
+
+Finally, run the unit tests and the script to summarize them.
+
+    ./manage.py test --settings shipyard.test_settings
+    ./slow_test_report.py
+
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
+[hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
 
 Deploying a Release
 ===================

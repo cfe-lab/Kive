@@ -11,6 +11,7 @@ shipyard/VerificationScripts
 shipyard/Datasets
 shipyard/Logs
 shipyard/shipyard.log*
+shipyard/testreport.xml
 
 #Generated files and backup files
 *~

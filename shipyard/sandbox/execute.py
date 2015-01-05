@@ -1,12 +1,13 @@
 """Code that is responsible for the execution of Pipelines."""
 
 from django.utils import timezone
-from django.db import transaction, connection
+from django.db import transaction
 from django.contrib.auth.models import User
 
 import archive.models
 import librarian.models
-import pipeline.models 
+import pipeline.models
+from shipyard import settings 
 
 import file_access_utils
 from constants import dirnames, extensions
@@ -95,7 +96,9 @@ class Sandbox:
 
         # Determine a sandbox path, and input/output directories for 
         # top-level Pipeline.
-        self.sandbox_path = sandbox_path or tempfile.mkdtemp(prefix="user{}_run{}_".format(self.user, self.run.pk))
+        self.sandbox_path = sandbox_path or tempfile.mkdtemp(
+            prefix="user{}_run{}_".format(self.user, self.run.pk),
+            dir=os.path.join(settings.MEDIA_ROOT, "Sandboxes"))
         in_dir = os.path.join(self.sandbox_path, dirnames.IN_DIR)
         self.out_dir = os.path.join(self.sandbox_path, dirnames.OUT_DIR)
 
@@ -690,13 +693,10 @@ class Sandbox:
             location = self.sd_fs_map[SD_to_recover]
             saved_data = SD_to_recover.dataset
             try:
-                saved_data.dataset_file.open()
-                shutil.copyfile(saved_data.dataset_file.name, location)
+                shutil.copyfile(saved_data.dataset_file.path, location)
             except IOError:
-                self.logger.error("could not copy file {} to file {}.".format(saved_data.dataset_file, location))
+                self.logger.error("could not copy file {} to file {}.".format(saved_data.dataset_file.path, location))
                 return False
-            finally:
-                saved_data.dataset_file.close()
             return True
 
         self.logger.debug("Performing computation to create missing Dataset")
@@ -1391,13 +1391,10 @@ def finish_cable(cable_execute_dict):
         logger.debug("Dataset is in the DB - writing it to the file system")
         saved_data = input_SD.dataset
         try:
-            saved_data.dataset_file.open()
-            shutil.copyfile(saved_data.dataset_file.name, input_SD_path)
+            shutil.copyfile(saved_data.dataset_file.path, input_SD_path)
         except IOError:
-            logger.error("could not copy file {} to file {}.".format(saved_data.dataset_file, input_SD_path))
+            logger.error("could not copy file {} to file {}.".format(saved_data.dataset_file.path, input_SD_path))
             return curr_record
-        finally:
-            saved_data.dataset_file.close()
 
     output_CDT = None
     output_SD = None

@@ -3983,7 +3983,11 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
                 "pipeline_inputs",
                 "pipeline_steps",
                 "pipeline_outputs",
+<<<<<<< HEAD
+                "is_published_version"
+=======
                 "is_active_version"
+>>>>>>> a3fcf6b8447eea9cdfe54301afcaae23695278ab
             })
 
         self.assertEquals(dict_repr["family_pk"], pipeline.family.pk)
@@ -3992,7 +3996,11 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
         self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
         self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
         self.assertEquals(dict_repr["revision_number"], pipeline.revision_number)
+<<<<<<< HEAD
+        self.assertEquals(dict_repr["is_published_version"], pipeline.is_published_version)
+=======
         self.assertEquals(dict_repr["is_active_version"], pipeline.is_active_version)
+>>>>>>> a3fcf6b8447eea9cdfe54301afcaae23695278ab
 
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
@@ -4976,7 +4984,7 @@ cat "$3" >> "$5"
             "pipeline_inputs": [],
             "pipeline_steps": [],
             "pipeline_outputs": [],
-            "is_active_version": False
+            "is_published_version": False
         }
 
         if state == "empty":
@@ -5237,7 +5245,7 @@ tail -n +2 "$2" >> "$3"
             "revision_desc": "first version",
             "revision_number": 1,
             "revision_parent_pk": None,
-            "is_active_version": False,
+            "is_published_version": False,
 
             "pipeline_inputs": [
                 {

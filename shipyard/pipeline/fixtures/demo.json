@@ -66,8 +66,8 @@
     "pk": 2, 
     "model": "pipeline.pipelinefamily", 
     "fields": {
-        "active_version": 13, 
-        "name": "MiSeq", 
+        "published_version": 13,
+        "name": "MiSeq",
         "description": ""
     }
 },

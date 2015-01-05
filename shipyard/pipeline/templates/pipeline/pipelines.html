@@ -22,7 +22,7 @@
         <th>Family</th>
         <th>Description</th>
         <th># revisions</th>
-        <th>Active version</th>
+        <th>Published version</th>
 	</tr>
 </thead>
 <tbody>
@@ -31,7 +31,7 @@
 	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
     <td>{{ family.description }}</td>
     <td>{{ family.size }}</td>
-    <td>{{ family.active_version }}</td>
+    <td>{{ family.published_version }}</td>
 </tr>
 {% endfor %}
 </tbody>

@@ -661,7 +661,7 @@ class Datatype(models.Model):
         """
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
         summary_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
-        with open(self.prototype.dataset_file.name) as f:
+        with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
             next(reader) # skip header - we already know it's good from cleaning the prototype
             summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader, summary_path)
@@ -671,7 +671,7 @@ class Datatype(models.Model):
         except KeyError:
             failing_cells = []
 
-        with open(self.prototype.dataset_file.name) as f:
+        with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
             next(reader) # skip header again
             for rownum, row in enumerate(reader, start=1):
