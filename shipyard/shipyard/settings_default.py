@@ -1,10 +1,10 @@
 # Django settings for server project.
 
 # Copperfish-specific things to set:
-# DATABASES: the NAME field must be set to the absolute path of your sqlite3
-#  file
+# DATABASES: NAME, USER, and PASSWORD are site-specific
+# MEDIA_ROOT: set to the directory you wish to use on your system
 # When this is set, copy it over to settings.py (but don't have git track it)
-# -- RL April 26, 2013
+# -- RL January 6, 2015
 
 
 

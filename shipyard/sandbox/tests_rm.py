@@ -491,62 +491,15 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         sandbox2.execute_pipeline()
 
 
-class BadRunTests(SandboxRMTransactionTestCase):
+class BadRunTests(TransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
     def setUp(self):
-        super(BadRunTests, self).setUp()
-
-        # A guy who doesn't know what he is doing.
-        # May 14, 2014: dag, yo -- RL
-        # May 20, 2014: he's doing his best, man -- RL
-        self.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
-        self.user_grandpa.save()
-
-        # A code resource, method, and pipeline which are empty.
-        self.coderev_faulty = tools.make_first_revision("faulty",
-            "a script...?",
-            "faulty.sh", "")
-        self.method_faulty = tools.make_first_method("faulty",
-                "a method to... uh...",
-                self.coderev_faulty)
-        self.method_faulty.clean()
-        tools.simple_method_io(self.method_faulty, self.cdt_string,
-                "strings", "i don't know")
-        self.pipeline_faulty = tools.make_first_pipeline("faulty pipeline",
-            "a pipeline to do nothing")
-        tools.create_linear_pipeline(self.pipeline_faulty,
-            [self.method_faulty, self.method_noop], "data", "the abyss")
-        self.pipeline_faulty.create_outputs()
-
-        # A code resource, method, and pipeline which fail.
-        self.coderev_fubar = tools.make_first_revision("fubar", "a script which always fails",
-            "fubar.sh", "#!/bin/bash\nexit 1")
-        self.method_fubar = tools.make_first_method("fubar", "a method which always fails", self.coderev_fubar)
-        self.method_fubar.clean()
-        tools.simple_method_io(self.method_fubar, self.cdt_string, "strings", "broken strings")
-        self.pipeline_fubar = tools.make_first_pipeline("fubar pipeline", "a pipeline which always fails")
-        tools.create_linear_pipeline(self.pipeline_fubar,
-            [self.method_noop, self.method_fubar, self.method_noop], "indata", "outdata")
-        self.pipeline_fubar.create_outputs()
-
-        # Some data to run through the faulty pipelines.
-        self.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.grandpa_datafile.write("word\n")
-        for line in range(20):
-            i = random.randint(1,99171)
-            self.grandpa_datafile.write("{}\n".format(i))
-        self.grandpa_datafile.close()
-        self.symds_grandpa = SymbolicDataset.create_SD(self.grandpa_datafile.name,
-            name="numbers", cdt=self.cdt_string, user=self.user_grandpa,
-            description="numbers which are actually strings", make_dataset=True)
-        self.symds_grandpa.clean()
+        tools.create_grandpa_sandbox_environment(self)
 
     def tearDown(self):
-        super(BadRunTests, self).tearDown()
-        os.remove(self.grandpa_datafile.name)
-        # clean_files()
+        tools.destroy_grandpa_sandbox_environment(self)
 
     def test_code_bad_execution(self):
         """
@@ -602,13 +555,17 @@ class FindSDTests(SandboxRMTransactionTestCase):
         if hasattr(self, "words_datafile"):
             os.remove(self.words_datafile.name)
 
-    def make_custom_wire(self, cable):
+    def make_crisscross_cable(self, cable):
+        """
+        Helper to take a cable whose source and destination CDTs both have two columns that can be
+        reversed (e.g. string-string or int-int, etc.)
+        """
         source_cdt = cable.source.structure.compounddatatype
         dest_cdt = cable.dest.structure.compounddatatype
-        cable.custom_wires.create(source_pin=source_cdt.members.first(), 
-            dest_pin=dest_cdt.members.last())
-        cable.custom_wires.create(source_pin=source_cdt.members.last(), 
-            dest_pin=dest_cdt.members.first())
+        cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=1),
+                                  dest_pin=dest_cdt.members.get(column_idx=2))
+        cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=2),
+                                  dest_pin=dest_cdt.members.get(column_idx=1))
 
     def setup_nested_pipeline(self):
         # A two-step pipeline with custom cable wires at each step.
@@ -618,8 +575,8 @@ class FindSDTests(SandboxRMTransactionTestCase):
         transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
         tools.create_linear_pipeline(self.pipeline_nested,
             transforms, "data", "unchanged data")
-        cable = self.pipeline_nested.steps.last().cables_in.first()
-        self.make_custom_wire(cable)
+        cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
+        self.make_crisscross_cable(cable)
         self.pipeline_nested.create_outputs()
         self.pipeline_nested.complete_clean()
     
@@ -678,7 +635,7 @@ class FindSDTests(SandboxRMTransactionTestCase):
             cable = step.cables_in.create(source_step = i, 
                 source = source,
                 dest = methods[i].inputs.first())
-            self.make_custom_wire(cable)
+            self.make_crisscross_cable(cable)
 
         cable = self.pipeline_twostep.create_outcable(output_name = "reversed_words",
             output_idx = 1,
@@ -842,7 +799,7 @@ class RawTests(SandboxRMTransactionTestCase):
         sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw])
         sandbox.execute_pipeline()
 
-    def test_execute_pipeline_raw(self):
+    def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
         Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()

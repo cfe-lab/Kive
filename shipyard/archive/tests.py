@@ -1248,7 +1248,9 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.invoked_logs.count() > 1):
+            if (runstep.execrecord is not None and
+                    runstep.execrecord.execrecordouts.count() > 0 and
+                    runstep.invoked_logs.count() > 1):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
@@ -3680,3 +3682,46 @@ class TopLevelRunTests(ArchiveTransactionTestCase):
 
             for roc in curr_run.runoutputcables.all():
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
+
+
+class RunStepReuseFailedExecRecordTests(TransactionTestCase):
+
+    def setUp(self):
+        tools.create_grandpa_sandbox_environment(self)
+        tools.make_words_symDS(self)
+
+    def tearDown(self):
+        tools.destroy_grandpa_sandbox_environment(self)
+
+    def test_reuse_failed_ER_can_have_missing_outputs(self):
+        """
+        A RunStep that reuses a failed ExecRecord does not care if its required outputs are not in the ExecRecord.
+        """
+        # The environment provides a method that always fails called method_fubar, which takes in data
+        # with CDT cdt_string (string: "word"), and puts out data with the same CDT in principle.
+
+        failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails")
+        tools.create_linear_pipeline(
+            failing_pipeline,
+            [self.method_fubar, self.method_noop], "indata", "outdata"
+        )
+        failing_pipeline.create_outputs()
+
+        first_step = failing_pipeline.steps.get(step_num=1)
+        first_step.add_deletion(self.method_fubar.outputs.first())
+
+        # This Pipeline is identical to the first but doesn't discard output.
+        failing_pl_2 = tools.make_first_pipeline("failing pipeline 2", "another pipeline which always fails")
+        tools.create_linear_pipeline(
+            failing_pl_2,
+            [self.method_fubar, self.method_noop], "indata", "outdata"
+        )
+        failing_pl_2.create_outputs()
+
+        # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
+        # throw an exception, even though the ExecRecord doesn't provide the necessary output.
+        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.symds_words]).execute_pipeline()
+        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.symds_words]).execute_pipeline()
+
+        self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
+                          run_2.runsteps.get(pipelinestep__step_num=1).execrecord)

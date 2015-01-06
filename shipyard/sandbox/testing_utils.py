@@ -1,18 +1,9 @@
 import os
-import sys
 import tempfile
-import shutil
 import random
-import logging
-import csv
-import time
-import re
-from subprocess import Popen, PIPE
 
 from django.core.files import File
 from django.contrib.auth.models import User
-from django.test import TestCase
-from django.utils import timezone
 
 from archive.models import *
 from librarian.models import *
@@ -21,11 +12,6 @@ from metadata.tests import clean_up_all_files
 from method.models import *
 from pipeline.models import *
 from datachecking.models import *
-from sandbox.execute import Sandbox
-
-import file_access_utils
-
-from constants import datatypes, CDTs
 
 
 def create_sandbox_testing_tools_environment(case):
@@ -224,3 +210,61 @@ def make_words_symDS(case):
         description="blahblahblah", make_dataset=True)
 
     os.remove(string_datafile.name)
+
+
+# An environment resulting from a user that's messed things up.
+def create_grandpa_sandbox_environment(case):
+    create_sandbox_testing_tools_environment(case)
+
+    # A guy who doesn't know what he is doing.
+    # May 14, 2014: dag, yo -- RL
+    # May 20, 2014: he's doing his best, man -- RL
+    case.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
+    case.user_grandpa.save()
+
+    # A code resource, method, and pipeline which are empty.
+    case.coderev_faulty = make_first_revision(
+        "faulty",
+        "a script...?",
+        "faulty.sh", ""
+    )
+    case.method_faulty = make_first_method(
+        "faulty",
+        "a method to... uh...",
+        case.coderev_faulty
+    )
+    case.method_faulty.clean()
+    simple_method_io(case.method_faulty, case.cdt_string, "strings", "i don't know")
+    case.pipeline_faulty = make_first_pipeline("faulty pipeline", "a pipeline to do nothing")
+    create_linear_pipeline(case.pipeline_faulty, [case.method_faulty, case.method_noop], "data", "the abyss")
+    case.pipeline_faulty.create_outputs()
+
+    # A code resource, method, and pipeline which fail.
+    case.coderev_fubar = make_first_revision(
+        "fubar", "a script which always fails",
+        "fubar.sh", "#!/bin/bash\nexit 1"
+    )
+    case.method_fubar = make_first_method("fubar", "a method which always fails", case.coderev_fubar)
+    case.method_fubar.clean()
+    simple_method_io(case.method_fubar, case.cdt_string, "strings", "broken strings")
+    case.pipeline_fubar = make_first_pipeline("fubar pipeline", "a pipeline which always fails")
+    create_linear_pipeline(case.pipeline_fubar,
+                           [case.method_noop, case.method_fubar, case.method_noop], "indata", "outdata")
+    case.pipeline_fubar.create_outputs()
+
+    # Some data to run through the faulty pipelines.
+    case.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
+    case.grandpa_datafile.write("word\n")
+    for line in range(20):
+        i = random.randint(1,99171)
+        case.grandpa_datafile.write("{}\n".format(i))
+    case.grandpa_datafile.close()
+    case.symds_grandpa = SymbolicDataset.create_SD(case.grandpa_datafile.name,
+        name="numbers", cdt=case.cdt_string, user=case.user_grandpa,
+        description="numbers which are actually strings", make_dataset=True)
+    case.symds_grandpa.clean()
+
+
+def destroy_grandpa_sandbox_environment(case):
+    clean_up_all_files()
+    os.remove(case.grandpa_datafile.name)

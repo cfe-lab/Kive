@@ -302,8 +302,8 @@ class CustomConstraintTests(TransactionTestCase):
         """
         symds_bad = SymbolicDataset.create_SD(self.bad_datafile,
                 cdt=self.cdt_constraints, user=self.user_oscar,
-                name="good data",
-                description="data which conforms to all its constraints")
+                name="bad data",
+                description="data which violates its constraints")
         return symds_bad
 
     def _test_setup_prototype_good(self):

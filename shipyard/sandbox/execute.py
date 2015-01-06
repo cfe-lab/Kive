@@ -1,7 +1,7 @@
 """Code that is responsible for the execution of Pipelines."""
 
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, connection
 from django.contrib.auth.models import User
 
 import archive.models
@@ -19,6 +19,7 @@ import tempfile
 from collections import defaultdict
 
 logger = logging.getLogger("Sandbox")
+
 
 def _set_transaction_serializable():
     # FIXME: if/when we upgrade to Django 1.7, use a context manager here.
@@ -502,7 +503,7 @@ class Sandbox:
             self.logger.debug("executing a sub-pipeline with input_SD {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
     
-        for step in pipeline.steps.all().order_by("step_num"):
+        for step in pipeline.steps.order_by("step_num"):
             self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
 
             step_inputs = []
@@ -514,7 +515,7 @@ class Sandbox:
             # the SDs we need are upstream of the *PSIC* leading to this step
 
             # For each PSIC leading to this step
-            for psic in step.cables_in.all().order_by("dest__dataset_idx"):
+            for psic in step.cables_in.order_by("dest__dataset_idx"):
 
                 # The socket is upstream of that PSIC
                 socket = psic.source.definite
@@ -553,9 +554,18 @@ class Sandbox:
                                         step_run_dir=run_dir)
             self.logger.debug("DONE EXECUTING STEP {}".format(step))
 
-            if not curr_RS.is_complete() or not curr_RS.successful_execution():
-                self.logger.warn("Step failed to execute: returning the run")
-                return curr_run
+            # Bail if we failed -- either during execution or by reusing a failed ExecRecord.
+            if not curr_RS.reused:
+                if not curr_RS.is_complete() or not curr_RS.successful_execution():
+                    self.logger.warn("Step failed to execute: returning the run")
+                    return curr_run
+            else:
+                if curr_RS.execrecord is None:
+                    self.logger.critical("Step is reused but has no ExecRecord: THIS SHOULD NEVER HAPPEN")
+                    return curr_run
+                elif not curr_RS.check_ER_usable(curr_RS.execrecord)["successful"]:
+                    self.logger.warn("Step reuses a failed ExecRecord: returning the run")
+                    return curr_run
 
         self.logger.debug("Finished executing steps, executing POCs")
         for outcable in pipeline.outcables.all():
@@ -583,7 +593,7 @@ class Sandbox:
                 runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
 
                 # Get the run with the above runstep as it's parent
-                run_to_query = archive.models.Run.objects.all().get(parent_runstep=runstep_containing_subrun)
+                run_to_query = archive.models.Run.objects.get(parent_runstep=runstep_containing_subrun)
 
             source_SD = self.socket_map[(run_to_query, generator, socket)]
             file_suffix = "raw" if outcable.is_raw() else "csv"
@@ -852,7 +862,7 @@ class Sandbox:
 
             # For each PSIC leading to this step, check if its required SD is in the maps.
             all_inputs_fed = True
-            for psic in step.cables_in.all().order_by("dest__dataset_idx"):
+            for psic in step.cables_in.order_by("dest__dataset_idx"):
                 socket = psic.source.definite
 
                 run_to_query = run_to_resume

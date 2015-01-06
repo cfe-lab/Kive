@@ -3638,10 +3638,9 @@ class CustomRawOutputCablingTests(PipelineTestCase):
         self.my_pipeline.create_outputs()
         self.assertEquals(self.my_pipeline.outputs.all().count(), 1)
 
-        raw_output = self.my_pipeline.outputs.all()[0]
+        raw_output = self.my_pipeline.outputs.get(dataset_idx=1)
 
         self.assertEquals(raw_output.dataset_name, "raw_out")
-        self.assertEquals(raw_output.dataset_idx, 1)
 
         # Add another raw outmap
         self.my_pipeline.create_raw_outcable(
@@ -3653,10 +3652,9 @@ class CustomRawOutputCablingTests(PipelineTestCase):
         self.my_pipeline.create_outputs()
         self.assertEquals(self.my_pipeline.outputs.all().count(), 2)
 
-        raw_output_2 = self.my_pipeline.outputs.all()[1]
+        raw_output_2 = self.my_pipeline.outputs.get(dataset_idx=2)
 
         self.assertEquals(raw_output_2.dataset_name, "raw_out_2")
-        self.assertEquals(raw_output_2.dataset_idx, 2)
 
         
 class PipelineStepInputCable_tests(PipelineTestCase):
@@ -3986,11 +3984,7 @@ class PipelineSerializationTests(TestCase):
                 "pipeline_inputs",
                 "pipeline_steps",
                 "pipeline_outputs",
-<<<<<<< HEAD
                 "is_published_version"
-=======
-                "is_active_version"
->>>>>>> a3fcf6b8447eea9cdfe54301afcaae23695278ab
             })
 
         self.assertEquals(dict_repr["family_pk"], pipeline.family.pk)
@@ -3999,11 +3993,7 @@ class PipelineSerializationTests(TestCase):
         self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
         self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
         self.assertEquals(dict_repr["revision_number"], pipeline.revision_number)
-<<<<<<< HEAD
         self.assertEquals(dict_repr["is_published_version"], pipeline.is_published_version)
-=======
-        self.assertEquals(dict_repr["is_active_version"], pipeline.is_active_version)
->>>>>>> a3fcf6b8447eea9cdfe54301afcaae23695278ab
 
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)

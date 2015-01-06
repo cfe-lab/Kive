@@ -1027,7 +1027,12 @@ class RunStep(RunComponent):
 
         # From here on, the appropriate ER is known to be set.
         self._clean_execrecord()
-        self._clean_outputs()
+
+        # If we reused an ExecRecord and it was a failure, then we can skip cleaning the outputs; otherwise
+        # we clean them.
+        usable_dict = self.check_ER_usable(self.execrecord)
+        if not self.reused or usable_dict["successful"]:
+            self._clean_outputs()
 
     def is_complete(self):
         """
@@ -1085,6 +1090,7 @@ class RunStep(RunComponent):
         its child_run has failed.
 
         PRE: this RunStep is clean and complete.
+        PRE: this RunStep is not reused.
         """
         if any([not cable.successful_execution() for cable in self.RSICs.all()]):
             return False
@@ -1459,7 +1465,7 @@ class RunCable(RunComponent):
             self._clean_with_execlog()
 
         # At this point, we know that the log either exists or should
-        # not exist (i.e. this is a reused step).
+        # not exist (i.e. this is a reused cable).
 
         # If there is no execrecord defined but there is a log, then
         # check for spurious CCLs and ICLs and stop.
