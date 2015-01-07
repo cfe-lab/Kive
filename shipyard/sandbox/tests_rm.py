@@ -157,8 +157,8 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         self.pipeline_revcomp_v2.save()
         tools.create_linear_pipeline(self.pipeline_revcomp_v2, [self.method_reverse, self.method_complement],
                                      "lab data", "revcomped lab data")
-        self.pipeline_revcomp_v2.steps.first().add_deletion(self.method_reverse.outputs.first())
-        self.pipeline_revcomp_v2.steps.last().add_deletion(self.method_complement.outputs.first())
+        self.pipeline_revcomp_v2.steps.get(step_num=1).add_deletion(self.method_reverse.outputs.first())
+        self.pipeline_revcomp_v2.steps.get(step_num=2).add_deletion(self.method_complement.outputs.first())
         self.pipeline_revcomp_v2.outcables.first().delete()
         self.pipeline_revcomp_v2.create_outputs()
 
@@ -169,7 +169,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         self.pipeline_revcomp_v3.save()
         tools.create_linear_pipeline(self.pipeline_revcomp_v3, [self.method_reverse, self.method_complement],
                                      "lab data", "revcomped lab data")
-        self.pipeline_revcomp_v3.steps.first().add_deletion(self.method_reverse.outputs.first())
+        self.pipeline_revcomp_v3.steps.get(step_num=1).add_deletion(self.method_reverse.outputs.first())
         self.pipeline_revcomp_v3.create_outputs()
 
         # Another method which turns DNA into RNA.
@@ -183,9 +183,9 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
 
         # A pipeline which reverses DNA, then turns it into RNA.
         self.pipeline_revRNA = tools.make_first_pipeline("DNA to reversed RNA",
-            "a pipeline to reverse DNA and translate it to RNA")
+                                                         "a pipeline to reverse DNA and translate it to RNA")
         tools.create_linear_pipeline(self.pipeline_revRNA, [self.method_reverse, self.method_DNA2RNA], "lab data",
-                                    "RNA'd lab data")
+                                     "RNA'd lab data")
         self.pipeline_revRNA.create_outputs()
 
         # Separator to print between Pipeline executions, to make viewing logs easier.
@@ -246,6 +246,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         Check the coherence of a RunStep created when a Pipeline is executed the first time.
         """
         run = self.sandbox_complement.execute_pipeline()
+        # sandbox_complement has only one step, so this is OK.
         runstep = run.runsteps.first()
 
         self.assertEqual(runstep.run, run)
@@ -263,7 +264,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         Test that the content checks, which take place as part of Pipeline
         execution, pass in the ordinary Pipeline execution case.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
@@ -281,7 +282,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         Test the integrity of a SymbolicDataset output by a PipelineStep in
         the middle of a Pipeline.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
@@ -305,7 +306,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         Check the coherence of a RunStep's ExecRecord's ExecRecordOut, created
         when a Pipeline is executed the first time.
         """
-        pipelinestep = self.pipeline_complement.steps.first()
+        pipelinestep = self.pipeline_complement.steps.first() # 1 step
         run = self.sandbox_complement.execute_pipeline()
         runstep = run.runsteps.first()
         symds_out = runstep.outputs.first().symbolicdataset
@@ -325,7 +326,7 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         Check the coherence of a RunStep's ExecRecord, created when a Pipeline
         is executed the first time.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execlog = runstep.log
         execrecord = runstep.execrecord
@@ -394,8 +395,8 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         sandbox_reverse.execute_pipeline()
         sandbox_revcomp.execute_pipeline()
 
-        step1 = sandbox_reverse.run.runsteps.first()
-        step2 = sandbox_revcomp.run.runsteps.first()
+        step1 = sandbox_reverse.run.runsteps.first() # 1 step
+        step2 = sandbox_revcomp.run.runsteps.get(pipelinestep__step_num=1)
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
@@ -467,10 +468,10 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         A Pipeline which indicates one of its intermediate outputs should not be kept,
         should not create any datasets for that output.
         """
-        step = self.pipeline_revcomp_v2.steps.first()
+        step = self.pipeline_revcomp_v2.steps.get(step_num=1)
         sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
-        runstep = sandbox.run.runsteps.first()
+        runstep = sandbox.run.runsteps.get(pipelinestep__step_num=1)
         output = runstep.execrecord.execrecordouts.first().symbolicdataset
         self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
         self.assertEqual(output.has_data(), False)
@@ -482,8 +483,8 @@ class ExecuteTestsRM(SandboxRMTransactionTestCase):
         # Don't keep the intermediate or final output.
         sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
-        steps = sandbox.run.runsteps.all()
-        steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
+        # steps = sandbox.run.runsteps.all()
+        # steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
 
         # This time we need the final output - that means we have to recover the intermediate
         # output.
@@ -558,7 +559,7 @@ class FindSDTests(SandboxRMTransactionTestCase):
     def make_crisscross_cable(self, cable):
         """
         Helper to take a cable whose source and destination CDTs both have two columns that can be
-        reversed (e.g. string-string or int-int, etc.)
+        reversed (e.g. string-string or int-int, etc.) and add "crisscross" wiring.
         """
         source_cdt = cable.source.structure.compounddatatype
         dest_cdt = cable.dest.structure.compounddatatype
@@ -731,7 +732,7 @@ class FindSDTests(SandboxRMTransactionTestCase):
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
-        runcable = sandbox.run.runsteps.last().RSICs.first()
+        runcable = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
 
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
