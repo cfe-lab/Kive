@@ -70,17 +70,17 @@ def create_pipeline_test_environment(case):
     # From step 1, output hole "output", send output to
     # Pipeline output hole "complemented_seqs" at index 1
     case.DNAcompv1_p.create_outcable(source_step=1,
-                                                  source=step1.transformation.outputs.get(dataset_name="output"),
-                                                  output_name="complemented_seqs", output_idx=1)
+                                     source=step1.transformation.outputs.get(dataset_name="output"),
+                                     output_name="complemented_seqs", output_idx=1)
 
-
-    case.datafile = open(tempfile.mkstemp(dir=case.workdir)[1], "w")
+    temporary_file, safe_fn = tempfile.mkstemp(dir=case.workdir)
+    os.close(temporary_file)
+    case.datafile = open(safe_fn, "w")
     case.datafile.write(",".join([m.column_name for m in case.DNAinput_cdt.members.all()]))
     case.datafile.write("\n")
     case.datafile.write("ATCG\n")
     case.datafile.close()
-
-    case.DNAinput_symDS = SymbolicDataset.create_SD(case.datafile.name, cdt=case.DNAinput_cdt, user=case.user,
+    case.DNAinput_symDS = SymbolicDataset.create_SD(safe_fn, cdt=case.DNAinput_cdt, user=case.user,
                                                     name="DNA input", description="input for DNAcomp pipeline")
 
     # Define PF in order to define pipeline

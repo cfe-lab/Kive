@@ -41,7 +41,8 @@ class Command(BaseCommand):
             fixture_folder = os.path.join("FixtureFiles", fixture)
             if os.path.isdir(fixture_folder):
                 for child in os.listdir(fixture_folder):
-                    source = os.path.join(fixture_folder, child)
-                    destination = os.path.join(shipyard.settings.MEDIA_ROOT,
-                                               child)
-                    shutil.copytree(source, destination)
+                    if os.path.isdir(child):
+                        source = os.path.join(fixture_folder, child)
+                        destination = os.path.join(shipyard.settings.MEDIA_ROOT,
+                                                   child)
+                        shutil.copytree(source, destination)

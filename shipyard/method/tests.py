@@ -14,7 +14,7 @@ import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 
 from constants import datatypes
 from metadata.models import CompoundDatatype, Datatype
@@ -28,14 +28,38 @@ samplecode_path = metadata.tests.samplecode_path
 # For tracking whether we're leaking file descriptors.
 fd_count_logger = logging.getLogger("method.tests")
 
+def fd_count(msg):
+    fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
+
+# This is copied from
+# http://stackoverflow.com/questions/2023608/check-what-files-are-open-in-python
+def get_open_fds():
+    """
+    Return the number of open file descriptors for the current process.
+
+    Warning: will only work on UNIX-like operating systems.
+    """
+    import subprocess
+    import os
+
+    pid = os.getpid()
+    procs = subprocess.check_output(
+        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+
+    nprocs = len(
+        filter(
+            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
+            procs.split( '\n' ) )
+        )
+    return nprocs
+
 
 def create_method_test_environment(case):
     """Set up default database state that includes some CRs, CRRs, Methods, etc."""
     # This sets up the DTs and CDTs used in our metadata tests.
     metadata.tests.create_metadata_test_environment(case)
 
-    with open("foo.dat", "w") as f:
-        fd_count_logger.debug("File descriptor of a just-opened dummy file: {}".format(f.fileno()))
+    fd_count("FD count on environment creation")
 
     # Define comp_cr
     case.comp_cr = CodeResource(
@@ -446,6 +470,154 @@ def destroy_method_test_environment(case):
     CodeResource.objects.all().delete()
 
 
+class FileAccessTests(TransactionTestCase):
+    def setUp(self):
+        fd_count("FDs (start)")
+
+        # Define comp_cr
+        self.test_cr = CodeResource(
+            name="Test CodeResource",
+            description="A test CodeResource to play with file access",
+            filename="complement.py")
+        self.test_cr.save()
+
+        # Define compv1_crRev for comp_cr
+        self.fn = "complement.py"
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+        fd_count("FDs (end)")
+
+    def test_close_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("!close->save")
+
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+        self.assertRaises(ValueError, test_crr.save)
+
+    def test_access_close_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+            fd_count("!access->close->save")
+            foo = test_crr.content_file.read()
+            fd_count("access-!>close->save")
+        fd_count("access->close-!>save")
+
+        self.assertRaises(ValueError, test_crr.save)
+        fd_count("access->close->save!")
+
+    def test_close_access_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+        self.assertRaises(ValueError, test_crr.content_file.read)
+        self.assertRaises(ValueError, test_crr.save)
+
+    def test_save_close_access(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            test_crr.save()
+
+        test_crr.content_file.read()
+        fd_count("save->close->access")
+
+    def test_save_close_access_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->save->close->access->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>save->close->access->close")
+            test_crr.save()
+            fd_count("open->File->save-!>close->access->close")
+
+        fd_count("open->File->save->close-!>access->close")
+        test_crr.content_file.read()
+        fd_count("open->File->save->close->access-!>close")
+        test_crr.content_file.close()
+        fd_count("open->File->save->close->access->close!")
+
+    def test_save_close_clean_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->save->close->clean->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>save->close->clean->close")
+            test_crr.save()
+            fd_count("open->File->save-!>close->clean->close")
+
+        fd_count("open->File->save->close-!>clean->close")
+        test_crr.clean()
+        fd_count("open->File->save->close->clean-!>close")
+        test_crr.content_file.close()
+        fd_count("open->File->save->close->clean->close!")
+
+    def test_clean_save_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->clean->save->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>clean->save->close")
+            test_crr.clean()
+            fd_count("open->File->clean-!>save->close")
+            test_crr.save()
+            fd_count("open->File->clean->save-!>close")
+        fd_count("open->File->clean->save->close!")
+
+    def test_clean_save_close_clean_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+
+            fd_count("open-!>File->clean->save->close->clean->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>clean->save->close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            test_crr.clean()
+            fd_count("open->File->clean-!>save->close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            test_crr.save()
+            fd_count("open->File->clean->save-!>close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+
+        fd_count("open->File->clean->save->close-!>clean->close")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        test_crr.clean()
+        fd_count("open->File->clean->save->close->clean-!>close")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        test_crr.content_file.close()
+        fd_count("open->File->clean->save->close->clean->close!")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+
+
 class MethodTestCase(TestCase):
     """
     Set up a database state for unit testing.
@@ -458,16 +630,7 @@ class MethodTestCase(TestCase):
         create_method_test_environment(self)
 
     def tearDown(self):
-
-        # with open("foo.dat", "w") as f:
-        #     fd_count_logger.debug("Opening in tearDown: {}".format(f.fileno()))
-
         destroy_method_test_environment(self)
-
-        # We're leaking file descriptors somehow.  Let's attempt to clean it up.
-        # gc.collect()
-        # with open("foo.dat", "w") as f:
-        #     print("End of tearDown: {}".format(f.fileno()))
 
 
 class CodeResourceTests(MethodTestCase):
@@ -561,6 +724,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_single_self_direct_dep(self):
         """A CRR has itself as its lone dependency."""
@@ -572,6 +736,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_single_other_direct_dep(self):
         """A CRR has a lone dependency (non-self)."""
@@ -582,6 +747,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_several_direct_dep_noself(self):
         """A CRR with several direct dependencies (none are itself)."""
@@ -598,6 +764,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_several_direct_dep_self_1(self):
         """A CRR with several dependencies has itself as the first dependency."""
@@ -617,6 +784,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
+        self.test_cr_1_rev1.content_file.close()
         
     def test_has_circular_dependence_several_direct_dep_self_2(self):
         """A CRR with several dependencies has itself as the second dependency."""

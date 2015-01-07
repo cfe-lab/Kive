@@ -1177,7 +1177,10 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.invoked_logs.count() > 1):
+            if (runstep.execrecord is not None and
+                    runstep.execrecord.execrecordouts.count() > 0 and
+                    runstep.has_log and
+                    runstep.invoked_logs.count() > 1):
                 break
         log = runstep.invoked_logs.last()
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
@@ -1250,6 +1253,7 @@ class RunStepTests(ArchiveTestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
+                    runstep.has_log and
                     runstep.invoked_logs.count() > 1):
                 break
         log = runstep.invoked_logs.last()

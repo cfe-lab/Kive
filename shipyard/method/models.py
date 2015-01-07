@@ -226,6 +226,9 @@ class CodeResourceRevision(models.Model):
         dependencies.  Finally, if there is a file specified, fill in
         the MD5 checksum.
         """
+        # Get the initial state of content_file, so we can preserve it afterwards.
+        initially_closed = self.content_file.closed
+
         # CodeResource can be a collection of dependencies and not contain
         # a file - in this case, MD5 has no meaning and shouldn't exist
         try:
@@ -236,6 +239,8 @@ class CodeResourceRevision(models.Model):
             # print("How about now, is self.content_file open? {}".format(not self.content_file.closed))
             # print("")
             md5gen.update(self.content_file.read())
+            if initially_closed:
+                self.content_file.close()
 
             self.MD5_checksum = md5gen.hexdigest()
 

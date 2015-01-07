@@ -1201,7 +1201,10 @@ class FindCompatibleERTests(LibrarianTestCase):
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
-        input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+                               for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated.sort()
+        input_SDs = [entry[1] for entry in input_SDs_decorated]
         runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
@@ -1217,7 +1220,10 @@ class FindCompatibleERTests(LibrarianTestCase):
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
-        input_SDs = [eri.symbolicdataset for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+                               for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated.sort()
+        input_SDs = [entry[1] for entry in input_SDs_decorated]
         runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
@@ -1225,16 +1231,19 @@ class FindCompatibleERTests(LibrarianTestCase):
         self.assertTrue(execrecord.has_ever_failed())
         self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
 
-    def test_find_compatible_exec_record_skips_nulls(self):
-        "Incomplete run steps don't break search for compatible exec records."
-        
-        # Find an exec record that has never failed
-        exec_record = None
-        for exec_record in ExecRecord.objects.all():
-            if not exec_record.has_ever_failed():
+    def test_find_compatible_ER_skips_nulls(self):
+        """
+        Incomplete run steps don't break search for compatible ExecRecords.
+        """
+        # Find an ExecRecord that has never failed
+        execrecord = None
+        for execrecord in ExecRecord.objects.all():
+            if not execrecord.has_ever_failed():
                 break
-        input_datasets = [eri.symbolicdataset 
-                          for eri in exec_record.execrecordins.all()]
+        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+                               for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated.sort()
+        input_SDs = [entry[1] for entry in input_SDs_decorated]
 
         # Create a method with two run steps, the first one is incomplete.
         method = Method()
@@ -1266,7 +1275,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         run_step2.run = Run.objects.first()
         run_step2.pipelinestep = pipeline_step2
         run_step2.reused = False
-        run_step2.execrecord = exec_record
+        run_step2.execrecord = execrecord
         run_step2.save()
         
-        self.assertEqual(method.find_compatible_ER(input_datasets), exec_record)
+        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)

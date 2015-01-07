@@ -413,9 +413,9 @@ class TransformationInput(TransformationXput):
 
     # Input index on the transformation.
     dataset_idx = models.PositiveIntegerField(
-            "input index",
-            validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this input")
+        "input index",
+        validators=[MinValueValidator(1)],
+        help_text="Index defining the relative order of this input")
 
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index
@@ -437,9 +437,9 @@ class TransformationOutput(TransformationXput):
         help_text="Name for output as an alternative to index")
 
     dataset_idx = models.PositiveIntegerField(
-            "output index",
-            validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this output")
+        "output index",
+        validators=[MinValueValidator(1)],
+        help_text="Index defining the relative order of this output")
 
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index
