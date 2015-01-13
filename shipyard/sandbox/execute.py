@@ -286,6 +286,9 @@ class Sandbox:
                     # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
                     # execute it for a parent step, we can return.
                     if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                        self.logger.debug(
+                            "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                        )
                         curr_record.reused = True
                         curr_record.stop()
                         curr_record.complete_clean()
@@ -427,7 +430,9 @@ class Sandbox:
                         can_reuse = curr_RS.check_ER_usable(curr_ER)
                         # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
                         if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                            self.logger.debug("ExecRecord {} is reusable".format(curr_ER))
+                            self.logger.debug(
+                                "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                            )
                             curr_RS.reused = True
                             curr_RS.stop()
                             curr_RS.complete_clean()
@@ -983,6 +988,9 @@ class Sandbox:
                 # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
                 # execute it for a parent step, we can return.
                 if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                    self.logger.debug(
+                        "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                    )
                     curr_record.reused = True
                     curr_record.stop()
                     curr_record.complete_clean()
@@ -1152,6 +1160,9 @@ class Sandbox:
                     can_reuse = curr_RS.check_ER_usable(curr_ER)
                     # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
                     if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                        self.logger.debug(
+                            "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                        )
                         curr_RS.reused = True
                         curr_RS.stop()
                         curr_RS.complete_clean()
@@ -1375,7 +1386,11 @@ def finish_cable(cable_execute_dict):
             can_reuse = curr_record.check_ER_usable(curr_ER)
             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
             # execute it for a parent step, we can return.
-            if not can_reuse["successful"] or (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None):
+            if (not can_reuse["successful"] or
+                    (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
+                logger.debug(
+                    "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                )
                 curr_record.reused = True
                 curr_record.stop()
                 curr_record.complete_clean()
@@ -1599,6 +1614,9 @@ def finish_step(step_execute_dict):
                 can_reuse = curr_RS.check_ER_usable(curr_ER)
                 # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
                 if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                    logger.debug(
+                        "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                    )
                     curr_RS.reused = True
                     curr_RS.stop()
                     curr_RS.complete_clean()

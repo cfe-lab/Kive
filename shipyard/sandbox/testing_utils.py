@@ -1,6 +1,7 @@
 import os
 import tempfile
 import random
+import subprocess
 
 from django.core.files import File
 from django.contrib.auth.models import User
@@ -12,6 +13,7 @@ from metadata.tests import clean_up_all_files
 from method.models import *
 from pipeline.models import *
 from datachecking.models import *
+import sandbox.execute
 
 
 def create_sandbox_testing_tools_environment(case):
@@ -54,6 +56,267 @@ def destroy_sandbox_testing_tools_environment(case):
     Clean up a TestCase where create_sandbox_testing_tools_environment has been called.
     # """
     clean_up_all_files()
+
+
+def create_sequence_manipulation_environment(case):
+    create_sandbox_testing_tools_environment(case)
+
+    # Alice is a Shipyard user.
+    case.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
+    case.user_alice.save()
+
+    # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
+    # She wants to create a pipeline for each. In the background, this also creates
+    # two new pipeline families.
+    case.pipeline_complement = make_first_pipeline("DNA complement", "a pipeline to complement DNA")
+    case.pipeline_reverse = make_first_pipeline("DNA reverse", "a pipeline to reverse DNA")
+    case.pipeline_revcomp = make_first_pipeline("DNA revcomp", "a pipeline to reverse and complement DNA")
+
+    # Alice is only going to be manipulating DNA, so she creates a "DNA"
+    # data type. A "string" datatype, which she will use for the headers,
+    # has been predefined in Shipyard. She also creates a compound "record"
+    # datatype for sequence + header.
+    case.datatype_dna = new_datatype("DNA", "sequences of ATCG", case.STR)
+    case.cdt_record = CompoundDatatype()
+    case.cdt_record.save()
+    case.cdt_record.members.create(datatype=case.datatype_str, column_name="header", column_idx=1)
+    case.cdt_record.members.create(datatype=case.datatype_dna, column_name="sequence", column_idx=2)
+
+    # Alice uploads code to perform each of the tasks. In the background,
+    # Shipyard creates new CodeResources for these scripts and sets her
+    # uploaded files as the first CodeResourceRevisions.
+    case.coderev_complement = make_first_revision(
+        "DNA complement", "a script to complement DNA",
+        "complement.sh",
+        """#!/bin/bash
+        cat "$1" | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
+        """)
+    case.coderev_reverse = make_first_revision(
+        "DNA reverse", "a script to reverse DNA", "reverse.sh",
+        """#!/bin/bash
+        cat "$1" | cut -d ',' -f 2 | rev | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
+        """)
+
+    # To tell the system how to use her code, Alice creates two Methods,
+    # one for each CodeResource. In the background, this creates two new
+    # MethodFamilies with her Methods as the first member of each.
+    case.method_complement = make_first_method("DNA complement", "a method to complement strings of DNA",
+                                               case.coderev_complement)
+    simple_method_io(case.method_complement, case.cdt_record, "DNA_to_complement", "complemented_DNA")
+    case.method_reverse = make_first_method("DNA reverse", "a method to reverse strings of DNA",
+                                            case.coderev_complement)
+    simple_method_io(case.method_reverse, case.cdt_record, "DNA_to_reverse", "reversed_DNA")
+
+    # Now Alice is ready to define her pipelines. She uses the GUI to drag
+    # the "complement" method into the "complement" pipeline, creates
+    # the pipeline's input and output, and connects them to the inputs and
+    # output of the method.
+    create_linear_pipeline(case.pipeline_complement, [case.method_complement], "lab data",
+                           "complemented lab data")
+    case.pipeline_complement.create_outputs()
+    create_linear_pipeline(case.pipeline_reverse, [case.method_reverse], "lab data", "reversed lab data")
+    case.pipeline_reverse.create_outputs()
+    create_linear_pipeline(case.pipeline_revcomp, [case.method_reverse, case.method_complement], "lab data",
+                           "reverse and complemented lab data")
+    case.pipeline_revcomp.create_outputs()
+
+    # Here is some data which is sitting on Alice's hard drive.
+    case.labdata = "header,sequence\n"
+    for i in range(10):
+        seq = "".join([random.choice("ATCG") for j in range(10)])
+        case.labdata += "patient{},{}\n".format(i, seq)
+    case.datafile = tempfile.NamedTemporaryFile(delete=False)
+    case.datafile.write(case.labdata)
+    case.datafile.close()
+
+    # Alice uploads the data to the system.
+    case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, name="lab data", cdt=case.cdt_record,
+                                                   user=case.user_alice, description="data from the lab",
+                                                   make_dataset=True)
+
+    # Now Alice is ready to run her pipelines. The system creates a Sandbox
+    # where she will run each of her pipelines.
+    case.sandbox_complement = sandbox.execute.Sandbox(case.user_alice, case.pipeline_complement, [case.symds_labdata])
+    case.sandbox_revcomp = sandbox.execute.Sandbox(case.user_alice, case.pipeline_revcomp, [case.symds_labdata])
+
+    # A second version of the complement Pipeline which doesn't keep any output.
+    case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",
+                                           revision_desc="second version")
+    case.pipeline_complement_v2.save()
+    create_linear_pipeline(case.pipeline_complement_v2, [case.method_complement], "lab data",
+                                "complemented lab data")
+    case.pipeline_complement_v2.steps.last().add_deletion(case.method_complement.outputs.first())
+    case.pipeline_complement_v2.outcables.first().delete()
+    case.pipeline_complement_v2.create_outputs()
+
+    # A second version of the reverse/complement Pipeline which doesn't keep
+    # intermediate or final output.
+    case.pipeline_revcomp_v2 = Pipeline(family=case.pipeline_revcomp.family, revision_name="2",
+                                        revision_desc="second version")
+    case.pipeline_revcomp_v2.save()
+    create_linear_pipeline(case.pipeline_revcomp_v2, [case.method_reverse, case.method_complement],
+                                 "lab data", "revcomped lab data")
+    case.pipeline_revcomp_v2.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
+    case.pipeline_revcomp_v2.steps.get(step_num=2).add_deletion(case.method_complement.outputs.first())
+    case.pipeline_revcomp_v2.outcables.first().delete()
+    case.pipeline_revcomp_v2.create_outputs()
+
+    # A third version of the reverse/complement Pipeline which keeps
+    # final output, but not intermediate.
+    case.pipeline_revcomp_v3 = Pipeline(family=case.pipeline_revcomp.family, revision_name="3",
+                                        revision_desc="third version")
+    case.pipeline_revcomp_v3.save()
+    create_linear_pipeline(case.pipeline_revcomp_v3, [case.method_reverse, case.method_complement],
+                                 "lab data", "revcomped lab data")
+    case.pipeline_revcomp_v3.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
+    case.pipeline_revcomp_v3.create_outputs()
+
+    # Another method which turns DNA into RNA.
+    case.coderev_DNA2RNA = make_first_revision("DNA to RNA", "a script to reverse DNA", "DNA2RNA.sh",
+            """#!/bin/bash
+            cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
+            """)
+    case.method_DNA2RNA = make_first_method("DNA to RNA", "a method to turn strings of DNA into RNA",
+                                                 case.coderev_DNA2RNA)
+    simple_method_io(case.method_DNA2RNA, case.cdt_record, "DNA_to_convert", "RNA")
+
+    # A pipeline which reverses DNA, then turns it into RNA.
+    case.pipeline_revRNA = make_first_pipeline("DNA to reversed RNA",
+                                                     "a pipeline to reverse DNA and translate it to RNA")
+    create_linear_pipeline(case.pipeline_revRNA, [case.method_reverse, case.method_DNA2RNA], "lab data",
+                                 "RNA'd lab data")
+    case.pipeline_revRNA.create_outputs()
+
+    # Separator to print between Pipeline executions, to make viewing logs easier.
+    case.sep = " "*80 + "\n" + "*"*80 + "\n" + " "*80 + "\n"
+
+    # Figure out the MD5 of the output file created when the complement method
+    # is run on Alice's data, so we can check it later.
+    tmpdir = tempfile.mkdtemp()
+    outfile = os.path.join(tmpdir, "output")
+    case.method_complement.invoke_code(tmpdir, [case.datafile.name], [outfile])
+    time.sleep(1)
+    case.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
+    shutil.rmtree(tmpdir)
+
+
+def destroy_sequence_manipulation_environment(case):
+    clean_up_all_files()
+    if os.path.exists(case.datafile.name):
+        os.remove(case.datafile.name)
+
+
+def create_word_reversal_environment(case):
+    """
+    Create an environment with some word-reversal code and pipelines.
+    """
+    create_sandbox_testing_tools_environment(case)
+
+    # A code resource which reverses a file.
+    case.coderev_reverse = make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
+        ("#!/usr/bin/env python\n"
+         "import sys\n"
+         "import csv\n"
+         "with open(sys.argv[1]) as infile, open(sys.argv[2], 'w') as outfile:\n"
+         "  reader = csv.reader(infile)\n"
+         "  writer = csv.writer(outfile)\n"
+         "  for row in reader:\n"
+         "      writer.writerow([row[1][::-1], row[0][::-1]])\n"))
+
+    # A CDT with two columns, word and drow.
+    case.cdt_wordbacks = CompoundDatatype()
+    case.cdt_wordbacks.save()
+    case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
+    case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="drow", column_idx=2)
+
+    # A second CDT, much like the first :]
+    case.cdt_backwords = CompoundDatatype()
+    case.cdt_backwords.save()
+    case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="drow", column_idx=1)
+    case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="word", column_idx=2)
+
+    # Methods for the reverse CRR, and noop CRR.
+    case.method_reverse = make_first_method("string reverse", "a method to reverse strings",
+                                            case.coderev_reverse)
+    simple_method_io(case.method_reverse, case.cdt_wordbacks, "words_to_reverse", "reversed_words")
+    case.method_re_reverse = make_first_method("string re-reverse", "a method to re-reverse strings",
+                                               case.coderev_reverse)
+    simple_method_io(case.method_re_reverse, case.cdt_backwords, "words_to_rereverse", "rereversed_words")
+
+    case.method_noop_wordbacks = make_first_method(
+        "noop wordback",
+        "a method to do nothing on two columns (word, drow)",
+        case.coderev_noop)
+    simple_method_io(case.method_noop_wordbacks, case.cdt_wordbacks, "words", "more_words")
+    case.method_noop_backwords = make_first_method(
+        "noop backword",
+        "a method to do nothing on two columns",
+        case.coderev_noop)
+    simple_method_io(case.method_noop_backwords, case.cdt_backwords, "backwords", "more_backwords")
+
+    # Some data of type (case.datatype_str: word).
+    string_datafile = tempfile.NamedTemporaryFile(delete=False)
+    string_datafile.write("word\n")
+    string_datafile.close()
+    os.system("head -1 /usr/share/dict/words >> {}".
+              format(string_datafile.name))
+    case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
+        name="blahblah", cdt=case.cdt_string, user=case.user_bob,
+        description="blahblahblah", make_dataset=True)
+
+    os.remove(string_datafile.name)
+
+    # Some data of type (case.datatype_str: word, case.datatype_str: drow).
+    case.wordbacks_datafile = tempfile.NamedTemporaryFile(delete=False)
+    writer = csv.writer(case.wordbacks_datafile)
+    writer.writerow(["word", "drow"])
+    for line in range(20):
+        i = random.randint(1,99171)
+        sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
+                               stdout=subprocess.PIPE)
+        word, _ = sed.communicate()
+        word = word.strip()
+        writer.writerow([word, word[::-1]])
+    case.wordbacks_datafile.close()
+
+    case.backwords_datafile = tempfile.NamedTemporaryFile(delete=False)
+    writer = csv.writer(case.backwords_datafile)
+    writer.writerow(["drow", "word"])
+    for line in range(20):
+        i = random.randint(1,99171)
+        sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
+                               stdout=subprocess.PIPE)
+        word, _ = sed.communicate()
+        word = word.strip()
+        writer.writerow([word[::-1], word])
+    case.backwords_datafile.close()
+
+    case.symds_wordbacks = SymbolicDataset.create_SD(case.wordbacks_datafile.name,
+        name="wordbacks", cdt=case.cdt_wordbacks, user=case.user_bob,
+        description="random reversed words", make_dataset=True)
+
+    case.symds_backwords = SymbolicDataset.create_SD(case.backwords_datafile.name,
+        name="backwords", cdt=case.cdt_backwords, user=case.user_bob,
+        description="random reversed words", make_dataset=True)
+
+
+def destroy_word_reversal_environment(case):
+    clean_up_all_files()
+    if hasattr(case, "words_datafile"):
+        os.remove(case.words_datafile.name)
+
+
+def make_crisscross_cable(cable):
+    """
+    Helper to take a cable whose source and destination CDTs both have two columns that can be
+    reversed (e.g. string-string or int-int, etc.) and add "crisscross" wiring.
+    """
+    source_cdt = cable.source.structure.compounddatatype
+    dest_cdt = cable.dest.structure.compounddatatype
+    cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=1),
+                              dest_pin=dest_cdt.members.get(column_idx=2))
+    cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=2),
+                              dest_pin=dest_cdt.members.get(column_idx=1))
 
 
 def new_datatype(dtname, dtdesc, shipyardtype):

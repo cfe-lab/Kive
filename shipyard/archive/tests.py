@@ -431,9 +431,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
     def setUp(self):
-        librarian.tests.create_librarian_test_environment(self)
-        tools.create_sandbox_testing_tools_environment(self)
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        create_archive_test_environment(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
@@ -1154,12 +1152,51 @@ class RunStepTests(ArchiveTestCase):
         self.assertTrue(self.step_E3_RS.keeps_output(self.C2_rawout))
         self.assertFalse(self.step_E3_RS.keeps_output(self.C3_rawout))
 
+
+class RunComponentTooManyChecks(TransactionTestCase):
+    """
+    Tests that check clean() on the case where a RunComponent has too much datachecking.
+    """
+    def setUp(self):
+        tools.create_word_reversal_environment(self)
+
+        # Set up and run a Pipeline that throws away its intermediate data.
+        self.two_step_pl = tools.make_first_pipeline("Two-step pipeline",
+                                                     "Toy pipeline for testing data check cleaning of RunSteps.")
+        tools.create_linear_pipeline(self.two_step_pl, [self.method_noop_wordbacks, self.method_noop_wordbacks],
+                                     "data", "samedata")
+        first_step = self.two_step_pl.steps.get(step_num=1)
+        first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
+        first_step.save()
+
+        self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks])
+        self.two_step_sdbx.execute_pipeline()
+
+        # The second one's second step will have to recover its first step.  (Its input cable is trivial
+        # and is able to reuse the input cable from the first Pipeline's second step.)
+        self.following_pl = tools.make_first_pipeline(
+            "Pipeline that will follow the first",
+            "Toy pipeline that will need to recover its first step when following the above."
+        )
+        tools.create_linear_pipeline(self.following_pl, [self.method_noop_wordbacks, self.method_reverse],
+                                     "data", "reversed_data")
+        first_step = self.following_pl.steps.get(step_num=1)
+        first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
+        first_step.save()
+
+        self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks])
+        self.following_sdbx.execute_pipeline()
+        second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        assert(second_step.invoked_logs.count() == 2)
+
+    def tearDown(self):
+        tools.destroy_word_reversal_environment(self)
+
     def test_RunStep_clean_too_many_integrity_checks(self):
         """RunStep should have <=1 integrity check for each output."""
-        self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.execrecord is not None and 
+            if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
                     runstep.has_log):
                 break
@@ -1173,8 +1210,7 @@ class RunStepTests(ArchiveTestCase):
                                 runstep.clean)
 
     def test_RunStep_clean_too_many_integrity_checks_invoked(self):
-        """RunStep should have <=1 integrity check for each output."""
-        self.step_through_runstep_creation(0)
+        """Invoked logs of RunStep should have <=1 integrity check for each output."""
         runstep = None
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
@@ -1182,21 +1218,22 @@ class RunStepTests(ArchiveTestCase):
                     runstep.has_log and
                     runstep.invoked_logs.count() > 1):
                 break
-        log = runstep.invoked_logs.last()
-        sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
-                                runstep.clean)
+        for log in runstep.invoked_logs.all():
+            sd = log.record.execrecord.execrecordouts.first().symbolicdataset
+            extra_check_1 = log.integrity_checks.create(symbolicdataset=sd)
+            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd)
+            self.assertRaisesRegexp(ValidationError,
+                                    re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
+                                              'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                    runstep.clean)
+            extra_check_1.delete()
+            extra_check_2.delete()
 
     def test_RunStep_clean_too_many_content_checks(self):
         """RunStep should have <=1 content check for each output."""
-        self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.execrecord is not None and 
+            if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
                     runstep.has_log):
                 break
@@ -1211,7 +1248,6 @@ class RunStepTests(ArchiveTestCase):
 
     def test_RunStep_clean_too_many_content_checks_invoked(self):
         """RunStep should have <=1 content check for each output."""
-        self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
@@ -1219,21 +1255,22 @@ class RunStepTests(ArchiveTestCase):
                     runstep.has_log and
                     runstep.invoked_logs.count() > 1):
                 break
-        log = runstep.invoked_logs.last()
-        sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
-                                runstep.clean)
+        for log in runstep.invoked_logs.all():
+            sd = runstep.execrecord.execrecordouts.first().symbolicdataset
+            extra_check_1 = log.content_checks.create(symbolicdataset=sd)
+            extra_check_2 = log.content_checks.create(symbolicdataset=sd)
+            self.assertRaisesRegexp(ValidationError,
+                                    re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
+                                              'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                    runstep.clean)
+            extra_check_1.delete()
+            extra_check_2.delete()
 
     def test_RunStep_clean_both_checks(self):
         """RunStep should have only one type of check for each output."""
-        self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
-            if (runstep.execrecord is not None and 
+            if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
                     runstep.has_log):
                 break
@@ -1241,6 +1278,10 @@ class RunStepTests(ArchiveTestCase):
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
+        print("Total number of checks: {}".format(log.content_checks.count() + log.integrity_checks.count()))
+        # # Make sure log and runstep are up-to-date.
+        # runstep = RunStep.objects.get(pk=runstep.pk)
+        # log = ExecLog.objects.get(pk=log.pk)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1248,7 +1289,6 @@ class RunStepTests(ArchiveTestCase):
 
     def test_RunStep_clean_both_checks_invoked(self):
         """RunStep should have only one type of check for each output."""
-        self.step_through_runstep_creation(0)
         runstep = None
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
@@ -1256,14 +1296,16 @@ class RunStepTests(ArchiveTestCase):
                     runstep.has_log and
                     runstep.invoked_logs.count() > 1):
                 break
-        log = runstep.invoked_logs.last()
-        sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
-                                runstep.clean)
+        for log in runstep.invoked_logs.all():
+            sd = runstep.execrecord.execrecordouts.first().symbolicdataset
+            extra_check_1 = log.content_checks.create(symbolicdataset=sd)
+            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd)
+            self.assertRaisesRegexp(ValidationError,
+                                    re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
+                                              'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                    runstep.clean)
+            extra_check_1.delete()
+            extra_check_2.delete()
 
 
 class RunTests(ArchiveTestCase):
@@ -1924,107 +1966,107 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32.keep_output = False
         self.assertFalse(self.E11_32_RSIC.keeps_output())
 
-    def test_RunSIC_clean_too_many_integrity_checks(self):
-        """RunSIC should have <=1 integrity check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.execrecord is not None and 
-                    runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.has_log):
-                break
-        log = runsic.log
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
-
-    def test_RunSIC_clean_too_many_integrity_checks_invoked(self):
-        """RunSIC should have <=1 integrity check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.invoked_logs.count() > 1):
-                break
-        log = runsic.invoked_logs.last()
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
-
-    def test_RunSIC_clean_too_many_content_checks(self):
-        """RunSIC should have <=1 content check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.execrecord is not None and 
-                    runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.has_log):
-                break
-        log = runsic.log
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
-
-    def test_RunSIC_clean_too_many_content_checks_invoked(self):
-        """RunSIC should have <=1 content check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.invoked_logs.count() > 1):
-                break
-        log = runsic.invoked_logs.last()
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
-
-    def test_RunSIC_clean_both_checks(self):
-        """RunSIC should have only one type of check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.execrecord is not None and 
-                    runsic.execrecord.execrecordouts.count() > 0 and
-                    runsic.has_log):
-                break
-        log = runsic.log
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
-
-    def test_RunSIC_clean_both_checks_invoked(self):
-        """RunSIC should have only one type of check for each output."""
-        self.step_through_runsic_creation(0)
-        runsic = None
-        for runsic in RunSIC.objects.all():
-            if (runsic.invoked_logs.count() > 1):
-                break
-        log = runsic.invoked_logs.last()
-        sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
-                                runsic.clean)
+    # def test_RunSIC_clean_too_many_integrity_checks(self):
+    #     """RunSIC should have <=1 integrity check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.execrecord is not None and
+    #                 runsic.execrecord.execrecordouts.count() > 0 and
+    #                 runsic.has_log):
+    #             break
+    #     log = runsic.log
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
+    #
+    # def test_RunSIC_clean_too_many_integrity_checks_invoked(self):
+    #     """RunSIC should have <=1 integrity check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.invoked_logs.count() > 1):
+    #             break
+    #     log = runsic.invoked_logs.last()
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
+    #
+    # def test_RunSIC_clean_too_many_content_checks(self):
+    #     """RunSIC should have <=1 content check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.execrecord is not None and
+    #                 runsic.execrecord.execrecordouts.count() > 0 and
+    #                 runsic.has_log):
+    #             break
+    #     log = runsic.log
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
+    #
+    # def test_RunSIC_clean_too_many_content_checks_invoked(self):
+    #     """RunSIC should have <=1 content check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.invoked_logs.count() > 1):
+    #             break
+    #     log = runsic.invoked_logs.last()
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
+    #
+    # def test_RunSIC_clean_both_checks(self):
+    #     """RunSIC should have only one type of check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.execrecord is not None and
+    #                 runsic.execrecord.execrecordouts.count() > 0 and
+    #                 runsic.has_log):
+    #             break
+    #     log = runsic.log
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
+    #
+    # def test_RunSIC_clean_both_checks_invoked(self):
+    #     """RunSIC should have only one type of check for each output."""
+    #     self.step_through_runsic_creation(0)
+    #     runsic = None
+    #     for runsic in RunSIC.objects.all():
+    #         if (runsic.invoked_logs.count() > 1):
+    #             break
+    #     log = runsic.invoked_logs.last()
+    #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
+    #                             runsic.clean)
 
 
 class RunOutputCableTests(ArchiveTestCase):
@@ -2485,107 +2527,107 @@ class RunOutputCableTests(ArchiveTestCase):
         self.step_E2.add_deletion(self.D1_out)
         self.assertFalse(self.D11_21_ROC.keeps_output())
 
-    def test_RunOutputCable_clean_too_many_integrity_checks(self):
-        """RunOutputCable should have <=1 integrity check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.execrecord is not None and 
-                    roc.execrecord.execrecordouts.count() > 0 and
-                    roc.has_log):
-                break
-        log = roc.log
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
-
-    def test_RunOutputCable_clean_too_many_integrity_checks_invoked(self):
-        """RunOutputCable should have <=1 integrity check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.invoked_logs.count() > 1):
-                break
-        log = roc.invoked_logs.last()
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
-
-    def test_RunOutputCable_clean_too_many_content_checks(self):
-        """RunOutputCable should have <=1 content check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.execrecord is not None and 
-                    roc.execrecord.execrecordouts.count() > 0 and
-                    roc.has_log):
-                break
-        log = roc.log
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
-
-    def test_RunOutputCable_clean_too_many_content_checks_invoked(self):
-        """RunOutputCable should have <=1 content check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.invoked_logs.count() > 1):
-                break
-        log = roc.invoked_logs.last()
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
-
-    def test_RunOutputCable_clean_both_checks(self):
-        """RunOutputCable should have only one type of check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.execrecord is not None and 
-                    roc.execrecord.execrecordouts.count() > 0 and
-                    roc.has_log):
-                break
-        log = roc.log
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
-
-    def test_RunOutputCable_clean_both_checks_invoked(self):
-        """RunOutputCable should have only one type of check for each output."""
-        self.step_through_roc_creation(0)
-        roc = None
-        for roc in RunOutputCable.objects.all():
-            if (roc.invoked_logs.count() > 1):
-                break
-        log = roc.invoked_logs.last()
-        sd = roc.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
-                                roc.clean)
+    # def test_RunOutputCable_clean_too_many_integrity_checks(self):
+    #     """RunOutputCable should have <=1 integrity check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.execrecord is not None and
+    #                 roc.execrecord.execrecordouts.count() > 0 and
+    #                 roc.has_log):
+    #             break
+    #     log = roc.log
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
+    #
+    # def test_RunOutputCable_clean_too_many_integrity_checks_invoked(self):
+    #     """RunOutputCable should have <=1 integrity check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.invoked_logs.count() > 1):
+    #             break
+    #     log = roc.invoked_logs.last()
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
+    #
+    # def test_RunOutputCable_clean_too_many_content_checks(self):
+    #     """RunOutputCable should have <=1 content check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.execrecord is not None and
+    #                 roc.execrecord.execrecordouts.count() > 0 and
+    #                 roc.has_log):
+    #             break
+    #     log = roc.log
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
+    #
+    # def test_RunOutputCable_clean_too_many_content_checks_invoked(self):
+    #     """RunOutputCable should have <=1 content check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.invoked_logs.count() > 1):
+    #             break
+    #     log = roc.invoked_logs.last()
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
+    #
+    # def test_RunOutputCable_clean_both_checks(self):
+    #     """RunOutputCable should have only one type of check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.execrecord is not None and
+    #                 roc.execrecord.execrecordouts.count() > 0 and
+    #                 roc.has_log):
+    #             break
+    #     log = roc.log
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
+    #
+    # def test_RunOutputCable_clean_both_checks_invoked(self):
+    #     """RunOutputCable should have only one type of check for each output."""
+    #     self.step_through_roc_creation(0)
+    #     roc = None
+    #     for roc in RunOutputCable.objects.all():
+    #         if (roc.invoked_logs.count() > 1):
+    #             break
+    #     log = roc.invoked_logs.last()
+    #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
+    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     self.assertRaisesRegexp(ValidationError,
+    #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
+    #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
+    #                             roc.clean)
 
 
 class DatasetTests(TestCase):
@@ -2623,117 +2665,6 @@ class DatasetTests(TestCase):
         ds1.save()
         msg = "A Dataset with that name and MD5 already exists"
         self.assertRaisesRegexp(ValidationError, msg, ds1.validate_unique)
-
-
-# Added March 26, 2014, as it's not working if I put this in
-# Stopwatch.tests.
-class StopwatchTests(ArchiveTestCase):
-
-    # Note that ArchiveTestCase creates self.pE_run, which is a
-    # Stopwatch, in its setUp.  We'll use this as our Stopwatch.
-
-    def test_clean_neither_set(self):
-        """
-        Neither start nor end time is set.  Stopwatch should be clean.
-        """
-        self.assertIsNone(self.pE_run.clean())
-
-    def test_clean_start_set_end_unset(self):
-        """
-        start_time set, end_time not set.  This is fine.
-        """
-        self.pE_run.start()
-        self.assertIsNone(self.pE_run.clean())
-
-    def test_clean_start_set_end_set(self):
-        """
-        start_time set, end_time set afterwards.  This is fine.
-        """
-        self.pE_run.start()
-        self.pE_run.stop()
-        self.assertIsNone(self.pE_run.clean())
-
-    def test_clean_start_unset_end_set(self):
-        """
-        end_time set and start_time unset.  This is not coherent.
-        """
-        self.pE_run.end_time = timezone.now()
-        self.assertRaisesRegexp(
-            ValidationError,
-            re.escape('Stopwatch "{}" does not have a start time but it has an end time'.format(self.pE_run)),
-            self.pE_run.clean
-        )
-
-    def test_clean_end_before_start(self):
-        """
-        end_time is before start_time.  This is not coherent.
-        """
-        start = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 30),
-                                    timezone.utc)
-        end   = timezone.make_aware(datetime(2000, 2, 14, 10, 0, 15),
-                                    timezone.utc)
-        expected_message = (
-            'Stopwatch "{}" start time is later than its end time: ' +
-            '2000-02-14 10:00:30+00:00 > 2000-02-14 10:00:15+00:00.').format(
-                self.pE_run)
-        self.pE_run.start_time = start
-        self.pE_run.end_time = end
-        try:
-            self.pE_run.clean()
-            
-            self.fail("Should have thrown.")
-        except ValidationError as ex:
-            self.assertSequenceEqual(expected_message, ex.message)
-
-    def test_has_started_true(self):
-        """
-        start_time is set.
-        """
-        self.pE_run.start_time = timezone.now()
-        self.assertTrue(self.pE_run.has_started())
-
-    def test_has_started_false(self):
-        """
-        start_time is unset.
-        """
-        self.assertFalse(self.pE_run.has_started())
-
-    def test_has_ended_true(self):
-        """
-        end_time is set.
-        """
-        self.pE_run.start_time = timezone.now()
-        self.pE_run.end_time = timezone.now()
-        self.assertTrue(self.pE_run.has_ended())
-
-    def test_has_ended_false(self):
-        """
-        end_time is unset.
-        """
-        # First, the neither-set case.
-        self.assertFalse(self.pE_run.has_ended())
-
-        # Now, the started-but-not-stopped case
-        self.pE_run.start_time = timezone.now()
-        self.assertFalse(self.pE_run.has_ended())
-
-    def test_start(self):
-        """
-        start() sets start_time.
-        """
-        self.assertFalse(self.pE_run.has_started())
-        self.pE_run.start()
-        self.assertTrue(self.pE_run.has_started())
-
-    def test_stop(self):
-        """
-        stop() sets end_time.
-        """
-        self.assertFalse(self.pE_run.has_ended())
-        self.pE_run.start()
-        self.assertFalse(self.pE_run.has_ended())
-        self.pE_run.stop()
-        self.assertTrue(self.pE_run.has_ended())
 
 
 class ExecLogTests(ArchiveTestCase):

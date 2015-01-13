@@ -1,16 +1,5 @@
-import os
 import sys
-import tempfile
-import shutil
-import random
-import logging
-import csv
-import time
-import re
-from subprocess import Popen, PIPE
 
-from django.core.files import File
-from django.contrib.auth.models import User
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
@@ -22,8 +11,6 @@ from pipeline.models import *
 from datachecking.models import *
 from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
-
-import file_access_utils
 
 
 # def rmf(path):
@@ -41,10 +28,6 @@ class SandboxRMTestCase(TestCase):
     def tearDown(self):
         tools.destroy_sandbox_testing_tools_environment(self)
 
-    def make_words_symDS(self):
-        """Set up a data file of words."""
-        tools.make_words_symDS(self)
-
 
 class SandboxRMTransactionTestCase(TransactionTestCase):
 
@@ -54,155 +37,14 @@ class SandboxRMTransactionTestCase(TransactionTestCase):
     def tearDown(self):
         tools.destroy_sandbox_testing_tools_environment(self)
 
-    def make_words_symDS(self):
-        """Set up a data file of words."""
-        tools.make_words_symDS(self)
 
-
-class ExecuteTestsRM(SandboxRMTransactionTestCase):
+class ExecuteTestsRM(TransactionTestCase):
 
     def setUp(self):
-        super(ExecuteTestsRM, self).setUp()
-
-        # Alice is a Shipyard user.
-        self.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
-        self.user_alice.save()
-
-        # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
-        # She wants to create a pipeline for each. In the background, this also creates
-        # two new pipeline families.
-        self.pipeline_complement = tools.make_first_pipeline("DNA complement", "a pipeline to complement DNA")
-        self.pipeline_reverse = tools.make_first_pipeline("DNA reverse", "a pipeline to reverse DNA")
-        self.pipeline_revcomp = tools.make_first_pipeline("DNA revcomp", "a pipeline to reverse and complement DNA")
-
-        # Alice is only going to be manipulating DNA, so she creates a "DNA"
-        # data type. A "string" datatype, which she will use for the headers,
-        # has been predefined in Shipyard. She also creates a compound "record"
-        # datatype for sequence + header.
-        self.datatype_dna = tools.new_datatype("DNA", "sequences of ATCG", self.STR)
-        self.cdt_record = CompoundDatatype()
-        self.cdt_record.save()
-        self.cdt_record.members.create(datatype=self.datatype_str, column_name="header", column_idx=1)
-        self.cdt_record.members.create(datatype=self.datatype_dna, column_name="sequence", column_idx=2)
-
-        # Alice uploads code to perform each of the tasks. In the background, 
-        # Shipyard creates new CodeResources for these scripts and sets her
-        # uploaded files as the first CodeResourceRevisions.
-        self.coderev_complement = tools.make_first_revision("DNA complement", "a script to complement DNA",
-                "complement.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-        self.coderev_reverse = tools.make_first_revision("DNA reverse", "a script to reverse DNA", "reverse.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | rev | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-
-        # To tell the system how to use her code, Alice creates two Methods,
-        # one for each CodeResource. In the background, this creates two new
-        # MethodFamilies with her Methods as the first member of each.
-        self.method_complement = tools.make_first_method("DNA complement", "a method to complement strings of DNA",
-                self.coderev_complement)
-        tools.simple_method_io(self.method_complement, self.cdt_record, "DNA_to_complement", "complemented_DNA")
-        self.method_reverse = tools.make_first_method("DNA reverse", "a method to reverse strings of DNA",
-                self.coderev_complement)
-        tools.simple_method_io(self.method_reverse, self.cdt_record, "DNA_to_reverse", "reversed_DNA")
-
-        # Now Alice is ready to define her pipelines. She uses the GUI to drag
-        # the "complement" method into the "complement" pipeline, creates
-        # the pipeline's input and output, and connects them to the inputs and
-        # output of the method.
-        tools.create_linear_pipeline(self.pipeline_complement, [self.method_complement], "lab data",
-                "complemented lab data")
-        self.pipeline_complement.create_outputs()
-        tools.create_linear_pipeline(self.pipeline_reverse, [self.method_reverse], "lab data", "reversed lab data")
-        self.pipeline_reverse.create_outputs()
-        tools.create_linear_pipeline(self.pipeline_revcomp, [self.method_reverse, self.method_complement], "lab data",
-                "reverse and complemented lab data")
-        self.pipeline_revcomp.create_outputs()
-
-        # Here is some data which is sitting on Alice's hard drive.
-        self.labdata = "header,sequence\n"
-        for i in range(10):
-            seq = "".join([random.choice("ATCG") for j in range(10)])
-            self.labdata += "patient{},{}\n".format(i, seq)
-        self.datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.datafile.write(self.labdata)
-        self.datafile.close()
-
-        # Alice uploads the data to the system.
-        self.symds_labdata = SymbolicDataset.create_SD(self.datafile.name, name="lab data", cdt=self.cdt_record,
-                                                       user=self.user_alice, description="data from the lab",
-                                                       make_dataset=True)
-
-        # Now Alice is ready to run her pipelines. The system creates a Sandbox
-        # where she will run each of her pipelines.
-        self.sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-        self.sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [self.symds_labdata])
-
-        # A second version of the complement Pipeline which doesn't keep any output.
-        self.pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family, revision_name="2",
-                                               revision_desc="second version")
-        self.pipeline_complement_v2.save()
-        tools.create_linear_pipeline(self.pipeline_complement_v2, [self.method_complement], "lab data",
-                                    "complemented lab data")
-        self.pipeline_complement_v2.steps.last().add_deletion(self.method_complement.outputs.first())
-        self.pipeline_complement_v2.outcables.first().delete()
-        self.pipeline_complement_v2.create_outputs()
-
-        # A second version of the reverse/complement Pipeline which doesn't keep 
-        # intermediate or final output.
-        self.pipeline_revcomp_v2 = Pipeline(family=self.pipeline_revcomp.family, revision_name="2",
-                                            revision_desc="second version")
-        self.pipeline_revcomp_v2.save()
-        tools.create_linear_pipeline(self.pipeline_revcomp_v2, [self.method_reverse, self.method_complement],
-                                     "lab data", "revcomped lab data")
-        self.pipeline_revcomp_v2.steps.get(step_num=1).add_deletion(self.method_reverse.outputs.first())
-        self.pipeline_revcomp_v2.steps.get(step_num=2).add_deletion(self.method_complement.outputs.first())
-        self.pipeline_revcomp_v2.outcables.first().delete()
-        self.pipeline_revcomp_v2.create_outputs()
-
-        # A third version of the reverse/complement Pipeline which keeps
-        # final output, but not intermediate.
-        self.pipeline_revcomp_v3 = Pipeline(family=self.pipeline_revcomp.family, revision_name="3", 
-                                            revision_desc="third version")
-        self.pipeline_revcomp_v3.save()
-        tools.create_linear_pipeline(self.pipeline_revcomp_v3, [self.method_reverse, self.method_complement],
-                                     "lab data", "revcomped lab data")
-        self.pipeline_revcomp_v3.steps.get(step_num=1).add_deletion(self.method_reverse.outputs.first())
-        self.pipeline_revcomp_v3.create_outputs()
-
-        # Another method which turns DNA into RNA.
-        self.coderev_DNA2RNA = tools.make_first_revision("DNA to RNA", "a script to reverse DNA", "DNA2RNA.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-        self.method_DNA2RNA = tools.make_first_method("DNA to RNA", "a method to turn strings of DNA into RNA",
-                                                     self.coderev_DNA2RNA)
-        tools.simple_method_io(self.method_DNA2RNA, self.cdt_record, "DNA_to_convert", "RNA")
-
-        # A pipeline which reverses DNA, then turns it into RNA.
-        self.pipeline_revRNA = tools.make_first_pipeline("DNA to reversed RNA",
-                                                         "a pipeline to reverse DNA and translate it to RNA")
-        tools.create_linear_pipeline(self.pipeline_revRNA, [self.method_reverse, self.method_DNA2RNA], "lab data",
-                                     "RNA'd lab data")
-        self.pipeline_revRNA.create_outputs()
-
-        # Separator to print between Pipeline executions, to make viewing logs easier.
-        self.sep = " "*80 + "\n" + "*"*80 + "\n" + " "*80 + "\n"
-
-        # Figure out the MD5 of the output file created when the complement method
-        # is run on Alice's data, so we can check it later.
-        tmpdir = tempfile.mkdtemp()
-        outfile = os.path.join(tmpdir, "output")
-        self.method_complement.invoke_code(tmpdir, [self.datafile.name], [outfile])
-        time.sleep(1)
-        self.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
-        shutil.rmtree(tmpdir)
+        tools.create_sequence_manipulation_environment(self)
 
     def tearDown(self):
-        super(ExecuteTestsRM, self).tearDown()
-        os.remove(self.datafile.name)
+        tools.destroy_sequence_manipulation_environment(self)
 
     def test_execute_pipeline_spaces_in_dataset_name(self):
         """
@@ -537,36 +379,19 @@ class BadRunTests(TransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
 
 
-class FindSDTests(SandboxRMTransactionTestCase):
+class FindSDTests(TransactionTestCase):
     """
     Tests for first_generator_of_SD.
     """
     def setUp(self):
-        super(FindSDTests, self).setUp()
+        tools.create_word_reversal_environment(self)
 
         self.setup_simple_pipeline()
         self.setup_twostep_pipeline()
         self.setup_nested_pipeline()
 
     def tearDown(self):
-        super(FindSDTests, self).tearDown()
-        # clean_files()
-        # if hasattr(self, "string_datafile"):
-        #     os.remove(self.string_datafile.name)
-        if hasattr(self, "words_datafile"):
-            os.remove(self.words_datafile.name)
-
-    def make_crisscross_cable(self, cable):
-        """
-        Helper to take a cable whose source and destination CDTs both have two columns that can be
-        reversed (e.g. string-string or int-int, etc.) and add "crisscross" wiring.
-        """
-        source_cdt = cable.source.structure.compounddatatype
-        dest_cdt = cable.dest.structure.compounddatatype
-        cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=1),
-                                  dest_pin=dest_cdt.members.get(column_idx=2))
-        cable.custom_wires.create(source_pin=source_cdt.members.get(column_idx=2),
-                                  dest_pin=dest_cdt.members.get(column_idx=1))
+        tools.destroy_word_reversal_environment(self)
 
     def setup_nested_pipeline(self):
         # A two-step pipeline with custom cable wires at each step.
@@ -577,7 +402,7 @@ class FindSDTests(SandboxRMTransactionTestCase):
         tools.create_linear_pipeline(self.pipeline_nested,
             transforms, "data", "unchanged data")
         cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
-        self.make_crisscross_cable(cable)
+        tools.make_crisscross_cable(cable)
         self.pipeline_nested.create_outputs()
         self.pipeline_nested.complete_clean()
     
@@ -589,37 +414,6 @@ class FindSDTests(SandboxRMTransactionTestCase):
                         |   reverse   |            |     noop     |
                         |_____________|            |______________|
         """
-        # A code resource which reverses a file.
-        self.coderev_reverse = tools.make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
-            ("#!/usr/bin/env python\n"
-             "import sys\n"
-             "import csv\n"
-             "with open(sys.argv[1]) as infile, open(sys.argv[2], 'w') as outfile:\n"
-             "  reader = csv.reader(infile)\n"
-             "  writer = csv.writer(outfile)\n"
-             "  for row in reader:\n"
-             "      writer.writerow([row[1][::-1], row[0][::-1]])\n"))
-
-        # A CDT with two columns, word and drow.
-        self.cdt_words = CompoundDatatype()
-        self.cdt_words.save()
-        self.cdt_words.members.create(datatype=self.datatype_str, column_name="word", column_idx=1)
-        self.cdt_words.members.create(datatype=self.datatype_str, column_name="drow", column_idx=2)
-
-        # A second CDT, much like the first :]
-        self.cdt_backwords = CompoundDatatype()
-        self.cdt_backwords.save()
-        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="drow", column_idx=1)
-        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="word", column_idx=2)
-
-        # Methods for the reverse CRR, and noop CRR with backwords CDT.
-        self.method_reverse = tools.make_first_method("string reverse", "a method to reverse strings",
-                                                     self.coderev_reverse)
-        tools.simple_method_io(self.method_reverse, self.cdt_words, "words_to_reverse", "reversed_words")
-        self.method_noop_backwords = tools.make_first_method("noop", "a method to do nothing on two columns",
-                                                            self.coderev_noop)
-        tools.simple_method_io(self.method_noop_backwords, self.cdt_backwords, "backwords", "more_backwords")
-
         # A two-step pipeline with custom cable wires at each step.
         self.pipeline_twostep = tools.make_first_pipeline("two-step pipeline",
                                                          "a two-step pipeline with custom cable wires at each step")
@@ -636,7 +430,7 @@ class FindSDTests(SandboxRMTransactionTestCase):
             cable = step.cables_in.create(source_step = i, 
                 source = source,
                 dest = methods[i].inputs.first())
-            self.make_crisscross_cable(cable)
+            tools.make_crisscross_cable(cable)
 
         cable = self.pipeline_twostep.create_outcable(output_name = "reversed_words",
             output_idx = 1,
@@ -645,23 +439,6 @@ class FindSDTests(SandboxRMTransactionTestCase):
 
         self.pipeline_twostep.create_outputs()
         self.pipeline_twostep.complete_clean()
-
-        # Some data to run through the two-step pipeline.
-        self.words_datafile = tempfile.NamedTemporaryFile(delete=False)
-        writer = csv.writer(self.words_datafile)
-        writer.writerow(["drow", "word"])
-        for line in range(20):
-            i = random.randint(1,99171)
-            sed = Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
-                        stdout=PIPE)
-            word, _ = sed.communicate()
-            word = word.strip()
-            writer.writerow([word[::-1], word])
-        self.words_datafile.close()
-
-        self.symds_backwords = SymbolicDataset.create_SD(self.words_datafile.name,
-            name="backwords", cdt=self.cdt_backwords, user=self.user_bob,
-            description="random reversed words", make_dataset=True)
     
     def setup_simple_pipeline(self):
         # A simple, one-step pipeline, which does nothing.
@@ -670,9 +447,6 @@ class FindSDTests(SandboxRMTransactionTestCase):
         tools.create_linear_pipeline(self.pipeline_noop,
             [self.method_noop], "lab data", "complemented lab data")
         self.pipeline_noop.create_outputs()
-
-        # Some data to run through the simple pipeline.
-        self.make_words_symDS()
 
     def test_find_symds_pipeline_input(self):
         """
@@ -791,7 +565,8 @@ class RawTests(SandboxRMTransactionTestCase):
         tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words",
+        self.symds_raw = SymbolicDataset.create_SD(
+            "/usr/share/dict/words",
             name="raw", cdt=None, user=self.user_bob,
             description="some raw data", make_dataset=True)
 
