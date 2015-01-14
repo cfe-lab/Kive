@@ -1,7 +1,7 @@
 """Code that is responsible for the execution of Pipelines."""
 
 from django.utils import timezone
-from django.db import transaction, connection
+from django.db import transaction, connection, OperationalError
 from django.contrib.auth.models import User
 
 import archive.models
@@ -16,6 +16,8 @@ import os.path
 import shutil
 import logging
 import tempfile
+import time
+import random
 from collections import defaultdict
 
 logger = logging.getLogger("Sandbox")
@@ -275,26 +277,35 @@ class Sandbox:
             # Attempt to reuse this PipelineCable.
             curr_ER = None
 
-            with transaction.atomic():
-                # This transaction should be serializable.
-                _set_transaction_serializable()
-                curr_ER = curr_record.find_compatible_ER(input_SD)
-                if curr_ER is not None:
-                    curr_record.execrecord = curr_ER
-                    output_SD = curr_ER.execrecordouts.first().symbolicdataset
-                    can_reuse = curr_record.check_ER_usable(curr_ER)
-                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
-                    # execute it for a parent step, we can return.
-                    if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                        self.logger.debug(
-                            "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                        )
-                        curr_record.reused = True
-                        curr_record.stop()
-                        curr_record.complete_clean()
-                        curr_record.save()
-                        self.update_cable_maps(curr_record, output_SD, output_path)
-                        return curr_record
+            succeeded_yet = False
+            while not succeeded_yet:
+                try:
+                    with transaction.atomic():
+                        # This transaction should be serializable.
+                        _set_transaction_serializable()
+                        curr_ER = curr_record.find_compatible_ER(input_SD)
+                        if curr_ER is not None:
+                            curr_record.execrecord = curr_ER
+                            output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                            can_reuse = curr_record.check_ER_usable(curr_ER)
+                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+                            # execute it for a parent step, we can return.
+                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                                self.logger.debug(
+                                    "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                                )
+                                curr_record.reused = True
+                                curr_record.stop()
+                                curr_record.complete_clean()
+                                curr_record.save()
+                                self.update_cable_maps(curr_record, output_SD, output_path)
+                                return curr_record
+                    succeeded_yet = True
+                except OperationalError:
+                    wait_time = random.random()
+                    self.logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+                    time.sleep(wait_time)
+
 
             # At this point, we know we did not reuse an ExecRecord -- we're either filling one in
             # or creating a new one.
@@ -415,39 +426,51 @@ class Sandbox:
                 inputs_after_cable.append(corresp_ERI.symbolicdataset)
 
         # Look for ExecRecord.
-        with transaction.atomic():
-            _set_transaction_serializable()
-            if pipelinestep.is_subpipeline:
-                curr_ER = None
-                self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".format(pipelinestep))
-            else:
-                if recover:
-                    curr_ER = librarian.models.ExecRecord.objects.get(pk=curr_RS.execrecord.pk)
-                else:
-                    curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
-                    if curr_ER is not None:
-                        curr_RS.execrecord = curr_ER
-                        can_reuse = curr_RS.check_ER_usable(curr_ER)
-                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
-                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                            self.logger.debug(
-                                "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                            )
-                            curr_RS.reused = True
-                            curr_RS.stop()
-                            curr_RS.complete_clean()
-                            curr_RS.save()
-                            self.update_step_maps(curr_RS, step_run_dir, output_paths)
-                            return curr_RS
-
-                        else:
-                            self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
-
+        succeeded_yet = False
+        while not succeeded_yet:
+            try:
+                with transaction.atomic():
+                    _set_transaction_serializable()
+                    if pipelinestep.is_subpipeline:
+                        curr_ER = None
+                        self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".
+                                          format(pipelinestep))
                     else:
-                        self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+                        if recover:
+                            curr_ER = librarian.models.ExecRecord.objects.get(pk=curr_RS.execrecord.pk)
+                        else:
+                            curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+                            if curr_ER is not None:
+                                curr_RS.execrecord = curr_ER
+                                can_reuse = curr_RS.check_ER_usable(curr_ER)
+                                # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it
+                                # now, we can return.
+                                if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                                    self.logger.debug(
+                                        "ExecRecord {} is reusable (successful = {})".format(
+                                            curr_ER, can_reuse["successful"])
+                                    )
+                                    curr_RS.reused = True
+                                    curr_RS.stop()
+                                    curr_RS.complete_clean()
+                                    curr_RS.save()
+                                    self.update_step_maps(curr_RS, step_run_dir, output_paths)
+                                    return curr_RS
 
-                    curr_RS.reused = False
-                    curr_RS.save()
+                                else:
+                                    self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                            else:
+                                self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
+
+                            curr_RS.reused = False
+                            curr_RS.save()
+                succeeded_yet = True
+            except OperationalError:
+                wait_time = random.random()
+                self.logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+                time.sleep(wait_time)
+
 
         invoking_record = recovering_record if recover else curr_RS
 
@@ -974,29 +997,37 @@ class Sandbox:
         self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
         self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
-
         # Attempt to reuse this PipelineCable.
         return_now = False
-        with transaction.atomic():
-            _set_transaction_serializable()
-            curr_ER = curr_record.find_compatible_ER(input_SD)
 
-            if curr_ER is not None:
-                curr_record.execrecord = curr_ER
-                output_SD = curr_ER.execrecordouts.first().symbolicdataset
-                can_reuse = curr_record.check_ER_usable(curr_ER)
-                # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
-                # execute it for a parent step, we can return.
-                if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                    self.logger.debug(
-                        "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                    )
-                    curr_record.reused = True
-                    curr_record.stop()
-                    curr_record.complete_clean()
-                    curr_record.save()
-                    self.update_cable_maps(curr_record, output_SD, output_path)
-                    return_now = True
+        succeeded_yet = False
+        while not succeeded_yet:
+            try:
+                with transaction.atomic():
+                    _set_transaction_serializable()
+                    curr_ER = curr_record.find_compatible_ER(input_SD)
+
+                    if curr_ER is not None:
+                        curr_record.execrecord = curr_ER
+                        output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                        can_reuse = curr_record.check_ER_usable(curr_ER)
+                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+                        # execute it for a parent step, we can return.
+                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                            self.logger.debug(
+                                "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                            )
+                            curr_record.reused = True
+                            curr_record.stop()
+                            curr_record.complete_clean()
+                            curr_record.save()
+                            self.update_cable_maps(curr_record, output_SD, output_path)
+                            return_now = True
+                succeeded_yet = True
+            except OperationalError:
+                wait_time = random.random()
+                self.logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+                time.sleep(wait_time)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
         if isinstance(parent_record, archive.models.RunStep):
@@ -1152,32 +1183,43 @@ class Sandbox:
 
             # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
             # Look for ExecRecord.
-            with transaction.atomic():
-                _set_transaction_serializable()
-                curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
-                if curr_ER is not None:
-                    curr_RS.execrecord = curr_ER
-                    can_reuse = curr_RS.check_ER_usable(curr_ER)
-                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
-                    if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                        self.logger.debug(
-                            "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                        )
-                        curr_RS.reused = True
-                        curr_RS.stop()
-                        curr_RS.complete_clean()
+            succeeded_yet = False
+            while not succeeded_yet:
+                try:
+                    with transaction.atomic():
+                        _set_transaction_serializable()
+                        curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+                        if curr_ER is not None:
+                            curr_RS.execrecord = curr_ER
+                            can_reuse = curr_RS.check_ER_usable(curr_ER)
+                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now,
+                            # we can return.
+                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                                self.logger.debug(
+                                    "ExecRecord {} is reusable (successful = {})".format(
+                                        curr_ER, can_reuse["successful"])
+                                )
+                                curr_RS.reused = True
+                                curr_RS.stop()
+                                curr_RS.complete_clean()
+                                curr_RS.save()
+                                self.update_step_maps(curr_RS, step_run_dir, output_paths)
+                                return curr_RS
+
+                            else:
+                                self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                        else:
+                            self.logger.debug("No compatible ExecRecord found yet")
+
+                        curr_RS.reused = False
                         curr_RS.save()
-                        self.update_step_maps(curr_RS, step_run_dir, output_paths)
-                        return curr_RS
+                    succeeded_yet = True
+                except OperationalError:
+                    wait_time = random.random()
+                    self.logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+                    time.sleep(wait_time)
 
-                    else:
-                        self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
-
-                else:
-                    self.logger.debug("No compatible ExecRecord found yet")
-
-                curr_RS.reused = False
-                curr_RS.save()
 
         # We found no reusable ER, so we add this step to the queue.
         # If there were any inputs that were only symbolically OK, we call queue_recover on them and register
@@ -1374,28 +1416,37 @@ def finish_cable(cable_execute_dict):
     # It's possible that this cable was completed in the time between the Manager queueing this task
     # and the worker.  If so we can use the ExecRecord, and maybe even fully reuse it if this was
     # not called by finish_step.
-    with transaction.atomic():
-        _set_transaction_serializable()
-        if cable_execute_dict["execrecord_pk"] is not None:
-            curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
-        else:
-            curr_ER = curr_record.find_compatible_ER(input_SD)
+    succeeded_yet = False
+    while not succeeded_yet:
+        try:
+            with transaction.atomic():
+                _set_transaction_serializable()
+                if cable_execute_dict["execrecord_pk"] is not None:
+                    curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
+                else:
+                    curr_ER = curr_record.find_compatible_ER(input_SD)
 
-        if curr_ER is not None:
-            curr_record.execrecord = curr_ER
-            can_reuse = curr_record.check_ER_usable(curr_ER)
-            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
-            # execute it for a parent step, we can return.
-            if (not can_reuse["successful"] or
-                    (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
-                logger.debug(
-                    "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                )
-                curr_record.reused = True
-                curr_record.stop()
-                curr_record.complete_clean()
-                curr_record.save()
-                return curr_record
+                if curr_ER is not None:
+                    curr_record.execrecord = curr_ER
+                    can_reuse = curr_record.check_ER_usable(curr_ER)
+                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+                    # execute it for a parent step, we can return.
+                    if (not can_reuse["successful"] or
+                            (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
+                        logger.debug(
+                            "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                        )
+                        curr_record.reused = True
+                        curr_record.stop()
+                        curr_record.complete_clean()
+                        curr_record.save()
+                        return curr_record
+            succeeded_yet = True
+        except OperationalError:
+            wait_time = random.random()
+            logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+            time.sleep(wait_time)
+
 
     # We're now committed to actually running this cable.
     input_SD_path = cable_execute_dict["input_SD_path"]
@@ -1459,61 +1510,70 @@ def _finish_cable_h(curr_record, cable, user, execrecord, input_SD, input_SD_pat
     # Check one last time to see if an ExecRecord is now available.
     # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
     preexisting_ER = execrecord is not None
-    with transaction.atomic():
-        _set_transaction_serializable()
-        if not preexisting_ER:
-            execrecord = curr_record.find_compatible_ER(input_SD)
-            if execrecord is not None:
-                logger.debug("A compatible ExecRecord has been created elsewhere.")
-                preexisting_ER = True
+    succeeded_yet = False
+    while not succeeded_yet:
+        try:
+            with transaction.atomic():
+                _set_transaction_serializable()
+                if not preexisting_ER:
+                    execrecord = curr_record.find_compatible_ER(input_SD)
+                    if execrecord is not None:
+                        logger.debug("A compatible ExecRecord has been created elsewhere.")
+                        preexisting_ER = True
 
-        missing_output = False
-        start_time = timezone.now()
-        if not file_access_utils.file_exists(output_path):
-            end_time = timezone.now()
-            # It's conceivable that the linking could fail in the
-            # trivial case; in which case we should associate a "missing data"
-            # check to input_SD == output_SD.
-            if cable.is_trivial():
-                output_SD = input_SD
-            if execrecord is None:
-                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-            else:
-                output_SD = execrecord.execrecordouts.first().symbolicdataset
-            output_SD.mark_missing(start_time, end_time, curr_log)
-            missing_output = True
+                missing_output = False
+                start_time = timezone.now()
+                if not file_access_utils.file_exists(output_path):
+                    end_time = timezone.now()
+                    # It's conceivable that the linking could fail in the
+                    # trivial case; in which case we should associate a "missing data"
+                    # check to input_SD == output_SD.
+                    if cable.is_trivial():
+                        output_SD = input_SD
+                    if execrecord is None:
+                        output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                    else:
+                        output_SD = execrecord.execrecordouts.first().symbolicdataset
+                    output_SD.mark_missing(start_time, end_time, curr_log)
+                    missing_output = True
 
-        elif cable.is_trivial():
-            output_SD = input_SD
+                elif cable.is_trivial():
+                    output_SD = input_SD
 
-        else:
-            # Do we need to keep this output?
-            make_dataset = curr_record.keeps_output()
-            dataset_name = curr_record.output_name()
-            dataset_desc = curr_record.output_description()
-            if not make_dataset:
-                logger.debug("Cable doesn't keep output: not creating a dataset")
+                else:
+                    # Do we need to keep this output?
+                    make_dataset = curr_record.keeps_output()
+                    dataset_name = curr_record.output_name()
+                    dataset_desc = curr_record.output_description()
+                    if not make_dataset:
+                        logger.debug("Cable doesn't keep output: not creating a dataset")
 
-            if execrecord is not None:
-                output_SD = execrecord.execrecordouts.first().symbolicdataset
-                if make_dataset:
-                    output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
+                    if execrecord is not None:
+                        output_SD = execrecord.execrecordouts.first().symbolicdataset
+                        if make_dataset:
+                            output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
 
-            else:
-                output_SD = librarian.models.SymbolicDataset.create_SD(output_path, output_CDT, make_dataset, user,
-                                                                       dataset_name, dataset_desc, curr_record, False)
+                    else:
+                        output_SD = librarian.models.SymbolicDataset.create_SD(
+                            output_path, output_CDT, make_dataset, user,
+                            dataset_name, dataset_desc, curr_record, False)
 
-        # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
-        if not recover:
-            if execrecord is None:
-                logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
-                # Make ExecRecord, linking it to the ExecLog.
-                execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
-            # Link ER to RunCable (this may have already been linked; that's fine).
-            curr_record.link_execrecord(execrecord, False)
+                # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
+                if not recover:
+                    if execrecord is None:
+                        logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
+                        # Make ExecRecord, linking it to the ExecLog.
+                        execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
+                    # Link ER to RunCable (this may have already been linked; that's fine).
+                    curr_record.link_execrecord(execrecord, False)
 
-        else:
-            logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
+                else:
+                    logger.debug("This was a recovery - not linking RSIC/RunOutputCable to ExecRecord")
+            succeeded_yet = True
+        except OperationalError:
+            wait_time = random.random()
+            logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+            time.sleep(wait_time)
 
     ####
     # Check outputs
@@ -1605,32 +1665,40 @@ def finish_step(step_execute_dict):
     if recover:
         assert curr_ER is not None
     else:
-        with transaction.atomic():
-            _set_transaction_serializable()
-            if curr_ER is None:
-                curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
-            if curr_ER is not None:
-                curr_RS.execrecord = curr_ER
-                can_reuse = curr_RS.check_ER_usable(curr_ER)
-                # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
-                if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                    logger.debug(
-                        "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
-                    )
-                    curr_RS.reused = True
-                    curr_RS.stop()
-                    curr_RS.complete_clean()
+        succeeded_yet = False
+        while not succeeded_yet:
+            try:
+                with transaction.atomic():
+                    _set_transaction_serializable()
+                    if curr_ER is None:
+                        curr_ER = curr_RS.find_compatible_ER(inputs_after_cable)
+                    if curr_ER is not None:
+                        curr_RS.execrecord = curr_ER
+                        can_reuse = curr_RS.check_ER_usable(curr_ER)
+                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                            logger.debug(
+                                "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                            )
+                            curr_RS.reused = True
+                            curr_RS.stop()
+                            curr_RS.complete_clean()
+                            curr_RS.save()
+                            return curr_RS
+
+                        else:
+                            logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                    else:
+                        logger.debug("No compatible ExecRecord found yet")
+
+                    curr_RS.reused = False
                     curr_RS.save()
-                    return curr_RS
-
-                else:
-                    logger.debug("Filling in ExecRecord {}".format(curr_ER))
-
-            else:
-                logger.debug("No compatible ExecRecord found yet")
-
-            curr_RS.reused = False
-            curr_RS.save()
+                succeeded_yet = True
+            except OperationalError:
+                wait_time = random.random()
+                logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+                time.sleep(wait_time)
 
     return _finish_step_h(user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths, output_paths,
                           log_dir, recovering_record)
@@ -1664,73 +1732,81 @@ def _finish_step_h(user, runstep, step_run_dir, execrecord, inputs_after_cable, 
     # We look one more time for an ExecRecord, since one may have been created while
     # running the code.
     preexisting_ER = execrecord is not None
-    with transaction.atomic():
-        _set_transaction_serializable()
-        # Don't create one elsewhere, we're going to make one here!
-        if not preexisting_ER:
-            execrecord = runstep.transformation.definite.find_compatible_ER(inputs_after_cable)
-            if execrecord is not None:
-                logger.debug("A compatible ExecRecord has been created elsewhere.")
-                preexisting_ER = True
+    succeeded_yet = False
+    while not succeeded_yet:
+        try:
+            with transaction.atomic():
+                _set_transaction_serializable()
+                # Don't create one elsewhere, we're going to make one here!
+                if not preexisting_ER:
+                    execrecord = runstep.transformation.definite.find_compatible_ER(inputs_after_cable)
+                    if execrecord is not None:
+                        logger.debug("A compatible ExecRecord has been created elsewhere.")
+                        preexisting_ER = True
 
-        # Create outputs.
-        # bad_output_found indicates we have detected problems with the output.
-        bad_output_found = not curr_log.is_successful()
-        output_SDs = []
-        logger.debug("ExecLog.is_successful() == {}".format(curr_log.is_successful()))
+                # Create outputs.
+                # bad_output_found indicates we have detected problems with the output.
+                bad_output_found = not curr_log.is_successful()
+                output_SDs = []
+                logger.debug("ExecLog.is_successful() == {}".format(curr_log.is_successful()))
 
-        if not (recover or preexisting_ER):
-            logger.debug("Creating new SymbolicDatasets for PipelineStep outputs")
+                if not (recover or preexisting_ER):
+                    logger.debug("Creating new SymbolicDatasets for PipelineStep outputs")
 
-        for i, curr_output in enumerate(pipelinestep.outputs):
-            output_path = output_paths[i]
-            output_CDT = curr_output.get_cdt()
+                for i, curr_output in enumerate(pipelinestep.outputs):
+                    output_path = output_paths[i]
+                    output_CDT = curr_output.get_cdt()
 
-            # Check that the file exists, as we did for cables.
-            start_time = timezone.now()
-            if not file_access_utils.file_exists(output_path):
-                end_time = timezone.now()
-                if execrecord is None:
-                    output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-                else:
-                    output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
-                output_SD.mark_missing(start_time, end_time, curr_log)
+                    # Check that the file exists, as we did for cables.
+                    start_time = timezone.now()
+                    if not file_access_utils.file_exists(output_path):
+                        end_time = timezone.now()
+                        if execrecord is None:
+                            output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                        else:
+                            output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
+                        output_SD.mark_missing(start_time, end_time, curr_log)
 
-                # FIXME continue from here -- for whatever reason an integrity check is still
-                # happening after this!
-                bad_output_found = True
+                        # FIXME continue from here -- for whatever reason an integrity check is still
+                        # happening after this!
+                        bad_output_found = True
 
-            else:
-                make_dataset = runstep.keeps_output(curr_output)
-                if recover or had_ER_at_beginning:
-                    output_ERO = execrecord.get_execrecordout(curr_output)
-                    make_dataset = make_dataset and not output_ERO.has_data()
+                    else:
+                        make_dataset = runstep.keeps_output(curr_output)
+                        if recover or had_ER_at_beginning:
+                            output_ERO = execrecord.get_execrecordout(curr_output)
+                            make_dataset = make_dataset and not output_ERO.has_data()
 
-                # Create new SymbolicDataset for output, along with Dataset
-                # if necessary.
-                dataset_name = runstep.output_name(curr_output)
-                dataset_desc = runstep.output_description(curr_output)
+                        # Create new SymbolicDataset for output, along with Dataset
+                        # if necessary.
+                        dataset_name = runstep.output_name(curr_output)
+                        dataset_desc = runstep.output_description(curr_output)
 
-                if not (recover or had_ER_at_beginning):
-                    output_SD = librarian.models.SymbolicDataset.create_SD(
-                        output_path, output_CDT, make_dataset,
-                        user, dataset_name, dataset_desc, runstep, False
-                    )
-                    logger.debug("First time seeing file: saved md5 {}".format(output_SD.MD5_checksum))
-                else:
-                    output_SD = output_ERO.symbolicdataset
-                    if make_dataset:
-                        output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, runstep)
-            output_SDs.append(output_SD)
+                        if not (recover or had_ER_at_beginning):
+                            output_SD = librarian.models.SymbolicDataset.create_SD(
+                                output_path, output_CDT, make_dataset,
+                                user, dataset_name, dataset_desc, runstep, False
+                            )
+                            logger.debug("First time seeing file: saved md5 {}".format(output_SD.MD5_checksum))
+                        else:
+                            output_SD = output_ERO.symbolicdataset
+                            if make_dataset:
+                                output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, runstep)
+                    output_SDs.append(output_SD)
 
-        # Link ExecRecord.
-        if not recover:
-            if not preexisting_ER:
-                # Make new ExecRecord, linking it to the ExecLog
-                logger.debug("Creating fresh ExecRecord")
-                execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep, inputs_after_cable, output_SDs)
-            # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-            runstep.link_execrecord(execrecord, False)
+                # Link ExecRecord.
+                if not recover:
+                    if not preexisting_ER:
+                        # Make new ExecRecord, linking it to the ExecLog
+                        logger.debug("Creating fresh ExecRecord")
+                        execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep, inputs_after_cable, output_SDs)
+                    # Link ExecRecord to RunStep (it may already have been linked; that's fine).
+                    runstep.link_execrecord(execrecord, False)
+            succeeded_yet = True
+        except OperationalError:
+            wait_time = random.random()
+            logger.debug("Database conflict.  Waiting for {} seconds before retrying.".format(wait_time))
+            time.sleep(wait_time)
 
     # Check outputs.
     for i, curr_output in enumerate(pipelinestep.outputs):

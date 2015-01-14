@@ -3,7 +3,6 @@ import tempfile
 import random
 import subprocess
 
-from django.core.files import File
 from django.contrib.auth.models import User
 
 from archive.models import *

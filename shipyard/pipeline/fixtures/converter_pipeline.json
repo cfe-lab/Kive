@@ -1,0 +1,66 @@
+[
+    {
+    "pk": 1,
+    "model": "pipeline.pipelinefamily",
+    "fields": {
+        "published_version": null,
+        "name": "Fasta2CSV",
+        "description": "One-step pipeline wrapper for Fasta2CSV Method"
+    }
+},
+{
+    "pk": 2,
+    "model": "pipeline.pipeline",
+    "fields": {
+        "revision_number": 1,
+        "revision_parent": null,
+        "family": 1
+    }
+},
+{
+    "pk": 1,
+    "model": "pipeline.pipelinestep",
+    "fields": {
+        "pipeline": 2,
+        "name": "",
+        "outputs_to_delete": [],
+        "y": 0.21,
+        "x": 0.15,
+        "transformation": 1,
+        "step_num": 1
+    }
+},
+{
+    "pk": 1,
+    "model": "pipeline.pipelinecable",
+    "fields": {}
+},
+{
+    "pk": 2,
+    "model": "pipeline.pipelinecable",
+    "fields": {}
+},
+{
+    "pk": 1,
+    "model": "pipeline.pipelinestepinputcable",
+    "fields": {
+        "pipelinestep": 1,
+        "dest": 1,
+        "keep_output": false,
+        "source": 3,
+        "source_step": 0
+    }
+},
+{
+    "pk": 2,
+    "model": "pipeline.pipelineoutputcable",
+    "fields": {
+        "pipeline": 2,
+        "output_idx": 1,
+        "source": 2,
+        "output_cdt": 4,
+        "output_name": "pipeline_output",
+        "source_step": 1
+    }
+}
+]

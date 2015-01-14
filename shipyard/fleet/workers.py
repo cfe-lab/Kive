@@ -269,22 +269,22 @@ class Manager:
             # Look for new jobs to run.  We will also
             # build in a delay here so we don't clog up the database.
             mgr_logger.debug("Looking for new runs....")
-            with transaction.atomic():
-                pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
+            # with transaction.atomic():
+            pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
 
-                mgr_logger.debug("Pending runs: {}".format(pending_runs))
+            mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
-                for run_to_process in pending_runs:
-                    mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
-                        run_to_process.pipeline, run_to_process.user))
-                    new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
-                                              [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
-                                              sandbox_path=run_to_process.sandbox_path)
-                    run_to_process.run = new_sdbx.run
-                    run_to_process.save()
+            for run_to_process in pending_runs:
+                mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
+                    run_to_process.pipeline, run_to_process.user))
+                new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
+                                          [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
+                                          sandbox_path=run_to_process.sandbox_path)
+                run_to_process.run = new_sdbx.run
+                run_to_process.save()
 
-                    mgr_logger.debug("Task queue: {}".format(self.task_queue))
-                    mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+                mgr_logger.debug("Task queue: {}".format(self.task_queue))
+                mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
 
 
 class Worker:
