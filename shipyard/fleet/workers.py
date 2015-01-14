@@ -336,14 +336,14 @@ class Worker:
     
             sandbox_result = None
             if type(task) == archive.models.RunStep:
-                sandbox_result = sandbox.execute.finish_step(task_info_dict)
+                sandbox_result = sandbox.execute.finish_step(task_info_dict, self.rank)
             else:
-                sandbox_result = sandbox.execute.finish_cable(task_info_dict)
+                sandbox_result = sandbox.execute.finish_cable(task_info_dict, self.rank)
             worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
             result = sandbox_result.pk
         except:
-            result = -1 #bogus return value
-            worker_logger.error("Task %s failed.", task, exc_info=True)
+            result = -1  # bogus return value
+            worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
             
         send_buf = numpy.array([self.rank, result], dtype="i")
         self.comm.Send(send_buf, dest=0, tag=Worker.FINISHED)
