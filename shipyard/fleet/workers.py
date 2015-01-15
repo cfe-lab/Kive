@@ -251,9 +251,17 @@ class Manager:
             for _ in range(shipyard.settings.FLEET_POLLING_INTERVAL):
                 test_result = self.work_finished_request.test()
                 if test_result[0]:
-                    mgr_logger.info("Worker {} reports task with PK {} is finished".format(
-                        self.work_finished_result[0], self.work_finished_result[1]
-                    ))
+                    if self.work_finished_result[1] != Worker.FAILURE:
+                        mgr_logger.info(
+                            "Worker %d reports task with PK %d is finished",
+                            self.work_finished_result[0], self.work_finished_result[1])
+                    else:
+                        mgr_logger.info(
+                            "Worker %d reports a failed task (PK %d)",
+                            self.work_finished_result[0],
+                            self.tasks_in_progress[self.work_finished_result[0]]["task"].pk)
+                        return
+
                     worker_returned = True
                     break
                 try:
@@ -299,6 +307,7 @@ class Worker:
     ASSIGNMENT = 2
     FINISHED = 3
     SHUTDOWN = 4
+    FAILURE = -1
 
     def __init__(self, comm):
         self.comm = comm
@@ -342,7 +351,7 @@ class Worker:
             worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
             result = sandbox_result.pk
         except:
-            result = -1  # bogus return value
+            result = Worker.FAILURE  # bogus return value
             worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
             
         send_buf = numpy.array([self.rank, result], dtype="i")
