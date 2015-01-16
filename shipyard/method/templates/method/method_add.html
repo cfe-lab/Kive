@@ -65,8 +65,7 @@
             {% if family == None %}
                 {{ family_form.name }}
             {% else %}
-                <input id="id_family_name" maxlength="60" name="name" type="text"
-                       style="background-color: lightgrey" disabled="true" value="{{ family.name }}"/>
+                <input id="id_family_name" maxlength="60" name="name" type="text" disabled="true" value="{{ family.name }}"/>
             {% endif %}
             <div class="helptext">A name for this Method Family</div>
             <br/>
@@ -77,7 +76,7 @@
             {% if family == None %}
                 {{ family_form.description }}
             {% else %}
-                <textarea cols="30" id="id_family_desc" name="description" rows="" style="height: 5em; background-color: lightgrey" disabled="true">{{ family.description }}
+                <textarea cols="30" id="id_family_desc" name="description" rows="" style="height: 5em;" disabled="true">{{ family.description }}
                 </textarea>
             {% endif %}
             <div class="helptext">Description of this Method Family</div>
