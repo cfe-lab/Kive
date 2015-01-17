@@ -28,17 +28,17 @@
     "fields": {
         "revision_parent": null, 
         "family": 2, 
-        "deterministic": true, 
+        "reusable": 1,
         "driver": 2, 
         "tainted": false, 
         "revision_number": 1
     }
 },
 {
-    "pk": 2, 
-    "model": "method.methodfamily", 
+    "pk": 2,
+    "model": "method.methodfamily",
     "fields": {
-        "name": "Sums and Products", 
+        "name": "Sums and Products",
         "description": ""
     }
 },
@@ -170,7 +170,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 3, 
-        "deterministic": true, 
+        "reusable": 2,
         "driver": 6, 
         "tainted": false, 
         "revision_number": 1
@@ -243,7 +243,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 4, 
-        "deterministic": true, 
+        "reusable": 2,
         "driver": 7, 
         "tainted": false, 
         "revision_number": 1
@@ -296,7 +296,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 5, 
-        "deterministic": true, 
+        "reusable": 1,
         "driver": 8, 
         "tainted": false, 
         "revision_number": 1
@@ -392,7 +392,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 6, 
-        "deterministic": true, 
+        "reusable": 1,
         "driver": 11, 
         "tainted": false, 
         "revision_number": 1
@@ -600,7 +600,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 8, 
-        "deterministic": true, 
+        "reusable": 1,
         "driver": 19, 
         "tainted": false, 
         "revision_number": 1
@@ -643,7 +643,7 @@
     "fields": {
         "revision_parent": null, 
         "family": 9, 
-        "deterministic": true, 
+        "reusable": 1,
         "driver": 21, 
         "tainted": false, 
         "revision_number": 1

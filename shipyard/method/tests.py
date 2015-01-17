@@ -15,12 +15,16 @@ import logging
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.test import TestCase, TransactionTestCase
+from django.contrib.auth.models import User
 
 from constants import datatypes
 from metadata.models import CompoundDatatype, Datatype
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
+import sandbox.testing_utils as tools
+import sandbox.execute
+import librarian.models
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
@@ -2578,3 +2582,185 @@ class MethodFamilyTests(MethodTestCase):
         """
         
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
+
+
+class NonReusableMethodTests(TransactionTestCase):
+    def setUp(self):
+        # A piece of code that is non-reusable.
+        self.rng = tools.make_first_revision(
+            "rng", "Generates a random number", "rng.py",
+            """#! /usr/bin/env python
+
+import random
+import csv
+import sys
+
+outfile = sys.argv[1]
+
+with open(outfile, "wb") as f:
+    my_writer = csv.writer(f)
+    my_writer.writerow(("random number",))
+    my_writer.writerow((random.random(),))
+"""
+        )
+
+        self.rng_out_cdt = CompoundDatatype()
+        self.rng_out_cdt.save()
+        self.rng_out_cdt.members.create(
+            column_name="random number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.rng_method = tools.make_first_method("rng", "Generate a random number", self.rng)
+        self.rng_method.create_output(dataset_name="random_number", dataset_idx=1, compounddatatype=self.rng_out_cdt,
+                                      min_row=1, max_row=1)
+        self.rng_method.reusable = Method.NON_REUSABLE
+        self.rng_method.save()
+
+        self.increment = tools.make_first_revision(
+            "increment", "Increments all numbers in its first input file by the number in its second",
+            "increment.py",
+            """#! /usr/bin/env python
+
+import csv
+import sys
+
+numbers_file = sys.argv[1]
+increment_file = sys.argv[2]
+outfile = sys.argv[3]
+
+incrementor = 0
+with open(increment_file, "rb") as f:
+    inc_reader = csv.DictReader(f)
+    for row in inc_reader:
+        incrementor = float(row["incrementor"])
+        break
+
+numbers = []
+with open(numbers_file, "rb") as f:
+    number_reader = csv.DictReader(f)
+    for row in number_reader:
+        numbers.append(float(row["number"]))
+
+with open(outfile, "wb") as f:
+    out_writer = csv.writer(f)
+    out_writer.writerow(("incremented number",))
+    for number in numbers:
+        out_writer.writerow((number + incrementor,))
+"""
+        )
+
+        self.increment_in_1_cdt = CompoundDatatype()
+        self.increment_in_1_cdt.save()
+        self.increment_in_1_cdt.members.create(
+            column_name="number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.increment_in_2_cdt = CompoundDatatype()
+        self.increment_in_2_cdt.save()
+        self.increment_in_2_cdt.members.create(
+            column_name="incrementor", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.increment_out_cdt = CompoundDatatype()
+        self.increment_out_cdt.save()
+        self.increment_out_cdt.members.create(
+            column_name="incremented number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.inc_method = tools.make_first_method(
+            "increment", "Increments all numbers in its first input file by the number in its second",
+            self.increment)
+        self.inc_method.create_input(dataset_name="numbers", dataset_idx=1, compounddatatype=self.increment_in_1_cdt)
+        self.inc_method.create_input(dataset_name="incrementor", dataset_idx=2,
+                                     compounddatatype=self.increment_in_2_cdt,
+                                     min_row=1, max_row=1)
+        self.inc_method.create_output(dataset_name="incremented_numbers", dataset_idx=1,
+                                      compounddatatype=self.increment_out_cdt)
+
+        self.test_nonreusable = tools.make_first_pipeline("Non-Reusable", "Pipeline with a non-reusable step")
+        self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
+                                           compounddatatype=self.increment_in_1_cdt)
+        step1 = self.test_nonreusable.steps.create(
+            step_num=1,
+            transformation=self.rng_method,
+            name="source of randomness"
+        )
+
+        step2 = self.test_nonreusable.steps.create(
+            step_num=2,
+            transformation=self.inc_method,
+            name="incrementor"
+        )
+        step2.cables_in.create(
+            dest=self.inc_method.inputs.get(dataset_name="numbers"),
+            source_step=0,
+            source=self.test_nonreusable.inputs.get(dataset_name="numbers")
+        )
+        connecting_cable = step2.cables_in.create(
+            dest=self.inc_method.inputs.get(dataset_name="incrementor"),
+            source_step=1,
+            source=self.rng_method.outputs.get(dataset_name="random_number")
+        )
+        connecting_cable.custom_wires.create(
+            source_pin=self.rng_out_cdt.members.get(column_name="random number"),
+            dest_pin=self.increment_in_2_cdt.members.get(column_name="incrementor")
+        )
+
+        self.test_nonreusable.create_outcable(
+            output_name="incremented_numbers",
+            output_idx=1,
+            source_step=2,
+            source=self.inc_method.outputs.get(dataset_name="incremented_numbers")
+        )
+
+        self.test_nonreusable.create_outputs()
+
+        # A user that runs a Pipeline.
+        self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
+        self.user_rob.save()
+
+        # A data file to add to the database.
+        self.numbers = "number\n1\n2\n3\n4\n"
+        datafile = tempfile.NamedTemporaryFile(delete=False)
+        datafile.write(self.numbers)
+        datafile.close()
+
+        # Alice uploads the data to the system.
+        self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(
+            datafile.name, name="numbers", cdt=self.increment_in_1_cdt,
+            user=self.user_rob, description="1-2-3-4",
+            make_dataset=True)
+
+    def test_find_compatible_ER_non_reusable_method(self):
+        """
+        The ExecRecord of a non-reusable Method should not be found compatible.
+        """
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx.execute_pipeline()
+
+        self.assertIsNone(self.rng_method.find_compatible_ER([]))
+
+    def test_execute_does_not_reuse(self):
+        """
+        Running a non-reusable Method twice does not reuse an ExecRecord, and
+        subsequent steps and cables in the same Pipeline will have different ExecRecords also.
+        """
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx.execute_pipeline()
+        first_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=1)
+        second_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        joining_cable_1 = second_step_1.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
+
+        sdbx2 = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx2.execute_pipeline()
+        first_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=1)
+        second_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=2)
+        joining_cable_2 = second_step_2.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
+
+        self.assertNotEqual(first_step_1.execrecord, first_step_2.execrecord)
+        self.assertNotEqual(second_step_1.execrecord, second_step_2.execrecord)
+        self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
