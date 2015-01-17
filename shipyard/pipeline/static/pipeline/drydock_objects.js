@@ -536,7 +536,7 @@ MethodNode.prototype.getVertices = function() {
         c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
         cosdmc = cos30 * dmc,
         ipy = cy - this.stack,
-        input_plane_len  = (this.in_magnets.length  * c2c + magnet_margin) / 2,
+        input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
         cosipl = cos30 * input_plane_len;
     
     if (typeof this.vertices == 'undefined' 
@@ -546,7 +546,7 @@ MethodNode.prototype.getVertices = function() {
         
         var opx = cx + this.scoop * cos30,
             opy = cy + this.scoop * .5,
-            output_plane_len = (this.out_magnets.length * c2c + magnet_margin) / 2,
+            output_plane_len = (this.n_outputs * c2c + magnet_margin) / 2,
             cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
     
         var vertices = [

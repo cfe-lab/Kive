@@ -46,12 +46,16 @@ ul#id_ctrl_nav li:hover {
     border: 1px solid #aaa;
     display: none;
     background: #fff;
+    width: 250px;
 }
 .input-label { color: #ccc; }
 
 #id_datatype_name, #id_select_method_family, 
 #id_select_method, #id_method_name, 
-#id_revision_name, #id_select_cdt { width: 250px; }
+#id_revision_name, #id_select_cdt {
+    box-sizing: border-box;
+    width: 250px;
+}
 
 #pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }

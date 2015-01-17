@@ -57,12 +57,16 @@ jQuery.fn.extend({
             e.stopPropagation();
         });
         
-        return $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag = opt.handle === "" ?
-                $(this).addClass('draggable') :
-                $(this).addClass('active-handle').parent().addClass('draggable');
+        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            if (opt.handle === '') {
+                var $drag = $(this).addClass('draggable');
+            } else {
+                var $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+            }  
             
-            var z = $drag.css('z-index'),
+            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
+            
+            var z = $drag.data('z'),
                 pos = $drag.offset(),
                 pos_y = pos.top - e.pageY,
                 pos_x = pos.left - e.pageX;
@@ -78,11 +82,14 @@ jQuery.fn.extend({
             
             e.preventDefault(); // disable selection
         }).on("mouseup", function() {
-            opt.handle === "" 
-                && $(this).removeClass('draggable')
-                || $(this).removeClass('active-handle').parent().removeClass('draggable');
+            if (opt.handle === "") {
+                $(this).removeClass('draggable')
+            } else {
+                $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
         });
-
+        
+        return $el;
     }
 });
 
@@ -299,7 +306,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             n_inputs  = get_obj_len(result.inputs);
                         
                         preview_canvas.height = (n_outputs + n_inputs) * 4 + 62;
-                        (new MethodNode(val, null, preview_canvas.width/2, n_inputs * 4 + 27,
+                        (new MethodNode(val, null,
+                            // Ensures node is centred perfectly on the preview canvas
+                            // Makes assumptions that parameters like magnet radius and scoop length are default.
+                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,
+                            n_inputs * 4 + 27,
                             null, null, null, null, null, null, result.inputs, result.outputs)).draw(ctx);
                     }
                 });
@@ -585,7 +596,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     
                     menu.css({
                         top:  sel.y + sel.dy - sel.n_inputs * 4 + canvas.offsetTop - 36,
-                        left: sel.x + sel.dx - preview_canvas.width/2  + canvas.offsetLeft - 9
+                        left: sel.x + sel.dx - (
+                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( sel.n_inputs * 8 + 14 ), 42 - sel.n_outputs * 8) + Math.max( sel.n_inputs  * 8 + 14, sel.n_outputs * 8 + 48 ) ) /4
+                        ) + canvas.offsetLeft - 9
                     });
                     $('#id_select_method_family').val(sel.family).change();  // trigger ajax
                     
