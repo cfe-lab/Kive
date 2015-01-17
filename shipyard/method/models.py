@@ -378,6 +378,15 @@ class Method(transformation.models.Transformation):
     Related to :model:`copperfish.MethodFamily`
     """
 
+    DETERMINISTIC = 1
+    REUSABLE = 2
+    NON_REUSABLE = 3
+    REUSABLE_CHOICES = (
+        (DETERMINISTIC, "deterministic"),
+        (REUSABLE, "reusable"),
+        (NON_REUSABLE, "non-reusable")
+    )
+
     family = models.ForeignKey("MethodFamily", related_name="members")
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
 
@@ -392,10 +401,17 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision)
-    deterministic = models.BooleanField(
-        default=True,
-        help_text="Is the output of this method the same if you run it again "
-            "with the same inputs?")
+    reusable = models.PositiveSmallIntegerField(
+        choices=REUSABLE_CHOICES,
+        default=DETERMINISTIC,
+        help_text="""Is the output of this method the same if you run it again with the same inputs?
+
+deterministic: always exactly the same
+
+reusable: the same but with some insignificant differences (e.g., rows are shuffled)
+
+non-reusable: no -- there may be meaningful differences each time (e.g., timestamp)
+""")
     tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
 
     # Implicitly defined:
@@ -514,10 +530,13 @@ class Method(transformation.models.Transformation):
         Note that this ExecRecord may be a failure, which the calling function
         would then handle appropriately.
         """
-        # For pipelinesteps featuring this method
+        if self.reusable == Method.NON_REUSABLE:
+            return None
+
+        # For pipelinesteps featuring this method....
         for possible_PS in self.pipelinesteps.all():
 
-            # For linked runsteps which did not *completely* reuse an ER
+            # For linked runsteps which did not *completely* reuse an ER....
             for possible_RS in possible_PS.pipelinestep_instances.filter(
                     reused=False,
                     execrecord_id__isnull=False):
@@ -526,7 +545,7 @@ class Method(transformation.models.Transformation):
                 # # Reject RunStep if its outputs are not OK.
                 # if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
 
-                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
+                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match.
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.definite.dataset_idx
@@ -535,7 +554,7 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    # All ERIs match input SDs, so commit to candidate ER
+                    # All ERIs match input SDs, so commit to candidate ER.
                     return candidate_ER
     
         # No compatible ExecRecords found.

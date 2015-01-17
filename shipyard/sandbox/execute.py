@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 import archive.models
 import librarian.models
 import pipeline.models
+import method.models
 from shipyard import settings 
 
 import file_access_utils
@@ -381,7 +382,7 @@ class Sandbox:
         """
         recover = recovering_record is not None
 
-        assert recover or (inputs and all([i.is_OK() for i in inputs]))
+        assert recover or (inputs is not None and all([i.is_OK() for i in inputs]))
         assert recover or step_run_dir
 
         # Create or retrieve RunStep and set up run/input/output/log directories.
@@ -1748,7 +1749,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
     )
 
     # We look one more time for an ExecRecord, since one may have been created while
-    # running the code.
+    # running the code.  This time however we don't bother looking if the step
+    # was not deterministic.
     preexisting_ER = execrecord is not None
     succeeded_yet = False
     while not succeeded_yet:
@@ -1756,7 +1758,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
             with transaction.atomic():
                 _set_transaction_serializable()
                 # Don't create one elsewhere, we're going to make one here!
-                if not preexisting_ER:
+                if (pipelinestep.transformation.definite.reusable == method.models.Method.DETERMINISTIC
+                        and not preexisting_ER):
                     execrecord = runstep.transformation.definite.find_compatible_ER(inputs_after_cable)
                     if execrecord is not None:
                         logger.debug("[{}] A compatible ExecRecord has been created elsewhere.".format(
@@ -1842,9 +1845,19 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
         # Recovering or filling in old ER? Yes.
         elif recover or preexisting_ER:
-            # Perform integrity check.
-            logger.debug("[{}] SD has been computed before, checking integrity of {}".format(worker_rank, output_SD))
-            check = output_SD.check_integrity(output_path, user, curr_log)
+            # Check that the file exists as in the non-recovery case.
+            start_time = timezone.now()
+            if not file_access_utils.file_exists(output_path):
+                end_time = timezone.now()
+                check = output_SD.mark_missing(start_time, end_time, curr_log)
+                logger.debug("[{}] During recovery, output ({}) is missing".format(
+                    worker_rank, output_path))
+
+            else:
+                # Perform integrity check.
+                logger.debug("[{}] SD has been computed before, checking integrity of {}".format(
+                    worker_rank, output_SD))
+                check = output_SD.check_integrity(output_path, user, curr_log)
 
         # Recovering or filling in old ER? No.
         else:

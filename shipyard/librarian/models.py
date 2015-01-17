@@ -202,6 +202,7 @@ class SymbolicDataset(models.Model):
         """
         ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog)
         ccl.add_missing_output()
+        return ccl
 
     @classmethod
     def create_empty(cls, compound_datatype=None):
@@ -281,6 +282,8 @@ class SymbolicDataset(models.Model):
                                        description=description, created_by=created_by)
 
             symDS.clean()
+            if not symDS.is_raw():
+                symDS.structure.save()
             symDS.save()
         return symDS
 

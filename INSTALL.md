@@ -135,7 +135,7 @@ run the reset command.
     ./manage.py reset --load=demo
 
 You can leave the load parameter off, or set it to other fixture names, like
-`simple`.
+`converter_pipeline`.
 
 You are now ready to run a local Django webserver:
 

@@ -49,10 +49,10 @@
     </tr>
 
     <tr>
-        <th>{{ method_form.deterministic.label }}</th>
+        <th>{{ method_form.reusable.label }}</th>
         <td>
-            {{ method_form.deterministic }}
-            <div class="helptext">{{ method_form.deterministic.help_text }}</div>
+            {{ method_form.reusable }}
+            <div class="helptext">{{ method_form.reusable.help_text|escape|linebreaks }}</div>
         </td>
         <th></th>
         <td></td>

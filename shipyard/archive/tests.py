@@ -3361,7 +3361,7 @@ echo
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # create for p_one.
+        # from p_one.
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
