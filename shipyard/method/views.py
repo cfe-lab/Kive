@@ -328,7 +328,7 @@ def return_method_forms (query, exceptions):
                                       'revision_desc': query['revision_desc'],
                                       'coderesource': query['coderesource'],
                                       'revisions': query['revisions'],
-                                      'deterministic': query.has_key('deterministic')})
+                                      'reusable': query['reusable']})
 
     for key, msg in exceptions.iteritems():
         method_form.errors.update({key: msg})
@@ -439,7 +439,7 @@ def parse_method_form(query, family=None, parent_method=None):
                     revision_desc=query['revision_desc'],
                     revision_parent=parent_method,
                     driver=coderesource_revision,
-                    deterministic=query.has_key('deterministic'))
+                    reusable=query['reusable'])
             return None
 
     except ValidationError as e:
@@ -531,7 +531,7 @@ def method_revise(request, id):
         method_form = MethodReviseForm(initial={#'revision_name': parent_method.revision_name,
                                                 'revision_desc': parent_method.revision_desc,
                                                 'revisions': parent_revision.pk,
-                                                'deterministic': parent_method.deterministic})
+                                                'reusable': parent_method.reusable})
         xput_forms = []
         inputs = parent_method.inputs.order_by("dataset_idx")
         outputs = parent_method.outputs.order_by("dataset_idx")
