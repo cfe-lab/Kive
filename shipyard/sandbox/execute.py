@@ -1731,7 +1731,6 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
     recover = recovering_record is not None
     invoking_record = recovering_record if recover else runstep
     pipelinestep = runstep.pipelinestep
-    had_ER_at_beginning = execrecord is not None
 
     # Run code, creating ExecLog and MethodOutput.
     curr_log = archive.models.ExecLog.create(runstep, invoking_record)
@@ -1773,8 +1772,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 output_SDs = []
                 logger.debug("[{}] ExecLog.is_successful() == {}".format(worker_rank, curr_log.is_successful()))
 
-                if not (recover or preexisting_ER):
-                    logger.debug("[{}] Creating new SymbolicDatasets for PipelineStep outputs".format(worker_rank))
+                if not recover:
+                    if preexisting_ER:
+                        logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs", worker_rank)
+                    else:
+                        logger.debug("[%d] Creating new SymbolicDatasets for PipelineStep outputs", worker_rank)
 
                     for i, curr_output in enumerate(pipelinestep.outputs):
                         output_path = output_paths[i]
@@ -1784,49 +1786,46 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                         start_time = timezone.now()
                         if not file_access_utils.file_exists(output_path):
                             end_time = timezone.now()
-                            if execrecord is None:
-                                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-                            else:
+                            if preexisting_ER:
                                 output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
+                            else:
+                                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
                             output_SD.mark_missing(start_time, end_time, curr_log)
 
-                            # FIXME continue from here -- for whatever reason an integrity check is still
-                            # happening after this!
                             bad_output_found = True
 
                         else:
-                            make_dataset = runstep.keeps_output(curr_output)
-                            if recover or had_ER_at_beginning:
-                                output_ERO = execrecord.get_execrecordout(curr_output)
-                                make_dataset = make_dataset and not output_ERO.has_data()
-
-                            # Create new SymbolicDataset for output, along with Dataset
-                            # if necessary.
+                            # If necessary, create new SymbolicDataset for output, and create the Dataset
+                            # if it's to be retained.
                             dataset_name = runstep.output_name(curr_output)
                             dataset_desc = runstep.output_description(curr_output)
+                            make_dataset = runstep.keeps_output(curr_output)
 
-                            if not (recover or had_ER_at_beginning):
+                            if preexisting_ER:
+                                output_ERO = execrecord.get_execrecordout(curr_output)
+                                output_SD = output_ERO.symbolicdataset
+                                if make_dataset and not output_ERO.has_data():
+                                    output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, runstep)
+
+                            else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(
                                     output_path, output_CDT, make_dataset,
                                     user, dataset_name, dataset_desc, runstep, False
                                 )
-                                logger.debug("[{}] First time seeing file: saved md5 {}".format(
-                                    worker_rank, output_SD.MD5_checksum))
-                            else:
-                                output_SD = output_ERO.symbolicdataset
-                                if make_dataset:
-                                    output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, runstep)
+                                logger.debug("[%d] First time seeing file: saved md5 %s",
+                                             worker_rank, output_SD.MD5_checksum)
                         output_SDs.append(output_SD)
 
-                # Link ExecRecord.
-                if not recover:
+                    # Create ExecRecord if there isn't already one.
                     if not preexisting_ER:
                         # Make new ExecRecord, linking it to the ExecLog
-                        logger.debug("[{}] Creating fresh ExecRecord".format(worker_rank))
+                        logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
                         execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep,
                                                                         inputs_after_cable, output_SDs)
+
                     # Link ExecRecord to RunStep (it may already have been linked; that's fine).
                     runstep.link_execrecord(execrecord, False)
+
             succeeded_yet = True
         except (OperationalError, InternalError) as e:
             wait_time = random.random()
@@ -1844,25 +1843,28 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
             logger.debug("[{}] Bad output found; no check on {} was done".format(worker_rank, output_path))
 
         # Recovering or filling in old ER? Yes.
-        elif recover or preexisting_ER:
-            # Check that the file exists as in the non-recovery case.
-            start_time = timezone.now()
-            if not file_access_utils.file_exists(output_path):
-                end_time = timezone.now()
-                check = output_SD.mark_missing(start_time, end_time, curr_log)
-                logger.debug("[{}] During recovery, output ({}) is missing".format(
-                    worker_rank, output_path))
+        elif preexisting_ER:
 
-            else:
+            file_is_present = True
+            if recover:
+                # Check that the file exists as in the non-recovery case.
+                start_time = timezone.now()
+                if not file_access_utils.file_exists(output_path):
+                    end_time = timezone.now()
+                    check = output_SD.mark_missing(start_time, end_time, curr_log)
+                    logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
+                    file_is_present = False
+
+            if file_is_present:
                 # Perform integrity check.
-                logger.debug("[{}] SD has been computed before, checking integrity of {}".format(
-                    worker_rank, output_SD))
+                logger.debug("[%d] SD has been computed before, checking integrity of %s",
+                             worker_rank, output_SD)
                 check = output_SD.check_integrity(output_path, user, curr_log)
 
         # Recovering or filling in old ER? No.
         else:
             # Perform content check.
-            logger.debug("[{}] {} is new data - performing content check".format(worker_rank, output_SD))
+            logger.debug("[%d] %s is new data - performing content check", worker_rank, output_SD)
             summary_path = "{}_summary".format(output_path)
             check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
                                                   curr_output.get_max_row(), curr_log)

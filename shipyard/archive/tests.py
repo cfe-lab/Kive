@@ -1278,7 +1278,6 @@ class RunComponentTooManyChecks(TransactionTestCase):
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
         log.content_checks.create(symbolicdataset=sd)
         log.integrity_checks.create(symbolicdataset=sd)
-        print("Total number of checks: {}".format(log.content_checks.count() + log.integrity_checks.count()))
         # # Make sure log and runstep are up-to-date.
         # runstep = RunStep.objects.get(pk=runstep.pk)
         # log = ExecLog.objects.get(pk=log.pk)
