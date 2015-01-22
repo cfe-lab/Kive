@@ -92,6 +92,19 @@
             <h3>Methods</h3>
 
             <form>
+            
+            <input type="hidden" id="id_select_colour" value="#999">
+            <div id="colour_picker_menu">
+            <div class="colour_picker_colour" style="background-color: #999;"></div>
+            <div class="colour_picker_colour" style="background-color: #d80;"></div>
+            <div class="colour_picker_colour" style="background-color: #d08;"></div>
+            <div class="colour_picker_colour" style="background-color: #8d0;"></div>
+            <div class="colour_picker_colour" style="background-color: #80d;"></div>
+            <div class="colour_picker_colour" style="background-color: #08d;"></div>
+            <div class="colour_picker_colour" style="background-color: #0d8;"></div>
+            </div>
+            <div class="colour_picker_colour" id="colour_picker_pick" style="background-color: #999;"></div>
+            
             <label for="id_method_name" class="text-field-label">Label</label>
             <input id="id_method_name" maxlength="128" name="method_name" type="text" />
             

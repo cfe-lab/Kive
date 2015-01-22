@@ -107,6 +107,24 @@ ul#id_ctrl_nav li:hover {
     position: absolute;
 }
 
+.colour_picker_colour {
+    width: 20px; height: 20px;
+    display: block;
+    float: left;
+    border: 1px solid white;
+    margin: -1px -1px 0 0;
+    cursor: pointer;
+}
+#colour_picker_pick {
+    float: none;
+}
+#colour_picker_menu {
+    width: 147px;
+    display: block;
+    position: absolute;
+    display: none;
+}
+
 .context_menu {
     position: absolute;
     display: none;

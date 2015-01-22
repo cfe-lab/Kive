@@ -217,7 +217,8 @@ CanvasState.prototype.doMove = function(e) {
                             connector_carrying_cdt = this.selection.source.cdt;
                         }
                         // does this in-magnet accept this CompoundDatatype?
-                        if (connector_carrying_cdt == in_magnet.cdt) {
+                        if (shape.constructor == MethodNode &&
+                            connector_carrying_cdt == in_magnet.cdt) {
                             // light up magnet
                             in_magnet.fill = '#ff8';
                             if (in_magnet.connected.length == 0 
@@ -234,6 +235,12 @@ CanvasState.prototype.doMove = function(e) {
                 }
             } else {
                 // carrying a shape
+                
+                // if execution order is ambiguous, the tiebreaker is the y-position.
+                // dragging a method node needs to calculate this in real-time.
+                if (this.exec_order_is_ambiguous && this.selection.constructor == MethodNode) {
+                    this.disambiguateExecutionOrder();
+                }
             }
         }
         // TODO: else dragging on canvas - we could implement block selection here
@@ -434,7 +441,7 @@ CanvasState.prototype.doUp = function(e) {
 
     if (connector.dest === null) {
         // connector not yet linked to anything
-
+        
         if (this.outputZone.contains(connector.x, connector.y)) {
             // Connector drawn into output zone
             if (connector.source.parent.constructor !== MethodNode) {
@@ -487,6 +494,7 @@ CanvasState.prototype.doUp = function(e) {
             this.selection = null;
             this.valid = false; // redraw canvas to remove this Connector
         }
+        
     } else if (connector.dest.constructor === Magnet) {
         // connector has been linked to an in-magnet
         if (connector.source.connected.indexOf(connector) < 0) {
@@ -499,6 +507,9 @@ CanvasState.prototype.doUp = function(e) {
             connector.dest.connected.push(connector);
         }
     }
+        
+    // see if this has changed the execution order
+    this.testExecutionOrder();
 
     // turn off all in-magnets
     var shapes = this.shapes;
@@ -525,9 +536,140 @@ CanvasState.prototype.contextMenu = function(e) {
 
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
+    
+    if (shape.constructor == MethodNode) {
+        this.testExecutionOrder();
+    }
+    
     this.valid = false;
     return shape;
 };
+
+// Returns nothing, but sets CanvasState.exec_order and CanvasState.exec_order_is_ambiguous
+CanvasState.prototype.testExecutionOrder = function() {
+    /*
+        gather method nodes which have no method-node parents
+        set as phase 0
+        gather method nodes which are children of phase 1 methods
+        eliminate method nodes which have parents not in an existing phase (0..n)
+        set as phase 1
+        etc...
+    */
+
+    var shapes = this.shapes,
+        shape,
+        phases = [],
+        phase,
+        n_methods = 0,
+        L = 0,
+        i, j, k,
+        parent, 
+        okay_to_add,
+        found;
+    
+    // count up the total number of methods
+    for ( i=0; i < shapes.length; i++ ) {
+        if (shapes[i].constructor === MethodNode)
+            n_methods++;
+    }
+
+    // esoteric syntax: label before a loop allows the statements "continue" and "break" to specify which loop they are continuing or breaking.
+    fill_phases_ar: while (
+            n_methods > phases.reduce( function(a,b) { return a + b.length }, 0 ) // Array.reduce lets us count up the number of methods in the phases array
+            && L < 200 // sanity check... don't let this algorithm run away
+        ) {
+        phase = [];
+        
+        check_for_shape: for ( i=0; i < shapes.length; i++ ) {
+            shape = shapes[i];
+            if (shape.constructor !== MethodNode)
+                continue;
+            
+            for ( k=0; k < phases.length; k++ ) {
+                // search for parent in phases array
+                if (phases[k].indexOf(shape) > -1) {
+                    continue check_for_shape;
+                }
+            }
+    
+            okay_to_add = true;
+            for ( j=0; j < shape.in_magnets.length; j++ ) {
+                
+                // check if pipeline is incomplete
+                // purposefully use fuzzy type coersion here: empty array will be 'false'
+                if (shape.in_magnets[j].connected == false) {
+                    // can't go any further in this case
+                    phases = false;
+                    break fill_phases_ar;
+                }
+                
+                parent = shape.in_magnets[j].connected[0].source.parent;
+                
+                if (parent.constructor !== MethodNode)
+                    continue;
+                
+                found = false;
+                for ( k=0; k < phases.length; k++ ) {
+                    // search for parent in phases array
+                    if (phases[k].indexOf(parent) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                // if parent node has not been put in order yet,
+                // then this node cannot be added.
+                if (found === false) {
+                    okay_to_add = false;
+                    break;
+                }
+            }
+        
+            if (okay_to_add === true) phase.push(shape);
+        }
+        
+        // check if pipeline is incomplete
+        if (phase.length == 0) {
+            // can't go any further in this case
+            phases = false;
+            break fill_phases_ar;
+        }
+        
+        phases.push(phase);
+        L++;
+    }
+    
+    if (L >= 200) {
+        console.log('DEBUG: Runaway topological sort algorithm');
+        phases = false;
+    }
+    
+    if (phases) {
+        this.exec_order = phases;
+        
+        // get the maximum number of methods per phase
+        // (.map counts the methods in each phase, while Math.max.apply finds the maximum and takes its input as an array rather than an argument list)
+        // comparison operation 1< will be true if there is more than 1 step per phase.
+        this.exec_order_is_ambiguous = 1 < Math.max.apply(null, phases.map(function(a) { return a.length }));
+        
+        if (this.exec_order_is_ambiguous) {
+            this.disambiguateExecutionOrder();
+        }
+    } else {
+        this.exec_order = false;
+        this.exec_order_is_ambiguous = null;
+    }
+};
+
+CanvasState.prototype.disambiguateExecutionOrder = function() {
+    for ( k=0; k < this.exec_order.length; k++ ) {
+        this.exec_order[k].sort(function(a,b) {
+            if (a.y > b.y) return 1;
+            if (a.y < b.y) return -1;
+            return 0;
+        });
+    }
+}
 
 CanvasState.prototype.clear = function() {
     // wipe canvas content clean before redrawing
@@ -570,7 +712,15 @@ CanvasState.prototype.draw = function() {
             shapes[i].draw(ctx);
             
             // queue label to be drawn after
-            labels.push(shapes[i].getLabel());
+            if (shapes[i].constructor !== MethodNode || !this.exec_order_is_ambiguous) {
+                labels.push(shapes[i].getLabel());
+            } else {
+                // add information about execution order
+                var L = shapes[i].getLabel(),
+                    flat_exec_order = Array.concat.apply(null, this.exec_order); //"flatten" 2d array into 1d by concatenation.
+                L.label = (flat_exec_order.indexOf(shape) + 1) +': '+ L.label;
+                labels.push(L);
+            }
         }
 
         // draw all connectors
@@ -644,7 +794,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
         out_magnets = [],
         out_magnet,
         this_connector = null;
-
+    
     if (mySel !== null) {
         if (mySel.constructor == Connector) {
             // remove selected Connector from list
@@ -713,6 +863,9 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
             index = this.shapes.indexOf(mySel);
             this.shapes.splice(index, 1);
         }
+        
+        // see if this has changed the execution order
+        this.testExecutionOrder();
 
         this.selection = null;
         this.valid = false; // re-draw canvas to make Connector disappear

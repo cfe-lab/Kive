@@ -283,8 +283,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             var ctx = preview_canvas.getContext('2d');
-            ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
             if (this.id == 'id_select_cdt') {
+                ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
                 if (val === '') {
                     (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
                 } else {
@@ -292,6 +292,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 }
             } else if (this.id == 'id_select_method') {
                 var filename = $(this).find('option:selected')[0].title;
+                var colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
                 $('#id_method_name').val_(filename);
                 
                 // use AJAX to retrieve Revision inputs and outputs
@@ -301,6 +302,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     data: { mid: val }, // specify data as an object
                     datatype: "json",
                     success: function(result) {
+                        ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
                         var get_obj_len = function(obj) { return $.map(obj, function() { return 1; }).length; },
                             n_outputs = get_obj_len(result.outputs),
                             n_inputs  = get_obj_len(result.inputs);
@@ -311,7 +313,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             // Makes assumptions that parameters like magnet radius and scoop length are default.
                             preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,
                             n_inputs * 4 + 27,
-                            null, null, null, null, null, null, result.inputs, result.outputs)).draw(ctx);
+                            null, null, null, colour, null, null, result.inputs, result.outputs)).draw(ctx);
                     }
                 });
             }
@@ -375,6 +377,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         var method_name = $('#id_method_name', this),
             method_error = $('#id_method_error', this),
             method_family = $('#id_select_method_family', this),
+            method_colour = $('#id_select_colour', this),
             method = $('#id_select_method', this),
             mid = method.val(), // pk of method
             pos,
@@ -423,7 +426,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                         if (document.getElementById('id_method_button').value == 'Add Method') {
                             // create new MethodNode
                             canvasState.addShape(new MethodNode(mid, method_family.val(), pos.left, pos.top,
-                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs));
                         } else {
                             // replace the selected MethodNode
@@ -434,7 +437,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
                             // draw new node over old node
                             var new_node = new MethodNode(mid, method_family.val(), old_node.x, old_node.y,
-                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs);
 
                             // check if we can re-use any Connectors
@@ -444,7 +447,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 old_xput = old_node.inputs[idx];
                                 if (inputs.hasOwnProperty(idx)) {
                                     new_xput = inputs[idx];
-                                    if (new_xput.cdt_pk === old_xput.cdt_pk) {
+                                    if (new_xput.cdt_pk === old_xput.cdt_pk
+                                            && old_node.in_magnets[idx-1].connected.length) {
                                         // re-attach Connector
                                         connector = old_node.in_magnets[idx-1].connected.pop();
                                         connector.dest = new_node.in_magnets[idx-1];
@@ -458,11 +462,13 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 if (outputs.hasOwnProperty(idx)) {
                                     new_xput = outputs[idx];
                                     if (new_xput.cdt_pk === old_xput.cdt_pk) {
-                                        // re-attach all Connectors - note this reverses order
+                                        // re-attach all Connectors - note this does not reverse order any longer
                                         for (var i = 0; i < old_node.out_magnets[idx-1].connected.length; i++) {
-                                            connector = old_node.out_magnets[idx-1].connected.pop();
-                                            connector.source = new_node.out_magnets[idx-1];
-                                            new_node.out_magnets[idx-1].connected.push(connector);
+                                            while (old_node.out_magnets[idx-1].connected.length) {
+                                                connector = old_node.out_magnets[idx-1].connected.pop();
+                                                connector.source = new_node.out_magnets[idx-1];
+                                                new_node.out_magnets[idx-1].connected.unshift(connector);
+                                            }
                                         }
                                     }
                                 }
@@ -580,15 +586,20 @@ $(function() { // wait for page to finish loading before executing jQuery code
         $(this).hide();
     });
     
+    // when a context menu option is clicked
     $('.context_menu').on('click', 'li', function(e) {
         var $this = $(this),
             sel = canvasState.selection;
         
+        // if there's a current node selected on the canvas
         if (sel) {
             var action = $this.data('action');
             
             if (action == 'edit') {
                 if (sel.constructor == MethodNode) {
+                    /*
+                        Open the edit dialog (rename, method selection, colour picker...)
+                    */
                     var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
                         preview_canvas = $('canvas', menu)[0];
                     
@@ -600,9 +611,14 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( sel.n_inputs * 8 + 14 ), 42 - sel.n_outputs * 8) + Math.max( sel.n_inputs  * 8 + 14, sel.n_outputs * 8 + 48 ) ) /4
                         ) + canvas.offsetLeft - 9
                     });
+                    
+                    $('#id_select_colour').val(sel.fill);
+                    $('#colour_picker_pick').css('background-color', sel.fill);
+                    
                     $('#id_select_method_family').val(sel.family).change();  // trigger ajax
                     
-                    // jQuery.one() will run this event exactly once before killing it.
+                    // #id_method_revision_field is always populated via ajax.
+                    // $.one() will run this event exactly once before killing it.
                     // first we execute, then we kill.
                     $(document).one('ajaxComplete', function() {
                         // wait for AJAX to populate drop-down before selecting option
@@ -611,6 +627,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     });
                 }
                 else if (sel.constructor == OutputNode) {
+                    /*
+                        Open the renaming dialog
+                    */
                     var dialog = $("#dialog_form");
                     
                     dialog.data('node', sel).show().css({
@@ -628,6 +647,19 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
         $('.context_menu').hide();
         e.stopPropagation();
+    });
+    
+    $('#colour_picker_pick').on('click', function() {
+        var pos = $(this).position();
+        $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
+    });
+    
+    $('#colour_picker_menu').on('click', 'div', function() {
+        var bg_col = $(this).css('background-color');
+        $('#colour_picker_pick').css('background-color', bg_col);
+        $('#id_select_colour').val(bg_col);
+        $('#colour_picker_menu').hide();
+        $('#id_select_method').trigger('change');
     });
     
     /*
@@ -721,18 +753,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (family_name === '') {
                 // FIXME: is there a better way to do this trigger?
                 $('li', 'ul#id_ctrl_nav')[0].click();
-                $('#id_family_name').css({'background-color': '#FFFFCC'}).focus();
+                $('#id_family_name').css({'background-color': '#ffc'}).focus();
                 submitError('Pipeline family must be named');
                 return;
             }
-            $('#id_family_name, #id_family_desc').css('background-color', '#FFFFFF');
+            $('#id_family_name, #id_family_desc').css('background-color', '#fff');
         }
 
         // FIXME: This is fragile if we add a menu to either page
         var meta_menu_index = !is_revision;
-        $('#id_revision_name, #id_revision_desc').css('background-color', '#FFFFFF');
-
-
+        $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
+        
         // Now we're ready to start
         var form_data = {};
 
@@ -951,6 +982,13 @@ $(function() { // wait for page to finish loading before executing jQuery code
             shape.y *= scale_y;
             shape.dx = shape.dy = 0;
             canvasState.detectCollisions(shape);
+        }
+        
+        var out_z = canvasState.outputZone;
+        out_z.x = canvasWidth * .8;
+        out_z.h = out_z.w = canvasWidth * .15;
+        while (out_z.h + out_z.y > canvasHeight) {
+            out_z.h /= 1.5;
         }
         
         canvasState.old_width = canvas.width;
