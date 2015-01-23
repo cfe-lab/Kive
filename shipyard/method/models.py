@@ -10,7 +10,7 @@ from __future__ import unicode_literals
 from django.db import models, transaction
 from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -413,6 +413,13 @@ reusable: the same but with some insignificant differences (e.g., rows are shuff
 non-reusable: no -- there may be meaningful differences each time (e.g., timestamp)
 """)
     tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
+
+    threads = models.PositiveIntegerField(
+        "Number of threads",
+        help_text="How many threads does this Method use during execution?",
+        default=1,
+        validators=[MinValueValidator(1)]
+    )
 
     # Implicitly defined:
     # - execrecords: from ExecRecord

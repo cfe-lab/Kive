@@ -3,11 +3,13 @@
 from django.utils import timezone
 from django.db import transaction, connection, OperationalError, InternalError
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
 import archive.models
 import librarian.models
 import pipeline.models
 import method.models
+import transformation.models
 from shipyard import settings 
 
 import file_access_utils
@@ -86,8 +88,6 @@ class Sandbox:
 
         self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
 
-        # FIXME this might change in the future
-        self.threads_required = 1
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
         self.pipeline = my_pipeline
@@ -305,6 +305,8 @@ class Sandbox:
                     succeeded_yet = True
                 except (OperationalError, InternalError) as e:
                     wait_time = random.random()
+                    # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
+                    #                   exc_info=e)
                     self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
 
@@ -471,8 +473,9 @@ class Sandbox:
                 succeeded_yet = True
             except (OperationalError, InternalError) as e:
                 wait_time = random.random()
-                self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                                  exc_info=e)
+                # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
+                #                   exc_info=e)
+                self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
 
@@ -1031,8 +1034,9 @@ class Sandbox:
                 succeeded_yet = True
             except (OperationalError, InternalError) as e:
                 wait_time = random.random()
-                self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                                  exc_info=e)
+                # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
+                #                   exc_info=e)
+                self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
@@ -1223,8 +1227,9 @@ class Sandbox:
                     succeeded_yet = True
                 except (OperationalError, InternalError) as e:
                     wait_time = random.random()
-                    self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                                      exc_info=e)
+                    # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
+                    #                   exc_info=e)
+                    self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
 
 
@@ -1326,12 +1331,6 @@ class Sandbox:
         ready_tasks = self.queue_for_processing
         self.queue_for_processing = []
         return ready_tasks
-
-    def exceeded_system(self, max_num_CPU):
-        """
-        Denote this run as having exceeded system capabilities.
-        """
-        self.run.not_enough_CPUs.create(threads_requested=self.threads_required, max_available=max_num_CPU)
 
     def get_task_info(self, task):
         """
@@ -1452,8 +1451,10 @@ def finish_cable(cable_execute_dict, worker_rank):
             succeeded_yet = True
         except (OperationalError, InternalError) as e:
             wait_time = random.random()
+            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+            #              worker_rank, wait_time, exc_info=e)
             logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                         worker_rank, wait_time, exc_info=e)
+                         worker_rank, wait_time)
             time.sleep(wait_time)
 
 
@@ -1528,7 +1529,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                 if not preexisting_ER:
                     execrecord = curr_record.find_compatible_ER(input_SD)
                     if execrecord is not None:
-                        logger.debug("[{}] A compatible ExecRecord has been created elsewhere.".format(worker_rank))
+                        logger.debug("[%d] A compatible ExecRecord has been created elsewhere.", worker_rank)
                         preexisting_ER = True
 
                 missing_output = False
@@ -1556,7 +1557,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     dataset_name = curr_record.output_name()
                     dataset_desc = curr_record.output_description()
                     if not make_dataset:
-                        logger.debug("[{}] Cable doesn't keep output: not creating a dataset".format(worker_rank))
+                        logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
 
                     if execrecord is not None:
                         output_SD = execrecord.execrecordouts.first().symbolicdataset
@@ -1571,23 +1572,40 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
                     if execrecord is None:
-                        logger.debug("[{}] No ExecRecord already in use - creating fresh cable ExecRecord".format(
-                            worker_rank
-                        ))
+                        logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
+                                     worker_rank)
                         # Make ExecRecord, linking it to the ExecLog.
                         execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
                     # Link ER to RunCable (this may have already been linked; that's fine).
-                    curr_record.link_execrecord(execrecord, False)
+                    curr_record.link_execrecord(execrecord, reused=False)
+
+                    # DEBUGGING
+                    # try:
+                    #     curr_record.link_execrecord(execrecord, reused=False)
+                    # except ValidationError as e:
+                    #     logger.debug("[%d] Squeeeeeps", worker_rank)
+                    #     logger.debug("[%d] Validation error caught.  Examining the error.", worker_rank,
+                    #                  exc_info=e)
+                    #     for ero in execrecord.execrecordouts.all():
+                    #         logger.debug("[%d] Examining ERO with index %d", worker_rank,
+                    #                      ero.generic_output.definite.dataset_idx)
+                    #         xput_pk = ero.generic_output.pk
+                    #         logger.debug("[%d] ERO xput is raw: %s", worker_rank, ero.generic_output.is_raw())
+                    #         fresh_retrieve_xput = transformation.models.TransformationXput.objects.get(pk=xput_pk)
+                    #         logger.debug("[%d] After re-retrieving: %s", worker_rank, fresh_retrieve_xput.is_raw())
+                    #     logger.debug("[%d] Squeeeeeeeeps", worker_rank)
+                    #     raise e
 
                 else:
-                    logger.debug("[{}] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord".format(
-                        worker_rank
-                    ))
+                    logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
+                                 worker_rank)
             succeeded_yet = True
         except (OperationalError, InternalError) as e:
             wait_time = random.random()
+            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+            #              worker_rank, wait_time, exc_info=e)
             logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                         worker_rank, wait_time, exc_info=e)
+                         worker_rank, wait_time)
             time.sleep(wait_time)
 
     ####
@@ -1597,16 +1615,13 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
     if not missing_output:
         # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
         if (preexisting_ER and (output_SD.is_OK() or output_SD.any_failed_checks())) or cable.is_trivial() or recover:
-            logger.debug("[{}] Performing integrity check of trivial or previously generated output".format(
-                worker_rank))
+            logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
             # Perform integrity check.
             output_SD.check_integrity(output_path, user, curr_log, output_SD.MD5_checksum)
 
         # Did ER already exist, or is cable trivial, or recovering? No.
         else:
-            logger.debug("[{}] Performing content check for output generated for the first time".format(
-                worker_rank
-            ))
+            logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
             summary_path = "{}_summary".format(output_path)
             # Perform content check.
             output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out,
@@ -1617,7 +1632,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
             # Success! Update sd_fs/socket/cable_map.
             sandbox_to_update.update_cable_maps(curr_record, output_SD, output_path)
 
-    logger.debug("[{}] DONE EXECUTING {} '{}'".format(worker_rank, type(cable).__name__, cable))
+    logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
     # End. Return curr_record.  Stop the clock if this was not a recovery.
     if not recover:
@@ -1715,8 +1730,10 @@ def finish_step(step_execute_dict, worker_rank):
                 succeeded_yet = True
             except (OperationalError, InternalError) as e:
                 wait_time = random.random()
+                # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+                #              worker_rank, wait_time, exc_info=e)
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                             worker_rank, wait_time, exc_info=e)
+                             worker_rank, wait_time)
                 time.sleep(wait_time)
 
     return _finish_step_h(worker_rank, user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
@@ -1829,8 +1846,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
             succeeded_yet = True
         except (OperationalError, InternalError) as e:
             wait_time = random.random()
-            logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time,
-                         exc_info=e)
+            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time,
+            #              exc_info=e)
+            logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
             time.sleep(wait_time)
 
     # Check outputs.
@@ -1910,8 +1928,8 @@ class RunStepExecuteInfo:
         self.log_dir = log_dir
         self.recovering_record = recovering_record
         self.output_paths = output_paths
-        # FIXME in the future this number could be more than 1.
-        self.threads_required = 1
+        # FIXME in the future this number may vary across runs.
+        self.threads_required = runstep.transformation.definite.threads
 
     def flag_for_recovery(self, recovering_record):
         assert self.recovering_record is None

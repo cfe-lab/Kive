@@ -677,7 +677,10 @@ class ExecRecordTests(LibrarianTestCase):
         myERI_raw_unraw_BAD = myER_C.execrecordins.create(
             symbolicdataset=self.raw_symDS,
             generic_input=self.C2_in)
-        self.assertRaisesRegexp(ValidationError,"Dataset \".*\" cannot feed source \".*\"",myERI_raw_unraw_BAD.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            r'SymbolicDataset ".*" \(raw\) cannot feed source ".*" \(non-raw\)',
+            myERI_raw_unraw_BAD.clean)
         myERI_raw_unraw_BAD.delete()
 
         myRS_A = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
@@ -687,7 +690,7 @@ class ExecRecordTests(LibrarianTestCase):
             generic_input=self.A1_rawin)
         self.assertRaisesRegexp(
             ValidationError,
-            "Dataset \".*\" cannot feed source \".*\"",
+            r'SymbolicDataset ".*" \(non-raw\) cannot feed source ".*" \(raw\)',
             myERI_unraw_raw_BAD.clean)
         myERI_unraw_raw_BAD.delete()
     
@@ -792,7 +795,7 @@ class ExecRecordTests(LibrarianTestCase):
             symbolicdataset=self.raw_symDS, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            "SymbolicDataset \".*\" cannot have come from output \".*\"",
+            r'SymbolicDataset ".*" \(raw\) cannot have come from output ".*" \(non-raw\)',
             myERO_rawDS_nonrawTO.clean)
         myERO_rawDS_nonrawTO.delete()
 
@@ -800,7 +803,7 @@ class ExecRecordTests(LibrarianTestCase):
             symbolicdataset=self.singlet_symDS, generic_output=self.C3_rawout)
         self.assertRaisesRegexp(
             ValidationError,
-            "SymbolicDataset \".*\" cannot have come from output \".*\"",
+            r'SymbolicDataset ".*" \(non-raw\) cannot have come from output ".*" \(raw\)',
             myERO_DS_rawTO.clean)
         myERO_DS_rawTO.delete()
 
@@ -814,8 +817,8 @@ class ExecRecordTests(LibrarianTestCase):
             symbolicdataset=self.triplet_symDS, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            "SymbolicDataset \".*\" cannot have come from output \".*\"",
-            myERO_DS_rawTO.clean)
+            'CDT of SymbolicDataset ".*" is not the CDT of the TransformationOutput ".*" of the generating Method',
+            myERO_invalid_CDT.clean)
         myERO_invalid_CDT.delete()
 
         # Dataset must have num rows within the row constraints of the producing TO
@@ -826,7 +829,7 @@ class ExecRecordTests(LibrarianTestCase):
             symbolicdataset=self.triplet_symDS, generic_output=self.B1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            "SymbolicDataset \".*\" was produced by TransformationOutput \".*\" but has too many rows",
+            'SymbolicDataset ".*" was produced by TransformationOutput ".*" but has too many rows',
             myERO_too_many_rows.clean)
         myERO_too_many_rows.delete()
 

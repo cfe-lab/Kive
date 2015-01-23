@@ -7,7 +7,7 @@ SymbolicDataset, etc.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 from django.utils import timezone
@@ -26,6 +26,7 @@ import archive.models
 import method.models
 import pipeline.models
 import transformation.models
+import librarian.models
 import datachecking.models
 import file_access_utils
 
@@ -96,13 +97,23 @@ class SymbolicDataset(models.Model):
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
-        if not hasattr(self, "dataset"):
+        # if not hasattr(self, "dataset"):
+        #     return False
+        # return self.dataset.pk is not None
+        try:
+            self.dataset
+        except ObjectDoesNotExist:
             return False
         return self.dataset.pk is not None
 
     def is_raw(self):
         """True if this SymbolicDataset is raw, i.e. not a CSV file."""
-        return not hasattr(self, "structure")
+        # return not hasattr(self, "structure")
+        try:
+            self.structure
+        except ObjectDoesNotExist:
+            return True
+        return self.structure is None
             
     def num_rows(self):
         """Returns number of rows in the associated Dataset.
@@ -637,7 +648,7 @@ class ExecRecord(models.Model):
         for ero in eros:
             ero.clean()
 
-        if type(self.general_transf()) != method.models.Method:
+        if not isinstance(self.general_transf(), method.models.Method):
             # If the cable is quenched:
             if eris.exists() and eros.exists():
                 
@@ -675,9 +686,11 @@ class ExecRecord(models.Model):
                         source_dt = source_CDT.members.get(column_idx=source_idx).datatype
 
                         if source_dt != dest_dt:
-                            raise ValidationError(('ExecRecord "{}" represents a cable, but the Datatype '
-                                                   'of its destination column, "{}", does not match the Datatype '
-                                                   'of its source column, "{}"').format(self, dest_dt, source_dt))
+                            raise ValidationError(
+                                ('ExecRecord "{}" represents a cable, but the Datatype '
+                                 'of its destination column, "{}", does not match the Datatype '
+                                 'of its source column, "{}"').format(self, dest_dt, source_dt)
+                            )
 
     def complete_clean(self):
         """
@@ -783,6 +796,10 @@ class ExecRecordIn(models.Model):
     class Meta:
         unique_together = ("execrecord", "generic_input");
 
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def __str__(self):
         """
         Unicode representation.
@@ -829,13 +846,13 @@ class ExecRecordIn(models.Model):
         if type(parent_transf) == pipeline.models.PipelineOutputCable:
             if self.generic_input.definite != parent_transf.source.definite:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" does not denote the TO that feeds the parent ExecRecord POC".
+                    'ExecRecordIn "{}" does not denote the TO that feeds the parent ExecRecord POC'.
                     format(self))
         # Similarly for a PSIC.
         elif type(parent_transf) == pipeline.models.PipelineStepInputCable:
             if self.generic_input.definite != parent_transf.source.definite:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" does not denote the TO/TI that feeds the parent ExecRecord PSIC".
+                    'ExecRecordIn "{}" does not denote the TO/TI that feeds the parent ExecRecord PSIC'.
                     format(self))
 
         else:
@@ -843,23 +860,26 @@ class ExecRecordIn(models.Model):
             # ERI must refer to a TI of the parent ER's Method.
             if type(self.generic_input) == transformation.models.TransformationOutput:
                 raise ValidationError(
-                    "ExecRecordIn \"{}\" must refer to a TI of the Method of the parent ExecRecord".
+                    'ExecRecordIn "{}" must refer to a TI of the Method of the parent ExecRecord'.
                     format(self))
 
             transf_inputs = parent_transf.inputs
             if not transf_inputs.filter(pk=self.generic_input.pk).exists():
                 raise ValidationError(
-                    "Input \"{}\" does not belong to Method of ExecRecord \"{}\"".
+                    'Input "{}" does not belong to Method of ExecRecord "{}"'.
                     format(self.generic_input, self.execrecord))
 
-
         # The ERI's SymbolicDataset raw/unraw state must match the
-        # raw/unraw state of the generic_input that it feeds it (if ER is a cable)
+        # raw/unraw state of the generic_input that feeds it (if ER is a cable)
         # or that it is fed into (if ER is a Method).
+        # self.symbolicdataset = librarian.models.SymbolicDataset.objects.get(pk=self.symbolicdataset.pk)
+        # self.generic_input = transformation.models.TransformationXput.objects.get(pk=self.generic_input.pk)
         if self.generic_input.is_raw() != self.symbolicdataset.is_raw():
+            sd_raw_str = "raw" if self.symbolicdataset.is_raw() else "non-raw"
+            gi_raw_str = "raw" if self.generic_input.is_raw() else "non-raw"
             raise ValidationError(
-                "SymbolicDataset \"{}\" cannot feed source \"{}\"".
-                format(self.symbolicdataset, self.generic_input))
+                'SymbolicDataset "{}" ({}) cannot feed source "{}" ({})'.
+                format(self.symbolicdataset, sd_raw_str, self.generic_input, gi_raw_str))
 
         if not self.symbolicdataset.is_raw():
             transf_xput_used = self.generic_input
@@ -871,26 +891,26 @@ class ExecRecordIn(models.Model):
             if not input_SD.structure.compounddatatype.is_restriction(
                     cdt_needed):
                 raise ValidationError(
-                    "CDT of SymbolicDataset \"{}\" is not a restriction of the required CDT".
+                    'CDT of SymbolicDataset "{}" is not a restriction of the required CDT'.
                     format(input_SD))
 
             # Check row constraints.
-            if (transf_xput_used.get_min_row() != None and
+            if (transf_xput_used.get_min_row() is not None and
                     input_SD.num_rows() < transf_xput_used.get_min_row()):
                 error_str = ""
                 if type(self.generic_input) == transformation.models.TransformationOutput:
-                    error_str = "SymbolicDataset \"{}\" has too few rows to have come from TransformationOutput \"{}\""
+                    error_str = 'SymbolicDataset "{}" has too few rows to have come from TransformationOutput "{}"'
                 else:
-                    error_str = "SymbolicDataset \"{}\" has too few rows for TransformationInput \"{}\""
+                    error_str = 'SymbolicDataset "{}" has too few rows for TransformationInput "{}"'
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
                     
             if (transf_xput_used.get_max_row() != None and
                 input_SD.num_rows() > transf_xput_used.get_max_row()):
                 error_str = ""
                 if type(self.generic_input) == transformation.models.TransformationOutput:
-                    error_str = "SymbolicDataset \"{}\" has too many rows to have come from TransformationOutput \"{}\""
+                    error_str = 'SymbolicDataset "{}" has too many rows to have come from TransformationOutput "{}"'
                 else:
-                    error_str = "SymbolicDataset \"{}\" has too many rows for TransformationInput \"{}\""
+                    error_str = 'SymbolicDataset "{}" has too many rows for TransformationInput "{}"'
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
 
     def is_OK(self):
@@ -958,7 +978,7 @@ class ExecRecordOut(models.Model):
         - The SymbolicDataset is compatible with generic_output. (??)
         """
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
-        if (type(self.execrecord.general_transf()) == pipeline.models.PipelineOutputCable):
+        if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
             parent_er_outcable = self.execrecord.general_transf()
 
             # ERO TO must belong to the same pipeline as the ER POC
@@ -974,7 +994,7 @@ class ExecRecordOut(models.Model):
                     format(self))
 
         # Second case: parent ER represents a PSIC.
-        elif (type (self.execrecord.general_transf()) == pipeline.models.PipelineStepInputCable):
+        elif isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
             # This ERO must point to a TI.
             if not self.generic_output.is_input:
                 raise ValidationError(
@@ -997,17 +1017,20 @@ class ExecRecordOut(models.Model):
         self.logger.debug("ERO generic_output '{}' {} is raw? {}".format(self.generic_output, type(self.generic_output), self.generic_output.is_raw()))
 
         # If SD is raw, the ERO output TO must also be raw
+        # Refresh symbolicdataset and generic_output to make sure we get the right information.
+        self.symbolicdataset = librarian.models.SymbolicDataset.objects.get(pk=self.symbolicdataset.pk)
+        self.generic_output = transformation.models.TransformationXput.objects.get(pk=self.generic_output.pk)
         if self.symbolicdataset.is_raw() != self.generic_output.is_raw():
+            sd_raw_str = "raw" if self.symbolicdataset.is_raw() else "non-raw"
+            go_raw_str = "raw" if self.generic_output.is_raw() else "non-raw"
             if type(self.generic_output) == pipeline.models.PipelineStepInputCable:
                 raise ValidationError(
-                    "SymbolicDataset \"{}\" cannot feed input \"{}\"".
-                    format(self.symbolicdataset, self.generic_output))
+                    'SymbolicDataset "{}" ({}) cannot feed input "{}" ({})'.
+                    format(self.symbolicdataset, sd_raw_str, self.generic_output, go_raw_str))
             else:
                 raise ValidationError(
-                    "SymbolicDataset \"{}\" cannot have come from output \"{}\"".
-                    format(self.symbolicdataset, self.generic_output))
-
-
+                    'SymbolicDataset "{}" ({}) cannot have come from output "{}" ({})'.
+                    format(self.symbolicdataset, sd_raw_str, self.generic_output, go_raw_str))
 
         # SD must satisfy the CDT / row constraints of the producing TO (Methods/Pipelines/POCs)
         # or of the TI fed (PSIC case)
@@ -1018,17 +1041,18 @@ class ExecRecordOut(models.Model):
             # must *exactly* be generic_output's CDT since it was
             # generated by this Method.
 
-            if type(self.execrecord.general_transf()) == method.models.Method:
+            if isinstance(self.execrecord.general_transf(), method.models.Method):
                 if input_SD.structure.compounddatatype != self.generic_output.get_cdt():
                     raise ValidationError(
-                        'CDT of SymbolicDataset "{}" is not the CDT of the TransformationOutput "{}" of the generating Method'.
+                        ('CDT of SymbolicDataset "{}" is not the CDT of the '
+                         'TransformationOutput "{}" of the generating Method').
                         format(input_SD, self.generic_output))
 
             # For POCs, ERO SD's CDT must be >>identical<< to generic_output's CDT, because it was generated either
             # by this POC or by a compatible one.
             # FIXME: self.generic_output.get_cdt().is_restriction(self.symbolicdataset.structure.compounddatatype)
 
-            elif type(self.execrecord.general_transf()) == pipeline.models.PipelineOutputCable:
+            elif isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
                 if not self.symbolicdataset.structure.compounddatatype.is_identical(self.generic_output.get_cdt()):
                     raise ValidationError(
                         "CDT of SymbolicDataset \"{}\" is not identical to the CDT of the TransformationOutput \"{}\" of the generating Pipeline".
@@ -1039,13 +1063,12 @@ class ExecRecordOut(models.Model):
             else:
                 if not input_SD.structure.compounddatatype.is_restriction(self.generic_output.get_cdt()):
                     raise ValidationError(
-                        "CDT of SymbolicDataset \"{}\" is not a restriction of the CDT of the fed TransformationInput \"{}\"".
+                        'CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'.
                         format(input_SD, self.generic_output))
 
             if (self.generic_output.get_min_row() != None and
                     input_SD.num_rows() < self.generic_output.get_min_row()):
-                if (type(self.execrecord.general_transf()) ==
-                        pipeline.models.PipelineStepInputCable):
+                if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                     raise ValidationError(
                         "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
                         format(input_SD, self.generic_output))
@@ -1056,8 +1079,7 @@ class ExecRecordOut(models.Model):
 
             if (self.generic_output.get_max_row() != None and 
                     input_SD.num_rows() > self.generic_output.get_max_row()):
-                if (type(self.execrecord.general_transf()) ==
-                        pipeline.models.PipelineStepInputCable):
+                if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                     raise ValidationError(
                         "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
                         format(input_SD, self.generic_output))

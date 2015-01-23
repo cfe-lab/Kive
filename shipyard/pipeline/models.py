@@ -553,6 +553,9 @@ class Pipeline(transformation.models.Transformation):
                 raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
                                  .format(self, i, minrows, maxrows, supplied_input.num_rows()))
 
+    def threads_needed(self):
+        return max(x.threads_needed() for x in self.steps.all())
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
@@ -810,6 +813,11 @@ class PipelineStep(models.Model):
             raise PipelineSerializationException("Error in creating pipeline step input cable: {}".format(e))
 
         return new_cable
+
+    def threads_needed(self):
+        if self.transformation.is_pipeline:
+            return self.transformation.threads_needed()
+        return self.transformation.definite.threads
 
 
 class PipelineCable(models.Model):

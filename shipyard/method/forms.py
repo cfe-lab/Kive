@@ -111,6 +111,11 @@ class CodeResourceDependencyForm (forms.ModelForm):
 
 
 class MethodForm (forms.ModelForm):
+
+    # We override the threads field.
+    threads = forms.IntegerField(min_value=1, initial=1,
+                                 help_text="Number of threads used during execution")
+
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
 
@@ -132,7 +137,7 @@ class MethodForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable')
+        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
         widgets = {
             'revision_desc': forms.Textarea(attrs={'rows': 5,
                                                    'cols': 30,
@@ -142,6 +147,11 @@ class MethodForm (forms.ModelForm):
 
 class MethodReviseForm (forms.ModelForm):
     """Revise an existing method.  No need to specify MethodFamily."""
+
+    # We override the threads field.
+    threads = forms.IntegerField(min_value=1, initial=1,
+                                 help_text="Number of threads used during execution")
+
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
 
@@ -156,7 +166,7 @@ class MethodReviseForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('revisions', 'revision_name', 'revision_desc', 'reusable')
+        fields = ('revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
 
 
 class TransformationXputForm (forms.ModelForm):

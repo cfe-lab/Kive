@@ -6,8 +6,8 @@ from mpi4py import MPI
 import numpy
 import logging
 from collections import defaultdict
-from django.db import transaction
 import time
+from exceptions import Exception
 
 import shipyard.settings  # @UnresolvedImport
 import fleet.models
@@ -30,27 +30,6 @@ class Manager:
     def __init__(self, worker_count, manage_script):
         self.worker_count = worker_count
         self.manage_script = manage_script
-        
-    def _startup(self, comm):
-        """
-        Set up/register the workers and prepare to run.
-
-        INPUTS
-        roster: a dictionary structured much like a host file, keyed by
-        hostname and containing the number of Workers on each host.
-        """
-        # Set up our communicator and other MPI info.
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.count = self.comm.Get_size()
-        self.hostname = MPI.Get_processor_name()
-
-        # Set up an ongoing non-blocking receive looking for all Worker.FINISHED-tagged
-        # messages from Workers.  Any time these are actually used, they should be
-        # replaced afresh.
-        self._setup_finished_task_receiver()
-
-        mgr_logger.debug("Manager started on host {}".format(self.hostname))
 
         # tasks_in_progress tracks what jobs are assigned to what workers.
         self.tasks_in_progress = {}
@@ -61,11 +40,37 @@ class Manager:
         # A table of currently running sandboxes, indexed by the Run.
         self.active_sandboxes = {}
 
-        # roster will be a dictionary keyed by hostname whose values are
+        # roster will be a dictionary keyed by hostnames whose values are
         # the sets of ranks of processes running on that host.  This will be
         # necessary down the line to help determine which hosts have enough
         # threads to run.
         self.roster = defaultdict(list)
+
+        # A reverse lookup table for the above.
+        self.hostnames = {}
+
+        
+    def _startup(self, comm):
+        """
+        Set up/register the workers and prepare to run.
+
+        INPUTS
+        roster: a dictionary structured much like a host file, keyed by
+        hostnames and containing the number of Workers on each host.
+        """
+        # Set up our communicator and other MPI info.
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.count = self.comm.Get_size()
+        self.mgr_hostname = MPI.Get_processor_name()
+
+        # Set up an ongoing non-blocking receive looking for all Worker.FINISHED-tagged
+        # messages from Workers.  Any time these are actually used, they should be
+        # replaced afresh.
+        self._setup_finished_task_receiver()
+
+        mgr_logger.debug("Manager started on host {}".format(self.mgr_hostname))
+
         workers_reported = 0
         while workers_reported < self.count - 1:
             hostname, rank = self.comm.recv(source=MPI.ANY_SOURCE, tag=Worker.ROLLCALL)
@@ -73,13 +78,12 @@ class Manager:
             self.roster[hostname].append(rank)
             workers_reported += 1
 
-        # A reverse lookup table for the above.
-        self.hostname = {}
         for hostname in self.roster:
             for rank in self.roster[hostname]:
-                self.hostname[rank] = hostname
+                self.hostnames[rank] = hostname
 
         self.worker_status = [Worker.READY for _ in range(self.count)]
+        self.max_host_cpus = max([len(self.roster[x]) for x in self.roster])
 
     def _setup_finished_task_receiver(self):
         self.work_finished_result = numpy.empty(2, dtype="i")
@@ -108,6 +112,10 @@ class Manager:
 
         return new_sdbx
 
+    def mop_up_failed_sandbox(self, sandbox):
+        self.active_sandboxes.pop(sandbox.run)
+        self.task_queue = [x for x in self.task_queue if x[0] != sandbox]
+
     def assign_task(self, sandbox, task):
         """
         Assign a task to a worker.
@@ -119,9 +127,13 @@ class Manager:
 
         # If we have no hosts that are capable of handling this many threads,
         # we blow up.
-        max_host_cpus = max([len(self.roster[x]) for x in self.roster])
-        if task_info.threads_required > max_host_cpus:
-            sandbox.exceeded_system(max_host_cpus)
+        if task_info.threads_required > self.max_host_cpus:
+            mgr_logger.info(
+                "Task %s requested %d threads but there are only %d workers.  Terminating parent run (%s).",
+                task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
+            task.not_enough_CPUs.create(threads_requested=task_info.threads_required,
+                                        max_available=self.max_host_cpus)
+            self.mop_up_failed_sandbox(sandbox)
             return
 
         while True:
@@ -150,13 +162,12 @@ class Manager:
             # We block and wait for a worker to become ready, so we can try again.
             mgr_logger.debug("Waiting for host to become ready....")
             self.work_finished_request.wait()
-            lord_rank = self.work_finished_result[0]
-            result_pk = self.work_finished_result[1]
-            self._setup_finished_task_receiver()
 
-            source_host = self.hostname[lord_rank]
-            result = archive.models.RunComponent.objects.get(pk=result_pk).definite
-            self.note_progress(lord_rank, result)
+            # Note the task that just finished, and release its workers.
+            # If this fails it will throw an exception.
+            lord_rank, _ = self.worker_finished()
+
+            source_host = self.hostnames[lord_rank]
             candidate_hosts = [source_host]
 
             # The task that returned may have belonged to the same sandbox, and
@@ -182,8 +193,7 @@ class Manager:
         # If the task just finished was unsuccessful, we should remove anything from the queue belonging to the
         # same sandbox.  Otherwise update the sandbox if this was not a recovery.
         if not task_finished.successful_execution():
-            self.active_sandboxes.pop(curr_sdbx.run)
-            self.task_queue = [x for x in self.task_queue if x[0] != curr_sdbx]
+            self.mop_up_failed_sandbox(curr_sdbx)
         else:
             # Did this task finish the run?
             is_complete = curr_sdbx.run.is_complete()
@@ -195,6 +205,8 @@ class Manager:
             
             if is_complete:
                 self.active_sandboxes.pop(curr_sdbx.run)
+                mgr_logger.info('Run "%s" finished (Pipeline: %s, User: %s)', curr_sdbx.run, curr_sdbx.pipeline,
+                                curr_sdbx.user)
 
             else:
                 # Was this task a recovery or novel progress??
@@ -231,7 +243,31 @@ class Manager:
             if rank != self.comm.Get_rank():
                 self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
         comm.Disconnect()
-        
+
+    def worker_finished(self):
+        """
+        Handle bookkeeping when a worker finishes.
+
+        PRE: self.work_finished_request.test()[0] is True.
+        """
+        assert self.work_finished_request.test()[0]
+
+        lord_rank, result_pk = self.work_finished_result
+        if result_pk == Worker.FAILURE:
+            raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
+                lord_rank,
+                self.tasks_in_progress[self.work_finished_result[0]]["task"].pk
+            ))
+
+        mgr_logger.info(
+            "Worker %d reports task with PK %d is finished",
+            lord_rank, result_pk)
+
+        task_finished = archive.models.RunComponent.objects.get(pk=result_pk).definite
+        self.note_progress(lord_rank, task_finished)
+        self._setup_finished_task_receiver()
+        return lord_rank, task_finished
+
     def main_loop(self):
         """
         Poll the database for new jobs, and handle running of sandboxes.
@@ -243,36 +279,28 @@ class Manager:
                 task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
                 # We assign this task to a worker, and do not proceed until the task
                 # is assigned.
-                self.assign_task(task_sdbx, curr_task[1])
+                try:
+                    self.assign_task(task_sdbx, curr_task[1])
+                except WorkerFailedException as e:
+                    mgr_logger.error(e.error_msg)
+                    return
                 self.task_queue = self.task_queue[1:]
 
             # Everything in the queue has been started, so we check and see if anything has finished.
-            worker_returned = False
             for _ in range(shipyard.settings.FLEET_POLLING_INTERVAL):
                 test_result = self.work_finished_request.test()
                 if test_result[0]:
-                    if self.work_finished_result[1] != Worker.FAILURE:
-                        mgr_logger.info(
-                            "Worker %d reports task with PK %d is finished",
-                            self.work_finished_result[0], self.work_finished_result[1])
-                    else:
-                        mgr_logger.info(
-                            "Worker %d reports a failed task (PK %d)",
-                            self.work_finished_result[0],
-                            self.tasks_in_progress[self.work_finished_result[0]]["task"].pk)
+                    try:
+                        self.worker_finished()
+                        break
+                    except WorkerFailedException as e:
+                        mgr_logger.error(e.error_msg)
                         return
 
-                    worker_returned = True
-                    break
                 try:
                     time.sleep(1)
                 except KeyboardInterrupt:
                     return
-            
-            if worker_returned:
-                task_finished = archive.models.RunComponent.objects.get(pk=self.work_finished_result[1]).definite
-                self.note_progress(self.work_finished_result[0], task_finished)
-                self._setup_finished_task_receiver()
 
             # Look for new jobs to run.  We will also
             # build in a delay here so we don't clog up the database.
@@ -283,6 +311,21 @@ class Manager:
             mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
             for run_to_process in pending_runs:
+                threads_needed = run_to_process.pipeline.threads_needed()
+                if threads_needed > self.max_host_cpus:
+                    mgr_logger.info(
+                        "Cannot run Pipeline %s for user %s: %d threads required, %d available",
+                        run_to_process.pipeline, run_to_process.user, threads_needed,
+                        self.max_host_cpus)
+                    esc = fleet.models.ExceedsSystemCapabilities(
+                        runtoprocess = run_to_process,
+                        threads_requested=threads_needed,
+                        max_available=self.max_host_cpus
+                    )
+                    esc.save()
+                    run_to_process.clean()
+                    continue
+
                 mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
                     run_to_process.pipeline, run_to_process.user))
                 new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
@@ -313,12 +356,12 @@ class Worker:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.count = self.comm.Get_size()
-        self.hostname = MPI.Get_processor_name()
+        self.wkr_hostname = MPI.Get_processor_name()
 
-        worker_logger.debug("Worker {} started on host {}".format(self.rank, self.hostname))
+        worker_logger.debug("Worker {} started on host {}".format(self.rank, self.wkr_hostname))
 
         # Report to the manager.
-        self.comm.send((self.hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
+        self.comm.send((self.wkr_hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
 
     def receive_and_perform_task(self):
         """
@@ -367,3 +410,8 @@ class Worker:
         tag = None
         while tag != self.SHUTDOWN:
             tag = self.receive_and_perform_task()
+
+
+class WorkerFailedException(Exception):
+    def __init__(self, error_msg):
+        self.error_msg = error_msg

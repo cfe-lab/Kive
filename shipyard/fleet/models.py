@@ -3,6 +3,8 @@ import threading
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 import archive.models
 import librarian.models
@@ -51,10 +53,14 @@ class RunToProcess(models.Model):
     time_queued = models.DateTimeField(auto_now_add=True)
     run = models.ForeignKey(archive.models.Run, null=True)
 
+    def clean(self):
+        if hasattr(self, "not_enough_CPUs"):
+            self.not_enough_CPUs.clean()
+
     @property
     @transaction.atomic
     def started(self):
-        return self.run is not None
+        return (self.run is not None) or hasattr(self, "not_enough_CPUs")
 
     @property
     @transaction.atomic
@@ -64,13 +70,19 @@ class RunToProcess(models.Model):
     @property
     @transaction.atomic
     def finished(self):
-        return self.started and self.run.is_complete()
+        return (self.started and self.run.is_complete()) or hasattr(self, "not_enough_CPUs")
 
     @transaction.atomic
     def get_run_progress(self):
         """
         Return a string describing the Run's current state.
         """
+        if hasattr(self, "not_enough_CPUs"):
+            esc = self.not_enough_CPUs
+            return "Terminated: requested too many threads ({} requested, {} available)".format(
+                esc.threads_requested, esc.max_available
+            )
+
         if not self.started:
             return "Waiting"
 
@@ -113,3 +125,18 @@ class RunToProcessInput(models.Model):
     runtoprocess = models.ForeignKey(RunToProcess, related_name="inputs")
     symbolicdataset = models.ForeignKey(librarian.models.SymbolicDataset)
     index = models.PositiveIntegerField()
+
+
+class ExceedsSystemCapabilities(models.Model):
+    """
+    Denotes a RunToProcess that could not be run due to requesting too much from the system.
+    """
+    runtoprocess = models.OneToOneField(RunToProcess, related_name="not_enough_CPUs")
+    threads_requested = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    max_available = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+
+    def clean(self):
+        if self.threads_requested <= self.max_available:
+            raise ValidationError("Threads requested ({}) does not exceed maximum available ({})".format(
+                self.threads_requested, self.max_available
+            ))

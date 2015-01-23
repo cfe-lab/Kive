@@ -31,7 +31,8 @@
         "reusable": 1,
         "driver": 2, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {
@@ -173,7 +174,8 @@
         "reusable": 2,
         "driver": 6, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 4
     }
 },
 {
@@ -246,7 +248,8 @@
         "reusable": 2,
         "driver": 7, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 4
     }
 },
 {
@@ -299,7 +302,8 @@
         "reusable": 1,
         "driver": 8, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {
@@ -395,7 +399,8 @@
         "reusable": 1,
         "driver": 11, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {
@@ -603,7 +608,8 @@
         "reusable": 1,
         "driver": 19, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {
@@ -643,10 +649,11 @@
     "fields": {
         "revision_parent": null, 
         "family": 9, 
-        "reusable": 1,
+        "reusable": 2,
         "driver": 21, 
         "tainted": false, 
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {

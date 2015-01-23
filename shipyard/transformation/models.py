@@ -7,7 +7,7 @@ Transformation.
 from __future__ import unicode_literals
 
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
@@ -291,7 +291,7 @@ class TransformationXput(models.Model):
 
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
-        return not hasattr(self, "structure")
+        return not self.has_structure
 
     def get_cdt(self):
         """Accessor that returns the CDT of this xput (and None if it is raw)."""
@@ -321,7 +321,12 @@ class TransformationXput(models.Model):
 
     @property
     def has_structure(self):
-        return hasattr(self, "structure")
+        # return hasattr(self, "structure")
+        try:
+            self.structure
+        except ObjectDoesNotExist:
+            return False
+        return True
 
     @transaction.atomic
     def add_structure(self, compounddatatype, min_row, max_row):

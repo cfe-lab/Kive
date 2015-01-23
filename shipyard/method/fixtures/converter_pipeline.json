@@ -28,10 +28,11 @@
     "fields": {
         "revision_parent": null,
         "family": 1,
-        "deterministic": true,
+        "reusable": 1,
         "driver": 1,
         "tainted": false,
-        "revision_number": 1
+        "revision_number": 1,
+        "threads": 1
     }
 },
 {
