@@ -1103,7 +1103,7 @@ class PipelineCable(models.Model):
 
         return new_wire
 
-    def find_compatible_ER(self, input_SD):
+    def find_compatible_ERs(self, input_SD):
         """Find an ExecRecord which may be reused by this PipelineCable.
 
         INPUTS
@@ -1116,6 +1116,7 @@ class PipelineCable(models.Model):
         # Look at ERIs with matching input SD.
         candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
 
+        candidates = []
         for candidate_ERI in candidate_ERIs:
             candidate_execrecord = candidate_ERI.execrecord
             candidate_component = candidate_execrecord.general_transf()
@@ -1125,7 +1126,9 @@ class PipelineCable(models.Model):
 
             if self.definite.is_compatible(candidate_component):
                 self.logger.debug("Compatible ER found")
-                return candidate_execrecord
+                candidates.append(candidate_execrecord)
+
+        return candidates
 
 
 @python_2_unicode_compatible

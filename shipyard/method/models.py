@@ -530,17 +530,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
                     ).save()
 
-    def find_compatible_ER(self, input_SDs):
+    def find_compatible_ERs(self, input_SDs):
         """
-        Given a set of input SDs, find an ER that uses these inputs.
+        Given a set of input SDs, find any ExecRecords that use these inputs.
 
         Note that this ExecRecord may be a failure, which the calling function
         would then handle appropriately.
         """
         if self.reusable == Method.NON_REUSABLE:
-            return None
+            return []
 
         # For pipelinesteps featuring this method....
+        candidates = []
         for possible_PS in self.pipelinesteps.all():
 
             # For linked runsteps which did not *completely* reuse an ER....
@@ -549,10 +550,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
 
-                # # Reject RunStep if its outputs are not OK.
-                # if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
-
-                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match.
+                # Check if inputs match.
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.definite.dataset_idx
@@ -562,10 +560,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         
                 if ER_matches:
                     # All ERIs match input SDs, so commit to candidate ER.
-                    return candidate_ER
-    
-        # No compatible ExecRecords found.
-        return None
+                    candidates.append(candidate_ER)
+
+        return candidates
 
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams

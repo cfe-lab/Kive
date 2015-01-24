@@ -2742,7 +2742,7 @@ with open(outfile, "wb") as f:
         sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
         sdbx.execute_pipeline()
 
-        self.assertIsNone(self.rng_method.find_compatible_ER([]))
+        self.assertListEqual(self.rng_method.find_compatible_ERs([]), [])
 
     def test_execute_does_not_reuse(self):
         """

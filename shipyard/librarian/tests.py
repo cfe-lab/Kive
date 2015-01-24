@@ -1213,7 +1213,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertFalse(execrecord.has_ever_failed())
-        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
 
     def test_find_compatible_ER_failed(self):
         """Should also find a compatible ExecRecord which failed."""
@@ -1232,7 +1232,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
-        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
 
     def test_find_compatible_ER_skips_nulls(self):
         """
@@ -1281,4 +1281,4 @@ class FindCompatibleERTests(LibrarianTestCase):
         run_step2.execrecord = execrecord
         run_step2.save()
         
-        self.assertEqual(method.find_compatible_ER(input_SDs), execrecord)
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
