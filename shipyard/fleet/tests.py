@@ -7,7 +7,7 @@ from librarian.models import ExecRecord
 
 class RunToProcessTest(TestCase):
     fixtures = ['initial_user', 'converter_pipeline']
-    def test_run_progress_waiting(self):
+    def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
         
         progress = run_tracker.get_run_progress()
@@ -41,12 +41,13 @@ class RunToProcessTest(TestCase):
         self.assertSequenceEqual('Starting step 1 of 1', progress)
 
     def add_exec_record(self, run_component):
-        generator = ExecLog(record=run_component, invoking_record=run_component)
-        generator.save()
+        generator = ExecLog.create(record=run_component,
+                                   invoking_record=run_component)
         execrecord = ExecRecord(generator=generator)
         execrecord.save()
         run_component.execrecord = execrecord
         run_component.save()
+        return execrecord
 
     def create_with_run_step(self):
         run_tracker = self.create_with_pipeline_step()
@@ -66,13 +67,14 @@ class RunToProcessTest(TestCase):
         
         self.assertSequenceEqual('Running step 1 of 1', progress)
 
-
     def create_with_completed_run_step(self):
         run_tracker = self.create_with_run_step()
         run_step = run_tracker.run.runsteps.first()
         run_step_input_cable = run_step.RSICs.first()
         self.add_exec_record(run_step_input_cable)
-        self.add_exec_record(run_step)
+        exec_record = self.add_exec_record(run_step)
+        exec_record.generator.methodoutput.return_code = 0
+        exec_record.generator.methodoutput.save()
         return run_tracker
 
     def test_run_progress_completed_steps(self):
@@ -81,6 +83,17 @@ class RunToProcessTest(TestCase):
         progress = run_tracker.get_run_progress()
         
         self.assertSequenceEqual('Starting output 1 of 1', progress)
+
+    def test_run_progress_failed_steps(self):
+        run_tracker = self.create_with_completed_run_step()
+        run_step = run_tracker.run.runsteps.first()
+        exec_log = run_step.invoked_logs.first()
+        exec_log.methodoutput.return_code = 5
+        exec_log.methodoutput.save()
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual('Step 1 of 1 failed (Return code 5)', progress)
 
     def test_run_progress_creating_output(self):
         run_tracker = self.create_with_completed_run_step()
