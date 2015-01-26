@@ -51,7 +51,7 @@ function handle_run_failure(run_data) {
 
 /* Display the progress of a run on the page. */
 function show_run_progress(message) {
-    $("#progress").html(message);
+    $("#progress").html($("<pre/>").text(message));
 }
 
 /* Display an error on the page. */

@@ -84,38 +84,35 @@ class RunToProcess(models.Model):
             )
 
         if not self.started:
-            return "Waiting"
+            return "?"
 
         run = self.run
 
-        # Run is finished?
-        if run.is_complete():
-            if run.successful_execution():
-                return "Complete"
-            return "{} ({})".format(*(run.describe_run_failure()))
+        status = ""
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
-        for i, step in enumerate(run.runsteps.order_by("pipelinestep__step_num"), start=1):
+        for step in run.runsteps.order_by("pipelinestep__step_num"):
             if not step.is_complete():
-                return "Running step {} of {}".format(i, total_steps)
+                status += ":"
+            elif not step.successful_execution():
+                status += "!"
+            else:
+                status += "+"
 
         # Just finished a step, but didn't start the next one?
-        if run.runsteps.count() < total_steps:
-            return "Starting step {} of {}".format(run.runsteps.count()+1, total_steps)
-
+        status += "." * (total_steps - run.runsteps.count())
+        
+        status += "-"
+        
         # One of the outcables is in progress?
         total_cables = run.pipeline.outcables.count()
-        for i, cable in enumerate(run.runoutputcables.order_by("pipelineoutputcable__output_idx"), start=1):
-            if not cable.is_complete():
-                return "Creating output {} of {}".format(i, total_cables)
+        for cable in run.runoutputcables.order_by("pipelineoutputcable__output_idx"):
+            status += "+" if cable.is_complete() else ":"
 
-        # Just finished a cable, but didn't start the next one?
-        if run.runoutputcables.count() < total_cables:
-            return "Starting output {} of {}".format(run.runoutputcables.count()+1, total_cables)
+        status += "." * (total_cables - run.runoutputcables.count())
 
-        # Something is wrong.
-        return "Unknown status"
+        return status
 
 
 class RunToProcessInput(models.Model):
