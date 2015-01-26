@@ -634,7 +634,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             out_thread.join()
             err_thread.join()
 
-            returncode = method_popen.poll()
+            returncode = method_popen.wait()
 
         for stream in output_streams + error_streams:
             stream.flush()
@@ -646,6 +646,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             # TODO: I'm not sure how this is going to handle huge output, 
             # it would be better to update the logs as we go.
             if details_to_fill:
+                self.logger.debug('return code is %s for %r.',
+                                  returncode,
+                                  details_to_fill)
                 details_to_fill.return_code = returncode
                 outlog = output_streams[0]
                 errlog = error_streams[0]

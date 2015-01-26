@@ -100,7 +100,8 @@ class RunToProcess(models.Model):
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
-        for step in run.runsteps.order_by("pipelinestep__step_num"):
+        runsteps = list(run.runsteps.order_by("pipelinestep__step_num"))
+        for step in runsteps:
             if not step.is_complete():
                 status += ":"
             elif not step.successful_execution():
@@ -109,16 +110,18 @@ class RunToProcess(models.Model):
                 status += "+"
 
         # Just finished a step, but didn't start the next one?
-        status += "." * (total_steps - run.runsteps.count())
+        status += "." * (total_steps - len(runsteps))
         
         status += "-"
         
         # One of the outcables is in progress?
         total_cables = run.pipeline.outcables.count()
-        for cable in run.runoutputcables.order_by("pipelineoutputcable__output_idx"):
+        runoutputcables = list(run.runoutputcables.order_by(
+            "pipelineoutputcable__output_idx"))
+        for cable in runoutputcables:
             status += "+" if cable.is_complete() else ":"
 
-        status += "." * (total_cables - run.runoutputcables.count())
+        status += "." * (total_cables - len(runoutputcables))
         
         if input_name:
             status += "-" + input_name
