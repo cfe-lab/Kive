@@ -12,7 +12,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Waiting', progress)
+        self.assertSequenceEqual('?', progress)
 
     def create_with_empty_pipeline(self):
         pipeline = Pipeline()
@@ -24,7 +24,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Complete', progress)
+        self.assertSequenceEqual('-', progress)
 
     def create_with_pipeline_step(self):
         pipeline=Pipeline.objects.get(pk=2)
@@ -38,7 +38,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Starting step 1 of 1', progress)
+        self.assertSequenceEqual('.-.', progress)
 
     def add_exec_record(self, run_component):
         generator = ExecLog.create(record=run_component,
@@ -65,7 +65,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Running step 1 of 1', progress)
+        self.assertSequenceEqual(':-.', progress)
 
     def create_with_completed_run_step(self):
         run_tracker = self.create_with_run_step()
@@ -82,7 +82,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Starting output 1 of 1', progress)
+        self.assertSequenceEqual('+-.', progress)
 
     def test_run_progress_failed_steps(self):
         run_tracker = self.create_with_completed_run_step()
@@ -93,7 +93,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Step 1 of 1 failed (Return code 5)', progress)
+        self.assertSequenceEqual('!-.', progress)
 
     def test_run_progress_creating_output(self):
         run_tracker = self.create_with_completed_run_step()
@@ -104,7 +104,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Creating output 1 of 1', progress)
+        self.assertSequenceEqual('+-:', progress)
 
     def test_run_progress_complete(self):
         run_tracker = self.create_with_completed_run_step()
@@ -117,4 +117,4 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('Complete', progress)
+        self.assertSequenceEqual('+-+', progress)

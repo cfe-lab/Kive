@@ -1,22 +1,15 @@
 import time
 import json
-import re
-import os
 import itertools
 import logging
 
 from django.http import HttpResponse
-from django.core import serializers
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from pipeline.models import Pipeline, PipelineFamily
 from archive.models import Dataset, Run
 from librarian.models import SymbolicDataset
-from transformation.models import TransformationInput
-from metadata.models import CompoundDatatype
-from execute import Sandbox
 from forms import PipelineSelectionForm
 import fleet.models
 from django.db import transaction
@@ -115,10 +108,9 @@ def _filter_pipelines(request):
         key, value = filter_instance["key"], filter_instance["val"]
         if key == "Smart":
             query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))
-    forms = [PipelineSelectionForm(pipeline_family_pk=f.pk) for f in query]
     response_data = []
     for family in query:
-        form = PipelineSelectionForm(pipeline_family_pk=f.pk) 
+        form = PipelineSelectionForm(pipeline_family_pk=family.pk) 
         response_data.append({"Pipeline Family": form.family_name,
                               "Revision": form.fields["pipeline"].widget.render("id_pipeline", "")})
     return json.dumps(response_data)
@@ -138,6 +130,21 @@ def filter_pipelines(request):
 #         return False
 #     return not rtp.run.is_complete()
 
+
+def _load_status():
+    try:
+        runs = fleet.models.RunToProcess.objects.all()
+        run_reports = []
+        for run in runs:
+            if not run.finished:
+                run_reports.append(run.get_run_progress())
+        
+        status = '\n'.join(run_reports)
+    except StandardError as e:
+        status = str(e)
+        ajax_logger.error('Status report failed.', exc_info=e)
+    return status
+
 def _poll_run_progress(request):
     """
     Helper to produce a JSON description of the current state of a run.
@@ -146,7 +153,6 @@ def _poll_run_progress(request):
     rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
 
     last_status = request.GET.get("status")
-    status = rtp.get_run_progress()
 
     # If the Run isn't done but the process is, we've crashed.
     # FIXME we are no longer monitoring threads directly here, so we need another way to know if
@@ -156,17 +162,19 @@ def _poll_run_progress(request):
     crashed = False
 
     # Arrrgh I hate sleeping. Find a better way.
-    while status == last_status and not rtp.finished:
+    while True:
+        status = _load_status()
+        if status != last_status or not status:
+            break
         time.sleep(1)
-        rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
-        status = rtp.get_run_progress()
         # ajax_logger.debug("status: {}".format(status))
         # ajax_logger.debug("rtp.finished: {}".format(rtp.finished))
         # ajax_logger.debug("run PK: {}".format(None if rtp.run is None else rtp.run.pk))
 
     success = rtp.started and rtp.run.successful_execution()
 
-    return_val = json.dumps({"status": status, "run": rtp.run.pk, "finished": rtp.finished, "success": success,
+    run_pk = None if rtp.run is None else rtp.run.pk
+    return_val = json.dumps({"status": status, "run": run_pk, "finished": rtp.finished, "success": success,
                              "queue_placeholder": rtp_pk, "crashed": crashed})
     ajax_logger.debug("Returning: {}".format(return_val))
     return return_val
