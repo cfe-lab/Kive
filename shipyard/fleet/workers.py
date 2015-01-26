@@ -194,6 +194,8 @@ class Manager:
         # same sandbox.  Otherwise update the sandbox if this was not a recovery.
         if not task_finished.successful_execution():
             self.mop_up_failed_sandbox(curr_sdbx)
+            if curr_sdbx.run.is_complete():
+                curr_sdbx.run.stop()
         else:
             # Did this task finish the run?
             is_complete = curr_sdbx.run.is_complete()
@@ -205,6 +207,7 @@ class Manager:
             
             if is_complete:
                 self.active_sandboxes.pop(curr_sdbx.run)
+                curr_sdbx.run.stop()
                 mgr_logger.info('Run "%s" finished (Pipeline: %s, User: %s)', curr_sdbx.run, curr_sdbx.pipeline,
                                 curr_sdbx.user)
 

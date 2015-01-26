@@ -82,9 +82,17 @@ class RunToProcess(models.Model):
             return "Terminated: requested too many threads ({} requested, {} available)".format(
                 esc.threads_requested, esc.max_available
             )
+        
+        input_name = None
+        for run_input in self.inputs.all():
+            input_name = run_input.symbolicdataset.dataset.name
+            break
 
         if not self.started:
-            return "?"
+            status = "?"
+            if input_name:
+                status += "-" + input_name
+            return status
 
         run = self.run
 
@@ -111,6 +119,9 @@ class RunToProcess(models.Model):
             status += "+" if cable.is_complete() else ":"
 
         status += "." * (total_cables - run.runoutputcables.count())
+        
+        if input_name:
+            status += "-" + input_name
 
         return status
 

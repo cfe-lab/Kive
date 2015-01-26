@@ -1,9 +1,9 @@
 from django.test import TestCase
-from fleet.models import RunToProcess
+from fleet.models import RunToProcess, RunToProcessInput
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
 from pipeline.models import Pipeline
 from django.contrib.auth.models import User
-from librarian.models import ExecRecord
+from librarian.models import ExecRecord, SymbolicDataset
 
 class RunToProcessTest(TestCase):
     fixtures = ['initial_user', 'converter_pipeline']
@@ -28,9 +28,10 @@ class RunToProcessTest(TestCase):
 
     def create_with_pipeline_step(self):
         pipeline=Pipeline.objects.get(pk=2)
-        run = Run(pipeline=pipeline, user=User.objects.first())
+        user = User.objects.first()
+        run = Run(pipeline=pipeline, user=user)
         run.save()
-        run_tracker = RunToProcess(run=run)
+        run_tracker = RunToProcess(run=run, user=user, pipeline=pipeline)
         return run_tracker
 
     def test_run_progress_starting(self):
@@ -118,3 +119,29 @@ class RunToProcessTest(TestCase):
         progress = run_tracker.get_run_progress()
         
         self.assertSequenceEqual('+-+', progress)
+
+    def add_input(self, run_tracker):
+        run_tracker.save()
+        symbolicdataset = SymbolicDataset.objects.get(pk=1)
+        run_input = RunToProcessInput(runtoprocess=run_tracker,
+                                      symbolicdataset=symbolicdataset,
+                                      index=1)
+        run_input.save()
+        
+    def test_run_progress_input_name(self):
+        run_tracker = self.create_with_pipeline_step()
+        self.add_input(run_tracker)
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual('.-.-TestFASTA', progress)
+
+    def test_run_progress_input_name_but_no_run(self):
+        pipeline=Pipeline.objects.get(pk=2)
+        user = User.objects.first()
+        run_tracker = RunToProcess(user=user, pipeline=pipeline)
+        self.add_input(run_tracker)
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual('?-TestFASTA', progress)

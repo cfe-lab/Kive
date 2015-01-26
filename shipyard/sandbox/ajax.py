@@ -1,18 +1,20 @@
-import time
-import json
+from datetime import timedelta
 import itertools
+import json
 import logging
+import time
 
-from django.http import HttpResponse
 from django.contrib.auth.models import User
-from django.db.models import Q
-
-from pipeline.models import Pipeline, PipelineFamily
-from archive.models import Dataset, Run
-from librarian.models import SymbolicDataset
-from forms import PipelineSelectionForm
-import fleet.models
 from django.db import transaction
+from django.db.models import Q
+from django.http import HttpResponse
+from django.utils import timezone
+
+from archive.models import Dataset, Run
+import fleet.models
+from forms import PipelineSelectionForm
+from librarian.models import SymbolicDataset
+from pipeline.models import Pipeline, PipelineFamily
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -133,11 +135,15 @@ def filter_pipelines(request):
 
 def _load_status():
     try:
-        runs = fleet.models.RunToProcess.objects.all()
+        recent_time = timezone.now() - timedelta(minutes=5)
+        runs = fleet.models.RunToProcess.objects.all().filter(
+            Q(run_id__isnull=True)|
+            Q(run__end_time__isnull=True)|
+            Q(run__end_time__gte=recent_time)).order_by(
+                'time_queued')
         run_reports = []
         for run in runs:
-            if not run.finished:
-                run_reports.append(run.get_run_progress())
+            run_reports.append(run.get_run_progress())
         
         status = '\n'.join(run_reports)
     except StandardError as e:
@@ -174,7 +180,7 @@ def _poll_run_progress(request):
     success = rtp.started and rtp.run.successful_execution()
 
     run_pk = None if rtp.run is None else rtp.run.pk
-    return_val = json.dumps({"status": status, "run": run_pk, "finished": rtp.finished, "success": success,
+    return_val = json.dumps({"status": status, "run": run_pk, "finished": len(status) == 0, "success": success,
                              "queue_placeholder": rtp_pk, "crashed": crashed})
     ajax_logger.debug("Returning: {}".format(return_val))
     return return_val
