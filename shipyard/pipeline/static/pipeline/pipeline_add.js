@@ -266,6 +266,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         $('#output_name_error').hide();
         
         out_node.label = label;
+        canvasState.selection = [ out_node ];
         canvasState.valid = false;
         dialog.hide();
     }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript
@@ -432,7 +433,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                             // replace the selected MethodNode
                             // if user clicks anywhere else, MethodNode is deselected
                             // and Methods menu closes
-                            var old_node = canvasState.selection;
+                            var old_node = canvasState.selection[0];
                             var idx;
 
                             // draw new node over old node
@@ -476,7 +477,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
                             canvasState.deleteObject();  // delete selected (old Method)
                             canvasState.addShape(new_node);
-                            canvasState.selection = new_node;
+                            canvasState.selection = [ new_node ];
                         }
                         
                         dlg.removeClass('modal_dialog').hide();
@@ -525,7 +526,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('#id_revision_desc').on('keydown', function() {
         var getHappierEachXChars = 12,
             happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
-    
+        
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
         .trigger('keydown')
@@ -538,12 +539,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
             
             if (desc_length == 0 || $(this).hasClass('input-label')) {
                 $('.happy_indicator, .happy_indicator_label', wrap).hide();
-            }
-            else if (desc_length > 20) {
+            } else if (desc_length > 20) {
                 $('.happy_indicator', wrap).show();
                 $('.happy_indicator_label', wrap).hide();
-            }
-            else {
+            } else {
                 $('.happy_indicator, .happy_indicator_label', wrap).show();
             }
         }).on('blur', function() {
@@ -570,7 +569,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             $('li', 'ul#id_ctrl_nav').removeClass('clicked');
             $('.ctrl_menu:visible').trigger('cancel');
             
-            canvasState.selection = null;
+            canvasState.selection = [];
             canvasState.valid = false;
         }
     })
@@ -595,7 +594,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
         if (sel) {
             var action = $this.data('action');
             
-            if (action == 'edit') {
+            if (action == 'edit' && sel.length == 1) {
+                sel = sel[0];
+                
                 if (sel.constructor == MethodNode) {
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)

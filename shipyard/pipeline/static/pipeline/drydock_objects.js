@@ -86,7 +86,7 @@ function RawNode (x, y, r, h, fill, inset, offset, label) {
     this.in_magnets = []; // for compatibility
 
     // CDT node always has one magnet
-    this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
+    this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label, null, true) ];
 }
 
 RawNode.prototype.draw = function(ctx) {
@@ -190,7 +190,7 @@ function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     this.label = label || '';
     this.in_magnets = [];
 
-    var magnet = new Magnet(this, 5, 2, "white", this.pk, this.label);
+    var magnet = new Magnet(this, 5, 2, "white", this.pk, this.label, null, true);
     this.out_magnets = [ magnet ];
 }
 

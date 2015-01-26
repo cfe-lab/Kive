@@ -9,7 +9,7 @@ function draw_inputs(pipeline) {
             canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width, node.y * canvas.height, cdtNodeWidth, cdtNodeHeight, null, null, null, node.dataset_name));
         }
         canvasState.dragging = true;
-        canvasState.selection = canvasState.shapes[canvasState.shapes.length-1];
+        canvasState.selection.push(canvasState.shapes[canvasState.shapes.length-1]);
         canvasState.doUp();
     }
     draw_steps(pipeline, pipeline_inputs.length);
