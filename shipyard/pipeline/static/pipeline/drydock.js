@@ -30,6 +30,9 @@ function CanvasState (canvas) {
         this.styleBorderLeft = parseInt(getComputedStyle(canvas, null).getPropertyValue('border-left-width'));
         this.styleBorderTop = parseInt(getComputedStyle(canvas, null).getPropertyValue('border-top-width'));
     }
+    
+    this.scale = 1;
+    this.enable_labels = true;
 
     // adjust for fixed-position bars at top or left of page
     var html = document.body.parentNode;
@@ -56,31 +59,17 @@ function CanvasState (canvas) {
     var myState = this; // save reference to this particular CanvasState
     
     this.outputZone = new OutputZone(this.width, this.height);
-    
-    // de-activate double-click selection of text on page
-    canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
-
-    canvas.addEventListener('mousedown', function(e) {
-        myState.doDown(e); // listener registered on mousedown event
-    }, true);
-
-    canvas.addEventListener('mousemove', function(e) {
-        myState.doMove(e);
-    }, true);
-
-    canvas.addEventListener('mouseup', function(e) {
-        myState.doUp(e);
-    }, true);
-    
-    canvas.addEventListener('contextmenu', function(e) {
-        myState.contextMenu(e);
-    }, true);
 
     // options
     this.selectionColor = '#7bf';
     this.selectionWidth = 2;
     setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
 }
+
+CanvasState.prototype.setScale = function(factor) {
+    this.scale = factor;
+    this.ctx.scale(factor, factor);
+};
 
 CanvasState.prototype.getMouseTarget = function(mx, my) {
     var shape, shapes = this.shapes;
@@ -373,8 +362,10 @@ CanvasState.prototype.centreCanvas = function() {
 
 CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
-        vertices = myShape.getVertices();
-    
+        vertices = myShape.getVertices(),
+        scale_width = canvas.width / this.scale,
+        scale_height = canvas.height / this.scale;
+        
     // Bias defines how much to move myShape vs how much to move the shape it collided with.
     // 1 would be 100% myShape movement, 0 would be 100% other shape movement, and everything
     // else in-between is possible.
@@ -420,44 +411,50 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                 my_x = myShape.x + myShape.dx;
                 sh_x = shape.x + shape.dx;
                 
-                if (my_x > canvas.width) {
-                    sh_x -= my_x - canvas.width;
-                    my_x = canvas.width;
+                if (my_x > scale_width) {
+                    sh_x -= my_x - scale_width;
+                    my_x = scale_width;
                 }
                 if (my_x < 0) {
                     sh_x -= my_x;
                     my_x = 0;
                 }
-                if (sh_x > canvas.width) {
-                    my_x -= sh_x - canvas.width;
-                    sh_x = canvas.width;
+                if (sh_x > scale_width) {
+                    my_x -= sh_x - scale_width;
+                    sh_x = scale_width;
                 }
                 if (sh_x < 0) {
                     my_x -= sh_x;
                     sh_x = 0;
                 }
                 
+                myShape.dx = my_x - myShape.x;
+                shape.dx = sh_x - shape.x;
+                
                 myShape.dy += Dy * bias;
                 shape.dy -= Dy * (1 - bias);
                 my_y = myShape.y + myShape.dy;
                 sh_y = shape.y + shape.dy;
                 
-                if (my_y > canvas.height) {
-                    sh_y -= my_y - canvas.height;
-                    my_y = canvas.height;
+                if (my_y > scale_height) {
+                    sh_y -= my_y - scale_height;
+                    my_y = scale_height;
                 }
                 if (my_y < 0) {
                     sh_y -= my_y;
                     my_y = 0;
                 }
-                if (shape.y > canvas.height) {
-                    my_y += sh_y - canvas.height;
-                    sh_y = canvas.height;
+                if (shape.y > scale_height) {
+                    my_y += sh_y - scale_height;
+                    sh_y = scale_height;
                 }
                 if (sh_y < 0) {
                     my_y -= sh_y;
                     sh_y = 0;
                 }
+                
+                myShape.dy = my_y - myShape.y;
+                shape.dy = sh_y - shape.y;
         
                 vertices = myShape.getVertices();
                 vertex = vertices[j];
@@ -761,7 +758,7 @@ CanvasState.prototype.disambiguateExecutionOrder = function() {
 
 CanvasState.prototype.clear = function() {
     // wipe canvas content clean before redrawing
-    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.ctx.clearRect(0, 0, this.width / this.scale, this.height / this.scale);
 
     this.ctx.textAlign = 'center';
     this.ctx.font = '12pt Lato, sans-serif';
@@ -792,7 +789,7 @@ CanvasState.prototype.draw = function() {
         for (var i = 0; i < shapes.length; i++) {
             var shape = shapes[i];
             // skip shapes moved off the screen
-            if (shape.x > this.width || shape.y > this.height ||
+            if (shape.x > this.width / this.scale || shape.y > this.height / this.scale ||
                 shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
                 continue;
             }
@@ -832,21 +829,23 @@ CanvasState.prototype.draw = function() {
                 sel.highlight(ctx, this.dragging);
             }
         }
+        
+        if (this.enable_labels) {
+            // draw all labels
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'alphabetic';
+            ctx.font = '10pt Lato, sans-serif';
+            for (i = 0; i < labels.length; i++) {
+                var l = labels[i],
+                    textWidth = ctx.measureText(l.label).width;
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = 0.4;
+                ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
 
-        // draw all labels
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        ctx.font = '10pt Lato, sans-serif';
-        for (i = 0; i < labels.length; i++) {
-            var l = labels[i],
-                textWidth = ctx.measureText(l.label).width;
-            ctx.fillStyle = '#fff';
-            ctx.globalAlpha = 0.4;
-            ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
-
-            ctx.fillStyle = '#000';
-            ctx.globalAlpha = 1.0;
-            ctx.fillText(l.label, l.x, l.y);
+                ctx.fillStyle = '#000';
+                ctx.globalAlpha = 1.0;
+                ctx.fillText(l.label, l.x, l.y);
+            }
         }
         
         this.valid = true;

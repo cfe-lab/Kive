@@ -95,14 +95,30 @@ jQuery.fn.extend({
 
 $(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
-    canvas = document.getElementById('pipeline_canvas');
+    canvas = $('#pipeline_canvas')[0];
     var canvasWidth  = canvas.width  = window.innerWidth,
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 
-    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
-    //    $(window).resize(function() {    });
-
     canvasState = new CanvasState(canvas);
+    
+    // de-activate double-click selection of text on page
+    canvasState.canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+
+    canvasState.canvas.addEventListener('mousedown', function(e) {
+        canvasState.doDown(e); // listener registered on mousedown event
+    }, true);
+
+    canvasState.canvas.addEventListener('mousemove', function(e) {
+        canvasState.doMove(e);
+    }, true);
+
+    canvasState.canvas.addEventListener('mouseup', function(e) {
+        canvasState.doUp(e);
+    }, true);
+    
+    canvasState.canvas.addEventListener('contextmenu', function(e) {
+        canvasState.contextMenu(e);
+    }, true);
     
     canvasState.old_width = canvasWidth;
     canvasState.old_height = canvasHeight;

@@ -6,7 +6,78 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
 	<script src="/static/portal/noxss.js"></script>
 	<script src="/static/sandbox/sandbox.js"></script>
+    <script src="/static/pipeline/jsBezier-0.6.js"></script>
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
+    <script type="text/javascript">
+
+// place in global namespace to access from other files
+var canvas;
+var canvasState;
+var submit_to_url = '/pipeline_add';
+
+var rawNodeWidth = 20,
+    rawNodeHeight = 25,
+    rawNodeColour = "#8D8",
+    rawNodeInset = 10,
+    rawNodeOffset = 10;
+
+var cdtNodeWidth = 45,
+    cdtNodeHeight = 28,
+    cdtNodeColour = '#88D',
+    cdtNodeInset = 13,
+    cdtNodeOffset = 15;
+
+var mNodeWidth = 40,
+    mNodeInset = 5,
+    mNodeSpacing = 10,
+    mNodeColour = '#999',
+    mNodeOffset = 5;
+
+$(function() {
+    // initialize animated canvas
+    canvas = document.getElementById('pipeline_preview_canvas');
+    var canvasWidth  = canvas.width  = 200,
+        canvasHeight = canvas.height = 150;
+
+    canvasState = new CanvasState(canvas);
+    canvasState.setScale(0.25);
+    canvasState.enable_labels = false;
+    
+    // change pipeline revision drop-down triggers ajax to redraw canvas
+    $('.tbselect-value').on('change', function () {
+        $.ajax({
+            type: "POST",
+            url: "/get_pipeline/",
+            data: { pipeline_id: $('.tbselect-value').val() },
+            datatype: "json",
+            success: function(result) {
+                // prepare to redraw canvas
+                // remove all objects from canvas
+                canvasState.clear();
+                // reset containers to reflect canvas
+                canvasState.shapes = [];
+                canvasState.connectors = [];
+                canvasState.exec_order = [];
+                canvasState.selection = [];
+        
+                submit_to_url = result['family_pk'];
+                var i, j, k; // counters
+                var node, cables, cable, connector, shape, source, magnet;
+        
+                draw_inputs(result);
+                canvasState.testExecutionOrder();
+        
+                for (var i = 0; i < canvasState.shapes.length; i++) {
+                    canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                }
+            }
+        });
+    }).change();
+});
+
+    </script>
 	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
@@ -21,6 +92,11 @@ Select a pipeline
 </p>
 
 {% if pipeline_forms|length > 0 %}
+    <div>
+        <h3>Currently selected: (thumbnail)</h3>
+        <canvas id="pipeline_preview_canvas">Warning: Kive does not support your web browser.</canvas>
+    </div>
+    
 	<div class="filter_ctrl">
 		<form class="short-filter">
 		<input name="name" type="text" data-link="Smart"><!--

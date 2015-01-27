@@ -396,7 +396,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             }
             filterTable_ajax(container.siblings('.results'));
         });
-    
+        
         $('.results').on('click', 'tbody tr', function() {
             var tab = $(this).closest('.results'),
                 tbselect = tab.siblings('input.tbselect-value');
@@ -411,6 +411,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 tbselect.val( $(this).get_pkey(tab.data('pkey')) );
                 $(this).addClass('selected');  
             }
+            
+            tbselect.trigger('change');
         });
         
         /* Browsers will remember input values, even for hidden fields, on page refresh

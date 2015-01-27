@@ -1,12 +1,36 @@
+
+// place in global namespace to access from other files
+var canvas;
+var canvasState;
+var submit_to_url = '/pipeline_add';
+
+var rawNodeWidth = 20,
+    rawNodeHeight = 25,
+    rawNodeColour = "#8D8",
+    rawNodeInset = 10,
+    rawNodeOffset = 25;
+
+var cdtNodeWidth = 45,
+    cdtNodeHeight = 28,
+    cdtNodeColour = '#88D',
+    cdtNodeInset = 13,
+    cdtNodeOffset = 15;
+
+var mNodeWidth = 80,
+    mNodeInset = 10,
+    mNodeSpacing = 20,
+    mNodeColour = '#999',
+    mNodeOffset = 10;
+
 // Draw pipeline inputs on the canvas.
 function draw_inputs(pipeline) {
     var pipeline_inputs = pipeline['pipeline_inputs'];  // Array[]
     for (i = 0; i < pipeline_inputs.length; i++) {
         node = pipeline_inputs[i];
         if (node.CDT_pk === null) {
-            canvasState.addShape(new RawNode(node.x * canvas.width, node.y * canvas.height, rawNodeWidth, rawNodeHeight, null, null, null, node.dataset_name));
+            canvasState.addShape(new RawNode(node.x * canvas.width / canvasState.scale, node.y * canvas.height / canvasState.scale, rawNodeWidth, rawNodeHeight, null, null, null, node.dataset_name));
         } else {
-            canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width, node.y * canvas.height, cdtNodeWidth, cdtNodeHeight, null, null, null, node.dataset_name));
+            canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width / canvasState.scale, node.y * canvas.height / canvasState.scale, cdtNodeWidth, cdtNodeHeight, null, null, null, node.dataset_name));
         }
         canvasState.dragging = true;
         canvasState.selection.push(canvasState.shapes[canvasState.shapes.length-1]);
@@ -23,7 +47,7 @@ function draw_steps(pipeline, method_node_offset) {
         var inputs = pipeline_steps[i]["inputs"],
             outputs = pipeline_steps[i]["outputs"];
         
-        var method_node = new MethodNode(node.transf_pk, node.family_pk, node.x * canvas.width, node.y * canvas.height, mNodeWidth,
+        var method_node = new MethodNode(node.transf_pk, node.family_pk, node.x * canvas.width / canvasState.scale, node.y * canvas.height / canvasState.scale, mNodeWidth,
                 mNodeInset, mNodeSpacing, mNodeColour, node.name, mNodeOffset,
                 inputs, outputs);
 
@@ -105,11 +129,11 @@ function draw_outputs(pipeline, method_node_offset) {
             magnet = source.out_magnets[k];
             if (magnet.label === this_output.source_dataset_name) {
                 connector = new Connector(null, null, magnet);
-                output_node = new OutputNode(this_output.x * canvas.width, this_output.y * canvas.height, null, null, null, null, null, this_output.output_name);
+                output_node = new OutputNode(this_output.x * canvas.width / canvasState.scale, this_output.y * canvas.height / canvasState.scale, null, null, null, null, null, this_output.output_name);
                 canvasState.addShape(output_node);
-
-                connector.x = this_output.x * canvas.width;
-                connector.y = this_output.y * canvas.height;
+                
+                connector.x = this_output.x * canvas.width / canvasState.scale;
+                connector.y = this_output.y * canvas.height / canvasState.scale;
 
                 connector.dest = output_node.in_magnets[0];
                 connector.dest.connected = [ connector ];  // bind cable to output node

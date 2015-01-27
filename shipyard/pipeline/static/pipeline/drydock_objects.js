@@ -513,14 +513,6 @@ MethodNode.prototype.contains = function(mx, my) {
     for ( var i=0; i < polygon.length; i++ )
         shape.push(vertices[polygon[i]]);
     return Geometry.inPolygon(mx, my, shape);
-    
-    /** old test (broken in some cases) 
-    return mx < vertices[6].x && mx > vertices[3].x
-        && !Geometry.ltLine(mx, my, vertices[1].x, vertices[1].y, vertices[2].x, vertices[2].y)
-        && !Geometry.ltLine(mx, my, vertices[3].x, vertices[3].y, vertices[2].x, vertices[2].y)
-        &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[5].x, vertices[5].y)
-        &&  Geometry.ltLine(mx, my, vertices[4].x, vertices[4].y, vertices[8].x, vertices[8].y);
-    */
 };
 
 MethodNode.prototype.getVertices = function() {
