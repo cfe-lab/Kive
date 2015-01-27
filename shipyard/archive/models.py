@@ -19,6 +19,7 @@ import os
 import time
 import file_access_utils
 import csv
+from operator import attrgetter, itemgetter
 
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import stopwatch.models
@@ -1018,6 +1019,7 @@ class RunStep(RunComponent):
         # If we reused an ExecRecord and it was a failure, then we can skip cleaning the outputs; otherwise
         # we clean them.
         usable_dict = self.check_ER_usable(self.execrecord)
+        # This is the negative of (self.reused and not usable_dict["successful"])....
         if not self.reused or usable_dict["successful"]:
             self._clean_outputs()
 
@@ -1108,8 +1110,8 @@ class RunStep(RunComponent):
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
 
-    def find_compatible_ER(self, inputs_after_cable):
-        return self.pipelinestep.transformation.definite.find_compatible_ER(inputs_after_cable)
+    def find_compatible_ERs(self, inputs_after_cable):
+        return self.pipelinestep.transformation.definite.find_compatible_ERs(inputs_after_cable)
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):
@@ -1130,35 +1132,58 @@ class RunStep(RunComponent):
 
         return result
 
-    # @transaction.atomic
-    # def attempt_reuse(self, inputs_after_cable):
-    #     """
-    #     Look for an ExecRecord that this RunStep can use.
-    #     """
-    #     curr_ER = self.pipelinestep.transformation.definite.find_compatible_ER(inputs_after_cable)
-    #
-    #     result = {"ExecRecord": curr_ER, "reused": False, "successful": True}
-    #     if curr_ER is not None:
-    #         # Terminal case 1: ER was a failure.  In this case, we don't want to proceed,
-    #         # so we return the failure for appropriate handling.
-    #         finish_now = False
-    #         if curr_ER.outputs_failed_any_checks() or curr_ER.has_ever_failed():
-    #             self.logger.debug("ExecRecord found ({}) was a failure".format(curr_ER))
-    #             result["successful"] = False
-    #             finish_now = True
-    #
-    #         # Terminal case 2: ER had fully checked outputs and provided the outputs needed.
-    #         elif curr_ER.outputs_OK() and curr_ER.provides_outputs(self.pipelinestep.outputs_to_retain()):
-    #             self.logger.debug("Completely reusing ExecRecord {}".format(curr_ER))
-    #             finish_now = True
-    #
-    #         if finish_now:
-    #             # Set RunStep as reused and link ExecRecord; update maps; return RunStep.
-    #             with transaction.atomic():
-    #                 self.link_execrecord(curr_ER, True)
-    #                 self.stop()
-    #             result["reused"] = True
-    #     return result
+    @transaction.atomic
+    def get_suitable_ER(self, input_SD):
+        """
+        Retrieve a suitable ExecRecord for this RunStep.
+
+        If any of them are failed, we find the failed one with the most outputs having data, with
+        ties broken by the smallest PK.
+        If any of them are fully reusable, we find the fully reusable one satisfying the same criteria.
+        Otherwise we find whichever one satisfies the same criteria.
+
+        Return a tuple containing the ExecRecord along with its summary (as
+        produced by check_ER_usable), or None if no appropriate ExecRecord is found.
+        """
+        execrecords = self.find_compatible_ERs(input_SD)
+        failed = []
+        fully_reusable = []
+        other = []
+        execrecords_sorted = sorted(execrecords, key=attrgetter("pk"))
+        for er in execrecords_sorted:
+            curr_summary = self.check_ER_usable(er)
+            curr_entry = (er, curr_summary)
+            if not curr_summary["successful"]:
+                failed.append(curr_entry)
+            elif curr_summary["fully reusable"]:
+                fully_reusable.append(curr_entry)
+            else:
+                other.append(curr_entry)
+
+        if len(failed) > 0:
+            return _first_ER_h(failed)
+
+        if len(fully_reusable) > 0:
+            return _first_ER_h(fully_reusable)
+
+        if len(other) > 0:
+            return _first_ER_h(other)
+
+        return (None, None)
+
+
+def _first_ER_h(execrecord_summary_list):
+    """
+    Of the (ExecRecord, summary) pairs provided, return the one with the most outputs having real Datasets.
+
+    Ties are broken according to their position in the list.
+    """
+    list_decorated = []
+    for er, curr_summary in execrecord_summary_list:
+        num_outputs = sum(1 if x.has_data() else 0 for x in er.execrecordouts.all())
+        list_decorated.append((er, curr_summary, num_outputs))
+    list_sorted = sorted(list_decorated, key=itemgetter(2))
+    return (list_sorted[0][0], list_sorted[0][1])
 
 
 class RunCable(RunComponent):
@@ -1464,19 +1489,17 @@ class RunCable(RunComponent):
         # Now, we know there to be an ExecRecord.
         self._clean_execrecord()
 
-    def find_compatible_ER(self, input_SD):
+    def find_compatible_ERs(self, input_SD):
         """
-        Find an ExecRecord which may be used by this RunCable, and determine its suitability for full reuse.
+        Find ExecRecords which may be used by this RunCable.
 
         INPUTS
         input_SD        SymbolicDataset to feed the cable
 
         OUTPUTS
-        summary         Dictionary containing the applicable ExecRecord (or None if no
-                        ExecRecord exists), along with whether it is fully reusable, and
-                        whether it was successful.
+        list of ExecRecords that are compatible with this cable and input (may be empty).
         """
-        return self.component.find_compatible_ER(input_SD)
+        return self.component.find_compatible_ERs(input_SD)
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):
@@ -1500,6 +1523,44 @@ class RunCable(RunComponent):
             summary["fully reusable"] = True
 
         return summary
+
+    @transaction.atomic
+    def get_suitable_ER(self, input_SD):
+        """
+        Retrieve a suitable ExecRecord for this RunCable.
+
+        If any of them are failed, we find the failed one with the most outputs, with
+        ties broken by the smallest PK.
+        If any of them are fully reusable, we find the fully reusable one satisfying the same criteria.
+        Otherwise we find whichever one satisfies the same criteria.
+
+        Return a tuple containing the ExecRecord along with its summary (as
+        produced by check_ER_usable), or None if no appropriate ExecRecord is found.
+        """
+        execrecords = self.find_compatible_ERs(input_SD)
+        failed = []
+        fully_reusable = []
+        other = []
+        execrecords_sorted = sorted(execrecords, key=attrgetter("pk"))
+        for er in execrecords_sorted:
+            curr_summary = self.check_ER_usable(er)
+            if not curr_summary["successful"]:
+                failed.append((er, curr_summary))
+            elif curr_summary["fully reusable"]:
+                fully_reusable.append((er, curr_summary))
+            else:
+                other.append((er, curr_summary))
+
+        if len(failed) > 0:
+            return _first_ER_h(failed)
+
+        if len(fully_reusable) > 0:
+            return _first_ER_h(fully_reusable)
+
+        if len(other) > 0:
+            return _first_ER_h(other)
+
+        return (None, None)
 
 
 class RunSIC(RunCable):
