@@ -516,6 +516,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // reset containers to reflect canvas
         canvasState.shapes = [];
         canvasState.connectors = [];
+        canvasState.exec_order = [];
+        canvasState.selection = [];
     });
 
     $('#id_delete_button').on('click', function() {
@@ -815,47 +817,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
         // append MethodNodes to sorted_elements Array in dependency order
         // see http://en.wikipedia.org/wiki/Topological_sorting#Algorithms
-        var sorted_elements = [];
-        var method_node;
-        var this_parent;
-        var okay_to_add;
-        i = 0;
-        
-        while (method_nodes.length > 0) {
-            for (j = 0; j < method_nodes.length; j++) {
-                method_node = method_nodes[j];
-                magnets = method_node.in_magnets;
-                okay_to_add = true;
-
-                for (var k = 0; k < magnets.length; k++) {
-                    this_magnet = magnets[k];
-                    if (this_magnet.connected.length == 0) {
-                        // unconnected in-magnet, still okay to add this MethodNode
-                        continue;
-                    }
-                    // trace up the Connector
-                    this_parent = this_magnet.connected[0].source.parent;  // in-magnets only have 1 connector
-                    if (this_parent.constructor === MethodNode) {  // ignore connections from data nodes
-                        if ($.inArray(this_parent, sorted_elements) < 0) {
-                            // dependency not cleared
-                            okay_to_add = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (okay_to_add) {
-                    // either MethodNode has no dependencies
-                    // or all dependencies already in sorted_elements
-                    sorted_elements.push(method_nodes.splice(j, 1)[0]);
-                }
-            }
-            i += 1;
-            if (i > 5 * shapes.length) {
-                console.log('DEBUG: topological sort routine failed')
-                return;
-            }
-        }
+        //
+        // MethodNodes are now sorted live, prior to pipeline submission —JN
+        //
+        var sorted_elements = Array.concat.apply([], canvasState.exec_order);
 
         // add arguments for input cabling
         var this_step;

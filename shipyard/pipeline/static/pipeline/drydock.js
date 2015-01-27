@@ -41,17 +41,18 @@ function CanvasState (canvas) {
     this.connectors = []; // collection of connectors between shapes
     this.dragging = false; // if mouse drag
 
-    this.selection = []; // reference to active (selected) object
+    this.selection = []; // reference to active (selected) objects
     this.dragstart = { x: 0, y: 0 }; // where in the object we clicked
     this.dragoffx = 0;
     this.dragoffy = 0;
+    
+    this.exec_order = [];
+    this.exec_order_is_ambiguous = null;
     
     this.collisions = 0;
 
     // events
     
-    // FIXME: what is this for? myState will not be a clone of the object, rather it will just be a reference to the object.
-    // canvasState.myState will just reference back to canvasState. —JN
     var myState = this; // save reference to this particular CanvasState
     
     this.outputZone = new OutputZone(this.width, this.height);

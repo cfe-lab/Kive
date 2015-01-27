@@ -17,6 +17,57 @@
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
+    <script type="text/javascript">
+    
+$(function() {
+    // change pipeline revision drop-down triggers ajax to redraw canvas
+    $('#id_pipeline_select').on('change', function () {
+        $.ajax({
+            type: "POST",
+            url: "/get_pipeline/",
+            data: { pipeline_id: $('#id_pipeline_select').val() },
+            datatype: "json",
+            success: function(result) {
+                // prepare to redraw canvas
+                $('#id_reset_button').click();
+                submit_to_url = result['family_pk'];
+                var i, j, k; // counters
+                var node, cables, cable, connector, shape, source, magnet;
+        
+                draw_inputs(result);
+                
+                canvasState.testExecutionOrder();
+        
+                for (var i = 0; i < canvasState.shapes.length; i++) {
+                    canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                }
+
+                $('#id_publish').val(
+                    result['is_published_version']?
+                    'Cancel publication' :
+                    'Make published version'
+                );
+            }
+        });
+    }).change();
+
+    $('#id_publish').on('click', function() {
+        $.ajax({
+            type: "POST",
+            url: "/activate_pipeline/",
+            data: { pipeline_id: $('#id_pipeline_select').val() },
+            datatype: "json",
+            success: function(result) {
+                $('#id_publish').val(
+                    result['is_published'] ?
+                    'Cancel publication' : 'Make published version'
+                );
+            }
+        });
+    });
+});
+
+</script>
     <link rel="stylesheet" href="/static/pipeline/drydock.css">
 {% endblock %}
 
