@@ -114,14 +114,15 @@ class RunToProcess(models.Model):
         
         status += "-"
         
-        # One of the outcables is in progress?
-        total_cables = run.pipeline.outcables.count()
-        runoutputcables = list(run.runoutputcables.order_by(
-            "pipelineoutputcable__output_idx"))
-        for cable in runoutputcables:
-            status += "+" if cable.is_complete() else ":"
-
-        status += "." * (total_cables - len(runoutputcables))
+        # Which outcables are in progress?
+        for pipeline_cable in run.pipeline.outcables.order_by("output_idx"):
+            run_cable = pipeline_cable.poc_instances.filter(run=run).first()
+            if run_cable is None:
+                status += "."
+            elif run_cable.is_complete():
+                status += "+"
+            else:
+                status += ":"
         
         if input_name:
             status += "-" + input_name
