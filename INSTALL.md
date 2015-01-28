@@ -6,7 +6,7 @@ Prerequisites
 **shipyard** is a set of Django applications.  As a result, it has the following requirements:
 
 1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
-2. Django (version 1.6 or higher)
+2. Django (version 1.7 or higher)
 3. OpenMPI
 4. mpi4py
 5. numpy
@@ -89,9 +89,52 @@ with `psql` and then exit.
     psql shipyard shipyard
     \q
 
+Having created the database, we must now create the tables that will be used by
+Shipyard.  This is handled by the `migrate` command to the `manage.py` script,
+which follows instructions created by the developers on how to lay out the tables:
+    ./manage.py migrate
+
+Should you ever need to completely remove the database and start over, you can run
+the following commands:
+
+    sudo su - postgres  # enter password if it asks
+    dropdb shipyard  # enter shipyard user's password if it asks
+    createdb shipyard  # etc.
+    exit
+    ./manage.py migrate
+
+This follows the above steps, except with an additional step that removes the
+shipyard database, and skipping the already-done configuration steps.
+
 [digitalocean]: https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-django-with-postgres-nginx-and-gunicorn
 [test-permission]: http://stackoverflow.com/q/14186055/4794
 [pg_hba]: http://stackoverflow.com/a/18664239/4794
+
+Remove test database (if necessary)
+-----------------------------------
+Sometimes, if something goes wrong while running the test suite, the system
+will leave a database named `test_shipyard` in place, which will give the
+following prompt the next time you run the tests:
+
+    Creating test database for alias 'default'...
+    Got an error creating the test database: database "test_shipyard" already exists
+
+    Type 'yes' if you would like to try deleting the test database 'test_shipyard', or 'no' to cancel:
+
+Then, on entering `yes`:
+
+    Destroying old test database 'default'...
+    Got an error recreating the test database: must be owner of database test_shipyard
+
+To properly dispose of this database, run the following commands:
+
+    sudo su - postgres  # enter password if it asks
+    dropdb test_shipyard  # enter shipyard user's password if it asks
+    exit
+    
+This is similar to the incantation used to completely remove the `shipyard` database,
+but simpler because we are only trying to get rid of the database and do not need to
+recreate or reinitialize anything.
 
 Settings
 --------
@@ -118,17 +161,9 @@ Options are described in the [Open MPI FAQ][mpifaq].
 
 [mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
 
-Initialize database
--------------------
-If you have made database schema changes, recreate the database.
-
-    sudo su - postgres
-    dropdb shipyard
-    createdb shipyard
-    exit
-    ./manage.py syncdb --noinput
-
-Whether you've recreated the database or not, now deploy the static files and
+Initialize the system
+---------------------
+To start fresh with a clean system, (re-)deploy the static files and
 run the reset command.
 
     sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
@@ -169,10 +204,16 @@ If you want to run your unit tests faster, you can run them against an
 in-memory SQLite database with this command:
 
     ./manage.py test --settings shipyard.test_settings
-
-This may have slightly different behaviour from the PostgreSQL database, so you
-should occasionally run the tests with the default settings. See [the Django
-documentation][unit-tests] for details on running specific tests.
+    
+This also reduces the amount of console output produced by the testing.  
+Testing with a SQLite database may have slightly different behaviour from 
+the PostgreSQL database, so you should occasionally run the tests with 
+the default settings.  Alternatively, to run the tests with all the default
+settings but with reduced console output:
+    
+    ./manage.py test --settings shipyard.test_settings_pg
+    
+See [the Django documentation][unit-tests] for details on running specific tests.
 
 If you want to time your unit tests to see which ones are slowest, [install
 HotRunner][hotrunner].

@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 from django.core.management.base import BaseCommand
+from django.core.management import call_command
 
 import shipyard.settings  # @UnresolvedImport
 
@@ -32,10 +33,12 @@ class Command(BaseCommand):
                 shutil.rmtree(target_path)
                 
         subprocess.check_call([python, manage_script, "flush", "--noinput"])
-        subprocess.check_call([python, manage_script, "loaddata", "initial_user"])
+        call_command("migrate")
+        call_command("loaddata", "initial_data")
+        call_command("loaddata", "initial_user")
         os.mkdir(os.path.join(shipyard.settings.MEDIA_ROOT, "Sandboxes"))
         if fixture:
-            subprocess.check_call([python, manage_script, "loaddata", fixture])
+            call_command("loaddata", fixture)
             fixture_folder = os.path.join("FixtureFiles", fixture)
             if os.path.isdir(fixture_folder):
                 for child in os.listdir(fixture_folder):
