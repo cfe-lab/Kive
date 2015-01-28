@@ -18,6 +18,13 @@ It also requires the [Expect automation tool](http://sourceforge.net/projects/ex
 Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
 
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
+If you are already running Django 1.6, installing should be as painless as running
+
+    pip install Django==1.7.4
+
+You will likely need to run this using `sudo` unless you only installed Django locally and not
+system-wide.  Also, many systems have multiple Python installations, so make sure that 
+`pip` is using the correct one.
 
 Instructions for downloading and installing PostgreSQL may be found at [postgresql.org](http://www.postgresql.org/).
 
