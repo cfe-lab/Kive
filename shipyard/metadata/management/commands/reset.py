@@ -34,8 +34,6 @@ class Command(BaseCommand):
         subprocess.check_call([python, manage_script, "flush", "--noinput"])
         subprocess.check_call([python, manage_script, "loaddata", "initial_user"])
         os.mkdir(os.path.join(shipyard.settings.MEDIA_ROOT, "Sandboxes"))
-        #TODO: Convert the data from setup_test_pipeline to fixture files
-        #TODO: Should we still import the data from load_default_objects.py?
         if fixture:
             subprocess.check_call([python, manage_script, "loaddata", fixture])
             fixture_folder = os.path.join("FixtureFiles", fixture)

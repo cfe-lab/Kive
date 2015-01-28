@@ -16,6 +16,7 @@ from constants import maxlengths
 
 import itertools
 
+
 @python_2_unicode_compatible
 class TransformationFamily(models.Model):
     """
