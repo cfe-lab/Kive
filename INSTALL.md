@@ -212,22 +212,24 @@ Once you have set up your production server, this is how to deploy a new release
 5. Get the code from Github onto the server.
 
         ssh user@server
-        cd /usr/local/share/Share/Shipyard/shipyard
-        git fetch github
+        cd /usr/local/share/Shipyard/shipyard
+        git fetch
         git checkout tags/vX.Y
 
 6. Check if you need to set any new settings by running
     `diff shipyard/settings_default.py shipyard/settings.py`. Do the same
     comparison of `hostfile`.
-7. TODO: Check whether an apache restart is needed. What about the fleet manager?
+7. Recreate the database as described in the Initialize Database section, and
+    deploy the static files.
+8. TODO: Check whether an apache restart is needed. What about the fleet manager?
 
         ps aux | grep runfleet
         sudo kill <pid for runfleet>
         sudo /usr/sbin/apachectl restart
         ./manage.py runfleet --workers 151 &>/dev/null &
 
-8. Remove the pre-release flag from the release.
-9. Close the milestone for this release, create one for the next release, and
+9. Remove the pre-release flag from the release.
+10. Close the milestone for this release, create one for the next release, and
     decide which issues you will include in that milestone.
 
 [release]: https://help.github.com/categories/85/articles

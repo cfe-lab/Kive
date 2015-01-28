@@ -2,22 +2,23 @@
 Defines the manager and the "workers" that manage and carry out the execution of Pipelines.
 """
 
-from mpi4py import MPI
-import numpy
-import logging
 from collections import defaultdict
-import time
 from exceptions import Exception
-
-import shipyard.settings  # @UnresolvedImport
-import fleet.models
-import archive.models
-import sandbox.execute
+import logging
+from mpi4py import MPI
 import sys
+import time
+
+import archive.models
+import fleet.models
+import sandbox.execute
+import shipyard.settings  # @UnresolvedImport
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
 
+# Shorter sleep makes worker more responsive, generates more load when idle
+SLEEP_SECONDS = 0.1
 
 class Manager:
     """
@@ -64,11 +65,6 @@ class Manager:
         self.count = self.comm.Get_size()
         self.mgr_hostname = MPI.Get_processor_name()
 
-        # Set up an ongoing non-blocking receive looking for all Worker.FINISHED-tagged
-        # messages from Workers.  Any time these are actually used, they should be
-        # replaced afresh.
-        self._setup_finished_task_receiver()
-
         mgr_logger.debug("Manager started on host {}".format(self.mgr_hostname))
 
         workers_reported = 0
@@ -84,12 +80,6 @@ class Manager:
 
         self.worker_status = [Worker.READY for _ in range(self.count)]
         self.max_host_cpus = max([len(self.roster[x]) for x in self.roster])
-
-    def _setup_finished_task_receiver(self):
-        self.work_finished_result = numpy.empty(2, dtype="i")
-        self.work_finished_request = self.comm.Irecv([self.work_finished_result, MPI.INT],
-                                                     source=MPI.ANY_SOURCE,
-                                                     tag=Worker.FINISHED)
 
     def is_worker_ready(self, rank):
         return self.worker_status[rank] == Worker.READY
@@ -161,11 +151,15 @@ class Manager:
             # Having reached this point, we know that no host was capable of taking on the task.
             # We block and wait for a worker to become ready, so we can try again.
             mgr_logger.debug("Waiting for host to become ready....")
-            self.work_finished_request.wait()
+            while not self.comm.Iprobe(source=MPI.ANY_SOURCE,
+                                       tag=Worker.FINISHED):
+                time.sleep(SLEEP_SECONDS)
+            lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
+                                                  tag=Worker.FINISHED)
 
             # Note the task that just finished, and release its workers.
             # If this fails it will throw an exception.
-            lord_rank, _ = self.worker_finished()
+            self.worker_finished(lord_rank, result_pk)
 
             source_host = self.hostnames[lord_rank]
             candidate_hosts = [source_host]
@@ -247,19 +241,16 @@ class Manager:
                 self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
         comm.Disconnect()
 
-    def worker_finished(self):
+    def worker_finished(self, lord_rank, result_pk):
         """
         Handle bookkeeping when a worker finishes.
 
-        PRE: self.work_finished_request.test()[0] is True.
         """
-        assert self.work_finished_request.test()[0]
 
-        lord_rank, result_pk = self.work_finished_result
         if result_pk == Worker.FAILURE:
             raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
                 lord_rank,
-                self.tasks_in_progress[self.work_finished_result[0]]["task"].pk
+                self.tasks_in_progress[lord_rank]["task"].pk
             ))
 
         mgr_logger.info(
@@ -268,8 +259,6 @@ class Manager:
 
         task_finished = archive.models.RunComponent.objects.get(pk=result_pk).definite
         self.note_progress(lord_rank, task_finished)
-        self._setup_finished_task_receiver()
-        return lord_rank, task_finished
 
     def main_loop(self):
         """
@@ -290,18 +279,20 @@ class Manager:
                 self.task_queue = self.task_queue[1:]
 
             # Everything in the queue has been started, so we check and see if anything has finished.
-            for _ in range(shipyard.settings.FLEET_POLLING_INTERVAL):
-                test_result = self.work_finished_request.test()
-                if test_result[0]:
+            time_to_poll = time.time() + shipyard.settings.FLEET_POLLING_INTERVAL
+            while time.time() < time_to_poll:
+                if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
+                    lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
+                                                          tag=Worker.FINISHED)
                     try:
-                        self.worker_finished()
+                        self.worker_finished(lord_rank, result_pk)
                         break
                     except WorkerFailedException as e:
                         mgr_logger.error(e.error_msg)
                         return
 
                 try:
-                    time.sleep(1)
+                    time.sleep(SLEEP_SECONDS)
                 except KeyboardInterrupt:
                     return
 
@@ -371,6 +362,8 @@ class Worker:
         Looks for an assigned task and performs it.
         """
         status = MPI.Status()
+        while not self.comm.Iprobe(source=0, tag=MPI.ANY_TAG):
+            time.sleep(SLEEP_SECONDS)
         task_info_dict = self.comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
         tag = status.Get_tag()
         if tag == self.SHUTDOWN:
@@ -400,9 +393,9 @@ class Worker:
             result = Worker.FAILURE  # bogus return value
             worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
             
-        send_buf = numpy.array([self.rank, result], dtype="i")
-        self.comm.Send(send_buf, dest=0, tag=Worker.FINISHED)
-        worker_logger.debug("Sent {} to Manager".format((self.rank, result)))
+        message = (self.rank, result)
+        self.comm.send(message, dest=0, tag=Worker.FINISHED)
+        worker_logger.debug("Sent {} to Manager".format(message))
         
         return tag
 
