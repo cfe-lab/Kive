@@ -24,6 +24,7 @@ class CustomConstraintTests(TransactionTestCase):
     """
     Test the creation and use of custom constraints.
     """
+    fixtures = ["initial_data"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)

@@ -506,21 +506,21 @@ class Sandbox:
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
 
-        if pipeline:
-            pipeline.check_inputs(input_SDs)
-        else:
-            pipeline = self.pipeline
-        sandbox_path = sandbox_path or self.sandbox_path
+        if self.run.is_complete():
+            self.logger.warn('A Pipeline has already been run in Sandbox "{}", returning the previous Run'.format(self))
+            return self.run
 
         curr_run = self.run
 
-        if (curr_run.is_complete()):
-            self.logger.warn('A Pipeline has already been run in Sandbox "{}", returning the previous Run'.format(self))
-            return curr_run
-
-        if parent_runstep is not None:
-            self.logger.debug("executing a sub-pipeline with input_SD {}".format(input_SDs))
+        if pipeline:
+            pipeline.check_inputs(input_SDs)
+            self.logger.debug("executing a sub-pipeline with input_SDs {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
+        else:
+            pipeline = self.pipeline
+
+        curr_run.start()
+        sandbox_path = sandbox_path or self.sandbox_path
     
         for step in pipeline.steps.order_by("step_num"):
             self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
@@ -577,13 +577,16 @@ class Sandbox:
             if not curr_RS.reused:
                 if not curr_RS.is_complete() or not curr_RS.successful_execution():
                     self.logger.warn("Step failed to execute: returning the run")
+                    curr_run.stop()
                     return curr_run
             else:
                 if curr_RS.execrecord is None:
                     self.logger.critical("Step is reused but has no ExecRecord: THIS SHOULD NEVER HAPPEN")
+                    curr_run.stop()
                     return curr_run
                 elif not curr_RS.check_ER_usable(curr_RS.execrecord)["successful"]:
                     self.logger.warn("Step reuses a failed ExecRecord: returning the run")
+                    curr_run.stop()
                     return curr_run
 
         self.logger.debug("Finished executing steps, executing POCs")
@@ -624,9 +627,11 @@ class Sandbox:
             if not curr_ROC.is_complete() or not curr_RS.successful_execution():
                 curr_run.clean()
                 self.logger.debug("Execution failed")
+                curr_run.stop()
                 return curr_run
 
         self.logger.debug("Finished executing output cables")
+        curr_run.stop()
         curr_run.save()
         curr_run.complete_clean()
         self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
@@ -820,6 +825,9 @@ class Sandbox:
         elif task_completed is not None:
             run_to_resume = task_completed.parent_run
 
+        if task_completed is None:
+            run_to_resume.start()
+
         pipeline_to_resume = run_to_resume.pipeline
 
         if run_to_resume != self.run:
@@ -849,8 +857,6 @@ class Sandbox:
             if corresp_runstep.exists():
                 # We don't advance sub-pipelines -- if those are waiting on tasks in their parent run,
                 # then that would be a case for enqueue_runnable_tasks.
-                #     if corresp_runstep.is_subpipeline:
-                #         self.advance_pipeline(corresp_runstep.child_run, task_completed)
                 continue
 
             # If this step is not fed at all by any of the tasks that just completed,
@@ -971,6 +977,7 @@ class Sandbox:
                 out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
                 output_path = os.path.join(self.out_dir, out_file_name)
                 self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
+
 
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_SD, output_path):
@@ -1458,6 +1465,7 @@ def finish_cable(cable_execute_dict, worker_rank):
         except IOError:
             logger.error("[{}] could not copy file {} to file {}.".format(
                 worker_rank, saved_data.dataset_file.path, input_SD_path))
+            curr_record.stop()
             return curr_record
 
     output_CDT = None

@@ -422,6 +422,8 @@ class ArchiveTestCaseHelpers:
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         create_archive_test_environment(self)
 
@@ -430,6 +432,8 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
 
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         create_archive_test_environment(self)
 
@@ -1157,6 +1161,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         tools.create_word_reversal_environment(self)
 
@@ -2630,6 +2636,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
 
 class DatasetTests(TestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         librarian.tests.create_librarian_test_environment(self)
@@ -3619,6 +3626,7 @@ class TopLevelRunTests(ArchiveTransactionTestCase):
 
 
 class RunStepReuseFailedExecRecordTests(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)

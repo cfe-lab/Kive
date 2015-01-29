@@ -21,6 +21,7 @@ import sandbox.testing_utils as tools
 
 
 class SandboxRMTestCase(TestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -30,6 +31,7 @@ class SandboxRMTestCase(TestCase):
 
 
 class SandboxRMTransactionTestCase(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -39,6 +41,7 @@ class SandboxRMTransactionTestCase(TransactionTestCase):
 
 
 class ExecuteTestsRM(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         tools.create_sequence_manipulation_environment(self)
@@ -338,6 +341,8 @@ class BadRunTests(TransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
 
@@ -383,6 +388,8 @@ class FindSDTests(TransactionTestCase):
     """
     Tests for first_generator_of_SD.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         tools.create_word_reversal_environment(self)
 

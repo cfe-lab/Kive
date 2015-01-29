@@ -115,6 +115,8 @@ class PipelineTestCase(TestCase):
     This extends MethodTestCase, which itself extended
     MetadataTestSetup.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
         create_pipeline_test_environment(self)
@@ -3946,6 +3948,8 @@ class PipelineSerializationTests(TestCase):
     """
     Tests of Pipeline serialization and deserialization.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 

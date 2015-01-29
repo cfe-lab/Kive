@@ -5,6 +5,8 @@ from metadata.models import *
 
 
 class TransformationTestCase(TestCase):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         # Create some objects.
         t = Transformation(); t.save()

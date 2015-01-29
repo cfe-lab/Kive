@@ -1101,6 +1101,11 @@ class CompoundDatatypeMember(models.Model):
     column_idx = models.PositiveIntegerField(validators=[MinValueValidator(1)],
         help_text="The column number of this DataType")
 
+    # There is no concept of "null" in a CSV....
+    blankable = models.BooleanField(
+        help_text="Can this entry be left blank?"
+    )
+
     # Define database indexing rules to ensure tuple uniqueness
     # A compoundDataType cannot have 2 member definitions with the same column name or column number
     class Meta:

@@ -20,6 +20,7 @@ from constants import datatypes
 
 
 class ExecuteTests(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
 
@@ -371,6 +372,7 @@ class ExecuteTests(TransactionTestCase):
 
 
 class SandboxTests(ExecuteTests):
+    fixtures = ["initial_data"]
 
     def test_sandbox_no_input(self):
         """

@@ -475,6 +475,8 @@ def destroy_method_test_environment(case):
 
 
 class FileAccessTests(TransactionTestCase):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         fd_count("FDs (start)")
 
@@ -629,6 +631,8 @@ class MethodTestCase(TestCase):
     This sets up all the stuff used in the Metadata tests, as well as some of the Datatypes
     and CDTs we use here.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         """Set up default database state for Method unit testing."""
         create_method_test_environment(self)
@@ -2585,6 +2589,8 @@ class MethodFamilyTests(MethodTestCase):
 
 
 class NonReusableMethodTests(TransactionTestCase):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         # A piece of code that is non-reusable.
         self.rng = tools.make_first_revision(

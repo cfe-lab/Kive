@@ -329,6 +329,8 @@ class LibrarianTestCase(TestCase):
     This extends PipelineTestCase, which itself extended
     other stuff (follow the chain).
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         """Set up default database state for librarian unit testing."""
         create_librarian_test_environment(self)

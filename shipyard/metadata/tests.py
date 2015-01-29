@@ -223,6 +223,8 @@ class MetadataTestCase(TestCase):
     
     Other test classes that require this state can extend this one.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         create_metadata_test_environment(self)
 
@@ -236,6 +238,8 @@ class MetadataTransactionTestCase(TransactionTestCase):
 
     Other test classes that require this state can extend this one.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         create_metadata_test_environment(self)
 

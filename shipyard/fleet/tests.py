@@ -5,8 +5,9 @@ from pipeline.models import Pipeline
 from django.contrib.auth.models import User
 from librarian.models import ExecRecord, SymbolicDataset
 
+
 class RunToProcessTest(TestCase):
-    fixtures = ['initial_user', 'converter_pipeline']
+    fixtures = ['initial_data', 'initial_user', 'converter_pipeline']
     def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
         
