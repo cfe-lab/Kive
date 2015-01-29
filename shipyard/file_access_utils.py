@@ -132,15 +132,18 @@ class FileReadHandler:
     Only closes the file upon exit if the file source was a string file path.
     """
     def __init__(self, file_path, file_handle, access_mode):
-        self.file_path = file_path
-        self.file_handle = file_handle
+        if file_handle:
+            self.file_handle = file_handle
+            self.file_path = None
+        else:
+            self.file_path = file_path
+            self.file_handle = None
         self.access_mode = access_mode
 
     def __enter__(self):
         if not self.file_handle:
             self.file_handle = open(self.file_path, self.access_mode)
         else:
-            self.file_path = None  # Explicitly set this to None so that the file_handle is not closed upon __exit__
             self.file_handle.seek(0)
         return self.file_handle
 

@@ -21,8 +21,10 @@ from metadata.models import Datatype, CompoundDatatype
 import metadata.tests
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
+from archive.models import Dataset
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
+import file_access_utils
 import logging
 
 
@@ -48,6 +50,10 @@ def create_librarian_test_environment(case):
     case.generic_cr.save()
     case.generic_crRev = CodeResourceRevision(
         coderesource=case.generic_cr, revision_name="v1", revision_desc="desc")
+
+    if not os.path.exists(samplecode_path):
+        os.makedirs(samplecode_path)
+
     with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
         case.generic_crRev.content_file.save("generic_script.py", File(f))
     case.generic_crRev.save()
@@ -377,7 +383,46 @@ class SymbolicDatasetTests(LibrarianTestCase):
     def tearDown(self):
         super(SymbolicDatasetTests, self).tearDown()
         os.remove(self.file_path)
-    
+
+    def test_filehandle(self):
+        """
+        Test that you can pass a filehandle to create_SD() to make a dataset.
+        """
+        import datetime
+        dt = datetime.datetime.now()
+        # Turn off logging, so the test output isn't polluted.
+        logging.getLogger('SymbolicDataset').setLevel(logging.CRITICAL)
+        logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
+
+        tmpfile = tempfile.NamedTemporaryFile(delete=False)
+        tmpfile.write("Random stuff")
+
+        expected_md5 = file_access_utils.compute_md5(tmpfile)
+
+        raw_datatype = None  # raw compound datatype
+        name = "Test file handle" + str(dt.microsecond)
+        desc = "Test create dataset with file handle"
+        sym_dataset = SymbolicDataset.create_SD(file_path=None,
+                                                cdt=raw_datatype,
+                                                make_dataset=True,
+                                                user=self.myUser,
+                                                name=name,
+                                                description=desc,
+                                                check=True,
+                                                file_handle=tmpfile)
+
+        tmpfile.close()
+        os.remove(tmpfile.name)
+
+        self.assertIsNotNone(Dataset.objects.filter(name=name).get(),
+                          msg="Can't find Dataset in DB for name=" + name)
+
+        self.assertEqual(SymbolicDataset.objects.filter(id=sym_dataset.id).get().MD5_checksum, expected_md5,
+                         msg="Checksum for Symbolic Dataset file does not match expected " + expected_md5)
+
+
+
+
     def test_is_raw(self):
         self.assertEqual(self.triplet_symDS.is_raw(), False)
         self.assertEqual(self.raw_symDS.is_raw(), True)
