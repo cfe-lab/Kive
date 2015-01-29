@@ -129,7 +129,7 @@ class FileReadHandler:
 
     If the file_handle is given, then seeks the beginning of the file.
     Otherwise, opens the file using the file_path.
-    Closes the file upon exiting the with-clause.
+    Only closes the file upon exit if the file source was a string file path.
     """
     def __init__(self, file_path, file_handle, access_mode):
         self.file_path = file_path
@@ -140,8 +140,10 @@ class FileReadHandler:
         if not self.file_handle:
             self.file_handle = open(self.file_path, self.access_mode)
         else:
+            self.file_path = None  # Explicitly set this to None so that the file_handle is not closed upon __exit__
             self.file_handle.seek(0)
         return self.file_handle
 
     def __exit__(self, type, value, traceback):
-        self.file_handle.close()
+        if self.file_path:
+            self.file_handle.close()

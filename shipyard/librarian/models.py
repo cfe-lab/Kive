@@ -139,23 +139,27 @@ class SymbolicDataset(models.Model):
 
     def set_MD5(self, file_path, file_handle=None):
         """Set the MD5 hash from a file.
-
-        :param str file_path:  path to file to calculate MD5 for
-        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
-                        If this is None, then uses file_path.
+        Closes the file afterwards if the file source is a string file path.
+        Does not close the file afterwards if file source is a file handle.
+        :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
+        :param file file_handle: file handle of file to calculate MD5.
+                Moves file handle to beginning of file before calculating MD5.
+                If file_handle empty, then uses file_path.
         """
-
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
             self.MD5_checksum = file_access_utils.compute_md5(f)
 
+
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
-
+        Closes the file afterwards if the file source is a string file path.
+        Does not close the file afterwards if file source is a file handle.
         PRE
         This SymbolicDataset must have a DatasetStructure
-        :param str file_path:  path to file to calculate MD5 for
-        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
-                        If this is None, then uses file_path.
+        :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
+        :param file file_handle: file handle of file to calculate MD5.
+                Moves file handle to beginning of file before calculating MD5.
+                If file_handle empty, then uses file_path.
         """
         assert not self.is_raw()
 
@@ -174,11 +178,15 @@ class SymbolicDataset(models.Model):
         """Create and register a new Dataset for this SymbolicDataset.
 
         Compute and set the MD5 for the new Dataset.
+
+        Closes the file afterwards if the file source is a string file path.
+        Does not close the file afterwards if file source is a file handle.
         
         INPUTS
         file_path           file to upload as the new Dataset
         file_handle         file handle of the file to upload as the new Dataset.
                             If supplied, then does not reopen the file in file_path.
+                            Moves handle to beginning of file before calculating MD5.
                             If None, then opens the file in file_path.
         user                user who uploaded the Dataset
         name                name for the new Dataset
@@ -307,6 +315,9 @@ class SymbolicDataset(models.Model):
         Instead of specifying datasets one by one,
         specify multiple datasets in a CSV.
 
+        Closes the file afterwards if the file source is a string file path.
+        Does not close the file afterwards if file source is a file handle.
+
         The CSV must have these columns, not necessarily in this order:
         - Name
         - Description
@@ -320,8 +331,8 @@ class SymbolicDataset(models.Model):
 
         Returns the SymbolicDataset created.
         :rtype : object
-        :param csv_file_path:
-        :param csv_file_handle:  file handle of csv.  If not None, then does not reopen csv_file_path.
+        :param csv_file_path:  path to csv file.  Not used if csv_file_handle supplied.
+        :param csv_file_handle:  file handle of csv.  If supplied, then does not reopen file and moves handle to beginning of file.
                 If None, then uses csv_file_path.
         :param cdt:
         :param make_dataset:
@@ -372,6 +383,9 @@ class SymbolicDataset(models.Model):
         Performs content check on a file, generates a CCL, and sets this
         SD's num_rows.
 
+        Closes the file afterwards if the file source is a string file path.
+        Does not close the file afterwards if file source is a file handle.
+
         OUTPUTS
         If SD is raw, creates a clean CCL.
         If not raw, checks the file and returns CCL with/without a
@@ -381,9 +395,10 @@ class SymbolicDataset(models.Model):
         Should never be called twice on the same symbolic dataset, as
         this would overwrite num_rows to a potentially new value?
 
-        :param file_path_to_check:  path of file to check
-        :param file_handle: file handle of file to check.  If this is supplied, then doesn't open the file again.
-                        If this is None, then uses file_path.
+        :param str file_path_to_check:  Path to file to check. file_path_to_check not used if file_handle supplied.
+        :param file file_handle: file handle of file to check.
+                Moves file handle to beginning of file before checking.
+                If file_handle empty, then uses file_path_to_check.
         :param summary_path: 
         :param min_row: 
         :param max_row: 
