@@ -1,14 +1,7 @@
-import sys
-
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
-from archive.models import *
-from librarian.models import *
-from metadata.models import *
-from method.models import *
-from pipeline.models import *
-from datachecking.models import *
+from librarian.models import SymbolicDataset
 from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
 
@@ -69,10 +62,11 @@ class ExecuteTestsRM(TransactionTestCase):
         sandbox.execute_pipeline()
         runstep = sandbox.run.runsteps.first()
         execlog = runstep.log
-        print(execlog.methodoutput.error_log.read())
+        log_text = execlog.methodoutput.error_log.read()
         self.assertEqual(runstep.successful_execution(), True)
         self.assertEqual(execlog.missing_outputs(), [])
         self.assertEqual(execlog.methodoutput.return_code, 0)
+        self.assertSequenceEqual("", log_text)
 
     def test_execute_pipeline_run(self):
         """
@@ -133,7 +127,6 @@ class ExecuteTestsRM(TransactionTestCase):
         symds = execrecord.execrecordouts.first().symbolicdataset
         ds = runstep.outputs.first()
 
-        sys.stderr.write(self.sep)
 
         self.assertEqual(symds.MD5_checksum, self.labdata_compd_md5)
         self.assertEqual(symds.dataset, ds)
@@ -165,6 +158,7 @@ class ExecuteTestsRM(TransactionTestCase):
         self.assertEqual(execrecordout.generic_output.definite, pipelinestep.transformation.outputs.first())
         self.assertEqual(execrecordout.has_data(), True)
         self.assertEqual(execrecordout.is_OK(), True)
+        self.assertNotEqual(None, execlog)
 
     def test_execute_pipeline_runstep_execrecord(self):
         """
@@ -218,7 +212,6 @@ class ExecuteTestsRM(TransactionTestCase):
 
         sandbox = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
         sandbox.execute_pipeline()
-        sys.stderr.write(self.sep)
         self.sandbox_complement.execute_pipeline()
 
         step1 = sandbox.run.runsteps.first()
@@ -320,6 +313,7 @@ class ExecuteTestsRM(TransactionTestCase):
         output = runstep.execrecord.execrecordouts.first().symbolicdataset
         self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
         self.assertEqual(output.has_data(), False)
+        self.assertNotEqual(None, step)
 
     def test_recover_intermediate_dataset(self):
         """
@@ -428,7 +422,7 @@ class FindSDTests(TransactionTestCase):
                                            dataset_idx=1)
 
         methods = [self.method_reverse, self.method_noop_backwords]
-        for i, method in enumerate(methods):
+        for i, _method in enumerate(methods):
             step = self.pipeline_twostep.steps.create(transformation=methods[i], step_num=i+1)
             if i == 0:
                 source = self.pipeline_twostep.inputs.first()

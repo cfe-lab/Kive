@@ -1,17 +1,21 @@
+import csv
 import os
-import tempfile
 import random
+import shutil
 import subprocess
+import tempfile
+import time
 
 from django.contrib.auth.models import User
+from django.core.files import File
 
-from archive.models import *
-from librarian.models import *
-from metadata.models import *
+from constants import datatypes
+import file_access_utils
+from librarian.models import SymbolicDataset
+from metadata.models import CompoundDatatype, Datatype
 from metadata.tests import clean_up_all_files
-from method.models import *
-from pipeline.models import *
-from datachecking.models import *
+from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
+from pipeline.models import Pipeline, PipelineFamily
 import sandbox.execute
 
 
@@ -122,7 +126,7 @@ def create_sequence_manipulation_environment(case):
     # Here is some data which is sitting on Alice's hard drive.
     case.labdata = "header,sequence\n"
     for i in range(10):
-        seq = "".join([random.choice("ATCG") for j in range(10)])
+        seq = "".join([random.choice("ATCG") for _ in range(10)])
         case.labdata += "patient{},{}\n".format(i, seq)
     case.datafile = tempfile.NamedTemporaryFile(delete=False)
     case.datafile.write(case.labdata)
@@ -269,7 +273,8 @@ def create_word_reversal_environment(case):
     case.wordbacks_datafile = tempfile.NamedTemporaryFile(delete=False)
     writer = csv.writer(case.wordbacks_datafile)
     writer.writerow(["word", "drow"])
-    for line in range(20):
+    random.seed("Constant seed avoids intermittent failures.")
+    for _ in range(20):
         i = random.randint(1,99171)
         sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
                                stdout=subprocess.PIPE)
@@ -281,7 +286,7 @@ def create_word_reversal_environment(case):
     case.backwords_datafile = tempfile.NamedTemporaryFile(delete=False)
     writer = csv.writer(case.backwords_datafile)
     writer.writerow(["drow", "word"])
-    for line in range(20):
+    for _ in range(20):
         i = random.randint(1,99171)
         sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
                                stdout=subprocess.PIPE)
@@ -437,7 +442,7 @@ def create_linear_pipeline(pipeline, methods, indata, outdata):
 
     # Create steps.
     steps = []
-    for i, method in enumerate(methods):
+    for i, _method in enumerate(methods):
         step = pipeline.steps.create(transformation=methods[i], step_num=i+1)
         if i == 0:
             source = pipeline_in
@@ -517,7 +522,8 @@ def create_grandpa_sandbox_environment(case):
     # Some data to run through the faulty pipelines.
     case.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
     case.grandpa_datafile.write("word\n")
-    for line in range(20):
+    random.seed("Constant seed avoids intermittent failures.")
+    for _ in range(20):
         i = random.randint(1,99171)
         case.grandpa_datafile.write("{}\n".format(i))
     case.grandpa_datafile.close()
