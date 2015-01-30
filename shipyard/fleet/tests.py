@@ -7,6 +7,14 @@ from librarian.models import ExecRecord, SymbolicDataset
 
 
 class RunToProcessTest(TestCase):
+    """ Check various status reports. Status symbols are:
+    ? - requested
+    . - waiting
+    : - ready
+    + - running
+    * - complete
+    Overall format is steps-outcables-inputname
+    """
     fixtures = ['initial_data', 'initial_user', 'converter_pipeline']
     def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
@@ -42,9 +50,12 @@ class RunToProcessTest(TestCase):
         
         self.assertSequenceEqual('.-.', progress)
 
+    def add_exec_log(self, run_component):
+        ExecLog.create(record=run_component,
+                       invoking_record=run_component)
+
     def add_exec_record(self, run_component):
-        generator = ExecLog.create(record=run_component,
-                                   invoking_record=run_component)
+        generator = run_component.log
         execrecord = ExecRecord(generator=generator)
         execrecord.save()
         run_component.execrecord = execrecord
@@ -62,29 +73,43 @@ class RunToProcessTest(TestCase):
         
         return run_tracker
 
-    def test_run_progress_running(self):
+    def test_run_progress_ready(self):
         run_tracker = self.create_with_run_step()
         
         progress = run_tracker.get_run_progress()
         
         self.assertSequenceEqual(':-.', progress)
 
-    def create_with_completed_run_step(self):
+    def create_with_started_run_step(self):
         run_tracker = self.create_with_run_step()
         run_step = run_tracker.run.runsteps.first()
         run_step_input_cable = run_step.RSICs.first()
+        self.add_exec_log(run_step_input_cable)
         self.add_exec_record(run_step_input_cable)
+        self.add_exec_log(run_step)
+        return run_tracker
+
+    def create_with_completed_run_step(self):
+        run_tracker = self.create_with_started_run_step()
+        run_step = run_tracker.run.runsteps.first()
         exec_record = self.add_exec_record(run_step)
         exec_record.generator.methodoutput.return_code = 0
         exec_record.generator.methodoutput.save()
         return run_tracker
+
+    def test_run_progress_started_steps(self):
+        run_tracker = self.create_with_started_run_step()
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual('+-.', progress)
 
     def test_run_progress_completed_steps(self):
         run_tracker = self.create_with_completed_run_step()
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('+-.', progress)
+        self.assertSequenceEqual('*-.', progress)
 
     def test_run_progress_failed_steps(self):
         run_tracker = self.create_with_completed_run_step()
@@ -97,7 +122,7 @@ class RunToProcessTest(TestCase):
         
         self.assertSequenceEqual('!-.', progress)
 
-    def test_run_progress_creating_output(self):
+    def test_run_progress_output_ready(self):
         run_tracker = self.create_with_completed_run_step()
         run = run_tracker.run
         pipeline_output_cable = run.pipeline.outcables.first()
@@ -106,7 +131,20 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('+-:', progress)
+        self.assertSequenceEqual('*-:', progress)
+
+    def test_run_progress_output_running(self):
+        run_tracker = self.create_with_completed_run_step()
+        run = run_tracker.run
+        pipeline_output_cable = run.pipeline.outcables.first()
+        run_output_cable = RunOutputCable(
+            pipelineoutputcable=pipeline_output_cable)
+        run.runoutputcables.add(run_output_cable)
+        self.add_exec_log(run_output_cable)
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual('*-+', progress)
 
     def test_run_progress_complete(self):
         run_tracker = self.create_with_completed_run_step()
@@ -115,11 +153,12 @@ class RunToProcessTest(TestCase):
         run_output_cable = RunOutputCable(
             pipelineoutputcable=pipeline_output_cable)
         run.runoutputcables.add(run_output_cable)
+        self.add_exec_log(run_output_cable)
         self.add_exec_record(run_output_cable)
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('+-+', progress)
+        self.assertSequenceEqual('*-*', progress)
 
     def add_input(self, run_tracker):
         run_tracker.save()

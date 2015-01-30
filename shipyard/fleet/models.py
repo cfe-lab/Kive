@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 import archive.models
 import librarian.models
 import pipeline.models
+from archive.models import ExecLog
 
 # This is an experimental replacement for the runfleet admin command.
 # Disable it by setting worker_count to 0.
@@ -103,11 +104,15 @@ class RunToProcess(models.Model):
         runsteps = list(run.runsteps.order_by("pipelinestep__step_num"))
         for step in runsteps:
             if not step.is_complete():
-                status += ":"
+                try:
+                    step.log
+                    status += "+"
+                except ExecLog.DoesNotExist:
+                    status += ":"
             elif not step.successful_execution():
                 status += "!"
             else:
-                status += "+"
+                status += "*"
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
@@ -120,9 +125,13 @@ class RunToProcess(models.Model):
             if run_cable is None:
                 status += "."
             elif run_cable.is_complete():
-                status += "+"
+                status += "*"
             else:
-                status += ":"
+                try:
+                    run_cable.log
+                    status += "+"
+                except ExecLog.DoesNotExist:
+                    status += ":"
         
         if input_name:
             status += "-" + input_name

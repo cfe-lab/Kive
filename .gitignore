@@ -18,5 +18,5 @@ shipyard/testreport.xml
 doc/*.aux
 doc/*.dvi
 doc/*.pdf
-doc/*.log
+*.log
 /.idea/
