@@ -397,7 +397,11 @@ class SymbolicDatasetTests(LibrarianTestCase):
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
 
         tmpfile = tempfile.NamedTemporaryFile(delete=False)
-        tmpfile.write("Random stuff")
+        tmpfile.file.write("Random stuff")
+        tmpfile.file.flush()  # flush python buffer to os buffer
+        os.fsync(tmpfile.file.fileno())  # flush os buffer to disk
+        tmpfile.file.seek(0)  # go to beginning of file before calculating expected md5
+
 
         expected_md5 = file_access_utils.compute_md5(tmpfile)
 
@@ -419,8 +423,12 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.assertIsNotNone(Dataset.objects.filter(name=name).get(),
                           msg="Can't find Dataset in DB for name=" + name)
 
-        self.assertEqual(SymbolicDataset.objects.filter(id=sym_dataset.id).get().MD5_checksum, expected_md5,
-                         msg="Checksum for Symbolic Dataset file does not match expected " + expected_md5)
+        actual_md5 = SymbolicDataset.objects.filter(id=sym_dataset.id).get().MD5_checksum
+        self.assertEqual(actual_md5, expected_md5,
+                         msg="Checksum for SymbolicDataset ({}) file does not match expected ({})".format(
+                             actual_md5,
+                             expected_md5
+                         ))
 
 
 
