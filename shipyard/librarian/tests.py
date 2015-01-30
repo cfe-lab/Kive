@@ -402,7 +402,6 @@ class SymbolicDatasetTests(LibrarianTestCase):
         os.fsync(tmpfile.file.fileno())  # flush os buffer to disk
         tmpfile.file.seek(0)  # go to beginning of file before calculating expected md5
 
-
         expected_md5 = file_access_utils.compute_md5(tmpfile)
 
         raw_datatype = None  # raw compound datatype
@@ -421,7 +420,7 @@ class SymbolicDatasetTests(LibrarianTestCase):
         os.remove(tmpfile.name)
 
         self.assertIsNotNone(Dataset.objects.filter(name=name).get(),
-                          msg="Can't find Dataset in DB for name=" + name)
+                             msg="Can't find Dataset in DB for name=" + name)
 
         actual_md5 = SymbolicDataset.objects.filter(id=sym_dataset.id).get().MD5_checksum
         self.assertEqual(actual_md5, expected_md5,
@@ -429,9 +428,6 @@ class SymbolicDatasetTests(LibrarianTestCase):
                              actual_md5,
                              expected_md5
                          ))
-
-
-
 
     def test_is_raw(self):
         self.assertEqual(self.triplet_symDS.is_raw(), False)

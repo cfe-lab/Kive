@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.encoding import python_2_unicode_compatible
 
 import stopwatch.models
@@ -170,6 +170,16 @@ class CellError(models.Model):
         The constraint failed, if it is not null, must belong to
         that CDTM's Datatype.
         """
+        try:
+            self.blank.clean()
+
+            if self.constraint_failed is not None:
+                raise ValidationError(
+                    'CellError "{}" represents a blank and a data constraint failure'.format(self)
+                )
+        except ObjectDoesNotExist:
+            pass
+
         bad_SD = self.baddata.contentchecklog.symbolicdataset
 
         if self.baddata.missing_output:
@@ -213,6 +223,13 @@ class CellError(models.Model):
         elif self.constraint_failed.__class__.__name__ == "CustomConstraint":
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
                 raise ValidationError(error_messages["CellError_bad_CC"].format(self))
+
+    def is_blank(self):
+        try:
+            self.blank
+        except ObjectDoesNotExist:
+            return False
+        return True
 
 
 class IntegrityCheckLog(stopwatch.models.Stopwatch):
@@ -308,3 +325,20 @@ class MD5Conflict(models.Model):
     """
     integritychecklog = models.OneToOneField(IntegrityCheckLog, related_name="usurper")
     conflicting_SD = models.OneToOneField("librarian.SymbolicDataset", related_name="usurps")
+
+
+class BlankCell(models.Model):
+    """
+    Denotes a CellError that represents a cell that was blank on a non-blankable
+    column.
+    """
+    cellerror = models.OneToOneField(CellError, related_name="blank")
+
+    def clean(self):
+        sd = self.cellerror.baddata.contentchecklog.symbolicdataset
+        if self.cellerror.column.blankable:
+            raise ValidationError(
+                'Entry ({},{}) of SymbolicDataset "{}" is blankable'.format(
+                    self.cellerror.row_num, self.cellerror.column.column_idx, sd
+                )
+            )

@@ -82,8 +82,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     # file to see which columns need to be copied out into their own
     # file.
     cols_with_cc = [i for i, c in enumerate(columns, start=1) if c.has_custom_constraint()]
-    column_files = dict.fromkeys(cols_with_cc) # files to write columns to
-    column_paths = dict.fromkeys(cols_with_cc) # working directories to do checks in
+    column_files = dict.fromkeys(cols_with_cc)  # files to write columns to
+    column_paths = dict.fromkeys(cols_with_cc)  # working directories to do checks in
     LOGGER.debug("{} columns with custom constraints found".format(len(cols_with_cc)))
 
     # Each column with custom constraints gets a file handle where 
@@ -222,7 +222,7 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
             if colnum in out_handles:
                 out_handles[colnum].write(curr_cell_value + "\n")
 
-    return (rownum, failing_cells)
+    return rownum, failing_cells
 
 
 @python_2_unicode_compatible
@@ -1103,8 +1103,12 @@ class CompoundDatatypeMember(models.Model):
 
     # There is no concept of "null" in a CSV....
     blankable = models.BooleanField(
-        help_text="Can this entry be left blank?"
+        help_text="Can this entry be left blank?",
+        default=False
     )
+
+    # Constant used elsewhere to denote a blank entry.
+    BLANK_ENTRY = "blank"
 
     # Define database indexing rules to ensure tuple uniqueness
     # A compoundDataType cannot have 2 member definitions with the same column name or column number
@@ -1138,6 +1142,8 @@ class CompoundDatatypeMember(models.Model):
         Check a value for conformance to the underlying Datatype's
         BasicConstraints.
         """
+        if value == "" and not self.blankable:
+            return [CompoundDatatypeMember.BLANK_ENTRY]
         return self.datatype.check_basic_constraints(value)
 
 

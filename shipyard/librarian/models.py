@@ -28,6 +28,7 @@ import pipeline.models
 import transformation.models
 import librarian.models
 import datachecking.models
+import metadata.models
 import file_access_utils
 
 LOGGER = logging.getLogger(__name__)
@@ -289,8 +290,16 @@ class SymbolicDataset(models.Model):
                     elif content_check.baddata.cell_errors.exists():
                         error = content_check.baddata.cell_errors.first()
                         cdtm = error.column
-                        raise ValueError('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                         'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype))
+                        if error.is_blank():
+                            raise ValueError(
+                                'Entry ({},{}) of file "{}" is blank.'.format(
+                                    error.row_num, cdtm.column_idx, file_name)
+                            )
+                        else:
+                            raise ValueError(
+                                'The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                                'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype)
+                            )
                     else:
                         # Shouldn't reach here.
                         raise ValueError('The file "{}" was malformed'.format(file_name))
@@ -456,8 +465,11 @@ class SymbolicDataset(models.Model):
                     new_cell_error = ccl.baddata.cell_errors.create(row_num=row,
                                                                     column=my_CDT.members.get(column_idx=col))
 
+                    if failed_constr == metadata.models.CompoundDatatypeMember.BLANK_ENTRY:
+                        blank_cell = datachecking.models.BlankCell(cellerror = new_cell_error)
+                        blank_cell.save()
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    if not isinstance(failed_constr, basestring):
+                    elif not isinstance(failed_constr, basestring):
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()

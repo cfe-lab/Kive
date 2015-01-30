@@ -839,7 +839,8 @@ class DatatypeTests(MetadataTestCase):
         """
         wrong_CDT = CompoundDatatype()
         wrong_CDT.save()
-        wrong_CDT.members.create(datatype=self.STR, column_name="example", column_idx=1)
+        wrong_CDT.members.create(datatype=self.STR, column_name="example", column_idx=1,
+                                 blankable=True)
         wrong_CDT.members.create(datatype=self.BOOL, column_name="thisshouldbesomethingelse", column_idx=2)
         wrong_CDT.clean()
 
