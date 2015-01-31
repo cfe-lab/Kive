@@ -269,6 +269,8 @@ class RunComponent(stopwatch.models.Stopwatch):
     """
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
+    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
+                                    default=False)
 
     # Implicit:
     # - log: via OneToOneField from ExecLog
@@ -530,6 +532,10 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         PRE: this RunComponent is clean.
         """
+        # Has this been cancelled before even being attempted?
+        if self.is_cancelled:
+            return True
+
         # Is there an ExecRecord?  If not, check if this failed during
         # recovery and then completed.
         if self.execrecord is None:

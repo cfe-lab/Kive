@@ -76,7 +76,11 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
         """
         True if this content check is a failure.
         """
-        return hasattr(self, "baddata")
+        try:
+            self.baddata
+        except ObjectDoesNotExist:
+            return False
+        return True
 
 
 @python_2_unicode_compatible
@@ -224,7 +228,7 @@ class CellError(models.Model):
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
                 raise ValidationError(error_messages["CellError_bad_CC"].format(self))
 
-    def is_blank(self):
+    def has_blank_error(self):
         try:
             self.blank
         except ObjectDoesNotExist:

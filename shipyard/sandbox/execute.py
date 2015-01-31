@@ -978,7 +978,6 @@ class Sandbox:
                 output_path = os.path.join(self.out_dir, out_file_name)
                 self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
 
-
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_SD, output_path):
         """

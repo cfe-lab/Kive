@@ -110,9 +110,18 @@ class Manager:
 
     def mop_up_failed_sandbox(self, sandbox):
         """
-        Remove all tasks coming from the specified sandbox from the work queue.
+        Remove all tasks coming from the specified sandbox from the work queue
+        and mark them as cancelled.
         """
-        self.task_queue = [x for x in self.task_queue if x[0] != sandbox]
+        new_task_queue = []
+        for task_sdbx, task in self.task_queue:
+            if task_sdbx != sandbox:
+                new_task_queue.append(task)
+            else:
+                task.is_cancelled = True
+                task.save()
+
+        self.task_queue = new_task_queue
 
     def assign_task(self, sandbox, task):
         """

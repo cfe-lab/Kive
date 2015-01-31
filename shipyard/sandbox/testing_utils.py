@@ -536,3 +536,17 @@ def create_grandpa_sandbox_environment(case):
 def destroy_grandpa_sandbox_environment(case):
     clean_up_all_files()
     os.remove(case.grandpa_datafile.name)
+
+
+def make_SD(contents, CDT, make_dataset, user, name, description, created_by, check):
+    """
+    Wrapper for create_SD that creates a SymbolicDataset from a string.
+    """
+    with tempfile.TemporaryFile() as f:
+        f.write(contents)
+        test_SD = SymbolicDataset.create_SD(None, CDT, make_dataset=make_dataset,
+                                            user=user, name=name,
+                                            description=description, created_by=created_by,
+                                            check=check, file_handle=f)
+
+    return test_SD

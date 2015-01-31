@@ -150,7 +150,6 @@ class SymbolicDataset(models.Model):
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
             self.MD5_checksum = file_access_utils.compute_md5(f)
 
-
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
         Closes the file afterwards if the file source is a string file path.
@@ -290,7 +289,7 @@ class SymbolicDataset(models.Model):
                     elif content_check.baddata.cell_errors.exists():
                         error = content_check.baddata.cell_errors.first()
                         cdtm = error.column
-                        if error.is_blank():
+                        if error.has_blank_error():
                             raise ValueError(
                                 'Entry ({},{}) of file "{}" is blank.'.format(
                                     error.row_num, cdtm.column_idx, file_name)
@@ -336,7 +335,8 @@ class SymbolicDataset(models.Model):
         with the SD. created_by can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if
         make_dataset=False). If check is True, do a ContentCheck on the
-        file.
+        file.  If this fails, then a ValueError is raised and no changes
+        are made to the database.
 
         Returns the SymbolicDataset created.
         :rtype : object
@@ -425,7 +425,8 @@ class SymbolicDataset(models.Model):
 
         my_CDT = self.get_cdt()
 
-        with file_access_utils.FileReadHandler(file_path=file_path_to_check, file_handle=file_handle, access_mode="rb") as f:
+        with file_access_utils.FileReadHandler(file_path=file_path_to_check,
+                                               file_handle=file_handle, access_mode="rb") as f:
             csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
 
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):

@@ -84,7 +84,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     cols_with_cc = [i for i, c in enumerate(columns, start=1) if c.has_custom_constraint()]
     column_files = dict.fromkeys(cols_with_cc)  # files to write columns to
     column_paths = dict.fromkeys(cols_with_cc)  # working directories to do checks in
-    LOGGER.debug("{} columns with custom constraints found".format(len(cols_with_cc)))
+    plural = "" if len(cols_with_cc) == 1 else "s"
+    LOGGER.debug("{} column{} with custom constraints found".format(len(cols_with_cc), plural))
 
     # Each column with custom constraints gets a file handle where 
     # the results of the verification method will be written.
@@ -101,7 +102,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
         # Check basic constraints and count rows.
         num_rows, failing_cells = _check_basic_constraints(columns, data_csv, column_files)
         summary["num_rows"] = num_rows
-        LOGGER.debug("Checked basic constraints for {} rows".format(num_rows))
+        plural = "" if num_rows == 1 else "s"
+        LOGGER.debug("Checked basic constraints for {} row{}".format(num_rows, plural))
 
     finally:
         for col in cols_with_cc:
@@ -133,7 +135,8 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
 
     # If there are any failing cells, then add the dict to summary.
     if failing_cells:
-        LOGGER.debug("{} cells failed constraints".format(len(failing_cells)))
+        plural = "" if len(failing_cells) == 1 else "s"
+        LOGGER.debug("{} cell{} failed constraints".format(len(failing_cells), plural))
         summary["failing_cells"] = failing_cells
 
     return summary
@@ -211,12 +214,15 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     failing_cells = {}
     rownum = 0
     for rownum, row in enumerate(data_reader, start=1):
+        # FIXME this is a hack to work around the Python CSV module's inability to handle blank lines.
+        if len(row) == 0:
+            row = [""]
         for colnum, col in enumerate(columns, start=1):
             curr_cell_value = row[colnum-1]
             test_result = col.check_basic_constraints(curr_cell_value)
                 
             if test_result:
-                LOGGER.debug("Value {} failed basic constraints".format(curr_cell_value))
+                LOGGER.debug('Value "{}" failed basic constraints'.format(curr_cell_value))
                 failing_cells[(rownum, colnum)] = test_result
             # TODO: should be print function
             if colnum in out_handles:
@@ -1121,7 +1127,8 @@ class CompoundDatatypeMember(models.Model):
         Describe a CompoundDatatypeMember with it's column number,
         datatype name, and column name
         """
-        return '{}: {}'.format(unicode(self.datatype), self.column_name)
+        blankable_marker = "?" if self.blankable else ""
+        return '{}{}: {}'.format(unicode(self.datatype), blankable_marker, self.column_name)
 
     def has_custom_constraint(self):
         """
@@ -1142,8 +1149,11 @@ class CompoundDatatypeMember(models.Model):
         Check a value for conformance to the underlying Datatype's
         BasicConstraints.
         """
-        if value == "" and not self.blankable:
-            return [CompoundDatatypeMember.BLANK_ENTRY]
+        if value == "":
+            if self.blankable:
+                return []
+            else:
+                return [CompoundDatatypeMember.BLANK_ENTRY]
         return self.datatype.check_basic_constraints(value)
 
 
@@ -1333,7 +1343,8 @@ class CompoundDatatype(models.Model):
             return summary
 
         # Check the constraints using the module helper.
-        summary.update(summarize_CSV(self.members.all().order_by("column_idx"), data_csv, summary_path, content_check_log))
+        summary.update(summarize_CSV(self.members.all().order_by("column_idx"), data_csv,
+                                     summary_path, content_check_log))
         return summary
 
     @property
