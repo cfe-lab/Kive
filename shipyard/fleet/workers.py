@@ -116,7 +116,7 @@ class Manager:
         new_task_queue = []
         for task_sdbx, task in self.task_queue:
             if task_sdbx != sandbox:
-                new_task_queue.append(task)
+                new_task_queue.append((task_sdbx, task))
             else:
                 task.is_cancelled = True
                 task.save()
