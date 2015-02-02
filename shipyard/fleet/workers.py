@@ -230,7 +230,7 @@ class Manager:
                 curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
                 if curr_sdbx.run.is_complete():
                     mgr_logger.info('Rest of Run "%s" completely reused (Pipeline: %s, User: %s)',
-                                    new_sdbx.run, pipeline_to_run, user)
+                                    curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
                     if not tasks_currently_running:
                         clean_up_now = True
 
@@ -301,6 +301,8 @@ class Manager:
         while True:
             # We can't use a for loop over the task queue because assign_task may add to the queue.
             while len(self.task_queue) > 0:
+                # task_queue entries are (sandbox, run_step)
+                self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
                 curr_task = self.task_queue[0] # looks like (sandbox, task)
                 task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
                 # We assign this task to a worker, and do not proceed until the task
