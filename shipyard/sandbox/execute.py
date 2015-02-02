@@ -823,6 +823,7 @@ class Sandbox:
         if run_to_start is not None:
             run_to_resume = run_to_start
         elif task_completed is not None:
+            self.logger.debug("Advancing pipeline after completion of task %s", task_completed)
             run_to_resume = task_completed.parent_run
 
         if task_completed is None:
@@ -927,7 +928,7 @@ class Sandbox:
                 continue
 
             # Start execution of this step.
-            self.logger.debug("Beginning execution of step")
+            self.logger.debug("Beginning execution of step %d (%s)", step.step_num, step)
             run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 

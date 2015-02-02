@@ -211,10 +211,18 @@ class Manager:
         # we mop up.
         clean_up_now = False
         if not curr_sdbx.run.successful_execution():
+
+            for runstep in curr_sdbx.run.runsteps_in_order:
+                if not runstep.successful_execution():
+                    print("Step {}: successful == {}".format(runstep.step_num, runstep.successful_execution()))
+            for roc in curr_sdbx.run.runoutputcables.all():
+                if not roc.successful_execution():
+                    print("Output cable {}: successful == {}".format(roc, roc.successful_execution()))
+
             self.mop_up_failed_sandbox(curr_sdbx)
             if not task_finished.successful_execution():
-                mgr_logger.info('Task %s of run "%s" (Pipeline: %s, User: %s) failed.',
-                                task_finished, curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
+                mgr_logger.info('Task %s (pk=%d) of run "%s" (Pipeline: %s, User: %s) failed.',
+                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
 
             if not tasks_currently_running:
                 clean_up_now = True

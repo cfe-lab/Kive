@@ -9,7 +9,7 @@ from __future__ import unicode_literals
 from django.db import models, transaction
 from django.db.models.signals import post_delete
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -165,9 +165,6 @@ class Run(stopwatch.models.Stopwatch):
     def successful_execution(self):
         """
         Checks if this Run is successful (so far).
-
-        PRE
-        This Run is clean and complete.
         """
 
         # Check steps for success.
@@ -613,9 +610,11 @@ class RunComponent(stopwatch.models.Stopwatch):
         for invoked_log in self.invoked_logs.all():
             if not invoked_log.is_successful():
                 return False
-            if any([x.is_fail() for x in invoked_log.integrity_checks.all()]):
+            icls = invoked_log.integrity_checks.all()
+            if icls.exists() and any([x.is_fail() for x in icls]):
                 return False
-            if any([x.is_fail() for x in invoked_log.content_checks.all()]):
+            ccls = invoked_log.content_checks.all()
+            if ccls.exists() and any([x.is_fail() for x in ccls]):
                 return False
         return True
 
@@ -1084,10 +1083,11 @@ class RunStep(RunComponent):
         wrinkle that a RunStep fails if any of its cables fails, or if
         its child_run has failed.
 
-        PRE: this RunStep is clean and complete.
+        PRE: this RunStep is clean.
         PRE: this RunStep is not reused.
         """
-        if any([not cable.successful_execution() for cable in self.RSICs.all()]):
+        input_cables = self.RSICs.all()
+        if input_cables.exists() and any([not cable.successful_execution() for cable in input_cables]):
             return False
 
         # At this point we know that all the cables were successful;
@@ -1098,8 +1098,11 @@ class RunStep(RunComponent):
 
         # In the case that this is a sub-Pipeline, check if child_run
         # is successful.
-        if hasattr(self, "child_run"):
+        try:
+            self.child_run
             return self.child_run.successful_execution()
+        except ObjectDoesNotExist:
+            pass
 
         # No logs failed, and this wasn't a sub-Pipeline, so....
         return True
@@ -2048,8 +2051,11 @@ class ExecLog(stopwatch.models.Stopwatch):
         this function tells us if anything has gone wrong so far.
         """
         # If this ExecLog has a MethodOutput, check its return code.
-        if (hasattr(self, "methodoutput") and self.methodoutput.return_code != 0):
-            return False
+        try:
+            if self.methodoutput.return_code is not None and self.methodoutput.return_code != 0:
+                return False
+        except ObjectDoesNotExist:
+            pass
 
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!
