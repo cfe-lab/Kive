@@ -354,7 +354,7 @@
         "revision_parent": null, 
         "revision_desc": "Post-processing of short-read alignments.", 
         "coderesource": 11, 
-        "MD5_checksum": "5d15e87e853b3a254b967f020f3d849b", 
+        "MD5_checksum": "d88a5186405b9ccaa0314a050c618113", 
         "content_file": "CodeResources/aln2counts.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T22:43:15.594Z"
