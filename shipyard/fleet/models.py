@@ -109,7 +109,7 @@ class RunToProcess(models.Model):
                     status += "+"
                 except ExecLog.DoesNotExist:
                     status += ":"
-            elif not step.successful_execution():
+            elif not step.is_successful():
                 status += "!"
             else:
                 status += "*"

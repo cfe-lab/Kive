@@ -122,7 +122,7 @@ class Run(stopwatch.models.Stopwatch):
                 all_exist = False
             elif not corresp_rs.is_complete():
                 return False
-            elif not corresp_rs.successful_execution():
+            elif not corresp_rs.is_successful():
                 anything_failed = True
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()
@@ -130,7 +130,7 @@ class Run(stopwatch.models.Stopwatch):
                 all_exist = False
             elif not corresp_roc.is_complete():
                 return False
-            elif not corresp_roc.successful_execution():
+            elif not corresp_roc.is_successful():
                 anything_failed = True
 
         # At this point, all RunSteps and ROCs that exist are complete.
@@ -166,15 +166,14 @@ class Run(stopwatch.models.Stopwatch):
         """
         Checks if this Run is successful (so far).
         """
-
         # Check steps for success.
         for step in self.runsteps.all():
-            if not step.successful_execution():
+            if not step.is_successful():
                 return False
 
         # All steps checked out.  Check outcables.
         for outcable in self.runoutputcables.all():
-            if not outcable.successful_execution():
+            if not outcable.is_successful():
                 return False
 
         # So far so good.
@@ -215,13 +214,13 @@ class Run(stopwatch.models.Stopwatch):
         # Check each step for failure.
         for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
     
-            if runstep.is_complete() and not runstep.successful_execution():
+            if runstep.is_complete() and not runstep.is_successful():
                 error = "Step {} of {} failed".format(i, total_steps)
     
                 # Check each cable.
                 total_cables = runstep.pipelinestep.cables_in.count()
                 for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
-                    if not runcable.successful_execution():
+                    if not runcable.is_successful():
                         return (error, "Input cable {} of {} failed".format(j, total_cables))
     
                 # Check the step execution.
@@ -250,7 +249,7 @@ class Run(stopwatch.models.Stopwatch):
         # Check each output cable.
         total_cables = self.pipeline.outcables.count()
         for i, runcable in enumerate(self.runoutputcables.order_by("pipelineoutputcable__output_idx")):
-            if not runcable.successful_execution():
+            if not runcable.is_successful():
                 return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
     
         # Shouldn't reach here.
@@ -536,7 +535,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         # Is there an ExecRecord?  If not, check if this failed during
         # recovery and then completed.
         if self.execrecord is None:
-            if not self.successful_execution():
+            if not self.is_successful():
 
                 for invoked_log in self.invoked_logs.all():
                     if not invoked_log.is_complete():
@@ -598,6 +597,23 @@ class RunComponent(stopwatch.models.Stopwatch):
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
 
+    def is_successful(self):
+        if self.reused:
+            return self.successful_reuse()
+        return self.successful_execution()
+
+    def successful_reuse(self):
+        """
+        True if RunComponent is successful on reuse; False otherwise.
+
+        PRE: this RunComponent is reused.
+        """
+        assert(self.reused)
+        if self.execrecord is not None:
+            return self.execrecord.outputs_OK() and not self.execrecord.has_ever_failed()
+        # If there is no ExecRecord yet then this is trivially true.
+        return True
+
     def successful_execution(self):
         """True if RunComponent is successful; False otherwise.
 
@@ -606,7 +622,10 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         PRE: this RunComponent is clean, and so are all of its invoked_logs.
         (It's OK that they might not be complete.)
+        PRE: this RunComponent is not reused.
         """
+        assert(not self.reused)
+
         for invoked_log in self.invoked_logs.all():
             if not invoked_log.is_successful():
                 return False
@@ -1062,7 +1081,7 @@ class RunStep(RunComponent):
                 all_cables_exist = False
             elif not corresp_RSIC.is_complete():
                 return False
-            elif not corresp_RSIC.successful_execution():
+            elif not corresp_RSIC.is_successful():
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
@@ -1087,8 +1106,9 @@ class RunStep(RunComponent):
         PRE: this RunStep is not reused.
         """
         input_cables = self.RSICs.all()
-        if input_cables.exists() and any([not cable.successful_execution() for cable in input_cables]):
-            return False
+        if input_cables.exists():
+            if any(not ic.is_successful() for ic in input_cables):
+                return False
 
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
@@ -2037,8 +2057,11 @@ class ExecLog(stopwatch.models.Stopwatch):
         """Returns output SDs missing output from this execution."""
         missing = []
         for ccl in self.content_checks.all():
-            if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
-                missing.append(ccl.symbolicdataset)
+            try:
+                if ccl.baddata.missing_output:
+                    missing.append(ccl.symbolicdataset)
+            except ObjectDoesNotExist:
+                pass
 
         self.logger.debug("returning missing outputs '{}'".format(missing))
         return missing

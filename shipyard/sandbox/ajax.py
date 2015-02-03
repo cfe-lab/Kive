@@ -211,7 +211,7 @@ def _get_failed_output(request):
     
     stdout, stderr = None, None
     for component in itertools.chain(run.runsteps.all(), run.runoutputcables.all()):
-        if not component.successful_execution():
+        if not component.is_successful():
             if component.has_log and hasattr(component.log, "methodoutput"):
                 stdout = component.log.methodoutput.output_log
                 stderr = component.log.methodoutput.error_log

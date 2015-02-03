@@ -803,7 +803,7 @@ class ExecRecord(models.Model):
         for component_using_this in self.used_by_components.all():
             if component_using_this.is_step:
                 runsteps_using_this.append(component_using_this.runstep)
-        return any(not runstep.successful_execution() for runstep in runsteps_using_this)
+        return any(not runstep.successful_execution() for runstep in runsteps_using_this if not runstep.reused)
 
 
 @python_2_unicode_compatible

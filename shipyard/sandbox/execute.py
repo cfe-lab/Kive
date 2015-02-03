@@ -404,8 +404,11 @@ class Sandbox:
                                                input_SD=inputs[i], output_path=cable_path)
 
                 # Cable failed, return incomplete RunStep.
-                if not curr_RSIC.successful_execution():
-                    self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
+                if not curr_RSIC.is_successful():
+                    if curr_RSIC.reused:
+                        self.logger.error("PipelineStepInputCable {} failed on reuse.".format(curr_RSIC))
+                    else:
+                        self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
                     curr_RS.stop()
                     return curr_RS
 
@@ -624,9 +627,12 @@ class Sandbox:
             curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
                                           input_SD=source_SD, output_path=output_path)
 
-            if not curr_ROC.is_complete() or not curr_RS.successful_execution():
+            if curr_ROC.is_successful():
+                if curr_ROC.reused:
+                    self.logger.debug("Reuse of cable %s failed", curr_ROC)
+                else:
+                    self.logger.debug("Execution of cable %s failed", curr_ROC)
                 curr_run.clean()
-                self.logger.debug("Execution failed")
                 curr_run.stop()
                 return curr_run
 
@@ -935,13 +941,19 @@ class Sandbox:
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
             if not curr_RS.pipelinestep.is_subpipeline:
-                if curr_RS.is_complete() and curr_RS.successful_execution():
+                if curr_RS.reused and not curr_RS.successful_reuse():
+                    self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
+                    return
+                elif curr_RS.is_complete():
                     step_nums_completed.append(step.step_num)
             # Otherwise, we look and see if any of its outcables are complete.  If so, then add them to the
             # list -- they may allow stuff to run.
             else:
                 for roc in curr_RS.child_run.runoutputcables.all():
-                    if roc.is_complete() and roc.successful_execution():
+                    if roc.reused and not roc.successful_reuse():
+                        self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                        return
+                    elif roc.is_complete():
                         cables_completed.append(roc)
 
         # Now go through the output cables and do the same.
@@ -977,7 +989,13 @@ class Sandbox:
                 file_suffix = "raw" if outcable.is_raw() else "csv"
                 out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
                 output_path = os.path.join(self.out_dir, out_file_name)
-                self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
+                cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
+                if cable_exec_info.cable_record.reused and not cable_exec_info.cable_record.successful_reuse():
+                    self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                    return
+
+
+
 
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_SD, output_path):
@@ -1763,10 +1781,16 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             make_dataset = runstep.keeps_output(curr_output)
 
                             if preexisting_ER:
+                                # Wrap in a transaction to prevent concurrent authoring of Datasets to
+                                # an existing SymbolicDataset.
                                 output_ERO = execrecord.get_execrecordout(curr_output)
-                                output_SD = output_ERO.symbolicdataset
-                                if make_dataset and not output_ERO.has_data():
-                                    output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, runstep)
+                                with transaction.atomic():
+                                    output_SD = SymbolicDataset.objects.select_for_update().filter(
+                                        pk=output_ERO.symbolicdatatset.pk
+                                    )
+                                    if make_dataset and not output_SD.has_data():
+                                        output_SD.register_dataset(output_path, user, dataset_name, dataset_desc,
+                                                                   runstep)
 
                             else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(
@@ -1822,6 +1846,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 logger.debug("[%d] SD has been computed before, checking integrity of %s",
                              worker_rank, output_SD)
                 check = output_SD.check_integrity(output_path, user, curr_log)
+
+            # FIXME perform a content_check if there isn't one already.
 
         # Recovering or filling in old ER? No.
         else:

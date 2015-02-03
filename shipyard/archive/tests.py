@@ -2817,6 +2817,52 @@ class ExecLogTests(ArchiveTestCase):
 
         self.assertIsNone(el_to_mess_with.clean())
 
+    def test_is_successful_methodoutput_unset(self):
+        """
+        An ExecLog with no MethodOutput should still be successful.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        execlog = ExecLog(record=self.step_E1_RS, invoking_record=self.step_E1_RS,
+                          start_time=timezone.now(), end_time=None)
+        execlog.save()
+        self.assertTrue(execlog.is_successful())
+
+    def test_is_successful_methodoutput_return_code_unset(self):
+        """
+        An ExecLog whose MethodOutput return_code has not been set yet should still be successful.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        execlog = ExecLog(record=self.step_E1_RS, invoking_record=self.step_E1_RS,
+                          start_time=timezone.now(), end_time=None)
+        execlog.save()
+        mo = MethodOutput(execlog=execlog)
+        mo.save()
+        self.assertTrue(execlog.is_successful())
+
+    def test_is_successful_methodoutput_good(self):
+        """
+        An ExecLog whose MethodOutput return_code is 0 should be successful.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        execlog = ExecLog(record=self.step_E1_RS, invoking_record=self.step_E1_RS,
+                          start_time=timezone.now(), end_time=None)
+        execlog.save()
+        mo = MethodOutput(execlog=execlog, return_code=0)
+        mo.save()
+        self.assertTrue(execlog.is_successful())
+
+    def test_is_successful_methodoutput_bad(self):
+        """
+        An ExecLog whose MethodOutput return_code is not 0 should be successful.
+        """
+        self.step_through_runstep_creation("first_rsic")
+        execlog = ExecLog(record=self.step_E1_RS, invoking_record=self.step_E1_RS,
+                          start_time=timezone.now(), end_time=None)
+        execlog.save()
+        mo = MethodOutput(execlog=execlog, return_code=1)
+        mo.save()
+        self.assertFalse(execlog.is_successful())
+
 
 class GetCoordinatesTests(ArchiveTransactionTestCase):
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
@@ -3075,7 +3121,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
                 continue
 
             self.assertTrue(runcomponent.is_complete())
-            self.assertTrue(runcomponent.successful_execution())
+            self.assertTrue(runcomponent.is_successful())
 
     def test_runcomponent_successful_no_execrecord(self):
         """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
@@ -3104,7 +3150,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_execution())
+        self.assertTrue(incomplete_cable.successful_reuse())
 
     def test_runcomponent_successful_checks_not_passed(self):
         """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
@@ -3386,7 +3432,7 @@ echo
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
         self.assertTrue(run2_step2_cable.is_complete())
-        self.assertTrue(run2_step2_cable.successful_execution())
+        self.assertFalse(run2_step2_cable.successful_reuse())
         self.assertFalse(run2_step2.successful_execution())
 
     def test_runstep_subpipeline_not_complete(self):
