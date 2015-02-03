@@ -87,8 +87,8 @@
         "revision_parent": null, 
         "revision_desc": "To make pipeline portable, allow user to specify local paths and thread counts.", 
         "coderesource": 3, 
-        "MD5_checksum": "f3d84d1555896e94d8e4ab0ee7c762b5", 
-        "content_file": "CodeResources/settings.py_20140811115944", 
+        "MD5_checksum": "7121a7e639218c633578babb84fae75a", 
+        "content_file": "CodeResources/settings.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T18:59:44.931Z"
     }
@@ -115,7 +115,7 @@
         "revision_parent": null, 
         "revision_desc": "Reference sequences", 
         "coderesource": 5, 
-        "MD5_checksum": "fd2fd44aabab5a12fdbe5d05714a6cba", 
+        "MD5_checksum": "4353613cdd8db1b7833f7fde17b41715", 
         "content_file": "CodeResources/projects.json", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T19:01:23.014Z"
@@ -129,8 +129,8 @@
         "revision_parent": null, 
         "revision_desc": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.", 
         "coderesource": 6, 
-        "MD5_checksum": "2baf0f9454e52c150e53655a5bd22367", 
-        "content_file": "CodeResources/prelim_map.py_20140811120247", 
+        "MD5_checksum": "ceab4d9a4ba011cf872b079fd6e63d8a", 
+        "content_file": "CodeResources/prelim_map.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T19:02:47.539Z"
     }
@@ -203,8 +203,8 @@
         "revision_parent": null, 
         "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
         "coderesource": 7, 
-        "MD5_checksum": "39d2e6dcee3506ed11b76706d21c8680", 
-        "content_file": "CodeResources/remap.py_20140811122443", 
+        "MD5_checksum": "4776a35064ff5404b8df73481c4bf3e9", 
+        "content_file": "CodeResources/remap.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T19:24:43.487Z"
     }
@@ -277,8 +277,8 @@
         "revision_parent": null, 
         "revision_desc": "Conversion of SAM data into aligned format.", 
         "coderesource": 8, 
-        "MD5_checksum": "44ecb64b5b210876aed6f7829f86430c", 
-        "content_file": "CodeResources/sam2aln.py_20140811144919", 
+        "MD5_checksum": "e7083ae1c8f79953ce883d15e5c3991a", 
+        "content_file": "CodeResources/sam2aln.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T21:32:06.239Z"
     }
@@ -354,8 +354,8 @@
         "revision_parent": null, 
         "revision_desc": "Post-processing of short-read alignments.", 
         "coderesource": 11, 
-        "MD5_checksum": "c399c371de1a1d389d3466ee115b1150", 
-        "content_file": "CodeResources/aln2counts.py_20140811154315", 
+        "MD5_checksum": "5d15e87e853b3a254b967f020f3d849b", 
+        "content_file": "CodeResources/aln2counts.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T22:43:15.594Z"
     }
@@ -637,8 +637,8 @@
         "revision_parent": null, 
         "revision_desc": "Plot coverage for each region in a sample.", 
         "coderesource": 21, 
-        "MD5_checksum": "0733e407edea9615008f1ceada3d017e", 
-        "content_file": "CodeResources/coverage_plots.R_20140812114014", 
+        "MD5_checksum": "77a11448dd4cc72e0ca9e1c2fb0ffb43", 
+        "content_file": "CodeResources/coverage_plots.R", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-12T18:40:14.598Z"
     }
@@ -681,8 +681,8 @@
         "revision_parent": null, 
         "revision_desc": "Load MiSeq project configurations from a JSON file.", 
         "coderesource": 22, 
-        "MD5_checksum": "c4866c13b2f7926c9c704523cceffec7", 
-        "content_file": "CodeResources/project_config.py_20141203134458", 
+        "MD5_checksum": "0f7bedb2a7de87b49a427004d709c34c", 
+        "content_file": "CodeResources/project_config.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-12-03T21:44:58.852Z"
     }

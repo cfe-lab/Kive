@@ -1288,9 +1288,9 @@
     "pk": 135, 
     "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
+        "datatype": 1, 
         "column_idx": 4, 
-        "column_name": "q.cut", 
+        "column_name": "seed", 
         "compounddatatype": 21
     }
 },
@@ -1300,7 +1300,7 @@
     "fields": {
         "datatype": 4, 
         "column_idx": 5, 
-        "column_name": "min.coverage", 
+        "column_name": "q.cut", 
         "compounddatatype": 21
     }
 },
@@ -1310,7 +1310,7 @@
     "fields": {
         "datatype": 4, 
         "column_idx": 6, 
-        "column_name": "which.key.pos", 
+        "column_name": "min.coverage", 
         "compounddatatype": 21
     }
 },
@@ -1320,7 +1320,7 @@
     "fields": {
         "datatype": 4, 
         "column_idx": 7, 
-        "column_name": "off.score", 
+        "column_name": "which.key.pos", 
         "compounddatatype": 21
     }
 },
@@ -1330,6 +1330,16 @@
     "fields": {
         "datatype": 4, 
         "column_idx": 8, 
+        "column_name": "off.score", 
+        "compounddatatype": 21
+    }
+},
+{
+    "pk": 140, 
+    "model": "metadata.compounddatatypemember", 
+    "fields": {
+        "datatype": 4, 
+        "column_idx": 9, 
         "column_name": "on.score", 
         "compounddatatype": 21
     }

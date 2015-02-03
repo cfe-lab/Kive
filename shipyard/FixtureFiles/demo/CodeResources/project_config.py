@@ -28,16 +28,27 @@ class ProjectConfig(object):
         self.config = json.load(json_file)
     
     def writeSeedFasta(self, fasta_file):
+        """ Write seed references to a FASTA file.
+        
+        @param fasta_file: an open file
+        """
         seed_region_set = set()
         for project in self.config['projects'].itervalues():
             for region in project['regions']:
-                seed_region_set.add(region['seed_region'])
-        
+                seed_region_set.update(region['seed_region_names'])
+         
         seed_region_list = list(seed_region_set)
+        seed_name_map = {} # {sequence: name}
         seed_region_list.sort()
         for name in seed_region_list:
             region = self.config['regions'][name]
             sequence = ''.join(region['reference'])
+            duplicate_name = seed_name_map.get(sequence)
+            if duplicate_name is not None:
+                raise RuntimeError("Duplicate references: {} and {}.".format(
+                    duplicate_name,
+                    name))
+            seed_name_map[sequence] = name
             fasta_file.write('>{name}\n{ref}\n'.format(name=name,
                                                        ref=sequence))
 
@@ -56,7 +67,7 @@ class ProjectConfig(object):
         for project in self.config['projects'].itervalues():
             for region in project['regions']:
                 coord_region = region['coordinate_region']
-                if region['seed_region'] == seed_region and coord_region:
+                if seed_region in region['seed_region_names'] and coord_region:
                     coord_refs[coord_region] = self.getReference(coord_region)
         return coord_refs
     
@@ -83,25 +94,15 @@ class ProjectConfig(object):
         
         seeds = set()
         for region in self.config['projects'][project_name]['regions']:
-            seeds.add(region['seed_region'])
+            seeds.update(region['seed_region_names'])
         
         return seeds
 
-    def findProjectRegion(self, project_name, coordinate_region_name):
-        """ Find a project region that matches the project and coordinate region.
+    def getSeedGroup(self, seed_region):
+        """ Find the seed group a seed region belongs to.
         
-        @param project_name: name of the project to find
-        @param coordinate_region_name: name of the coordinate region to find
-            within that project. If the project has more than one region with
-            the same coordinate region, just return one of them.
-        @return (project_region_id, seed_name)
+        @param seed_region: the name of a seed region
+        @return the name of a seed group
         """
-        project = self.config['projects'].get(project_name)
-        if project is None:
-            raise KeyError('Project %r not found.' % project_name)
         
-        for project_region in project['regions']:
-            if project_region['coordinate_region'] == coordinate_region_name:
-                return project_region['id'], project_region['seed_region']
-        raise KeyError('Coordinate region %r not found in project %rx' %
-                       (coordinate_region_name, project_name))
+        return self.config['regions'][seed_region]['seed_group']

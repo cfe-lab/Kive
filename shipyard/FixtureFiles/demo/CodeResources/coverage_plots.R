@@ -10,7 +10,7 @@
 
 library(jsonlite)
 
-syntax.error = "Correct syntax: ./coverage_plot.R <amino CSV> <output maps tar> <output scores CSV>"
+syntax.error = "Correct syntax: ./coverage_plots.R <amino CSV> <output maps tar> <output scores CSV>"
 args <- commandArgs(TRUE)
 
 if (length(args) != 3) {
@@ -27,7 +27,8 @@ record.score <- function(
         coverage.levels,
         sample, 
         project.name,
-        region, 
+        region,
+        seed,
         q.cut) {
     # Add a row of scores to the scores matrix.
     #
@@ -44,7 +45,8 @@ record.score <- function(
     #   for the four different scores in on-target regions.
     # sample - the sample name
     # project.name - the project name
-    # region - the region name
+    # region - the coordinate region name
+    # seed - the seed region name
     # q.cut - the quality cutoff used for this data
     # Returns scores with a new row added.
     all.coverage <- data$coverage
@@ -79,7 +81,8 @@ record.score <- function(
         scores <- rbind(scores, c(
                         sample,
                         project.name,
-                        region, 
+                        region,
+                        seed,
                         q.cut, 
                         min.coverage, 
                         min.pos,
@@ -139,7 +142,9 @@ projects.config <- fromJSON('projects.json')
 projects <- projects.config$projects
 
 coverage.levels <- data.frame()
-key.positions <- data.frame()
+key.positions <- data.frame()  # { pos, project, region.index }
+region.indexes <- data.frame() # { seed, coord, region.index }
+region.index <- 0
 for (project.name in names(projects)) {
     project <- projects[[project.name]]
     region.count <- nrow(project$regions)
@@ -148,35 +153,40 @@ for (project.name in names(projects)) {
     }
     for (i in seq_len(region.count)) {
         region <- project$regions[i,]
-        new.coverage.levels <- data.frame(
-                project=project.name,
-                seed=region$seed_region,
-                coord=region$coordinate_region,
-                red=region$min_coverage1,
-                yellow=region$min_coverage2,
-                green=region$min_coverage3)
-        coverage.levels <- rbind(coverage.levels, new.coverage.levels)
+        seed_regions <- region$seed_region_names[[1]]
+        for (seed.index in seq_along(seed_regions)) {
+            new.coverage.levels <- data.frame(
+                    project=project.name,
+                    seed=seed_regions[[seed.index]],
+                    coord=region$coordinate_region,
+                    red=region$min_coverage1,
+                    yellow=region$min_coverage2,
+                    green=region$min_coverage3)
+            coverage.levels <- rbind(coverage.levels, new.coverage.levels)
+            
+            new.region.indexes <- data.frame(
+                    coord=region$coordinate_region,
+                    seed=seed_regions[[seed.index]],
+                    region.index=region.index)
+            region.indexes <- rbind(region.indexes, new.region.indexes)
+        }
         region.pairs <- region$key_positions[[1]]
         if (length(region.pairs) != 0) {
             region.pairs$end_pos[is.na(region.pairs$end_pos)] <- (
                         region.pairs$start_pos[is.na(region.pairs$end_pos)])
         }
         else {
-            ref <- paste(
-                    projects.config$regions[[region$coordinate_region]]$reference,
-                    collapse="")
-            region.pairs = data.frame(
-                    start_pos=1:nchar(ref),
-                    end_pos=1:nchar(ref))
+            ref <- projects.config$regions[[region$coordinate_region]]$reference
+            region.pairs = data.frame(start_pos=1, end_pos=sum(nchar(ref)))
         }
         for (j in seq_along(region.pairs$start_pos)) {
             new.positions <- data.frame(
                     pos=region.pairs$start_pos[[j]]:region.pairs$end_pos[[j]],
-                    coord=region$coordinate_region,
-                    seed=region$seed_region,
-                    project=project.name)
+                    project=project.name,
+                    region.index=region.index)
             key.positions <- rbind(key.positions, new.positions)
         }
+        region.index <- region.index + 1
     }
 }
 
@@ -184,6 +194,7 @@ scores.columns <- c(
         'sample',
         'project',
         'region',
+        'seed',
         'q.cut',
         'min.coverage',
         'which.key.pos',
@@ -215,8 +226,10 @@ for (i in seq_along(coverage)) {
     df <- coverage[[i]]
     xlim <- max(df$refseq.aa.pos)
     x.label <- "Reference coordinates (AA)"
+    related.regions <- region.indexes[
+            region.indexes$coord == region & region.indexes$seed == seed,]
     related.positions <- key.positions[
-            key.positions$coord == region & key.positions$seed == seed,]
+            key.positions$region.index %in% related.regions$region.index,]
     project.positions <- split(
             related.positions$pos,
             f=list(related.positions$project),
@@ -262,6 +275,7 @@ for (i in seq_along(coverage)) {
                     sample,
                     project.name,
                     region,
+                    seed,
                     q.cut)
         }
         
