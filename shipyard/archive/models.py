@@ -598,6 +598,8 @@ class RunComponent(stopwatch.models.Stopwatch):
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
 
     def is_successful(self):
+        if self.is_cancelled:
+            return False
         if self.reused:
             return self.successful_reuse()
         return self.successful_execution()

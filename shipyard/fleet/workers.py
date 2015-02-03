@@ -213,8 +213,9 @@ class Manager:
         if not curr_sdbx.run.successful_execution():
             self.mop_up_failed_sandbox(curr_sdbx)
             if not task_finished.is_successful():
-                mgr_logger.info('Task %s (pk=%d) of run "%s" (Pipeline: %s, User: %s) failed.',
-                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
+                mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
+                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
+                                curr_sdbx.pipeline, curr_sdbx.user)
 
             if not tasks_currently_running:
                 clean_up_now = True
@@ -229,8 +230,8 @@ class Manager:
                 curr_sdbx.update_sandbox(task_finished)
                 curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
                 if curr_sdbx.run.is_complete():
-                    mgr_logger.info('Rest of Run "%s" completely reused (Pipeline: %s, User: %s)',
-                                    curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
+                    mgr_logger.info('Rest of Run "%s" (pk=%d) completely reused (Pipeline: %s, User: %s)',
+                                    curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
                     if not tasks_currently_running:
                         clean_up_now = True
 
@@ -241,8 +242,8 @@ class Manager:
 
         if clean_up_now:
             if not curr_sdbx.run.successful_execution():
-                mgr_logger.info('Cleaning up failed run "%s" (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
+                mgr_logger.info('Cleaning up failed run "%s" (pk=%d) (Pipeline: %s, User: %s)',
+                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
 
             self.active_sandboxes.pop(curr_sdbx.run)
             curr_sdbx.run.stop()
@@ -250,8 +251,8 @@ class Manager:
             curr_sdbx.run.complete_clean()
 
             if curr_sdbx.run.successful_execution():
-                mgr_logger.info('Finished successful run "%s" (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.pipeline, curr_sdbx.user)
+                mgr_logger.info('Finished successful run "%s" (pk=%d) (Pipeline: %s, User: %s)',
+                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
 
         return workers_freed
 
