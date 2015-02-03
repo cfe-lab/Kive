@@ -277,7 +277,7 @@
         "revision_parent": null, 
         "revision_desc": "Conversion of SAM data into aligned format.", 
         "coderesource": 8, 
-        "MD5_checksum": "e7083ae1c8f79953ce883d15e5c3991a", 
+        "MD5_checksum": "474bfa052bd9345860b589b666857ff0", 
         "content_file": "CodeResources/sam2aln.py", 
         "revision_number": 1, 
         "revision_DateTime": "2014-08-11T21:32:06.239Z"
