@@ -15,9 +15,9 @@ import logging
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
-from constants import datatypes
+from constants import datatypes, groups
 from metadata.models import CompoundDatatype, Datatype
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
@@ -31,6 +31,8 @@ samplecode_path = metadata.tests.samplecode_path
 
 # For tracking whether we're leaking file descriptors.
 fd_count_logger = logging.getLogger("method.tests")
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 def fd_count(msg):
     fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
@@ -216,8 +218,7 @@ def create_method_test_environment(case):
     case.RNAinput_ti = case.RNAcompv1_m.create_input(
         compounddatatype = case.RNAinput_cdt,
         dataset_name = "input",
-        dataset_idx = 1,
-        user=case.myUser)
+        dataset_idx = 1)
     case.RNAinput_ti.full_clean()
     case.RNAinput_ti.save()
 
@@ -225,8 +226,7 @@ def create_method_test_environment(case):
     case.RNAoutput_to = case.RNAcompv1_m.create_output(
         compounddatatype = case.RNAoutput_cdt,
         dataset_name = "output",
-        dataset_idx = 1,
-        user=case.myUser)
+        dataset_idx = 1)
     case.RNAoutput_to.full_clean()
     case.RNAoutput_to.save()
 
@@ -460,7 +460,7 @@ def create_method_test_environment(case):
     case.testmethod = case.script_4_1_M
 
     # Some code for a no-op method.
-    resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
+    resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser); resource.save()
     with tempfile.NamedTemporaryFile() as f:
         f.write("#!/bin/bash\ncat $1")
         case.noop_data_file = f.name
@@ -512,16 +512,23 @@ def destroy_method_test_environment(case):
 
 
 class FileAccessTests(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         fd_count("FDs (start)")
+
+        # A typical user.
+        self.user_randy = User.objects.create_user("Randy", "theotherrford@deco.ca", "hat")
+        self.user_randy.save()
+        self.user_randy.groups.add(everyone_group)
+        self.user_randy.save()
 
         # Define comp_cr
         self.test_cr = CodeResource(
             name="Test CodeResource",
             description="A test CodeResource to play with file access",
-            filename="complement.py")
+            filename="complement.py",
+            user=self.user_randy)
         self.test_cr.save()
 
         # Define compv1_crRev for comp_cr
@@ -539,7 +546,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
 
         self.assertRaises(ValueError, test_crr.save)
 
@@ -549,7 +557,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
 
             fd_count("!access->close->save")
             foo = test_crr.content_file.read()
@@ -564,7 +573,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
 
         self.assertRaises(ValueError, test_crr.content_file.read)
         self.assertRaises(ValueError, test_crr.save)
@@ -575,7 +585,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
             test_crr.save()
 
         test_crr.content_file.read()
@@ -588,7 +599,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
             fd_count("open->File-!>save->close->access->close")
             test_crr.save()
             fd_count("open->File->save-!>close->access->close")
@@ -606,7 +618,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
             fd_count("open->File-!>save->close->clean->close")
             test_crr.save()
             fd_count("open->File->save-!>close->clean->close")
@@ -624,7 +637,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
             fd_count("open->File-!>clean->save->close")
             test_crr.clean()
             fd_count("open->File->clean-!>save->close")
@@ -640,7 +654,8 @@ class FileAccessTests(TransactionTestCase):
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
-                content_file=File(f))
+                content_file=File(f),
+                user=self.user_randy)
             fd_count("open->File-!>clean->save->close->clean->close")
             fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
             test_crr.clean()
@@ -667,7 +682,7 @@ class MethodTestCase(TestCase):
     This sets up all the stuff used in the Metadata tests, as well as some of the Datatypes
     and CDTs we use here.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         """Set up default database state for Method unit testing."""
@@ -926,13 +941,10 @@ class CodeResourceRevisionTests(MethodTestCase):
         its parent CodeResource.
         """
         cr = CodeResource(
-                name="test_complement",
-                filename="",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
             name="test_complement",
             filename="",
-            description="Complement DNA/RNA nucleotide sequences")
+            description="Complement DNA/RNA nucleotide sequences",
+            user=self.myUser)
         cr.save()
 
         # So it's revision does not have a content_file
@@ -2643,9 +2655,15 @@ class MethodFamilyTests(MethodTestCase):
 
 
 class NonReusableMethodTests(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
+        # An unpredictable, non-reusable user.
+        self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
+        self.user_rob.save()
+        self.user_rob.groups.add(everyone_group)
+        self.user_rob.save()
+
         # A piece of code that is non-reusable.
         self.rng = tools.make_first_revision(
             "rng", "Generates a random number", "rng.py",
@@ -2661,7 +2679,8 @@ with open(outfile, "wb") as f:
     my_writer = csv.writer(f)
     my_writer.writerow(("random number",))
     my_writer.writerow((random.random(),))
-"""
+""",
+            self.user_rob
         )
 
         self.rng_out_cdt = CompoundDatatype()
@@ -2671,7 +2690,8 @@ with open(outfile, "wb") as f:
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
 
-        self.rng_method = tools.make_first_method("rng", "Generate a random number", self.rng)
+        self.rng_method = tools.make_first_method("rng", "Generate a random number", self.rng,
+                                                  self.user_rob)
         self.rng_method.create_output(dataset_name="random_number", dataset_idx=1, compounddatatype=self.rng_out_cdt,
                                       min_row=1, max_row=1)
         self.rng_method.reusable = Method.NON_REUSABLE
@@ -2707,7 +2727,8 @@ with open(outfile, "wb") as f:
     out_writer.writerow(("incremented number",))
     for number in numbers:
         out_writer.writerow((number + incrementor,))
-"""
+""",
+            self.user_rob
         )
 
         self.increment_in_1_cdt = CompoundDatatype()
@@ -2733,7 +2754,7 @@ with open(outfile, "wb") as f:
 
         self.inc_method = tools.make_first_method(
             "increment", "Increments all numbers in its first input file by the number in its second",
-            self.increment)
+            self.increment, self.user_rob)
         self.inc_method.create_input(dataset_name="numbers", dataset_idx=1, compounddatatype=self.increment_in_1_cdt)
         self.inc_method.create_input(dataset_name="incrementor", dataset_idx=2,
                                      compounddatatype=self.increment_in_2_cdt,
@@ -2741,7 +2762,8 @@ with open(outfile, "wb") as f:
         self.inc_method.create_output(dataset_name="incremented_numbers", dataset_idx=1,
                                       compounddatatype=self.increment_out_cdt)
 
-        self.test_nonreusable = tools.make_first_pipeline("Non-Reusable", "Pipeline with a non-reusable step")
+        self.test_nonreusable = tools.make_first_pipeline("Non-Reusable", "Pipeline with a non-reusable step",
+                                                          self.user_rob)
         self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
                                            compounddatatype=self.increment_in_1_cdt)
         step1 = self.test_nonreusable.steps.create(
@@ -2778,10 +2800,6 @@ with open(outfile, "wb") as f:
         )
 
         self.test_nonreusable.create_outputs()
-
-        # A user that runs a Pipeline.
-        self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
-        self.user_rob.save()
 
         # A data file to add to the database.
         self.numbers = "number\n1\n2\n3\n4\n"

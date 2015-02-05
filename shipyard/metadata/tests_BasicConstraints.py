@@ -10,7 +10,7 @@ from method.models import CodeResourceRevision
 from constants import datatypes
 
 class BasicConstraintTestSetup(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         """

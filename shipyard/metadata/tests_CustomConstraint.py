@@ -24,7 +24,7 @@ class CustomConstraintTests(TransactionTestCase):
     """
     Test the creation and use of custom constraints.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -56,7 +56,8 @@ class CustomConstraintTests(TransactionTestCase):
               fi  
               row_num=$(($row_num+1))
             done""",
-            self.dt_custom)
+            self.dt_custom,
+            self.user_oscar)
 
         # A compound datatype composed of alphabetic strings and correctly
         # spelled words.
@@ -99,11 +100,10 @@ class CustomConstraintTests(TransactionTestCase):
         script  contents of CodeResourceRevision which will drive the method
         cdt     CompoundDatatype used throughout the pipeline
         """
-        coderev = tools.make_first_revision(name, desc,
-                "{}.sh".format(name), script)
-        method = tools.make_first_method(name, desc, coderev)
+        coderev = tools.make_first_revision(name, desc, "{}.sh".format(name), script, self.user_oscar)
+        method = tools.make_first_method(name, desc, coderev, self.user_oscar)
         tools.simple_method_io(method, cdt, "in data", "out data")
-        pipeline = tools.make_first_pipeline(name, desc)
+        pipeline = tools.make_first_pipeline(name, desc, self.user_oscar)
         tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
         pipeline.create_outputs()
         return pipeline
@@ -148,7 +148,7 @@ class CustomConstraintTests(TransactionTestCase):
         compounddatatype.save()
         return compounddatatype
 
-    def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype):
+    def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype, user):
         """
         Helper function to set up a custom constraint on a datatype.
         
@@ -162,16 +162,18 @@ class CustomConstraintTests(TransactionTestCase):
         scriptfile.write(script)
         scriptfile.close()
 
-        coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc)
+        coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc, user=user)
         coderesource.save()
         with open(scriptfile.name, "rb") as f:
             revision = coderesource.revisions.create(revision_name="1", revision_number=1,
                                                      revision_desc="first version",
-                                                     content_file=File(f))
+                                                     content_file=File(f),
+                                                     user=user)
             revision.save()
-        methodfamily = MethodFamily(name=famname, description=famdesc)
+        methodfamily = MethodFamily(name=famname, description=famdesc, user=user)
         methodfamily.save()
-        method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1)
+        method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1,
+                                             user=user)
         method.create_input("to_test", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
         method.create_output("failed_row", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK))
         method.save()
@@ -187,7 +189,7 @@ class CustomConstraintTests(TransactionTestCase):
         """
         symbolicdataset = SymbolicDataset.create_SD(datafile, user=user, cdt=cdt, name=name,
                                                     description=desc)
-        log = ContentCheckLog(symbolicdataset=symbolicdataset)
+        log = ContentCheckLog(symbolicdataset=symbolicdataset, user=user)
         log.save()
         return log
 
@@ -200,7 +202,8 @@ class CustomConstraintTests(TransactionTestCase):
                 [Datatype.objects.get(pk=datatypes.INT_PK)])
         self._setup_custom_constraint(
             "empty", "Methods producing no output",
-            "empty", "a script producing no output", "#!/bin/bash", dt_no_output)
+            "empty", "a script producing no output", "#!/bin/bash", dt_no_output,
+            self.user_oscar)
         cdt_no_output = self._setup_compounddatatype( 
                 [dt_no_output, self.dt_basic],
                 ["numerics", "letter strings"])
@@ -230,7 +233,8 @@ class CustomConstraintTests(TransactionTestCase):
             "bigrow",
             "a script outputting a big row number",
             '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
-            dt_big_row)
+            dt_big_row,
+            self.user_oscar)
         cdt_big_row = self._setup_compounddatatype(
                 [dt_big_row, self.dt_custom], ["barcodes", "words"])
         big_row_datafile = self._setup_datafile(cdt_big_row,
@@ -250,7 +254,8 @@ class CustomConstraintTests(TransactionTestCase):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        log = self._setup_content_check_log(self.good_datafile,
+        log = self._setup_content_check_log(
+            self.good_datafile,
             self.cdt_constraints, self.user_oscar, "constraint data",
             "data to test custom constraint checking")
         with open(self.good_datafile) as f:

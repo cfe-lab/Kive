@@ -2,7 +2,7 @@
 Unit tests for Shipyard metadata models.
 """
 from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 
 from metadata.models import *
@@ -11,9 +11,10 @@ from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
 
-from constants import datatypes, CDTs
+from constants import datatypes, CDTs, groups
 
 samplecode_path = "../samplecode"
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def create_metadata_test_environment(case):
@@ -176,6 +177,8 @@ def create_metadata_test_environment(case):
     # but we put it here now so all tests can use it.
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     case.myUser.save()
+    case.myUser.groups.add(everyone_group)
+    case.myUser.save()
 
 
 def clean_up_all_files():
@@ -223,7 +226,7 @@ class MetadataTestCase(TestCase):
     
     Other test classes that require this state can extend this one.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_metadata_test_environment(self)
@@ -238,7 +241,7 @@ class MetadataTransactionTestCase(TransactionTestCase):
 
     Other test classes that require this state can extend this one.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_metadata_test_environment(self)

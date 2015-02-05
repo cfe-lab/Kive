@@ -7,7 +7,6 @@
         "date_modified": "2015-01-13T21:15:28.253Z",
         "symbolicdataset": 1,
         "created_by": null,
-        "user": 1,
         "date_created": "2015-01-13T21:15:28.253Z",
         "dataset_file": "Datasets/2015_01/step_0_raw.fasta",
         "name": "TestFASTA"

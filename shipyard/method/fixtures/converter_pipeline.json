@@ -5,7 +5,8 @@
     "fields": {
         "description": "FASTA converter script",
         "name": "Fasta2CSV",
-        "filename": "Fasta2CSV.py"
+        "filename": "Fasta2CSV.py",
+        "user": 1
     }
 },
 {
@@ -19,7 +20,8 @@
         "MD5_checksum": "da8ced380c7d4f8f92ae0ce210512517",
         "content_file": "CodeResources/fasta2csv.py",
         "revision_number": 1,
-        "revision_DateTime": "2015-01-13T21:15:28.307Z"
+        "revision_DateTime": "2015-01-13T21:15:28.307Z",
+        "user": 1
     }
 },
 {
@@ -40,7 +42,8 @@
     "model": "method.methodfamily",
     "fields": {
         "name": "Fasta2CSV",
-        "description": "Converts FASTA to CSV"
+        "description": "Converts FASTA to CSV",
+        "user": 1
     }
 }
 ]

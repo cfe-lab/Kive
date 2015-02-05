@@ -4,7 +4,7 @@ import sys
 import tempfile
 
 from django.core.files import File
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.test import TransactionTestCase
 
 from archive.models import MethodOutput, Dataset
@@ -16,17 +16,22 @@ from sandbox.execute import Sandbox
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 
 from method.tests import samplecode_path
-from constants import datatypes
+from constants import datatypes, groups
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 class ExecuteTests(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
 
 		# Users + method/pipeline families
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
+        self.myUser.groups.add(everyone_group)
+        self.myUser.save()
+
         self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser); self.mf.save()
         self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser); self.pf.save()
 
@@ -121,33 +126,37 @@ class ExecuteTests(TransactionTestCase):
         for dataset in Dataset.objects.all():
             dataset.delete()
 
-    def find_raw_pipeline(self):
+    def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""
-        for p in Pipeline.objects.all():
-            for step in p.steps.all():
-                for incable in step.cables_in.all():
-                    if incable.source_step == 0 and incable.source.is_raw():
-                        return p
+        for p in Pipeline.objects.filter(user=user):
+            for input in p.inputs.all():
+                if input.is_raw():
+                    return p
 
     def find_inputs_for_pipeline(self, pipeline):
         """Find appropriate input SymbolicDatasets for a Pipeline."""
-        inputs = []
-        for step in pipeline.steps.all():
-            for incable in step.cables_in.all():
-                if incable.source_step == 0:
-                    source = incable.source
+        input_SDs = []
+        pipeline_owner = pipeline.user
+        for input in pipeline.inputs.all():
+            if input.is_raw():
+                candidate_SDs = SymbolicDataset.objects.filter(user=pipeline_owner)
+                if candidate_SDs.exists():
+                    for sd in candidate_SDs:
+                        if sd.is_raw():
+                            dataset = sd
+                            break
+                else:
                     dataset = None
-                    if source.is_raw():
-                        for sd in SymbolicDataset.objects.all():
-                            if sd.is_raw():
-                                dataset = sd
-                                break
-                    else:
-                        datatype = incable.source.structure.compounddatatype
-                        structure = DatasetStructure.objects.filter(compounddatatype=datatype)[0]
-                        dataset = structure.symbolicdataset
-                    inputs.append(dataset)
-        return inputs
+            else:
+                datatype = input.structure.compounddatatype
+                structure = DatasetStructure.objects.filter(
+                    compounddatatype=datatype, symbolicdataset__user=pipeline_owner)
+                if structure.exists():
+                    dataset = structure.first().symbolicdataset
+                else:
+                    dataset = None
+            input_SDs.append(dataset)
+        return input_SDs
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -311,13 +320,12 @@ class ExecuteTests(TransactionTestCase):
     def test_pipeline_all_inputs_OK_raw(self):
         """Execute a Pipeline with OK raw inputs."""
         # Find a Pipeline with a raw input.
-        pipeline = self.find_raw_pipeline()
+        pipeline = self.find_raw_pipeline(self.myUser)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
-        user = User.objects.first()
-        run = Sandbox(user, pipeline, inputs).execute_pipeline()
+        run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
         self.assertTrue(run.successful_execution())
         self.assertIsNone(run.clean())
@@ -352,7 +360,7 @@ class ExecuteTests(TransactionTestCase):
     def test_pipeline_inputs_not_OK_raw(self):
         """Can't execute a Pipeline with non-OK raw inputs."""
         user = User.objects.first()
-        pipeline = self.find_raw_pipeline()
+        pipeline = self.find_raw_pipeline(self.myUser)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
@@ -378,7 +386,7 @@ class ExecuteTests(TransactionTestCase):
 
 
 class SandboxTests(ExecuteTests):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def test_sandbox_no_input(self):
         """

@@ -1564,8 +1564,8 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
                     else:
                         output_SD = librarian.models.SymbolicDataset.create_SD(
-                            output_path, user, output_CDT, make_dataset,
-                            dataset_name, dataset_desc, curr_record, check=False)
+                            output_path, user, cdt=output_CDT, make_dataset=make_dataset,
+                            name=dataset_name, description=dataset_desc, created_by=curr_record, check=False)
 
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
@@ -1795,8 +1795,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
                             else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(
-                                    output_path, user, output_CDT, make_dataset,
-                                    dataset_name, dataset_desc, runstep, False
+                                    output_path, user, cdt=output_CDT, make_dataset=make_dataset,
+                                    name=dataset_name, description=dataset_desc, created_by=runstep,
+                                    check=False
                                 )
                                 logger.debug("[%d] First time seeing file: saved md5 %s",
                                              worker_rank, output_SD.MD5_checksum)

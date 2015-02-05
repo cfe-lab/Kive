@@ -117,12 +117,18 @@ def create_librarian_test_environment(case):
     case.E3_rawout = case.pE.outputs.get(dataset_name="E3_rawout")
 
     # Custom wiring/outwiring
-    case.E01_21_wire1 = case.E01_21.custom_wires.create(source_pin=case.triplet_cdt.members.all()[0],dest_pin=case.doublet_cdt.members.all()[1])
-    case.E01_21_wire2 = case.E01_21.custom_wires.create(source_pin=case.triplet_cdt.members.all()[2],dest_pin=case.doublet_cdt.members.all()[0])
-    case.E11_32_wire1 = case.E11_32.custom_wires.create(source_pin=case.doublet_cdt.members.all()[0],dest_pin=case.doublet_cdt.members.all()[1])
-    case.E11_32_wire2 = case.E11_32.custom_wires.create(source_pin=case.doublet_cdt.members.all()[1],dest_pin=case.doublet_cdt.members.all()[0])
-    case.E21_41_wire1 = case.E21_41.custom_wires.create(source_pin=case.triplet_cdt.members.all()[1],dest_pin=case.doublet_cdt.members.all()[1])
-    case.E21_41_wire2 = case.E21_41.custom_wires.create(source_pin=case.triplet_cdt.members.all()[2],dest_pin=case.doublet_cdt.members.all()[0])
+    case.E01_21_wire1 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=1), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E01_21_wire2 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3), dest_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.E11_32_wire1 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=1), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E11_32_wire2 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=2), dest_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.E21_41_wire1 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=2), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E21_41_wire2 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3), dest_pin=case.doublet_cdt.members.get(column_idx=1))
     case.pE.clean()
 
     # Runs for the pipelines.
@@ -302,7 +308,7 @@ class LibrarianTestCase(TestCase):
     This extends PipelineTestCase, which itself extended
     other stuff (follow the chain).
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         """Set up default database state for librarian unit testing."""

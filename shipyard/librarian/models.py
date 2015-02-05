@@ -411,7 +411,8 @@ class SymbolicDataset(metadata.models.AccessControl):
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
-    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog, checking_user, file_handle=None):
+    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog,
+                            checking_user, file_handle=None):
         """
         Performs content check on a file, generates a CCL, and sets this
         SD's num_rows.

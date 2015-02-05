@@ -1384,7 +1384,7 @@ class AccessControl(models.Model):
         """
         True if user can access this object; False otherwise.
         """
-        if self.user == user or self.users_allowed.filter(pk=user).exists():
+        if self.user == user or self.users_allowed.filter(pk=user.pk).exists():
             return True
 
         for group in self.groups_allowed.all():

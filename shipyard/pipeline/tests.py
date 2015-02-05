@@ -46,12 +46,12 @@ def create_pipeline_test_environment(case):
 
     # Define DNAcomp_pf
     case.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.",
-                                     user=self.user)
+                                     user=case.user)
     case.DNAcomp_pf.save()
 
     # Define DNAcompv1_p (pipeline revision)
     case.DNAcompv1_p = case.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version",
-                                                      user=self.user)
+                                                      user=case.user)
 
     # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
     case.DNAcompv1_p.create_input(
@@ -101,7 +101,7 @@ def create_pipeline_test_environment(case):
     CompoundDatatype.objects.first()
 
     # Nothing defined.
-    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version")
+    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version", user=case.user)
     p.save()
 
 
@@ -118,7 +118,7 @@ class PipelineTestCase(TestCase):
     """
     Set up a database state for unit testing Pipeline.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
@@ -4009,7 +4009,7 @@ class PipelineSerializationTests(TestCase):
     """
     Tests of Pipeline serialization and deserialization.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -4223,7 +4223,7 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_input(self):
         """Serializing a Pipeline input."""
-        my_pipeline = tools.make_first_pipeline("serialize input", "For testing serializing input")
+        my_pipeline = tools.make_first_pipeline("serialize input", "For testing serializing input", self.user_bob)
 
         input_1 = my_pipeline.create_input("foo", 1, compounddatatype=self.string_doublet)
         input_raw = my_pipeline.create_input("bar", 2, compounddatatype=None, x=0.2, y=0.3)
@@ -4237,7 +4237,7 @@ class PipelineSerializationTests(TestCase):
         """
         Define a Pipeline input from a dictionary.
         """
-        my_pipeline = tools.make_first_pipeline("deserialize input", "For testing deserializing input")
+        my_pipeline = tools.make_first_pipeline("deserialize input", "For testing deserializing input", self.user_bob)
 
         input_1_dict = {
             "dataset_name": "foo",
@@ -4280,7 +4280,7 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_incable_no_wires(self):
         """Serializing PSICs with no wiring."""
-        my_pipeline = tools.make_first_pipeline("serialize PSIC", "For testing serializing PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize PSIC", "For testing serializing PSIC", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4291,7 +4291,7 @@ class PipelineSerializationTests(TestCase):
 
     def test_deserialize_incable_no_wires(self):
         """Define PSICs with no wiring from dictionaries."""
-        my_pipeline = tools.make_first_pipeline("deserialize PSIC", "For testing deserializing PSIC")
+        my_pipeline = tools.make_first_pipeline("deserialize PSIC", "For testing deserializing PSIC", self.user_bob)
         my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=self.cdt_string)
         step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop)
 
@@ -4329,7 +4329,7 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_raw_incables(self):
         """Serializing raw PSICs with no wiring."""
-        my_pipeline = tools.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw, self.method_noop_raw],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4340,7 +4340,8 @@ class PipelineSerializationTests(TestCase):
 
     def test_deserialize_raw_incables(self):
         """Define raw PSICs from dictionaries."""
-        my_pipeline = tools.make_first_pipeline("de-serialize raw PSIC", "For testing de-serializing raw PSIC")
+        my_pipeline = tools.make_first_pipeline("de-serialize raw PSIC", "For testing de-serializing raw PSIC",
+                                                self.user_bob)
         my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=None)
         step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop_raw)
 
@@ -4354,7 +4355,7 @@ class PipelineSerializationTests(TestCase):
         incable_1 = step_1.create_incable_from_dict(incable_1_dict)
         self._check_incable(incable_1_dict, incable_1)
 
-        step_2 = my_pipeline.steps.create(step_num=2, transformation=self.method_noop_raw)
+        step_2 = my_pipeline.steps.create(step_num=2, transformation=self.method_noop_raw,)
         incable_2_dict = {
             "source_dataset_name": self.method_noop_raw.outputs.first().dataset_name,
             "source_step": 1,
@@ -4378,13 +4379,15 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_wire(self):
         """Serializing a CustomCableWire."""
-        my_pipeline = tools.make_first_pipeline("serialize wire", "For testing serializing a wire")
+        my_pipeline = tools.make_first_pipeline("serialize wire", "For testing serializing a wire",
+                                                self.user_bob)
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4400,13 +4403,15 @@ class PipelineSerializationTests(TestCase):
 
     def test_deserialize_wire(self):
         """Defining a CustomCableWire from a dictionary."""
-        my_pipeline = tools.make_first_pipeline("de-serialize wire", "For testing de-serializing a wire")
+        my_pipeline = tools.make_first_pipeline("de-serialize wire", "For testing de-serializing a wire",
+                                                self.user_bob)
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4424,13 +4429,16 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_incable_non_trivial(self):
         """Serializing a PSIC with wiring."""
-        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC",
+                                                "For testing serializing non-trivial PSIC",
+                                                self.user_bob)
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4457,13 +4465,15 @@ class PipelineSerializationTests(TestCase):
     def test_deserialize_incable_non_trivial(self):
         """Defining PSICs with wiring from dictionaries."""
         my_pipeline = tools.make_first_pipeline("deserialize non-trivial PSIC",
-                                               "For testing deserializing non-trivial PSIC")
+                                               "For testing deserializing non-trivial PSIC",
+                                               self.user_bob)
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4498,13 +4508,16 @@ class PipelineSerializationTests(TestCase):
 
     def test_serialize_incable_non_trivial_deleted(self):
         """Serializing a PSIC with wiring that keeps its output."""
-        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC",
+                                                "For testing serializing non-trivial PSIC",
+                                                self.user_bob)
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4535,13 +4548,15 @@ class PipelineSerializationTests(TestCase):
     def test_deserialize_incable_non_trivial_deleted(self):
         """Defining a PSIC with wiring that keeps its output using a dictionary."""
         my_pipeline = tools.make_first_pipeline("de-serialize non-trivial PSIC",
-                                               "For testing de-serializing non-trivial PSIC")
+                                                "For testing de-serializing non-trivial PSIC",
+                                                self.user_bob)
         my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
         self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
-            self.coderev_noop)
+            self.coderev_noop,
+            self.user_bob)
         tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
@@ -4577,7 +4592,7 @@ class PipelineSerializationTests(TestCase):
     def test_serialize_step_one_input_no_deletions(self):
         """Serializing a PS."""
         my_pipeline = tools.make_first_pipeline(
-            "serialize PS", "For testing serializing PSs with one input and no deletions"
+            "serialize PS", "For testing serializing PSs with one input and no deletions", self.user_bob
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4597,7 +4612,7 @@ class PipelineSerializationTests(TestCase):
     def test_deserialize_step_one_input_no_deletions(self):
         """Defining a PS from a dictionary."""
         my_pipeline = tools.make_first_pipeline(
-            "de-serialize PS", "For testing de-serializing PSs with one input and no deletions"
+            "de-serialize PS", "For testing de-serializing PSs with one input and no deletions", self.user_bob
         )
         my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4649,12 +4664,13 @@ class PipelineSerializationTests(TestCase):
         """Serializing a PS whose Transformation is a Pipeline."""
         # First, define a simple sub-Pipeline.
         sub_pipeline = tools.make_first_pipeline(
-            "sub-Pipeline", "For use as a sub-Pipeline"
+            "sub-Pipeline", "For use as a sub-Pipeline", self.user_bob
         )
         tools.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
 
         my_pipeline = tools.make_first_pipeline(
-            "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted"
+            "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted",
+            self.user_bob
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4667,12 +4683,13 @@ class PipelineSerializationTests(TestCase):
         """Define a PS whose Transformation is a Pipeline from a dictionary."""
         # First, define a simple sub-Pipeline as above.
         sub_pipeline = tools.make_first_pipeline(
-            "sub-Pipeline", "For use as a sub-Pipeline"
+            "sub-Pipeline", "For use as a sub-Pipeline", self.user_bob
         )
         tools.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
 
         my_pipeline = tools.make_first_pipeline(
-            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
+            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted",
+            self.user_bob
         )
         my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4701,7 +4718,8 @@ class PipelineSerializationTests(TestCase):
     def test_serialize_step_one_input_output_deleted(self):
         """Serializing a PS with one input and one output (which is deleted)."""
         my_pipeline = tools.make_first_pipeline(
-            "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted"
+            "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted",
+            self.user_bob
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4722,7 +4740,8 @@ class PipelineSerializationTests(TestCase):
     def test_deserialize_step_one_input_output_deleted(self):
         """Defining a PS with one input and one output (which is deleted) from a dictionary."""
         my_pipeline = tools.make_first_pipeline(
-            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
+            "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted",
+            self.user_bob
         )
         my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
@@ -4781,13 +4800,15 @@ class PipelineSerializationTests(TestCase):
 cat "$1" > "$4"
 tail -n +2 "$2" >> "$4"
 cat "$3" >> "$5"
-""")
+""",
+            self.user_bob)
 
         # The corresponding method.
         method_threetwo_string_doublet = tools.make_first_method(
             "string doublet three-in two-out",
             "appends two compatible CSV files and passes through a third",
-            coderev_3cat)
+            coderev_3cat,
+            self.user_bob)
         method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
         method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
@@ -4795,7 +4816,8 @@ cat "$3" >> "$5"
         mo_2 = method_threetwo_string_doublet.create_output("passedfile", 2, compounddatatype=self.cdt_string)
 
         my_pipeline = tools.make_first_pipeline(
-            "serialize multi-input PS", "For testing serializing PSs with several inputs"
+            "serialize multi-input PS", "For testing serializing PSs with several inputs",
+            self.user_bob
         )
         input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
         input_2 = my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
@@ -4836,13 +4858,15 @@ cat "$3" >> "$5"
 cat "$1" > "$4"
 tail -n +2 "$2" >> "$4"
 cat "$3" >> "$5"
-""")
+""",
+            self.user_bob)
 
         # The corresponding method.
         method_threetwo_string_doublet = tools.make_first_method(
             "string doublet three-in two-out",
             "appends two compatible CSV files and passes through a third",
-            coderev_3cat)
+            coderev_3cat,
+            self.user_bob)
         method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
         method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
@@ -4850,7 +4874,8 @@ cat "$3" >> "$5"
         mo_2 = method_threetwo_string_doublet.create_output("passedfile", 2, compounddatatype=self.cdt_string)
 
         my_pipeline = tools.make_first_pipeline(
-            "de-serialize multi-input PS", "For testing de-serializing PSs with several inputs"
+            "de-serialize multi-input PS", "For testing de-serializing PSs with several inputs",
+            self.user_bob
         )
         my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
         my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
@@ -4910,7 +4935,7 @@ cat "$3" >> "$5"
 
     def test_serialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
-        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op")
+        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4919,7 +4944,7 @@ cat "$3" >> "$5"
 
     def test_deserialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
-        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op")
+        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4944,7 +4969,7 @@ cat "$3" >> "$5"
 
     def test_serialize_raw_outcable(self):
         """Serializing a raw POC."""
-        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4953,7 +4978,7 @@ cat "$3" >> "$5"
 
     def test_deserialize_raw_outcable(self):
         """Defining a raw POC from a dictionary."""
-        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
                                      "input_to_not_touch", "untouched_output")
 
@@ -4979,12 +5004,12 @@ cat "$3" >> "$5"
     def test_serialize_outcable_custom_wires(self):
         """Serializing a POC with custom wiring."""
         my_pipeline = tools.make_first_pipeline(
-            "custom-wired outcable", "For testing serialization of a POC with custom wiring"
+            "custom-wired outcable", "For testing serialization of a POC with custom wiring", self.user_bob
         )
 
         # self.method_noop takes cdt_string, which is built on datatype_str, which is not the same as self.STR.
         method_builtin_STR_noop = tools.make_first_method(
-            "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop
+            "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop, self.user_bob
         )
         tools.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
 
@@ -5008,12 +5033,12 @@ cat "$3" >> "$5"
     def test_deserialize_outcable_custom_wires(self):
         """Defining a POC with custom wiring using a dictionary."""
         my_pipeline = tools.make_first_pipeline(
-            "custom-wired outcable", "For testing de-serialization of a POC with custom wiring"
+            "custom-wired outcable", "For testing de-serialization of a POC with custom wiring", self.user_bob
         )
 
         # self.method_noop takes cdt_string, which is built on datatype_str, which is not the same as self.STR.
         method_builtin_STR_noop = tools.make_first_method(
-            "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop
+            "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop, self.user_bob
         )
         tools.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
 
@@ -5159,7 +5184,7 @@ cat "$3" >> "$5"
 
     def test_serialize_empty_pipeline(self):
         """Serializing an empty Pipeline."""
-        my_pipeline = tools.make_first_pipeline("test", "Test family")
+        my_pipeline = tools.make_first_pipeline("test", "Test family", self.user_bob)
 
         my_dict = my_pipeline.represent_as_dict()
 
@@ -5179,7 +5204,7 @@ cat "$3" >> "$5"
 
     def test_serialize_incomplete_pipeline(self):
         """Serializing an incomplete Pipeline."""
-        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op")
+        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
@@ -5203,7 +5228,7 @@ cat "$3" >> "$5"
 
     def test_serialize_pipeline(self):
         """Serializing a complete Pipeline."""
-        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op")
+        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
@@ -5228,13 +5253,15 @@ cat "$3" >> "$5"
             """#!/bin/bash -e
 cat "$1" > "$3"
 tail -n +2 "$2" >> "$3"
-""")
+""",
+            self.user_bob)
 
         # The corresponding method.
         method_twocat_string_doublet = tools.make_first_method(
             "string doublet two-cat",
             "appends two string-doublet CSV files",
-            coderev_twocat)
+            coderev_twocat,
+            self.user_bob)
         doublet_i1 = method_twocat_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
         doublet_i2 = method_twocat_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         doublet_o1 = method_twocat_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
@@ -5242,12 +5269,14 @@ tail -n +2 "$2" >> "$3"
         method_twocat_string_singlet = tools.make_first_method(
             "string singlet two-cat",
             "appends two string-singlet CSV files",
-            coderev_twocat)
+            coderev_twocat,
+            self.user_bob)
         singlet_i1 = method_twocat_string_singlet.create_input("firstfile", 1, compounddatatype=self.string_singlet)
         singlet_i2 = method_twocat_string_singlet.create_input("secondfile", 2, compounddatatype=self.string_singlet)
         singlet_o1 = method_twocat_string_singlet.create_output("combinedfile", 1, compounddatatype=self.string_singlet)
 
-        my_pipeline = tools.make_first_pipeline("more complicated Pipeline", "For testing serialization of Pipelines")
+        my_pipeline = tools.make_first_pipeline("more complicated Pipeline", "For testing serialization of Pipelines",
+                                                self.user_bob)
         input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
         input_2 = my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
         input_3 = my_pipeline.create_input("pi_3", 3, compounddatatype=self.string_singlet)
@@ -5289,13 +5318,15 @@ tail -n +2 "$2" >> "$3"
             """#!/bin/bash -e
 cat "$1" > "$3"
 tail -n +2 "$2" >> "$3"
-""")
+""",
+            self.user_bob)
 
         # The corresponding method.
         method_twocat_string_doublet = tools.make_first_method(
             "string doublet two-cat",
             "appends two string-doublet CSV files",
-            coderev_twocat)
+            coderev_twocat,
+            self.user_bob)
         doublet_i1 = method_twocat_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
         doublet_i2 = method_twocat_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         doublet_o1 = method_twocat_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
@@ -5303,7 +5334,8 @@ tail -n +2 "$2" >> "$3"
         method_twocat_string_singlet = tools.make_first_method(
             "string singlet two-cat",
             "appends two string-singlet CSV files",
-            coderev_twocat)
+            coderev_twocat,
+            self.user_bob)
         singlet_i1 = method_twocat_string_singlet.create_input("firstsingletfile", 1,
                                                                compounddatatype=self.string_singlet)
         singlet_i2 = method_twocat_string_singlet.create_input("secondsingletfile", 2,

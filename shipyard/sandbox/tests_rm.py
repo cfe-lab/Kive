@@ -14,7 +14,7 @@ import sandbox.testing_utils as tools
 
 
 class SandboxRMTestCase(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -24,7 +24,7 @@ class SandboxRMTestCase(TestCase):
 
 
 class SandboxRMTransactionTestCase(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -34,7 +34,7 @@ class SandboxRMTransactionTestCase(TransactionTestCase):
 
 
 class ExecuteTestsRM(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sequence_manipulation_environment(self)
@@ -46,15 +46,16 @@ class ExecuteTestsRM(TransactionTestCase):
         """
         You should be allowed to have spaces in the name of your dataset.
         """
-        coderev = tools.make_first_revision("test",
-                "a script for testing purposes", "test.sh",
-                """#!/bin/bash
-                cat "$1" > "$2"
-                """)
-        method = tools.make_first_method("test", "a test method", coderev)
-        tools.simple_method_io(method, self.cdt_record,
-                "input name with spaces", "more spaces")
-        pipeline = tools.make_first_pipeline("test", "a test pipeline")
+        coderev = tools.make_first_revision(
+            "test",
+            "a script for testing purposes", "test.sh",
+            """#!/bin/bash
+            cat "$1" > "$2"
+            """,
+            self.user_alice)
+        method = tools.make_first_method("test", "a test method", coderev, self.user_alice)
+        tools.simple_method_io(method, self.cdt_record, "input name with spaces", "more spaces")
+        pipeline = tools.make_first_pipeline("test", "a test pipeline", self.user_alice)
         tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
         pipeline.create_outputs()
         
@@ -335,7 +336,7 @@ class BadRunTests(TransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
@@ -382,7 +383,7 @@ class FindSDTests(TransactionTestCase):
     """
     Tests for first_generator_of_SD.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_word_reversal_environment(self)
@@ -396,8 +397,10 @@ class FindSDTests(TransactionTestCase):
 
     def setup_nested_pipeline(self):
         # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_nested = tools.make_first_pipeline("nested pipeline",
-            "a pipeline with a sub-pipeline")
+        self.pipeline_nested = tools.make_first_pipeline(
+            "nested pipeline",
+            "a pipeline with a sub-pipeline",
+            self.user_bob)
 
         transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
         tools.create_linear_pipeline(self.pipeline_nested,
@@ -416,8 +419,10 @@ class FindSDTests(TransactionTestCase):
                         |_____________|            |______________|
         """
         # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_twostep = tools.make_first_pipeline("two-step pipeline",
-                                                         "a two-step pipeline with custom cable wires at each step")
+        self.pipeline_twostep = tools.make_first_pipeline(
+            "two-step pipeline",
+            "a two-step pipeline with custom cable wires at each step",
+            self.user_bob)
         self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords, dataset_name="words_to_reverse",
                                            dataset_idx=1)
 
@@ -443,10 +448,9 @@ class FindSDTests(TransactionTestCase):
     
     def setup_simple_pipeline(self):
         # A simple, one-step pipeline, which does nothing.
-        self.pipeline_noop = tools.make_first_pipeline("simple pipeline",
-            "a simple, one-step pipeline")
-        tools.create_linear_pipeline(self.pipeline_noop,
-            [self.method_noop], "lab data", "complemented lab data")
+        self.pipeline_noop = tools.make_first_pipeline("simple pipeline", "a simple, one-step pipeline",
+                                                       self.user_bob)
+        tools.create_linear_pipeline(self.pipeline_noop, [self.method_noop], "lab data", "complemented lab data")
         self.pipeline_noop.create_outputs()
 
     def test_find_symds_pipeline_input(self):
@@ -562,7 +566,9 @@ class RawTests(SandboxRMTransactionTestCase):
     def setUp(self):
         super(RawTests, self).setUp()
 
-        self.pipeline_raw = tools.make_first_pipeline("raw noop", "a pipeline to do nothing to raw data")
+        self.pipeline_raw = tools.make_first_pipeline(
+            "raw noop", "a pipeline to do nothing to raw data",
+            self.user_bob)
         tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
         self.pipeline_raw.create_outputs()
 

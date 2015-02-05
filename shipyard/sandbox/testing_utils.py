@@ -6,10 +6,10 @@ import subprocess
 import tempfile
 import time
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.files import File
 
-from constants import datatypes
+from constants import datatypes, groups
 import file_access_utils
 from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype, Datatype
@@ -18,12 +18,16 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from pipeline.models import Pipeline, PipelineFamily
 import sandbox.execute
 
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+
 
 def create_sandbox_testing_tools_environment(case):
     case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
     # An ordinary user.
     case.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
+    case.user_bob.save()
+    case.user_bob.groups.add(everyone_group)
     case.user_bob.save()
 
     # Predefined datatypes.
@@ -71,6 +75,8 @@ def create_sequence_manipulation_environment(case):
 
     # Alice is a Shipyard user.
     case.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
+    case.user_alice.save()
+    case.user_alice.groups.add(everyone_group)
     case.user_alice.save()
 
     # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
@@ -496,6 +502,8 @@ def make_words_symDS(case):
     case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
         description="blahblahblah", make_dataset=True)
+    case.symds_words.groups_allowed.add(everyone_group)
+    case.symds_words.save()
 
     os.remove(string_datafile.name)
 
@@ -508,6 +516,8 @@ def create_grandpa_sandbox_environment(case):
     # May 14, 2014: dag, yo -- RL
     # May 20, 2014: he's doing his best, man -- RL
     case.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
+    case.user_grandpa.save()
+    case.user_grandpa.groups.add(everyone_group)
     case.user_grandpa.save()
 
     # A code resource, method, and pipeline which are empty.
@@ -570,9 +580,8 @@ def make_SD(contents, CDT, make_dataset, user, name, description, created_by, ch
     """
     with tempfile.TemporaryFile() as f:
         f.write(contents)
-        test_SD = SymbolicDataset.create_SD(None, CDT, make_dataset=make_dataset,
-                                            user=user, name=name,
-                                            description=description, created_by=created_by,
+        test_SD = SymbolicDataset.create_SD(None, user, cdt=CDT, make_dataset=make_dataset,
+                                            name=name, description=description, created_by=created_by,
                                             check=check, file_handle=f)
 
     return test_SD

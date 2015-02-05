@@ -5,7 +5,8 @@
     "fields": {
         "revision_DateTime": "2015-01-13T21:15:28.340Z",
         "revision_desc": "first version",
-        "revision_name": "v1"
+        "revision_name": "v1",
+        "user": 1
     }
 },
 {
@@ -14,7 +15,8 @@
     "fields": {
         "revision_DateTime": "2015-01-13T21:15:28.379Z",
         "revision_desc": "first version",
-        "revision_name": "v1"
+        "revision_name": "v1",
+        "user": 1
     }
 },
 {

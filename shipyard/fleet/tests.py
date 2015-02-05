@@ -15,7 +15,7 @@ class RunToProcessTest(TestCase):
     * - complete
     Overall format is steps-outcables-inputname
     """
-    fixtures = ['initial_data', 'initial_user', 'converter_pipeline']
+    fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
     def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
         
