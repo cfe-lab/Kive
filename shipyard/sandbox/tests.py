@@ -5,7 +5,7 @@ import tempfile
 
 from django.core.files import File
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
@@ -19,7 +19,8 @@ from method.tests import samplecode_path
 from constants import datatypes
 
 
-class ExecuteTests(TestCase):
+class ExecuteTests(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
 
@@ -219,7 +220,7 @@ class ExecuteTests(TestCase):
         self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
 
         # Define 1-step inner pipeline pY
-        self.pY = Pipeline(family=self.pf, revision_name="pY_revision",revision_desc="Y", user=self.myUser)
+        self.pY = Pipeline(family=self.pf, revision_name="pY_revision", revision_desc="Y", user=self.myUser)
         self.pY.save()
         self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
 
@@ -228,39 +229,54 @@ class ExecuteTests(TestCase):
         self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_1,dest_pin=self.mA_in_cdtm_2)
         self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_2,dest_pin=self.mA_in_cdtm_1)
 
-        self.pY_cable_out = self.pY.outcables.create(output_name="pY_out",output_idx=1,source_step=1,source=self.mA_out,output_cdt=self.pY_out_cdt)
-        self.pY_outwire1 = self.pY_cable_out.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.pY_out_cdt_cdtm_1)
+        self.pY_cable_out = self.pY.outcables.create(
+            output_name="pY_out", output_idx=1, source_step=1,
+            source=self.mA_out, output_cdt=self.pY_out_cdt
+        )
+        self.pY_outwire1 = self.pY_cable_out.custom_wires.create(source_pin=self.mA_out_cdtm_1,
+                                                                 dest_pin=self.pY_out_cdt_cdtm_1)
         self.pY.create_outputs()
 
         # Define CDTs for the output of pX
         self.pX_out_cdt_1 = CompoundDatatype()
         self.pX_out_cdt_1.save()
-        self.pX_out_cdt_1_cdtm_1 = self.pX_out_cdt_1.members.create(column_name="pXq",column_idx=1,datatype=self.int_dt)
+        self.pX_out_cdt_1_cdtm_1 = self.pX_out_cdt_1.members.create(column_name="pXq", column_idx=1,
+                                                                    datatype=self.int_dt)
 
         self.pX_out_cdt_2 = CompoundDatatype()
         self.pX_out_cdt_2.save()
-        self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(column_name="pXr",column_idx=1,datatype=self.string_dt)
+        self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(
+            column_name="pXr", column_idx=1, datatype=self.string_dt
+        )
 
         # Define outer 2-step pipeline with mA at step 1 and pY at step 2
         self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
-        self.pX_step_1 = self.pX.steps.create(transformation=self.mA,step_num=1)
-        self.pX_step_2 = self.pX.steps.create(transformation=self.pY,step_num=2)
+        self.pX_step_1 = self.pX.steps.create(transformation=self.mA, step_num=1)
+        self.pX_step_2 = self.pX.steps.create(transformation=self.pY, step_num=2)
 
-        self.pX_step_1_cable = self.pX_step_1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.pX_step_1_cable.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.pX_step_1_cable.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+        self.pX_step_1_cable = self.pX_step_1.cables_in.create(dest=self.mA_in, source_step=0, source=self.X1_in)
+        self.pX_step_1_cable.custom_wires.create(source_pin=self.pX_in_cdtm_2, dest_pin=self.mA_in_cdtm_2)
+        self.pX_step_1_cable.custom_wires.create(source_pin=self.pX_in_cdtm_3, dest_pin=self.mA_in_cdtm_1)
 
-        self.pX_step_2_cable = self.pX_step_2.cables_in.create(dest=self.pY_in,source_step=1,source=self.mA_out)
-        self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.pY_in_cdtm_1)
-        self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.pY_in_cdtm_2)
+        self.pX_step_2_cable = self.pX_step_2.cables_in.create(dest=self.pY_in, source_step=1, source=self.mA_out)
+        self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_1, dest_pin=self.pY_in_cdtm_1)
+        self.pX_step_2_cable.custom_wires.create(source_pin=self.mA_out_cdtm_2, dest_pin=self.pY_in_cdtm_2)
 
-        self.pX_outcable_1 = self.pX.outcables.create(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out,output_cdt=self.pX_out_cdt_2)
-        self.pX_outcable_1.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.pX_out_cdt_2_cdtm_1)
+        self.pX_outcable_1 = self.pX.outcables.create(
+            output_name="pX_out_1", output_idx=1, source_step=1,
+            source=self.mA_out, output_cdt=self.pX_out_cdt_2
+        )
+        self.pX_outcable_1.custom_wires.create(source_pin=self.mA_out_cdtm_2, dest_pin=self.pX_out_cdt_2_cdtm_1)
 
-        self.pX_outcable_2 = self.pX.outcables.create(output_name="pX_out_2",output_idx=2,source_step=2,source=self.pY.outputs.get(dataset_name="pY_out"),output_cdt=self.pX_out_cdt_1)
-        self.pX_outcable_2.custom_wires.create(source_pin=self.pY.outputs.get(dataset_name="pY_out").get_cdt().members.get(column_name="pYC"),dest_pin=self.pX_out_cdt_1_cdtm_1)
+        self.pX_outcable_2 = self.pX.outcables.create(
+            output_name="pX_out_2", output_idx=2, source_step=2,
+            source=self.pY.outputs.get(dataset_name="pY_out"), output_cdt=self.pX_out_cdt_1)
+        self.pX_outcable_2.custom_wires.create(
+            source_pin=self.pY.outputs.get(dataset_name="pY_out").get_cdt().members.get(column_name="pYC"),
+            dest_pin=self.pX_out_cdt_1_cdtm_1
+        )
 
         self.pX.create_outputs()
 
@@ -362,6 +378,7 @@ class ExecuteTests(TestCase):
 
 
 class SandboxTests(ExecuteTests):
+    fixtures = ["initial_data"]
 
     def test_sandbox_no_input(self):
         """

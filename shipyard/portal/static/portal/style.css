@@ -50,6 +50,10 @@ td:last-child,
 th:last-child {
     padding-right: 0;
 }
+td:last-child:empty,
+th:last-child:empty {
+    display: none;
+}
 tr:hover td {
     background-color: rgba(0,0,0,0.02);
 }
@@ -67,6 +71,14 @@ tr.inputs input {
 #wrapper > h2 {
     font-size: 1.333em;
     margin-left: 3em;
+}
+.formtable td {
+    vertical-align: middle;
+}
+span.smalltxt {
+    font-weight: normal;
+    font-style: italic;
+    font-size: 0.8em;
 }
 h1 {
     font-size: 3em;
@@ -155,6 +167,16 @@ input, textarea, select {
     font: inherit;
     border: 1px solid #ccc;
     outline: none; /* Annoying WebKit feature */
+}
+input[disabled], textarea[disabled], select[disabled] {
+    background-color: #f4f4f4;
+    color: #888;
+}
+select {
+    max-width: 30em;
+}
+select option {
+    max-width: 30em;
 }
 
 .helptext {
@@ -255,10 +277,10 @@ select:not([multiple]) {
     border-radius: 0;
     -moz-appearance: none;
     text-indent: 0.01px;
-    text-overflow: '';
+    text-overflow: ellipsis;
     
     /* Create a drop-down button to replace the one we just removed. */
-    background: url('data:image/gif;base64,R0lGODlhDwAOAJEAAN/f3////8DAwAAAACH5BAAAAAAALAAAAAAPAA4AAAIgjANwyyCi2HIPSkOrbVrHC4biSEpZ9x3nk06eSLVXEhYAOw==') #fff right center no-repeat;
+    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAOCAYAAADwikbvAAAARElEQVQoz2NgwASaUIwC/v//j4GxafSHYk1SNCNrxDAAn2ZsGlEMwKUZn0a4AcT4GScYZpopDjCyo4riREJx8iQ5YwAAg8Lgu+iiljMAAAAASUVORK5CYII=') #fff right center no-repeat;
 }
 input.add {
     border-radius: 1em 0 0 1em;

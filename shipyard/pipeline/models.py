@@ -13,15 +13,17 @@ from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
 
+import csv
 import exceptions
 import os
-import csv
 import logging
-import json
 import operator
+import sys
 import transformation.models
+
 import method.models
 import metadata.models
+import librarian.models
 from constants import maxlengths
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,10 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
+
+    # marks which member of the PipelineFamily in production
+    published_version = models.ForeignKey('Pipeline', null=True, blank=True)
+
     def get_absolute_url(self):
         return '/pipeline_revise/{}'.format(self.id)
 
@@ -126,6 +132,11 @@ class Pipeline(transformation.models.Transformation):
     def family_size(self):
         """Returns size of this Pipeline's family"""
         return self.family.members.count()
+
+    @property
+    def is_published_version(self):
+        """Evaluate if this pipeline revision is marked as the published version"""
+        return self.family.published_version == self
 
     def clean(self):
         """
@@ -262,7 +273,9 @@ class Pipeline(transformation.models.Transformation):
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
-            "pipeline_outputs": []
+            "pipeline_outputs": [],
+
+            "is_published_version": self.is_published_version
         }
 
         # Populate dict_repr["pipeline_inputs"].
@@ -537,6 +550,59 @@ class Pipeline(transformation.models.Transformation):
         """
         raise NotImplementedError("Structural comparison not available for pipelines.")
 
+    def check_inputs(self, inputs):
+        """
+        Are the supplied inputs are appropriate for this pipeline?
+
+        We check if the input CDT's are restrictions of this pipeline's expected
+        input CDT's, and that the number of rows is in the range that the pipeline
+        expects. We don't rearrange inputs that are in the wrong order.
+        """
+        # First quick check that the number of inputs are the same.
+        if len(inputs) != self.inputs.count():
+            raise ValueError('Pipeline "{}" expects {} inputs, but {} were supplied'
+                             .format(self, self.inputs.count(), len(inputs)))
+
+        # Check each individual input.
+        for i, supplied_input in enumerate(inputs, start=1):
+            if not supplied_input.is_OK():
+                raise ValueError('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                                 .format(supplied_input, i, self))
+
+            pipeline_input = self.inputs.get(dataset_idx=i)
+            pipeline_raw = pipeline_input.is_raw()
+            supplied_raw = supplied_input.is_raw()
+
+            if pipeline_raw != supplied_raw:
+                if pipeline_raw:
+                    raise ValueError('Pipeline "{}" expected input {} to be raw, but got one with CompoundDatatype '
+                                     '"{}"'.format(self, i, supplied_input.get_cdt()))
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
+                                 .format(self, i, pipeline_input.get_cdt()))
+
+            # Both are raw.
+            elif pipeline_raw: continue
+
+            # Neither is raw.
+            supplied_cdt = supplied_input.get_cdt()
+            pipeline_cdt = pipeline_input.get_cdt()
+
+            if not supplied_cdt.is_restriction(pipeline_cdt):
+                raise ValueError('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one with '
+                                 'CompoundDatatype "{}"'.format(self, i, pipeline_cdt, supplied_cdt))
+
+            # The CDT's match. Is the number of rows okay?
+            minrows = pipeline_input.get_min_row() or 0
+            maxrows = pipeline_input.get_max_row()
+            maxrows = maxrows if maxrows is not None else sys.maxint
+
+            if not minrows <= supplied_input.num_rows() <= maxrows:
+                raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
+                                 .format(self, i, minrows, maxrows, supplied_input.num_rows()))
+
+    def threads_needed(self):
+        return max(x.threads_needed() for x in self.steps.all())
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
@@ -795,6 +861,11 @@ class PipelineStep(models.Model):
 
         return new_cable
 
+    def threads_needed(self):
+        if self.transformation.is_pipeline:
+            return self.transformation.threads_needed()
+        return self.transformation.definite.threads
+
 
 class PipelineCable(models.Model):
     """A cable feeding into a step or out of a pipeline."""
@@ -886,6 +957,67 @@ class PipelineCable(models.Model):
         else:
             return self.pipelineoutputcable
 
+    # TODO: this needs testing
+    def find_compounddatatype(self):
+        """Find a CompoundDatatype for the output of this cable.
+
+        OUTPUTS
+        output_CDT  a compatible CompoundDatatype for the cable's
+                    output, or None if one doesn't exist
+
+        PRE
+        this cable is neither raw nor trivial
+        """
+        assert not self.definite.is_raw()
+        assert not self.is_trivial()
+        wires = self.custom_wires.all()
+
+        # Use wires to determine the CDT of the output of this cable
+        all_members = metadata.models.CompoundDatatypeMember.objects # shorthand
+        compatible_CDTs = None
+        for wire in wires:
+            # Find all CompoundDatatypes with correct members.
+            candidate_members = all_members.filter(datatype=wire.source_pin.datatype,
+                                                   column_name=wire.dest_pin.column_name,
+                                                   column_idx=wire.dest_pin.column_idx)
+            candidate_CDTs = set([m.compounddatatype for m in candidate_members])
+            if compatible_CDTs is None:
+                compatible_CDTs = candidate_CDTs
+            else:
+                compatible_CDTs &= candidate_CDTs # intersection
+            if not compatible_CDTs:
+                return None
+
+        for output_CDT in compatible_CDTs:
+            if output_CDT.members.count() == len(wires):
+                return output_CDT
+
+        return None
+
+    def create_compounddatatype(self):
+        """Create a CompoundDatatype for the output of this cable.
+
+        OUTPUTS
+        output_CDT  a new CompoundDatatype for the cable's output
+
+        PRE
+        this cable is neither raw nor trivial
+        """
+
+        output_CDT = metadata.models.CompoundDatatype()
+        wires = self.custom_wires.all()
+
+        # Use wires to determine the CDT of the output of this cable
+        for wire in wires:
+            self.logger.debug("Adding CDTM: {} {}".format(wire.dest_pin.column_name, wire.dest_pin.column_idx))
+            output_CDT.members.create(datatype=wire.source_pin.datatype,
+                                      column_name=wire.dest_pin.column_name,
+                                       column_idx=wire.dest_pin.column_idx)
+
+        output_CDT.clean()
+        output_CDT.save()
+        return output_CDT
+
     def run_cable(self, source, output_path, cable_record, curr_log):
         """
         Perform cable transformation on the input.
@@ -927,8 +1059,6 @@ class PipelineCable(models.Model):
         output_fields = [column_names_by_idx[i] for i in sorted(column_names_by_idx)]
 
         with open(source, "rb") as infile:
-            infile = open(source, "rb")
-
             input_csv = csv.DictReader(infile)
 
             with open(output_path, "wb") as outfile:
@@ -1019,6 +1149,33 @@ class PipelineCable(models.Model):
             raise PipelineSerializationException("Error in defining custom wire: {}".format(e))
 
         return new_wire
+
+    def find_compatible_ERs(self, input_SD):
+        """Find an ExecRecord which may be reused by this PipelineCable.
+
+        INPUTS
+        input_SD        SymbolicDataset to feed the cable
+
+        OUTPUTS
+        execrecord      ExecRecord which may be reused, or None if no
+                        ExecRecord exists
+        """
+        # Look at ERIs with matching input SD.
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
+
+        candidates = []
+        for candidate_ERI in candidate_ERIs:
+            candidate_execrecord = candidate_ERI.execrecord
+            candidate_component = candidate_execrecord.general_transf()
+
+            if not candidate_component.is_cable:
+                continue
+
+            if self.definite.is_compatible(candidate_component):
+                self.logger.debug("Compatible ER found")
+                candidates.append(candidate_execrecord)
+
+        return candidates
 
 
 @python_2_unicode_compatible

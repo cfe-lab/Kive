@@ -1,10 +1,10 @@
 # Django settings for server project.
 
 # Copperfish-specific things to set:
-# DATABASES: the NAME field must be set to the absolute path of your sqlite3
-#  file
+# DATABASES: NAME, USER, and PASSWORD are site-specific
+# MEDIA_ROOT: set to the directory you wish to use on your system
 # When this is set, copy it over to settings.py (but don't have git track it)
-# -- RL April 26, 2013
+# -- RL January 6, 2015
 
 
 
@@ -19,11 +19,11 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '/Users/art/git/Shipyard/db/shipyard.db',                      # Or path to database file if using sqlite3.
+        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+        'NAME': '[YOUR DB NAME HERE]',                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
-        'USER': '',
-        'PASSWORD': '',
+        'USER': '[YOUR DB USER NAME HERE]',
+        'PASSWORD': '[YOUR DB USER PASSWORD HERE]',
         'HOST': '',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'PORT': '',                      # Set to empty string for default.
     }
@@ -141,7 +141,8 @@ INSTALLED_APPS = (
     'datachecking',
     'sandbox',
     'portal',
-    'stopwatch'
+    'stopwatch',
+    'fleet'
 )
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
@@ -194,6 +195,21 @@ LOGGING = {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
+        },
+        "fleet.Manager": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False
+        },
+        "fleet.Worker": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False
         }
     }
 }
+
+# The polling interval that the manager of the fleet uses between queries to the database.
+FLEET_POLLING_INTERVAL = 30 # in seconds
+
+TEST_RUNNER = 'django.test.runner.DiscoverRunner'

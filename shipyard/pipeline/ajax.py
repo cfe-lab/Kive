@@ -116,3 +116,28 @@ def get_pipeline(request):
         return response
     else:
         raise Http404
+
+
+def activate_pipeline(request):
+    """
+    Make this pipeline revision the published version.
+    :param request:
+    :return:
+    """
+    if request.is_ajax():
+        #response = HttpResponse()
+        pipeline_revision_id = request.POST.get('pipeline_id')
+        if pipeline_revision_id != '':
+            pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
+            pipeline_family = pipeline_revision.family
+            pipeline_family.published_version = None if pipeline_revision.is_published_version else pipeline_revision
+
+            pipeline_family.full_clean()
+            pipeline_family.save()
+
+            return HttpResponse(json.dumps({'is_published': pipeline_revision.is_published_version}), content_type='application/json')
+        # else
+        return HttpResponse()
+    else:
+        return Http404
+

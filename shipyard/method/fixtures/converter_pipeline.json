@@ -1,0 +1,46 @@
+[
+{
+    "pk": 1,
+    "model": "method.coderesource",
+    "fields": {
+        "description": "FASTA converter script",
+        "name": "Fasta2CSV",
+        "filename": "Fasta2CSV.py"
+    }
+},
+{
+    "pk": 1,
+    "model": "method.coderesourcerevision",
+    "fields": {
+        "revision_name": "v1",
+        "revision_parent": null,
+        "revision_desc": "First version",
+        "coderesource": 1,
+        "MD5_checksum": "da8ced380c7d4f8f92ae0ce210512517",
+        "content_file": "CodeResources/fasta2csv.py",
+        "revision_number": 1,
+        "revision_DateTime": "2015-01-13T21:15:28.307Z"
+    }
+},
+{
+    "pk": 1,
+    "model": "method.method",
+    "fields": {
+        "revision_parent": null,
+        "family": 1,
+        "reusable": 1,
+        "driver": 1,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1
+    }
+},
+{
+    "pk": 1,
+    "model": "method.methodfamily",
+    "fields": {
+        "name": "Fasta2CSV",
+        "description": "Converts FASTA to CSV"
+    }
+}
+]

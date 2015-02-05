@@ -1,402 +1,72 @@
-import os
-import sys
-import tempfile
-import shutil
-import random
-import logging
-import csv
-import time
-import re
-from subprocess import Popen, PIPE
-
-from django.core.files import File
-from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
-from archive.models import *
-from librarian.models import *
-from metadata.models import *
-from method.models import *
-from pipeline.models import *
-from datachecking.models import *
+from librarian.models import SymbolicDataset
 from sandbox.execute import Sandbox
-
-import file_access_utils
-
-from constants import datatypes, CDTs
+import sandbox.testing_utils as tools
 
 
-def rmf(path):
-    try:
-        os.remove(path)
-    except OSError:
-        pass
+# def rmf(path):
+#     try:
+#         os.remove(path)
+#     except OSError:
+#         pass
 
 
-def clean_files():
-    Dataset.objects.all().delete()
-    CodeResourceRevision.objects.all().delete()
-    for cls in [MethodOutput, VerificationLog]:
-        for output in cls.objects.all():
-            rmf(output.output_log.name)
-            rmf(output.error_log.name)
-
-
-class UtilityMethods():
+class SandboxRMTestCase(TestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
-        # An ordinary user.
-        self.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
-        self.user_bob.save()
-
-
-        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
-
-        # Predefined datatypes.
-        self.datatype_str = self.new_datatype("my_string", "sequences of ASCII characters", self.STR)
-
-        # A CDT composed of only one column, strings.
-        self.cdt_string = CompoundDatatype()
-        self.cdt_string.save()
-        self.cdt_string.members.create(datatype=self.datatype_str, column_name="word", column_idx=1)
-
-        # A code resource which does nothing.
-        self.coderev_noop = self.make_first_revision("noop", "a script to do nothing", "noop.sh",
-                '#!/bin/bash\n cat "$1" > "$2"')
-
-        # A Method telling Shipyard how to use the noop code on string data.
-        self.method_noop = self.make_first_method("string noop", "a method to do nothing to strings", self.coderev_noop)
-        self.simple_method_io(self.method_noop, self.cdt_string, "strings", "same_strings")
-
-        # Another totally different Method that uses the same CodeRevision and yes it does the same thing.
-        self.method_trivial = self.make_first_method(
-            "string trivial",
-            "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone",
-            self.coderev_noop)
-        self.simple_method_io(self.method_trivial, self.cdt_string, "strings", "untouched_strings")
-
-        # A third one, only this one takes raw input.
-        self.method_noop_raw = self.make_first_method("raw noop", "do nothing to raw data", self.coderev_noop)
-        self.simple_method_io(self.method_noop_raw, None, "raw", "same raw")
+        tools.create_sandbox_testing_tools_environment(self)
 
     def tearDown(self):
-        os.remove(self.string_datafile.name)
-        clean_files()
-
-    def make_second_pipeline(self, pipeline):
-        """
-        Create a second version of a Pipeline, in the same family as the first,
-        without making any changes. Hook up the steps to each other, but don't
-        create inputs and outputs for the new Pipeline.
-        """
-        new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version",
-                                user=self.user_bob)
-        new_pipeline.save()
-
-        for step in pipeline.steps.all():
-            new_step = new_pipeline.steps.create(transformation=step.transformation, step_num=step.step_num)
-            for cable in step.cables_in.all():
-                if cable.source.transformation.__class__.__name__ == "PipelineStep":
-                    new_step.cables_in.create(source = cable.source, dest = cable.dest)
-        return new_pipeline
-
-    def create_linear_pipeline(self, pipeline, methods, indata, outdata):
-        """
-        Helper function to create a "linear" pipeline, ie.
-
-                ___       __
-          in --|   |-...-|  |-- out
-               |___|     |__|
-
-        indata and outdata are the names of the input and output datasets.
-        """
-        # Create pipeline input.
-        if methods[0].inputs.first().is_raw():
-            cdt_in = None
-        else:
-            cdt_in = methods[0].inputs.first().structure.compounddatatype
-        pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name = indata, dataset_idx = 1)
-
-        # Create steps.
-        steps = []
-        for i, method in enumerate(methods):
-            step = pipeline.steps.create(transformation=methods[i], step_num=i+1)
-            if i == 0:
-                source = pipeline_in
-            else:
-                source = methods[i-1].outputs.first()
-            step.cables_in.create(source_step = i, source = source, dest = methods[i].inputs.first())
-            step.complete_clean()
-            steps.append(step)
-
-        # Create pipeline output.
-        pipeline.create_outcable(output_name=outdata, output_idx=1, source_step=len(steps),
-                                 source=methods[-1].outputs.first())
-        pipeline.create_outputs()
-        pipeline.complete_clean()
-
-    def simple_method_io(self, method, cdt, indataname, outdataname):
-        """
-        Helper function to create inputs and outputs for a simple
-        Method with one input, one output, and the same CompoundDatatype
-        for both incoming and outgoing data.
-        """
-        minput = method.create_input(compounddatatype=cdt,
-            dataset_name = indataname,
-            dataset_idx = 1)
-        minput.clean()
-        moutput = method.create_output(compounddatatype=cdt,
-            dataset_name = outdataname,
-            dataset_idx = 1)
-        moutput.clean()
-        method.clean()
-        return minput, moutput
-
-    def new_datatype(self, dtname, dtdesc, shipyardtype):
-        """
-        Helper function to create a new datatype.
-        """
-        datatype = Datatype(name=dtname, description=dtdesc)
-        datatype.save()
-        datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
-        datatype.complete_clean()
-        return datatype
-
-    def make_first_revision(self, resname, resdesc, resfn, contents):
-        """
-        Helper function to make a CodeResource and the first version.
-        """
-        resource = CodeResource(name=resname, description=resdesc, 
-            filename=resfn, user=self.user_bob)
-        resource.clean()
-        resource.save()
-        with tempfile.TemporaryFile() as f:
-            f.write(contents)
-            revision = CodeResourceRevision(
-                coderesource=resource,
-                revision_name="1",
-                revision_desc="first version",
-                content_file=File(f),
-                user=self.user_bob)
-            revision.clean()
-            revision.save()
-        resource.clean()
-        return revision
-
-    def make_first_method(self, famname, famdesc, driver):
-        """
-        Helper function to make a new MethodFamily for a new Method.
-        """
-        family = MethodFamily(name=famname, description=famdesc, user=self.user_bob)
-        family.clean()
-        family.save()
-        method = Method(
-            revision_name="v1",
-            revision_desc="first version",
-            family=family,
-            driver=driver,
-            user=self.user_bob)
-        method.clean()
-        method.save()
-        family.clean()
-        return method
-
-    def make_first_pipeline(self, pname, pdesc):
-        """
-        Helper function to make a new PipelineFamily and the first Pipeline
-        member.  
-        """
-        family = PipelineFamily(name=pname, description=pdesc, user=self.user_bob)
-        family.clean()
-        family.save()
-        pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=self.user_bob)
-        pipeline.clean()
-        pipeline.save()
-        family.clean()
-        return pipeline
-
-    def make_words_symDS(self):
-        """Set up a data file of words."""
-        self.string_datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.string_datafile.write("word\n")
-        self.string_datafile.close()
-        os.system("head -1 /usr/share/dict/words >> {}".
-                  format(self.string_datafile.name))
-        self.symds_words = SymbolicDataset.create_SD(self.string_datafile.name,
-                                                     user=self.user_bob, cdt=self.cdt_string, make_dataset=True,
-                                                     name="blahblah", description="blahblahblah")
+        tools.destroy_sandbox_testing_tools_environment(self)
 
 
-class ExecuteTestsRM(UtilityMethods):
+class SandboxRMTransactionTestCase(TransactionTestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
-        super(ExecuteTestsRM, self).setUp()
-
-        # Alice is a Shipyard user.
-        self.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
-        self.user_alice.save()
-
-        # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
-        # She wants to create a pipeline for each. In the background, this also creates
-        # two new pipeline families.
-        self.pipeline_complement = self.make_first_pipeline("DNA complement", "a pipeline to complement DNA")
-        self.pipeline_reverse = self.make_first_pipeline("DNA reverse", "a pipeline to reverse DNA")
-        self.pipeline_revcomp = self.make_first_pipeline("DNA revcomp", "a pipeline to reverse and complement DNA")
-
-        # Alice is only going to be manipulating DNA, so she creates a "DNA"
-        # data type. A "string" datatype, which she will use for the headers,
-        # has been predefined in Shipyard. She also creates a compound "record"
-        # datatype for sequence + header.
-        self.datatype_dna = self.new_datatype("DNA", "sequences of ATCG", self.STR)
-        self.cdt_record = CompoundDatatype()
-        self.cdt_record.save()
-        self.cdt_record.members.create(datatype=self.datatype_str, column_name="header", column_idx=1)
-        self.cdt_record.members.create(datatype=self.datatype_dna, column_name="sequence", column_idx=2)
-
-        # Alice uploads code to perform each of the tasks. In the background, 
-        # Shipyard creates new CodeResources for these scripts and sets her
-        # uploaded files as the first CodeResourceRevisions.
-        self.coderev_complement = self.make_first_revision("DNA complement", "a script to complement DNA",
-                "complement.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-        self.coderev_reverse = self.make_first_revision("DNA reverse", "a script to reverse DNA", "reverse.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | rev | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-
-        # To tell the system how to use her code, Alice creates two Methods,
-        # one for each CodeResource. In the background, this creates two new
-        # MethodFamilies with her Methods as the first member of each.
-        self.method_complement = self.make_first_method("DNA complement", "a method to complement strings of DNA",
-                self.coderev_complement)
-        self.simple_method_io(self.method_complement, self.cdt_record, "DNA_to_complement", "complemented_DNA")
-        self.method_reverse = self.make_first_method("DNA reverse", "a method to reverse strings of DNA",
-                self.coderev_complement)
-        self.simple_method_io(self.method_reverse, self.cdt_record, "DNA_to_reverse", "reversed_DNA")
-
-        # Now Alice is ready to define her pipelines. She uses the GUI to drag
-        # the "complement" method into the "complement" pipeline, creates
-        # the pipeline's input and output, and connects them to the inputs and
-        # output of the method.
-        self.create_linear_pipeline(self.pipeline_complement, [self.method_complement], "lab data", 
-                "complemented lab data")
-        self.pipeline_complement.create_outputs()
-        self.create_linear_pipeline(self.pipeline_reverse, [self.method_reverse], "lab data", "reversed lab data")
-        self.pipeline_reverse.create_outputs()
-        self.create_linear_pipeline(self.pipeline_revcomp, [self.method_reverse, self.method_complement], "lab data",
-                "reverse and complemented lab data")
-        self.pipeline_revcomp.create_outputs()
-
-        # Here is some data which is sitting on Alice's hard drive.
-        self.labdata = "header,sequence\n"
-        for i in range(10):
-            seq = "".join([random.choice("ATCG") for j in range(10)])
-            self.labdata += "patient{},{}\n".format(i, seq)
-        self.datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.datafile.write(self.labdata)
-        self.datafile.close()
-
-        # Alice uploads the data to the system.
-        self.symds_labdata = SymbolicDataset.create_SD(self.datafile.name, user=self.user_alice,
-                                                       cdt=self.cdt_record, make_dataset=True, name="lab data",
-                                                       description="data from the lab")
-
-        # Now Alice is ready to run her pipelines. The system creates a Sandbox
-        # where she will run each of her pipelines.
-        self.sandbox_complement = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-        self.sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [self.symds_labdata])
-
-        # A second version of the complement Pipeline which doesn't keep any output.
-        self.pipeline_complement_v2 = Pipeline(family=self.pipeline_complement.family, revision_name="2",
-                                               revision_desc="second version")
-        self.pipeline_complement_v2.save()
-        self.create_linear_pipeline(self.pipeline_complement_v2, [self.method_complement], "lab data", 
-                                    "complemented lab data")
-        self.pipeline_complement_v2.steps.last().add_deletion(self.method_complement.outputs.first())
-        self.pipeline_complement_v2.outcables.first().delete()
-        self.pipeline_complement_v2.create_outputs()
-
-        # A second version of the reverse/complement Pipeline which doesn't keep 
-        # intermediate or final output.
-        self.pipeline_revcomp_v2 = Pipeline(family=self.pipeline_revcomp.family, revision_name="2",
-                                            revision_desc="second version")
-        self.pipeline_revcomp_v2.save()
-        self.create_linear_pipeline(self.pipeline_revcomp_v2, [self.method_reverse, self.method_complement], "lab data",
-                                    "revcomped lab data")
-        self.pipeline_revcomp_v2.steps.first().add_deletion(self.method_reverse.outputs.first())
-        self.pipeline_revcomp_v2.steps.last().add_deletion(self.method_complement.outputs.first())
-        self.pipeline_revcomp_v2.outcables.first().delete()
-        self.pipeline_revcomp_v2.create_outputs()
-
-        # A third version of the reverse/complement Pipeline which keeps
-        # final output, but not intermediate.
-        self.pipeline_revcomp_v3 = Pipeline(family=self.pipeline_revcomp.family, revision_name="3", 
-                                            revision_desc="third version")
-        self.pipeline_revcomp_v3.save()
-        self.create_linear_pipeline(self.pipeline_revcomp_v3, [self.method_reverse, self.method_complement], "lab data",
-                                    "revcomped lab data")
-        self.pipeline_revcomp_v3.steps.first().add_deletion(self.method_reverse.outputs.first())
-        self.pipeline_revcomp_v3.create_outputs()
-
-        # Another method which turns DNA into RNA.
-        self.coderev_DNA2RNA = self.make_first_revision("DNA to RNA", "a script to reverse DNA", "DNA2RNA.sh",
-                """#!/bin/bash
-                cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-                """)
-        self.method_DNA2RNA = self.make_first_method("DNA to RNA", "a method to turn strings of DNA into RNA",
-                                                     self.coderev_DNA2RNA)
-        self.simple_method_io(self.method_DNA2RNA, self.cdt_record, "DNA_to_convert", "RNA")
-
-        # A pipeline which reverses DNA, then turns it into RNA.
-        self.pipeline_revRNA = self.make_first_pipeline("DNA to reversed RNA",
-            "a pipeline to reverse DNA and translate it to RNA")
-        self.create_linear_pipeline(self.pipeline_revRNA, [self.method_reverse, self.method_DNA2RNA], "lab data", 
-                                    "RNA'd lab data")
-        self.pipeline_revRNA.create_outputs()
-
-        # Separator to print between Pipeline executions, to make viewing logs easier.
-        self.sep = " "*80 + "\n" + "*"*80 + "\n" + " "*80 + "\n"
-
-        # Figure out the MD5 of the output file created when the complement method
-        # is run on Alice's data, so we can check it later.
-        tmpdir = tempfile.mkdtemp()
-        outfile = os.path.join(tmpdir, "output")
-        self.method_complement.invoke_code(tmpdir, [self.datafile.name], [outfile])
-        time.sleep(1)
-        self.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
-        shutil.rmtree(tmpdir)
+        tools.create_sandbox_testing_tools_environment(self)
 
     def tearDown(self):
-        clean_files()
-        os.remove(self.datafile.name)
+        tools.destroy_sandbox_testing_tools_environment(self)
+
+
+class ExecuteTestsRM(TransactionTestCase):
+    fixtures = ["initial_data"]
+
+    def setUp(self):
+        tools.create_sequence_manipulation_environment(self)
+
+    def tearDown(self):
+        tools.destroy_sequence_manipulation_environment(self)
 
     def test_execute_pipeline_spaces_in_dataset_name(self):
         """
         You should be allowed to have spaces in the name of your dataset.
         """
-        coderev = self.make_first_revision("test",
+        coderev = tools.make_first_revision("test",
                 "a script for testing purposes", "test.sh",
                 """#!/bin/bash
                 cat "$1" > "$2"
                 """)
-        method = self.make_first_method("test", "a test method", coderev)
-        self.simple_method_io(method, self.cdt_record,
+        method = tools.make_first_method("test", "a test method", coderev)
+        tools.simple_method_io(method, self.cdt_record,
                 "input name with spaces", "more spaces")
-        pipeline = self.make_first_pipeline("test", "a test pipeline")
-        self.create_linear_pipeline(pipeline, [method], "in data", "out data")
+        pipeline = tools.make_first_pipeline("test", "a test pipeline")
+        tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
         pipeline.create_outputs()
         
         sandbox = Sandbox(self.user_alice, pipeline, [self.symds_labdata])
         sandbox.execute_pipeline()
         runstep = sandbox.run.runsteps.first()
         execlog = runstep.log
-        print(execlog.methodoutput.error_log.read())
+        log_text = execlog.methodoutput.error_log.read()
         self.assertEqual(runstep.successful_execution(), True)
         self.assertEqual(execlog.missing_outputs(), [])
         self.assertEqual(execlog.methodoutput.return_code, 0)
+        self.assertSequenceEqual("", log_text)
 
     def test_execute_pipeline_run(self):
         """
@@ -415,6 +85,7 @@ class ExecuteTestsRM(UtilityMethods):
         Check the coherence of a RunStep created when a Pipeline is executed the first time.
         """
         run = self.sandbox_complement.execute_pipeline()
+        # sandbox_complement has only one step, so this is OK.
         runstep = run.runsteps.first()
 
         self.assertEqual(runstep.run, run)
@@ -432,7 +103,7 @@ class ExecuteTestsRM(UtilityMethods):
         Test that the content checks, which take place as part of Pipeline
         execution, pass in the ordinary Pipeline execution case.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
@@ -450,13 +121,12 @@ class ExecuteTestsRM(UtilityMethods):
         Test the integrity of a SymbolicDataset output by a PipelineStep in
         the middle of a Pipeline.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
         ds = runstep.outputs.first()
 
-        sys.stderr.write(self.sep)
 
         self.assertEqual(symds.MD5_checksum, self.labdata_compd_md5)
         self.assertEqual(symds.dataset, ds)
@@ -474,7 +144,7 @@ class ExecuteTestsRM(UtilityMethods):
         Check the coherence of a RunStep's ExecRecord's ExecRecordOut, created
         when a Pipeline is executed the first time.
         """
-        pipelinestep = self.pipeline_complement.steps.first()
+        pipelinestep = self.pipeline_complement.steps.first() # 1 step
         run = self.sandbox_complement.execute_pipeline()
         runstep = run.runsteps.first()
         symds_out = runstep.outputs.first().symbolicdataset
@@ -488,13 +158,14 @@ class ExecuteTestsRM(UtilityMethods):
         self.assertEqual(execrecordout.generic_output.definite, pipelinestep.transformation.outputs.first())
         self.assertEqual(execrecordout.has_data(), True)
         self.assertEqual(execrecordout.is_OK(), True)
+        self.assertNotEqual(None, execlog)
 
     def test_execute_pipeline_runstep_execrecord(self):
         """
         Check the coherence of a RunStep's ExecRecord, created when a Pipeline
         is executed the first time.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.sandbox_complement.execute_pipeline() # 1 step
         runstep = run.runsteps.first()
         execlog = runstep.log
         execrecord = runstep.execrecord
@@ -541,7 +212,6 @@ class ExecuteTestsRM(UtilityMethods):
 
         sandbox = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
         sandbox.execute_pipeline()
-        sys.stderr.write(self.sep)
         self.sandbox_complement.execute_pipeline()
 
         step1 = sandbox.run.runsteps.first()
@@ -563,8 +233,8 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox_reverse.execute_pipeline()
         sandbox_revcomp.execute_pipeline()
 
-        step1 = sandbox_reverse.run.runsteps.first()
-        step2 = sandbox_revcomp.run.runsteps.first()
+        step1 = sandbox_reverse.run.runsteps.first() # 1 step
+        step2 = sandbox_revcomp.run.runsteps.get(pipelinestep__step_num=1)
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
@@ -636,13 +306,14 @@ class ExecuteTestsRM(UtilityMethods):
         A Pipeline which indicates one of its intermediate outputs should not be kept,
         should not create any datasets for that output.
         """
-        step = self.pipeline_revcomp_v2.steps.first()
+        step = self.pipeline_revcomp_v2.steps.get(step_num=1)
         sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
-        runstep = sandbox.run.runsteps.first()
+        runstep = sandbox.run.runsteps.get(pipelinestep__step_num=1)
         output = runstep.execrecord.execrecordouts.first().symbolicdataset
         self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
         self.assertEqual(output.has_data(), False)
+        self.assertNotEqual(None, step)
 
     def test_recover_intermediate_dataset(self):
         """
@@ -651,8 +322,8 @@ class ExecuteTestsRM(UtilityMethods):
         # Don't keep the intermediate or final output.
         sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
         sandbox.execute_pipeline()
-        steps = sandbox.run.runsteps.all()
-        steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
+        # steps = sandbox.run.runsteps.all()
+        # steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
 
         # This time we need the final output - that means we have to recover the intermediate
         # output.
@@ -660,62 +331,17 @@ class ExecuteTestsRM(UtilityMethods):
         sandbox2.execute_pipeline()
 
 
-class BadRunTests(UtilityMethods):
+class BadRunTests(TransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
-        super(BadRunTests, self).setUp()
-
-        # A guy who doesn't know what he is doing.
-        # May 14, 2014: dag, yo -- RL
-        # May 20, 2014: he's doing his best, man -- RL
-        self.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
-        self.user_grandpa.save()
-
-        # A code resource, method, and pipeline which are empty.
-        self.coderev_faulty = self.make_first_revision("faulty",
-            "a script...?",
-            "faulty.sh", "")
-        self.method_faulty = self.make_first_method("faulty",
-                "a method to... uh...",
-                self.coderev_faulty)
-        self.method_faulty.clean()
-        self.simple_method_io(self.method_faulty, self.cdt_string,
-                "strings", "i don't know")
-        self.pipeline_faulty = self.make_first_pipeline("faulty pipeline",
-            "a pipeline to do nothing")
-        self.create_linear_pipeline(self.pipeline_faulty,
-            [self.method_faulty, self.method_noop], "data", "the abyss")
-        self.pipeline_faulty.create_outputs()
-
-        # A code resource, method, and pipeline which fail.
-        self.coderev_fubar = self.make_first_revision("fubar", "a script which always fails",
-            "fubar.sh", "#!/bin/bash\nexit 1")
-        self.method_fubar = self.make_first_method("fubar", "a method which always fails", self.coderev_fubar)
-        self.method_fubar.clean()
-        self.simple_method_io(self.method_fubar, self.cdt_string, "strings", "broken strings")
-        self.pipeline_fubar = self.make_first_pipeline("fubar pipeline", "a pipeline which always fails")
-        self.create_linear_pipeline(self.pipeline_fubar,
-            [self.method_noop, self.method_fubar, self.method_noop], "indata", "outdata")
-        self.pipeline_fubar.create_outputs()
-
-        # Some data to run through the faulty pipelines.
-        self.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
-        self.grandpa_datafile.write("word\n")
-        for line in range(20):
-            i = random.randint(1,99171)
-            self.grandpa_datafile.write("{}\n".format(i))
-        self.grandpa_datafile.close()
-        self.symds_grandpa = SymbolicDataset.create_SD(self.grandpa_datafile.name,
-                                                       user=self.user_grandpa, cdt=self.cdt_string, make_dataset=True,
-                                                       name="numbers", description="numbers which are actually strings")
-        self.symds_grandpa.clean()
+        tools.create_grandpa_sandbox_environment(self)
 
     def tearDown(self):
-        super(BadRunTests, self).tearDown()
-        os.remove(self.grandpa_datafile.name)
-        clean_files()
+        tools.destroy_grandpa_sandbox_environment(self)
 
     def test_code_bad_execution(self):
         """
@@ -752,41 +378,32 @@ class BadRunTests(UtilityMethods):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
 
 
-class FindSDTests(UtilityMethods):
+class FindSDTests(TransactionTestCase):
     """
     Tests for first_generator_of_SD.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
-        super(FindSDTests, self).setUp()
+        tools.create_word_reversal_environment(self)
 
         self.setup_simple_pipeline()
         self.setup_twostep_pipeline()
         self.setup_nested_pipeline()
 
     def tearDown(self):
-        super(FindSDTests, self).tearDown()
-        clean_files()
-        os.remove(self.string_datafile.name)
-        os.remove(self.words_datafile.name)
-
-    def make_custom_wire(self, cable):
-        source_cdt = cable.source.structure.compounddatatype
-        dest_cdt = cable.dest.structure.compounddatatype
-        cable.custom_wires.create(source_pin=source_cdt.members.first(), 
-            dest_pin=dest_cdt.members.last())
-        cable.custom_wires.create(source_pin=source_cdt.members.last(), 
-            dest_pin=dest_cdt.members.first())
+        tools.destroy_word_reversal_environment(self)
 
     def setup_nested_pipeline(self):
         # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_nested = self.make_first_pipeline("nested pipeline",
+        self.pipeline_nested = tools.make_first_pipeline("nested pipeline",
             "a pipeline with a sub-pipeline")
 
         transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
-        self.create_linear_pipeline(self.pipeline_nested,
+        tools.create_linear_pipeline(self.pipeline_nested,
             transforms, "data", "unchanged data")
-        cable = self.pipeline_nested.steps.last().cables_in.first()
-        self.make_custom_wire(cable)
+        cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
+        tools.make_crisscross_cable(cable)
         self.pipeline_nested.create_outputs()
         self.pipeline_nested.complete_clean()
     
@@ -798,45 +415,14 @@ class FindSDTests(UtilityMethods):
                         |   reverse   |            |     noop     |
                         |_____________|            |______________|
         """
-        # A code resource which reverses a file.
-        self.coderev_reverse = self.make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
-            ("#!/usr/bin/env python\n"
-             "import sys\n"
-             "import csv\n"
-             "with open(sys.argv[1]) as infile, open(sys.argv[2], 'w') as outfile:\n"
-             "  reader = csv.reader(infile)\n"
-             "  writer = csv.writer(outfile)\n"
-             "  for row in reader:\n"
-             "      writer.writerow([row[1][::-1], row[0][::-1]])\n"))
-
-        # A CDT with two columns, word and drow.
-        self.cdt_words = CompoundDatatype()
-        self.cdt_words.save()
-        self.cdt_words.members.create(datatype=self.datatype_str, column_name="word", column_idx=1)
-        self.cdt_words.members.create(datatype=self.datatype_str, column_name="drow", column_idx=2)
-
-        # A second CDT, much like the first :]
-        self.cdt_backwords = CompoundDatatype()
-        self.cdt_backwords.save()
-        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="drow", column_idx=1)
-        self.cdt_backwords.members.create(datatype=self.datatype_str, column_name="word", column_idx=2)
-
-        # Methods for the reverse CRR, and noop CRR with backwords CDT.
-        self.method_reverse = self.make_first_method("string reverse", "a method to reverse strings",
-                                                     self.coderev_reverse)
-        self.simple_method_io(self.method_reverse, self.cdt_words, "words_to_reverse", "reversed_words")
-        self.method_noop_backwords = self.make_first_method("noop", "a method to do nothing on two columns",
-                                                            self.coderev_noop)
-        self.simple_method_io(self.method_noop_backwords, self.cdt_backwords, "backwords", "more_backwords")
-
         # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_twostep = self.make_first_pipeline("two-step pipeline",
+        self.pipeline_twostep = tools.make_first_pipeline("two-step pipeline",
                                                          "a two-step pipeline with custom cable wires at each step")
         self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords, dataset_name="words_to_reverse",
                                            dataset_idx=1)
 
         methods = [self.method_reverse, self.method_noop_backwords]
-        for i, method in enumerate(methods):
+        for i, _method in enumerate(methods):
             step = self.pipeline_twostep.steps.create(transformation=methods[i], step_num=i+1)
             if i == 0:
                 source = self.pipeline_twostep.inputs.first()
@@ -845,7 +431,7 @@ class FindSDTests(UtilityMethods):
             cable = step.cables_in.create(source_step = i, 
                 source = source,
                 dest = methods[i].inputs.first())
-            self.make_custom_wire(cable)
+            tools.make_crisscross_cable(cable)
 
         cable = self.pipeline_twostep.create_outcable(output_name = "reversed_words",
             output_idx = 1,
@@ -854,34 +440,14 @@ class FindSDTests(UtilityMethods):
 
         self.pipeline_twostep.create_outputs()
         self.pipeline_twostep.complete_clean()
-
-        # Some data to run through the two-step pipeline.
-        self.words_datafile = tempfile.NamedTemporaryFile(delete=False)
-        writer = csv.writer(self.words_datafile)
-        writer.writerow(["drow", "word"])
-        for line in range(20):
-            i = random.randint(1,99171)
-            sed = Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
-                        stdout=PIPE)
-            word, _ = sed.communicate()
-            word = word.strip()
-            writer.writerow([word[::-1], word])
-        self.words_datafile.close()
-
-        self.symds_backwords = SymbolicDataset.create_SD(self.words_datafile.name,
-                                                         user=self.user_bob, cdt=self.cdt_backwords, make_dataset=True,
-                                                         name="backwords", description="random reversed words")
     
     def setup_simple_pipeline(self):
         # A simple, one-step pipeline, which does nothing.
-        self.pipeline_noop = self.make_first_pipeline("simple pipeline",
+        self.pipeline_noop = tools.make_first_pipeline("simple pipeline",
             "a simple, one-step pipeline")
-        self.create_linear_pipeline(self.pipeline_noop,
+        tools.create_linear_pipeline(self.pipeline_noop,
             [self.method_noop], "lab data", "complemented lab data")
         self.pipeline_noop.create_outputs()
-
-        # Some data to run through the simple pipeline.
-        self.make_words_symDS()
 
     def test_find_symds_pipeline_input(self):
         """
@@ -941,7 +507,7 @@ class FindSDTests(UtilityMethods):
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
-        runcable = sandbox.run.runsteps.last().RSICs.first()
+        runcable = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
 
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
@@ -991,24 +557,25 @@ class FindSDTests(UtilityMethods):
         self.assertEqual(gen, cable.PSIC)
 
 
-class RawTests(UtilityMethods):
+class RawTests(SandboxRMTransactionTestCase):
 
     def setUp(self):
         super(RawTests, self).setUp()
 
-        self.pipeline_raw = self.make_first_pipeline("raw noop", "a pipeline to do nothing to raw data")
-        self.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
+        self.pipeline_raw = tools.make_first_pipeline("raw noop", "a pipeline to do nothing to raw data")
+        tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words", user=self.user_bob,
-                                                   cdt=None, make_dataset=True, name="raw", description="some raw data")
+        self.symds_raw = SymbolicDataset.create_SD(
+            "/usr/share/dict/words", user=self.user_bob,
+            cdt=None, make_dataset=True, name="raw", description="some raw data")
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
         sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw])
         sandbox.execute_pipeline()
 
-    def test_execute_pipeline_raw(self):
+    def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
         Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()

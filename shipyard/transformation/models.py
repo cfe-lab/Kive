@@ -7,7 +7,7 @@ Transformation.
 from __future__ import unicode_literals
 
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
@@ -18,6 +18,7 @@ import metadata.models
 from constants import maxlengths
 
 import itertools
+
 
 @python_2_unicode_compatible
 class TransformationFamily(metadata.models.AccessControl):
@@ -46,6 +47,7 @@ class TransformationFamily(metadata.models.AccessControl):
 
     class Meta:
         abstract = True
+        ordering = ('name', )
 
     @classmethod
     @transaction.atomic
@@ -293,7 +295,7 @@ class TransformationXput(models.Model):
 
     def is_raw(self):
         """True if this Xput is raw, false otherwise."""
-        return not hasattr(self, "structure")
+        return not self.has_structure
 
     def get_cdt(self):
         """Accessor that returns the CDT of this xput (and None if it is raw)."""
@@ -323,7 +325,12 @@ class TransformationXput(models.Model):
 
     @property
     def has_structure(self):
-        return hasattr(self, "structure")
+        # return hasattr(self, "structure")
+        try:
+            self.structure
+        except ObjectDoesNotExist:
+            return False
+        return True
 
     @transaction.atomic
     def add_structure(self, compounddatatype, min_row, max_row):
@@ -415,9 +422,9 @@ class TransformationInput(TransformationXput):
 
     # Input index on the transformation.
     dataset_idx = models.PositiveIntegerField(
-            "input index",
-            validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this input")
+        "input index",
+        validators=[MinValueValidator(1)],
+        help_text="Index defining the relative order of this input")
 
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index
@@ -439,9 +446,9 @@ class TransformationOutput(TransformationXput):
         help_text="Name for output as an alternative to index")
 
     dataset_idx = models.PositiveIntegerField(
-            "output index",
-            validators=[MinValueValidator(1)],
-            help_text="Index defining the relative order of this output")
+        "output index",
+        validators=[MinValueValidator(1)],
+        help_text="Index defining the relative order of this output")
 
     class Meta:
         # A transformation cannot have multiple definitions for column name or column index

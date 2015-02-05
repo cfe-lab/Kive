@@ -29,9 +29,6 @@ class Stopwatch(models.Model):
         if self.start_time is None and self.end_time is not None:
             raise ValidationError('Stopwatch "{}" does not have a start time but it has an end time'.format(self))
 
-        if self.end_time is not None and self.start_time > self.end_time:
-            raise ValidationError('Stopwatch "{}" start time is later than its end time'.format(self))
-
     def has_started(self):
         """
         Checks whether this Stopwatch object has actually started.

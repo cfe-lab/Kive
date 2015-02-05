@@ -2,7 +2,8 @@
 *.pyc
 # Ignore the database file
 db/shipyard.db
-# Don't get the settings.py file that has been customized
+# Don't get the settings.py or hostfile files that have been customized
+shipyard/shipyard/hostfile
 shipyard/shipyard/settings.py
 # Ignore the temporary stuff created during testing
 shipyard/CodeResources
@@ -10,13 +11,12 @@ shipyard/VerificationScripts
 shipyard/Datasets
 shipyard/Logs
 shipyard/shipyard.log*
-# Don't get the customized version of the script that nukes the DB
-shipyard/nukeDB.expect
+shipyard/testreport.xml
 
 #Generated files and backup files
 *~
 doc/*.aux
 doc/*.dvi
 doc/*.pdf
-doc/*.log
+*.log
 /.idea/

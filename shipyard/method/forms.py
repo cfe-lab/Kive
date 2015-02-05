@@ -20,7 +20,8 @@ class CodeResourceMinimalForm (forms.Form):
     revision_name = forms.CharField(max_length=255)
     revision_desc = forms.CharField(max_length=255)
 
-class CodeResourcePrototypeForm (forms.Form):
+
+class CodeResourcePrototypeForm(forms.Form):
     """
     A form for submitting the first version of a CodeResource, which
     we refer to as the "prototype".  We require two sets of names and
@@ -70,7 +71,7 @@ class CodeResourcePrototypeForm (forms.Form):
         self.fields["groups_allowed"].choices = [(g.id, g.name) for g in Group.objects.all()]
 
 
-class CodeResourceRevisionForm (forms.Form):
+class CodeResourceRevisionForm(forms.Form):
 
     # Stuff that goes directly into the CodeResourceRevision.
     content_file = forms.FileField(
@@ -169,13 +170,28 @@ class CodeResourceDependencyForm (forms.Form):
         fields = ('coderesource', 'revisions', 'depPath', 'depFileName')
 
 
-class MethodForm (forms.ModelForm):
+class MethodForm(forms.ModelForm):
     coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
                                                [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')])
     revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
 
-    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
-    shared = forms.BooleanField(help_text="Share with all users?", required=False)
+    users_allowed = forms.MultipleChoiceField(
+        label="Users allowed",
+        help_text="Which users are allowed access to this resource?",
+        choices=[(u.id, u.username) for u in User.objects.all()],
+        required=False
+    )
+
+    groups_allowed = forms.MultipleChoiceField(
+        label="Groups allowed",
+        help_text="Which groups are allowed access to this resource?",
+        choices=[(g.id, g.name) for g in Group.objects.all()],
+        required=False
+    )
+
+    # We override the threads field.
+    threads = forms.IntegerField(min_value=1, initial=1,
+                                 help_text="Number of threads used during execution")
 
     def __init__(self, *args, **kwargs):
         super(MethodForm, self).__init__(*args, **kwargs)
@@ -194,7 +210,7 @@ class MethodForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'deterministic')
+        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
         widgets = {
             'revision_desc': forms.Textarea(attrs={'rows': 5,
                                                    'cols': 30,
@@ -204,8 +220,23 @@ class MethodForm (forms.ModelForm):
 
 class MethodReviseForm (forms.ModelForm):
     """Revise an existing method.  No need to specify MethodFamily."""
-    # FIXME this should also be deprecated as in CodeResourcePrototypeForm.
-    shared = forms.BooleanField(help_text="Share with all users?", required=False)
+    users_allowed = forms.MultipleChoiceField(
+        label="Users allowed",
+        help_text="Which users are allowed access to this resource?",
+        choices=[(u.id, u.username) for u in User.objects.all()],
+        required=False
+    )
+
+    groups_allowed = forms.MultipleChoiceField(
+        label="Groups allowed",
+        help_text="Which groups are allowed access to this resource?",
+        choices=[(g.id, g.name) for g in Group.objects.all()],
+        required=False
+    )
+
+    # We override the threads field.
+    threads = forms.IntegerField(min_value=1, initial=1,
+                                 help_text="Number of threads used during execution")
 
     def __init__(self, *args, **kwargs):
         super(MethodReviseForm, self).__init__(*args, **kwargs)
@@ -221,7 +252,7 @@ class MethodReviseForm (forms.ModelForm):
 
     class Meta:
         model = Method
-        fields = ('revisions', 'revision_name', 'revision_desc', 'deterministic')
+        fields = ('revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
 
 
 class TransformationXputForm (forms.ModelForm):
@@ -246,6 +277,7 @@ class XputStructureForm (forms.ModelForm):
     class Meta:
         model = XputStructure
         fields = ('compounddatatype', 'min_row', 'max_row')
+
 
 class MethodFamilyForm (forms.ModelForm):
     """Form to create a new MethodFamily"""

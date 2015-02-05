@@ -10,7 +10,7 @@ from __future__ import unicode_literals
 from django.db import models, transaction
 from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -49,6 +49,9 @@ class CodeResource(metadata.models.AccessControl):
                                                    message="Invalid code resource filename"),
                                 ])
     description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    
+    class Meta:
+        ordering = ('name',)
 
     @property
     def num_revisions(self):
@@ -224,11 +227,22 @@ class CodeResourceRevision(metadata.models.AccessControl):
         dependencies.  Finally, if there is a file specified, fill in
         the MD5 checksum.
         """
+        # Get the initial state of content_file, so we can preserve it afterwards.
+        initially_closed = self.content_file.closed
+
         # CodeResource can be a collection of dependencies and not contain
         # a file - in this case, MD5 has no meaning and shouldn't exist
         try:
             md5gen = hashlib.md5()
+            # print("Before reading, self.content_file is open? {}".format(not self.content_file.closed))
+            # print("Before reading, self.content_file.file is open? {}".format(not self.content_file.file.closed))
+            # print("self.content_file.file is {}".format(self.content_file.file))
+            # print("How about now, is self.content_file open? {}".format(not self.content_file.closed))
+            # print("")
             md5gen.update(self.content_file.read())
+            if initially_closed:
+                self.content_file.close()
+
             self.MD5_checksum = md5gen.hexdigest()
 
         except ValueError:
@@ -365,6 +379,15 @@ class Method(transformation.models.Transformation):
     Related to :model:`copperfish.MethodFamily`
     """
 
+    DETERMINISTIC = 1
+    REUSABLE = 2
+    NON_REUSABLE = 3
+    REUSABLE_CHOICES = (
+        (DETERMINISTIC, "deterministic"),
+        (REUSABLE, "reusable"),
+        (NON_REUSABLE, "non-reusable")
+    )
+
     family = models.ForeignKey("MethodFamily", related_name="members")
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
 
@@ -379,11 +402,25 @@ class Method(transformation.models.Transformation):
 
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision)
-    deterministic = models.BooleanField(
-        default=True,
-        help_text="Is the output of this method the same if you run it again "
-            "with the same inputs?")
+    reusable = models.PositiveSmallIntegerField(
+        choices=REUSABLE_CHOICES,
+        default=DETERMINISTIC,
+        help_text="""Is the output of this method the same if you run it again with the same inputs?
+
+deterministic: always exactly the same
+
+reusable: the same but with some insignificant differences (e.g., rows are shuffled)
+
+non-reusable: no -- there may be meaningful differences each time (e.g., timestamp)
+""")
     tainted = models.BooleanField(default=False, help_text="Is this Method broken?")
+
+    threads = models.PositiveIntegerField(
+        "Number of threads",
+        help_text="How many threads does this Method use during execution?",
+        default=1,
+        validators=[MinValueValidator(1)]
+    )
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
@@ -494,24 +531,27 @@ class Method(transformation.models.Transformation):
                         min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
                     ).save()
 
-    def find_compatible_ER(self, input_SDs):
+    def find_compatible_ERs(self, input_SDs):
         """
-        Given a set of input SDs, find an ER that can be reused given these inputs.
-        A compatible ER may have to be filled in.
+        Given a set of input SDs, find any ExecRecords that use these inputs.
+
+        Note that this ExecRecord may be a failure, which the calling function
+        would then handle appropriately.
         """
-        # For pipelinesteps featuring this method
+        if self.reusable == Method.NON_REUSABLE:
+            return []
+
+        # For pipelinesteps featuring this method....
+        candidates = []
         for possible_PS in self.pipelinesteps.all():
 
-            # For linked runsteps which did not *completely* reuse an ER
+            # For linked runsteps which did not *completely* reuse an ER....
             for possible_RS in possible_PS.pipelinestep_instances.filter(
                     reused=False,
                     execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
 
-                # Reject RunStep if its outputs are not OK.
-                if not candidate_ER.outputs_OK() or candidate_ER.has_ever_failed(): continue
-
-                # Candidate ER is OK (no bad CCLs or ICLs), so check if inputs match
+                # Check if inputs match.
                 ER_matches = True
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.definite.dataset_idx
@@ -520,11 +560,10 @@ class Method(transformation.models.Transformation):
                         break
                         
                 if ER_matches:
-                    # All ERIs match input SDs, so commit to candidate ER
-                    return candidate_ER
-    
-        # No compatible ExecRecords found.
-        return None
+                    # All ERIs match input SDs, so commit to candidate ER.
+                    candidates.append(candidate_ER)
+
+        return candidates
 
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams
@@ -534,7 +573,7 @@ class Method(transformation.models.Transformation):
         @param dest_streams: a sequence of streams to redirect output to
         """
         for line in source_stream:
-            self.logger.debug('%s: %s', source_name, line[:-1]) #drops \n
+            self.logger.debug('%s: %s', source_name, line.rstrip()) #drops \n
 
             for stream in dest_streams:
                 stream.write(line)
@@ -593,7 +632,7 @@ class Method(transformation.models.Transformation):
             out_thread.join()
             err_thread.join()
 
-            returncode = method_popen.poll()
+            returncode = method_popen.wait()
 
         for stream in output_streams + error_streams:
             stream.flush()
@@ -605,6 +644,9 @@ class Method(transformation.models.Transformation):
             # TODO: I'm not sure how this is going to handle huge output, 
             # it would be better to update the logs as we go.
             if details_to_fill:
+                self.logger.debug('return code is %s for %r.',
+                                  returncode,
+                                  details_to_fill)
                 details_to_fill.return_code = returncode
                 outlog = output_streams[0]
                 errlog = error_streams[0]

@@ -23,6 +23,8 @@ def pipelines(request):
     """
     t = loader.get_template('pipeline/pipelines.html')
     families = PipelineFamily.objects.all()
+    pipelines = Pipeline.objects.all()
+
     #pipelines = Pipeline.objects.filter(revision_parent=None)
     c = Context({'families': families})
     c.update(csrf(request))
@@ -107,3 +109,4 @@ def pipeline_exec(request):
     c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+

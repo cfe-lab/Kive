@@ -1,213 +1,257 @@
 """
 Unit tests for Shipyard metadata models.
 """
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
 from metadata.models import *
 from method.models import CodeResourceRevision
-from archive.models import Dataset
+from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
+from datachecking.models import VerificationLog
 
 from constants import datatypes, CDTs
 
 samplecode_path = "../samplecode"
 
 
-class MetadataTestSetup(TestCase):
+def create_metadata_test_environment(case):
+    """Setup default database state from which to perform unit testing."""
+    # Load up the builtin Datatypes.
+    case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+    case.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+    case.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+    # Many tests use case.string_dt as a name for case.STR.
+    case.string_dt = case.STR
+
+    # Create Datatype "DNANucSeq" with a regexp basic constraint.
+    case.DNA_dt = Datatype(
+        name="DNANucSeq",
+        description="String consisting of ACGTacgt")
+    case.DNA_dt.save()
+    # DNA_dt is a restricted type of string
+    case.DNA_dt.restricts.add(case.string_dt)
+    case.DNA_dt.basic_constraints.create(
+        ruletype=BasicConstraint.REGEXP,
+        rule="^[ACGTacgt]*$")
+    case.DNA_dt.save()
+
+    # Similarly, create Datatype "RNANucSeq".
+    case.RNA_dt = Datatype(
+        name="RNANucSeq",
+        description="String consisting of ACGUacgu")
+    case.RNA_dt.save()
+    # RNA_dt is a restricted type of string
+    case.RNA_dt.restricts.add(case.string_dt)
+    case.RNA_dt.basic_constraints.create(
+        ruletype=BasicConstraint.REGEXP,
+        rule="^[ACGUacgu]*$")
+    case.RNA_dt.save()
+
+    # Define test_cdt as containing 3 members:
+    # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
+    case.test_cdt = CompoundDatatype()
+    case.test_cdt.save()
+
+    case.test_cdt.members.create(
+        datatype=case.string_dt,
+        column_name="label",
+        column_idx=1)
+    case.test_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="PBMCseq",
+        column_idx=2)
+    case.test_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="PLAseq",
+        column_idx=3)
+    case.test_cdt.full_clean()
+    case.test_cdt.save()
+
+    # Define DNAinput_cdt (1 member)
+    case.DNAinput_cdt = CompoundDatatype()
+    case.DNAinput_cdt.save()
+    case.DNAinput_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="SeqToComplement",
+        column_idx=1)
+    case.DNAinput_cdt.full_clean()
+    case.DNAinput_cdt.save()
+
+    # Define DNAoutput_cdt (1 member)
+    case.DNAoutput_cdt = CompoundDatatype()
+    case.DNAoutput_cdt.save()
+    case.DNAoutput_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="ComplementedSeq",
+        column_idx=1)
+    case.DNAoutput_cdt.full_clean()
+    case.DNAoutput_cdt.save()
+
+    # Define RNAinput_cdt (1 column)
+    case.RNAinput_cdt = CompoundDatatype()
+    case.RNAinput_cdt.save()
+    case.RNAinput_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="SeqToComplement",
+        column_idx=1)
+    case.RNAinput_cdt.full_clean()
+    case.RNAinput_cdt.save()
+
+    # Define RNAoutput_cdt (1 column)
+    case.RNAoutput_cdt = CompoundDatatype()
+    case.RNAoutput_cdt.save()
+    case.RNAoutput_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="ComplementedSeq",
+        column_idx=1)
+    case.RNAoutput_cdt.full_clean()
+    case.RNAoutput_cdt.save()
+
+    ####
+    # Everything above this point is used in metadata.tests.
+    # This next bit is used in method.tests.
+
+    # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
+    case.tuple_cdt = CompoundDatatype()
+    case.tuple_cdt.save()
+    case.tuple_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
+    case.tuple_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+
+    # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
+    case.singlet_cdt = CompoundDatatype()
+    case.singlet_cdt.save()
+    case.singlet_cdt.members.create(
+        datatype=case.string_dt, column_name="k", column_idx=1)
+
+    case.triplet_cdt = CompoundDatatype()
+    case.triplet_cdt.save()
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="a", column_idx=1)
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="b", column_idx=2)
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="c", column_idx=3)
+
+    ####
+    # This next bit is used for pipeline.tests.
+
+    # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
+    case.triplet_squares_cdt = CompoundDatatype()
+    case.triplet_squares_cdt.save()
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="a^2", column_idx=1)
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="b^2", column_idx=2)
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="c^2", column_idx=3)
+
+    # A CDT with mixed Datatypes
+    case.mix_triplet_cdt = CompoundDatatype()
+    case.mix_triplet_cdt.save()
+    case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol1", column_idx=1)
+    case.mix_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="DNACol2", column_idx=2)
+    case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol3", column_idx=3)
+
+    # Define CDT "doublet_cdt" with 2 members for use as an input/output
+    case.doublet_cdt = CompoundDatatype()
+    case.doublet_cdt.save()
+    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
+    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+
+    ####
+    # Stuff from this point on is used in librarian and archive
+    # testing.
+
+    # October 15: more CDTs.
+    case.DNA_triplet_cdt = CompoundDatatype()
+    case.DNA_triplet_cdt.save()
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="a", column_idx=1)
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="b", column_idx=2)
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="c", column_idx=3)
+
+    case.DNA_doublet_cdt = CompoundDatatype()
+    case.DNA_doublet_cdt.save()
+    case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="x", column_idx=1)
+    case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="y", column_idx=2)
+
+    # Define a user.  This was previously in librarian/tests.py,
+    # but we put it here now so all tests can use it.
+    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    case.myUser.save()
+
+
+def clean_up_all_files():
+    """
+    Delete all files that have been put into the database as FileFields.
+    """
+    for crr in CodeResourceRevision.objects.all():
+        # Remember that this can be empty.
+        # if crr.content_file != None:
+        #     crr.content_file.delete()
+        # Weirdly, if crr.content_file == None,
+        # it still entered the above.  This seems to be a bug
+        # in Django!
+        if crr.coderesource.filename != "":
+            crr.content_file.close()
+            crr.content_file.delete()
+
+        crr.delete()
+
+    # Also clear all datasets.  This was previously in librarian.tests
+    # but we move it here.
+    for dataset in Dataset.objects.all():
+        dataset.dataset_file.close()
+        dataset.dataset_file.delete()
+        dataset.delete()
+
+    for mo in MethodOutput.objects.all():
+        mo.output_log.close()
+        mo.output_log.delete()
+        mo.error_log.close()
+        mo.error_log.delete()
+        mo.delete()
+
+    for vl in VerificationLog.objects.all():
+        vl.output_log.close()
+        vl.output_log.delete()
+        vl.error_log.close()
+        vl.error_log.delete()
+        vl.delete()
+
+
+class MetadataTestCase(TestCase):
     """
     Set up a database state for unit testing.
     
     Other test classes that require this state can extend this one.
     """
+    fixtures = ["initial_data"]
 
     def setUp(self):
-        """Setup default database state from which to perform unit testing."""
-        # Load up the builtin Datatypes.
-        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
-        self.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
-        self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
-        self.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
-
-        # Many tests use self.string_dt as a name for self.STR.
-        self.string_dt = self.STR
-
-        # Create Datatype "DNANucSeq" with a regexp basic constraint.
-        self.DNA_dt = Datatype(
-            name="DNANucSeq",
-            description="String consisting of ACGTacgt")
-        self.DNA_dt.save()
-        # DNA_dt is a restricted type of string
-        self.DNA_dt.restricts.add(self.string_dt)
-        self.DNA_dt.basic_constraints.create(
-            ruletype=BasicConstraint.REGEXP,
-            rule="^[ACGTacgt]*$")
-        self.DNA_dt.save()
-
-        # Similarly, create Datatype "RNANucSeq".
-        self.RNA_dt = Datatype(
-            name="RNANucSeq",
-            description="String consisting of ACGUacgu")
-        self.RNA_dt.save()
-        # RNA_dt is a restricted type of string
-        self.RNA_dt.restricts.add(self.string_dt)
-        self.RNA_dt.basic_constraints.create(
-            ruletype=BasicConstraint.REGEXP,
-            rule="^[ACGUacgu]*$")
-        self.RNA_dt.save()
-
-        # Define test_cdt as containing 3 members:
-        # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
-        self.test_cdt = CompoundDatatype()
-        self.test_cdt.save()
-
-        self.test_cdt.members.create(
-            datatype=self.string_dt,
-            column_name="label",
-            column_idx=1)
-        self.test_cdt.members.create(
-            datatype=self.DNA_dt,
-            column_name="PBMCseq",
-            column_idx=2)
-        self.test_cdt.members.create(
-            datatype=self.RNA_dt,
-            column_name="PLAseq",
-            column_idx=3)
-        self.test_cdt.full_clean()
-        self.test_cdt.save()
-
-        # Define DNAinput_cdt (1 member)
-        self.DNAinput_cdt = CompoundDatatype()
-        self.DNAinput_cdt.save()
-        self.DNAinput_cdt.members.create(
-            datatype=self.DNA_dt,
-            column_name="SeqToComplement",
-            column_idx=1)
-        self.DNAinput_cdt.full_clean()
-        self.DNAinput_cdt.save()
-
-        # Define DNAoutput_cdt (1 member)
-        self.DNAoutput_cdt = CompoundDatatype()
-        self.DNAoutput_cdt.save()
-        self.DNAoutput_cdt.members.create(
-            datatype=self.DNA_dt,
-            column_name="ComplementedSeq",
-            column_idx=1)
-        self.DNAoutput_cdt.full_clean()
-        self.DNAoutput_cdt.save()
-
-        # Define RNAinput_cdt (1 column)
-        self.RNAinput_cdt = CompoundDatatype()
-        self.RNAinput_cdt.save()
-        self.RNAinput_cdt.members.create(
-            datatype=self.RNA_dt,
-            column_name="SeqToComplement",
-            column_idx=1)
-        self.RNAinput_cdt.full_clean()
-        self.RNAinput_cdt.save()
-
-        # Define RNAoutput_cdt (1 column)
-        self.RNAoutput_cdt = CompoundDatatype()
-        self.RNAoutput_cdt.save()
-        self.RNAoutput_cdt.members.create(
-            datatype=self.RNA_dt,
-            column_name="ComplementedSeq",
-            column_idx=1)
-        self.RNAoutput_cdt.full_clean()
-        self.RNAoutput_cdt.save()
-
-        ####
-        # Everything above this point is used in metadata.tests.
-        # This next bit is used in method.tests.
-
-        # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
-        self.tuple_cdt = CompoundDatatype()
-        self.tuple_cdt.save()
-        self.tuple_cdt.members.create(datatype=self.string_dt, column_name="x", column_idx=1)
-        self.tuple_cdt.members.create(datatype=self.string_dt, column_name="y", column_idx=2)
-
-        # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
-        self.singlet_cdt = CompoundDatatype()
-        self.singlet_cdt.save()
-        self.singlet_cdt.members.create(
-            datatype=self.string_dt, column_name="k", column_idx=1)
-
-        self.triplet_cdt = CompoundDatatype()
-        self.triplet_cdt.save()
-        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="a", column_idx=1)
-        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="b", column_idx=2)
-        self.triplet_cdt.members.create(datatype=self.string_dt, column_name="c", column_idx=3)
-
-        ####
-        # This next bit is used for pipeline.tests.
-
-        # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
-        self.triplet_squares_cdt = CompoundDatatype()
-        self.triplet_squares_cdt.save()
-        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="a^2", column_idx=1)
-        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="b^2", column_idx=2)
-        self.triplet_squares_cdt.members.create(datatype=self.string_dt, column_name="c^2", column_idx=3)
-
-        # A CDT with mixed Datatypes
-        self.mix_triplet_cdt = CompoundDatatype()
-        self.mix_triplet_cdt.save()
-        self.mix_triplet_cdt.members.create(datatype=self.string_dt, column_name="StrCol1", column_idx=1)
-        self.mix_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="DNACol2", column_idx=2)
-        self.mix_triplet_cdt.members.create(datatype=self.string_dt, column_name="StrCol3", column_idx=3)
-
-        # Define CDT "doublet_cdt" with 2 members for use as an input/output
-        self.doublet_cdt = CompoundDatatype()
-        self.doublet_cdt.save()
-        self.doublet_cdt.members.create(datatype=self.string_dt, column_name="x", column_idx=1)
-        self.doublet_cdt.members.create(datatype=self.string_dt, column_name="y", column_idx=2)
-
-        #### 
-        # Stuff from this point on is used in librarian and archive
-        # testing.
-
-        # October 15: more CDTs.
-        self.DNA_triplet_cdt = CompoundDatatype()
-        self.DNA_triplet_cdt.save()
-        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="a", column_idx=1)
-        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="b", column_idx=2)
-        self.DNA_triplet_cdt.members.create(datatype=self.DNA_dt, column_name="c", column_idx=3)
-
-        self.DNA_doublet_cdt = CompoundDatatype()
-        self.DNA_doublet_cdt.save()
-        self.DNA_doublet_cdt.members.create(datatype=self.DNA_dt, column_name="x", column_idx=1)
-        self.DNA_doublet_cdt.members.create(datatype=self.DNA_dt, column_name="y", column_idx=2)
-
-        # Define a user.  This was previously in librarian/tests.py,
-        # but we put it here now so all tests can use it.
-        self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-        self.myUser.save()
+        create_metadata_test_environment(self)
 
     def tearDown(self):
-        """Delete any files that have been put into the database."""
-        for crr in CodeResourceRevision.objects.all():
-            # Remember that this can be empty.
-            # if crr.content_file != None:
-            #     crr.content_file.delete()
-            # Weirdly, if crr.content_file == None,
-            # it still entered the above.  This seems to be a bug
-            # in Django!
-            if crr.coderesource.filename != "":
-                crr.content_file.close()
-                crr.content_file.delete()
-
-        # Also clear all datasets.  This was previously in librarian.tests
-        # but we move it here.
-        for dataset in Dataset.objects.all():
-            dataset.dataset_file.close()
-            dataset.dataset_file.delete()
+        clean_up_all_files()
 
 
-class DatatypeTests(MetadataTestSetup):
+class MetadataTransactionTestCase(TransactionTestCase):
+    """
+    Set up a database state for unit testing.
+
+    Other test classes that require this state can extend this one.
+    """
+    fixtures = ["initial_data"]
+
+    def setUp(self):
+        create_metadata_test_environment(self)
+
+    def tearDown(self):
+        clean_up_all_files()
+
+
+class DatatypeTests(MetadataTestCase):
 
     def setUp(self):
         """Add some DTs used to check circular restrictions."""
-        super(DatatypeTests, self).setUp()
+        MetadataTestCase.setUp(self)
 
         # Datatypes used to test circular restrictions.
         self.dt_1 = Datatype(
@@ -614,7 +658,6 @@ class DatatypeTests(MetadataTestSetup):
     # New tests to check the new functionality in Datatype.clean()
     # that checks BasicConstraints, the prototype Dataset, etc.
 
-
     def __test_clean_restrict_same_builtin_multiply_good_h(self, builtin_type):
         """
         Helper for testing clean() on cases where a Datatype restricts several supertypes with the same builtin type.
@@ -794,7 +837,8 @@ class DatatypeTests(MetadataTestSetup):
         """
         wrong_CDT = CompoundDatatype()
         wrong_CDT.save()
-        wrong_CDT.members.create(datatype=self.STR, column_name="example", column_idx=1)
+        wrong_CDT.members.create(datatype=self.STR, column_name="example", column_idx=1,
+                                 blankable=True)
         wrong_CDT.members.create(datatype=self.BOOL, column_name="thisshouldbesomethingelse", column_idx=2)
         wrong_CDT.clean()
 
@@ -917,18 +961,21 @@ class DatatypeTests(MetadataTestSetup):
         constr_DT.restricts.add(builtin_type)
 
         counts = {}
+        bad_ruletypes = set()
         for curr_ruletype, curr_rule in rules:
             try:
                 counts[curr_ruletype] += 1
-                bad_ruletype = curr_ruletype
+                bad_ruletypes.add(curr_ruletype)
             except KeyError:
                 counts[curr_ruletype] = 1
             constr_DT.basic_constraints.create(ruletype=curr_ruletype, rule="{}".format(curr_rule))
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has {} constraints of type {}, but should have at most one'
-                                           .format(constr_DT, counts[bad_ruletype], bad_ruletype))),
-                                constr_DT.clean)
+        possible_matches = [re.escape('Datatype "{}" has {} constraints of type {}, but should have at most one'.
+                                      format(constr_DT, counts[x], x))
+                            for x in bad_ruletypes]
+        match_pattern = "|".join(possible_matches)
+
+        self.assertRaisesRegexp(ValidationError, match_pattern, constr_DT.clean)
 
     def test_clean_int_multiple_min_val_bad(self):
         """
@@ -1497,11 +1544,10 @@ class DatatypeTests(MetadataTestSetup):
                                 constr_DT.complete_clean)
 
 
-class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
+class DatatypeGetBuiltinTypeTests(MetadataTestCase):
     """
     Tests of the Datatype.get_builtin_type() function.
     """
-
     def test_on_builtins(self):
         """
         Testing on the built-in Shipyard types.
@@ -1659,7 +1705,7 @@ class DatatypeGetBuiltinTypeTests(MetadataTestSetup):
         self.assertEquals(my_DT.get_builtin_type(), self.BOOL)
 
 
-class DatatypeCheckBasicConstraints(MetadataTestSetup):
+class DatatypeCheckBasicConstraints(MetadataTestCase):
     """
     Tests of Datatype.check_basic_constraints().
     """
@@ -2032,7 +2078,7 @@ class DatatypeCheckBasicConstraints(MetadataTestSetup):
         """
         self.__test_regexp_h(self.BOOL, "True|TRUE|true|t|1", "True", passes_constraint=True)
 
-    def test_int_regexp_fail(self):
+    def test_bool_regexp_fail(self):
         """
         Test a Boolean against a REGEXP it doesn't satisfy.
         """
@@ -2299,21 +2345,27 @@ class DatatypeCheckBasicConstraints(MetadataTestSetup):
         self.assertEquals(set(my_DT.check_basic_constraints("False")), set([my_regexp, my_regexp2]))
 
 
-class CompoundDatatypeMemberTests(MetadataTestSetup):
+class CompoundDatatypeMemberTests(MetadataTestCase):
     def test_cdtMember_unicode(self):
         """
         Unicode of compoundDatatypeMember should return
         (column index, datatype name, column name)
         """
-        self.assertEqual(unicode(self.test_cdt.members.all()[0]),
-                "string: label")
-        self.assertEqual(unicode(self.test_cdt.members.all()[1]),
-                "DNANucSeq: PBMCseq")
-        self.assertEqual(unicode(self.test_cdt.members.all()[2]),
-                "RNANucSeq: PLAseq")
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=1)),
+            "string: label"
+        )
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=2)),
+            "DNANucSeq: PBMCseq"
+        )
+        self.assertEqual(
+            unicode(self.test_cdt.members.get(column_idx=3)),
+            "RNANucSeq: PLAseq"
+        )
 
 
-class CompoundDatatypeTests(MetadataTestSetup):
+class CompoundDatatypeTests(MetadataTestCase):
 
     def test_cdt_zero_member_unicode(self):
         """

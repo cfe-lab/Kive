@@ -121,7 +121,7 @@ $(function(){
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
-        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX });
+        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
         setTimeout("$('.fulltext').fadeOut(300);", 2000);
     });
 

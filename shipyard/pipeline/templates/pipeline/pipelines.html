@@ -18,17 +18,20 @@
 <table>
 <thead>
 	<tr>
-    <th>Family</th>
-    <th># revisions</th>
-    <th>Description</th>
+        <!-- TODO: provide help text -->
+        <th>Family</th>
+        <th>Description</th>
+        <th># revisions</th>
+        <th>Published version</th>
 	</tr>
 </thead>
 <tbody>
 {% for family in families %}
 <tr>
 	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
+    <td>{{ family.description }}</td>
     <td>{{ family.size }}</td>
-	<td>{{ family.description }}</td>
+    <td>{{ family.published_version }}</td>
 </tr>
 {% endfor %}
 </tbody>

@@ -10,6 +10,7 @@ from method.models import CodeResourceRevision
 from constants import datatypes
 
 class BasicConstraintTestSetup(TestCase):
+    fixtures = ["initial_data"]
 
     def setUp(self):
         """
@@ -1383,7 +1384,7 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         regexp3_BC = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                     rule=".*")
 
-        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC, regexp3_BC])
+        self.assertSetEqual(set(my_DT.get_all_regexps()), {regexp_BC, regexp2_BC, regexp3_BC})
 
     def test_one_inherited_regexp(self):
         """
@@ -1429,8 +1430,8 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         my_DT.save()
         my_DT.restricts.add(second_DT)
 
-        self.assertEquals(second_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
-        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
+        self.assertSetEqual(set(second_DT.get_all_regexps()), {regexp_BC, regexp2_BC})
+        self.assertSetEqual(set(my_DT.get_all_regexps()), {regexp_BC, regexp2_BC})
 
     def test_several_once_removed_inherited_regexps(self):
         """
@@ -1454,7 +1455,7 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         my_DT.restricts.add(super_DT)
         my_DT.restricts.add(second_DT)
 
-        self.assertEquals(my_DT.get_all_regexps(), [regexp_BC, regexp2_BC])
+        self.assertSetEqual(set(my_DT.get_all_regexps()), {regexp_BC, regexp2_BC})
 
     def test_several_regexps_multiple_sources(self):
         """

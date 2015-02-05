@@ -35,12 +35,12 @@
 	<td>{{ dataset.description|escape|linebreaksbr }}</td>
     <td>{{ dataset.date_created }}</td>
     <td>{{ dataset.get_filesize }}</td>
-    <td><a href="{{ dataset.get_absolute_url|get_view_link }}">View</a></td>
+    <td><a href="{{ dataset.get_absolute_url|get_view_link }}">View</a> | <a href="{{ dataset.get_absolute_url }}">Download</a></td>
 </tr>
 {% endfor %}
 </table>
 
-<a href="/datasets_add">Add Datasets</a>
-<a href="/datasets_add_bulk">Add Bulk Datasets</a>
+<a href="/datasets_add" class="button">+&ensp;<span class="button-lbl">Add Datasets</span></a>&ensp;
+<a href="/datasets_add_bulk" class="button">+&ensp;<span class="button-lbl">Add Bulk Datasets</span></a>
 
 {% endblock %}

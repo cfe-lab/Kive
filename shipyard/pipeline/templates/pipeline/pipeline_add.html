@@ -29,6 +29,8 @@
     <canvas id="pipeline_canvas">
         HTML5 Canvas not supported by this browser.
     </canvas>
+    <div id="method_context_menu" class="context_menu"><ul><li data-action="edit" class="edit">Edit</li><li data-action="delete" class="delete">Delete</li></ul></div>
+    </div>
     </div>
 
     <!-- Method selector -->
@@ -36,8 +38,8 @@
         <ul id="id_ctrl_nav">
             <li data-rel="#id_family_ctrl">Family</li>
             <li data-rel="#id_meta_ctrl">Pipeline</li>
-            <li data-rel="#id_input_ctrl">Inputs</li>
-            <li data-rel="#id_method_ctrl">Methods</li>
+            <li data-rel="#id_input_ctrl" class="new_ctrl">Add Input</li>
+            <li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>
         </ul>
         
         <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
@@ -67,6 +69,7 @@
         </form>
 
         <div id="id_input_ctrl" class="ctrl_menu">
+            <canvas width="100%" height="60"></canvas>
             <h3>Inputs</h3>
             
             <form>
@@ -86,9 +89,23 @@
         </div>
 
         <div id="id_method_ctrl" class="ctrl_menu">
+            <canvas width="100%" height="60"></canvas>
             <h3>Methods</h3>
 
             <form>
+            
+            <input type="hidden" id="id_select_colour" value="#999">
+            <div id="colour_picker_menu">
+            <div class="colour_picker_colour" style="background-color: #999;"></div>
+            <div class="colour_picker_colour" style="background-color: #d80;"></div>
+            <div class="colour_picker_colour" style="background-color: #d08;"></div>
+            <div class="colour_picker_colour" style="background-color: #8d0;"></div>
+            <div class="colour_picker_colour" style="background-color: #80d;"></div>
+            <div class="colour_picker_colour" style="background-color: #08d;"></div>
+            <div class="colour_picker_colour" style="background-color: #0d8;"></div>
+            </div>
+            <div class="colour_picker_colour" id="colour_picker_pick" style="background-color: #999;"></div>
+            
             <label for="id_method_name" class="text-field-label">Label</label>
             <input id="id_method_name" maxlength="128" name="method_name" type="text" />
             
@@ -118,6 +135,7 @@
             <label for="output_name">Output name</label>
             <input type="text" name="output_name" id="output_name" class="text">
             <input type="submit" id="output_submit" value="OK">
+            <div id="output_name_error">That name has already been used.</div>
         </form>
     </div>
 

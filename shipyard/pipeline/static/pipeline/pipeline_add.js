@@ -57,43 +57,71 @@ jQuery.fn.extend({
             e.stopPropagation();
         });
         
-        return $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag = opt.handle === "" ?
-                $(this).addClass('draggable') :
-                $(this).addClass('active-handle').parent().addClass('draggable');
+        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            if (opt.handle === '') {
+                var $drag = $(this).addClass('draggable');
+            } else {
+                var $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+            }  
             
-            var z = $drag.css('z-index'),
+            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
+            
+            var z = $drag.data('z'),
                 pos = $drag.offset(),
                 pos_y = pos.top - e.pageY,
                 pos_x = pos.left - e.pageX;
-            $drag.css('z-index', 1000).parents().on("mousemove", function(e) {
+            
+            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
                 $('.draggable').offset({
                     top:  e.pageY + pos_y,
                     left: e.pageX + pos_x
-                }).on("mouseup", function() {
-                    $(this).removeClass('draggable').css('z-index', z);
                 });
+            }).on("mouseup", function() {
+                $(this).removeClass('draggable').css('z-index', z);
             });
+            
             e.preventDefault(); // disable selection
         }).on("mouseup", function() {
-            opt.handle === "" 
-                && $(this).removeClass('draggable')
-                || $(this).removeClass('active-handle').parent().removeClass('draggable');
+            if (opt.handle === "") {
+                $(this).removeClass('draggable')
+            } else {
+                $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
         });
-
+        
+        return $el;
     }
 });
 
 $(function() { // wait for page to finish loading before executing jQuery code
     // initialize animated canvas
-    canvas = document.getElementById('pipeline_canvas');
-    var canvasWidth  = canvas.width  = Math.max(window.innerWidth, 780),
-        canvasHeight = canvas.height = Math.max(window.innerHeight - $(canvas).offset().top - 5, 400);
-
-    // TODO: can canvas be dynamically redrawn to fit window when it is resized?
-    //    $(window).resize(function() {    });
+    canvas = $('#pipeline_canvas')[0];
+    var canvasWidth  = canvas.width  = window.innerWidth,
+        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 
     canvasState = new CanvasState(canvas);
+    
+    // de-activate double-click selection of text on page
+    canvasState.canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+
+    canvasState.canvas.addEventListener('mousedown', function(e) {
+        canvasState.doDown(e); // listener registered on mousedown event
+    }, true);
+
+    canvasState.canvas.addEventListener('mousemove', function(e) {
+        canvasState.doMove(e);
+    }, true);
+
+    canvasState.canvas.addEventListener('mouseup', function(e) {
+        canvasState.doUp(e);
+    }, true);
+    
+    canvasState.canvas.addEventListener('contextmenu', function(e) {
+        canvasState.contextMenu(e);
+    }, true);
+    
+    canvasState.old_width = canvasWidth;
+    canvasState.old_height = canvasHeight;
 
     // trigger ajax on CR drop-down to populate revision select
     $(document).ajaxSend(function(event, xhr, settings) {
@@ -102,7 +130,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             On each XMLHttpRequest, set a custom X-CSRFToken header to the value of the CSRF token.
             ajaxSend is a function to be executed before an Ajax request is sent.
         */
-        //console.log('ajaxSend triggered');
 
         function getCookie(name) {
             var cookieValue = null;
@@ -121,10 +148,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
         function sameOrigin(url) {
             // url could be relative or scheme relative or absolute
-            var host = document.location.host; // host + port
-            var protocol = document.location.protocol;
-            var sr_origin = '//' + host;
-            var origin = protocol + sr_origin;
+            var host = document.location.host, // host + port
+                protocol = document.location.protocol,
+                sr_origin = '//' + host,
+                origin = protocol + sr_origin;
+            
             // Allow absolute or scheme relative URLs to same origin
             return url == origin || url.slice(0, origin.length + 1) == origin + '/' ||
                 url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/' ||
@@ -144,7 +172,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $("#id_select_method_family").on('change',
         function() {
             mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
-            if (mf_id != "") {
+            if (mf_id != '') {
                 $.ajax({
                     type: "POST",
                     url: "/get_method_revisions/",
@@ -167,12 +195,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         }
     ).change(); // trigger on load
-
-    // Use option TITLE as default Method node name
-    $('#id_select_method').on('change', function() {
-        var filename = $('#id_select_method option:selected')[0].title;
-        $('#id_method_name').val_(filename);
-    });
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
@@ -203,33 +225,36 @@ $(function() { // wait for page to finish loading before executing jQuery code
         
     });
     
+    $('.ctrl_menu').draggable();
+    
     $('li', 'ul#id_ctrl_nav').on('click', function(e) {
         var $this = $(this),
-            menu = $($this.data('rel')).draggable();
+            menu = $($this.data('rel'));
 
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
         
+        if (menu.is('#id_method_ctrl')) {
+            $('#id_method_button', menu).val('Add Method');
+        }
+        
         if ($this.hasClass('new_ctrl')) {
             menu.css({ left: 100, top: 350 }).addClass('modal_dialog');
-            
-            var preview_canvas = $('canvas', menu);
-            if (preview_canvas.length == 0) {
-                preview_canvas = $('<canvas>').prependTo(menu)[0];
-                preview_canvas.width = menu.innerWidth();
-                preview_canvas.height = 60;
-            } else {
-                preview_canvas = preview_canvas[0];
-            }
+            var preview_canvas = $('canvas', menu)[0];
+            preview_canvas.width = menu.innerWidth();
+            preview_canvas.height = 60;
             
             $('#id_select_cdt').change();
         }
         
+        $('form', menu).trigger('reset');
+        
         for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
-            if (inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html() || inputs[i].value == '') {
-                $(inputs[i]).focus();
+            if (!inputs[i].value || inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html())
+            {
+                $(inputs[i]).val_('').focus();
                 break;
             }
         }
@@ -243,29 +268,74 @@ $(function() { // wait for page to finish loading before executing jQuery code
         e.preventDefault();
         var dialog = $(this).closest('#dialog_form');
         var out_node = dialog.data('node');
-        out_node.label = $('#output_name').val();
+        var label = $('#output_name').val();
+        var shape;
+        
+        for (var i = 0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            if (shape == out_node) continue;
+            if (shape.constructor == OutputNode && shape.label == label) {
+                $('#output_name_error').show();
+                return false;
+            }
+        }
+        $('#output_name_error').hide();
+        
+        out_node.label = label;
+        canvasState.selection = [ out_node ];
         canvasState.valid = false;
         dialog.hide();
     }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript
         $(this).closest('#dialog_form').hide();
+        $('#output_name_error').hide();
         canvasState.connectors.pop();
         canvasState.valid = false;
     });
     
-    $('#id_select_cdt').on('change', function() {
+    $('#id_select_cdt, #id_select_method').on('change', function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
-            val = $(this).val();
+            val = this.value;
+        
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             var ctx = preview_canvas.getContext('2d');
-            ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-            if (val === '') {
-                (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
-            } else {
-                (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+            if (this.id == 'id_select_cdt') {
+                ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+                if (val === '') {
+                    (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                } else {
+                    (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                }
+            } else if (this.id == 'id_select_method') {
+                var filename = $(this).find('option:selected')[0].title;
+                var colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
+                $('#id_method_name').val_(filename);
+                
+                // use AJAX to retrieve Revision inputs and outputs
+                $.ajax({
+                    type: "POST",
+                    url: "/get_method_io/",
+                    data: { mid: val }, // specify data as an object
+                    datatype: "json",
+                    success: function(result) {
+                        ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+                        var get_obj_len = function(obj) { return $.map(obj, function() { return 1; }).length; },
+                            n_outputs = get_obj_len(result.outputs),
+                            n_inputs  = get_obj_len(result.inputs);
+                        
+                        preview_canvas.height = (n_outputs + n_inputs) * 4 + 62;
+                        (new MethodNode(val, null,
+                            // Ensures node is centred perfectly on the preview canvas
+                            // Makes assumptions that parameters like magnet radius and scoop length are default.
+                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,
+                            n_inputs * 4 + 27,
+                            null, null, null, colour, null, null, result.inputs, result.outputs)).draw(ctx);
+                    }
+                });
             }
         }
+        e.stopPropagation();
     });
     
     // Handle 'Inputs' menu
@@ -285,6 +355,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
             pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
         }
         
+        // check for duplicate names
+        for (var i = 0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            if ((shape.constructor == RawNode || shape.constructor == CDtNode) && shape.label == node_label) {
+                $('#id_dt_error', this)[0].innerHTML = 'That name has already been used.';
+                return false;
+            }
+        }
+        
         if (node_label === '' || node_label === "Label") {
             // required field
             $('#id_dt_error', this)[0].innerHTML = "Label is required";
@@ -295,10 +374,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 shape;
             
             if (this_pk == ""){
-                canvasState.addShape(shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label);
             } else {
-                canvasState.addShape(shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label));
+                shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label);
             }
+            canvasState.addShape(shape);
             
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
             $('#id_datatype_name').val('');  // reset text field
@@ -314,9 +394,21 @@ $(function() { // wait for page to finish loading before executing jQuery code
         var method_name = $('#id_method_name', this),
             method_error = $('#id_method_error', this),
             method_family = $('#id_select_method_family', this),
+            method_colour = $('#id_select_colour', this),
             method = $('#id_select_method', this),
-            mid = method.val(); // pk of method
-
+            mid = method.val(), // pk of method
+            pos,
+            dlg = $(this).closest('.modal_dialog'),
+            preview_canvas = dlg.find('canvas');
+        
+        if (dlg.length) {
+            pos = preview_canvas.offset();
+            pos.left += preview_canvas[0].width/2  - canvas.offsetLeft;
+            pos.top  += preview_canvas[0].height/2 - canvas.offsetTop;
+        } else {
+            pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
+        }
+        
         if (mid === undefined || method_family.val() == '') {
             method_error[0].innerHTML = "Select a Method";
             
@@ -337,7 +429,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
             else {
                 method_error[0].innerHTML = '';
-
+                
                 // use AJAX to retrieve Revision inputs and outputs
                 $.ajax({
                     type: "POST",
@@ -348,23 +440,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
                         var inputs = result['inputs'],
                             outputs = result['outputs'];
 
-                        if ($('#id_method_button').val() === 'Add Method') {
+                        if (document.getElementById('id_method_button').value == 'Add Method') {
                             // create new MethodNode
-                            canvasState.addShape(new MethodNode(mid, 200, 200 + Math.round(50 * Math.random()),
-                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                            canvasState.addShape(new MethodNode(mid, method_family.val(), pos.left, pos.top,
+                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs));
                         } else {
                             // replace the selected MethodNode
                             // if user clicks anywhere else, MethodNode is deselected
                             // and Methods menu closes
-                            var old_node = canvasState.selection;
+                            var old_node = canvasState.selection[0];
                             var idx;
 
                             // draw new node over old node
-                            var new_node = new MethodNode(mid, old_node.x, old_node.y,
-                                mNodeWidth, mNodeInset, mNodeSpacing, mNodeColour, node_label, mNodeOffset,
+                            var new_node = new MethodNode(mid, method_family.val(), old_node.x, old_node.y,
+                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
                                 inputs, outputs);
-
 
                             // check if we can re-use any Connectors
                             var new_xput, old_xput, connector;
@@ -373,7 +464,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 old_xput = old_node.inputs[idx];
                                 if (inputs.hasOwnProperty(idx)) {
                                     new_xput = inputs[idx];
-                                    if (new_xput.cdt_pk === old_xput.cdt_pk) {
+                                    if (new_xput.cdt_pk === old_xput.cdt_pk
+                                            && old_node.in_magnets[idx-1].connected.length) {
                                         // re-attach Connector
                                         connector = old_node.in_magnets[idx-1].connected.pop();
                                         connector.dest = new_node.in_magnets[idx-1];
@@ -387,11 +479,13 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 if (outputs.hasOwnProperty(idx)) {
                                     new_xput = outputs[idx];
                                     if (new_xput.cdt_pk === old_xput.cdt_pk) {
-                                        // re-attach all Connectors - note this reverses order
+                                        // re-attach all Connectors - note this does not reverse order any longer
                                         for (var i = 0; i < old_node.out_magnets[idx-1].connected.length; i++) {
-                                            connector = old_node.out_magnets[idx-1].connected.pop();
-                                            connector.source = new_node.out_magnets[idx-1];
-                                            new_node.out_magnets[idx-1].connected.push(connector);
+                                            while (old_node.out_magnets[idx-1].connected.length) {
+                                                connector = old_node.out_magnets[idx-1].connected.pop();
+                                                connector.source = new_node.out_magnets[idx-1];
+                                                new_node.out_magnets[idx-1].connected.unshift(connector);
+                                            }
                                         }
                                     }
                                 }
@@ -399,16 +493,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
                             canvasState.deleteObject();  // delete selected (old Method)
                             canvasState.addShape(new_node);
+                            canvasState.selection = [ new_node ];
                         }
-
+                        
+                        dlg.removeClass('modal_dialog').hide();
                     }
                 });
 
                 method_name.val_('');
             }
         }
+    }).on('reset', function() {
+        var method_family = $('#id_select_method_family', this);
+        $('#id_method_name', this).val_('');
+        method_family.val(method_family.children('option').eq(0)).change();
     });
-
+    
     $('#id_example_button').on('click', function () {
         /*
         Populate canvasState with objects for an example pipeline.
@@ -432,6 +532,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // reset containers to reflect canvas
         canvasState.shapes = [];
         canvasState.connectors = [];
+        canvasState.exec_order = [];
+        canvasState.selection = [];
     });
 
     $('#id_delete_button').on('click', function() {
@@ -439,32 +541,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
         canvasState.deleteObject();
     });
     
-    $('.ctrl_menu').on('cancel', function() {
-        $(this).hide();
-    });
-    
-    $(document).on('keydown', function(e) {
-        // backspace or delete key also removes selected object
-        if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
-            // prevent backspace from triggering browser to navigate back one page
-            e.preventDefault();
-            canvasState.deleteObject();
-        }
-        // escape key closes menus
-        // TODO: also should deselect any selected objects
-        else if (e.which == 27) {
-            $('li', 'ul#id_ctrl_nav').removeClass('clicked');
-            $('.ctrl_menu:visible').trigger('cancel');
-            
-            canvasState.selection = null;
-            canvasState.valid = false;
-        }
-    })
-    
     $('#id_revision_desc').on('keydown', function() {
         var getHappierEachXChars = 12,
             happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
-    
+        
         $('.happy_indicator').css('background-position', happy + 'px 0px');
     })
         .trigger('keydown')
@@ -477,28 +557,130 @@ $(function() { // wait for page to finish loading before executing jQuery code
             
             if (desc_length == 0 || $(this).hasClass('input-label')) {
                 $('.happy_indicator, .happy_indicator_label', wrap).hide();
-            }
-            else if (desc_length > 20) {
+            } else if (desc_length > 20) {
                 $('.happy_indicator', wrap).show();
                 $('.happy_indicator_label', wrap).hide();
-            }
-            else {
+            } else {
                 $('.happy_indicator, .happy_indicator_label', wrap).show();
             }
         }).on('blur', function() {
             $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
         }).blur()
     ;
+    
+    $(document).on('keydown', function(e) {
+        // backspace or delete key also removes selected object
+        if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
+            // prevent backspace from triggering browser to navigate back one page
+            e.preventDefault();
+            
+            if (canvasState.selection) {
+                canvasState.deleteObject();
+                var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
+                menus.trigger('cancel');
+                $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+            }
+        }
+        
+        // escape key closes menus
+        else if (e.which == 27) {
+            $('li', 'ul#id_ctrl_nav').removeClass('clicked');
+            $('.ctrl_menu:visible').trigger('cancel');
+            
+            canvasState.selection = [];
+            canvasState.valid = false;
+        }
+    })
 
     
-    $('body').on('click', function(e) {
-        var menus = $('.ctrl_menu:visible');
+    $(document).on('mousedown', function(e) {
+        var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
             menus.trigger('cancel');
             $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
         }
+    }).on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() {
+        $(this).hide();
     });
-
+    
+    // when a context menu option is clicked
+    $('.context_menu').on('click', 'li', function(e) {
+        var $this = $(this),
+            sel = canvasState.selection;
+        
+        // if there's a current node selected on the canvas
+        if (sel) {
+            var action = $this.data('action');
+            
+            if (action == 'edit' && sel.length == 1) {
+                sel = sel[0];
+                
+                if (sel.constructor == MethodNode) {
+                    /*
+                        Open the edit dialog (rename, method selection, colour picker...)
+                    */
+                    var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
+                        preview_canvas = $('canvas', menu)[0];
+                    
+                    preview_canvas.width = menu.innerWidth();
+                    
+                    menu.css({
+                        top:  sel.y + sel.dy - sel.n_inputs * 4 + canvas.offsetTop - 36,
+                        left: sel.x + sel.dx - (
+                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( sel.n_inputs * 8 + 14 ), 42 - sel.n_outputs * 8) + Math.max( sel.n_inputs  * 8 + 14, sel.n_outputs * 8 + 48 ) ) /4
+                        ) + canvas.offsetLeft - 9
+                    });
+                    
+                    $('#id_select_colour').val(sel.fill);
+                    $('#colour_picker_pick').css('background-color', sel.fill);
+                    
+                    $('#id_select_method_family').val(sel.family).change();  // trigger ajax
+                    
+                    // #id_method_revision_field is always populated via ajax.
+                    // $.one() will run this event exactly once before killing it.
+                    // first we execute, then we kill.
+                    $(document).one('ajaxComplete', function() {
+                        // wait for AJAX to populate drop-down before selecting option
+                        $('#id_method_revision_field select').val(sel.pk);
+                        $('#id_method_name').val_(sel.label).select();
+                    });
+                }
+                else if (sel.constructor == OutputNode) {
+                    /*
+                        Open the renaming dialog
+                    */
+                    var dialog = $("#dialog_form");
+                    
+                    dialog.data('node', sel).show().css({
+                        left: sel.x + sel.dx + canvas.offsetLeft - dialog.width()/2,
+                        top:  sel.y + sel.dy + canvas.offsetTop - dialog.height()/2 - sel.h/2 - sel.offset
+                    }).addClass('modal_dialog');
+                    
+                    $('#output_name_error').hide();
+                    $('#output_name', dialog).val(sel.label).select(); // default value;
+                }
+            }
+            if (action == 'delete') {
+                canvasState.deleteObject();
+            }
+        }
+        $('.context_menu').hide();
+        e.stopPropagation();
+    });
+    
+    $('#colour_picker_pick').on('click', function() {
+        var pos = $(this).position();
+        $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
+    });
+    
+    $('#colour_picker_menu').on('click', 'div', function() {
+        var bg_col = $(this).css('background-color');
+        $('#colour_picker_pick').css('background-color', bg_col);
+        $('#id_select_colour').val(bg_col);
+        $('#colour_picker_menu').hide();
+        $('#id_select_method').trigger('change');
+    });
+    
     /*
         Submit form
     */
@@ -511,23 +693,21 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
         // Since a field contains its label on pageload, a field's label as its value is treated as blank
         $('input, textarea', this).each(function() {
-            var $this = $(this);
-            if ($this.val() == $this.data('label'))
-                $this.val('');
+            if (this.value == $(this).data('label'))
+                this.value = '';
         });
         
-
         var shapes = canvasState.shapes;
 
         // check graph integrity
-        var this_shape;
-        var magnets;
-        var this_magnet;
-        var i, j;
-        var pipeline_inputs = [];  // collect data nodes
-        var pipeline_outputs = [];
-        var method_nodes = [];
-        var num_connections;
+        var this_shape,
+            magnets,
+            this_magnet,
+            i, j,
+            pipeline_inputs = [],  // collect data nodes
+            pipeline_outputs = [],
+            method_nodes = [],
+            num_connections;
 
         document.getElementById('id_submit_error').innerHTML = '';
 
@@ -592,18 +772,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (family_name === '') {
                 // FIXME: is there a better way to do this trigger?
                 $('li', 'ul#id_ctrl_nav')[0].click();
-                $('#id_family_name').css({'background-color': '#FFFFCC'}).focus();
+                $('#id_family_name').css({'background-color': '#ffc'}).focus();
                 submitError('Pipeline family must be named');
                 return;
             }
-            $('#id_family_name, #id_family_desc').css('background-color', '#FFFFFF');
+            $('#id_family_name, #id_family_desc').css('background-color', '#fff');
         }
 
         // FIXME: This is fragile if we add a menu to either page
-        var meta_menu_index = (is_revision ? 0 : 1);
-        $('#id_revision_name, #id_revision_desc').css('background-color', '#FFFFFF');
-
-
+        var meta_menu_index = !is_revision;
+        $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
+        
         // Now we're ready to start
         var form_data = {};
 
@@ -637,7 +816,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         function sortByYpos (a, b) {
             var ay = a.y;
             var by = b.y;
-            return ((ay < by) ? -1 : ((ay > by) ? 1 : 0));
+            return +(ay < by ? -1 : ay > by);
         }
         pipeline_inputs.sort(sortByYpos);
 
@@ -659,47 +838,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
         // append MethodNodes to sorted_elements Array in dependency order
         // see http://en.wikipedia.org/wiki/Topological_sorting#Algorithms
-        var sorted_elements = [];
-        var method_node;
-        var this_parent;
-        var okay_to_add;
-        i = 0;
-        
-        while (method_nodes.length > 0) {
-            for (j = 0; j < method_nodes.length; j++) {
-                method_node = method_nodes[j];
-                magnets = method_node.in_magnets;
-                okay_to_add = true;
-
-                for (var k = 0; k < magnets.length; k++) {
-                    this_magnet = magnets[k];
-                    if (this_magnet.connected.length == 0) {
-                        // unconnected in-magnet, still okay to add this MethodNode
-                        continue;
-                    }
-                    // trace up the Connector
-                    this_parent = this_magnet.connected[0].source.parent;  // in-magnets only have 1 connector
-                    if (this_parent.constructor === MethodNode) {  // ignore connections from data nodes
-                        if ($.inArray(this_parent, sorted_elements) < 0) {
-                            // dependency not cleared
-                            okay_to_add = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (okay_to_add) {
-                    // either MethodNode has no dependencies
-                    // or all dependencies already in sorted_elements
-                    sorted_elements.push(method_nodes.splice(j, 1)[0]);
-                }
-            }
-            i += 1;
-            if (i > 5 * shapes.length) {
-                console.log('DEBUG: topological sort routine failed')
-                return;
-            }
-        }
+        //
+        // MethodNodes are now sorted live, prior to pipeline submission —JN
+        //
+        var sorted_elements = Array.concat.apply([], canvasState.exec_order);
 
         // add arguments for input cabling
         var this_step;
@@ -808,4 +950,36 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         })
     })
+    
+    $(window).resize(function(e) {
+        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
+        canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        
+        var scale_x = canvas.width  / canvasState.old_width,
+            scale_y = canvas.height / canvasState.old_height;
+            
+        if (scale_x == 1 && scale_y == 1) {
+            return;
+        }
+        
+        var shape;
+        for (var i=0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            shape.x *= scale_x;
+            shape.y *= scale_y;
+            shape.dx = shape.dy = 0;
+            canvasState.detectCollisions(shape);
+        }
+        
+        var out_z = canvasState.outputZone;
+        out_z.x = canvasWidth * .8;
+        out_z.h = out_z.w = canvasWidth * .15;
+        while (out_z.h + out_z.y > canvasHeight) {
+            out_z.h /= 1.5;
+        }
+        
+        canvasState.old_width = canvas.width;
+        canvasState.old_height = canvas.height;
+        canvasState.valid = false;
+    });
 });// end of document.ready()

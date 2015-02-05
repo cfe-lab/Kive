@@ -5,15 +5,14 @@
  *       "status": string,
  *       "finished": bool, 
  *       "success": bool,
- *       "thread": string,
+ *       "queue_placeholder": integer,
  *       "crashed": bool}
  *
  * - "run" is the primary key of the Run 
  * - "status" is a string describing the Run's status
  * - "finished" is true if the Run is done or false otherwise
  * - "success" is true if the Run was successful or false if it failed
- * - "thread" is an identifier for the backend thread where the pipeline is
- *   running
+ * - "queue_placeholder" is the primary key of the RunToProcess object holding its place in the queue
  * - "crashed" is true if Shipyard crashed while running the Pipeline
  */
 
@@ -29,9 +28,9 @@ function poll_run_progress(run_data) {
                 if (new_data["finished"]) {
                     $("#loading").hide("slow");
                     if (new_data["success"]) {
-                        show_results_link(run_data["run"]);
+                        show_results_link(new_data["run"]);
                     } else if (!new_data["crashed"]) {
-                        handle_run_failure(run_data);
+                        handle_run_failure(new_data);
                     }
                 } else {
                     poll_run_progress(new_data); 
@@ -52,7 +51,7 @@ function handle_run_failure(run_data) {
 
 /* Display the progress of a run on the page. */
 function show_run_progress(message) {
-    $("#progress").html(message);
+    $("#progress").html($("<pre/>").text(message));
 }
 
 /* Display an error on the page. */
@@ -397,7 +396,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             }
             filterTable_ajax(container.siblings('.results'));
         });
-    
+        
         $('.results').on('click', 'tbody tr', function() {
             var tab = $(this).closest('.results'),
                 tbselect = tab.siblings('input.tbselect-value');
@@ -412,6 +411,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 tbselect.val( $(this).get_pkey(tab.data('pkey')) );
                 $(this).addClass('selected');  
             }
+            
+            tbselect.trigger('change');
         });
         
         /* Browsers will remember input values, even for hidden fields, on page refresh

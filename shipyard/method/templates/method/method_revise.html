@@ -40,27 +40,65 @@ Add a revision of this Method based on a revision of the same CodeResource.
     </tr>
 
     <tr>
-        <th>{{ method_form.deterministic.label }}</th>
+        <th>{{ method_form.reusable.label }}</th>
         <td>
-            {{ method_form.deterministic }}
-            <div class="helptext">{{ method_form.deterministic.help_text }}</div>
+            {{ method_form.reusable }}
+            <div class="helptext">{{ method_form.reusable.help_text|escape|linebreaks }}</div>
         </td>
         <th></th>
         <td></td>
     </tr>
 
     <tr>
-        <th>{{ method_form.shared.label }}</th>
+        <th>{{ method_form.users_allowed.label }} <div class="helptext">{{ method_form.users_allowed.help_text }}</div></th>
+        <td style="font-style:italic">
+            {% if parent.users_allowed.exists %}
+            <ul>
+            {% for user in parent.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+        </td>
+        <td>{{ method_form.users_allowed }}<br>
+            <div style="color:red">{{ method_form.users_allowed.errors }}</div>
+        </td>
+    </tr>
+    <tr>
+        <th>{{ method_form.groups_allowed.label }} <div class="helptext">{{ method_form.groups_allowed.help_text }}</div></th>
+        <td style="font-style:italic">
+            {% if parent.groups_allowed.exists %}
+            <ul>
+            {% for group in parent.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+        </td>
+        <td>{{ method_form.groups_allowed }}<br>
+            <div style="color:red">{{ method_form.groups_allowed.errors }}</div>
+        </td>
+    </tr>
+
+    <tr>
+        <th>{{ method_form.threads.label }}</th>
         <td>
-            {{ method_form.shared }}
-            <div class="helptext">{{ method_form.shared.help_text }}</div>
+            {{ method_form.threads }}
+            <div class="helptext">{{ method_form.threads.help_text }}</div>
+            <br/>
+            <div class="errortext">{{ method_form.threads.errors }}</div>
+            <br/>
         </td>
         <th></th>
         <td></td>
     </tr>
 
     <tr>
-        <th>Method<br/> revision name<br/><i>Optional</i></th>
+        <th>Method<br/> revision name<br/><span class="smalltxt">Optional</span></i></th>
                     <td>
                         {{ method_form.revision_name }}
                         <div class="helptext">{{ method_form.revision_name.help_text }}</div>

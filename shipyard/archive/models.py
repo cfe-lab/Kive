@@ -9,7 +9,7 @@ from __future__ import unicode_literals
 from django.db import models, transaction
 from django.db.models.signals import post_delete
 from django.contrib.auth.models import User, Group
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -19,7 +19,9 @@ import os
 import time
 import file_access_utils
 import csv
+from operator import attrgetter, itemgetter
 
+from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import stopwatch.models
 import metadata.models
 from constants import maxlengths
@@ -116,12 +118,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         all_exist = True
 
         for step in self.pipeline.steps.all():
-            corresp_rs = self.runsteps.filter(pipelinestep=step)
-            if not corresp_rs.exists():
+            corresp_rs = self.runsteps.filter(pipelinestep=step).first()
+            if corresp_rs is None:
                 all_exist = False
-            elif not corresp_rs.first().is_complete():
+            elif not corresp_rs.is_complete():
                 return False
-            elif not corresp_rs.first().successful_execution():
+            elif not corresp_rs.is_successful():
                 anything_failed = True
         for outcable in self.pipeline.outcables.all():
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()
@@ -129,7 +131,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 all_exist = False
             elif not corresp_roc.is_complete():
                 return False
-            elif not corresp_roc.successful_execution():
+            elif not corresp_roc.is_successful():
                 anything_failed = True
 
         # At this point, all RunSteps and ROCs that exist are complete.
@@ -164,18 +166,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def successful_execution(self):
         """
         Checks if this Run is successful (so far).
-
-        PRE
-        This Run is clean and complete.
         """
         # Check steps for success.
         for step in self.runsteps.all():
-            if not step.successful_execution():
+            if not step.is_successful():
                 return False
 
         # All steps checked out.  Check outcables.
         for outcable in self.runoutputcables.all():
-            if not outcable.successful_execution():
+            if not outcable.is_successful():
                 return False
 
         # So far so good.
@@ -197,6 +196,65 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             return ()
         # Otherwise, return the coordinates of the parent RunStep.
         return self.parent_runstep.get_coordinates()
+    
+    def describe_run_failure(self):
+        """
+        Return a tuple (error, reason) describing a Run failure.
+    
+        TODO: this is very rudimentary at the moment.
+        - It does not take recovery into account - should report which step
+          was actually executed and failed, not which step tried to recover
+          and failed.
+        - It does not take sub-pipelines into account.
+        - Failure details for a cable are not reported.
+        - Details of cell errors are not reported.
+        """
+        total_steps = self.pipeline.steps.count()
+        error = ""
+    
+        # Check each step for failure.
+        for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
+    
+            if runstep.is_complete() and not runstep.is_successful():
+                error = "Step {} of {} failed".format(i, total_steps)
+    
+                # Check each cable.
+                total_cables = runstep.pipelinestep.cables_in.count()
+                for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
+                    if not runcable.is_successful():
+                        return (error, "Input cable {} of {} failed".format(j, total_cables))
+    
+                # Check the step execution.
+                if not runstep.log:
+                    return (error, "Recovery failed")
+                return_code = runstep.log.methodoutput.return_code 
+                if return_code != 0:
+                    return (error, "Return code {}".format(return_code))
+    
+                # Check for bad output.
+                for output in runstep.execrecord.execrecordouts.all():
+                    try:
+                        check = runstep.log.content_checks.get(symbolicdataset=output.symbolicdataset)
+                    except ContentCheckLog.DoesNotExist:
+                        try:
+                            check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
+                        except IntegrityCheckLog.DoesNotExist:
+                            continue
+    
+                    if check.is_fail():
+                        return (error, "Output {}: {}".format(output.generic_output.definite.dataset_idx, check))
+    
+                # Something else went wrong with the step?
+                return (error, "Unknown error")
+                    
+        # Check each output cable.
+        total_cables = self.pipeline.outcables.count()
+        for i, runcable in enumerate(self.runoutputcables.order_by("pipelineoutputcable__output_idx")):
+            if not runcable.is_successful():
+                return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
+    
+        # Shouldn't reach here.
+        return ("Unknown error", "Unknown reason")
 
 
 class RunComponent(stopwatch.models.Stopwatch):
@@ -208,6 +266,8 @@ class RunComponent(stopwatch.models.Stopwatch):
     """
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
+    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
+                                    default=False)
 
     # Implicit:
     # - log: via OneToOneField from ExecLog
@@ -290,11 +350,12 @@ class RunComponent(stopwatch.models.Stopwatch):
         elif self.is_outcable:
             return self.runoutputcable
 
-    def link_execrecord(self, execrecord, reused):
+    def link_execrecord(self, execrecord, reused, clean=True):
         """Link an ExecRecord to this RunComponent."""
         self.reused = reused
         self.execrecord = execrecord
-        self.clean()
+        if clean:
+            self.clean()
         self.save()
 
     def _clean_undecided_reused(self):
@@ -468,10 +529,14 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         PRE: this RunComponent is clean.
         """
+        # Has this been cancelled before even being attempted?
+        if self.is_cancelled:
+            return True
+
         # Is there an ExecRecord?  If not, check if this failed during
         # recovery and then completed.
         if self.execrecord is None:
-            if not self.successful_execution():
+            if not self.is_successful():
 
                 for invoked_log in self.invoked_logs.all():
                     if not invoked_log.is_complete():
@@ -533,6 +598,25 @@ class RunComponent(stopwatch.models.Stopwatch):
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
 
+    def is_successful(self):
+        if self.is_cancelled:
+            return False
+        if self.reused:
+            return self.successful_reuse()
+        return self.successful_execution()
+
+    def successful_reuse(self):
+        """
+        True if RunComponent is successful on reuse; False otherwise.
+
+        PRE: this RunComponent is reused.
+        """
+        assert(self.reused)
+        if self.execrecord is not None:
+            return self.execrecord.outputs_OK() and not self.execrecord.has_ever_failed()
+        # If there is no ExecRecord yet then this is trivially true.
+        return True
+
     def successful_execution(self):
         """True if RunComponent is successful; False otherwise.
 
@@ -541,13 +625,18 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         PRE: this RunComponent is clean, and so are all of its invoked_logs.
         (It's OK that they might not be complete.)
+        PRE: this RunComponent is not reused.
         """
+        assert(not self.reused)
+
         for invoked_log in self.invoked_logs.all():
             if not invoked_log.is_successful():
                 return False
-            if any([x.is_fail() for x in invoked_log.integrity_checks.all()]):
+            icls = invoked_log.integrity_checks.all()
+            if icls.exists() and any([x.is_fail() for x in icls]):
                 return False
-            if any([x.is_fail() for x in invoked_log.content_checks.all()]):
+            ccls = invoked_log.content_checks.all()
+            if ccls.exists() and any([x.is_fail() for x in ccls]):
                 return False
         return True
 
@@ -953,7 +1042,13 @@ class RunStep(RunComponent):
 
         # From here on, the appropriate ER is known to be set.
         self._clean_execrecord()
-        self._clean_outputs()
+
+        # If we reused an ExecRecord and it was a failure, then we can skip cleaning the outputs; otherwise
+        # we clean them.
+        usable_dict = self.check_ER_usable(self.execrecord)
+        # This is the negative of (self.reused and not usable_dict["successful"])....
+        if not self.reused or usable_dict["successful"]:
+            self._clean_outputs()
 
     def is_complete(self):
         """
@@ -989,7 +1084,7 @@ class RunStep(RunComponent):
                 all_cables_exist = False
             elif not corresp_RSIC.is_complete():
                 return False
-            elif not corresp_RSIC.successful_execution():
+            elif not corresp_RSIC.is_successful():
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
@@ -1010,10 +1105,13 @@ class RunStep(RunComponent):
         wrinkle that a RunStep fails if any of its cables fails, or if
         its child_run has failed.
 
-        PRE: this RunStep is clean and complete.
+        PRE: this RunStep is clean.
+        PRE: this RunStep is not reused.
         """
-        if any([not cable.successful_execution() for cable in self.RSICs.all()]):
-            return False
+        input_cables = self.RSICs.all()
+        if input_cables.exists():
+            if any(not ic.is_successful() for ic in input_cables):
+                return False
 
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
@@ -1023,8 +1121,11 @@ class RunStep(RunComponent):
 
         # In the case that this is a sub-Pipeline, check if child_run
         # is successful.
-        if hasattr(self, "child_run"):
+        try:
+            self.child_run
             return self.child_run.successful_execution()
+        except ObjectDoesNotExist:
+            pass
 
         # No logs failed, and this wasn't a sub-Pipeline, so....
         return True
@@ -1040,6 +1141,81 @@ class RunStep(RunComponent):
         run_coords = self.run.get_coordinates()
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
+
+    def find_compatible_ERs(self, inputs_after_cable):
+        return self.pipelinestep.transformation.definite.find_compatible_ERs(inputs_after_cable)
+
+    @transaction.atomic
+    def check_ER_usable(self, execrecord):
+        """
+        Check that the specified ExecRecord may be reused.
+        """
+        result = {"fully reusable": False, "successful": True}
+        # Case 1: ER was a failure.  In this case, we don't want to proceed,
+        # so we return the failure for appropriate handling.
+        if execrecord.outputs_failed_any_checks() or execrecord.has_ever_failed():
+            self.logger.debug("ExecRecord found ({}) was a failure".format(execrecord))
+            result["successful"] = False
+
+        # Case 2: ER has fully checked outputs and provides the outputs needed.
+        elif execrecord.outputs_OK() and execrecord.provides_outputs(self.pipelinestep.outputs_to_retain()):
+            self.logger.debug("Completely reusing ExecRecord {}".format(execrecord))
+            result["fully reusable"] = True
+
+        return result
+
+    @transaction.atomic
+    def get_suitable_ER(self, input_SD):
+        """
+        Retrieve a suitable ExecRecord for this RunStep.
+
+        If any of them are failed, we find the failed one with the most outputs having data, with
+        ties broken by the smallest PK.
+        If any of them are fully reusable, we find the fully reusable one satisfying the same criteria.
+        Otherwise we find whichever one satisfies the same criteria.
+
+        Return a tuple containing the ExecRecord along with its summary (as
+        produced by check_ER_usable), or None if no appropriate ExecRecord is found.
+        """
+        execrecords = self.find_compatible_ERs(input_SD)
+        failed = []
+        fully_reusable = []
+        other = []
+        execrecords_sorted = sorted(execrecords, key=attrgetter("pk"))
+        for er in execrecords_sorted:
+            curr_summary = self.check_ER_usable(er)
+            curr_entry = (er, curr_summary)
+            if not curr_summary["successful"]:
+                failed.append(curr_entry)
+            elif curr_summary["fully reusable"]:
+                fully_reusable.append(curr_entry)
+            else:
+                other.append(curr_entry)
+
+        if len(failed) > 0:
+            return _first_ER_h(failed)
+
+        if len(fully_reusable) > 0:
+            return _first_ER_h(fully_reusable)
+
+        if len(other) > 0:
+            return _first_ER_h(other)
+
+        return (None, None)
+
+
+def _first_ER_h(execrecord_summary_list):
+    """
+    Of the (ExecRecord, summary) pairs provided, return the one with the most outputs having real Datasets.
+
+    Ties are broken according to their position in the list.
+    """
+    list_decorated = []
+    for er, curr_summary in execrecord_summary_list:
+        num_outputs = sum(1 if x.has_data() else 0 for x in er.execrecordouts.all())
+        list_decorated.append((er, curr_summary, num_outputs))
+    list_sorted = sorted(list_decorated, key=itemgetter(2))
+    return (list_sorted[0][0], list_sorted[0][1])
 
 
 class RunCable(RunComponent):
@@ -1094,6 +1270,13 @@ class RunCable(RunComponent):
         Abstract function that retrieves the PSIC/POC.
         """
         pass
+
+    @property
+    def component(self):
+        return self.PSIC
+
+    def is_trivial(self):
+        return self.component.is_trivial()
 
     def _clean_not_reused(self):
         """
@@ -1326,7 +1509,7 @@ class RunCable(RunComponent):
             self._clean_with_execlog()
 
         # At this point, we know that the log either exists or should
-        # not exist (i.e. this is a reused step).
+        # not exist (i.e. this is a reused cable).
 
         # If there is no execrecord defined but there is a log, then
         # check for spurious CCLs and ICLs and stop.
@@ -1337,6 +1520,79 @@ class RunCable(RunComponent):
 
         # Now, we know there to be an ExecRecord.
         self._clean_execrecord()
+
+    def find_compatible_ERs(self, input_SD):
+        """
+        Find ExecRecords which may be used by this RunCable.
+
+        INPUTS
+        input_SD        SymbolicDataset to feed the cable
+
+        OUTPUTS
+        list of ExecRecords that are compatible with this cable and input (may be empty).
+        """
+        return self.component.find_compatible_ERs(input_SD)
+
+    @transaction.atomic
+    def check_ER_usable(self, execrecord):
+        """
+        Check that the specified ExecRecord is reusable (fully or not) or unsuccessful.
+        """
+        summary = {"fully reusable": False, "successful": True}
+
+        output_SD = execrecord.execrecordouts.first().symbolicdataset
+
+        # Terminal case 1: the found ExecRecord has failed some checks.  In this case,
+        # we just return and the RunCable fails.
+        if output_SD.any_failed_checks():
+            self.logger.debug("The ExecRecord ({}) found is failed.".format(execrecord))
+            summary["successful"] = False
+
+        # Terminal case 2: the ExecRecord passed its checks and
+        # provides the output we need.
+        elif output_SD.is_OK() and (not self.keeps_output() or output_SD.has_data()):
+            self.logger.debug("Can fully reuse ER {}".format(execrecord))
+            summary["fully reusable"] = True
+
+        return summary
+
+    @transaction.atomic
+    def get_suitable_ER(self, input_SD):
+        """
+        Retrieve a suitable ExecRecord for this RunCable.
+
+        If any of them are failed, we find the failed one with the most outputs, with
+        ties broken by the smallest PK.
+        If any of them are fully reusable, we find the fully reusable one satisfying the same criteria.
+        Otherwise we find whichever one satisfies the same criteria.
+
+        Return a tuple containing the ExecRecord along with its summary (as
+        produced by check_ER_usable), or None if no appropriate ExecRecord is found.
+        """
+        execrecords = self.find_compatible_ERs(input_SD)
+        failed = []
+        fully_reusable = []
+        other = []
+        execrecords_sorted = sorted(execrecords, key=attrgetter("pk"))
+        for er in execrecords_sorted:
+            curr_summary = self.check_ER_usable(er)
+            if not curr_summary["successful"]:
+                failed.append((er, curr_summary))
+            elif curr_summary["fully reusable"]:
+                fully_reusable.append((er, curr_summary))
+            else:
+                other.append((er, curr_summary))
+
+        if len(failed) > 0:
+            return _first_ER_h(failed)
+
+        if len(fully_reusable) > 0:
+            return _first_ER_h(fully_reusable)
+
+        if len(other) > 0:
+            return _first_ER_h(other)
+
+        return (None, None)
 
 
 class RunSIC(RunCable):
@@ -1472,6 +1728,10 @@ class RunOutputCable(RunCable):
         runoutputcable.clean()
         runoutputcable.save()
         return runoutputcable
+    
+    def __str__(self):
+        return 'RunOutputCable("{}")'.format(
+            self.pipelineoutputcable.output_name)
 
     def _pipeline_cable(self):
         """
@@ -1809,8 +2069,11 @@ class ExecLog(stopwatch.models.Stopwatch):
         """Returns output SDs missing output from this execution."""
         missing = []
         for ccl in self.content_checks.all():
-            if hasattr(ccl, "baddata") and ccl.baddata.missing_output:
-                missing.append(ccl.symbolicdataset)
+            try:
+                if ccl.baddata.missing_output:
+                    missing.append(ccl.symbolicdataset)
+            except ObjectDoesNotExist:
+                pass
 
         self.logger.debug("returning missing outputs '{}'".format(missing))
         return missing
@@ -1823,8 +2086,11 @@ class ExecLog(stopwatch.models.Stopwatch):
         this function tells us if anything has gone wrong so far.
         """
         # If this ExecLog has a MethodOutput, check its return code.
-        if (hasattr(self, "methodoutput") and self.methodoutput.return_code != 0):
-            return False
+        try:
+            if self.methodoutput.return_code is not None and self.methodoutput.return_code != 0:
+                return False
+        except ObjectDoesNotExist:
+            pass
 
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!
@@ -1952,6 +2218,7 @@ class MethodOutput(models.Model):
         methodoutput.clean()
         methodoutput.save()
         return methodoutput
+
 
 # Register signals.
 post_delete.connect(archive.signals.dataset_post_delete, sender=Dataset)

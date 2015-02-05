@@ -1,0 +1,9 @@
+[
+{
+    "pk": 1,
+    "model": "librarian.symbolicdataset",
+    "fields": {
+        "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e"
+    }
+}
+]

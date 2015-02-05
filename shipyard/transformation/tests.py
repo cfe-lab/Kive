@@ -3,7 +3,10 @@ from django.test import TestCase
 from transformation.models import *
 from metadata.models import *
 
-class TransformationTestSetup(TestCase):
+
+class TransformationTestCase(TestCase):
+    fixtures = ["initial_data"]
+
     def setUp(self):
         self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')
         self.transf_user.save()
@@ -33,7 +36,8 @@ class TransformationTestSetup(TestCase):
     def tearDown(self):
         pass
 
-class XputStructureTests(TransformationTestSetup):
+
+class XputStructureTests(TransformationTestCase):
     def setUp(self):
         super(XputStructureTests, self).setUp()
 
@@ -76,7 +80,8 @@ class XputStructureTests(TransformationTestSetup):
         s2.save()
         self.assertTrue(s1.is_identical(s2))
 
-class TransformationInputTests(TransformationTestSetup):
+
+class TransformationInputTests(TransformationTestCase):
     def setUp(self):
         super(TransformationInputTests, self).setUp()
 
@@ -118,7 +123,8 @@ class TransformationInputTests(TransformationTestSetup):
         t2 = TransformationInput.objects.filter(structure__isnull=False).exclude(structure=t1.structure).first()
         self.assertFalse(t1.is_identical(t2))
 
-class TransformationOutputTests(TransformationTestSetup):
+
+class TransformationOutputTests(TransformationTestCase):
     def setUp(self):
         super(TransformationOutputTests, self).setUp()
 
@@ -160,7 +166,8 @@ class TransformationOutputTests(TransformationTestSetup):
         t2 = TransformationOutput.objects.filter(structure__isnull=False).exclude(structure=t1.structure).first()
         self.assertFalse(t1.is_identical(t2))
 
-class TransformationTests(TransformationTestSetup):
+
+class TransformationTests(TransformationTestCase):
     def setUp(self):
         super(TransformationTests, self).setUp()
 

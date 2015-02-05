@@ -11,7 +11,7 @@
 {% block content %}
 
 <a href="/datatypes" rel="prev">Return to summary view</a>
-<h2>Detailed view &mdash; <tt>{{ datatype.name }}</tt></h2>
+<h2><tt>{{ datatype.name }}</tt></h2>
 
 
 <h3>Details</h3>
@@ -36,6 +36,7 @@
 {% endfor %}
 </table>
 
+{% if constraints %}
 <h3>Basic constraints</h3>
 
 <table>
@@ -50,5 +51,6 @@
 </tr>
 {% endfor %}
 </table>
+{% endif %}
 
 {% endblock %}

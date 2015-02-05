@@ -87,8 +87,8 @@ def set_up_directory(directory_to_use, tolerate=False):
         for path in paths:
             if tolerate:
                 if (path == os.path.join(directory_to_use, dirnames.IN_DIR) or
-                            path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
-                            path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
+                        path == os.path.join(directory_to_use, dirnames.OUT_DIR) or
+                        path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
                     continue
             raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
@@ -129,11 +129,15 @@ class FileReadHandler:
 
     If the file_handle is given, then seeks the beginning of the file.
     Otherwise, opens the file using the file_path.
-    Closes the file upon exiting the with-clause.
+    Only closes the file upon exit if the file source was a string file path.
     """
     def __init__(self, file_path, file_handle, access_mode):
-        self.file_path = file_path
-        self.file_handle = file_handle
+        if file_handle:
+            self.file_handle = file_handle
+            self.file_path = None
+        else:
+            self.file_path = file_path
+            self.file_handle = None
         self.access_mode = access_mode
 
     def __enter__(self):
@@ -144,4 +148,5 @@ class FileReadHandler:
         return self.file_handle
 
     def __exit__(self, type, value, traceback):
-        self.file_handle.close()
+        if self.file_path:
+            self.file_handle.close()

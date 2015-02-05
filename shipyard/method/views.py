@@ -51,6 +51,11 @@ def return_crv_forms(query, field_errors, backend_exceptions, is_new):
     to be returned as HttpResponse.
 
     NOTE: cannot set default value of FileField due to security.
+    :param query: Dictionary containing POST data
+    :param exceptions: Dictionary containing exception messages with custom keys
+    :param is_new: modify form if user is attempting to create a new CodeResource
+        (prototype) or revising an existing one (revision)
+    :return: populated Form objects to render in context
     """
 
     if is_new:
@@ -411,7 +416,7 @@ def return_method_forms (query, exceptions):
                                       'revision_desc': query['revision_desc'],
                                       'coderesource': query['coderesource'],
                                       'revisions': query['revisions'],
-                                      'deterministic': query.has_key('deterministic')})
+                                      'reusable': query['reusable']})
 
     for key, msg in exceptions.iteritems():
         method_form.errors.update({key: msg})
@@ -524,7 +529,7 @@ def parse_method_form(query, family=None, parent_method=None):
                 revision_desc=query['revision_desc'],
                 revision_parent=parent_method,
                 driver=coderesource_revision,
-                deterministic=query.has_key('deterministic'),
+                reusable=query['reusable'],
                 user=query["user"]
             )
 
@@ -574,10 +579,6 @@ def method_add(request, id=None):
 
         # Add the requesting user to the query.
         query["user"] = request.user
-        # FIXME for the moment everyone is allowed access.
-        query["users_allowed"] = []
-        if query["shared"]:
-            query["groups_allowed"] = [everyone]
 
         exceptions = parse_method_form(query, this_family)
         if exceptions is None:
@@ -626,10 +627,6 @@ def method_revise(request, id):
         query = request.POST.dict()
         query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
         query["user"] = request.user
-        # FIXME same issue as in method_add where everyone is allowed access.
-        query["users_allowed"] = []
-        if query["shared"]:
-            query["groups_allowed"] = [everyone]
 
         exceptions = parse_method_form(query, family=family, parent_method=parent_method)
         if exceptions is None:
@@ -641,7 +638,7 @@ def method_revise(request, id):
         method_form = MethodReviseForm(initial={#'revision_name': parent_method.revision_name,
                                                 'revision_desc': parent_method.revision_desc,
                                                 'revisions': parent_revision.pk,
-                                                'deterministic': parent_method.deterministic})
+                                                'reusable': parent_method.reusable})
         xput_forms = []
         inputs = parent_method.inputs.order_by("dataset_idx")
         outputs = parent_method.outputs.order_by("dataset_idx")

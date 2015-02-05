@@ -7,7 +7,7 @@
     margin-top: -2.5em;
 }
 #pipeline_ctrl {
-    position: fixed;
+    position: absolute;
     top: 46px; left: 0;
     width: 100%;
     height: 1.5em;
@@ -46,12 +46,16 @@ ul#id_ctrl_nav li:hover {
     border: 1px solid #aaa;
     display: none;
     background: #fff;
+    width: 250px;
 }
 .input-label { color: #ccc; }
 
 #id_datatype_name, #id_select_method_family, 
 #id_select_method, #id_method_name, 
-#id_revision_name, #id_select_cdt { width: 250px; }
+#id_revision_name, #id_select_cdt {
+    box-sizing: border-box;
+    width: 250px;
+}
 
 #pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
@@ -92,4 +96,53 @@ ul#id_ctrl_nav li:hover {
 }
 #dialog_form form > * {
     display: block;
+}
+#dialog_form #output_name_error {
+    display: none;
+    font-weight: bold;
+    padding: 0.25em;
+    background-color: #fff;
+    background-color: rgba(255,255,255,0.7);
+    text-align: center;
+    position: absolute;
+}
+
+.colour_picker_colour {
+    width: 20px; height: 20px;
+    display: block;
+    float: left;
+    border: 1px solid white;
+    margin: -1px -1px 0 0;
+    cursor: pointer;
+}
+#colour_picker_pick {
+    float: none;
+}
+#colour_picker_menu {
+    width: 147px;
+    display: block;
+    position: absolute;
+    display: none;
+}
+
+.context_menu {
+    position: absolute;
+    display: none;
+    border: 1px solid #ddd;
+    font-size: 1em;
+}
+.context_menu ul {
+    display: block;
+    margin: 0; padding: 0;
+    background-color: #fff;
+}
+.context_menu li {
+    display: block;
+    margin: 0; padding: 0.7em;
+    background-color: #fff;
+    padding-right: 1.5em;
+    cursor: pointer;
+}
+.context_menu li:hover {
+    background-color: #eee;
 }

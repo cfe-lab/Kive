@@ -2,26 +2,28 @@
 Shipyard unit tests pertaining to Pipeline and its relatives.
 """
 
-from django.test import TestCase
-from django.core.files import File
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import User
 from django.db.models import Count
 from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.utils import timezone
 
-import re
-import os.path
-import tempfile
-import shutil
+from constants import datatypes
 import json
+import os.path
+import re
+import shutil
+import tempfile
 
-from metadata.models import *
-from method.models import *
-from pipeline.models import *
-from librarian.models import *
-from archive.models import *
+from metadata.models import CompoundDatatype, Datatype
+from method.models import Method
+from pipeline.models import Pipeline, PipelineFamily, \
+    PipelineSerializationException, PipelineStep, PipelineStepInputCable, \
+    PipelineOutputCable
+from librarian.models import SymbolicDataset
+from archive.models import Dataset, ExecLog, User
 import method.tests
-import sandbox.tests_rm
+import sandbox.testing_utils as tools
 
 from django.core import serializers
 
@@ -30,118 +32,103 @@ from constants import datatypes, groups
 samplecode_path = "../samplecode"
 
 
-class PipelineTestSetup(method.tests.MethodTestSetup):
+def create_pipeline_test_environment(case):
+    """
+    Sets up default database state for some Pipeline unit testing.
+
+    This also sets up Methods, CR/CRR/CRDs, and DTs/CDTs as in the Metadata and Methods tests.
+    """
+    method.tests.create_method_test_environment(case)
+    case.workdir = tempfile.mkdtemp()
+
+    case.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
+    case.user.save()
+
+    # Define DNAcomp_pf
+    case.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.",
+                                     user=self.user)
+    case.DNAcomp_pf.save()
+
+    # Define DNAcompv1_p (pipeline revision)
+    case.DNAcompv1_p = case.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version",
+                                                      user=self.user)
+
+    # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
+    case.DNAcompv1_p.create_input(
+        compounddatatype=case.DNAinput_cdt,
+        dataset_name="seqs_to_complement",
+        dataset_idx=1)
+
+    # Add a step to Pipeline revision DNAcompv1_p involving
+    # a transformation DNAcompv2_m at step 1
+    step1 = case.DNAcompv1_p.steps.create(
+        transformation=case.DNAcompv2_m,
+        step_num=1)
+
+    # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
+    # From step 0, output hole "seqs_to_complement" to
+    # input hole "input" (of this step)
+    step1.cables_in.create(dest=case.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
+                           source=case.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
+
+    # Add output cabling (PipelineOutputCable) to DNAcompv1_p
+    # From step 1, output hole "output", send output to
+    # Pipeline output hole "complemented_seqs" at index 1
+    case.DNAcompv1_p.create_outcable(source_step=1,
+                                     source=step1.transformation.outputs.get(dataset_name="output"),
+                                     output_name="complemented_seqs", output_idx=1)
+
+    temporary_file, safe_fn = tempfile.mkstemp(dir=case.workdir)
+    os.close(temporary_file)
+    case.datafile = open(safe_fn, "w")
+    case.datafile.write(",".join([m.column_name for m in case.DNAinput_cdt.members.all()]))
+    case.datafile.write("\n")
+    case.datafile.write("ATCG\n")
+    case.datafile.close()
+    case.DNAinput_symDS = SymbolicDataset.create_SD(safe_fn, user=case.user, cdt=case.DNAinput_cdt,
+                                                    name="DNA input", description="input for DNAcomp pipeline")
+
+    # Define PF in order to define pipeline
+    case.test_PF = PipelineFamily(
+        name="test pipeline family",
+        description="pipeline family placeholder",
+        user=case.user)
+    case.test_PF.full_clean()
+    case.test_PF.save()
+
+    # Set up an empty Pipeline.
+    family = PipelineFamily.objects.first()
+    CompoundDatatype.objects.first()
+
+    # Nothing defined.
+    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version")
+    p.save()
+
+
+def destroy_pipeline_test_environment(case):
+    """
+    Clean up a TestCase where create_pipeline_test_environment has been called.
+    """
+    method.tests.destroy_method_test_environment(case)
+    Dataset.objects.all().delete()
+    shutil.rmtree(case.workdir)
+
+
+class PipelineTestCase(TestCase):
     """
     Set up a database state for unit testing Pipeline.
-
-    This extends MethodTestSetup, which itself extended
-    MetadataTestSetup.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
-        # Methods, CR/CRR/CRDs, and DTs/CDTs are set up by calling this.
-        super(PipelineTestSetup, self).setUp()
-        self.workdir = tempfile.mkdtemp()
-
-        self.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
-        self.user.save()
-        
-        # Define DNAcomp_pf
-        self.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.",
-                                         user=self.user)
-        self.DNAcomp_pf.save()
-
-        # Define DNAcompv1_p (pipeline revision)
-        self.DNAcompv1_p = self.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version",
-                                                          user=self.user)
-
-        # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
-        self.DNAcompv1_p.create_input(
-            compounddatatype=self.DNAinput_cdt,
-            dataset_name="seqs_to_complement",
-            dataset_idx=1)
-
-        # Add a step to Pipeline revision DNAcompv1_p involving
-        # a transformation DNAcompv2_m at step 1
-        step1 = self.DNAcompv1_p.steps.create(
-            transformation=self.DNAcompv2_m,
-            step_num=1)
-
-        # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
-        # From step 0, output hole "seqs_to_complement" to
-        # input hole "input" (of this step)
-        step1.cables_in.create(dest=self.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
-                               source=self.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
-
-        # Add output cabling (PipelineOutputCable) to DNAcompv1_p
-        # From step 1, output hole "output", send output to
-        # Pipeline output hole "complemented_seqs" at index 1
-        outcabling = self.DNAcompv1_p.create_outcable(source_step=1,
-                                                      source=step1.transformation.outputs.get(dataset_name="output"),
-                                                      output_name="complemented_seqs", output_idx=1)
-
-        
-        self.datafile = open(tempfile.mkstemp(dir=self.workdir)[1], "w")
-        self.datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
-        self.datafile.write("\n")
-        self.datafile.write("ATCG\n")
-        self.datafile.close()
-
-        self.DNAinput_symDS = SymbolicDataset.create_SD(self.datafile.name, user=self.user,
-                                                        cdt=self.DNAinput_cdt, name="DNA input",
-                                                        description="input for DNAcomp pipeline")
-
-        # Define PF in order to define pipeline
-        self.test_PF = PipelineFamily(
-            name="test pipeline family",
-            description="pipeline family placeholder",
-            user=self.user)
-        self.test_PF.full_clean()
-        self.test_PF.save()
-
-        self.manufacture_pipeline()
-
-    def manufacture_pipeline(self):
-        """Create Pipelines in various stages of manufacture."""
-
-        family = PipelineFamily.objects.first()
-        cdt = CompoundDatatype.objects.first()
-
-        # Nothing defined.
-        p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version", user=self.user)
-        p.save()
+        create_pipeline_test_environment(self)
 
     def tearDown(self):
-        super(PipelineTestSetup, self).tearDown()
-        Dataset.objects.all().delete()
-        shutil.rmtree(self.workdir)
-
-    def pipelinestep_to_dict(self, ps):
-        from django.core.serializers import serialize, deserialize
-        my_dict = json.loads(serialize("json", [ps]))[0]
-        my_dict["transformation"] = json.loads(serialize("json", [ps.transformation.definite]))[0]
-        return my_dict
-
-    def dict_to_pipelinestep(self, dict_ps):
-        from django.core.serializers import serialize, deserialize
-        transf = next(serializers.deserialize("json", json.dumps([dict_ps["transformation"]]))).object
-        del dict_ps["transformation"]
-        ps = next(serializers.deserialize("json", json.dumps([dict_ps]))).object
-        return ps
-
-    def test_foo(self):
-        from pprint import pprint
-        from django.core.serializers import serialize, deserialize
-        p = PipelineStep.objects.first()
-        pprint(p.represent_as_dict())
-        print("*"*80)
-        my_dict = self.pipelinestep_to_dict(p)
-        pprint(my_dict)
-        p2 = self.dict_to_pipelinestep(my_dict)
-        self.assertEqual(p2, p)
+        destroy_pipeline_test_environment(self)
 
 
-class PipelineFamilyTests(PipelineTestSetup):
+class PipelineFamilyTests(PipelineTestCase):
 
     def test_unicode(self):
         """
@@ -154,7 +141,7 @@ class PipelineFamilyTests(PipelineTestSetup):
         self.assertIsNone(PipelineFamily.objects.first().delete())
 
 
-class PipelineTests(PipelineTestSetup):
+class PipelineTests(PipelineTestCase):
     """Tests for basic Pipeline functionality."""
     
     def test_pipeline_one_valid_input_no_steps(self):
@@ -223,7 +210,7 @@ class PipelineTests(PipelineTestSetup):
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=10)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=10)
         self.assertRaisesRegexp(
                 ValidationError,
                 "Steps are not consecutively numbered starting from 1",
@@ -236,9 +223,9 @@ class PipelineTests(PipelineTestSetup):
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
 
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
-        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2)
-        step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
+        foo.steps.create(transformation=self.DNArecomp_m, step_num=2)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=3)
         
         self.assertEquals(foo.clean(), None)
 
@@ -249,9 +236,9 @@ class PipelineTests(PipelineTestSetup):
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
 
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=3)
-        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=2)
-        step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=3)
+        foo.steps.create(transformation=self.DNArecomp_m, step_num=2)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
         
         self.assertEquals(foo.clean(), None)
 
@@ -262,9 +249,9 @@ class PipelineTests(PipelineTestSetup):
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                           dataset_name="oneinput", dataset_idx=1)
 
-        step1 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
-        step2 = foo.steps.create(transformation=self.DNArecomp_m, step_num=4)
-        step3 = foo.steps.create(transformation=self.DNAcompv2_m, step_num=5)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=1)
+        foo.steps.create(transformation=self.DNArecomp_m, step_num=4)
+        foo.steps.create(transformation=self.DNAcompv2_m, step_num=5)
         
         self.assertRaisesRegexp(
                 ValidationError,
@@ -2168,7 +2155,7 @@ class PipelineTests(PipelineTestSetup):
 
         # Add outcable for 2nd output (Which is deleted)
         # August 24, 2013: this is now allowed, so tests should be fine.
-        outcable2 = foo.create_outcable(
+        foo.create_outcable(
             output_name="output_a_b_c_mean",
             output_idx=2,
             source_step=1,
@@ -2238,13 +2225,13 @@ class PipelineTests(PipelineTestSetup):
         # The second:
         # self.singlet_cdt, output_a_b_c_mean, 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "output_a_b_c_squared")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "output_a_b_c_mean")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.singlet_cdt)
@@ -2313,13 +2300,13 @@ class PipelineTests(PipelineTestSetup):
         # self.DNAoutput_cdt, "outputone", 1, None, None
         # self.DNAinput_cdt, "outputtwo", 2, None, None
         self.assertEquals(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
         self.assertEquals(curr_out_1.dataset_name, "outputone")
         self.assertEquals(curr_out_1.dataset_idx, 1)
         self.assertEquals(curr_out_1.get_cdt(), self.DNAoutput_cdt)
         self.assertEquals(curr_out_1.get_min_row(), None)
         self.assertEquals(curr_out_1.get_max_row(), None)
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEquals(curr_out_2.dataset_name, "outputtwo")
         self.assertEquals(curr_out_2.dataset_idx, 2)
         self.assertEquals(curr_out_2.get_cdt(), self.DNAinput_cdt)
@@ -2350,7 +2337,7 @@ class PipelineTests(PipelineTestSetup):
         self.assertIsNone(pipeline.delete())
 
 
-class PipelineStepTests(PipelineTestSetup):
+class PipelineStepTests(PipelineTestCase):
 
     def test_pipelineStep_without_pipeline_set_unicode(self):
         """Test unicode representation when no pipeline is set."""
@@ -2636,19 +2623,19 @@ class PipelineStepTests(PipelineTestSetup):
         PipelineStep.objects.first().delete()
 
 
-class PipelineStepInputCableTests(PipelineTestSetup):
+class PipelineStepInputCableTests(PipelineTestCase):
     def test_delete_pipeline_step_input_cable(self):
         """Deleting a PipelineStepInputCable is possible."""
         self.assertIsNone(PipelineStepInputCable.objects.first().delete())
 
 
-class PipelineOutputCableTests(PipelineTestSetup):
+class PipelineOutputCableTests(PipelineTestCase):
     def test_delete_pipeline_output_cable(self):
         """Deleting a PipelineOutputCable is possible."""
         self.assertIsNone(PipelineOutputCable.objects.first().delete())
 
 
-class PipelineStepRawDeleteTests(PipelineTestSetup):
+class PipelineStepRawDeleteTests(PipelineTestCase):
 
     def test_PipelineStep_clean_raw_output_to_be_deleted_good(self):
         # Define a single raw input, and a raw + CSV (self.triplet_cdt) output for self.script_4_1_M
@@ -2686,7 +2673,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
 
     def test_PipelineStep_clean_delete_non_existent_tro_bad(self):
         # Define a 1-step pipeline containing self.script_4_1_M which has a raw_output
-        raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
+        self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
         pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version", user=self.user)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
@@ -2698,7 +2685,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         raw_output_unrelated = self.script_4_2_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=1)
         pipeline_unrelated = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
                                                          user=self.user)
-        step1_unrelated = pipeline_unrelated.steps.create(transformation=self.script_4_2_M,step_num=1)
+        pipeline_unrelated.steps.create(transformation=self.script_4_2_M, step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in an unrelated method
         step1.add_deletion(raw_output_unrelated)
@@ -2712,7 +2699,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         self.script_4_1_M.inputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
-        raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
+        self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         self.script_4_2_M = Method(revision_name="s42", revision_desc="s42",
                                    family = self.test_MF, driver = self.script_4_1_CRR,
@@ -2729,7 +2716,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         pipeline_2 = self.test_PF.members.create(revision_name="bar",revision_desc="Bar version", user=self.user)
                                                  
         pipeline_2.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1_unrelated = pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
+        pipeline_2.steps.create(transformation=self.script_4_2_M,step_num=1)
 
         # For pipeline 1, mark a raw output to be deleted in a different pipeline (pipeline_2)
         step1.add_deletion(unrelated_raw_output)
@@ -2739,7 +2726,7 @@ class PipelineStepRawDeleteTests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError, error_msg, pipeline_1.clean)
 
 
-class RawOutputCableTests(PipelineTestSetup):
+class RawOutputCableTests(PipelineTestCase):
 
     def test_PipelineOutputCable_raw_outcable_references_valid_step_good(self):
 
@@ -2782,7 +2769,7 @@ class RawOutputCableTests(PipelineTestSetup):
                                                       user=self.user)
         pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
-        step2 = pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2)
+        pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=2)
 
         # Outmap a raw cable from a valid step + valid output
         outcable1 = pipeline_1.create_raw_outcable(raw_output_name="validName",
@@ -2809,7 +2796,7 @@ class RawOutputCableTests(PipelineTestSetup):
         self.script_4_1_M.outputs.all().delete()
         self.script_4_1_M.create_input(dataset_name="a_b_c",dataset_idx=1)
         self.script_4_1_M.create_output(compounddatatype=self.triplet_cdt, dataset_name="a_b_c_squared",dataset_idx=1)
-        raw_output = self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
+        self.script_4_1_M.create_output(dataset_name="a_b_c_squared_raw",dataset_idx=2)
 
         # Define an unrelated method and give it a raw output
         unrelated_method = Method(
@@ -2824,7 +2811,7 @@ class RawOutputCableTests(PipelineTestSetup):
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
                                                       user=self.user)
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+        self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         # Outmap a raw cable to a valid step but a TransformationRawOutput that does not exist at the specified PS
         outcable1 = self.pipeline_1.outcables.create(
@@ -2852,7 +2839,7 @@ class RawOutputCableTests(PipelineTestSetup):
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
                                                       user=self.user)
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+        self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         # Outmap a raw cable to an invalid step
         outcable1 = self.pipeline_1.outcables.create(output_name="validName",
@@ -2866,7 +2853,7 @@ class RawOutputCableTests(PipelineTestSetup):
                                 self.pipeline_1.complete_clean)
 
 
-class RawInputCableTests(PipelineTestSetup):
+class RawInputCableTests(PipelineTestCase):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
         """
         Cable is fed from a pipeline input.
@@ -2918,7 +2905,7 @@ class RawInputCableTests(PipelineTestSetup):
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
                                                       user=self.user)
         self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1_pipeline_1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+        self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
         self.pipeline_2 = self.test_PF.members.create(revision_name="v2", revision_desc="Second version",
                                                       user=self.user)
@@ -3007,7 +2994,7 @@ class RawInputCableTests(PipelineTestSetup):
             dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
             source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"))
 
-        rawcable2 = step2.create_raw_cable(
+        step2.create_raw_cable(
             dest=self.script_4_1_M.inputs.get(dataset_name="a_b_c"),
             source=self.pipeline_1.inputs.get(dataset_name="a_b_c_pipeline"))
 
@@ -3021,7 +3008,7 @@ class RawInputCableTests(PipelineTestSetup):
             rawcable1.clean)
 
 
-class RawSaveTests(PipelineTestSetup):
+class RawSaveTests(PipelineTestCase):
     def test_method_with_raw_input_defined_do_not_copy_raw_xputs_to_new_revision(self):
         # Give script_4_1_M a raw input
         self.script_4_1_M.inputs.all().delete()
@@ -3076,7 +3063,7 @@ class RawSaveTests(PipelineTestSetup):
 
 
 # August 23, 2013: these are kind of redundant now but what the hey.
-class SingleRawInputTests(PipelineTestSetup):
+class SingleRawInputTests(PipelineTestCase):
     def test_transformation_rawinput_coexists_with_nonraw_inputs_clean_good(self):
 
         # Define raw input "a_b_c" at index = 1
@@ -3125,7 +3112,7 @@ class SingleRawInputTests(PipelineTestSetup):
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        raw_input_cable_1 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input)
 
@@ -3144,11 +3131,11 @@ class SingleRawInputTests(PipelineTestSetup):
         pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        raw_input_cable_1 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input)
 
-        raw_input_cable_2 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input)
 
@@ -3176,11 +3163,11 @@ class SingleRawInputTests(PipelineTestSetup):
 
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        raw_input_cable_1 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input)
 
-        raw_input_cable_2 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input_2)
 
@@ -3189,28 +3176,25 @@ class SingleRawInputTests(PipelineTestSetup):
         self.assertRaisesRegexp(ValidationError, errorMessage,
                 step1.complete_clean)
 
-        
     def test_PipelineStep_completeClean_check_underquenching_of_raw_inputs_bad(self):
         # Wire 1 raw input to a pipeline step that expects only 1 input
         self.script_4_1_M.inputs.all().delete()
-        method_raw_in = self.script_4_1_M.create_input(dataset_name = "a_b_c",dataset_idx = 1)
+        self.script_4_1_M.create_input(dataset_name = "a_b_c", dataset_idx = 1)
         
         # Define 1-step pipeline with a single raw pipeline input
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
                                                       user=self.user)
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M, step_num=1)
 
         errorMessage = "Input \"a_b_c\" to transformation at step 1 is not cabled'"
-
         self.assertEquals(step1.clean(), None)
-
         self.assertRaisesRegexp(
             ValidationError,
             errorMessage,
             step1.complete_clean)
 
 
-class SeveralRawInputsTests(PipelineTestSetup):
+class SeveralRawInputsTests(PipelineTestCase):
     def test_transformation_several_rawinputs_coexists_with_several_nonraw_inputs_clean_good(self):
         # Note that this method wouldn't actually run -- inputs don't match.
 
@@ -3312,15 +3296,15 @@ class SeveralRawInputsTests(PipelineTestSetup):
 
         step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
 
-        raw_input_cable_1 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input)
 
-        raw_input_cable_2 = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in_2,
             source = pipeline_input_2)
 
-        raw_input_cable_over = step1.create_raw_cable(
+        step1.create_raw_cable(
             dest = method_raw_in,
             source = pipeline_input_2)
 
@@ -3337,7 +3321,7 @@ class SeveralRawInputsTests(PipelineTestSetup):
 
 
 # August 23, 2013: these also seem pretty redundant, but let's just leave 'em.
-class SingleRawOutputTests(PipelineTestSetup):
+class SingleRawOutputTests(PipelineTestCase):
     def test_transformation_rawoutput_coexists_with_nonraw_outputs_clean_good(self):
 
         # Define raw output "a_b_c" at index = 1
@@ -3372,7 +3356,7 @@ class SingleRawOutputTests(PipelineTestSetup):
             self.script_4_1_M.clean)
 
 
-class SeveralRawOutputsTests(PipelineTestSetup):
+class SeveralRawOutputsTests(PipelineTestCase):
 
     def test_transformation_several_rawoutputs_coexists_with_several_nonraw_outputs_clean_good(self):
         # Note: the method we define here doesn't correspond to reality; the
@@ -3423,7 +3407,7 @@ class SeveralRawOutputsTests(PipelineTestSetup):
             self.script_4_1_M.clean)
 
 
-class CustomWiringTests(PipelineTestSetup):
+class CustomWiringTests(PipelineTestCase):
 
     def test_CustomCableWire_wires_from_pipeline_input_identical_dt_good(self):
         """Custom wiring that connects identical datatypes together, on a cable leading from pipeline input (not PS output)."""
@@ -3460,7 +3444,7 @@ class CustomWiringTests(PipelineTestSetup):
         self.assertEquals(my_cable1.clean(), None)
 
         self.assertRaisesRegexp(ValidationError,
-            'Destination member "string: b" has no wires leading to it',
+            'Destination member "string: (b|c)" has no wires leading to it',
             my_cable1.clean_and_completely_wired)
 
         # Here, we wire the remaining 2 CDT members
@@ -3618,19 +3602,19 @@ class CustomWiringTests(PipelineTestSetup):
 
 
 # August 23, 2013: This is pretty redundant now.
-class PipelineOutputCableRawTests(PipelineTestSetup):
+class PipelineOutputCableRawTests(PipelineTestCase):
     
     def test_pipeline_check_for_colliding_outputs_clean_good(self):
 
         # Define 1-step pipeline with 2 raw pipeline inputs
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
                                                       user=self.user)
-        pipeline_input = self.pipeline_1.create_input(dataset_name="a_b_c_pipeline",dataset_idx=1)
-        step1 = self.pipeline_1.steps.create(transformation=self.script_4_1_M,step_num=1)
+        self.pipeline_1.create_input(dataset_name="a_b_c_pipeline", dataset_idx=1)
+        self.pipeline_1.steps.create(transformation=self.script_4_1_M, step_num=1)
 
         script_4_1_M = self.script_4_1_M
 
-        output_1 = script_4_1_M.create_output(
+        script_4_1_M.create_output(
             compounddatatype=self.mix_triplet_cdt,
             dataset_name="scriptOutput1",
             dataset_idx=1)
@@ -3669,13 +3653,13 @@ class PipelineOutputCableRawTests(PipelineTestSetup):
         self.assertEquals(self.pipeline_1.clean(), None)
 
 
-class CustomRawOutputCablingTests(PipelineTestSetup):
+class CustomRawOutputCablingTests(PipelineTestCase):
 
     def test_Pipeline_create_multiple_raw_outputs_with_raw_outmap(self):
         self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
                                                        user=self.user)
 
-        pipeline_in = self.my_pipeline.create_input(
+        self.my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,
             dataset_name="pipeline_in_1",
             dataset_idx=1)
@@ -3686,12 +3670,12 @@ class CustomRawOutputCablingTests(PipelineTestSetup):
             dataset_idx=1)
 
         # Add a step
-        my_step1 = self.my_pipeline.steps.create(
+        self.my_pipeline.steps.create(
             transformation=self.testmethod,
             step_num=1)
 
         # Add raw outmap
-        outmap = self.my_pipeline.create_raw_outcable(
+        self.my_pipeline.create_raw_outcable(
             raw_output_name="raw_out",
             raw_output_idx=1,
             source_step=1,
@@ -3701,13 +3685,12 @@ class CustomRawOutputCablingTests(PipelineTestSetup):
         self.my_pipeline.create_outputs()
         self.assertEquals(self.my_pipeline.outputs.all().count(), 1)
 
-        raw_output = self.my_pipeline.outputs.all()[0]
+        raw_output = self.my_pipeline.outputs.get(dataset_idx=1)
 
         self.assertEquals(raw_output.dataset_name, "raw_out")
-        self.assertEquals(raw_output.dataset_idx, 1)
 
         # Add another raw outmap
-        outmap2 = self.my_pipeline.create_raw_outcable(
+        self.my_pipeline.create_raw_outcable(
             raw_output_name="raw_out_2",
             raw_output_idx=2,
             source_step=1,
@@ -3716,13 +3699,12 @@ class CustomRawOutputCablingTests(PipelineTestSetup):
         self.my_pipeline.create_outputs()
         self.assertEquals(self.my_pipeline.outputs.all().count(), 2)
 
-        raw_output_2 = self.my_pipeline.outputs.all()[1]
+        raw_output_2 = self.my_pipeline.outputs.get(dataset_idx=2)
 
         self.assertEquals(raw_output_2.dataset_name, "raw_out_2")
-        self.assertEquals(raw_output_2.dataset_idx, 2)
 
         
-class PipelineStepInputCable_tests(PipelineTestSetup):
+class PipelineStepInputCable_tests(PipelineTestCase):
 
     def test_PSIC_clean_and_completely_wired_CDT_equal_no_wiring_good(self):
         # Define pipeline with mix_triplet_cdt (string, DNA, string) pipeline input
@@ -3908,21 +3890,20 @@ class PipelineStepInputCable_tests(PipelineTestSetup):
 
 
 # August 29, 2013: reworked to handle new design for outcables.
-class CustomOutputWiringTests(PipelineTestSetup):
+class CustomOutputWiringTests(PipelineTestCase):
 
     def test_CustomOutputCableWire_clean_references_invalid_CDTM(self):
-
         self.my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version",
                                                        user=self.user)
-        pipeline_in = self.my_pipeline.create_input(compounddatatype=self.triplet_cdt, dataset_name="pipeline_in_1",
-                                                    dataset_idx=1)
+        self.my_pipeline.create_input(compounddatatype=self.triplet_cdt, dataset_name="pipeline_in_1",
+                                      dataset_idx=1)
 
         # Give the method self.triplet_cdt output
         method_out = self.testmethod.create_output(dataset_name="TestOut", dataset_idx=1,
                                                    compounddatatype=self.triplet_cdt)
 
         # Add a step
-        my_step1 = self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
+        self.my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
 
         # Add an output cable
         outcable1 = self.my_pipeline.create_outcable(output_name="blah", output_idx=1, source_step=1, source=method_out)
@@ -3943,7 +3924,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
         self.my_pipeline = self.test_PF.members.create(revision_name="foo",revision_desc="Foo version",
                                                        user=self.user)
 
-        pipeline_in = self.my_pipeline.create_input(
+        self.my_pipeline.create_input(
             compounddatatype=self.triplet_cdt,
             dataset_name="pipeline_in_1",
             dataset_idx=1)
@@ -3955,7 +3936,7 @@ class CustomOutputWiringTests(PipelineTestSetup):
             compounddatatype=self.mix_triplet_cdt)
 
         # Add a step
-        my_step1 = self.my_pipeline.steps.create(
+        self.my_pipeline.steps.create(
             transformation=self.testmethod, step_num=1)
 
         # Add an output cable with the following output CDT:
@@ -3982,19 +3963,19 @@ class CustomOutputWiringTests(PipelineTestSetup):
             output_cdt=new_cdt)
         
         # Add wiring
-        wire1 = outcable1.custom_wires.create(
+        outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[0],
             dest_pin=pin1)
 
-        wire2 = outcable1.custom_wires.create(
+        outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[1],
             dest_pin=pin2)
 
-        wire3 = outcable1.custom_wires.create(
+        outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[0],
             dest_pin=pin3)
 
-        wire4 = outcable1.custom_wires.create(
+        outcable1.custom_wires.create(
             source_pin=method_out.get_cdt().members.all()[2],
             dest_pin=pin4)
 
@@ -4024,12 +4005,14 @@ class CustomOutputWiringTests(PipelineTestSetup):
 
 
 # June 19, 2014: for the functions that serialize and de-serialize Pipelines.
-class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
+class PipelineSerializationTests(TestCase):
     """
     Tests of Pipeline serialization and deserialization.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
-        sandbox.tests_rm.UtilityMethods.setUp(self)
+        tools.create_sandbox_testing_tools_environment(self)
 
         # Set up a CDT with two elements to allow some wiring to occur.
         self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
@@ -4044,6 +4027,9 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
         self.string_singlet = CompoundDatatype()
         self.string_singlet.save()
         self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
+
+    def tearDown(self):
+        tools.destroy_sandbox_testing_tools_environment(self)
 
     def _check_pipeline_own_members(self, dict_repr, pipeline):
         """
@@ -4065,7 +4051,8 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
                 "revision_parent_pk",
                 "pipeline_inputs",
                 "pipeline_steps",
-                "pipeline_outputs"
+                "pipeline_outputs",
+                "is_published_version"
             })
 
         self.assertEquals(dict_repr["user"], pipeline.user.pk)
@@ -4084,6 +4071,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
         self.assertEquals(dict_repr["revision_name"], pipeline.revision_name)
         self.assertEquals(dict_repr["revision_desc"], pipeline.revision_desc)
         self.assertEquals(dict_repr["revision_number"], pipeline.revision_number)
+        self.assertEquals(dict_repr["is_published_version"], pipeline.is_published_version)
 
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
@@ -4235,7 +4223,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_input(self):
         """Serializing a Pipeline input."""
-        my_pipeline = self.make_first_pipeline("serialize input", "For testing serializing input")
+        my_pipeline = tools.make_first_pipeline("serialize input", "For testing serializing input")
 
         input_1 = my_pipeline.create_input("foo", 1, compounddatatype=self.string_doublet)
         input_raw = my_pipeline.create_input("bar", 2, compounddatatype=None, x=0.2, y=0.3)
@@ -4249,7 +4237,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
         """
         Define a Pipeline input from a dictionary.
         """
-        my_pipeline = self.make_first_pipeline("deserialize input", "For testing deserializing input")
+        my_pipeline = tools.make_first_pipeline("deserialize input", "For testing deserializing input")
 
         input_1_dict = {
             "dataset_name": "foo",
@@ -4292,9 +4280,9 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_incable_no_wires(self):
         """Serializing PSICs with no wiring."""
-        my_pipeline = self.make_first_pipeline("serialize PSIC", "For testing serializing PSIC")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("serialize PSIC", "For testing serializing PSIC")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
+                                     "input_to_not_touch", "untouched_output")
 
         # All of the input cables in this Pipeline are unwired.
         for step in my_pipeline.steps.all():
@@ -4303,7 +4291,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_incable_no_wires(self):
         """Define PSICs with no wiring from dictionaries."""
-        my_pipeline = self.make_first_pipeline("deserialize PSIC", "For testing deserializing PSIC")
+        my_pipeline = tools.make_first_pipeline("deserialize PSIC", "For testing deserializing PSIC")
         my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=self.cdt_string)
         step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop)
 
@@ -4341,9 +4329,9 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_raw_incables(self):
         """Serializing raw PSICs with no wiring."""
-        my_pipeline = self.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw, self.method_noop_raw],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("serialize raw PSIC", "For testing serializing raw PSIC")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw, self.method_noop_raw],
+                                     "input_to_not_touch", "untouched_output")
 
         # All of the input cables in this Pipeline are unwired.
         for step in my_pipeline.steps.all():
@@ -4352,7 +4340,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_raw_incables(self):
         """Define raw PSICs from dictionaries."""
-        my_pipeline = self.make_first_pipeline("de-serialize raw PSIC", "For testing de-serializing raw PSIC")
+        my_pipeline = tools.make_first_pipeline("de-serialize raw PSIC", "For testing de-serializing raw PSIC")
         my_pipeline.create_input("input_to_not_touch", 1, compounddatatype=None)
         step_1 = my_pipeline.steps.create(step_num=1, transformation=self.method_noop_raw)
 
@@ -4390,14 +4378,14 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_wire(self):
         """Serializing a CustomCableWire."""
-        my_pipeline = self.make_first_pipeline("serialize wire", "For testing serializing a wire")
+        my_pipeline = tools.make_first_pipeline("serialize wire", "For testing serializing a wire")
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
@@ -4412,14 +4400,14 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_wire(self):
         """Defining a CustomCableWire from a dictionary."""
-        my_pipeline = self.make_first_pipeline("de-serialize wire", "For testing de-serializing a wire")
+        my_pipeline = tools.make_first_pipeline("de-serialize wire", "For testing de-serializing a wire")
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
@@ -4436,14 +4424,14 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_incable_non_trivial(self):
         """Serializing a PSIC with wiring."""
-        my_pipeline = self.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
@@ -4468,15 +4456,15 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_incable_non_trivial(self):
         """Defining PSICs with wiring from dictionaries."""
-        my_pipeline = self.make_first_pipeline("deserialize non-trivial PSIC",
+        my_pipeline = tools.make_first_pipeline("deserialize non-trivial PSIC",
                                                "For testing deserializing non-trivial PSIC")
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
 
@@ -4510,14 +4498,14 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_incable_non_trivial_deleted(self):
         """Serializing a PSIC with wiring that keeps its output."""
-        my_pipeline = self.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
+        my_pipeline = tools.make_first_pipeline("serialize non-trivial PSIC", "For testing serializing non-trivial PSIC")
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable = first_step.cables_in.create(source=input_1, source_step=0,
@@ -4546,15 +4534,15 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_incable_non_trivial_deleted(self):
         """Defining a PSIC with wiring that keeps its output using a dictionary."""
-        my_pipeline = self.make_first_pipeline("de-serialize non-trivial PSIC",
+        my_pipeline = tools.make_first_pipeline("de-serialize non-trivial PSIC",
                                                "For testing de-serializing non-trivial PSIC")
-        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
+        my_pipeline.create_input("pi", 1, compounddatatype=self.string_doublet)
 
-        self.method_doublet_noop = self.make_first_method(
+        self.method_doublet_noop = tools.make_first_method(
             "string doublet noop",
             "a noop on a two-column input",
             self.coderev_noop)
-        self.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_doublet_noop)
         first_cable_dict = {
@@ -4588,18 +4576,18 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_step_one_input_no_deletions(self):
         """Serializing a PS."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "serialize PS", "For testing serializing PSs with one input and no deletions"
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_noop)
-        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+        first_step.cables_in.create(source=input_1, source_step=0,
                                                   dest=self.method_noop.inputs.first())
 
         second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_noop,
                                                name="noop2", x=50, y=200)
-        second_cable = second_step.cables_in.create(source=self.method_noop.outputs.first(),
+        second_step.cables_in.create(source=self.method_noop.outputs.first(),
                                                     source_step=1,
                                                     dest=self.method_noop.inputs.first())
 
@@ -4608,10 +4596,10 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_step_one_input_no_deletions(self):
         """Defining a PS from a dictionary."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "de-serialize PS", "For testing de-serializing PSs with one input and no deletions"
         )
-        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+        my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step_dict = {
             "transf_pk": self.method_noop.pk,
@@ -4660,33 +4648,33 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
     def test_serialize_step_subpipeline(self):
         """Serializing a PS whose Transformation is a Pipeline."""
         # First, define a simple sub-Pipeline.
-        sub_pipeline = self.make_first_pipeline(
+        sub_pipeline = tools.make_first_pipeline(
             "sub-Pipeline", "For use as a sub-Pipeline"
         )
-        self.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
+        tools.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
 
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted"
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=sub_pipeline)
-        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+        first_step.cables_in.create(source=input_1, source_step=0,
                                                   dest=sub_pipeline.inputs.first())
         self._check_step(first_step.represent_as_dict(), first_step)
 
     def test_deserialize_step_subpipeline(self):
         """Define a PS whose Transformation is a Pipeline from a dictionary."""
         # First, define a simple sub-Pipeline as above.
-        sub_pipeline = self.make_first_pipeline(
+        sub_pipeline = tools.make_first_pipeline(
             "sub-Pipeline", "For use as a sub-Pipeline"
         )
-        self.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
+        tools.create_linear_pipeline(sub_pipeline, [self.method_noop, self.method_noop], "sp_in1", "sp_out1")
 
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
         )
-        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+        my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step_dict = {
             "transf_pk": sub_pipeline.pk,
@@ -4712,18 +4700,18 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_serialize_step_one_input_output_deleted(self):
         """Serializing a PS with one input and one output (which is deleted)."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "serialize PS with deletion", "For testing serializing PSs with one input and only output deleted"
         )
         input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=self.method_noop)
-        first_cable = first_step.cables_in.create(source=input_1, source_step=0,
+        first_step.cables_in.create(source=input_1, source_step=0,
                                                   dest=self.method_noop.inputs.first())
         first_step.add_deletion(self.method_noop.outputs.first())
 
         second_step = my_pipeline.steps.create(step_num=2, transformation=self.method_noop)
-        second_cable = second_step.cables_in.create(source=self.method_noop.outputs.first(),
+        second_step.cables_in.create(source=self.method_noop.outputs.first(),
                                                     source_step=1,
                                                     dest=self.method_noop.inputs.first())
         second_step.add_deletion(self.method_noop.outputs.first())
@@ -4733,10 +4721,10 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
 
     def test_deserialize_step_one_input_output_deleted(self):
         """Defining a PS with one input and one output (which is deleted) from a dictionary."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "de-serialize PS with deletion", "For testing de-serializing PSs with one input and only output deleted"
         )
-        input_1 = my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
+        my_pipeline.create_input("pi", 1, compounddatatype=self.cdt_string)
 
         first_step_dict = {
             "transf_pk": self.method_noop.pk,
@@ -4785,7 +4773,7 @@ class PipelineSerializationTests(TestCase, sandbox.tests_rm.UtilityMethods):
     def test_serialize_step_several_inputs_outputs(self):
         """Serializing a PS with several inputs and outputs."""
         # Define a simple CodeResource and first revision for a method with multiple inputs and outputs.
-        coderev_3cat = self.make_first_revision(
+        coderev_3cat = tools.make_first_revision(
             "threeintwoout",
             "Sticks together two compatible CSV files and passes through a third file",
             "threeintwoout.sh",
@@ -4796,17 +4784,17 @@ cat "$3" >> "$5"
 """)
 
         # The corresponding method.
-        method_threetwo_string_doublet = self.make_first_method(
+        method_threetwo_string_doublet = tools.make_first_method(
             "string doublet three-in two-out",
             "appends two compatible CSV files and passes through a third",
             coderev_3cat)
-        mi_1 = method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
-        mi_2 = method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
-        mi_3 = method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
+        method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
+        method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
+        method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
         mo_1 = method_threetwo_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
         mo_2 = method_threetwo_string_doublet.create_output("passedfile", 2, compounddatatype=self.cdt_string)
 
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "serialize multi-input PS", "For testing serializing PSs with several inputs"
         )
         input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
@@ -4814,11 +4802,11 @@ cat "$3" >> "$5"
         input_3 = my_pipeline.create_input("pi_3", 3, compounddatatype=self.cdt_string)
 
         first_step = my_pipeline.steps.create(step_num=1, transformation=method_threetwo_string_doublet)
-        cable_1 = first_step.cables_in.create(source=input_1, source_step=0,
+        first_step.cables_in.create(source=input_1, source_step=0,
                                               dest=method_threetwo_string_doublet.inputs.get(dataset_idx=1))
-        cable_2 = first_step.cables_in.create(source=input_2, source_step=0,
+        first_step.cables_in.create(source=input_2, source_step=0,
                                               dest=method_threetwo_string_doublet.inputs.get(dataset_idx=2))
-        cable_3 = first_step.cables_in.create(source=input_3, source_step=0,
+        first_step.cables_in.create(source=input_3, source_step=0,
                                               dest=method_threetwo_string_doublet.inputs.get(dataset_idx=3))
 
         self._check_step(first_step.represent_as_dict(), first_step)
@@ -4840,7 +4828,7 @@ cat "$3" >> "$5"
     def test_deserialize_step_several_inputs_outputs(self):
         """Defining a PS with several inputs and outputs from a dictionary."""
         # Define a simple CodeResource and first revision for a method with multiple inputs and outputs.
-        coderev_3cat = self.make_first_revision(
+        coderev_3cat = tools.make_first_revision(
             "threeintwoout",
             "Sticks together two compatible CSV files and passes through a third file",
             "threeintwoout.sh",
@@ -4851,22 +4839,22 @@ cat "$3" >> "$5"
 """)
 
         # The corresponding method.
-        method_threetwo_string_doublet = self.make_first_method(
+        method_threetwo_string_doublet = tools.make_first_method(
             "string doublet three-in two-out",
             "appends two compatible CSV files and passes through a third",
             coderev_3cat)
-        mi_1 = method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
-        mi_2 = method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
-        mi_3 = method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
+        method_threetwo_string_doublet.create_input("firstfile", 1, compounddatatype=self.string_doublet)
+        method_threetwo_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
+        method_threetwo_string_doublet.create_input("third_file", 3, compounddatatype=self.cdt_string)
         mo_1 = method_threetwo_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
         mo_2 = method_threetwo_string_doublet.create_output("passedfile", 2, compounddatatype=self.cdt_string)
 
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "de-serialize multi-input PS", "For testing de-serializing PSs with several inputs"
         )
-        input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
-        input_2 = my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
-        input_3 = my_pipeline.create_input("pi_3", 3, compounddatatype=self.cdt_string)
+        my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
+        my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
+        my_pipeline.create_input("pi_3", 3, compounddatatype=self.cdt_string)
 
         first_step_dict = {
             "transf_pk": method_threetwo_string_doublet.pk,
@@ -4922,18 +4910,18 @@ cat "$3" >> "$5"
 
     def test_serialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
-        my_pipeline = self.make_first_pipeline("two-step noop", "Double no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
+                                     "input_to_not_touch", "untouched_output")
 
         for outcable in my_pipeline.outcables.all():
             self._check_outcable(outcable.represent_as_dict(), outcable)
 
     def test_deserialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
-        my_pipeline = self.make_first_pipeline("two-step noop", "Double no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("two-step noop", "Double no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop],
+                                     "input_to_not_touch", "untouched_output")
 
         # Throw out the outcables and define my own.
         for outcable in my_pipeline.outcables.all():
@@ -4956,18 +4944,18 @@ cat "$3" >> "$5"
 
     def test_serialize_raw_outcable(self):
         """Serializing a raw POC."""
-        my_pipeline = self.make_first_pipeline("two-step raw noop", "Double raw no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
+                                     "input_to_not_touch", "untouched_output")
 
         for outcable in my_pipeline.outcables.all():
             self._check_outcable(outcable.represent_as_dict(), outcable)
 
     def test_deserialize_raw_outcable(self):
         """Defining a raw POC from a dictionary."""
-        my_pipeline = self.make_first_pipeline("two-step raw noop", "Double raw no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
+                                     "input_to_not_touch", "untouched_output")
 
         # Throw out the outcables and define my own.
         for outcable in my_pipeline.outcables.all():
@@ -4990,15 +4978,15 @@ cat "$3" >> "$5"
 
     def test_serialize_outcable_custom_wires(self):
         """Serializing a POC with custom wiring."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "custom-wired outcable", "For testing serialization of a POC with custom wiring"
         )
 
         # self.method_noop takes cdt_string, which is built on datatype_str, which is not the same as self.STR.
-        method_builtin_STR_noop = self.make_first_method(
+        method_builtin_STR_noop = tools.make_first_method(
             "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop
         )
-        self.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
+        tools.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
 
         my_pipeline.create_input("foo", 1, compounddatatype=self.string_singlet)
 
@@ -5019,15 +5007,15 @@ cat "$3" >> "$5"
 
     def test_deserialize_outcable_custom_wires(self):
         """Defining a POC with custom wiring using a dictionary."""
-        my_pipeline = self.make_first_pipeline(
+        my_pipeline = tools.make_first_pipeline(
             "custom-wired outcable", "For testing de-serialization of a POC with custom wiring"
         )
 
         # self.method_noop takes cdt_string, which is built on datatype_str, which is not the same as self.STR.
-        method_builtin_STR_noop = self.make_first_method(
+        method_builtin_STR_noop = tools.make_first_method(
             "STR noop", "a method to do nothing to builtin-STRs", self.coderev_noop
         )
-        self.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
+        tools.simple_method_io(method_builtin_STR_noop, self.string_singlet, "strings", "same_strings")
 
         my_pipeline.create_input("foo", 1, compounddatatype=self.string_singlet)
 
@@ -5070,7 +5058,8 @@ cat "$3" >> "$5"
 
             "pipeline_inputs": [],
             "pipeline_steps": [],
-            "pipeline_outputs": []
+            "pipeline_outputs": [],
+            "is_published_version": False
         }
 
         if state == "empty":
@@ -5170,7 +5159,7 @@ cat "$3" >> "$5"
 
     def test_serialize_empty_pipeline(self):
         """Serializing an empty Pipeline."""
-        my_pipeline = self.make_first_pipeline("test", "Test family")
+        my_pipeline = tools.make_first_pipeline("test", "Test family")
 
         my_dict = my_pipeline.represent_as_dict()
 
@@ -5190,9 +5179,9 @@ cat "$3" >> "$5"
 
     def test_serialize_incomplete_pipeline(self):
         """Serializing an incomplete Pipeline."""
-        my_pipeline = self.make_first_pipeline("three-step noop", "Triple no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
+                                     "input_to_not_touch", "untouched_output")
 
         for outcable in my_pipeline.outcables.all():
             outcable.delete()
@@ -5214,9 +5203,9 @@ cat "$3" >> "$5"
 
     def test_serialize_pipeline(self):
         """Serializing a complete Pipeline."""
-        my_pipeline = self.make_first_pipeline("three-step noop", "Triple no-op")
-        self.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
-                                    "input_to_not_touch", "untouched_output")
+        my_pipeline = tools.make_first_pipeline("three-step noop", "Triple no-op")
+        tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
+                                     "input_to_not_touch", "untouched_output")
 
         self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline)
 
@@ -5232,7 +5221,7 @@ cat "$3" >> "$5"
 
     def test_serialize_pipeline_multiple_steps_multiple_outputs(self):
         """Serializing a more complicated Pipeline."""
-        coderev_twocat = self.make_first_revision(
+        coderev_twocat = tools.make_first_revision(
             "twocat",
             "Sticks together two compatible CSV files",
             "twocat.sh",
@@ -5242,7 +5231,7 @@ tail -n +2 "$2" >> "$3"
 """)
 
         # The corresponding method.
-        method_twocat_string_doublet = self.make_first_method(
+        method_twocat_string_doublet = tools.make_first_method(
             "string doublet two-cat",
             "appends two string-doublet CSV files",
             coderev_twocat)
@@ -5250,7 +5239,7 @@ tail -n +2 "$2" >> "$3"
         doublet_i2 = method_twocat_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         doublet_o1 = method_twocat_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
 
-        method_twocat_string_singlet = self.make_first_method(
+        method_twocat_string_singlet = tools.make_first_method(
             "string singlet two-cat",
             "appends two string-singlet CSV files",
             coderev_twocat)
@@ -5258,7 +5247,7 @@ tail -n +2 "$2" >> "$3"
         singlet_i2 = method_twocat_string_singlet.create_input("secondfile", 2, compounddatatype=self.string_singlet)
         singlet_o1 = method_twocat_string_singlet.create_output("combinedfile", 1, compounddatatype=self.string_singlet)
 
-        my_pipeline = self.make_first_pipeline("more complicated Pipeline", "For testing serialization of Pipelines")
+        my_pipeline = tools.make_first_pipeline("more complicated Pipeline", "For testing serialization of Pipelines")
         input_1 = my_pipeline.create_input("pi_1", 1, compounddatatype=self.string_doublet)
         input_2 = my_pipeline.create_input("pi_2", 2, compounddatatype=self.string_doublet)
         input_3 = my_pipeline.create_input("pi_3", 3, compounddatatype=self.string_singlet)
@@ -5293,7 +5282,7 @@ tail -n +2 "$2" >> "$3"
 
     def test_deserialize_pipeline_multiple_steps_multiple_outputs(self):
         """Defining a more complicated Pipeline from a dictionary."""
-        coderev_twocat = self.make_first_revision(
+        coderev_twocat = tools.make_first_revision(
             "twocat",
             "Sticks together two compatible CSV files",
             "twocat.sh",
@@ -5303,7 +5292,7 @@ tail -n +2 "$2" >> "$3"
 """)
 
         # The corresponding method.
-        method_twocat_string_doublet = self.make_first_method(
+        method_twocat_string_doublet = tools.make_first_method(
             "string doublet two-cat",
             "appends two string-doublet CSV files",
             coderev_twocat)
@@ -5311,7 +5300,7 @@ tail -n +2 "$2" >> "$3"
         doublet_i2 = method_twocat_string_doublet.create_input("secondfile", 2, compounddatatype=self.string_doublet)
         doublet_o1 = method_twocat_string_doublet.create_output("combinedfile", 1, compounddatatype=self.string_doublet)
 
-        method_twocat_string_singlet = self.make_first_method(
+        method_twocat_string_singlet = tools.make_first_method(
             "string singlet two-cat",
             "appends two string-singlet CSV files",
             coderev_twocat)
@@ -5335,6 +5324,7 @@ tail -n +2 "$2" >> "$3"
             "revision_desc": "first version",
             "revision_number": 1,
             "revision_parent_pk": None,
+            "is_published_version": False,
 
             "pipeline_inputs": [
                 {
@@ -5525,7 +5515,7 @@ tail -n +2 "$2" >> "$3"
         revision_pipeline_dict["pipeline_steps"][1]["outputs_to_delete"].append(
             self.method_noop.outputs.first().dataset_name)
         revision_pipeline_dict["family_pk"] = my_pipeline.family.pk
-        new_revision = my_pipeline.revise_from_dict(revision_pipeline_dict)
+        my_pipeline.revise_from_dict(revision_pipeline_dict)
 
         # Try to update the first one.
         self.assertRaisesRegexp(
@@ -5540,7 +5530,7 @@ tail -n +2 "$2" >> "$3"
         empty_pipeline_dict = self._setup_pipeline_dict("empty")
 
         # First, create a complete Pipeline.
-        first_pipeline = Pipeline.create_from_dict(complete_pipeline_dict)
+        Pipeline.create_from_dict(complete_pipeline_dict)
 
         # Now try to create a second to the same family.
         self.assertRaisesRegexp(

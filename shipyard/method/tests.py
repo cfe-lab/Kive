@@ -4,472 +4,680 @@ Unit tests for Shipyard method models.
 
 import filecmp
 import hashlib
+import os
 import os.path
 import re
 import shutil
 import tempfile
 import itertools
+import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.db.models import Q
+from django.test import TestCase, TransactionTestCase
+from django.contrib.auth.models import User
 
 from constants import datatypes
 from metadata.models import CompoundDatatype, Datatype
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
-    
+import sandbox.testing_utils as tools
+import sandbox.execute
+import librarian.models
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
 
+# For tracking whether we're leaking file descriptors.
+fd_count_logger = logging.getLogger("method.tests")
 
-class MethodTestSetup(metadata.tests.MetadataTestSetup):
+def fd_count(msg):
+    fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
+
+# This is copied from
+# http://stackoverflow.com/questions/2023608/check-what-files-are-open-in-python
+def get_open_fds():
+    """
+    Return the number of open file descriptors for the current process.
+
+    Warning: will only work on UNIX-like operating systems.
+    """
+    import subprocess
+    import os
+    pid = os.getpid()
+    procs = subprocess.check_output(
+        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+
+    nprocs = len(
+        filter(
+            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
+            procs.split( '\n' ) )
+        )
+    return nprocs
+
+def create_method_test_environment(case):
+    """Set up default database state that includes some CRs, CRRs, Methods, etc."""
+    # This sets up the DTs and CDTs used in our metadata tests.
+    metadata.tests.create_metadata_test_environment(case)
+
+    fd_count("FD count on environment creation")
+
+    # Define comp_cr
+    case.comp_cr = CodeResource(
+        name="complement",
+        description="Complement DNA/RNA nucleotide sequences",
+        filename="complement.py",
+        user=case.myUser)
+    case.comp_cr.save()
+
+    # Define compv1_crRev for comp_cr
+    fn = "complement.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.compv1_crRev = CodeResourceRevision(
+            coderesource=case.comp_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv1_crRev.content_file.save(fn, File(f))
+        case.compv1_crRev.full_clean()
+        case.compv1_crRev.save()
+
+    # Define compv2_crRev for comp_cr
+    fn = "complement_v2.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.compv2_crRev = CodeResourceRevision(
+            coderesource=case.comp_cr,
+            revision_name="v2",
+            revision_desc="Second version: better docstring",
+            revision_parent=case.compv1_crRev,
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv2_crRev.content_file.save(fn, File(f))
+        case.compv2_crRev.full_clean()
+        case.compv2_crRev.save()
+
+    # The following is for testing code resource dependencies.
+    case.test_cr_1 = CodeResource(name="test_cr_1",
+                                  filename="test_cr_1.py",
+                                  description="CR1",
+                                  user=case.myUser)
+    case.test_cr_1.save()
+    case.test_cr_1_rev1 = CodeResourceRevision(coderesource=case.test_cr_1,
+                                               revision_name="v1",
+                                               revision_desc="CR1-rev1",
+                                               user=case.myUser)
+
+
+    case.test_cr_2 = CodeResource(name="test_cr_2",
+                                  filename="test_cr_2.py",
+                                  description="CR2",
+                                  user=case.myUser)
+    case.test_cr_2.save()
+    case.test_cr_2_rev1 = CodeResourceRevision(coderesource=case.test_cr_2,
+                                               revision_name="v1",
+                                               revision_desc="CR2-rev1",
+                                               user=case.myUser)
+
+    case.test_cr_3 = CodeResource(name="test_cr_3",
+                                  filename="test_cr_3.py",
+                                  description="CR3",
+                                  user=case.myUser)
+    case.test_cr_3.save()
+    case.test_cr_3_rev1 = CodeResourceRevision(coderesource=case.test_cr_3,
+                                               revision_name="v1",
+                                               revision_desc="CR3-rev1",
+                                               user=case.myUser)
+    case.test_cr_3_rev1.save()
+
+    case.test_cr_4 = CodeResource(name="test_cr_4",
+                                  filename="test_cr_4.py",
+                                  description="CR4",
+                                  user=case.myUser)
+    case.test_cr_4.save()
+    case.test_cr_4_rev1 = CodeResourceRevision(coderesource=case.test_cr_4,
+                                               revision_name="v1",
+                                               revision_desc="CR4-rev1",
+                                               user=case.myUser)
+    case.test_cr_4_rev1.save()
+
+    fn = "test_cr.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
+            crr.content_file.save(fn, File(f))
+
+
+    for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
+        # crr.full_clean()
+        crr.save()
+
+    # Define DNAcomp_mf
+    case.DNAcomp_mf = MethodFamily(
+        name="DNAcomplement",
+        description="Complement DNA nucleotide sequences.",
+        user=case.myUser)
+    case.DNAcomp_mf.full_clean()
+    case.DNAcomp_mf.save()
+
+    # Define DNAcompv1_m (method revision) for DNAcomp_mf with driver compv1_crRev
+    case.DNAcompv1_m = case.DNAcomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv1_crRev,
+        user=case.myUser)
+
+    # Add input DNAinput_cdt to DNAcompv1_m
+    case.DNAinput_ti = case.DNAcompv1_m.create_input(
+        compounddatatype = case.DNAinput_cdt,
+        dataset_name = "input",
+        dataset_idx = 1)
+    case.DNAinput_ti.full_clean()
+    case.DNAinput_ti.save()
+
+    # Add output DNAoutput_cdt to DNAcompv1_m
+    case.DNAoutput_to = case.DNAcompv1_m.create_output(
+        compounddatatype = case.DNAoutput_cdt,
+        dataset_name = "output",
+        dataset_idx = 1)
+    case.DNAoutput_to.full_clean()
+    case.DNAoutput_to.save()
+
+    # Define DNAcompv2_m for DNAcomp_mf with driver compv2_crRev
+    # May 20, 2014: where previously the inputs/outputs would be
+    # automatically copied over from the parent using save(), now
+    # we explicitly call copy_io_from_parent.
+    case.DNAcompv2_m = case.DNAcomp_mf.members.create(
+        revision_name="v2",
+        revision_desc="Second version",
+        revision_parent=case.DNAcompv1_m,
+        driver=case.compv2_crRev,
+        user=case.myUser)
+    case.DNAcompv2_m.full_clean()
+    case.DNAcompv2_m.save()
+    case.DNAcompv2_m.copy_io_from_parent()
+
+    # Define second family, RNAcomp_mf
+    case.RNAcomp_mf = MethodFamily(
+        name="RNAcomplement",
+        description="Complement RNA nucleotide sequences.",
+        user=case.myUser)
+    case.RNAcomp_mf.full_clean()
+    case.RNAcomp_mf.save()
+
+    # Define RNAcompv1_m for RNAcomp_mf with driver compv1_crRev
+    case.RNAcompv1_m = case.RNAcomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv1_crRev,
+        user=case.myUser)
+
+    # Add input RNAinput_cdt to RNAcompv1_m
+    case.RNAinput_ti = case.RNAcompv1_m.create_input(
+        compounddatatype = case.RNAinput_cdt,
+        dataset_name = "input",
+        dataset_idx = 1,
+        user=case.myUser)
+    case.RNAinput_ti.full_clean()
+    case.RNAinput_ti.save()
+
+    # Add output RNAoutput_cdt to RNAcompv1_m
+    case.RNAoutput_to = case.RNAcompv1_m.create_output(
+        compounddatatype = case.RNAoutput_cdt,
+        dataset_name = "output",
+        dataset_idx = 1,
+        user=case.myUser)
+    case.RNAoutput_to.full_clean()
+    case.RNAoutput_to.save()
+
+    # Define RNAcompv2_m for RNAcompv1_mf with driver compv2_crRev
+    # May 20, 2014: again, we now explicitly copy over the inputs/outputs.
+    case.RNAcompv2_m = case.RNAcomp_mf.members.create(
+        revision_name="v2",
+        revision_desc="Second version",
+        revision_parent=case.RNAcompv1_m,
+        driver=case.compv2_crRev,
+        user=case.myUser)
+    case.RNAcompv2_m.full_clean()
+    case.RNAcompv2_m.save()
+    case.RNAcompv2_m.copy_io_from_parent()
+
+    # Create method family for script_1_method / script_2_method / script_3_method
+    case.test_mf = MethodFamily(name="Test method family",
+                                description="Holds scripts 1/2/3",
+                                user=case.myUser)
+    case.test_mf.full_clean()
+    case.test_mf.save()
+
+    # script_1_sum_and_outputs.py
+    # INPUT: 1 csv containing (x,y)
+    # OUTPUT: 1 csv containing (x+y,xy)
+    case.script_1_cr = CodeResource(name="Sum and product of x and y",
+                                    filename="script_1_sum_and_products.py",
+                                    description="Addition and multiplication",
+                                    user=case.myUser)
+    case.script_1_cr.save()
+
+    # Add code resource revision for code resource (script_1_sum_and_products )
+    case.script_1_crRev = CodeResourceRevision(
+        coderesource=case.script_1_cr,
+        revision_name="v1",
+        revision_desc="First version",
+        user=case.myUser
+    )
+    fn = "script_1_sum_and_products.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.script_1_crRev.content_file.save(fn, File(f))
+    case.script_1_crRev.save()
+
+    # Establish code resource revision as a method
+    case.script_1_method = Method(
+        revision_name="script1",
+        revision_desc="script1",
+        family = case.test_mf,
+        driver = case.script_1_crRev,
+        user=case.myUser)
+    case.script_1_method.save()
+
+    # Assign tuple as both an input and an output to script_1_method
+    case.script_1_method.create_input(compounddatatype = case.tuple_cdt,
+                                      dataset_name = "input_tuple",
+                                      dataset_idx = 1)
+    case.script_1_method.create_output(compounddatatype = case.tuple_cdt,
+                                       dataset_name = "input_tuple",
+                                       dataset_idx = 1)
+    case.script_1_method.full_clean()
+    case.script_1_method.save()
+
+    # script_2_square_and_means
+    # INPUT: 1 csv containing (a,b,c)
+    # OUTPUT-1: 1 csv containing triplet (a^2,b^2,c^2)
+    # OUTPUT-2: 1 csv containing singlet mean(a,b,c)
+    case.script_2_cr = CodeResource(name="Square and mean of (a,b,c)",
+                                    filename="script_2_square_and_means.py",
+                                    description="Square and mean - 2 CSVs",
+                                    user=case.myUser)
+    case.script_2_cr.save()
+
+    # Add code resource revision for code resource (script_2_square_and_means)
+    fn = "script_2_square_and_means.py"
+    case.script_2_crRev = CodeResourceRevision(
+        coderesource=case.script_2_cr,
+        revision_name="v1",
+        revision_desc="First version",
+        user=case.myUser)
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.script_2_crRev.content_file.save(fn, File(f))
+    case.script_2_crRev.save()
+
+    # Establish code resource revision as a method
+    case.script_2_method = Method(
+        revision_name="script2",
+        revision_desc="script2",
+        family = case.test_mf,
+        driver = case.script_2_crRev,
+        user=case.myUser)
+    case.script_2_method.save()
+
+    # Assign triplet as input and output,
+    case.script_2_method.create_input(
+        compounddatatype = case.triplet_cdt,
+        dataset_name = "a_b_c",
+        dataset_idx = 1)
+    case.script_2_method.create_output(
+        compounddatatype = case.triplet_cdt,
+        dataset_name = "a_b_c_squared",
+        dataset_idx = 1)
+    case.script_2_method.create_output(
+        compounddatatype = case.singlet_cdt,
+        dataset_name = "a_b_c_mean",
+        dataset_idx = 2)
+    case.script_2_method.full_clean()
+    case.script_2_method.save()
+
+    # script_3_product
+    # INPUT-1: Single column (k)
+    # INPUT-2: Single-row, single column (r)
+    # OUTPUT-1: Single column r*(k)
+    case.script_3_cr = CodeResource(name="Scalar multiple of k",
+                                    filename="script_3_product.py",
+                                    description="Product of input",
+                                    user=case.myUser)
+    case.script_3_cr.save()
+
+    # Add code resource revision for code resource (script_3_product)
+    with open(os.path.join(samplecode_path, "script_3_product.py"), "rb") as f:
+        case.script_3_crRev = CodeResourceRevision(
+            coderesource=case.script_3_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            content_file=File(f),
+            user=case.myUser)
+        case.script_3_crRev.save()
+
+    # Establish code resource revision as a method
+    case.script_3_method = Method(
+        revision_name="script3",
+        revision_desc="script3",
+        family = case.test_mf,
+        driver = case.script_3_crRev,
+        user=case.myUser)
+    case.script_3_method.save()
+
+    # Assign singlet as input and output
+    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
+                                      dataset_name = "k",
+                                      dataset_idx = 1)
+
+    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
+                                      dataset_name = "r",
+                                      dataset_idx = 2,
+                                      max_row = 1,
+                                      min_row = 1)
+
+    case.script_3_method.create_output(compounddatatype = case.singlet_cdt,
+                                       dataset_name = "kr",
+                                       dataset_idx = 1)
+    case.script_3_method.full_clean()
+    case.script_3_method.save()
+
+    ####
+    # This next bit was originally in pipeline.tests.
+
+    # DNArecomp_mf is a MethodFamily called DNArecomplement
+    case.DNArecomp_mf = MethodFamily(
+        name="DNArecomplement",
+        description="Re-complement DNA nucleotide sequences.",
+        user=case.myUser)
+    case.DNArecomp_mf.full_clean()
+    case.DNArecomp_mf.save()
+
+    # Add to MethodFamily DNArecomp_mf a method revision DNArecomp_m
+    case.DNArecomp_m = case.DNArecomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv2_crRev,
+        user=case.myUser)
+
+    # To this method revision, add inputs with CDT DNAoutput_cdt
+    case.DNArecomp_m.create_input(
+        compounddatatype = case.DNAoutput_cdt,
+        dataset_name = "complemented_seqs",
+        dataset_idx = 1)
+
+    # To this method revision, add outputs with CDT DNAinput_cdt
+    case.DNArecomp_m.create_output(
+        compounddatatype = case.DNAinput_cdt,
+        dataset_name = "recomplemented_seqs",
+        dataset_idx = 1)
+
+    # Setup used in the "2nd-wave" tests (this was originally in
+    # Copperfish_Raw_Setup).
+
+    # Define CR "script_4_raw_in_CSV_out.py"
+    # input: raw [but contains (a,b,c) triplet]
+    # output: CSV [3 CDT members of the form (a^2, b^2, c^2)]
+
+    # Define CR in order to define CRR
+    case.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
+        filename="script_4_raw_in_CSV_out.py",
+        description="Given (a,b,c), outputs (a^2,b^2,c^2)",
+        user=case.myUser)
+    case.script_4_CR.save()
+
+    # Define CRR for this CR in order to define method
+    with open(os.path.join(samplecode_path, "script_4_raw_in_CSV_out.py"), "rb") as f:
+        case.script_4_1_CRR = CodeResourceRevision(
+            coderesource=case.script_4_CR,
+            revision_name="v1",
+            revision_desc="v1",
+            content_file=File(f),
+            user=case.myUser)
+        case.script_4_1_CRR.save()
+
+    # Define MF in order to define method
+    case.test_MF = MethodFamily(
+        name="test method family",
+        description="method family placeholder",
+        user=case.myUser)
+    case.test_MF.full_clean()
+    case.test_MF.save()
+
+    # Establish CRR as a method within a given method family
+    case.script_4_1_M = Method(
+        revision_name="s4",
+        revision_desc="s4",
+        family = case.test_MF,
+        driver = case.script_4_1_CRR,
+        user=case.myUser)
+    case.script_4_1_M.save()
+
+    case.script_4_1_M.create_input(compounddatatype=case.triplet_cdt,
+        dataset_name="s4 input", dataset_idx = 1)
+    case.script_4_1_M.full_clean()
+
+    # A shorter alias
+    case.testmethod = case.script_4_1_M
+
+    # Some code for a no-op method.
+    resource = CodeResource(name="noop", filename="noop.sh"); resource.save()
+    with tempfile.NamedTemporaryFile() as f:
+        f.write("#!/bin/bash\ncat $1")
+        case.noop_data_file = f.name
+        revision = CodeResourceRevision(coderesource = resource, content_file = File(f),
+                                        user=case.myUser)
+        revision.clean()
+        revision.save()
+
+    # Retrieve the string type.
+    string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+    string_cdt = CompoundDatatype()
+    string_cdt.save()
+    string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
+    string_cdt.full_clean()
+
+    mfamily = MethodFamily(name="noop", user=case.myUser); mfamily.save()
+    case.noop_method = Method(
+        family=mfamily, driver=revision,
+        revision_name = "1", revision_desc = "first version",
+        user=case.myUser)
+    case.noop_method.save()
+    case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
+    case.noop_method.clean()
+    case.noop_method.full_clean()
+
+    # Some data.
+    case.scratch_dir = tempfile.mkdtemp()
+    try:
+        fd, case.noop_infile = tempfile.mkstemp(dir=case.scratch_dir)
+    finally:
+        os.close(fd)
+    try:
+        fd, case.noop_outfile = tempfile.mkstemp(dir=case.scratch_dir)
+    finally:
+        os.close(fd)
+    case.noop_indata = "word\nhello\nworld"
+
+    with open(case.noop_infile, "w") as handle:
+        handle.write(case.noop_indata)
+
+
+def destroy_method_test_environment(case):
+    """
+    Clean up a TestCase where create_method_test_environment has been called.
+    """
+    metadata.tests.clean_up_all_files()
+    shutil.rmtree(case.scratch_dir)
+    CodeResource.objects.all().delete()
+
+
+class FileAccessTests(TransactionTestCase):
+    fixtures = ["initial_data"]
+
+    def setUp(self):
+        fd_count("FDs (start)")
+
+        # Define comp_cr
+        self.test_cr = CodeResource(
+            name="Test CodeResource",
+            description="A test CodeResource to play with file access",
+            filename="complement.py")
+        self.test_cr.save()
+
+        # Define compv1_crRev for comp_cr
+        self.fn = "complement.py"
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+        fd_count("FDs (end)")
+
+    def test_close_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("!close->save")
+
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+        self.assertRaises(ValueError, test_crr.save)
+
+    def test_access_close_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+            fd_count("!access->close->save")
+            foo = test_crr.content_file.read()
+            fd_count("access-!>close->save")
+        fd_count("access->close-!>save")
+        self.assertRaises(ValueError, test_crr.save)
+        fd_count("access->close->save!")
+
+    def test_close_access_save(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+
+        self.assertRaises(ValueError, test_crr.content_file.read)
+        self.assertRaises(ValueError, test_crr.save)
+
+    def test_save_close_access(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            test_crr.save()
+
+        test_crr.content_file.read()
+        fd_count("save->close->access")
+
+    def test_save_close_access_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->save->close->access->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>save->close->access->close")
+            test_crr.save()
+            fd_count("open->File->save-!>close->access->close")
+
+        fd_count("open->File->save->close-!>access->close")
+        test_crr.content_file.read()
+        fd_count("open->File->save->close->access-!>close")
+        test_crr.content_file.close()
+        fd_count("open->File->save->close->access->close!")
+
+    def test_save_close_clean_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->save->close->clean->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>save->close->clean->close")
+            test_crr.save()
+            fd_count("open->File->save-!>close->clean->close")
+
+        fd_count("open->File->save->close-!>clean->close")
+        test_crr.clean()
+        fd_count("open->File->save->close->clean-!>close")
+        test_crr.content_file.close()
+        fd_count("open->File->save->close->clean->close!")
+
+    def test_clean_save_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            fd_count("open-!>File->clean->save->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>clean->save->close")
+            test_crr.clean()
+            fd_count("open->File->clean-!>save->close")
+            test_crr.save()
+            fd_count("open->File->clean->save-!>close")
+        fd_count("open->File->clean->save->close!")
+
+    def test_clean_save_close_clean_close(self):
+        with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+
+            fd_count("open-!>File->clean->save->close->clean->close")
+            test_crr = CodeResourceRevision(
+                coderesource=self.test_cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f))
+            fd_count("open->File-!>clean->save->close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            test_crr.clean()
+            fd_count("open->File->clean-!>save->close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            test_crr.save()
+            fd_count("open->File->clean->save-!>close->clean->close")
+            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+
+        fd_count("open->File->clean->save->close-!>clean->close")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        test_crr.clean()
+        fd_count("open->File->clean->save->close->clean-!>close")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        test_crr.content_file.close()
+        fd_count("open->File->clean->save->close->clean->close!")
+        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+
+
+class MethodTestCase(TestCase):
     """
     Set up a database state for unit testing.
     
-    This extends MetadataTestSetup, which set up some of the Datatypes
+    This sets up all the stuff used in the Metadata tests, as well as some of the Datatypes
     and CDTs we use here.
     """
+    fixtures = ["initial_data"]
+
     def setUp(self):
         """Set up default database state for Method unit testing."""
-        # This sets up the DTs and CDTs used in our metadata tests.
-        super(MethodTestSetup, self).setUp()
-
-        # Define comp_cr
-        self.comp_cr = CodeResource(
-            name="complement",
-            description="Complement DNA/RNA nucleotide sequences",
-            filename="complement.py",
-            user=self.myUser)
-        self.comp_cr.save()
-
-        # Define compv1_crRev for comp_cr
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            self.compv1_crRev = CodeResourceRevision(
-                coderesource=self.comp_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            self.compv1_crRev.full_clean()
-            self.compv1_crRev.save()
-
-        # Define compv2_crRev for comp_cr
-        with open(os.path.join(samplecode_path, "complement_v2.py"), "rb") as f:
-            self.compv2_crRev = CodeResourceRevision(
-                coderesource=self.comp_cr,
-                revision_name="v2",
-                revision_desc="Second version: better docstring",
-                revision_parent=self.compv1_crRev,
-                content_file=File(f),
-                user=self.myUser)
-            self.compv2_crRev.full_clean()
-            self.compv2_crRev.save()
-
-        # The following is for testing code resource dependencies
-        with open(os.path.join(samplecode_path, "test_cr.py"), "rb") as f:
-            test_cr_1 = CodeResource(name="test_cr_1",
-                                     filename="test_cr_1.py",
-                                     description="CR1",
-                                     user=self.myUser)
-            test_cr_1.save()
-            test_cr_1_rev1 = CodeResourceRevision(coderesource=test_cr_1,
-                                                  revision_name="v1",
-                                                  revision_desc="CR1-rev1",
-                                                  content_file=File(f),
-                                                  user=self.myUser)
-            test_cr_1_rev1.save()
-            self.test_cr_1 = test_cr_1
-            self.test_cr_1_rev1 = test_cr_1_rev1
-            
-            test_cr_2 = CodeResource(name="test_cr_2",
-                                     filename="test_cr_2.py",
-                                     description="CR2",
-                                     user=self.myUser)
-            test_cr_2.save()
-            test_cr_2_rev1 = CodeResourceRevision(coderesource=test_cr_2,
-                                                  revision_name="v1",
-                                                  revision_desc="CR2-rev1",
-                                                  content_file=File(f),
-                                                  user=self.myUser)
-            test_cr_2_rev1.save()
-            self.test_cr_2 = test_cr_2
-            self.test_cr_2_rev1 = test_cr_2_rev1
-    
-            test_cr_3 = CodeResource(name="test_cr_3",
-                                     filename="test_cr_3.py",
-                                     description="CR3",
-                                     user=self.myUser)
-            test_cr_3.save()
-            test_cr_3_rev1 = CodeResourceRevision(coderesource=test_cr_3,
-                                                  revision_name="v1",
-                                                  revision_desc="CR3-rev1",
-                                                  content_file=File(f),
-                                                  user=self.myUser)
-            test_cr_3_rev1.save()
-            self.test_cr_3 = test_cr_3
-            self.test_cr_3_rev1 = test_cr_3_rev1
-    
-            test_cr_4 = CodeResource(name="test_cr_4",
-                                     filename="test_cr_4.py",
-                                     description="CR4",
-                                     user=self.myUser)
-            test_cr_4.save()
-            test_cr_4_rev1 = CodeResourceRevision(coderesource=test_cr_4,
-                                                  revision_name="v1",
-                                                  revision_desc="CR4-rev1",
-                                                  content_file=File(f),
-                                                  user=self.myUser)
-            test_cr_4_rev1.save()
-            self.test_cr_4 = test_cr_4
-            self.test_cr_4_rev1 = test_cr_4_rev1
-
-
-        # Define DNAcomp_mf
-        self.DNAcomp_mf = MethodFamily(
-            name="DNAcomplement",
-            description="Complement DNA nucleotide sequences.",
-            user=self.myUser)
-        self.DNAcomp_mf.full_clean()
-        self.DNAcomp_mf.save()
-
-        # Define DNAcompv1_m (method revision) for DNAcomp_mf with driver compv1_crRev
-        self.DNAcompv1_m = self.DNAcomp_mf.members.create(
-            revision_name="v1",
-            revision_desc="First version",
-            driver=self.compv1_crRev,
-            user=self.myUser)
-
-        # Add input DNAinput_cdt to DNAcompv1_m
-        self.DNAinput_ti = self.DNAcompv1_m.create_input(
-            compounddatatype = self.DNAinput_cdt,
-            dataset_name = "input",
-            dataset_idx = 1)
-        self.DNAinput_ti.full_clean()
-        self.DNAinput_ti.save()
-
-        # Add output DNAoutput_cdt to DNAcompv1_m
-        self.DNAoutput_to = self.DNAcompv1_m.create_output(
-            compounddatatype = self.DNAoutput_cdt,
-            dataset_name = "output",
-            dataset_idx = 1)
-        self.DNAoutput_to.full_clean()
-        self.DNAoutput_to.save()
-
-        # Define DNAcompv2_m for DNAcomp_mf with driver compv2_crRev
-        # May 20, 2014: where previously the inputs/outputs would be
-        # automatically copied over from the parent using save(), now
-        # we explicitly call copy_io_from_parent.
-        self.DNAcompv2_m = self.DNAcomp_mf.members.create(
-            revision_name="v2",
-            revision_desc="Second version",
-            revision_parent=self.DNAcompv1_m,
-            driver=self.compv2_crRev,
-            user=self.myUser)
-        self.DNAcompv2_m.full_clean()
-        self.DNAcompv2_m.save()
-        self.DNAcompv2_m.copy_io_from_parent()
-
-        # Define second family, RNAcomp_mf
-        self.RNAcomp_mf = MethodFamily(
-            name="RNAcomplement",
-            description="Complement RNA nucleotide sequences.",
-            user=self.myUser)
-        self.RNAcomp_mf.full_clean()
-        self.RNAcomp_mf.save()
-
-        # Define RNAcompv1_m for RNAcomp_mf with driver compv1_crRev
-        self.RNAcompv1_m = self.RNAcomp_mf.members.create(
-            revision_name="v1",
-            revision_desc="First version",
-            driver=self.compv1_crRev,
-            user=self.myUser)
-        
-        # Add input RNAinput_cdt to RNAcompv1_m
-        self.RNAinput_ti = self.RNAcompv1_m.create_input(
-            compounddatatype = self.RNAinput_cdt,
-            dataset_name = "input",
-            dataset_idx = 1)
-        self.RNAinput_ti.full_clean()
-        self.RNAinput_ti.save()
-
-        # Add output RNAoutput_cdt to RNAcompv1_m
-        self.RNAoutput_to = self.RNAcompv1_m.create_output(
-            compounddatatype = self.RNAoutput_cdt,
-            dataset_name = "output",
-            dataset_idx = 1)
-        self.RNAoutput_to.full_clean()
-        self.RNAoutput_to.save()
-
-        # Define RNAcompv2_m for RNAcompv1_mf with driver compv2_crRev
-        # May 20, 2014: again, we now explicitly copy over the inputs/outputs.
-        self.RNAcompv2_m = self.RNAcomp_mf.members.create(
-            revision_name="v2",
-            revision_desc="Second version",
-            revision_parent=self.RNAcompv1_m,
-            driver=self.compv2_crRev,
-            user=self.myUser)
-        self.RNAcompv2_m.full_clean()
-        self.RNAcompv2_m.save()
-        self.RNAcompv2_m.copy_io_from_parent()
-
-        # Create method family for script_1_method / script_2_method / script_3_method
-        self.test_mf = MethodFamily(name="Test method family",
-                                    description="Holds scripts 1/2/3",
-                                    user=self.myUser)
-        self.test_mf.full_clean()
-        self.test_mf.save()
-
-        # script_1_sum_and_outputs.py
-        # INPUT: 1 csv containing (x,y)
-        # OUTPUT: 1 csv containing (x+y,xy)
-        self.script_1_cr = CodeResource(name="Sum and product of x and y",
-                                        filename="script_1_sum_and_products.py",
-                                        description="Addition and multiplication",
-                                        user=self.myUser)
-        self.script_1_cr.save()
-
-        # Add code resource revision for code resource (script_1_sum_and_products ) 
-        with open(os.path.join(samplecode_path, "script_1_sum_and_products.py"), "rb") as f:
-            self.script_1_crRev = CodeResourceRevision(
-                coderesource=self.script_1_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            self.script_1_crRev.save()
-
-        # Establish code resource revision as a method
-        self.script_1_method = Method(
-            revision_name="script1",
-            revision_desc="script1",
-            family = self.test_mf,
-            driver = self.script_1_crRev,
-            user=self.myUser)
-        self.script_1_method.save()
-
-        # Assign tuple as both an input and an output to script_1_method
-        self.script_1_method.create_input(compounddatatype = self.tuple_cdt,
-                                          dataset_name = "input_tuple",
-                                          dataset_idx = 1)
-        self.script_1_method.create_output(compounddatatype = self.tuple_cdt,
-                                           dataset_name = "input_tuple",
-                                           dataset_idx = 1)
-        self.script_1_method.full_clean()
-        self.script_1_method.save()
-
-        # script_2_square_and_means
-        # INPUT: 1 csv containing (a,b,c)
-        # OUTPUT-1: 1 csv containing triplet (a^2,b^2,c^2)
-        # OUTPUT-2: 1 csv containing singlet mean(a,b,c)
-        self.script_2_cr = CodeResource(name="Square and mean of (a,b,c)",
-                                        filename="script_2_square_and_means.py",
-                                        description="Square and mean - 2 CSVs",
-                                        user=self.myUser)
-        self.script_2_cr.save()
-
-        # Add code resource revision for code resource (script_2_square_and_means)
-        with open(os.path.join(samplecode_path, "script_2_square_and_means.py"), "rb") as f:
-            self.script_2_crRev = CodeResourceRevision(
-                coderesource=self.script_2_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            self.script_2_crRev.save()
-
-        # Establish code resource revision as a method
-        self.script_2_method = Method(
-            revision_name="script2",
-            revision_desc="script2",
-            family = self.test_mf,
-            driver = self.script_2_crRev,
-            user=self.myUser)
-        self.script_2_method.save()
-
-        # Assign triplet as input and output,
-        self.script_2_method.create_input(
-            compounddatatype = self.triplet_cdt,
-            dataset_name = "a_b_c",
-            dataset_idx = 1)
-        self.script_2_method.create_output(
-            compounddatatype = self.triplet_cdt,
-            dataset_name = "a_b_c_squared",
-            dataset_idx = 1)
-        self.script_2_method.create_output(
-            compounddatatype = self.singlet_cdt,
-            dataset_name = "a_b_c_mean",
-            dataset_idx = 2)
-        self.script_2_method.full_clean()
-        self.script_2_method.save()
-
-        # script_3_product
-        # INPUT-1: Single column (k)
-        # INPUT-2: Single-row, single column (r)
-        # OUTPUT-1: Single column r*(k)
-        self.script_3_cr = CodeResource(name="Scalar multiple of k",
-                                        filename="script_3_product.py",
-                                        description="Product of input",
-                                        user=self.myUser)
-        self.script_3_cr.save()
-
-        # Add code resource revision for code resource (script_3_product)
-        with open(os.path.join(samplecode_path, "script_3_product.py"), "rb") as f:
-            self.script_3_crRev = CodeResourceRevision(
-                coderesource=self.script_3_cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            self.script_3_crRev.save()
-
-        # Establish code resource revision as a method
-        self.script_3_method = Method(
-            revision_name="script3",
-            revision_desc="script3",
-            family = self.test_mf,
-            driver = self.script_3_crRev,
-            user=self.myUser)
-        self.script_3_method.save()
-
-        # Assign singlet as input and output
-        self.script_3_method.create_input(compounddatatype = self.singlet_cdt,
-                                          dataset_name = "k",
-                                          dataset_idx = 1)
-
-        self.script_3_method.create_input(compounddatatype = self.singlet_cdt,
-                                          dataset_name = "r",
-                                          dataset_idx = 2,
-                                          max_row = 1,
-                                          min_row = 1)
-
-        self.script_3_method.create_output(compounddatatype = self.singlet_cdt,
-                                           dataset_name = "kr",
-                                           dataset_idx = 1)
-        self.script_3_method.full_clean()
-        self.script_3_method.save()
-
-        ####
-        # This next bit was originally in pipeline.tests.
-        
-        # DNArecomp_mf is a MethodFamily called DNArecomplement
-        self.DNArecomp_mf = MethodFamily(
-            name="DNArecomplement",
-            description="Re-complement DNA nucleotide sequences.",
-            user=self.myUser)
-        self.DNArecomp_mf.full_clean()
-        self.DNArecomp_mf.save()
-
-        # Add to MethodFamily DNArecomp_mf a method revision DNArecomp_m
-        self.DNArecomp_m = self.DNArecomp_mf.members.create(
-            revision_name="v1",
-            revision_desc="First version",
-            driver=self.compv2_crRev,
-            user=self.myUser)
-
-        # To this method revision, add inputs with CDT DNAoutput_cdt
-        self.DNArecomp_m.create_input(
-            compounddatatype = self.DNAoutput_cdt,
-            dataset_name = "complemented_seqs",
-            dataset_idx = 1)
-
-        # To this method revision, add outputs with CDT DNAinput_cdt
-        self.DNArecomp_m.create_output(
-            compounddatatype = self.DNAinput_cdt,
-            dataset_name = "recomplemented_seqs",
-            dataset_idx = 1)
-
-        # Setup used in the "2nd-wave" tests (this was originally in
-        # Copperfish_Raw_Setup).
-        
-        # Define CR "script_4_raw_in_CSV_out.py"
-        # input: raw [but contains (a,b,c) triplet]
-        # output: CSV [3 CDT members of the form (a^2, b^2, c^2)]
-
-        # Define CR in order to define CRR
-        self.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
-            filename="script_4_raw_in_CSV_out.py",
-            description="Given (a,b,c), outputs (a^2,b^2,c^2)",
-            user=self.myUser)
-        self.script_4_CR.save()
-
-        # Define CRR for this CR in order to define method
-        with open(os.path.join(samplecode_path, "script_4_raw_in_CSV_out.py"), "rb") as f:
-            self.script_4_1_CRR = CodeResourceRevision(
-                coderesource=self.script_4_CR,
-                revision_name="v1",
-                revision_desc="v1",
-                content_file=File(f),
-                user=self.myUser)
-            self.script_4_1_CRR.save()
-
-        # Define MF in order to define method
-        self.test_MF = MethodFamily(
-            name="test method family",
-            description="method family placeholder",
-            user=self.myUser)
-        self.test_MF.full_clean()
-        self.test_MF.save()
-
-        # Establish CRR as a method within a given method family
-        self.script_4_1_M = Method(
-            revision_name="s4",
-            revision_desc="s4",
-            family = self.test_MF,
-            driver = self.script_4_1_CRR,
-            user=self.myUser)
-        self.script_4_1_M.save()
-
-        self.script_4_1_M.create_input(compounddatatype=self.triplet_cdt, 
-            dataset_name="s4 input", dataset_idx = 1)
-        self.script_4_1_M.full_clean()
-
-        # A shorter alias
-        self.testmethod = self.script_4_1_M
-
-        # Some code for a no-op method.
-        resource = CodeResource(name="noop", filename="noop.sh", user=self.myUser)
-        resource.save()
-        with tempfile.NamedTemporaryFile() as f:
-            f.write("#!/bin/bash\ncat $1")
-            self.noop_data_file = f.name
-            revision = CodeResourceRevision(coderesource = resource, content_file = File(f), user=self.myUser)
-            revision.clean()
-            revision.save()
-
-        # Retrieve the string type.
-        string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
-        string_cdt = CompoundDatatype()
-        string_cdt.save()
-        string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
-        string_cdt.full_clean()
-        
-        mfamily = MethodFamily(name="noop", user=self.myUser); mfamily.save()
-        self.noop_method = Method(family=mfamily, driver=revision,
-                                  revision_name = "1", revision_desc = "first version",
-                                  user=self.myUser)
-        self.noop_method.save()
-        self.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
-        self.noop_method.clean()
-        self.noop_method.full_clean()
-
-        # Some data.
-        self.scratch_dir = tempfile.mkdtemp()
-        fd, self.noop_infile = tempfile.mkstemp(dir=self.scratch_dir)
-        self.noop_outfile = tempfile.mkstemp(dir=self.scratch_dir)[1]
-        self.noop_indata = "word\nhello\nworld"
-
-        handle = open(self.noop_infile, "w")
-        handle.write(self.noop_indata)
-        handle.close()
+        create_method_test_environment(self)
 
     def tearDown(self):
-        shutil.rmtree(self.scratch_dir)
-        CodeResource.objects.all().delete()
+        destroy_method_test_environment(self)
 
-class CodeResourceTests(MethodTestSetup):
+
+class CodeResourceTests(MethodTestCase):
      
     def test_unicode(self):
         """
@@ -528,7 +736,7 @@ class CodeResourceTests(MethodTestSetup):
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
 
-class CodeResourceRevisionTests(MethodTestSetup):
+class CodeResourceRevisionTests(MethodTestCase):
 
     def test_unicode(self):
         """
@@ -537,7 +745,6 @@ class CodeResourceRevisionTests(MethodTestSetup):
 
         Or, if no CodeResource has been linked, should display a placeholder.
         """
-
         # Valid crRev should return it's cr.name and crRev.revision_name
         self.assertEquals(unicode(self.compv1_crRev), "v1")
 
@@ -549,81 +756,86 @@ class CodeResourceRevisionTests(MethodTestSetup):
         no_cr_set.revision_name = "foo"
         self.assertEquals(unicode(no_cr_set), "foo")
 
-
     # Tests of has_circular_dependence and clean
     def test_has_circular_dependence_nodep(self):
         """A CRR with no dependencies should not have any circular dependence."""
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_single_self_direct_dep(self):
         """A CRR has itself as its lone dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(), True)
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_single_other_direct_dep(self):
         """A CRR has a lone dependency (non-self)."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_2_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_several_direct_dep_noself(self):
         """A CRR with several direct dependencies (none are itself)."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_2_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_4_rev1,
-                depPath=".")
+            requirement=self.test_cr_4_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
+        self.test_cr_1_rev1.content_file.close()
 
     def test_has_circular_dependence_several_direct_dep_self_1(self):
         """A CRR with several dependencies has itself as the first dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
+
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
+        self.test_cr_1_rev1.content_file.close()
         
     def test_has_circular_dependence_several_direct_dep_self_2(self):
         """A CRR with several dependencies has itself as the second dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -633,15 +845,15 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_direct_dep_self_3(self):
         """A CRR with several dependencies has itself as the last dependency."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".",
-                depFileName="foo")
+            requirement=self.test_cr_1_rev1,
+            depPath=".",
+            depFileName="foo")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -651,14 +863,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_nested_dep_noself(self):
         """A CRR with several dependencies including a nested one."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_3_rev1.dependencies.create(
-                requirement=self.test_cr_4_rev1,
-                depPath=".")
+            requirement=self.test_cr_4_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
@@ -666,14 +878,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_several_nested_dep_selfnested(self):
         """A CRR with several dependencies including itself as a nested one."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_3_rev1.dependencies.create(
-                requirement=self.test_cr_1_rev1,
-                depPath=".")
+            requirement=self.test_cr_1_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
@@ -689,14 +901,14 @@ class CodeResourceRevisionTests(MethodTestSetup):
     def test_has_circular_dependence_nested_dep_has_circ(self):
         """A nested dependency is circular."""
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_3_rev1,
-                depPath=".")
+            requirement=self.test_cr_3_rev1,
+            depPath=".")
         self.test_cr_2_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath=".")
+            requirement=self.test_cr_2_rev1,
+            depPath=".")
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           True)
         self.assertRaisesRegexp(ValidationError,
@@ -713,22 +925,24 @@ class CodeResourceRevisionTests(MethodTestSetup):
         A CRR with a content file should have a filename associated with
         its parent CodeResource.
         """
-
         cr = CodeResource(
                 name="test_complement",
                 filename="",
                 description="Complement DNA/RNA nucleotide sequences",
                 user=self.myUser)
+            name="test_complement",
+            filename="",
+            description="Complement DNA/RNA nucleotide sequences")
         cr.save()
 
         # So it's revision does not have a content_file
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
             cr_rev_v1 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
-                    content_file=File(f),
-                    user=self.myUser)
+                coderesource=cr,
+                revision_name="v1",
+                revision_desc="First version",
+                content_file=File(f),
+                user=self.myUser)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -740,26 +954,24 @@ class CodeResourceRevisionTests(MethodTestSetup):
         A CRR with no content file should not have a filename associated with
         its parent CodeResource.
         """
-
         cr = CodeResource(
-                name="nonmetapackage",
-                filename="foo",
-                description="Associated CRRs should have a content file",
-                user=self.myUser)
+            name="nonmetapackage",
+            filename="foo",
+            description="Associated CRRs should have a content file",
+            user=self.myUser)
         cr.save()
 
         # Create a revision without a content_file.
         cr_rev_v1 = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="v1",
-                revision_desc="Has no content file!",
-                user=self.myUser)
+            coderesource=cr,
+            revision_name="v1",
+            revision_desc="Has no content file!",
+            user=self.myUser)
 
         self.assertRaisesRegexp(
             ValidationError,
             "Cannot have a filename specified in the absence of a content file",
             cr_rev_v1.clean)
-
 
     def test_clean_blank_MD5_on_codeResourceRevision_without_file(self):
         """
@@ -773,10 +985,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
         
         # Create crRev with a codeResource but no file contents
         no_file_crRev = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="foo",
-                revision_desc="foo",
-                user=self.myUser)
+            coderesource=cr,
+            revision_name="foo",
+            revision_desc="foo",
+            user=self.myUser)
   
         no_file_crRev.clean()
 
@@ -794,9 +1006,7 @@ class CodeResourceRevisionTests(MethodTestSetup):
             md5gen.update(f.read())
 
         # Revision should have the correct MD5 checksum
-        self.assertEquals(
-                md5gen.hexdigest(),
-                self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
+        self.assertEquals(md5gen.hexdigest(), self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
 
     def test_dependency_depends_on_nothing_clean_good (self):
         self.assertEqual(self.test_cr_1_rev1.clean(), None)
@@ -1235,11 +1445,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="C_nested",
             depFileName="C.py")
 
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py',
-                          u'B1_nested/B1.py',
-                          u'B1_nested/C_nested/C.py',
-                          u'B2.py'])
+        self.assertSetEqual(
+            set(self.test_cr_1_rev1.list_all_filepaths()),
+            {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
+        )
 
     def test_dependency_list_all_filepaths_recursive_case_2 (self):
         """
@@ -1265,11 +1474,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="C_nested",
             depFileName="C.py")
 
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py',
-                          u'B1_nested/B1.py',
-                          u'B2.py',
-                          u'C_nested/C.py'])
+        self.assertSetEqual(
+            set(self.test_cr_1_rev1.list_all_filepaths()),
+            {u'test_cr_1.py', u'B1_nested/B1.py', u'B2.py', u'C_nested/C.py'}
+        )
 
     def test_dependency_list_all_filepaths_with_metapackage(self):
 
@@ -1309,10 +1517,10 @@ class CodeResourceRevisionTests(MethodTestSetup):
             depPath="deeperNestedFolder",
             depFileName="D.py")
 
-        self.assertEqual(test_cr_6_rev1.list_all_filepaths(),
-                         [u'B.py',
-                          u'nestedFolder/C.py',
-                          u'nestedFolder/deeperNestedFolder/D.py'])
+        self.assertSetEqual(
+            set(test_cr_6_rev1.list_all_filepaths()),
+            {u'B.py', u'nestedFolder/C.py', u'nestedFolder/deeperNestedFolder/D.py'}
+        )
 
         # FIXME
         # test_cr_6_rev1.content_file.delete()
@@ -1337,7 +1545,7 @@ class CodeResourceRevisionTests(MethodTestSetup):
                          [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
 
 
-class CodeResourceDependencyTests(MethodTestSetup):
+class CodeResourceDependencyTests(MethodTestCase):
 
     def test_unicode(self):
         """
@@ -1578,7 +1786,7 @@ class CodeResourceDependencyTests(MethodTestSetup):
         self.assertEqual(good_crd.clean(), None)
 
 
-class CodeResourceRevisionInstallTests(MethodTestSetup):
+class CodeResourceRevisionInstallTests(MethodTestCase):
     """Tests of the install function of CodeResourceRevision."""
     def test_base_case(self):
         """
@@ -1846,7 +2054,7 @@ class CodeResourceRevisionInstallTests(MethodTestSetup):
         shutil.rmtree(test_path)
 
 
-class MethodTests(MethodTestSetup):
+class MethodTests(MethodTestCase):
 
     def test_with_family_unicode(self):
         """
@@ -2119,8 +2327,8 @@ class MethodTests(MethodTestSetup):
         # Outputs:
         # self.triplet_cdt, "a_b_c_squared", 1
         # self.singlet_cdt, "a_b_c_mean", 2
-        curr_out_1 = self.script_2_method.outputs.all()[0]
-        curr_out_2 = self.script_2_method.outputs.all()[1]
+        curr_out_1 = self.script_2_method.outputs.get(dataset_idx=1)
+        curr_out_2 = self.script_2_method.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
@@ -2136,8 +2344,8 @@ class MethodTests(MethodTestSetup):
         # Script 3 has inputs:
         # self.singlet_cdt, "k", 1
         # self.singlet_cdt, "r", 2, min_row = max_row = 1
-        curr_in_1 = self.script_3_method.inputs.all()[0]
-        curr_in_2 = self.script_3_method.inputs.all()[1]
+        curr_in_1 = self.script_3_method.inputs.get(dataset_idx=1)
+        curr_in_2 = self.script_3_method.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
@@ -2150,7 +2358,7 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_in_2.get_max_row(), 1)
         # Outputs:
         # self.singlet_cdt, "kr", 1
-        curr_out = self.script_3_method.outputs.all()[0]
+        curr_out = self.script_3_method.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.dataset_name, "kr")
         self.assertEqual(curr_out.dataset_idx, 1)
         self.assertEqual(curr_out.get_cdt(), self.singlet_cdt)
@@ -2162,7 +2370,7 @@ class MethodTests(MethodTestSetup):
 
         # DNAcompv2_m should have 1 input, copied from DNAcompv1
         self.assertEqual(self.DNAcompv2_m.inputs.count(), 1)
-        curr_in = self.DNAcompv2_m.inputs.all()[0]
+        curr_in = self.DNAcompv2_m.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.dataset_name,
                          self.DNAinput_ti.dataset_name)
         self.assertEqual(curr_in.dataset_idx,
@@ -2171,7 +2379,7 @@ class MethodTests(MethodTestSetup):
                          self.DNAinput_ti.get_cdt())
 
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
-        curr_out = self.DNAcompv2_m.outputs.all()[0]
+        curr_out = self.DNAcompv2_m.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.dataset_name,
                          self.DNAoutput_to.dataset_name)
         self.assertEqual(curr_out.dataset_idx,
@@ -2186,7 +2394,7 @@ class MethodTests(MethodTestSetup):
         foo.copy_io_from_parent()
         # Check that it has the same input as script_2_method:
         # self.triplet_cdt, "a_b_c", 1
-        curr_in = foo.inputs.all()[0]
+        curr_in = foo.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.dataset_name, "a_b_c")
         self.assertEqual(curr_in.dataset_idx, 1)
         self.assertEqual(curr_in.get_cdt(), self.triplet_cdt)
@@ -2195,8 +2403,8 @@ class MethodTests(MethodTestSetup):
         # Outputs:
         # self.triplet_cdt, "a_b_c_squared", 1
         # self.singlet_cdt, "a_b_c_mean", 2
-        curr_out_1 = foo.outputs.all()[0]
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)
@@ -2216,8 +2424,8 @@ class MethodTests(MethodTestSetup):
         # Check that the outputs match script_3_method:
         # self.singlet_cdt, "k", 1
         # self.singlet_cdt, "r", 2, min_row = max_row = 1
-        curr_in_1 = bar.inputs.all()[0]
-        curr_in_2 = bar.inputs.all()[1]
+        curr_in_1 = bar.inputs.get(dataset_idx=1)
+        curr_in_2 = bar.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
@@ -2230,7 +2438,7 @@ class MethodTests(MethodTestSetup):
         self.assertEqual(curr_in_2.get_max_row(), 1)
         # Outputs:
         # self.singlet_cdt, "kr", 1
-        curr_out = bar.outputs.all()[0]
+        curr_out = bar.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_out.dataset_name, "kr")
         self.assertEqual(curr_out.dataset_idx, 1)
@@ -2249,7 +2457,7 @@ class MethodTests(MethodTestSetup):
         self.DNAcompv1_m.save()
         self.DNAcompv1_m.copy_io_from_parent()
         self.assertEqual(self.DNAcompv1_m.inputs.count(), 1)
-        curr_in = self.DNAcompv1_m.inputs.all()[0]
+        curr_in = self.DNAcompv1_m.inputs.get(dataset_idx=1)
         self.assertEqual(curr_in.get_cdt(), old_cdt)
         self.assertEqual(curr_in.dataset_name, old_name)
         self.assertEqual(curr_in.dataset_idx, old_idx)
@@ -2259,7 +2467,7 @@ class MethodTests(MethodTestSetup):
         old_idx = self.DNAoutput_to.dataset_idx
 
         self.assertEqual(self.DNAcompv2_m.outputs.count(), 1)
-        curr_out = self.DNAcompv2_m.outputs.all()[0]
+        curr_out = self.DNAcompv2_m.outputs.get(dataset_idx=1)
         self.assertEqual(curr_out.get_cdt(), old_cdt)
         self.assertEqual(curr_out.dataset_name, old_name)
         self.assertEqual(curr_out.dataset_idx, old_idx)
@@ -2270,8 +2478,8 @@ class MethodTests(MethodTestSetup):
         bar.copy_io_from_parent()
         self.assertEqual(bar.inputs.count(), 2)
         self.assertEqual(bar.outputs.count(), 0)
-        curr_in_1 = bar.inputs.all()[0]
-        curr_in_2 = bar.inputs.all()[1]
+        curr_in_1 = bar.inputs.get(dataset_idx=1)
+        curr_in_2 = bar.inputs.get(dataset_idx=2)
         self.assertEqual(curr_in_1.get_cdt(), self.singlet_cdt)
         self.assertEqual(curr_in_1.dataset_name, "k")
         self.assertEqual(curr_in_1.dataset_idx, 1)
@@ -2289,8 +2497,8 @@ class MethodTests(MethodTestSetup):
         foo.copy_io_from_parent()
         self.assertEqual(foo.inputs.count(), 0)
         self.assertEqual(foo.outputs.count(), 2)
-        curr_out_1 = foo.outputs.all()[0]
-        curr_out_2 = foo.outputs.all()[1]
+        curr_out_1 = foo.outputs.get(dataset_idx=1)
+        curr_out_2 = foo.outputs.get(dataset_idx=2)
         self.assertEqual(curr_out_1.get_cdt(), self.triplet_cdt)
         self.assertEqual(curr_out_1.dataset_name, "a_b_c_squared")
         self.assertEqual(curr_out_1.dataset_idx, 1)
@@ -2423,7 +2631,8 @@ class MethodTests(MethodTestSetup):
                 user=self.myUser)
         self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
 
-class MethodFamilyTests(MethodTestSetup):
+
+class MethodFamilyTests(MethodTestCase):
 
     def test_unicode(self):
         """
@@ -2431,3 +2640,187 @@ class MethodFamilyTests(MethodTestSetup):
         """
         
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
+
+
+class NonReusableMethodTests(TransactionTestCase):
+    fixtures = ["initial_data"]
+
+    def setUp(self):
+        # A piece of code that is non-reusable.
+        self.rng = tools.make_first_revision(
+            "rng", "Generates a random number", "rng.py",
+            """#! /usr/bin/env python
+
+import random
+import csv
+import sys
+
+outfile = sys.argv[1]
+
+with open(outfile, "wb") as f:
+    my_writer = csv.writer(f)
+    my_writer.writerow(("random number",))
+    my_writer.writerow((random.random(),))
+"""
+        )
+
+        self.rng_out_cdt = CompoundDatatype()
+        self.rng_out_cdt.save()
+        self.rng_out_cdt.members.create(
+            column_name="random number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.rng_method = tools.make_first_method("rng", "Generate a random number", self.rng)
+        self.rng_method.create_output(dataset_name="random_number", dataset_idx=1, compounddatatype=self.rng_out_cdt,
+                                      min_row=1, max_row=1)
+        self.rng_method.reusable = Method.NON_REUSABLE
+        self.rng_method.save()
+
+        self.increment = tools.make_first_revision(
+            "increment", "Increments all numbers in its first input file by the number in its second",
+            "increment.py",
+            """#! /usr/bin/env python
+
+import csv
+import sys
+
+numbers_file = sys.argv[1]
+increment_file = sys.argv[2]
+outfile = sys.argv[3]
+
+incrementor = 0
+with open(increment_file, "rb") as f:
+    inc_reader = csv.DictReader(f)
+    for row in inc_reader:
+        incrementor = float(row["incrementor"])
+        break
+
+numbers = []
+with open(numbers_file, "rb") as f:
+    number_reader = csv.DictReader(f)
+    for row in number_reader:
+        numbers.append(float(row["number"]))
+
+with open(outfile, "wb") as f:
+    out_writer = csv.writer(f)
+    out_writer.writerow(("incremented number",))
+    for number in numbers:
+        out_writer.writerow((number + incrementor,))
+"""
+        )
+
+        self.increment_in_1_cdt = CompoundDatatype()
+        self.increment_in_1_cdt.save()
+        self.increment_in_1_cdt.members.create(
+            column_name="number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.increment_in_2_cdt = CompoundDatatype()
+        self.increment_in_2_cdt.save()
+        self.increment_in_2_cdt.members.create(
+            column_name="incrementor", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.increment_out_cdt = CompoundDatatype()
+        self.increment_out_cdt.save()
+        self.increment_out_cdt.members.create(
+            column_name="incremented number", column_idx=1,
+            datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
+        )
+
+        self.inc_method = tools.make_first_method(
+            "increment", "Increments all numbers in its first input file by the number in its second",
+            self.increment)
+        self.inc_method.create_input(dataset_name="numbers", dataset_idx=1, compounddatatype=self.increment_in_1_cdt)
+        self.inc_method.create_input(dataset_name="incrementor", dataset_idx=2,
+                                     compounddatatype=self.increment_in_2_cdt,
+                                     min_row=1, max_row=1)
+        self.inc_method.create_output(dataset_name="incremented_numbers", dataset_idx=1,
+                                      compounddatatype=self.increment_out_cdt)
+
+        self.test_nonreusable = tools.make_first_pipeline("Non-Reusable", "Pipeline with a non-reusable step")
+        self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
+                                           compounddatatype=self.increment_in_1_cdt)
+        step1 = self.test_nonreusable.steps.create(
+            step_num=1,
+            transformation=self.rng_method,
+            name="source of randomness"
+        )
+
+        step2 = self.test_nonreusable.steps.create(
+            step_num=2,
+            transformation=self.inc_method,
+            name="incrementor"
+        )
+        step2.cables_in.create(
+            dest=self.inc_method.inputs.get(dataset_name="numbers"),
+            source_step=0,
+            source=self.test_nonreusable.inputs.get(dataset_name="numbers")
+        )
+        connecting_cable = step2.cables_in.create(
+            dest=self.inc_method.inputs.get(dataset_name="incrementor"),
+            source_step=1,
+            source=self.rng_method.outputs.get(dataset_name="random_number")
+        )
+        connecting_cable.custom_wires.create(
+            source_pin=self.rng_out_cdt.members.get(column_name="random number"),
+            dest_pin=self.increment_in_2_cdt.members.get(column_name="incrementor")
+        )
+
+        self.test_nonreusable.create_outcable(
+            output_name="incremented_numbers",
+            output_idx=1,
+            source_step=2,
+            source=self.inc_method.outputs.get(dataset_name="incremented_numbers")
+        )
+
+        self.test_nonreusable.create_outputs()
+
+        # A user that runs a Pipeline.
+        self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
+        self.user_rob.save()
+
+        # A data file to add to the database.
+        self.numbers = "number\n1\n2\n3\n4\n"
+        datafile = tempfile.NamedTemporaryFile(delete=False)
+        datafile.write(self.numbers)
+        datafile.close()
+
+        # Alice uploads the data to the system.
+        self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(
+            datafile.name, name="numbers", cdt=self.increment_in_1_cdt,
+            user=self.user_rob, description="1-2-3-4",
+            make_dataset=True)
+
+    def test_find_compatible_ER_non_reusable_method(self):
+        """
+        The ExecRecord of a non-reusable Method should not be found compatible.
+        """
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx.execute_pipeline()
+
+        self.assertListEqual(self.rng_method.find_compatible_ERs([]), [])
+
+    def test_execute_does_not_reuse(self):
+        """
+        Running a non-reusable Method twice does not reuse an ExecRecord, and
+        subsequent steps and cables in the same Pipeline will have different ExecRecords also.
+        """
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx.execute_pipeline()
+        first_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=1)
+        second_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        joining_cable_1 = second_step_1.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
+
+        sdbx2 = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx2.execute_pipeline()
+        first_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=1)
+        second_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=2)
+        joining_cable_2 = second_step_2.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
+
+        self.assertNotEqual(first_step_1.execrecord, first_step_2.execrecord)
+        self.assertNotEqual(second_step_1.execrecord, second_step_2.execrecord)
+        self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
