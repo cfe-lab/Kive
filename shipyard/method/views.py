@@ -151,7 +151,6 @@ def resource_add(request):
 
         # FIXME we can't simply use request.user because that's an AnonymousUser.
         creating_user = shipyard_user
-        new_code_resource = None
         prototype = None
 
         try:
@@ -233,7 +232,6 @@ def resource_add(request):
     return HttpResponse(t.render(c))
 
 
-# FIXME continue from here and refactor this as above
 def resource_revision_add(request, id):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
@@ -259,6 +257,18 @@ def resource_revision_add(request, id):
                 # ignore blank CR dependency forms
                 dep_forms.append(None)
                 continue
+
+            dep_forms.append(
+                CodeResourceDependencyForm(
+                    {
+                        'coderesource': query['coderesource_'+str(i)],
+                        'revisions': query['revisions_'+str(i)],
+                        'depPath': query['depPath_'+str(i)],
+                        'depFileName': query['depFileName_'+str(i)]
+                    },
+                    auto_id='id_%s_'+str(i)
+                )
+            )
 
         all_valid = True
 
@@ -290,8 +300,8 @@ def resource_revision_add(request, id):
             # is this file identical to another CodeResourceRevision?
             revision = CodeResourceRevision(
                 revision_parent=parent_revision,
-                revision_name=query['revision_name'],
-                revision_desc=query['revision_desc'],
+                revision_name=revision_form.cleaned_data['revision_name'],
+                revision_desc=revision_form.cleaned_data['revision_desc'],
                 coderesource=coderesource,
                 content_file=file_in_memory,
                 user=creating_user
@@ -397,7 +407,7 @@ def methods(request, id):
     return HttpResponse(t.render(c))
 
 
-def return_method_forms (query, exceptions):
+def return_method_forms(query, exceptions):
     """
     Helper function for method_add()
     Send HttpResponse Context with forms filled out with previous values including error messages
@@ -462,6 +472,9 @@ def parse_method_form(query, family=None, parent_method=None):
     exceptions = {"inputs": {}, "outputs": {}}
     num_input_forms = sum(k.startswith('dataset_name_in_') for k in query)
     num_output_forms = sum(k.startswith('dataset_name_out_') for k in query)
+
+    # FIXME change this when we implement login!
+    query["user"] = shipyard_user
 
     # retrieve CodeResource revision as driver
     try:
@@ -578,7 +591,8 @@ def method_add(request, id=None):
         query = request.POST.dict()
 
         # Add the requesting user to the query.
-        query["user"] = request.user
+        # FIXME change this once we implement proper logins!
+        query["user"] = shipyard_user
 
         exceptions = parse_method_form(query, this_family)
         if exceptions is None:
@@ -626,7 +640,8 @@ def method_revise(request, id):
     if request.method == 'POST':
         query = request.POST.dict()
         query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
-        query["user"] = request.user
+        # FIXME change this when we implement login!
+        query["user"] = shipyard_user
 
         exceptions = parse_method_form(query, family=family, parent_method=parent_method)
         if exceptions is None:

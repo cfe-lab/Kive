@@ -208,9 +208,16 @@ class MethodForm(forms.ModelForm):
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
+        # Refresh the choices.
+        self.fields["users_allowed"].choices = [(u.id, u.username) for u in User.objects.all()]
+        self.fields["groups_allowed"].choices = [(g.id, g.name) for g in Group.objects.all()]
+
     class Meta:
         model = Method
-        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
+        fields = (
+            'coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable', "threads",
+            "users_allowed", "groups_allowed"
+        )
         widgets = {
             'revision_desc': forms.Textarea(attrs={'rows': 5,
                                                    'cols': 30,
@@ -247,12 +254,16 @@ class MethodReviseForm (forms.ModelForm):
         self.fields['revision_desc'].label = 'Description'
         self.fields['revision_desc'].help_text = 'A detailed description for this new method'
 
-    #coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
+    # coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
+    # [(x.id, x.name) for x in CodeResource.objects.all()])
     revisions = forms.ChoiceField() # to be populated by view function
 
     class Meta:
         model = Method
-        fields = ('revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
+        fields = (
+            'revisions', 'revision_name', 'revision_desc', 'reusable', "threads",
+            "users_allowed", "groups_allowed"
+        )
 
 
 class TransformationXputForm (forms.ModelForm):
