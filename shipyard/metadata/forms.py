@@ -29,6 +29,7 @@ class BasicConstraintForm (forms.ModelForm):
     #ruletype = forms.ChoiceField(BasicConstraint.CONSTRAINT_TYPES)
     class Meta:
         model = BasicConstraint
+        exclude = ()
         #exclude = ('datatype', )
 
 class IntegerConstraintForm (forms.Form):
@@ -46,4 +47,4 @@ class CompoundDatatypeMemberForm(forms.ModelForm):
     #column_idx = forms.ChoiceField(choices=[(1, '1')])
     class Meta:
         model = CompoundDatatypeMember
-        exclude = ('compounddatatype','column_idx')
+        exclude = ('compounddatatype', 'column_idx')

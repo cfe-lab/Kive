@@ -292,3 +292,4 @@ class MethodFamilyForm (forms.ModelForm):
                                                    'cols': 30,
                                                    'style': 'height: 5em;'}),
         }
+        exclude = ()

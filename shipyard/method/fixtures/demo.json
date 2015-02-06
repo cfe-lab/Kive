@@ -1,740 +1,920 @@
 [
 {
-    "pk": 2, 
-    "model": "method.coderesource", 
     "fields": {
-        "description": "Take in two integers, output sums and products.", 
-        "name": "script_1_sum_and_products", 
-        "filename": "script_1_sum_and_products.py"
-    }
+        "description": "Take in two integers, output sums and products.",
+        "groups_allowed": [],
+        "filename": "script_1_sum_and_products.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "script_1_sum_and_products"
+    },
+    "model": "method.coderesource",
+    "pk": 2
 },
 {
-    "pk": 2, 
-    "model": "method.coderesourcerevision", 
     "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Take in two integers, output sums and products.", 
-        "coderesource": 2, 
-        "MD5_checksum": "5d454fec2eb55b5e643afa6c988ac974", 
-        "content_file": "CodeResources/script_1_sum_and_products.py_20140807145144", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-07T21:51:44.301Z"
-    }
+        "description": "To make pipeline portable, allow user to specify local paths and thread counts.",
+        "groups_allowed": [],
+        "filename": "settings.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "settings"
+    },
+    "model": "method.coderesource",
+    "pk": 3
 },
 {
-    "pk": 2, 
-    "model": "method.method", 
     "fields": {
-        "revision_parent": null, 
-        "family": 2, 
-        "reusable": 1,
-        "driver": 2, 
-        "tainted": false, 
+        "description": "Standard configuration for logging",
+        "groups_allowed": [],
+        "filename": "miseq_logging.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "miseq_logging"
+    },
+    "model": "method.coderesource",
+    "pk": 4
+},
+{
+    "fields": {
+        "description": "Reference sequences",
+        "groups_allowed": [],
+        "filename": "projects.json",
+        "users_allowed": [],
+        "user": 1,
+        "name": "projects.json"
+    },
+    "model": "method.coderesource",
+    "pk": 5
+},
+{
+    "fields": {
+        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
+        "groups_allowed": [],
+        "filename": "prelim_map.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "prelim_map"
+    },
+    "model": "method.coderesource",
+    "pk": 6
+},
+{
+    "fields": {
+        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
+        "groups_allowed": [],
+        "filename": "remap.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "remap"
+    },
+    "model": "method.coderesource",
+    "pk": 7
+},
+{
+    "fields": {
+        "description": "Conversion of SAM data into aligned format.",
+        "groups_allowed": [],
+        "filename": "sam2aln.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "sam2aln"
+    },
+    "model": "method.coderesource",
+    "pk": 8
+},
+{
+    "fields": {
+        "description": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().",
+        "groups_allowed": [],
+        "filename": "hyphyAlign.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "hyphyAlign"
+    },
+    "model": "method.coderesource",
+    "pk": 10
+},
+{
+    "fields": {
+        "description": "Post-processing of short-read alignments.",
+        "groups_allowed": [],
+        "filename": "aln2counts.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "aln2counts"
+    },
+    "model": "method.coderesource",
+    "pk": 11
+},
+{
+    "fields": {
+        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
+        "groups_allowed": [],
+        "filename": "sam_g2p.rb",
+        "users_allowed": [],
+        "user": 1,
+        "name": "sam_g2p"
+    },
+    "model": "method.coderesource",
+    "pk": 14
+},
+{
+    "fields": {
+        "description": "Written by Conan",
+        "groups_allowed": [],
+        "filename": "pssm_lib.rb",
+        "users_allowed": [],
+        "user": 1,
+        "name": "pssm_lib"
+    },
+    "model": "method.coderesource",
+    "pk": 15
+},
+{
+    "fields": {
+        "description": "Compiled version of alignment.cpp",
+        "groups_allowed": [],
+        "filename": "alignment.so",
+        "users_allowed": [],
+        "user": 1,
+        "name": "alignment"
+    },
+    "model": "method.coderesource",
+    "pk": 16
+},
+{
+    "fields": {
+        "description": "",
+        "groups_allowed": [],
+        "filename": "g2p.matrix",
+        "users_allowed": [],
+        "user": 1,
+        "name": "g2p.matrix"
+    },
+    "model": "method.coderesource",
+    "pk": 17
+},
+{
+    "fields": {
+        "description": "",
+        "groups_allowed": [],
+        "filename": "g2p_fpr.txt",
+        "users_allowed": [],
+        "user": 1,
+        "name": "g2p_fpr.txt"
+    },
+    "model": "method.coderesource",
+    "pk": 18
+},
+{
+    "fields": {
+        "description": "Shell script to  launch Ruby version",
+        "groups_allowed": [],
+        "filename": "sam_g2p.sh",
+        "users_allowed": [],
+        "user": 1,
+        "name": "sam_g2p.sh"
+    },
+    "model": "method.coderesource",
+    "pk": 19
+},
+{
+    "fields": {
+        "description": "Plot coverage for each region in a sample.",
+        "groups_allowed": [],
+        "filename": "coverage_plots.R",
+        "users_allowed": [],
+        "user": 1,
+        "name": "coverage_plots"
+    },
+    "model": "method.coderesource",
+    "pk": 21
+},
+{
+    "fields": {
+        "description": "Load MiSeq project configurations from a JSON file.",
+        "groups_allowed": [],
+        "filename": "project_config.py",
+        "users_allowed": [],
+        "user": 1,
+        "name": "project_config"
+    },
+    "model": "method.coderesource",
+    "pk": 22
+},
+{
+    "fields": {
+        "description": "Mac version of the alignment module used by sam_g2p.  Compiled on OS X 10.6.",
+        "groups_allowed": [
+            1
+        ],
+        "filename": "alignment.bundle",
+        "users_allowed": [],
+        "user": 1,
+        "name": "alignment.bundle"
+    },
+    "model": "method.coderesource",
+    "pk": 23
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Take in two integers, output sums and products.",
+        "coderesource": 2,
+        "MD5_checksum": "5d454fec2eb55b5e643afa6c988ac974",
+        "content_file": "CodeResources/script_1_sum_and_products.py_20140807145144",
+        "user": 1,
         "revision_number": 1,
-        "threads": 1
-    }
+        "revision_DateTime": "2014-08-07T21:51:44.301Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 2
 },
 {
-    "pk": 2,
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "To make pipeline portable, allow user to specify local paths and thread counts.",
+        "coderesource": 3,
+        "MD5_checksum": "7121a7e639218c633578babb84fae75a",
+        "content_file": "CodeResources/settings.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T18:59:44.931Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 3
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Standard configuration for logging",
+        "coderesource": 4,
+        "MD5_checksum": "d98e48f57cc791eb7b68230af283dd3b",
+        "content_file": "CodeResources/miseq_logging.py_20140811120034",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T19:00:34.738Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 4
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Reference sequences",
+        "coderesource": 5,
+        "MD5_checksum": "4353613cdd8db1b7833f7fde17b41715",
+        "content_file": "CodeResources/projects.json",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T19:01:23.014Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 5
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
+        "coderesource": 6,
+        "MD5_checksum": "ceab4d9a4ba011cf872b079fd6e63d8a",
+        "content_file": "CodeResources/prelim_map.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T19:02:47.539Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 6
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
+        "coderesource": 7,
+        "MD5_checksum": "4776a35064ff5404b8df73481c4bf3e9",
+        "content_file": "CodeResources/remap.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T19:24:43.487Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 7
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Conversion of SAM data into aligned format.",
+        "coderesource": 8,
+        "MD5_checksum": "474bfa052bd9345860b589b666857ff0",
+        "content_file": "CodeResources/sam2aln.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T21:32:06.239Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 8
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().",
+        "coderesource": 10,
+        "MD5_checksum": "3563b23f2e275d184865e2907e50034b",
+        "content_file": "CodeResources/hyphyAlign.py_20140811154128",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T22:41:28.990Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 10
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Post-processing of short-read alignments.",
+        "coderesource": 11,
+        "MD5_checksum": "d88a5186405b9ccaa0314a050c618113",
+        "content_file": "CodeResources/aln2counts.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T22:43:15.594Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 11
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
+        "coderesource": 14,
+        "MD5_checksum": "cc361585b84ffd4b92b12153f4e563f2",
+        "content_file": "CodeResources/sam_g2p.rb_20140811165352",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T23:53:52.052Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 14
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Written by Conan",
+        "coderesource": 15,
+        "MD5_checksum": "173be3144ccf7a6f073c85db53e25821",
+        "content_file": "CodeResources/pssm_lib.rb_20140811165447",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T23:54:47.460Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 15
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Compiled version of alignment.cpp",
+        "coderesource": 16,
+        "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62",
+        "content_file": "CodeResources/alignment.so_20140811165911",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T23:59:11.169Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 16
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "",
+        "coderesource": 17,
+        "MD5_checksum": "b4c8b3013b1b6822d056f5958115f50a",
+        "content_file": "CodeResources/g2p.matrix_20140811165953",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-11T23:59:53.915Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 17
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "",
+        "coderesource": 18,
+        "MD5_checksum": "c7aad4c7db95f0fc797806895a76a449",
+        "content_file": "CodeResources/g2p_fpr.txt_20140811170012",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-12T00:00:12.535Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 18
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Shell script to  launch Ruby version",
+        "coderesource": 19,
+        "MD5_checksum": "6eed3db03077b725408f14ceb78c1c9f",
+        "content_file": "CodeResources/sam_g2p.sh_20140811170132",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-12T00:01:32.384Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 19
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Plot coverage for each region in a sample.",
+        "coderesource": 21,
+        "MD5_checksum": "77a11448dd4cc72e0ca9e1c2fb0ffb43",
+        "content_file": "CodeResources/coverage_plots.R",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-08-12T18:40:14.598Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 21
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [],
+        "revision_desc": "Load MiSeq project configurations from a JSON file.",
+        "coderesource": 22,
+        "MD5_checksum": "0f7bedb2a7de87b49a427004d709c34c",
+        "content_file": "CodeResources/project_config.py",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2014-12-03T21:44:58.852Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 22
+},
+{
+    "fields": {
+        "revision_name": "Prototype",
+        "revision_parent": null,
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "Mac version of the alignment module used by sam_g2p.  Compiled on OS X 10.6.",
+        "coderesource": 23,
+        "MD5_checksum": "5210d6a9a77b0d716a859a0ff9805404",
+        "content_file": "CodeResources/alignment.bundle_20150205161123",
+        "user": 1,
+        "revision_number": 1,
+        "revision_DateTime": "2015-02-06T00:11:23.270Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 23
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 3,
+        "coderesourcerevision": 6,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 1
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 4,
+        "coderesourcerevision": 6,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 2
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 5,
+        "coderesourcerevision": 6,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 3
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 3,
+        "coderesourcerevision": 7,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 4
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 4,
+        "coderesourcerevision": 7,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 5
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 5,
+        "coderesourcerevision": 7,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 6
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 3,
+        "coderesourcerevision": 8,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 7
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 3,
+        "coderesourcerevision": 11,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 8
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 4,
+        "coderesourcerevision": 11,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 10
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 10,
+        "coderesourcerevision": 11,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 11
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 14,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 15
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 15,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 16
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 16,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 17
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 17,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 18
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 18,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 19
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 22,
+        "coderesourcerevision": 6,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 20
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 22,
+        "coderesourcerevision": 7,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 21
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 22,
+        "coderesourcerevision": 11,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 22
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 5,
+        "coderesourcerevision": 11,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 23
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 5,
+        "coderesourcerevision": 21,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 24
+},
+{
+    "fields": {
+        "depPath": ".",
+        "requirement": 23,
+        "coderesourcerevision": 19,
+        "depFileName": ""
+    },
+    "model": "method.coderesourcedependency",
+    "pk": 25
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 2,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 2,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 2
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 3,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 6,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 4,
+        "reusable": 2
+    },
+    "model": "method.method",
+    "pk": 4
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 4,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 7,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 4,
+        "reusable": 2
+    },
+    "model": "method.method",
+    "pk": 5
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 5,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 8,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 6
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 6,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 11,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 7
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 8,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 19,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 9
+},
+{
+    "fields": {
+        "revision_parent": null,
+        "family": 9,
+        "users_allowed": [],
+        "groups_allowed": [],
+        "driver": 21,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 2
+    },
+    "model": "method.method",
+    "pk": 11
+},
+{
+    "fields": {
+        "description": "",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "Sums and Products"
+    },
     "model": "method.methodfamily",
-    "fields": {
-        "name": "Sums and Products",
-        "description": ""
-    }
-},
-{
-    "pk": 3, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "To make pipeline portable, allow user to specify local paths and thread counts.", 
-        "name": "settings", 
-        "filename": "settings.py"
-    }
-},
-{
-    "pk": 4, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Standard configuration for logging", 
-        "name": "miseq_logging", 
-        "filename": "miseq_logging.py"
-    }
-},
-{
-    "pk": 5, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Reference sequences", 
-        "name": "projects.json", 
-        "filename": "projects.json"
-    }
-},
-{
-    "pk": 6, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.", 
-        "name": "prelim_map", 
-        "filename": "prelim_map.py"
-    }
-},
-{
-    "pk": 3, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "To make pipeline portable, allow user to specify local paths and thread counts.", 
-        "coderesource": 3, 
-        "MD5_checksum": "7121a7e639218c633578babb84fae75a", 
-        "content_file": "CodeResources/settings.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T18:59:44.931Z"
-    }
-},
-{
-    "pk": 4, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Standard configuration for logging", 
-        "coderesource": 4, 
-        "MD5_checksum": "d98e48f57cc791eb7b68230af283dd3b", 
-        "content_file": "CodeResources/miseq_logging.py_20140811120034", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T19:00:34.738Z"
-    }
-},
-{
-    "pk": 5, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Reference sequences", 
-        "coderesource": 5, 
-        "MD5_checksum": "4353613cdd8db1b7833f7fde17b41715", 
-        "content_file": "CodeResources/projects.json", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T19:01:23.014Z"
-    }
-},
-{
-    "pk": 6, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.", 
-        "coderesource": 6, 
-        "MD5_checksum": "ceab4d9a4ba011cf872b079fd6e63d8a", 
-        "content_file": "CodeResources/prelim_map.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T19:02:47.539Z"
-    }
-},
-{
-    "pk": 1, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 3, 
-        "coderesourcerevision": 6, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 2, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 4, 
-        "coderesourcerevision": 6, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 3, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 5, 
-        "coderesourcerevision": 6, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 4, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 3, 
-        "reusable": 2,
-        "driver": 6, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 4
-    }
-},
-{
-    "pk": 3, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "prelim_map", 
-        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file."
-    }
-},
-{
-    "pk": 7, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
-        "name": "remap", 
-        "filename": "remap.py"
-    }
-},
-{
-    "pk": 7, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
-        "coderesource": 7, 
-        "MD5_checksum": "4776a35064ff5404b8df73481c4bf3e9", 
-        "content_file": "CodeResources/remap.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T19:24:43.487Z"
-    }
-},
-{
-    "pk": 4, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 3, 
-        "coderesourcerevision": 7, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 5, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 4, 
-        "coderesourcerevision": 7, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 6, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 5, 
-        "coderesourcerevision": 7, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 5, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 4, 
-        "reusable": 2,
-        "driver": 7, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 4
-    }
-},
-{
-    "pk": 4, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "remap", 
-        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing."
-    }
-},
-{
-    "pk": 8, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Conversion of SAM data into aligned format.", 
-        "name": "sam2aln", 
-        "filename": "sam2aln.py"
-    }
-},
-{
-    "pk": 8, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Conversion of SAM data into aligned format.", 
-        "coderesource": 8, 
-        "MD5_checksum": "474bfa052bd9345860b589b666857ff0", 
-        "content_file": "CodeResources/sam2aln.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T21:32:06.239Z"
-    }
-},
-{
-    "pk": 7, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 3, 
-        "coderesourcerevision": 8, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 6, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 5, 
-        "reusable": 1,
-        "driver": 8, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 1
-    }
-},
-{
-    "pk": 5, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "sam2aln", 
-        "description": "Conversion of SAM data into aligned format."
-    }
-},
-{
-    "pk": 10, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().", 
-        "name": "hyphyAlign", 
-        "filename": "hyphyAlign.py"
-    }
-},
-{
-    "pk": 11, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Post-processing of short-read alignments.", 
-        "name": "aln2counts", 
-        "filename": "aln2counts.py"
-    }
-},
-{
-    "pk": 10, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().", 
-        "coderesource": 10, 
-        "MD5_checksum": "3563b23f2e275d184865e2907e50034b", 
-        "content_file": "CodeResources/hyphyAlign.py_20140811154128", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T22:41:28.990Z"
-    }
-},
-{
-    "pk": 11, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Post-processing of short-read alignments.", 
-        "coderesource": 11, 
-        "MD5_checksum": "d88a5186405b9ccaa0314a050c618113", 
-        "content_file": "CodeResources/aln2counts.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T22:43:15.594Z"
-    }
-},
-{
-    "pk": 8, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 3, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 10, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 4, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 11, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 10, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 7, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 6, 
-        "reusable": 1,
-        "driver": 11, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 1
-    }
-},
-{
-    "pk": 6, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "aln2counts", 
-        "description": "Post-processing of short-read alignments."
-    }
-},
-{
-    "pk": 14, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
-        "name": "sam_g2p", 
-        "filename": "sam_g2p.rb"
-    }
-},
-{
-    "pk": 15, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Written by Conan", 
-        "name": "pssm_lib", 
-        "filename": "pssm_lib.rb"
-    }
-},
-{
-    "pk": 16, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Compiled version of alignment.cpp", 
-        "name": "alignment", 
-        "filename": "alignment.so"
-    }
-},
-{
-    "pk": 17, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "", 
-        "name": "g2p.matrix", 
-        "filename": "g2p.matrix"
-    }
-},
-{
-    "pk": 18, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "", 
-        "name": "g2p_fpr.txt", 
-        "filename": "g2p_fpr.txt"
-    }
-},
-{
-    "pk": 19, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Shell script to  launch Ruby version", 
-        "name": "sam_g2p.sh", 
-        "filename": "sam_g2p.sh"
-    }
-},
-{
-    "pk": 14, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
-        "coderesource": 14, 
-        "MD5_checksum": "cc361585b84ffd4b92b12153f4e563f2", 
-        "content_file": "CodeResources/sam_g2p.rb_20140811165352", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:53:52.052Z"
-    }
-},
-{
-    "pk": 15, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Written by Conan", 
-        "coderesource": 15, 
-        "MD5_checksum": "173be3144ccf7a6f073c85db53e25821", 
-        "content_file": "CodeResources/pssm_lib.rb_20140811165447", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:54:47.460Z"
-    }
-},
-{
-    "pk": 16, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Compiled version of alignment.cpp", 
-        "coderesource": 16, 
-        "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62", 
-        "content_file": "CodeResources/alignment.so_20140811165911", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:59:11.169Z"
-    }
-},
-{
-    "pk": 17, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "", 
-        "coderesource": 17, 
-        "MD5_checksum": "b4c8b3013b1b6822d056f5958115f50a", 
-        "content_file": "CodeResources/g2p.matrix_20140811165953", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-11T23:59:53.915Z"
-    }
-},
-{
-    "pk": 18, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "", 
-        "coderesource": 18, 
-        "MD5_checksum": "c7aad4c7db95f0fc797806895a76a449", 
-        "content_file": "CodeResources/g2p_fpr.txt_20140811170012", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-12T00:00:12.535Z"
-    }
-},
-{
-    "pk": 19, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Shell script to  launch Ruby version", 
-        "coderesource": 19, 
-        "MD5_checksum": "6eed3db03077b725408f14ceb78c1c9f", 
-        "content_file": "CodeResources/sam_g2p.sh_20140811170132", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-12T00:01:32.384Z"
-    }
-},
-{
-    "pk": 15, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 14, 
-        "coderesourcerevision": 19, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 16, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 15, 
-        "coderesourcerevision": 19, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 17, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 16, 
-        "coderesourcerevision": 19, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 18, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 17, 
-        "coderesourcerevision": 19, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 19, 
-    "model": "method.coderesourcedependency", 
-    "fields": {
-        "depPath": ".", 
-        "requirement": 18, 
-        "coderesourcerevision": 19, 
-        "depFileName": ""
-    }
-},
-{
-    "pk": 9, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 8, 
-        "reusable": 1,
-        "driver": 19, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 1
-    }
-},
-{
-    "pk": 8, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "sam_g2p.sh", 
-        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence."
-    }
-},
-{
-    "pk": 21, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Plot coverage for each region in a sample.", 
-        "name": "coverage_plots", 
-        "filename": "coverage_plots.R"
-    }
-},
-{
-    "pk": 21, 
-    "model": "method.coderesourcerevision", 
-    "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Plot coverage for each region in a sample.", 
-        "coderesource": 21, 
-        "MD5_checksum": "77a11448dd4cc72e0ca9e1c2fb0ffb43", 
-        "content_file": "CodeResources/coverage_plots.R", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-08-12T18:40:14.598Z"
-    }
-},
-{
-    "pk": 11, 
-    "model": "method.method", 
-    "fields": {
-        "revision_parent": null, 
-        "family": 9, 
-        "reusable": 2,
-        "driver": 21, 
-        "tainted": false, 
-        "revision_number": 1,
-        "threads": 1
-    }
-},
-{
-    "pk": 9, 
-    "model": "method.methodfamily", 
-    "fields": {
-        "name": "coverage_plots", 
-        "description": "Plot coverage for each region in a sample."
-    }
-},
-{
-    "pk": 22, 
-    "model": "method.coderesource", 
-    "fields": {
-        "description": "Load MiSeq project configurations from a JSON file.", 
-        "name": "project_config", 
-        "filename": "project_config.py"
-    }
+    "pk": 2
 },
 {
-    "pk": 22, 
-    "model": "method.coderesourcerevision", 
     "fields": {
-        "revision_name": "Prototype", 
-        "revision_parent": null, 
-        "revision_desc": "Load MiSeq project configurations from a JSON file.", 
-        "coderesource": 22, 
-        "MD5_checksum": "0f7bedb2a7de87b49a427004d709c34c", 
-        "content_file": "CodeResources/project_config.py", 
-        "revision_number": 1, 
-        "revision_DateTime": "2014-12-03T21:44:58.852Z"
-    }
+        "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "prelim_map"
+    },
+    "model": "method.methodfamily",
+    "pk": 3
 },
 {
-    "pk": 20, 
-    "model": "method.coderesourcedependency", 
     "fields": {
-        "depPath": ".", 
-        "requirement": 22, 
-        "coderesourcerevision": 6, 
-        "depFileName": ""
-    }
+        "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "remap"
+    },
+    "model": "method.methodfamily",
+    "pk": 4
 },
 {
-    "pk": 21, 
-    "model": "method.coderesourcedependency", 
     "fields": {
-        "depPath": ".", 
-        "requirement": 22, 
-        "coderesourcerevision": 7, 
-        "depFileName": ""
-    }
+        "description": "Conversion of SAM data into aligned format.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "sam2aln"
+    },
+    "model": "method.methodfamily",
+    "pk": 5
 },
 {
-    "pk": 22, 
-    "model": "method.coderesourcedependency", 
     "fields": {
-        "depPath": ".", 
-        "requirement": 22, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
+        "description": "Post-processing of short-read alignments.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "aln2counts"
+    },
+    "model": "method.methodfamily",
+    "pk": 6
 },
 {
-    "pk": 23, 
-    "model": "method.coderesourcedependency", 
     "fields": {
-        "depPath": ".", 
-        "requirement": 5, 
-        "coderesourcerevision": 11, 
-        "depFileName": ""
-    }
+        "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "sam_g2p.sh"
+    },
+    "model": "method.methodfamily",
+    "pk": 8
 },
 {
-    "pk": 24, 
-    "model": "method.coderesourcedependency", 
     "fields": {
-        "depPath": ".", 
-        "requirement": 5, 
-        "coderesourcerevision": 21, 
-        "depFileName": ""
-    }
+        "description": "Plot coverage for each region in a sample.",
+        "groups_allowed": [],
+        "users_allowed": [],
+        "user": 1,
+        "name": "coverage_plots"
+    },
+    "model": "method.methodfamily",
+    "pk": 9
 }
 ]
