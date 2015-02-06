@@ -455,6 +455,7 @@ def parse_method_form(query, family=None, parent_method=None):
 
     return exceptions
 
+
 def method_add(request, id=None):
     """
     Generate forms for adding Methods, and validate and process POST data returned
@@ -571,6 +572,7 @@ def method_revise(request, id):
                  'parent': parent_method})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
+
 
 def resource_revision_view(request, id):
     revision = CodeResourceRevision.objects.get(pk=id)
