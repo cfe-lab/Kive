@@ -274,7 +274,7 @@ Once you have set up your production server, this is how to deploy a new release
         ps aux | grep runfleet
         sudo kill <pid for runfleet>
         sudo /usr/sbin/apachectl restart
-        ./manage.py runfleet --workers 151 &>/dev/null &
+        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
 
 9. Remove the pre-release flag from the release.
 10. Close the milestone for this release, create one for the next release, and
