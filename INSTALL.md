@@ -159,7 +159,10 @@ of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).
 This is a database that must be created by an administrator prior to using
 Shipyard.
 
-You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
+Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
+working files for the server and any uploaded files. You may also wish to modify
+the `TIME_ZONE` setting to your region, although this localization is not
+strictly necessary.
 
 Another configuration file is `hostfile` in the same folder as `settings.py`.
 Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
