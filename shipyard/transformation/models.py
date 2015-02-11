@@ -390,13 +390,13 @@ class XputStructure(models.Model):
     # Nullable fields indicating that this dataset has
     # restrictions on how many rows it can have
     min_row = models.PositiveIntegerField(
-        "Minimum row",
+        "Minimum rows",
         help_text="Minimum number of rows this input/output returns",
         null=True,
         blank=True)
 
     max_row = models.PositiveIntegerField(
-        "Maximum row",
+        "Maximum rows",
         help_text="Maximum number of rows this input/output returns",
         null=True,
         blank=True)

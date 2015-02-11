@@ -70,10 +70,19 @@
         <tbody id="dependencyForms">
             {% for dep_form in dep_forms %}
             <tr>
-                <td>{{ dep_form.coderesource }}</td>
-                <td>{{ dep_form.revisions }}</td>
-                <td>{{ dep_form.depPath }}</td>
-                <td>{{ dep_form.depFileName }}</td>
+                <td>{{ dep_form.coderesource }}
+                    <div class="errortext">{{ dep_form.non_field_errors }}</div>
+                    <div class="errortext">{{ dep_form.coderesource.errors }}</div>
+                </td>
+                <td>{{ dep_form.revisions }}
+                    <div class="errortext">{{ dep_form.revisions.errors }}</div>
+                </td>
+                <td>{{ dep_form.depPath }}
+                    <div class="errortext">{{ dep_form.depPath.errors }}</div>
+                </td>
+                <td>{{ dep_form.depFileName }}
+                    <div class="errortext">{{ dep_form.depFileName.errors }}</div>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
