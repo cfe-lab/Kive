@@ -1251,7 +1251,8 @@
         "datatype": 1, 
         "column_idx": 7, 
         "column_name": "error", 
-        "compounddatatype": 20
+        "compounddatatype": 20,
+        "blankable": true
     }
 },
 {

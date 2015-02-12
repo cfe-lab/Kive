@@ -231,11 +231,15 @@ class CellError(models.Model):
             # Note that A.is_restriction(B) is like A <= B, whereas B.is_restricted_by(A)
             # is like B > A; we want the possible equality.
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
-                raise ValidationError(error_messages["CellError_bad_BC"].format(self))
+                raise ValidationError(
+                    ('CellError "{}" refers to a BasicConstraint that does ' +
+                     'not apply to the associated column').format(self))
 
         elif self.constraint_failed.__class__.__name__ == "CustomConstraint":
             if not self.column.datatype.is_restriction(self.constraint_failed.datatype):
-                raise ValidationError(error_messages["CellError_bad_CC"].format(self))
+                raise ValidationError(
+                    ('CellError "{}" refers to a CustomConstraint that does ' +
+                     'not apply to the associated column').format(self))
 
     def has_blank_error(self):
         try:
@@ -335,7 +339,7 @@ class VerificationLog(stopwatch.models.Stopwatch):
         """
         self.clean()
         if self.return_code is None or self.end_time is None:
-            raise ValidationError(error_messages["verificationlog_incomplete"].
+            raise ValidationError('VerificationLog "{}" is not complete.'.
                     format(self))
 
 

@@ -159,7 +159,10 @@ of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).
 This is a database that must be created by an administrator prior to using
 Shipyard.
 
-You may also wish to modify the `TIME_ZONE` setting to your region, although this localization is not strictly necessary.
+Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
+working files for the server and any uploaded files. You may also wish to modify
+the `TIME_ZONE` setting to your region, although this localization is not
+strictly necessary.
 
 Another configuration file is `hostfile` in the same folder as `settings.py`.
 Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
@@ -274,7 +277,7 @@ Once you have set up your production server, this is how to deploy a new release
         ps aux | grep runfleet
         sudo kill <pid for runfleet>
         sudo /usr/sbin/apachectl restart
-        ./manage.py runfleet --workers 151 &>/dev/null &
+        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
 
 9. Remove the pre-release flag from the release.
 10. Close the milestone for this release, create one for the next release, and

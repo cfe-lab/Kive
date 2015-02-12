@@ -1,10 +1,9 @@
 # Django settings for server project.
 
-# Copperfish-specific things to set:
+# Copy this file to settings.py, then adjust the settings in the copy.
+# Kive-specific things to set:
 # DATABASES: NAME, USER, and PASSWORD are site-specific
-# MEDIA_ROOT: set to the directory you wish to use on your system
-# When this is set, copy it over to settings.py (but don't have git track it)
-# -- RL January 6, 2015
+# MEDIA_ROOT: set to the absolute path you wish to use on your system
 
 
 
