@@ -135,11 +135,19 @@
                     <td>{{ bulkAddDatasetForm.description }}</td>
                     <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
                 </tr>
+                <tr><td><label>{{ bulkAddDatasetForm.users_allowed.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.users_allowed }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.users_allowed.errors }}</td>
+
+                    <td><label>{{ bulkAddDatasetForm.groups_allowed.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.groups_allowed }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.groups_allowed.errors }}</td>
+                </tr>
             </table>
         </fieldset>
         <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
 
-
+    <!-- This code may become useful again if we get to implementing a progress bar.
         <div class="bulk_dataset_table">
             <table id="uploadProgressTable">
                 <thead>
@@ -155,7 +163,6 @@
                 <tbody>
                     {% for bulkDisplayResult in bulkDisplayResults %}
                         <tr>
-                            <!-- instance means Django model.  Noneditable -->
                             <td>{{ bulkDisplayResult.orig_filename }}</td>
                             <td>{{ bulkDisplayResult.dataset.get_formatted_filesize }}</td>
                             <td>{{ bulkDisplayResult.dataset.name }}</td>
@@ -167,8 +174,9 @@
                 </tbody>
             </table>
         </div>
+    -->
 
-        <div class="errorStrip errortext">{{ create_error }}</div>
+        <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
         <div id="loading" class="loading_container">
             <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
         </div>

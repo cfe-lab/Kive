@@ -337,12 +337,13 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.header = "header,sequence"
 
         self.datatype_str = Datatype.objects.get(pk=datatypes.STR_PK)
-        self.datatype_dna = Datatype(name="DNA", description="sequences of ATCG")
+        self.datatype_dna = Datatype(name="DNA", description="sequences of ATCG",
+                                     user=self.myUser)
         self.datatype_dna.clean()
         self.datatype_dna.save()
         self.datatype_dna.restricts.add(self.datatype_str)
         self.datatype_dna.complete_clean()
-        self.cdt_record = CompoundDatatype()
+        self.cdt_record = CompoundDatatype(user=self.myUser)
         self.cdt_record.save()
         self.cdt_record.members.create(datatype=self.datatype_str, 
             column_name="header", column_idx=1)
@@ -493,7 +494,7 @@ foo,bar
         Symbolic dataset creation fails if the data file has too many
         columns.
         """
-        compound_datatype = CompoundDatatype()
+        compound_datatype = CompoundDatatype(user=self.myUser)
         compound_datatype.save()
         compound_datatype.members.create(datatype=self.STR, 
                                          column_name="name",
@@ -880,7 +881,7 @@ class ExecRecordTests(LibrarianTestCase):
 
         # Good case: input SymbolicDataset has an identical CDT of
         # generic_input.
-        other_CDT = CompoundDatatype()
+        other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
 
         col1 = other_CDT.members.create(datatype=self.string_dt,
@@ -919,7 +920,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(mA_ERO.clean(), None)
 
         # Bad case: output SymbolicDataset has an identical CDT.
-        other_CDT = CompoundDatatype()
+        other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="x", column_idx=1)
@@ -955,7 +956,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(outcable_ERO.clean(), None)
 
         # Good case: output SymbolicDataset has an identical CDT.
-        other_CDT = CompoundDatatype()
+        other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
         col1 = other_CDT.members.create(datatype=self.string_dt,
                                         column_name="x", column_idx=1)
@@ -995,7 +996,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(cable_ERO.clean(), None)
 
         # Good case: output Dataset has an identical CDT.
-        other_CDT = CompoundDatatype()
+        other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
         col1 = other_CDT.members.create(datatype=self.string_dt,
                                         column_name="x", column_idx=1)

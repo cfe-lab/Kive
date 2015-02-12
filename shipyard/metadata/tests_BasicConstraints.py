@@ -3,11 +3,15 @@ Unit tests for Shipyard's BasicConstraint class and functionality relating to it
 """
 from django.test import TestCase
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 
 from metadata.models import *
 from method.models import CodeResourceRevision
 
 from constants import datatypes
+
+shipyard_user = User.objects.get(pk=1)
+
 
 class BasicConstraintTestSetup(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
@@ -28,7 +32,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper for testing clean() on a well-defined (MIN|MAX)_(VAL|LENGTH) constraint.
         """
-        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -93,7 +97,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper for testing clean() on bad numeric constraints.
         """
-        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -257,7 +261,7 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         Helper for defining tests on (MIN|MAX)_LENGTH constraints wrongly applied to non-string types.
         """
         constr_DT = Datatype(name="NumericalWithLengthConstraint",
-                             description="Incorrectly length-constrained Datatype")
+                             description="Incorrectly length-constrained Datatype", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -319,7 +323,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         Helper for defining tests on (MIN|MAX)_LENGTH constraints with non-integer values.
         """
         constr_DT = Datatype(name="NonIntegerLengthConstraint",
-                             description="String with poorly-formed length constraint")
+                             description="String with poorly-formed length constraint",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.STR)
@@ -367,7 +372,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         Helper for defining tests on (MIN|MAX)_LENGTH constraints whose values are too small.
         """
         constr_DT = Datatype(name="TooSmallLengthConstraint",
-                             description="String with too-small length constraint")
+                             description="String with too-small length constraint",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.STR)
@@ -415,7 +421,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         Helper to create good REGEXP-constraint test cases.
         """
         regexped_DT = Datatype(name="RegexpedDT",
-                               description="Datatype with good REGEXP attached")
+                               description="Datatype with good REGEXP attached",
+                               user=shipyard_user)
         regexped_DT.full_clean()
         regexped_DT.save()
         regexped_DT.restricts.add(builtin_type)
@@ -457,7 +464,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper to create bad REGEXP-constraint test cases.
         """
-        regexped_DT = Datatype(name="RegexpedDT", description="Datatype with bad REGEXP attached")
+        regexped_DT = Datatype(name="RegexpedDT", description="Datatype with bad REGEXP attached",
+                               user=shipyard_user)
         regexped_DT.full_clean()
         regexped_DT.save()
         regexped_DT.restricts.add(builtin_type)
@@ -502,7 +510,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper for testing clean() on good DATETIMEFORMATs.
         """
-        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached")
+        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached",
+                          user=shipyard_user)
         dtf_DT.full_clean()
         dtf_DT.save()
         dtf_DT.restricts.add(self.STR)
@@ -535,7 +544,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper for testing clean() on DATETIMEFORMATs applied to non-strings.
         """
-        dtf_DT = Datatype(name="BadDTF", description="Non-string with a DTF constraint attached")
+        dtf_DT = Datatype(name="BadDTF", description="Non-string with a DTF constraint attached",
+                          user=shipyard_user)
         dtf_DT.full_clean()
         dtf_DT.save()
         dtf_DT.restricts.add(builtin_type)
@@ -575,7 +585,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Helper for clean() on a BasicConstraint attached to an incomplete Datatype.
         """
-        incomplete_DT = Datatype(name="IncompleteDT", description="Datatype that does not restrict any builtin")
+        incomplete_DT = Datatype(name="IncompleteDT", description="Datatype that does not restrict any builtin",
+                                 user=shipyard_user)
         incomplete_DT.full_clean()
         incomplete_DT.save()
 
@@ -637,12 +648,12 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a well-defined MIN_VAL constraint on a second-generation integer.
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.INT)
 
-        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(parent_DT)
@@ -656,12 +667,12 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a badly-defined MAX_VAL constraint (second-gen float).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.FLOAT)
 
-        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype")
+        constr_DT = Datatype(name="ConstrDT", description="Constrained Datatype", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(parent_DT)
@@ -682,13 +693,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a badly-defined MIN_LENGTH constraint (second-gen Boolean).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.BOOL)
 
         constr_DT = Datatype(name="BooleanWithLengthConstraint",
-                             description="Incorrectly length-constrained Datatype")
+                             description="Incorrectly length-constrained Datatype",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(parent_DT)
@@ -710,13 +722,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a badly-defined (str) MIN_LENGTH constraint (second-gen Datatype).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.STR)
 
         constr_DT = Datatype(name="NonIntegerLengthConstraint",
-                             description="String with poorly-formed length constraint")
+                             description="String with poorly-formed length constraint",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(parent_DT)
@@ -736,13 +749,14 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on an edge-case negative (0) MIN_LENGTH constraint (second-gen Datatype).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.STR)
 
         constr_DT = Datatype(name="TooSmallLengthConstraint",
-                             description="String with too-small length constraint")
+                             description="String with too-small length constraint",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(parent_DT)
@@ -762,23 +776,24 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a second-gen Datatype with good REGEXP attached.
         """
-        mother_DT = Datatype(name="Mother", description="Mother")
+        mother_DT = Datatype(name="Mother", description="Mother", user=shipyard_user)
         mother_DT.full_clean()
         mother_DT.save()
         mother_DT.restricts.add(self.STR)
 
-        father_DT = Datatype(name="Father", description="Father")
+        father_DT = Datatype(name="Father", description="Father", user=shipyard_user)
         father_DT.full_clean()
         father_DT.save()
         father_DT.restricts.add(self.STR)
 
-        milkman_DT = Datatype(name="Milkman", description="Milkman")
+        milkman_DT = Datatype(name="Milkman", description="Milkman", user=shipyard_user)
         milkman_DT.full_clean()
         milkman_DT.save()
         milkman_DT.restricts.add(self.STR)
 
         regexped_DT = Datatype(name="RegexpedDT",
-                               description="Datatype with good REGEXP attached")
+                               description="Datatype with good REGEXP attached",
+                               user=shipyard_user)
         regexped_DT.full_clean()
         regexped_DT.save()
         regexped_DT.restricts.add(mother_DT)
@@ -795,18 +810,18 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a second-gen Datatype with a bad REGEXP constraint.
         """
-        Danny_DT = Datatype(name="Bob Saget", description="Ostensible father")
+        Danny_DT = Datatype(name="Bob Saget", description="Ostensible father", user=shipyard_user)
         # Danny_DT.full_house()
         Danny_DT.full_clean()
         Danny_DT.save()
         Danny_DT.restricts.add(self.INT)
 
-        Joey_DT = Datatype(name="Dave Coulier", description="Popeye imitator")
+        Joey_DT = Datatype(name="Dave Coulier", description="Popeye imitator", user=shipyard_user)
         Joey_DT.full_clean()
         Joey_DT.save()
         Joey_DT.restricts.add(self.INT)
 
-        Jesse_DT = Datatype(name="John Stamos", description="Mercy-haver")
+        Jesse_DT = Datatype(name="John Stamos", description="Mercy-haver", user=shipyard_user)
         Jesse_DT.full_clean()
         Jesse_DT.save()
         Jesse_DT.restricts.add(self.INT)
@@ -815,7 +830,8 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         pattern = "(.+"
 
         regexped_DT = Datatype(name="RegexpedDT",
-                               description="Datatype with bad REGEXP attached")
+                               description="Datatype with bad REGEXP attached",
+                               user=shipyard_user)
         regexped_DT.full_clean()
         regexped_DT.save()
         regexped_DT.restricts.add(Danny_DT)
@@ -838,12 +854,12 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a good DATETIMEFORMAT (second-gen Datatype).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.STR)
 
-        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached")
+        dtf_DT = Datatype(name="GoodDTF", description="String with a DTF constraint attached", user=shipyard_user)
         dtf_DT.full_clean()
         dtf_DT.save()
         dtf_DT.restricts.add(parent_DT)
@@ -858,12 +874,12 @@ class BasicConstraintCleanTests(BasicConstraintTestSetup):
         """
         Testing clean() on a DATETIMEFORMATs applied to a float (second-gen).
         """
-        parent_DT = Datatype(name="Middleman DT", description="Middleman DT")
+        parent_DT = Datatype(name="Middleman DT", description="Middleman DT", user=shipyard_user)
         parent_DT.full_clean()
         parent_DT.save()
         parent_DT.restricts.add(self.FLOAT)
 
-        dtf_DT = Datatype(name="BadDTF", description="Float with a DTF constraint attached")
+        dtf_DT = Datatype(name="BadDTF", description="Float with a DTF constraint attached", user=shipyard_user)
         dtf_DT.full_clean()
         dtf_DT.save()
         dtf_DT.restricts.add(parent_DT)
@@ -929,7 +945,7 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         Helper to test get_effective_num_constraint for several different builtin types
         and constraint types in the no-constraint case
         """
-        no_constr_set = Datatype(name="NoConstrSet", description="No constraint set")
+        no_constr_set = Datatype(name="NoConstrSet", description="No constraint set", user=shipyard_user)
         no_constr_set.clean()
         no_constr_set.save()
         no_constr_set.restricts.add(builtin_type)
@@ -988,7 +1004,8 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Helper to check retrieving constraints set directly on a Datatype.
         """
-        constr_DT = Datatype(name="Constrained DT", description="Datatype with numerical constraint")
+        constr_DT = Datatype(name="Constrained DT", description="Datatype with numerical constraint",
+                             user=shipyard_user)
         constr_DT.clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -1039,7 +1056,7 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Helper for testing the inheritance of numerical constraints from a single parent.
         """
-        constr_parent = Datatype(name="ConstrParent", description="Constrained parent")
+        constr_parent = Datatype(name="ConstrParent", description="Constrained parent", user=shipyard_user)
         constr_parent.clean()
         constr_parent.save()
         constr_parent.restricts.add(builtin_type)
@@ -1047,7 +1064,7 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         constr = constr_parent.basic_constraints.create(ruletype=BC_type, rule="{}".format(constr_val))
         constr.full_clean()
 
-        heir = Datatype(name="Heir", description="Inherits BC from parent")
+        heir = Datatype(name="Heir", description="Inherits BC from parent", user=shipyard_user)
         heir.clean()
         heir.save()
         heir.restricts.add(constr_parent)
@@ -1097,14 +1114,16 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Helper for testing the inheritance of constraints from several supertypes.
         """
-        dominant_parent = Datatype(name="DominantParent", description="Parent with dominant constraint")
+        dominant_parent = Datatype(name="DominantParent", description="Parent with dominant constraint",
+                                   user=shipyard_user)
         dominant_parent.full_clean()
         dominant_parent.save()
         dominant_parent.restricts.add(dominant_builtin)
         dominant_constr = dominant_parent.basic_constraints.create(
             ruletype=BC_type, rule="{}".format(dominant_constr_val))
 
-        other_parent = Datatype(name="OtherParent", description="Parent whose constraint is overruled")
+        other_parent = Datatype(name="OtherParent", description="Parent whose constraint is overruled",
+                                user=shipyard_user)
         other_parent.full_clean()
         other_parent.save()
         other_parent.restricts.add(other_builtin)
@@ -1112,7 +1131,7 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         if other_constr_val != None:
             other_constr = other_parent.basic_constraints.create(ruletype=BC_type, rule="{}".format(other_constr_val))
 
-        heir = Datatype(name="Heir", description="Inherits from two parents")
+        heir = Datatype(name="Heir", description="Inherits from two parents", user=shipyard_user)
         heir.full_clean()
         heir.save()
         heir.restricts.add(dominant_parent)
@@ -1218,13 +1237,13 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Datatype that inherits from BOOL should not have an effective MIN_VAL.
         """
-        min_zero = Datatype(name="MinZero", description="Integer >= 0")
+        min_zero = Datatype(name="MinZero", description="Integer >= 0", user=shipyard_user)
         min_zero.full_clean()
         min_zero.save()
         min_zero.restricts.add(self.INT)
         min_zero.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="0")
 
-        heir = Datatype(name="Heir", description="Inherits from MinZero and BOOL")
+        heir = Datatype(name="Heir", description="Inherits from MinZero and BOOL", user=shipyard_user)
         heir.full_clean()
         heir.save()
         heir.restricts.add(min_zero)
@@ -1236,13 +1255,13 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Datatype that inherits from FLOAT should not have an effective MAX_LENGTH.
         """
-        max_50 = Datatype(name="Max50", description="String of length <= 50")
+        max_50 = Datatype(name="Max50", description="String of length <= 50", user=shipyard_user)
         max_50.full_clean()
         max_50.save()
         max_50.restricts.add(self.STR)
         max_50.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="50")
 
-        heir = Datatype(name="Heir", description="Inherits from Max50 and FLOAT")
+        heir = Datatype(name="Heir", description="Inherits from Max50 and FLOAT", user=shipyard_user)
         heir.full_clean()
         heir.save()
         heir.restricts.add(max_50)
@@ -1254,13 +1273,13 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Datatype that inherits from BOOL should not have an effective MIN_LENGTH.
         """
-        min_50 = Datatype(name="Min50", description="String of length <= 50")
+        min_50 = Datatype(name="Min50", description="String of length <= 50", user=shipyard_user)
         min_50.full_clean()
         min_50.save()
         min_50.restricts.add(self.STR)
         min_50.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="50")
 
-        heir = Datatype(name="Heir", description="Inherits from Min50 and BOOL")
+        heir = Datatype(name="Heir", description="Inherits from Min50 and BOOL", user=shipyard_user)
         heir.full_clean()
         heir.save()
         heir.restricts.add(min_50)
@@ -1274,13 +1293,13 @@ class BasicConstraintGetEffectiveNumConstraintTests(BasicConstraintTestSetup):
         """
         Helper for testing cases where a Datatype overrides its supertypes' constraints.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype with constraint")
+        super_DT = Datatype(name="SuperDT", description="Supertype with constraint", user=shipyard_user)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(supertype_builtin_type)
         super_DT.basic_constraints.create(ruletype=BC_type, rule="{}".format(supertype_constr_val))
 
-        heir_DT = Datatype(name="Heir", description="Heir of supertype with overriding constraint")
+        heir_DT = Datatype(name="Heir", description="Heir of supertype with overriding constraint", user=shipyard_user)
         heir_DT.full_clean()
         heir_DT.save()
         heir_DT.restricts.add(builtin_type)
@@ -1329,7 +1348,7 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype has no regexps defined on it.
         """
-        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT")
+        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.STR)
@@ -1340,15 +1359,15 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype has no regexps defined on it and neither do its supertypes.
         """
-        super_DT = Datatype(name="SuperDT", description="Unfettered FLOAT")
+        super_DT = Datatype(name="SuperDT", description="Unfettered FLOAT", user=shipyard_user)
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
 
-        second_DT = Datatype(name="SecondDT", description="Unfettered INT")
+        second_DT = Datatype(name="SecondDT", description="Unfettered INT", user=shipyard_user)
         second_DT.save()
         second_DT.restricts.add(self.INT)
 
-        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT")
+        my_DT = Datatype(name="NoRegexpDT", description="Unfettered DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(second_DT)
@@ -1360,7 +1379,7 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype has one regexp defined on it.
         """
-        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean")
+        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.BOOL)
@@ -1373,7 +1392,7 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype has several regexps defined on it.
         """
-        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean")
+        my_DT = Datatype(name="RegexpedDT", description="Regexped Boolean", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.BOOL)
@@ -1390,18 +1409,18 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype has no regexps defined on it but its supertypes do.
         """
-        super_DT = Datatype(name="SuperDT", description="Regexped STR")
+        super_DT = Datatype(name="SuperDT", description="Regexped STR", user=shipyard_user)
         super_DT.save()
         super_DT.restricts.add(self.STR)
         regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule="1e.+")
 
-        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP", user=shipyard_user)
         second_DT.save()
         second_DT.restricts.add(super_DT)
         second_DT.restricts.add(self.FLOAT)
 
-        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(second_DT)
@@ -1413,19 +1432,19 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype inherits several regexps and has none of its own.
         """
-        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT", user=shipyard_user)
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule="1999393939.....")
 
-        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP", user=shipyard_user)
         second_DT.save()
         second_DT.restricts.add(super_DT)
         regexp2_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule="[1-9]+")
 
-        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(second_DT)
@@ -1437,19 +1456,19 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype inherits several regexps from direct ancestors and has none of its own.
         """
-        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT", user=shipyard_user)
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule="1999393939.....")
 
-        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP")
+        second_DT = Datatype(name="SecondDT", description="FLOAT inheriting a REGEXP", user=shipyard_user)
         second_DT.save()
         second_DT.restricts.add(self.FLOAT)
         regexp2_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule="[1-9]+")
 
-        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -1461,13 +1480,13 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         """
         Case where Datatype inherits several regexps from ancestors and has some of its own.
         """
-        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT")
+        super_DT = Datatype(name="SuperDT", description="Regexped FLOAT", user=shipyard_user)
         super_DT.save()
         super_DT.restricts.add(self.STR)
         regexp_BC = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                       rule=".*")
 
-        second_DT = Datatype(name="SecondDT", description="STR inheriting a REGEXP")
+        second_DT = Datatype(name="SecondDT", description="STR inheriting a REGEXP", user=shipyard_user)
         second_DT.save()
         second_DT.restricts.add(super_DT)
         regexp2_BC = second_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
@@ -1475,13 +1494,13 @@ class BasicConstraintGetAllRegexpTests(BasicConstraintTestSetup):
         regexp3_BC = second_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                        rule="[1-7]*")
 
-        third_DT = Datatype(name="ThirdDT", description="STR inheriting a REGEXP")
+        third_DT = Datatype(name="ThirdDT", description="STR inheriting a REGEXP", user=shipyard_user)
         third_DT.save()
         third_DT.restricts.add(self.STR)
         regexp4_BC = third_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP,
                                                        rule=".+")
 
-        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT")
+        my_DT = Datatype(name="InheritingDT", description="Third-gen inheriting DT", user=shipyard_user)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(second_DT)
@@ -1518,7 +1537,7 @@ class BasicConstraintGetEffectiveDatetimeformatTests(BasicConstraintTestSetup):
         """
         Helper to test the cases where a non-builtin Datatype has no DTF defined.
         """
-        constr_DT = Datatype(name="DTwithoutDTF", description="Datatype with no DTF")
+        constr_DT = Datatype(name="DTwithoutDTF", description="Datatype with no DTF", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -1553,7 +1572,7 @@ class BasicConstraintGetEffectiveDatetimeformatTests(BasicConstraintTestSetup):
         """
         Testing the case where a string has a direct DTF defined.
         """
-        constr_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF")
+        constr_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.STR)
@@ -1567,14 +1586,14 @@ class BasicConstraintGetEffectiveDatetimeformatTests(BasicConstraintTestSetup):
         """
         Testing the case where a string has one supertype and inherits its DTF.
         """
-        super_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF")
+        super_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF", user=shipyard_user)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         new_DTF = super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
                                                     rule="%Y %m %d %H:%M:%S %z")
 
-        constr_DT = Datatype(name="InheritingDT", description="Datatype with inherited DTF")
+        constr_DT = Datatype(name="InheritingDT", description="Datatype with inherited DTF", user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1585,14 +1604,15 @@ class BasicConstraintGetEffectiveDatetimeformatTests(BasicConstraintTestSetup):
         """
         Testing the case where a non-string has a supertype with a DTF.
         """
-        super_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF")
+        super_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF", user=shipyard_user)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         new_DTF = super_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
                                                     rule="%Y")
 
-        constr_DT = Datatype(name="InheritingDT", description="Non-string Datatype with inherited DTF")
+        constr_DT = Datatype(name="InheritingDT", description="Non-string Datatype with inherited DTF",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1604,30 +1624,31 @@ class BasicConstraintGetEffectiveDatetimeformatTests(BasicConstraintTestSetup):
         """
         Testing the case where a non-string has several supertypes and inherits a DTF from an indirect ancestor.
         """
-        super_DT = Datatype(name="AncestorDT", description="Ancestor Datatype with no DTF")
+        super_DT = Datatype(name="AncestorDT", description="Ancestor Datatype with no DTF", user=shipyard_user)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
 
-        super2_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF")
+        super2_DT = Datatype(name="DTwithDTF", description="Datatype with a DTF", user=shipyard_user)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(self.STR)
         new_DTF = super2_DT.basic_constraints.create(ruletype=BasicConstraint.DATETIMEFORMAT,
                                                      rule="%Y")
 
-        super3_DT = Datatype(name="DTwithREGEXP", description="Datatype with a REGEXP but no DTF")
+        super3_DT = Datatype(name="DTwithREGEXP", description="Datatype with a REGEXP but no DTF", user=shipyard_user)
         super3_DT.full_clean()
         super3_DT.save()
         super3_DT.restricts.add(self.STR)
         super3_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="4")
 
-        super4_DT = Datatype(name="DirectAncestor", description="Datatype with no DTF")
+        super4_DT = Datatype(name="DirectAncestor", description="Datatype with no DTF", user=shipyard_user)
         super4_DT.full_clean()
         super4_DT.save()
         super4_DT.restricts.add(super2_DT)
 
-        constr_DT = Datatype(name="InheritingDT", description="Non-string Datatype with inherited DTF")
+        constr_DT = Datatype(name="InheritingDT", description="Non-string Datatype with inherited DTF",
+                             user=shipyard_user)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super2_DT)

@@ -471,7 +471,7 @@ def create_method_test_environment(case):
 
     # Retrieve the string type.
     string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
-    string_cdt = CompoundDatatype()
+    string_cdt = CompoundDatatype(user=case.myUser)
     string_cdt.save()
     string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
     string_cdt.full_clean()
@@ -2683,7 +2683,7 @@ with open(outfile, "wb") as f:
             self.user_rob
         )
 
-        self.rng_out_cdt = CompoundDatatype()
+        self.rng_out_cdt = CompoundDatatype(user=self.user_rob)
         self.rng_out_cdt.save()
         self.rng_out_cdt.members.create(
             column_name="random number", column_idx=1,
@@ -2731,21 +2731,21 @@ with open(outfile, "wb") as f:
             self.user_rob
         )
 
-        self.increment_in_1_cdt = CompoundDatatype()
+        self.increment_in_1_cdt = CompoundDatatype(user=self.user_rob)
         self.increment_in_1_cdt.save()
         self.increment_in_1_cdt.members.create(
             column_name="number", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
 
-        self.increment_in_2_cdt = CompoundDatatype()
+        self.increment_in_2_cdt = CompoundDatatype(user=self.user_rob)
         self.increment_in_2_cdt.save()
         self.increment_in_2_cdt.members.create(
             column_name="incrementor", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
 
-        self.increment_out_cdt = CompoundDatatype()
+        self.increment_out_cdt = CompoundDatatype(user=self.user_rob)
         self.increment_out_cdt.save()
         self.increment_out_cdt.members.create(
             column_name="incremented number", column_idx=1,

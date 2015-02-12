@@ -232,8 +232,45 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     return rownum, failing_cells
 
 
+class AccessControl(models.Model):
+    """
+    Represents anything that belongs to a certain user.
+    """
+    user = models.ForeignKey(User)
+    users_allowed = models.ManyToManyField(
+        User,
+        related_name="%(app_label)s_%(class)s_has_access_to",
+        help_text="Which users have access?"
+    )
+    groups_allowed = models.ManyToManyField(
+        Group,
+        related_name="%(app_label)s_%(class)s_has_access_to",
+        help_text="What groups have access?"
+    )
+
+    class Meta:
+        abstract = True
+
+    @property
+    def shared_with_everyone(self):
+        return self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists()
+
+    def can_be_accessed(self, user):
+        """
+        True if user can access this object; False otherwise.
+        """
+        if self.user == user or self.users_allowed.filter(pk=user.pk).exists():
+            return True
+
+        for group in self.groups_allowed.all():
+            if user.groups.filter(pk=group.pk).exists():
+                return True
+
+        return False
+
+
 @python_2_unicode_compatible
-class Datatype(models.Model):
+class Datatype(AccessControl):
     """
     Abstract definition of a semantically atomic type of data.
     Related to :model:`metadata.models.CompoundDatatype`
@@ -1159,7 +1196,7 @@ class CompoundDatatypeMember(models.Model):
 
 
 @python_2_unicode_compatible
-class CompoundDatatype(models.Model):
+class CompoundDatatype(AccessControl):
     """
     A definition of a structured collection of datatypes,
     the resultant data structure serving as inputs or outputs
@@ -1355,40 +1392,3 @@ class CompoundDatatype(models.Model):
         Is this even possible?
         """
         return 0
-
-
-class AccessControl(models.Model):
-    """
-    Represents anything that belongs to a certain user.
-    """
-    user = models.ForeignKey(User)
-    users_allowed = models.ManyToManyField(
-        User,
-        related_name="%(app_label)s_%(class)s_has_access_to",
-        help_text="Which users have access?"
-    )
-    groups_allowed = models.ManyToManyField(
-        Group,
-        related_name="%(app_label)s_%(class)s_has_access_to",
-        help_text="What groups have access?"
-    )
-
-    class Meta:
-        abstract = True
-
-    @property
-    def shared_with_everyone(self):
-        return self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists()
-
-    def can_be_accessed(self, user):
-        """
-        True if user can access this object; False otherwise.
-        """
-        if self.user == user or self.users_allowed.filter(pk=user.pk).exists():
-            return True
-
-        for group in self.groups_allowed.all():
-            if user.groups.filter(pk=group.pk).exists():
-                return True
-
-        return False

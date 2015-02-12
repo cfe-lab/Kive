@@ -19,6 +19,13 @@ everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
+    # Define a user.  This was previously in librarian/tests.py,
+    # but we put it here now so all tests can use it.
+    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    case.myUser.save()
+    case.myUser.groups.add(everyone_group)
+    case.myUser.save()
+
     # Load up the builtin Datatypes.
     case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
     case.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
@@ -31,10 +38,12 @@ def create_metadata_test_environment(case):
     # Create Datatype "DNANucSeq" with a regexp basic constraint.
     case.DNA_dt = Datatype(
         name="DNANucSeq",
-        description="String consisting of ACGTacgt")
+        description="String consisting of ACGTacgt",
+        user=case.myUser)
     case.DNA_dt.save()
     # DNA_dt is a restricted type of string
     case.DNA_dt.restricts.add(case.string_dt)
+    case.DNA_dt.groups_allowed.add(everyone_group)
     case.DNA_dt.basic_constraints.create(
         ruletype=BasicConstraint.REGEXP,
         rule="^[ACGTacgt]*$")
@@ -43,10 +52,12 @@ def create_metadata_test_environment(case):
     # Similarly, create Datatype "RNANucSeq".
     case.RNA_dt = Datatype(
         name="RNANucSeq",
-        description="String consisting of ACGUacgu")
+        description="String consisting of ACGUacgu",
+        user=case.myUser)
     case.RNA_dt.save()
     # RNA_dt is a restricted type of string
     case.RNA_dt.restricts.add(case.string_dt)
+    case.RNA_dt.groups_allowed.add(everyone_group)
     case.RNA_dt.basic_constraints.create(
         ruletype=BasicConstraint.REGEXP,
         rule="^[ACGUacgu]*$")
@@ -54,7 +65,9 @@ def create_metadata_test_environment(case):
 
     # Define test_cdt as containing 3 members:
     # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
-    case.test_cdt = CompoundDatatype()
+    case.test_cdt = CompoundDatatype(user=case.myUser)
+    case.test_cdt.save()
+    case.test_cdt.groups_allowed.add(everyone_group)
     case.test_cdt.save()
 
     case.test_cdt.members.create(
@@ -73,42 +86,46 @@ def create_metadata_test_environment(case):
     case.test_cdt.save()
 
     # Define DNAinput_cdt (1 member)
-    case.DNAinput_cdt = CompoundDatatype()
+    case.DNAinput_cdt = CompoundDatatype(user=case.myUser)
     case.DNAinput_cdt.save()
     case.DNAinput_cdt.members.create(
         datatype=case.DNA_dt,
         column_name="SeqToComplement",
         column_idx=1)
+    case.DNAinput_cdt.groups_allowed.add(everyone_group)
     case.DNAinput_cdt.full_clean()
     case.DNAinput_cdt.save()
 
     # Define DNAoutput_cdt (1 member)
-    case.DNAoutput_cdt = CompoundDatatype()
+    case.DNAoutput_cdt = CompoundDatatype(user=case.myUser)
     case.DNAoutput_cdt.save()
     case.DNAoutput_cdt.members.create(
         datatype=case.DNA_dt,
         column_name="ComplementedSeq",
         column_idx=1)
+    case.DNAoutput_cdt.groups_allowed.add(everyone_group)
     case.DNAoutput_cdt.full_clean()
     case.DNAoutput_cdt.save()
 
     # Define RNAinput_cdt (1 column)
-    case.RNAinput_cdt = CompoundDatatype()
+    case.RNAinput_cdt = CompoundDatatype(user=case.myUser)
     case.RNAinput_cdt.save()
     case.RNAinput_cdt.members.create(
         datatype=case.RNA_dt,
         column_name="SeqToComplement",
         column_idx=1)
+    case.RNAinput_cdt.groups_allowed.add(everyone_group)
     case.RNAinput_cdt.full_clean()
     case.RNAinput_cdt.save()
 
     # Define RNAoutput_cdt (1 column)
-    case.RNAoutput_cdt = CompoundDatatype()
+    case.RNAoutput_cdt = CompoundDatatype(user=case.myUser)
     case.RNAoutput_cdt.save()
     case.RNAoutput_cdt.members.create(
         datatype=case.RNA_dt,
         column_name="ComplementedSeq",
         column_idx=1)
+    case.RNAoutput_cdt.groups_allowed.add(everyone_group)
     case.RNAoutput_cdt.full_clean()
     case.RNAoutput_cdt.save()
 
@@ -117,68 +134,69 @@ def create_metadata_test_environment(case):
     # This next bit is used in method.tests.
 
     # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
-    case.tuple_cdt = CompoundDatatype()
+    case.tuple_cdt = CompoundDatatype(user=case.myUser)
     case.tuple_cdt.save()
     case.tuple_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
     case.tuple_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+    case.tuple_cdt.groups_allowed.add(everyone_group)
 
     # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
-    case.singlet_cdt = CompoundDatatype()
+    case.singlet_cdt = CompoundDatatype(user=case.myUser)
     case.singlet_cdt.save()
     case.singlet_cdt.members.create(
         datatype=case.string_dt, column_name="k", column_idx=1)
+    case.singlet_cdt.groups_allowed.add(everyone_group)
 
-    case.triplet_cdt = CompoundDatatype()
+    case.triplet_cdt = CompoundDatatype(user=case.myUser)
     case.triplet_cdt.save()
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="a", column_idx=1)
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="b", column_idx=2)
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="c", column_idx=3)
+    case.triplet_cdt.groups_allowed.add(everyone_group)
 
     ####
     # This next bit is used for pipeline.tests.
 
     # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
-    case.triplet_squares_cdt = CompoundDatatype()
+    case.triplet_squares_cdt = CompoundDatatype(user=case.myUser)
     case.triplet_squares_cdt.save()
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="a^2", column_idx=1)
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="b^2", column_idx=2)
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="c^2", column_idx=3)
+    case.triplet_squares_cdt.groups_allowed.add(everyone_group)
 
     # A CDT with mixed Datatypes
-    case.mix_triplet_cdt = CompoundDatatype()
+    case.mix_triplet_cdt = CompoundDatatype(user=case.myUser)
     case.mix_triplet_cdt.save()
     case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol1", column_idx=1)
     case.mix_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="DNACol2", column_idx=2)
     case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol3", column_idx=3)
+    case.mix_triplet_cdt.groups_allowed.add(everyone_group)
 
     # Define CDT "doublet_cdt" with 2 members for use as an input/output
-    case.doublet_cdt = CompoundDatatype()
+    case.doublet_cdt = CompoundDatatype(user=case.myUser)
     case.doublet_cdt.save()
     case.doublet_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
     case.doublet_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+    case.doublet_cdt.groups_allowed.add(everyone_group)
 
     ####
     # Stuff from this point on is used in librarian and archive
     # testing.
 
     # October 15: more CDTs.
-    case.DNA_triplet_cdt = CompoundDatatype()
+    case.DNA_triplet_cdt = CompoundDatatype(user=case.myUser)
     case.DNA_triplet_cdt.save()
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="a", column_idx=1)
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="b", column_idx=2)
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="c", column_idx=3)
+    case.DNA_triplet_cdt.groups_allowed.add(everyone_group)
 
-    case.DNA_doublet_cdt = CompoundDatatype()
+    case.DNA_doublet_cdt = CompoundDatatype(user=case.myUser)
     case.DNA_doublet_cdt.save()
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="x", column_idx=1)
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="y", column_idx=2)
-
-    # Define a user.  This was previously in librarian/tests.py,
-    # but we put it here now so all tests can use it.
-    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-    case.myUser.save()
-    case.myUser.groups.add(everyone_group)
-    case.myUser.save()
+    case.DNA_doublet_cdt.groups_allowed.add(everyone_group)
 
 
 def clean_up_all_files():
@@ -259,31 +277,36 @@ class DatatypeTests(MetadataTestCase):
         # Datatypes used to test circular restrictions.
         self.dt_1 = Datatype(
             name="dt_1",
-            description="A string (1)")
+            description="A string (1)",
+            user=self.myUser)
         self.dt_1.save()
         self.dt_1.restricts.add(self.string_dt)
 
         self.dt_2 = Datatype(
             name="dt_2",
-            description="A string (2)")
+            description="A string (2)",
+            user=self.myUser)
         self.dt_2.save()
         self.dt_2.restricts.add(self.string_dt)
 
         self.dt_3 = Datatype(
             name="dt_3",
-            description="A string (3)")
+            description="A string (3)",
+            user=self.myUser)
         self.dt_3.save()
         self.dt_3.restricts.add(self.string_dt)
 
         self.dt_4 = Datatype(
             name="dt_4",
-            description="A string (4)")
+            description="A string (4)",
+            user=self.myUser)
         self.dt_4.save()
         self.dt_4.restricts.add(self.string_dt)
 
         self.dt_5 = Datatype(
             name="dt_5",
-            description="A string (5)")
+            description="A string (5)",
+            user=self.myUser)
         self.dt_5.save()
         self.dt_5.restricts.add(self.string_dt)
 
@@ -292,7 +315,7 @@ class DatatypeTests(MetadataTestCase):
         Unicode representation must be the instance's name.
 
         """
-        my_datatype = Datatype(name="fhqwhgads")
+        my_datatype = Datatype(name="fhqwhgads", user=self.myUser)
         self.assertEqual(unicode(my_datatype), "fhqwhgads")
 
     ### Unit tests for datatype.clean (Circular restrictions) ###
@@ -652,7 +675,8 @@ class DatatypeTests(MetadataTestCase):
         """
         datatype = Datatype(
             name="squeaky",
-            description="a clean, new datatype")
+            description="a clean, new datatype",
+            user=self.myUser)
         # Note that this passes if the next line is uncommented.
         #datatype.save()
         self.assertEqual(datatype.clean(), None)
@@ -665,22 +689,22 @@ class DatatypeTests(MetadataTestCase):
         """
         Helper for testing clean() on cases where a Datatype restricts several supertypes with the same builtin type.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype 1")
+        super_DT = Datatype(name="SuperDT", description="Supertype 1", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(builtin_type)
 
-        super2_DT = Datatype(name="SuperDT2", description="Supertype 2")
+        super2_DT = Datatype(name="SuperDT2", description="Supertype 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(builtin_type)
 
-        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes")
+        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type, builtin_type)
 
-        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes")
+        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes", user=self.myUser)
         your_DT.full_clean()
         your_DT.save()
         your_DT.restricts.add(super_DT, super2_DT)
@@ -716,22 +740,22 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on the case where a Datatype restricts both integer and float supertypes.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype 1")
+        super_DT = Datatype(name="SuperDT", description="Supertype 1", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.INT)
 
-        super2_DT = Datatype(name="SuperDT2", description="Supertype 2")
+        super2_DT = Datatype(name="SuperDT2", description="Supertype 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(self.FLOAT)
 
-        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes")
+        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.INT, self.FLOAT)
 
-        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes")
+        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes", user=self.myUser)
         your_DT.full_clean()
         your_DT.save()
         your_DT.restricts.add(super_DT, super2_DT)
@@ -744,22 +768,22 @@ class DatatypeTests(MetadataTestCase):
         """
         Helper for testing clean() on cases where a Datatype restricts supertypes with non-compatible builtin types.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype 1")
+        super_DT = Datatype(name="SuperDT", description="Supertype 1", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(builtin_type_1)
 
-        super2_DT = Datatype(name="SuperDT2", description="Supertype 2")
+        super2_DT = Datatype(name="SuperDT2", description="Supertype 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(builtin_type_2)
 
-        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes")
+        my_DT = Datatype(name="MyDT", description="Datatype with two built-in supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type_1, builtin_type_2)
 
-        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes")
+        your_DT = Datatype(name="YourDT", description="Datatype with two supertypes", user=self.myUser)
         your_DT.full_clean()
         your_DT.save()
         your_DT.restricts.add(super_DT, super2_DT)
@@ -838,7 +862,7 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a Datatype whose prototype has the incorrect CDT.
         """
-        wrong_CDT = CompoundDatatype()
+        wrong_CDT = CompoundDatatype(user=self.myUser)
         wrong_CDT.save()
         wrong_CDT.members.create(datatype=self.STR, column_name="example", column_idx=1,
                                  blankable=True)
@@ -863,7 +887,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing to confirm that BasicConstraint.clean() is called from Datatype.clean(): good case.
         """
-        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good BasicConstraint")
+        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good BasicConstraint",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.FLOAT)
@@ -876,7 +901,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing to confirm that BasicConstraint.clean() is called from Datatype.clean(): bad case.
         """
-        constr_DT = Datatype(name="BadlyConstrainedDatatype", description="Datatype with bad BasicConstraint")
+        constr_DT = Datatype(name="BadlyConstrainedDatatype", description="Datatype with bad BasicConstraint",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.FLOAT)
@@ -895,7 +921,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a Datatype with a good REGEXP attached.
         """
-        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good REGEXP")
+        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good REGEXP",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.FLOAT)
@@ -908,7 +935,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a Datatype with a good MIN_VAL attached.
         """
-        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good MIN_VAL")
+        constr_DT = Datatype(name="ConstrainedDatatype", description="Datatype with good MIN_VAL",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.INT)
@@ -922,7 +950,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a Datatype with several good BCs attached.
         """
-        constr_DT = Datatype(name="ConstrainedDatatype", description="FLOAT with good BCs")
+        constr_DT = Datatype(name="ConstrainedDatatype", description="FLOAT with good BCs",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.FLOAT)
@@ -937,7 +966,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a string Datatype with several good BCs attached.
         """
-        constr_DT = Datatype(name="ConstrainedDatatype", description="STR with good BCs")
+        constr_DT = Datatype(name="ConstrainedDatatype", description="STR with good BCs",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.STR)
@@ -958,7 +988,8 @@ class DatatypeTests(MetadataTestCase):
         BasicConstraint.DATETIMEFORMAT.
         """
         constr_DT = Datatype(name="MultiplyConstrainedDatatype",
-                             description="Datatype with several BCs of the same type")
+                             description="Datatype with several BCs of the same type",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(builtin_type)
@@ -1051,7 +1082,7 @@ class DatatypeTests(MetadataTestCase):
         Helper function to create a Datatype. Rules is a list of tuples (ruletype, rule),
         and restricts is a list of supertypes.
         """
-        dt = Datatype(name=name, description=desc)
+        dt = Datatype(name=name, description=desc, user=self.myUser)
         dt.full_clean()
         dt.save()
         for supertype in restricts:
@@ -1241,14 +1272,15 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a float Datatype with conflicting MIN|MAX_VAL, one inherited and one directly.
         """
-        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL")
+        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="17.7")
 
         constr_DT = Datatype(name="ConflictingBoundsDT",
-                             description="Float with half-inherited conflicting MIN|MAX_VAL")
+                             description="Float with half-inherited conflicting MIN|MAX_VAL",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1264,7 +1296,8 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on an integer Datatype whose MIN|MAX_VAL do not admit any integers.
         """
         constr_DT = Datatype(name="ConflictingBoundsDT",
-                             description="INT with MIN|MAX_VAL too narrow")
+                             description="INT with MIN|MAX_VAL too narrow",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.INT)
@@ -1281,20 +1314,23 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on an integer Datatype whose inherited MIN|MAX_VAL do not admit any integers.
         """
-        super_DT = Datatype(name="BoundedFloatDT", description="Float with a MIN_VAL")
+        super_DT = Datatype(name="BoundedFloatDT", description="Float with a MIN_VAL",
+                            user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="20.2")
 
-        second_DT = Datatype(name="BoundedIntDT", description="Int with a MAX_VAL")
+        second_DT = Datatype(name="BoundedIntDT", description="Int with a MAX_VAL",
+                             user=self.myUser)
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.INT)
         second_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="20.55")
 
         constr_DT = Datatype(name="InheritingBadBoundsDT",
-                             description="Datatype inheriting too-narrow MIN|MAX_VAL")
+                             description="Datatype inheriting too-narrow MIN|MAX_VAL",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1311,14 +1347,15 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a float Datatype with half-inherited MIN|MAX_VAL that are too narrow.
         """
-        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL")
+        super_DT = Datatype(name="BoundedDT", description="Float with a MIN_VAL", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="17.1")
 
         constr_DT = Datatype(name="NarrowBoundsDT",
-                             description="INT with half-inherited too-narrow MIN|MAX_VAL")
+                             description="INT with half-inherited too-narrow MIN|MAX_VAL",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1336,7 +1373,8 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on a string Datatype with conflicting MIN|MAX_LENGTH defined directly.
         """
         constr_DT = Datatype(name="ConflictingBoundsDT",
-                             description="String with conflicting MIN|MAX_LENGTH")
+                             description="String with conflicting MIN|MAX_LENGTH",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(self.STR)
@@ -1352,20 +1390,21 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a string Datatype with conflicting MIN|MAX_LENGTH defined on its supertypes.
         """
-        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH")
+        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="44")
 
-        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH")
+        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH", user=self.myUser)
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.STR)
         second_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="22")
 
         constr_DT = Datatype(name="InheritingBadBoundsDT",
-                             description="Datatype inheriting conflicting MIN|MAX_LENGTH")
+                             description="Datatype inheriting conflicting MIN|MAX_LENGTH",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1380,14 +1419,16 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a string Datatype with conflicting MIN|MAX_LENGTH, one inherited and one direct.
         """
-        super_DT = Datatype(name="BoundedDT", description="String with a MIN_LENGTH")
+        super_DT = Datatype(name="BoundedDT", description="String with a MIN_LENGTH",
+                            user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="20")
 
         constr_DT = Datatype(name="HalfInheritingBadBoundsDT",
-                             description="Datatype inheriting conflicting MIN|MAX_LENGTH")
+                             description="Datatype inheriting conflicting MIN|MAX_LENGTH",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1406,7 +1447,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests is_complete() on an unsaved Datatype (returns False).
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype",
+                         user=self.myUser)
         my_DT.full_clean()
 
         self.assertEquals(my_DT.is_complete(), False)
@@ -1415,7 +1457,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests is_complete() on a saved but incomplete Datatype (returns False).
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype",
+                         user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
 
@@ -1425,7 +1468,8 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests is_complete() on a complete Datatype that restricts STR (returns True).
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype",
+                         user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.STR)
@@ -1436,17 +1480,17 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests is_complete() on a complete Datatype that restricts other Datatypes (returns True).
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
 
-        middle_DT = Datatype(name="MiddleDT", description="Middle type")
+        middle_DT = Datatype(name="MiddleDT", description="Middle type", user=self.myUser)
         middle_DT.full_clean()
         middle_DT.save()
         middle_DT.restricts.add(super_DT)
 
-        my_DT = Datatype(name="SubDT", description="Subtype")
+        my_DT = Datatype(name="SubDT", description="Subtype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(middle_DT, self.INT)
@@ -1460,7 +1504,7 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests complete_clean() on an unsaved Datatype.
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype", user=self.myUser)
         my_DT.full_clean()
 
         self.assertRaisesRegexp(ValidationError,
@@ -1472,7 +1516,7 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests complete_clean() on a saved but incomplete Datatype.
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
 
@@ -1486,7 +1530,7 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests complete_clean() on a complete Datatype that restricts STR.
         """
-        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype")
+        my_DT = Datatype(name="IncompleteDT", description="Non-finished Datatype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.STR)
@@ -1497,17 +1541,17 @@ class DatatypeTests(MetadataTestCase):
         """
         Tests complete_clean() on a complete Datatype that restricts other Datatypes (returns True).
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
 
-        middle_DT = Datatype(name="MiddleDT", description="Middle type")
+        middle_DT = Datatype(name="MiddleDT", description="Middle type", user=self.myUser)
         middle_DT.full_clean()
         middle_DT.save()
         middle_DT.restricts.add(super_DT)
 
-        my_DT = Datatype(name="SubDT", description="Subtype")
+        my_DT = Datatype(name="SubDT", description="Subtype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(middle_DT, self.STR)
@@ -1522,20 +1566,21 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing complete_clean() on a string Datatype with conflicting MIN|MAX_LENGTH defined on its supertypes.
         """
-        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH")
+        super_DT = Datatype(name="BoundedMinDT", description="String with a MIN_LENGTH", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="44")
 
-        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH")
+        second_DT = Datatype(name="BoundedMaxDT", description="String with a MAX_LENGTH", user=self.myUser)
         second_DT.full_clean()
         second_DT.save()
         second_DT.restricts.add(self.STR)
         second_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="22")
 
         constr_DT = Datatype(name="InheritingBadBoundsDT",
-                             description="Datatype inheriting conflicting MIN|MAX_LENGTH")
+                             description="Datatype inheriting conflicting MIN|MAX_LENGTH",
+                             user=self.myUser)
         constr_DT.full_clean()
         constr_DT.save()
         constr_DT.restricts.add(super_DT)
@@ -1565,7 +1610,7 @@ class DatatypeGetBuiltinTypeTests(MetadataTestCase):
         """
         Helper for testing on direct descendants on the builtins.
         """
-        my_DT = Datatype(name="DescendantDT", description="Descendant of builtin DT")
+        my_DT = Datatype(name="DescendantDT", description="Descendant of builtin DT", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -1601,7 +1646,7 @@ class DatatypeGetBuiltinTypeTests(MetadataTestCase):
         """
         Helper for testing appropriate supertype precedence.
         """
-        my_DT = Datatype(name="InheritingDT", description="Datatype with several supertypes")
+        my_DT = Datatype(name="InheritingDT", description="Datatype with several supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
 
@@ -1657,22 +1702,22 @@ class DatatypeGetBuiltinTypeTests(MetadataTestCase):
         """
         Testing case where Datatype has multiple supertypes of varying generations.
         """
-        super_DT = Datatype(name="SuperDT", description="Super DT")
+        super_DT = Datatype(name="SuperDT", description="Super DT", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
 
-        super2_DT = Datatype(name="SuperDT2", description="Super DT 2")
+        super2_DT = Datatype(name="SuperDT2", description="Super DT 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(self.STR)
 
-        super3_DT = Datatype(name="SuperDT3", description="Super DT 3")
+        super3_DT = Datatype(name="SuperDT3", description="Super DT 3", user=self.myUser)
         super3_DT.full_clean()
         super3_DT.save()
         super3_DT.restricts.add(super_DT)
 
-        my_DT = Datatype(name="DescendantDT", description="Descendant of several supertypes")
+        my_DT = Datatype(name="DescendantDT", description="Descendant of several supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super2_DT)
@@ -1684,22 +1729,22 @@ class DatatypeGetBuiltinTypeTests(MetadataTestCase):
         """
         Another testing case where Datatype has multiple supertypes of varying generations.
         """
-        super_DT = Datatype(name="SuperDT", description="Super DT")
+        super_DT = Datatype(name="SuperDT", description="Super DT", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.FLOAT)
 
-        super2_DT = Datatype(name="SuperDT2", description="Super DT 2")
+        super2_DT = Datatype(name="SuperDT2", description="Super DT 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(self.BOOL)
 
-        super3_DT = Datatype(name="SuperDT3", description="Super DT 3")
+        super3_DT = Datatype(name="SuperDT3", description="Super DT 3", user=self.myUser)
         super3_DT.full_clean()
         super3_DT.save()
         super3_DT.restricts.add(super_DT)
 
-        my_DT = Datatype(name="DescendantDT", description="Descendant of several supertypes")
+        my_DT = Datatype(name="DescendantDT", description="Descendant of several supertypes", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super2_DT)
@@ -1716,7 +1761,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Helper for testing good cases where the input conforms to the appropriate built-in type.
         """
-        my_DT = Datatype(name="MyDT", description="Non-builtin datatype")
+        my_DT = Datatype(name="MyDT", description="Non-builtin datatype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -1766,7 +1811,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Helper for testing cases where the input does not conform to the appropriate built-in type.
         """
-        my_DT = Datatype(name="MyDT", description="Non-builtin datatype")
+        my_DT = Datatype(name="MyDT", description="Non-builtin datatype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -1806,7 +1851,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Helper for testing cases where the input does not conform to the appropriate built-in type.
         """
-        my_DT = Datatype(name="MyDT", description="Non-builtin datatype")
+        my_DT = Datatype(name="MyDT", description="Non-builtin datatype", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -1846,7 +1891,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Helper to test strings against numerical constraints.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with numerical BC")
+        my_DT = Datatype(name="MyDT", description="Datatype with numerical BC", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -2027,7 +2072,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Helper to test strings against a REGEXP constraints.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with REGEXP BC")
+        my_DT = Datatype(name="MyDT", description="Datatype with REGEXP BC", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(builtin_type)
@@ -2093,7 +2138,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a string against several restrictions.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.STR)
@@ -2109,7 +2154,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a string against several restrictions, some of which fail.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.STR)
@@ -2128,7 +2173,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a float against several restrictions, all of which pass.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.FLOAT)
@@ -2143,7 +2188,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a float against several restrictions, some of which fail.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.FLOAT)
@@ -2158,7 +2203,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test an int against several restrictions, all of which pass.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.INT)
@@ -2173,7 +2218,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test an int against several restrictions, some of which fail.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.INT)
@@ -2191,7 +2236,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a Boolean against several restrictions, all of which pass.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.BOOL)
@@ -2205,7 +2250,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Test a Boolean against several restrictions, some of which fail.
         """
-        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype with several restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(self.BOOL)
@@ -2227,13 +2272,13 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Testing a string against some inherited restrictions.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         my_regexp = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="Hello t....")
 
-        my_DT = Datatype(name="MyDT", description="Datatype inheriting a restriction")
+        my_DT = Datatype(name="MyDT", description="Datatype inheriting a restriction", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -2252,13 +2297,13 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Testing a float against some inherited restrictions.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         my_min_length = super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="2")
 
-        my_DT = Datatype(name="MyDT", description="Datatype inheriting a restriction")
+        my_DT = Datatype(name="MyDT", description="Datatype inheriting a restriction", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -2276,19 +2321,19 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Testing an integer against some inherited restrictions.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
         my_regexp = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="1000...")
 
-        super2_DT = Datatype(name="SuperDT2", description="Supertype 2")
+        super2_DT = Datatype(name="SuperDT2", description="Supertype 2", user=self.myUser)
         super2_DT.full_clean()
         super2_DT.save()
         super2_DT.restricts.add(self.INT)
         my_min_val = super2_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="1000100")
 
-        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -2307,13 +2352,13 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Testing an integer against an overridden inherited restriction.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.INT)
         super_max_val = super_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="999")
 
-        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -2328,14 +2373,14 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         """
         Testing a Boolean against some inherited restrictions.
         """
-        super_DT = Datatype(name="SuperDT", description="Supertype")
+        super_DT = Datatype(name="SuperDT", description="Supertype", user=self.myUser)
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.BOOL)
         my_regexp = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="T.+")
         my_regexp2 = super_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule=".rue")
 
-        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions")
+        my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions", user=self.myUser)
         my_DT.full_clean()
         my_DT.save()
         my_DT.restricts.add(super_DT)
@@ -2374,7 +2419,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         Unicode of empty CompoundDatatype should be empty.
         """
-        empty_cdt = CompoundDatatype()
+        empty_cdt = CompoundDatatype(user=self.myUser)
         empty_cdt.save()
         self.assertEqual(unicode(empty_cdt), "[empty CompoundDatatype]")
 
@@ -2396,7 +2441,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         CompoundDatatype with single index equalling 1.
         """
-        sad_cdt = CompoundDatatype()
+        sad_cdt = CompoundDatatype(user=self.myUser)
         sad_cdt.save()
         sad_cdt.members.create(datatype=self.RNA_dt,
                                column_name="ColumnTwo",
@@ -2407,7 +2452,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         CompoundDatatype with single index not equalling 1.
         """
-        sad_cdt = CompoundDatatype()
+        sad_cdt = CompoundDatatype(user=self.myUser)
         sad_cdt.save()
         sad_cdt.members.create(datatype=self.RNA_dt,
                                column_name="ColumnTwo",
@@ -2423,7 +2468,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         self.assertEqual(self.test_cdt.clean(), None)
 
-        good_cdt = CompoundDatatype()
+        good_cdt = CompoundDatatype(user=self.myUser)
         good_cdt.save()
         good_cdt.members.create(datatype=self.RNA_dt, column_name="ColumnTwo", column_idx=2)
         good_cdt.members.create(datatype=self.DNA_dt, column_name="ColumnOne", column_idx=1)
@@ -2433,7 +2478,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         A CompoundDatatype without consecutive member indices throws a ValidationError.
         """
-        bad_cdt = CompoundDatatype()
+        bad_cdt = CompoundDatatype(user=self.myUser)
         bad_cdt.save()
         bad_cdt.members.create(datatype=self.RNA_dt, column_name="ColumnOne", column_idx=3)
         bad_cdt.members.create(datatype=self.DNA_dt, column_name="ColumnTwo", column_idx=1)
@@ -2446,7 +2491,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         Datatype members must have column names.
         """
-        cdt = CompoundDatatype()
+        cdt = CompoundDatatype(user=self.myUser)
         cdt.save()
         cdt.members.create(datatype=self.RNA_dt, column_idx=1)
         self.assertRaisesRegexp(ValidationError,

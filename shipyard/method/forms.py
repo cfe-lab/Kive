@@ -7,32 +7,11 @@ from method.models import CodeResource, CodeResourceRevision, CodeResourceDepend
 from metadata.models import CompoundDatatype
 from transformation.models import TransformationInput, XputStructure
 from django.contrib.auth.models import User, Group
+from metadata.forms import AccessControlForm
 
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-class AccessControlForm(forms.Form):
-
-    users_allowed = forms.MultipleChoiceField(
-        label="Users allowed",
-        help_text="Which users are allowed access to this resource?",
-        choices=[(u.id, u.username) for u in User.objects.all()],
-        required=False
-    )
-
-    groups_allowed = forms.MultipleChoiceField(
-        label="Groups allowed",
-        help_text="Which groups are allowed access to this resource?",
-        choices=[(g.id, g.name) for g in Group.objects.all()],
-        required=False
-    )
-
-    def __init__(self, *args, **kwargs):
-        super(AccessControlForm, self).__init__(*args, **kwargs)
-        self.fields["users_allowed"].choices = [(u.id, u.username) for u in User.objects.all()]
-        self.fields["groups_allowed"].choices = [(g.id, g.name) for g in Group.objects.all()]
 
 
 # CodeResource forms.

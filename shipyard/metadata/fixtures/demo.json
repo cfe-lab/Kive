@@ -1347,86 +1347,137 @@
 {
     "pk": 5, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 6, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 7, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 8, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 9, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 10, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 11, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 12, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 13, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 14, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 15, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 16, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 17, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 18, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 19, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 20, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 },
 {
     "pk": 21, 
     "model": "metadata.compounddatatype", 
-    "fields": {}
+    "fields": {
+        "user": 1,
+        "groups_allowed": [1, 2, 3]
+    }
 }
 ]

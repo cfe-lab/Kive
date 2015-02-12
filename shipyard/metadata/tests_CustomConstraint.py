@@ -19,6 +19,8 @@ import sandbox.testing_utils as tools
 
 from constants import datatypes, CDTs
 
+shipyard_user = User.objects.get(pk=1)
+
 
 class CustomConstraintTests(TransactionTestCase):
     """
@@ -32,13 +34,12 @@ class CustomConstraintTests(TransactionTestCase):
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
-        self.dt_basic = self._setup_datatype("alpha", "strings of letters", 
-                [("regexp", "^[A-Za-z]+$")], 
-                [Datatype.objects.get(pk=datatypes.STR_PK)])
+        self.dt_basic = self._setup_datatype("alpha", "strings of letters", self.user_oscar,
+                                             [("regexp", "^[A-Za-z]+$")], [Datatype.objects.get(pk=datatypes.STR_PK)])
         
         # A Datatype with custom constraints restricting the basic datatype.
-        self.dt_custom = self._setup_datatype("words", 
-                "correctly spelled words", [], [self.dt_basic])
+        self.dt_custom = self._setup_datatype("words", "correctly spelled words", self.user_oscar,
+                                              [], [self.dt_basic])
 
         # Set up the custom constraint, a spell checker.
         self._setup_custom_constraint(
@@ -62,8 +63,7 @@ class CustomConstraintTests(TransactionTestCase):
         # A compound datatype composed of alphabetic strings and correctly
         # spelled words.
         self.cdt_constraints = self._setup_compounddatatype(
-                [self.dt_basic, self.dt_custom],
-                ["letter strings", "words"])
+            [self.dt_basic, self.dt_custom], ["letter strings", "words"], self.user_oscar)
 
         # A file conforming to the compound datatype.
         self.good_datafile = self._setup_datafile(self.cdt_constraints,
@@ -121,13 +121,13 @@ class CustomConstraintTests(TransactionTestCase):
         datafile.close()
         return datafile.name
 
-    def _setup_datatype(self, name, desc, basic_constraints, restricts):
+    def _setup_datatype(self, name, desc, user, basic_constraints, restricts):
         """
         Helper function to set up a Datatype, given a list of basic
         constraints (which are tuples (ruletype, rule)), and a list
         of other datatypes to restrict.
         """
-        datatype = Datatype(name=name, description=desc)
+        datatype = Datatype(name=name, description=desc, user=user)
         datatype.save()
         for supertype in restricts:
             datatype.restricts.add(supertype)
@@ -135,12 +135,12 @@ class CustomConstraintTests(TransactionTestCase):
             datatype.basic_constraints.create(ruletype=ruletype, rule=rule)
         return(datatype)
 
-    def _setup_compounddatatype(self, datatypes, column_names):
+    def _setup_compounddatatype(self, datatypes, column_names, user):
         """
         Helper function to create a compound datatype, given a list of members
         and column names.
         """
-        compounddatatype = CompoundDatatype()
+        compounddatatype = CompoundDatatype(user=user)
         compounddatatype.save()
         for i in range(len(datatypes)):
             compounddatatype.members.create(datatype=datatypes[i],
@@ -197,16 +197,17 @@ class CustomConstraintTests(TransactionTestCase):
         """
         A verification method which produces no output should throw a ValueError.
         """
-        dt_no_output = self._setup_datatype("numerics", "strings of digits",
-                [("regexp", "^[0-9]+$")],
-                [Datatype.objects.get(pk=datatypes.INT_PK)])
+        dt_no_output = self._setup_datatype("numerics", "strings of digits", self.user_oscar,
+                                            [("regexp", "^[0-9]+$")],
+                                            [Datatype.objects.get(pk=datatypes.INT_PK)])
         self._setup_custom_constraint(
             "empty", "Methods producing no output",
             "empty", "a script producing no output", "#!/bin/bash", dt_no_output,
             self.user_oscar)
         cdt_no_output = self._setup_compounddatatype( 
-                [dt_no_output, self.dt_basic],
-                ["numerics", "letter strings"])
+            [dt_no_output, self.dt_basic],
+            ["numerics", "letter strings"],
+            self.user_oscar)
         no_output_datafile = self._setup_datafile(cdt_no_output,
                 [[123, "foo"], [456, "bar"], [789, "baz"]])
 
@@ -223,10 +224,12 @@ class CustomConstraintTests(TransactionTestCase):
         If a verification method produces a row which is greater than the number
         of rows in the input, a ValueError should be raised.
         """
-        dt_big_row = self._setup_datatype("barcodes",
-                "strings of upper case alphanumerics of length between 10 and 12", 
-                [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
-                [Datatype.objects.get(pk=datatypes.STR_PK)])
+        dt_big_row = self._setup_datatype(
+            "barcodes",
+            "strings of upper case alphanumerics of length between 10 and 12",
+            self.user_oscar,
+            [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
+            [Datatype.objects.get(pk=datatypes.STR_PK)])
         self._setup_custom_constraint(
             "bigrow",
             "methods outputting a big row number",
@@ -235,8 +238,8 @@ class CustomConstraintTests(TransactionTestCase):
             '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
             dt_big_row,
             self.user_oscar)
-        cdt_big_row = self._setup_compounddatatype(
-                [dt_big_row, self.dt_custom], ["barcodes", "words"])
+        cdt_big_row = self._setup_compounddatatype([dt_big_row, self.dt_custom], ["barcodes", "words"],
+                                                   self.user_oscar)
         big_row_datafile = self._setup_datafile(cdt_big_row,
                 [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
 
@@ -329,9 +332,8 @@ class CustomConstraintTests(TransactionTestCase):
         # Add a prototype to the custom DT, and make a new CDT.
         self.dt_custom.prototype = prototype_SD.dataset
         self.dt_custom.save()
-        cdt = self._setup_compounddatatype(
-                [self.dt_basic, self.dt_custom],
-                ["letter strings", "words"])
+        cdt = self._setup_compounddatatype([self.dt_basic, self.dt_custom], ["letter strings", "words"],
+                                           self.user_oscar)
         return cdt
 
     def _test_setup_prototype_bad(self):

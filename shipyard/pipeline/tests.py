@@ -3473,18 +3473,19 @@ class CustomWiringTests(PipelineTestCase):
         # Define a datatype that has nothing to do with anything and have it restrict
         # the builtin Shipyard string Datatype.
         self.incompatible_dt = Datatype(name="Not compatible",
-                                        description="A datatype not having anything to do with anything")
+                                        description="A datatype not having anything to do with anything",
+                                        user=self.user)
         self.incompatible_dt.save()
         self.incompatible_dt.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
 
         # Define 2 CDTs that are unequal: (DNA, string, string), and (string, DNA, incompatible)
-        cdt_1 = CompoundDatatype()
+        cdt_1 = CompoundDatatype(user=self.user)
         cdt_1.save()
         cdt_1.members.create(datatype=self.DNA_dt,column_name="col_1",column_idx=1)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_2",column_idx=2)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_3",column_idx=3)
 
-        cdt_2 = CompoundDatatype()
+        cdt_2 = CompoundDatatype(user=self.user)
         cdt_2.save()
         cdt_2.members.create(datatype=self.string_dt,column_name="col_1",column_idx=1)
         cdt_2.members.create(datatype=self.DNA_dt,column_name="col_2",column_idx=2)
@@ -3530,19 +3531,19 @@ class CustomWiringTests(PipelineTestCase):
         # For source_pin and dest_pin, give a CDTM from an unrelated CDT
 
         # Define a datatype that has nothing to do with anything.
-        self.incompatible_dt = Datatype(name="poop", description="poop!!")
+        self.incompatible_dt = Datatype(name="poop", description="poop!!", user=self.user)
         self.incompatible_dt.save()
         self.incompatible_dt.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
 
 
         # Define 2 different CDTs: (DNA, string, string), and (string, DNA, incompatible)
-        cdt_1 = CompoundDatatype()
+        cdt_1 = CompoundDatatype(user=self.user)
         cdt_1.save()
         cdt_1.members.create(datatype=self.DNA_dt,column_name="col_1",column_idx=1)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_2",column_idx=2)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_3",column_idx=3)
 
-        cdt_2 = CompoundDatatype()
+        cdt_2 = CompoundDatatype(user=self.user)
         cdt_2.save()
         cdt_2.members.create(datatype=self.string_dt,column_name="col_1",column_idx=1)
         cdt_2.members.create(datatype=self.DNA_dt,column_name="col_2",column_idx=2)
@@ -3944,7 +3945,7 @@ class CustomOutputWiringTests(PipelineTestCase):
         # column 2: "col2_DNA", type DNA_dt (from 2nd col of triplet)
         # column 3: "col3_str", type string_dt (from 1st col of triplet)
         # column 4: "col4_str", type string_dt (from 3rd col of triplet)
-        new_cdt = CompoundDatatype()
+        new_cdt = CompoundDatatype(user=self.user)
         new_cdt.save()
         pin1 = new_cdt.members.create(column_name="col1_str", column_idx=1,
                                       datatype=self.string_dt)
@@ -4018,13 +4019,13 @@ class PipelineSerializationTests(TestCase):
         self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
         # A CDT composed of two builtin-STR columns.
-        self.string_doublet = CompoundDatatype()
+        self.string_doublet = CompoundDatatype(user=self.user_bob)
         self.string_doublet.save()
         self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
         self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
 
         # A CDT composed of one builtin-STR column.
-        self.string_singlet = CompoundDatatype()
+        self.string_singlet = CompoundDatatype(user=self.user_bob)
         self.string_singlet.save()
         self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
 

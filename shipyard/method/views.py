@@ -95,10 +95,10 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
         # Skip the clean until later; after all, we're protected by a transaction here.
         code_resource.save()
 
-        for user_pk in crv_form.cleaned_data["users_allowed"]:
-            code_resource.users_allowed.add(user_pk)
-        for group_pk in crv_form.cleaned_data["groups_allowed"]:
-            code_resource.groups_allowed.add(group_pk)
+        for user in crv_form.cleaned_data["users_allowed"]:
+            code_resource.users_allowed.add(user)
+        for group in crv_form.cleaned_data["groups_allowed"]:
+            code_resource.groups_allowed.add(group)
 
         rev_name = "Prototype"
         rev_desc = crv_form.cleaned_data["resource_desc"]
@@ -119,10 +119,10 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
     )
     revision.save()
 
-    for user_pk in crv_form.cleaned_data["users_allowed"]:
-        revision.users_allowed.add(user_pk)
-    for group_pk in crv_form.cleaned_data["groups_allowed"]:
-        revision.groups_allowed.add(group_pk)
+    for user in crv_form.cleaned_data["users_allowed"]:
+        revision.users_allowed.add(user)
+    for group in crv_form.cleaned_data["groups_allowed"]:
+        revision.groups_allowed.add(group)
 
     revision.save()
 

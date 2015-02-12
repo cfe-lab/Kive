@@ -49,18 +49,18 @@ class ExecuteTests(TransactionTestCase):
         self.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
 
 		# Basic CDTs
-        self.pX_in_cdt = CompoundDatatype()
+        self.pX_in_cdt = CompoundDatatype(user=self.myUser)
         self.pX_in_cdt.save()
         self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_a",column_idx=1)
         self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_b",column_idx=2)
         self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt,column_name="pX_c",column_idx=3)
 
-        self.mA_in_cdt = CompoundDatatype()
+        self.mA_in_cdt = CompoundDatatype(user=self.myUser)
         self.mA_in_cdt.save()
         self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
         self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
 
-        self.mA_out_cdt = CompoundDatatype()
+        self.mA_out_cdt = CompoundDatatype(user=self.myUser)
         self.mA_out_cdt.save()
         self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
         self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
@@ -191,7 +191,7 @@ class ExecuteTests(TransactionTestCase):
         self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
 
         # Define CDT for the second output (first output is defined by a trivial cable)
-        self.pipeline_out2_cdt = CompoundDatatype()
+        self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
         self.pipeline_out2_cdt.save()
         self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
         self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
@@ -219,12 +219,12 @@ class ExecuteTests(TransactionTestCase):
         """Two step pipeline with second step identical to the first"""
 
         # Define 2 member input and 1 member output CDTs for inner pipeline pY
-        self.pY_in_cdt = CompoundDatatype()
+        self.pY_in_cdt = CompoundDatatype(user=self.myUser)
         self.pY_in_cdt.save()
         self.pY_in_cdtm_1 = self.pY_in_cdt.members.create(column_name="pYA",column_idx=1,datatype=self.int_dt)
         self.pY_in_cdtm_2 = self.pY_in_cdt.members.create(column_name="pYB",column_idx=2,datatype=self.string_dt)
 
-        self.pY_out_cdt = CompoundDatatype()
+        self.pY_out_cdt = CompoundDatatype(user=self.myUser)
         self.pY_out_cdt.save()
         self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
 
@@ -247,12 +247,12 @@ class ExecuteTests(TransactionTestCase):
         self.pY.create_outputs()
 
         # Define CDTs for the output of pX
-        self.pX_out_cdt_1 = CompoundDatatype()
+        self.pX_out_cdt_1 = CompoundDatatype(user=self.myUser)
         self.pX_out_cdt_1.save()
         self.pX_out_cdt_1_cdtm_1 = self.pX_out_cdt_1.members.create(column_name="pXq", column_idx=1,
                                                                     datatype=self.int_dt)
 
-        self.pX_out_cdt_2 = CompoundDatatype()
+        self.pX_out_cdt_2 = CompoundDatatype(user=self.myUser)
         self.pX_out_cdt_2.save()
         self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(
             column_name="pXr", column_idx=1, datatype=self.string_dt

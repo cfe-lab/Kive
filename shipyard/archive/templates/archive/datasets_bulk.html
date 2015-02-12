@@ -84,15 +84,28 @@
                         Use AJAX to post edits to server.
                         Use django formset names so that server can automagically update model.
                        -->
-                        <td style="display:none">{{ dataset_form.id }}</td>
-                        <td>{{ dataset_form.orig_filename }}</td>
-                        <td>{{ dataset_form.filesize }}</td>
-                        <td>{{ dataset_form.name }}</td>
-                        <td>{{ dataset_form.description }}</td>
-                        <td class="display_only_input">{{ dataset_form.md5 }}</td>
-                        <!-- TODO:  use ajax to poll status of each file upload.  Will be handy  if lots of large files -->
+                        <td style="display:none">{{ dataset_form.id }}
+                            <div class="errortext">{{ dataset_form.id.errors }}</div>
+                        </td>
+                        <td>{{ dataset_form.orig_filename }}
+                            <div class="errortext">{{ dataset_form.orig_filename.errors }}</div>
+                        </td>
+                        <td>{{ dataset_form.filesize }}
+                            <div class="errortext">{{ dataset_form.filesize.errors }}</div>
+                        </td>
+                        <td>{{ dataset_form.name }}
+                            <div class="errortext">{{ dataset_form.name.errors }}</div>
+                        </td>
+                        <td>{{ dataset_form.description }}
+                            <div class="errortext">{{ dataset_form.description.errors }}</div>
+                        </td>
+                        <td class="display_only_input">{{ dataset_form.md5 }}
+                            <div class="errortext">{{ dataset_form.md5.errors }}</div>
+                        </td>
+                        <!-- TODO:  use ajax to poll status of each file upload.
+                        Will be handy if lots of large files -->
                         <td class="status_cell">{{ dataset_form.status }}</td>
-                        <td class="errortext">{{ dataset_form.err_msg }}</td>
+                        <td class="errortext">{{ dataset_form.non_field_errors }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -100,8 +113,6 @@
     </div>
     <input type="submit" id="editBulkDatasets" name="editBulkDatasets" value="Submit" />
 </form>
-
-<div class="errorStrip errortext">{{ errors }}</div>
 
 {% endblock %}
 

@@ -31,10 +31,10 @@ def create_sandbox_testing_tools_environment(case):
     case.user_bob.save()
 
     # Predefined datatypes.
-    case.datatype_str = new_datatype("my_string", "sequences of ASCII characters", case.STR)
+    case.datatype_str = new_datatype("my_string", "sequences of ASCII characters", case.STR, case.user_bob)
 
     # A CDT composed of only one column, strings.
-    case.cdt_string = CompoundDatatype()
+    case.cdt_string = CompoundDatatype(user=case.user_bob)
     case.cdt_string.save()
     case.cdt_string.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
 
@@ -91,8 +91,8 @@ def create_sequence_manipulation_environment(case):
     # data type. A "string" datatype, which she will use for the headers,
     # has been predefined in Shipyard. She also creates a compound "record"
     # datatype for sequence + header.
-    case.datatype_dna = new_datatype("DNA", "sequences of ATCG", case.STR)
-    case.cdt_record = CompoundDatatype()
+    case.datatype_dna = new_datatype("DNA", "sequences of ATCG", case.STR, case.user_alice)
+    case.cdt_record = CompoundDatatype(user=case.user_alice)
     case.cdt_record.save()
     case.cdt_record.members.create(datatype=case.datatype_str, column_name="header", column_idx=1)
     case.cdt_record.members.create(datatype=case.datatype_dna, column_name="sequence", column_idx=2)
@@ -248,13 +248,13 @@ def create_word_reversal_environment(case):
         case.user_bob)
 
     # A CDT with two columns, word and drow.
-    case.cdt_wordbacks = CompoundDatatype()
+    case.cdt_wordbacks = CompoundDatatype(user=case.user_bob)
     case.cdt_wordbacks.save()
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="drow", column_idx=2)
 
     # A second CDT, much like the first :]
-    case.cdt_backwords = CompoundDatatype()
+    case.cdt_backwords = CompoundDatatype(user=case.user_bob)
     case.cdt_backwords.save()
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="drow", column_idx=1)
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="word", column_idx=2)
@@ -348,11 +348,11 @@ def make_crisscross_cable(cable):
                               dest_pin=dest_cdt.members.get(column_idx=1))
 
 
-def new_datatype(dtname, dtdesc, shipyardtype):
+def new_datatype(dtname, dtdesc, shipyardtype, user):
     """
     Helper function to create a new datatype.
     """
-    datatype = Datatype(name=dtname, description=dtdesc)
+    datatype = Datatype(name=dtname, description=dtdesc, user=user)
     datatype.save()
     datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
     datatype.complete_clean()

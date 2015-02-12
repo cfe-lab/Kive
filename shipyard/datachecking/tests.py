@@ -45,7 +45,7 @@ class BlankableColumn(BlankableTestCase):
 
     def setUp(self):
         BlankableTestCase.setUp(self)
-        self.blankable_CDT = metadata.models.CompoundDatatype()
+        self.blankable_CDT = metadata.models.CompoundDatatype(user=self.user_doug)
         self.blankable_CDT.save()
         self.blankable_CDT.members.create(datatype=self.INT, column_name="firstcol", column_idx=1,
                                           blankable=True)
@@ -94,7 +94,7 @@ class BlankCellNonBlankable(BlankableTestCase):
 
     def setUp(self):
         BlankableTestCase.setUp(self)
-        self.test_CDT = metadata.models.CompoundDatatype()
+        self.test_CDT = metadata.models.CompoundDatatype(user=self.user_doug)
         self.test_CDT.save()
         self.test_CDT.members.create(datatype=self.INT, column_name="firstcol", column_idx=1)
         self.test_CDT.clean()
