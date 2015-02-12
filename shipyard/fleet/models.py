@@ -6,10 +6,9 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 
-import archive.models
-import librarian.models
-import pipeline.models
-from archive.models import ExecLog
+from archive.models import ExecLog, Run
+from librarian.models import SymbolicDataset
+from pipeline.models import Pipeline
 
 # This is an experimental replacement for the runfleet admin command.
 # Disable it by setting worker_count to 0.
@@ -49,10 +48,10 @@ class RunToProcess(models.Model):
     # - inputs
     # - sandbox_path (default is None)
     user = models.ForeignKey(User)
-    pipeline = models.ForeignKey(pipeline.models.Pipeline)
+    pipeline = models.ForeignKey(Pipeline)
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(auto_now_add=True)
-    run = models.ForeignKey(archive.models.Run, null=True)
+    run = models.ForeignKey(Run, null=True)
 
     def clean(self):
         if hasattr(self, "not_enough_CPUs"):
@@ -72,6 +71,21 @@ class RunToProcess(models.Model):
     @transaction.atomic
     def finished(self):
         return (self.started and self.run.is_complete()) or hasattr(self, "not_enough_CPUs")
+    
+    @property
+    def display_name(self):
+        try:
+            pipeline_name = self.pipeline.family.name
+        except Pipeline.DoesNotExist:
+            pipeline_name = "Run"
+        inputs = self.inputs.select_related('symbolicdataset__dataset')
+        first_input = inputs.order_by('index').first()
+        if not first_input:
+            if self.time_queued:
+                return "{} at {}".format(pipeline_name, self.time_queued)
+            return pipeline_name
+        first_input_name = first_input.symbolicdataset.dataset.name
+        return '{} on {}'.format(pipeline_name, first_input_name) 
 
     @transaction.atomic
     def get_run_progress(self):
@@ -84,15 +98,8 @@ class RunToProcess(models.Model):
                 esc.threads_requested, esc.max_available
             )
         
-        input_name = None
-        for run_input in self.inputs.all():
-            input_name = run_input.symbolicdataset.dataset.name
-            break
-
         if not self.started:
-            status = "?"
-            if input_name:
-                status += "-" + input_name
+            status = "?-" + self.display_name
             return status
 
         run = self.run
@@ -133,8 +140,7 @@ class RunToProcess(models.Model):
                 except ExecLog.DoesNotExist:
                     status += ":"
         
-        if input_name:
-            status += "-" + input_name
+        status += "-" + self.display_name
 
         return status
 
@@ -144,7 +150,7 @@ class RunToProcessInput(models.Model):
     Represents an input to a run to process.
     """
     runtoprocess = models.ForeignKey(RunToProcess, related_name="inputs")
-    symbolicdataset = models.ForeignKey(librarian.models.SymbolicDataset)
+    symbolicdataset = models.ForeignKey(SymbolicDataset)
     index = models.PositiveIntegerField()
 
 
