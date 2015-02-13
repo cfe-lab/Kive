@@ -334,18 +334,20 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     this.scoop = 45;
 
     this.in_magnets = [];
-    var sorted_in_keys = Object.keys(inputs).sort(function(a,b){return a-b});
-    for (var key in sorted_in_keys) {
-        var this_input = this.inputs[key];
-        var magnet = new Magnet(
-            parent = this,
-            r = 5,
-            attract = 5,
-            fill = '#fff',
-            cdt = this_input['cdt_pk'],
-            label = this_input['datasetname'],
-            null, false
-        );
+    var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
+    for (var keyIndex in sorted_in_keys) {
+        var key = sorted_in_keys[keyIndex],
+            this_input = this.inputs[key],
+            magnet = new Magnet(
+                parent = this,
+                r = 5,
+                attract = 5,
+                fill = '#fff',
+                cdt = this_input['cdt_pk'],
+                label = this_input['datasetname'],
+                null,
+                false
+            );
 
         if (this.n_inputs == 1) {
             magnet.x -= this.h/3
@@ -356,17 +358,19 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
 
     this.out_magnets = [];
     var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b});
-    for (key in sorted_out_keys) {
-        var this_output = this.outputs[key];
-        magnet = new Magnet(
-            parent = this,
-            r = 5,
-            attract = 5,
-            fill = '#fff',
-            cdt = this_output['cdt_pk'],
-            label = this_output['datasetname'],
-            null, true
-        );
+    for (keyIndex in sorted_out_keys) {
+        var key = sorted_out_keys[keyIndex],
+            this_output = this.outputs[key],
+            magnet = new Magnet(
+                parent = this,
+                r = 5,
+                attract = 5,
+                fill = '#fff',
+                cdt = this_output['cdt_pk'],
+                label = this_output['datasetname'],
+                null,
+                true
+            );
 
         if (this.n_inputs == 1) {
             magnet.x += this.h/3
