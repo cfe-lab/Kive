@@ -802,7 +802,11 @@ CanvasState.prototype.draw = function() {
             } else {
                 // add information about execution order
                 var L = shapes[i].getLabel(),
-                    flat_exec_order = Array.concat.apply(null, this.exec_order); //"flatten" 2d array into 1d by concatenation.
+                    flat_exec_order = [];
+                for( j in this.exec_order) {
+                    //"flatten" 2d array into 1d by concatenation.
+                    flat_exec_order = flat_exec_order.concat(this.exec_order[j]);
+                }
                 L.label = (flat_exec_order.indexOf(shape) + 1) +': '+ L.label;
                 labels.push(L);
             }
