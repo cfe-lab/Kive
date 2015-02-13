@@ -91,9 +91,7 @@ def datasets_add(request):
             single_dataset_form.add_error(None, e)
 
         if success:
-            datasets = Dataset.objects.all()    # Once saved, let user browse table of all datasets
-            t = loader.get_template('archive/datasets.html')
-            c = Context({'datasets': datasets})
+            return HttpResponseRedirect("datasets")
         else:
             t = loader.get_template('archive/datasets_add.html')
             c = Context({'singleDataset': single_dataset_form})
@@ -230,9 +228,7 @@ def datasets_bulk(request):
 
         if all_good:
             # Success!
-            datasets = Dataset.objects.all()    # Once saved, let user browse table of all datasets
-            t = loader.get_template('archive/datasets.html')
-            c = Context({'datasets': datasets})
+            return HttpResponseRedirect("datasets")
         else:
             # Failure!
             c = Context({'bulk_dataset_formset': bulk_dataset_update_formset})

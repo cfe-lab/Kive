@@ -22,16 +22,42 @@ A compound datatype is an ordered set of datatypes, describing the expected stru
 <table>
 <thead>
 	<tr>
-	<th>Scheme</th>
-	<th>#datasets</th>
+        <th>Scheme</th>
+        <th>Creator</th>
+        <th>Users with access</th>
+        <th>Groups with access</th>
+        <th>#datasets</th>
 	</tr>
 </thead>
+
 {% for cd in compound_datatypes %}
 <tr>
 	<td>{{ cd }}</td> <!--unicode representation-->
+    <td>{{ cd.user }}</td>
+
+    <td>
+        {% if cd.users_allowed.exists %}
+        <ul>
+            {% for ua in cd.users_allowed.all %}
+            <li>{{ ua }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </td>
+
+    <td>
+        {% if cd.groups_allowed.exists %}
+        <ul>
+            {% for ga in cd.groups_allowed.all %}
+            <li>{{ ga }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </td>
 	<td><!-- reserved for number of conforming datasets--></td>
 </tr>
 {% endfor %}
+
 </table>
 
 
