@@ -91,9 +91,15 @@ def get_method_xputs(method):
                 structure = xput.structure
                 cdt_pk = structure.compounddatatype.pk
                 cdt_label = str(structure.compounddatatype)
-            xputs.update({xput.dataset_idx: {'datasetname': xput.dataset_name,
-                                               'cdt_pk': cdt_pk,
-                                               'cdt_label': cdt_label}})
+            xputs.update(
+                {
+                    xput.dataset_idx: {
+                        'datasetname': xput.dataset_name,
+                        'cdt_pk': cdt_pk,
+                        'cdt_label': cdt_label
+                    }
+                }
+            )
         result.append(xputs)
     return {'inputs': result[0], 'outputs': result[1]}
 

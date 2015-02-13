@@ -334,7 +334,8 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     this.scoop = 45;
 
     this.in_magnets = [];
-    for (var key in this.inputs) {
+    var sorted_in_keys = Object.keys(inputs).sort(function(a,b){return a-b});
+    for (var key in sorted_in_keys) {
         var this_input = this.inputs[key];
         var magnet = new Magnet(
             parent = this,
@@ -354,7 +355,8 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     }
 
     this.out_magnets = [];
-    for (key in this.outputs) {
+    var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b});
+    for (key in sorted_out_keys) {
         var this_output = this.outputs[key];
         magnet = new Magnet(
             parent = this,
