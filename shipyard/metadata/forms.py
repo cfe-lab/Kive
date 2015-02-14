@@ -10,6 +10,19 @@ from datetime import datetime
 from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
 
 
+def setup_form_users_allowed(form, users_allowed):
+    """
+    Helper that sets up the users_allowed field on a Form or ModelForm that has a users_allowed
+    ModelMultipleChoiceField (e.g. anything that inherits from AccessControl).
+    """
+    form.fields["users_allowed"].queryset = users_allowed if users_allowed else User.objects.all()
+
+
+def setup_form_groups_allowed(form, groups_allowed):
+    form.fields["groups_allowed"].queryset = groups_allowed if groups_allowed else Group.objects.all()
+
+
+
 class AccessControlForm(forms.Form):
 
     users_allowed = forms.ModelMultipleChoiceField(
@@ -28,18 +41,11 @@ class AccessControlForm(forms.Form):
 
     def __init__(self, possible_users_allowed=None, possible_groups_allowed=None, *args, **kwargs):
         super(AccessControlForm, self).__init__(*args, **kwargs)
-        if possible_users_allowed:
-            self.fields["users_allowed"].queryset = possible_users_allowed
-        else:
-            self.fields["users_allowed"].queryset = User.objects.all()
-
-        if possible_groups_allowed:
-            self.fields["groups_allowed"].queryset = possible_groups_allowed
-        else:
-            self.fields["groups_allowed"].queryset = Group.objects.all()
+        setup_form_users_allowed(self, possible_users_allowed)
+        setup_form_groups_allowed(self, possible_groups_allowed)
 
 
-class DatatypeForm (forms.ModelForm, AccessControlForm):
+class DatatypeForm (forms.ModelForm):
 
     restricts = forms.ModelMultipleChoiceField(
         queryset = Datatype.objects.all(),
@@ -50,6 +56,11 @@ class DatatypeForm (forms.ModelForm, AccessControlForm):
     class Meta:
         model = Datatype
         fields = ('name', 'description', 'restricts', "users_allowed", "groups_allowed")
+
+    def __init__(self, users_allowed, groups_allowed, *args, **kwargs):
+        super(DatatypeForm, self).__init__(*args, **kwargs)
+        setup_form_users_allowed(self, users_allowed)
+        setup_form_groups_allowed(self, groups_allowed)
 
 
 class BasicConstraintForm (forms.ModelForm):
@@ -83,7 +94,13 @@ class CompoundDatatypeMemberForm(forms.ModelForm):
         exclude = ('compounddatatype', 'column_idx')
 
 
-class CompoundDatatypeForm(forms.ModelForm, AccessControlForm):
+class CompoundDatatypeForm(forms.ModelForm):
     class Meta:
         model = CompoundDatatype
         exclude = ("user",)
+
+    def __init__(self, possible_users_allowed, possible_groups_allowed, *args, **kwargs):
+        super(CompoundDatatypeForm, self).__init__(*args, **kwargs)
+        setup_form_users_allowed(self, possible_users_allowed)
+        setup_form_groups_allowed(self, possible_groups_allowed)
+

@@ -240,12 +240,14 @@ class AccessControl(models.Model):
     users_allowed = models.ManyToManyField(
         User,
         related_name="%(app_label)s_%(class)s_has_access_to",
-        help_text="Which users have access?"
+        help_text="Which users have access?",
+        null=True, blank=True
     )
     groups_allowed = models.ManyToManyField(
         Group,
         related_name="%(app_label)s_%(class)s_has_access_to",
-        help_text="What groups have access?"
+        help_text="What groups have access?",
+        null=True, blank=True
     )
 
     class Meta:
@@ -1232,11 +1234,41 @@ class CompoundDatatype(AccessControl):
         """
         Check if Datatype members have consecutive indices from 1 to n
         """
+        users_with_access = []
+        groups_with_access = []
         for i, member in enumerate(self.members.order_by("column_idx"), start=1):
             member.full_clean()
             if member.column_idx != i:
                 raise ValidationError(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'
                                        .format(self)))
+
+            curr_users_with_access = [member.datatype.user] + list(member.datatype.users_allowed.all())
+            curr_groups_with_access = list(member.datatype.groups_allowed.all())
+            if i == 1:
+                users_with_access = curr_users_with_access
+                groups_with_access = curr_groups_with_access
+            else:
+                users_with_access = users_with_access.intersection(curr_users_with_access)
+                groups_with_access = groups_with_access.intersection(curr_groups_with_access)
+
+        # Check that the permissions defined on this CDT don't overstep those on its members.
+        if self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+            return
+
+        groups_with_access_pks = [x.pk for x in groups_with_access]
+        for user in self.users_allowed.all():
+            if (user not in users_with_access and
+                    not user.groups.filter(pk__in=groups_with_access_pks.exists())):
+                raise ValidationError(
+                    "User {} does not have access to all of the Datatypes used in CompoundDatatype {}".format(
+                        user, self))
+
+        for group in self.groups_allowed.all():
+            if group not in groups_with_access:
+                raise ValidationError(
+                    "Group {} does not have access to all of the Datatypes used in CompoundDatatype {}".format(self)
+                )
+
 
     def is_restriction(self, other_CDT):
         """

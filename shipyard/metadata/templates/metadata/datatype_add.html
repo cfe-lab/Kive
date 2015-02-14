@@ -20,7 +20,7 @@
 <h3>New datatype</h3>
 
 
-<div class="errortext">
+<div class="errortext">{{ datatype_form.non_field_errors }}</div>
 <form action="" method="post">{% csrf_token %}
     <table>
         <tr>
@@ -58,7 +58,9 @@
     </table>
 
     <!-- field set contextually by JavaScript.  This is used for the front-end validation of restricts. -->
+    <!--
     <div id='id_to_hide'>{{ datatype_form.Python_type }}</div>
+    -->
 
     <h3>Basic constraints</h3>
 

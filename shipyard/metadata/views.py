@@ -3,7 +3,7 @@ metadata.views
 """
 
 from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context
+from django.template import loader, Context, RequestContext
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.forms.util import ErrorList
@@ -21,19 +21,22 @@ from constants import datatypes as dt_pks, groups
 
 everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
+
+def user_access_query(user):
+    query_object = Q(user=user) | Q(users_allowed=user) | Q(groups_allowed=everyone_group)
+    for group in user.groups.all():
+        query_object = query_object | Q(groups_allowed=group)
+    return query_object
+
+
 @login_required
 def datatypes(request):
     """
     Render table and form on user request for datatypes.html
     """
-    # What datatypes are we able to see?
-    query_object = Q(user=request.user) | Q(users_allowed=request.user) | Q(groups_allowed=everyone_group)
-    for group in request.user.groups.all():
-        query_object = query_object | Q(groups_allowed=group)
-    accessible_dts = Datatype.objects.filter(query_object)
+    accessible_dts = Datatype.objects.filter(user_access_query(request.user)).distinct()
     t = loader.get_template('metadata/datatypes.html')
-    c = Context({'datatypes': accessible_dts, "user": request.user})
-    c.update(csrf(request))
+    c = RequestContext(request, {'datatypes': accessible_dts})
     return HttpResponse(t.render(c))
     #return render_to_response('datatypes.html', {'form': form})
 
@@ -44,11 +47,14 @@ def datatype_add(request):
     Render form for creating a new Datatype
     """
     t = loader.get_template('metadata/datatype_add.html')
-    c = Context({"user": request.user})
+    c = RequestContext(request)
+
+    # A dummy Datatype to be used for filling in a DatatypeForm.
+    dt = Datatype(user=request.user, date_created=timezone.now())
 
     if request.method == 'POST':
-        dt = Datatype(user=request.user, date_created=timezone.now())
-        dform = DatatypeForm(request.POST, instance=dt) #  create form bound to POST data
+        # dt = Datatype(user=request.user, date_created=timezone.now())
+        dform = DatatypeForm(None, None, request.POST, instance=dt) #  create form bound to POST data
         icform = IntegerConstraintForm(request.POST)
         scform = StringConstraintForm(request.POST)
         query = request.POST.dict()
@@ -65,8 +71,7 @@ def datatype_add(request):
                 bail_now = True
 
         if bail_now:
-            c.push({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
-            c.update(csrf(request))
+            c.update({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
             return HttpResponse(t.render(c))
 
         Python_type = Python_type.pop()
@@ -133,12 +138,11 @@ def datatype_add(request):
             pass
 
     else:
-        dform = DatatypeForm()  # unbound
+        dform = DatatypeForm(None, None)  # unbound
         icform = IntegerConstraintForm()
         scform = StringConstraintForm()
 
-    c.push({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
-    c.update(csrf(request))
+    c.update({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
     return HttpResponse(t.render(c))
 
 
@@ -206,7 +210,7 @@ def compound_datatype_add(request):
     if request.method == 'POST':
         # Create a parent CDT object so we can define its members.
         dummy_cdt = CompoundDatatype(user=request.user)
-        cdt_form = CompoundDatatypeForm(request.POST, instance=dummy_cdt)
+        cdt_form = CompoundDatatypeForm(None, None, request.POST, instance=dummy_cdt)
         member_forms = make_cdm_forms(request, cdt=None)
         try:
             with transaction.atomic():
@@ -240,7 +244,7 @@ def compound_datatype_add(request):
             pass
     else:
         # Make initial blank forms.
-        cdt_form = CompoundDatatypeForm()
+        cdt_form = CompoundDatatypeForm(None, None)
         member_forms = [CompoundDatatypeMemberForm(auto_id='id_%s_0')]
 
     # Note that even if there were exceptions thrown the forms have been properly annotated with errors.
