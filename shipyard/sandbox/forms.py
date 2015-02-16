@@ -3,8 +3,7 @@ Forms for running a Pipeline.
 """
 
 from django import forms
-from pipeline.models import Pipeline, PipelineFamily
-from librarian.models import SymbolicDataset
+from pipeline.models import PipelineFamily
 
 class PipelineSelectionForm(forms.Form):
     """Form for selecting a Pipeline to run."""

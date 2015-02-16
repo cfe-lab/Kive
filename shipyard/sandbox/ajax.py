@@ -39,7 +39,13 @@ class AJAXRequestHandler:
 
 
 def _run_pipeline(request):
-    """Run a Pipeline as the global Shipyard user."""
+    """Run a Pipeline as the global Shipyard user.
+    
+    Request parameters are:
+    
+    * pipeline - the pipeline id
+    * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
+    """
     pipeline_pk = request.GET.get("pipeline")
     pipeline = Pipeline.objects.get(pk=pipeline_pk)
 

@@ -1,14 +1,11 @@
 from django.template import loader, Context
 from django.core.context_processors import csrf
 from django.http import HttpResponse
-from django.contrib.auth.models import User
 
-from sandbox.forms import *
-
-import pipeline.models
-import librarian.models
 import archive.models
-from sandbox.execute import Sandbox
+import pipeline.models
+from sandbox.forms import PipelineSelectionForm
+
 
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
@@ -50,10 +47,10 @@ def choose_inputs(request):
         # Method not allowed
         return HttpResponse(status=405)
 
-def view_results(request, id):
+def view_results(request, run_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
-    run = archive.models.Run.objects.get(pk=id)
+    run = archive.models.Run.objects.get(pk=run_id)
     context = Context({"run": run})
     context.update(csrf(request))
     return HttpResponse(template.render(context))
