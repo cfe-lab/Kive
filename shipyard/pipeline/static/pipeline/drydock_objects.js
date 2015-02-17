@@ -611,6 +611,7 @@ function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     this.isOutput = isOutput || false;
     this.isInput = !this.isOutput;
     this.connected = [];  // hold references to Connectors
+    this.acceptingConnector = false; // true if a connector is being dragged
 }
 
 Magnet.prototype.draw = function(ctx) {
@@ -620,6 +621,9 @@ Magnet.prototype.draw = function(ctx) {
     ctx.closePath();
     ctx.fillStyle = this.fill;
     ctx.fill();
+    
+    if (this.acceptingConnector)
+        this.highlight(ctx);
 };
 
 Magnet.prototype.highlight = function(ctx) {
@@ -739,11 +743,45 @@ Connector.prototype.draw = function(ctx) {
     } else {
         // if connector doesn't have a destination yet,
         // give it the label of the source magnet it's coming from 
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+        
+        
+        // save the canvas state to start applying transformations
+        ctx.save();
         ctx.font = '10pt Lato, sans-serif';
-        ctx.fillText(this.source.label, this.x, this.y + ctx.lineWidth );
+        this.label_width = ctx.measureText(this.source.label).width + 10;
+        
+        // determine the angle of the bezier at the midpoint
+        var corner = 6;
+    
+        // set the bezier midpoint as the origin
+        $(canvas).css("cursor", "none");
+        ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
+        ctx.fillStyle = '#aaa';
+        ctx.globalAlpha = 1;
+    
+        var x1 = this.label_width/2,
+            y1 = 7;
+    
+        // rounded rectangle
+        ctx.beginPath();
+        ctx.moveTo(-x1 + corner, -y1);
+        ctx.lineTo( x1 - corner, -y1);
+        ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
+//        ctx.lineTo( x1, -y1);
+        ctx.lineTo( x1,  y1 - corner);
+        ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
+        ctx.lineTo(-x1 + corner, y1);
+        ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
+        ctx.lineTo(-x1, -y1 + corner);
+        ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(this.source.label, 0, ctx.lineWidth );
+        ctx.restore();
     }
     
     this.dx = this.x - this.fromX,
@@ -802,7 +840,12 @@ Connector.prototype.getJsBez = function() {
 };
 
 Connector.prototype.drawLabel = function(ctx) {
-    this.label_width = ctx.measureText(this.source.label).width + 10;
+    var label = this.source.label;
+    if (this.source.label !== this.dest.label) {
+        label += "->" + this.dest.label;
+    }
+    
+    this.label_width = ctx.measureText(label).width + 10;
     this.dx = this.x - this.fromX,
     this.dy = this.y - this.fromY;
     
@@ -840,7 +883,7 @@ Connector.prototype.drawLabel = function(ctx) {
         
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
-        ctx.fillText(this.source.label, 0, 0);
+        ctx.fillText(label, 0, 0);
         ctx.restore();
     }
 }
