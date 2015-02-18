@@ -90,7 +90,34 @@ Note that if you used a database location or name other than the MacPorts defaul
 
 Installing psycopg
 ------------------
-Instructions for downloading and installing psycopg may be found at [initd.org](http://initd.org/psycopg/).
+Psycopg is a PostgreSQL adaptor for Python.  It is mandatory in order for Django to use a PostgreSQL database.  Instructions for downloading and installing psycopg2 may be found at [initd.org](http://initd.org/psycopg/).
+
+#### Installing psycopg2 in OS-X
+
+First, note that OS-X ships with its own version of Python (often referred to as System Python).  However, this version may be older and lack features required by open source software.  System Python also has some irregularities about the installation of modules that can complicate the installation and upgrading process of third-party modules.  For such reasons, users often like to install another version of Python.  
+
+If you are using a MacPorts binary of Python, you can easily install the psycopg2 port, by running
+```
+sudo port install py27-psycopg2
+```
+This may also install a number of dependencies if they are not already present on your system, such as `libxslt`.
+
+If you compiled your own version of Python from source, then you can obtain the source code for psycopg2 [here](http://initd.org/psycopg/download/).
+Compiling pscyopg2 requires the `pg_config` executable that might not be in your `$PATH` -- for example, if you used MacPorts to install the PostgreSQL server, it is located at `/opt/local/lib/postgresql93/bin/pg_config`.  
+You can direct the `setup.py` script to this executable by modifying the file `setup.cfg` and editing the last line in the block:
+```
+# "pg_config" is required to locate PostgreSQL headers and libraries needed to
+# build psycopg2. If pg_config is not in the path or is installed under a
+# different name uncomment the following option and set it to the pg_config
+# full path.
+pg_config
+```
+so that it reads
+```
+pg_config=/opt/local/lib/postgresql93/bin/pg_config
+```
+Then you can compile and install this module by running `sudo python setup.py install`.
+To confirm that the module is installed, start an interaction session by calling `python` on the command line and then enter `import psycopg2`.  If this raises an `ImportError` then something has gone wrong - for example, the version of Python used to install the module is different from the version running the interactive session.
 
 
 Project structure
