@@ -231,7 +231,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             // TODO: make this generic (put all the table data in the dict, not 
             // just compound_datatype specifically).
             request_data = {
-                filter_data: JSON.stringify(filters)
+                filter_data: JSON.stringify(filters),
+                compound_datatype: tab.data('compounddatatype')
             };
             
             $.getJSON(tab.data('ajax-url'), request_data, function (data) {
