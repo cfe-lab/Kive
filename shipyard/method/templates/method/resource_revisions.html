@@ -23,6 +23,35 @@
 <tr><td>Description</td><td>{{ coderesource.description }}</td></tr>
 <tr><td># revisions</td><td>{{ coderesource.num_revisions }}</td></tr>
 <tr><td>Last revision date</td><td>{{ coderesource.last_revision_date }}</td></tr>
+<tr><td>Creator</td><td>{{ coderesource.user }}</td></tr>
+<tr>
+    <td>Users allowed</td>
+    <td>
+        {% if coderesource.users_allowed.exists %}
+            <ul>
+            {% for user in coderesource.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+        None
+        {% endif %}
+    </td>
+</tr>
+<tr>
+    <td>Groups allowed</td>
+    <td>
+        {% if coderesource.groups_allowed.exists %}
+            <ul>
+            {% for group in coderesource.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+        None
+        {% endif %}
+    </td>
+</tr>
 </table>
 
 <h3>Revisions:</h3>
@@ -32,6 +61,9 @@
     <th>Name</th>
     <th>Description</th>
     <th>Date</th>
+    <th>Creator</th>
+    <th>Users allowed</th>
+    <th>Groups allowed</th>
     <th></th>
 </tr>
 {% for revision in revisions %}
@@ -40,6 +72,29 @@
     <td><a href="{{ revision.get_absolute_url }}">{{ revision }}</a></td>
     <td>{{ revision.revision_desc }}</td>
     <td>{{ revision.revision_DateTime }}</td>
+    <td>{{ revision.user }}</td>
+    <td>
+        {% if revision.users_allowed.exists %}
+            <ul>
+            {% for user in revision.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+        None
+        {% endif %}
+    </td>
+    <td>
+        {% if revision.groups_allowed.exists %}
+            <ul>
+            {% for group in revision.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+        None
+        {% endif %}
+    </td>
     <td><a href="/resource_revision_view/{{ revision.pk }}">View</a></td>
 </tr>
 {% endfor %}

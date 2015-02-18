@@ -5,9 +5,7 @@ metadata.forms
 from django import forms
 from django.contrib.auth.models import User, Group
 
-from datetime import datetime
-
-from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
+from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype, KiveUser
 
 
 def setup_form_users_allowed(form, users_allowed):
@@ -39,8 +37,9 @@ class AccessControlForm(forms.Form):
         required=False
     )
 
-    def __init__(self, possible_users_allowed=None, possible_groups_allowed=None, *args, **kwargs):
-        super(AccessControlForm, self).__init__(*args, **kwargs)
+    def __init__(self, data=None, files=None, possible_users_allowed=None, possible_groups_allowed=None,
+                 *args, **kwargs):
+        super(AccessControlForm, self).__init__(data, files, *args, **kwargs)
         setup_form_users_allowed(self, possible_users_allowed)
         setup_form_groups_allowed(self, possible_groups_allowed)
 
@@ -57,8 +56,8 @@ class DatatypeForm (forms.ModelForm):
         model = Datatype
         fields = ('name', 'description', 'restricts', "users_allowed", "groups_allowed")
 
-    def __init__(self, users_allowed, groups_allowed, *args, **kwargs):
-        super(DatatypeForm, self).__init__(*args, **kwargs)
+    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
+        super(DatatypeForm, self).__init__(data, *args, **kwargs)
         setup_form_users_allowed(self, users_allowed)
         setup_form_groups_allowed(self, groups_allowed)
 
@@ -93,14 +92,21 @@ class CompoundDatatypeMemberForm(forms.ModelForm):
         model = CompoundDatatypeMember
         exclude = ('compounddatatype', 'column_idx')
 
+    def __init__(self, data=None, user=None, *args, **kwargs):
+        super(CompoundDatatypeMemberForm, self).__init__(data, *args, **kwargs)
+        if user is not None:
+            # Cast user to class KiveUser.
+            curr_user = KiveUser.kiveify(user)
+            self.fields["datatype"].queryset = Datatype.objects.filter(curr_user.access_query())
+
 
 class CompoundDatatypeForm(forms.ModelForm):
     class Meta:
         model = CompoundDatatype
         exclude = ("user",)
 
-    def __init__(self, possible_users_allowed, possible_groups_allowed, *args, **kwargs):
-        super(CompoundDatatypeForm, self).__init__(*args, **kwargs)
-        setup_form_users_allowed(self, possible_users_allowed)
-        setup_form_groups_allowed(self, possible_groups_allowed)
+    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
+        super(CompoundDatatypeForm, self).__init__(data, *args, **kwargs)
+        setup_form_users_allowed(self, users_allowed)
+        setup_form_groups_allowed(self, groups_allowed)
 

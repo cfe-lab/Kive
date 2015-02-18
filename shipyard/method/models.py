@@ -254,6 +254,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
         if self.has_circular_dependence():
             raise ValidationError("Self-referential dependency")
 
+        for dep in self.dependencies.all():
+            dep.clean()
+
         # Check if dependencies conflict with each other
         listOfDependencyPaths = self.list_all_filepaths()
         if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
@@ -266,6 +269,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
         # If no content file exists, it must not have a file name
         if not self.content_file and self.coderesource.filename != "":
             raise ValidationError("Cannot have a filename specified in the absence of a content file")
+
+        # Check that user/group access is coherent.
+        self.validate_restrict_access([self.coderesource])
 
     def install(self, install_path):
         """
@@ -358,6 +364,9 @@ class CodeResourceDependency(models.Model):
         # have a depFileName as this makes no sense
         if self.requirement.coderesource.filename == "" and self.depFileName != "":
             raise ValidationError("Metapackage dependencies cannot have a depFileName")
+
+        # Check that user/group access is coherent.
+        self.coderesourcerevision.validate_restrict_access([self.requirement])
 
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
@@ -486,6 +495,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if not self.driver.content_file:
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
+
+        # Check that permissions are coherent.
+        self.validate_restrict_access([self.family])
+        self.validate_restrict_access([self.driver])
 
     def complete_clean(self):
         """Check coherence and completeness of this Method.

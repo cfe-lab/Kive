@@ -29,6 +29,10 @@ $(function() {
 
 <h2>Datatypes</h2>
 
+{% if no_access %}
+    <p>You do not have access to the datatype with id={{ no_access }}.</p>
+{% endif %}
+
 <a href="/datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
 <table>

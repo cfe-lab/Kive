@@ -2,19 +2,21 @@
 method.views
 """
 
-from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context
-#from django.shortcuts import render, render_to_response
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, Context, RequestContext
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django.contrib.auth.decorators import login_required
 
 from datetime import datetime
 
+import metadata.models
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
 from method.forms import *
 from transformation.models import *
+import metadata.views
 
 from constants import groups, users
 
@@ -22,31 +24,49 @@ everyone = Group.objects.get(pk=groups.EVERYONE_PK)
 shipyard_user = User.objects.get(pk=users.SHIPYARD_USER_PK)
 
 
+@login_required
 def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = CodeResource.objects.all()
+    # Cast request.user to KiveUser.
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    resources = CodeResource.objects.filter(curr_user.access_query()).distinct()
 
     t = loader.get_template('method/resources.html')
-    c = Context({'resources': resources})
-    c.update(csrf(request))
+    c = RequestContext(request, {'resources': resources})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def resource_revisions(request, id):
     """
     Display a list of all revisions of a specific Code Resource in database.
     """
-    coderesource = CodeResource.objects.get(pk=id)
-    revisions = coderesource.revisions.order_by('-revision_number')
+    c = RequestContext(request)
+    four_oh_four = False
+    try:
+        coderesource = CodeResource.objects.get(pk=id)
+    except CodeResource.DoesNotExist:
+        four_oh_four = True
+
+    if not coderesource.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    # Cast request.user to class KiveUser.
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    revisions = coderesource.revisions.filter(curr_user.access_query()).distinct().order_by(
+        '-revision_number')
     t = loader.get_template('method/resource_revisions.html')
-    c = Context({'coderesource': coderesource, 'revisions': revisions})
-    c.update(csrf(request))
+    c.update({'coderesource': coderesource, 'revisions': revisions})
     return HttpResponse(t.render(c))
 
 
-def _make_dep_forms(query_dict):
+def _make_dep_forms(query_dict, user):
     """
     Helper for resource_add and resource_revision_add that creates the CodeResourceDependencyForms.
     """
@@ -67,6 +87,7 @@ def _make_dep_forms(query_dict):
                     'depPath': query_dict['depPath_'+str(i)],
                     'depFileName': query_dict['depFileName_'+str(i)]
                 },
+                user=user,
                 auto_id='id_%s_'+str(i)
             )
         )
@@ -82,7 +103,7 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
     # If parent_revision is specified, we are only making a CodeResourceRevision and not its parent CodeResource.
     assert not (parent_revision is None and isinstance(crv_form, CodeResourceRevision))
     for dep_form in dep_forms:
-        assert isinstance(dep_form, CodeResourceDependencyForm)
+        assert isinstance(dep_form, CodeResourceDependencyForm) or dep_form is None
 
     if parent_revision is None:
         # crv_form is a CodeResourcePrototypeForm.
@@ -154,6 +175,7 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
     return revision
 
 
+@login_required
 def resource_add(request):
     """
     Add a new code resource with a prototype (no revisions).  The FILENAME of the prototype will
@@ -164,11 +186,13 @@ def resource_add(request):
     NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
     t = loader.get_template('method/resource_add.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
     if request.method == 'POST':
         # Using forms here provides validation and better parsing of parameters in the request.
         resource_form = CodeResourcePrototypeForm(request.POST, request.FILES)
-        dep_forms = _make_dep_forms(request.POST.dict())
+        dep_forms = _make_dep_forms(request.POST.dict(), creating_user)
 
         # Note that entries of dep_forms may be None -- we simply skip these.
         all_good = True
@@ -179,47 +203,58 @@ def resource_add(request):
                 all_good = False
 
         if not all_good:
-            c = Context({'resource_form': resource_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
+            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
             return HttpResponse(t.render(c))
 
         # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
-        # FIXME change this when we implement login.
-        creating_user = shipyard_user
         try:
             _make_crv(request.FILES["content_file"], creating_user, resource_form, dep_forms)
         except ValidationError as e:
             # All forms have the appropriate errors attached.
-            c = Context({'resource_form': resource_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
+            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
             return HttpResponse(t.render(c))
 
         # Success -- return to the resources root page.
         return HttpResponseRedirect('/resources')
     else:
         resource_form = CodeResourcePrototypeForm()
-        dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
+        dep_forms = [CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0')]
 
-    c = Context({'resource_form': resource_form, 'dep_forms': dep_forms})
-    c.update(csrf(request))
+    c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def resource_revision_add(request, id):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
     revision to this code resource.
     """
     t = loader.get_template('method/resource_revision_add.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
     # Use POST information (id) to retrieve the CRv being revised.
-    parent_revision = CodeResourceRevision.objects.get(pk=id)
+    four_oh_four = False
+    try:
+        parent_revision = CodeResourceRevision.objects.get(pk=id)
+    except CodeResourceRevision.DoesNotExist:
+        four_oh_four = True
+        raise Http404("ID {} cannot be accessed".format(id))
+
     coderesource = parent_revision.coderesource
+
+    if not parent_revision.can_be_accessed(creating_user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
 
     if request.method == 'POST':
         # Use forms here, just as in resource_add.  Again note that entries of dep_forms may be None.
         revision_form = CodeResourceRevisionForm(request.POST, request.FILES)
-        dep_forms = _make_dep_forms(request.POST.dict())
+        dep_forms = _make_dep_forms(request.POST.dict(), creating_user)
 
         all_good = True
         if not revision_form.is_valid():
@@ -229,25 +264,27 @@ def resource_revision_add(request, id):
                 all_good = False
 
         if not all_good:
-            print("Baaaaar")
-            for dep_form in [x for x in dep_forms if x is not None]:
-                print(dep_form.is_bound)
-            c = Context({'revision_form': revision_form, 'parent_revision': parent_revision,
-                         'coderesource': coderesource, 'dep_forms': dep_forms})
-            c.update(csrf(request))
+            c.update({
+                'revision_form': revision_form,
+                'parent_revision': parent_revision,
+                'coderesource': coderesource,
+                'dep_forms': dep_forms
+            })
             return HttpResponse(t.render(c))
 
-        # FIXME as above, for now, everything happens as the Shipyard user.
-        creating_user = shipyard_user
 
         try:
             _make_crv(request.FILES['content_file'], creating_user, revision_form, dep_forms,
                       parent_revision=parent_revision)
         except ValidationError as e:
             # The forms have all been updated with the appropriate errors.
-            c = Context({'revision_form': revision_form, 'parent_revision': parent_revision,
-                         'coderesource': coderesource, 'dep_forms': dep_forms})
-            c.update(csrf(request))
+            c.update(
+                {
+                    'revision_form': revision_form,
+                    'parent_revision': parent_revision,
+                    'coderesource': coderesource,
+                    'dep_forms': dep_forms
+                })
             return HttpResponse(t.render(c)) # CodeResourceRevision object required for next steps
 
         # Success; return to the resources page.
@@ -264,51 +301,93 @@ def resource_revision_add(request, id):
         its_crv = dependency.requirement
         its_cr = its_crv.coderesource
         if its_cr:
-            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
-                                                  initial={'coderesource': its_cr.pk,
-                                                           'revisions': its_crv.pk,
-                                                           'depPath': dependency.depPath,
-                                                           'depFileName': dependency.depFileName},
-                                                  parent=coderesource.id)
+            dep_form = CodeResourceDependencyForm(
+                user=creating_user,
+                auto_id='id_%s_'+str(i),
+                initial={
+                    'coderesource': its_cr.pk,
+                    'revisions': its_crv.pk,
+                    'depPath': dependency.depPath,
+                    'depFileName': dependency.depFileName
+                },
+                parent=coderesource.id)
         else:
-            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i))
+            dep_form = CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_'+str(i))
         dep_forms.append(dep_form)
 
     # in case the parent revision has no CR dependencies, add a blank form
     if len(dep_forms) == 0:
-        dep_forms.append(CodeResourceDependencyForm(auto_id='id_%s_0', parent=coderesource.id))
+        dep_forms.append(CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0', parent=coderesource.id))
 
-    c = Context({'revision_form': crv_form, 'parent_revision': parent_revision,
-                 'coderesource': coderesource, 'dep_forms': dep_forms})
-    c.update(csrf(request))
+    c.update(
+        {
+            'revision_form': crv_form,
+            'parent_revision': parent_revision,
+            'coderesource': coderesource,
+            'dep_forms': dep_forms
+        }
+    )
     return HttpResponse(t.render(c))
 
 
+@login_required
+def resource_revision_view(request, id):
+    four_oh_four = False
+    try:
+        revision = CodeResourceRevision.objects.get(pk=id)
+    except CodeResourceRevision.DoesNotExist:
+        four_oh_four = True
+
+    if not revision.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four
+        raise Http404("ID {} is not accessible".format(id))
+
+    t = loader.get_template("method/resource_revision_view.html")
+    c = RequestContext(request, {"revision": revision})
+    return HttpResponse(t.render(c))
+
+
+@login_required
 def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
     """
-    families = MethodFamily.objects.all()
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    families = MethodFamily.objects.filter(curr_user.access_query()).distinct()
     t = loader.get_template('method/method_families.html')
-    c = Context({'families': families})
-    c.update(csrf(request))
+    c = RequestContext(request, {'families': families})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def methods(request, id):
     """
     Display a list of all Methods within a given MethodFamily.
     """
-    family = MethodFamily.objects.get(pk=id)
-    its_methods = family.members.all()
+    four_oh_four = False
+    try:
+        family = MethodFamily.objects.get(pk=id)
+    except MethodFamily.DoesNotExist:
+        four_oh_four = True
+
+    if not family.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    user_plus = metadata.models.KiveUser.kiveify(request.user)
+    its_methods = family.members.filter(user_plus.access_query()).distinct()
 
     t = loader.get_template('method/methods.html')
-    c = Context({'methods': its_methods, 'family': family})
-    c.update(csrf(request))
+    c = RequestContext(request, {'methods': its_methods, 'family': family})
     return HttpResponse(t.render(c))
 
 
-def create_method_forms(request_post):
+def create_method_forms(request_post, user):
     """
     Helper function for method_add() that creates Forms from the provided information and validates them.
     """
@@ -321,9 +400,9 @@ def create_method_forms(request_post):
 
     # Populate main form with submitted values.
     if "coderesource" in query_dict:
-        method_form = MethodForm(request_post)
+        method_form = MethodForm(request_post, user=user)
     else:
-        method_form = MethodReviseForm(request_post)
+        method_form = MethodReviseForm(request_post, user=user)
     method_form.is_valid()
 
     # Populate in/output forms with submitted values.
@@ -343,6 +422,7 @@ def create_method_forms(request_post):
                 {'compounddatatype': query_dict['compounddatatype_{}_{}'.format(xput_type, i)],
                  'min_row': query_dict['min_row_{}_{}'.format(xput_type, i)],
                  'max_row': query_dict['max_row_{}_{}'.format(xput_type, i)]},
+                user=user,
                 auto_id=auto_id)
             xs_form.is_valid()
 
@@ -361,82 +441,35 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
     # This assures that not both family_form and family are None.
     assert family is not None or family_form is not None
 
-    # Retrieve the CodeResource revision as driver
+    # Retrieve the CodeResource revision as driver.
     try:
         coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['revisions'])
     except (ValueError, CodeResourceRevision.DoesNotExist) as e:
         method_form.add_error("revisions", e)
         return None
 
-    # Attempt to make in/outputs.
-    names = {}
-    compounddatatypes = {}
-    row_limits = {}
-    num_inputs = len(input_forms)
-    num_outputs = len(output_forms)
-
-    any_errors = False
-    for xput_type in ("in", "out"):
-        curr_forms = input_forms
-        if xput_type == "out":
-            curr_forms = output_forms
-
-        curr_names = []
-        curr_cdts = []
-        curr_row_limits = []
-
-        for i, form_tuple in enumerate(curr_forms, start=1):
-            t_form = form_tuple[0]
-            xs_form = form_tuple[1]
-            dataset_name = t_form.cleaned_data["dataset_name"]
-            cdt_id = xs_form.cleaned_data["compounddatatype"]
-
-            if dataset_name == '' and cdt_id == '':
-                # ignore blank form
-                continue
-
-            curr_names.append(dataset_name)
-            my_compound_datatype = None
-            min_row = None
-            max_row = None
-            if cdt_id != '__raw__':
-                try:
-                    my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
-                    min_row = xs_form.cleaned_data["min_row"]
-                    max_row = xs_form.cleaned_data["max_row"]
-                except (ValueError, CompoundDatatype.DoesNotExist) as e:
-                    xs_form.add_error("compounddatatype", e)
-                    any_errors = True
-
-            curr_cdts.append(my_compound_datatype)
-            curr_row_limits.append((min_row or None, max_row or None))
-
-        names[xput_type] = curr_names
-        compounddatatypes[xput_type] = curr_cdts
-        row_limits[xput_type] = curr_row_limits
-
-    # if num_outputs == 0 and len(exceptions['outputs']) == 0:
-    if num_outputs == 0:
-        method_form.add_error(None, "You must specify at least one output.")
-        any_errors = True
-
-    if any_errors:
-        # Bail out.  The forms are now annotated with errors.
-        return None
-
     new_method = None
     try:
+        # Note how the except blocks re-raise their exception: that is to terminate
+        # this transaction.
         with transaction.atomic():
             if family is None:
-                family = MethodFamily.create(
-                    name=family_form.cleaned_data["name"],
-                    description=family_form.cleaned_data['description'],
-                    user=creating_user)
-            new_method = Method.create(
-                names["in"] + names["out"],
-                compounddatatypes=compounddatatypes["in"] + compounddatatypes["out"],
-                row_limits=row_limits["in"] + row_limits["out"],
-                num_inputs=num_inputs,
+                try:
+                    family = MethodFamily.create(
+                        name=family_form.cleaned_data["name"],
+                        description=family_form.cleaned_data['description'],
+                        user=creating_user)
+
+                    for user in method_form.cleaned_data["users_allowed"]:
+                        family.users_allowed.add(user)
+                    for group in method_form.cleaned_data["groups_allowed"]:
+                        family.groups_allowed.add(group)
+
+                except ValidationError as e:
+                    family_form.add_error(None, e)
+                    raise e
+
+            new_method = Method(
                 family=family,
                 revision_name=method_form.cleaned_data['revision_name'],
                 revision_desc=method_form.cleaned_data['revision_desc'],
@@ -445,18 +478,75 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
                 reusable=method_form.cleaned_data['reusable'],
                 user=creating_user
             )
-
-            for user in method_form.cleaned_data["users_allowed"]:
-                family.users_allowed.add(user)
-                new_method.users_allowed.add(user)
-            for group in method_form.cleaned_data["groups_allowed"]:
-                family.groups_allowed.add(group)
-                new_method.groups_allowed.add(group)
-            family.save()
             new_method.save()
 
-    except ValidationError as e:
-        method_form.add_error(None, e)
+            for user in method_form.cleaned_data["users_allowed"]:
+                new_method.users_allowed.add(user)
+            for group in method_form.cleaned_data["groups_allowed"]:
+                new_method.groups_allowed.add(group)
+
+            # Attempt to make in/outputs.
+            num_outputs = len(output_forms)
+            if num_outputs == 0:
+                method_form.add_error(None, "You must specify at least one output.")
+                raise ValidationError("You must specify at least one output.")
+
+            for xput_type in ("in", "out"):
+                curr_forms = input_forms
+                if xput_type == "out":
+                    curr_forms = output_forms
+
+                for form_tuple in curr_forms:
+                    t_form = form_tuple[0]
+                    xs_form = form_tuple[1]
+                    dataset_name = t_form.cleaned_data["dataset_name"]
+                    cdt_id = xs_form.cleaned_data["compounddatatype"]
+
+                    if dataset_name == '' and cdt_id == '':
+                        # ignore blank form
+                        continue
+
+                    my_compound_datatype = None
+                    min_row = None
+                    max_row = None
+                    if cdt_id != '__raw__':
+                        try:
+                            my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
+                            min_row = xs_form.cleaned_data["min_row"]
+                            max_row = xs_form.cleaned_data["max_row"]
+                        except (ValueError, CompoundDatatype.DoesNotExist) as e:
+                            xs_form.add_error("compounddatatype", e)
+                            raise e
+
+                    curr_xput = new_method.create_xput(
+                        dataset_name=dataset_name,
+                        compounddatatype=my_compound_datatype,
+                        row_limits=(min_row, max_row),
+                        input=(xput_type == "in"),
+                        clean=False
+                    )
+
+                    if cdt_id != "__raw__":
+                        try:
+                            curr_xput.structure.clean()
+                        except ValidationError as e:
+                            xs_form.add_error(None, e)
+                            raise e
+
+                    try:
+                        curr_xput.clean()
+                    except ValidationError as e:
+                        t_form.add_error(None, e)
+                        raise e
+
+            try:
+                new_method.complete_clean()
+            except ValidationError as e:
+                method_form.add_error(None, e)
+                raise e
+
+    except ValidationError:
+        return None
 
     return new_method
 
@@ -472,8 +562,7 @@ def _method_forms_check_valid(family_form, method_form, input_form_tuples, outpu
     return all(x.is_valid() for x in all_forms)
 
 
-
-
+@login_required
 def method_add(request, id=None):
     """
     Generate forms for adding Methods, and validate and process POST data returned
@@ -483,29 +572,38 @@ def method_add(request, id=None):
            without a specified parent Method (different CodeResource)
            If id is None, then user is creating a new MethodFamily.
     """
+    creating_user = request.user
     if id:
-        this_family = MethodFamily.objects.get(pk=id)
+        four_oh_four = False
+        try:
+            this_family = MethodFamily.objects.get(pk=id)
+        except MethodFamily.DoesNotExist:
+            four_oh_four = True
+        if not this_family.can_be_accessed(creating_user):
+            four_oh_four = True
+        if four_oh_four:
+            raise Http404("ID {} is inaccessible".format(id))
         header = "Add a new Method to MethodFamily '%s'" % this_family.name
     else:
         this_family = None
         header = 'Start a new MethodFamily with an initial Method'
 
     t = loader.get_template('method/method_add.html')
+    c = RequestContext(request)
     if request.method == 'POST':
-
-        # FIXME change this once we implement proper logins!
-        creating_user = shipyard_user
-
-        family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(request.POST)
+        family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
+            request.POST, creating_user)
         if not _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
-            c = Context({'family_form': family_form,
-                         'method_form': method_form,
-                         'input_forms': input_form_tuples,
-                         'output_forms': output_form_tuples,
-                         'family': this_family,
-                         'header': header})
-            c.update(csrf(request))
+            c.update(
+                {
+                    'family_form': family_form,
+                    'method_form': method_form,
+                    'input_forms': input_form_tuples,
+                    'output_forms': output_form_tuples,
+                    'family': this_family,
+                    'header': header
+                })
             return HttpResponse(t.render(c))
 
         # Next, attempt to build the Method and its associated MethodFamily (if necessary),
@@ -514,6 +612,7 @@ def method_add(request, id=None):
             family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
             family=this_family
         )
+
         if _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Success!
             if id:
@@ -524,51 +623,75 @@ def method_add(request, id=None):
     else:
         # Prepare a blank set of forms for rendering.
         family_form = MethodFamilyForm()
-        method_form = MethodForm()
-        input_form_tuples = [(TransformationXputForm(auto_id='id_%s_in_0'), XputStructureForm(auto_id='id_%s_in_0'))]
-        output_form_tuples = [(TransformationXputForm(auto_id='id_%s_out_0'), XputStructureForm(auto_id='id_%s_out_0'))]
+        method_form = MethodForm(user=creating_user)
+        input_form_tuples = [
+            (TransformationXputForm(auto_id='id_%s_in_0'), XputStructureForm(user=creating_user,
+                                                                             auto_id='id_%s_in_0'))
+        ]
+        output_form_tuples = [
+            (TransformationXputForm(auto_id='id_%s_out_0'), XputStructureForm(user=creating_user,
+                                                                              auto_id='id_%s_out_0'))
+        ]
 
-    c = Context({'family_form': family_form,
-                 'method_form': method_form,
-                 'input_forms': input_form_tuples,
-                 'output_forms': output_form_tuples,
-                 'family': this_family,
-                 'header': header})
-    c.update(csrf(request))
+    c.update(
+        {
+            'family_form': family_form,
+            'method_form': method_form,
+            'input_forms': input_form_tuples,
+            'output_forms': output_form_tuples,
+            'family': this_family,
+            'header': header
+        })
     return HttpResponse(t.render(c))
 
 
+@login_required
 def method_revise(request, id):
     """
     Add a revision of an existing Method.  revision_parent is defined by the
     previous version.
     """
     t = loader.get_template('method/method_revise.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
-    # FIXME change this when we implement login!
-    creating_user = shipyard_user
+    # Retrieve the most recent member of this Method's family.
+    four_oh_four = False
+    try:
+        parent_method = Method.objects.get(pk=id)
+    except Method.DoesNotExist:
+        four_oh_four = True
 
-    # retrieve the most recent member of this Method's family
-    parent_method = Method.objects.get(pk=id)
+    if not parent_method.can_be_accessed(creating_user):
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} is inaccessible".format(id))
+
     family = parent_method.family
 
-    # retrieve the most recent revision of the corresponding CR
+    # Retrieve the most recent revision of the corresponding CR.
     parent_revision = parent_method.driver
     this_code_resource = parent_revision.coderesource
-    all_revisions = this_code_resource.revisions.order_by('-revision_DateTime')
+    # Filter the available revisions by user.
+    user_plus = metadata.models.KiveUser.kiveify(creating_user)
+    all_revisions = this_code_resource.revisions.filter(user_plus.access_query()).order_by('-revision_DateTime')
 
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
-        family_form, method_revise_form, input_form_tuples, output_form_tuples = create_method_forms(request.POST)
+        family_form, method_revise_form, input_form_tuples, output_form_tuples = create_method_forms(
+            request.POST, creating_user)
         if not _method_forms_check_valid(family_form, method_revise_form, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
-            c = Context({'coderesource': this_code_resource,
-                         'method_revise_form': method_revise_form,
-                         'input_forms': input_form_tuples,
-                         'output_forms': output_form_tuples,
-                         'family': family,
-                         'parent': parent_method})
-            c.update(csrf(request))
+            c.update(
+                {
+                    'coderesource': this_code_resource,
+                    'method_revise_form': method_revise_form,
+                    'input_forms': input_form_tuples,
+                    'output_forms': output_form_tuples,
+                    'family': family,
+                    'parent': parent_method
+                })
             return HttpResponse(t.render(c))
 
         # Next, attempt to build the Method and add it to family.
@@ -599,12 +722,14 @@ def method_revise(request, id):
                                                           'dataset_idx': xput.dataset_idx})
                 if xput.has_structure:
                     structure = xput.structure
-                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
+                    xs_form = XputStructureForm(user=creating_user,
+                                                auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
                                                 initial={'compounddatatype': structure.compounddatatype.id,
                                                          'min_row': structure.min_row,
                                                          'max_row': structure.max_row})
                 else:
-                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
+                    xs_form = XputStructureForm(user=creating_user,
+                                                auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
                                                 initial={'compounddatatype': '__raw__'})
 
                 forms.append((tx_form, xs_form))
@@ -614,7 +739,7 @@ def method_revise(request, id):
         # if previous Method has no inputs, provide blank forms
         if len(input_form_tuples) == 0:
             tx_form = TransformationXputForm(auto_id='id_%s_in_0')
-            xs_form = XputStructureForm(auto_id='id_%s_in_0')
+            xs_form = XputStructureForm(user=creating_user, auto_id='id_%s_in_0')
             input_form_tuples.append((tx_form, xs_form))
 
     method_revise_form.fields['revisions'].widget.choices = [
@@ -626,13 +751,5 @@ def method_revise(request, id):
                  'output_forms': output_form_tuples,
                  'family': family,
                  'parent': parent_method})
-    c.update(csrf(request))
-    return HttpResponse(t.render(c))
-
-
-def resource_revision_view(request, id):
-    revision = CodeResourceRevision.objects.get(pk=id)
-    t = loader.get_template("method/resource_revision_view.html")
-    c = Context({"revision": revision})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

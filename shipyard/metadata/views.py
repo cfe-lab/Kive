@@ -2,31 +2,21 @@
 metadata.views
 """
 
-from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context, RequestContext
-from django.core.context_processors import csrf
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, RequestContext
 from django.core.exceptions import ValidationError
-from django.forms.util import ErrorList
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.db.models import Q
 
 import re
 
-from metadata.models import Datatype, CompoundDatatype, get_builtin_types
+from metadata.models import Datatype, CompoundDatatype, get_builtin_types, KiveUser
 from metadata.forms import *
 from constants import datatypes as dt_pks, groups
 
 everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
-
-
-def user_access_query(user):
-    query_object = Q(user=user) | Q(users_allowed=user) | Q(groups_allowed=everyone_group)
-    for group in user.groups.all():
-        query_object = query_object | Q(groups_allowed=group)
-    return query_object
 
 
 @login_required
@@ -34,7 +24,9 @@ def datatypes(request):
     """
     Render table and form on user request for datatypes.html
     """
-    accessible_dts = Datatype.objects.filter(user_access_query(request.user)).distinct()
+    # Re-cast request.user to our proxy class.
+    curr_user = KiveUser.kiveify(request.user)
+    accessible_dts = Datatype.objects.filter(curr_user.access_query()).distinct()
     t = loader.get_template('metadata/datatypes.html')
     c = RequestContext(request, {'datatypes': accessible_dts})
     return HttpResponse(t.render(c))
@@ -54,7 +46,7 @@ def datatype_add(request):
 
     if request.method == 'POST':
         # dt = Datatype(user=request.user, date_created=timezone.now())
-        dform = DatatypeForm(None, None, request.POST, instance=dt) #  create form bound to POST data
+        dform = DatatypeForm(request.POST, instance=dt) #  create form bound to POST data
         icform = IntegerConstraintForm(request.POST)
         scform = StringConstraintForm(request.POST)
         query = request.POST.dict()
@@ -138,7 +130,7 @@ def datatype_add(request):
             pass
 
     else:
-        dform = DatatypeForm(None, None)  # unbound
+        dform = DatatypeForm()  # unbound
         icform = IntegerConstraintForm()
         scform = StringConstraintForm()
 
@@ -149,15 +141,25 @@ def datatype_add(request):
 @login_required
 def datatype_detail(request, id):
     # retrieve the Datatype object from database by PK
-    this_datatype = Datatype.objects.get(pk=id)
+    four_oh_four = False
+    try:
+        this_datatype = Datatype.objects.get(pk=id)
+    except Datatype.DoesNotExist as e:
+        four_oh_four = True
+
+    if not this_datatype.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} cannot be accessed".format(id))
+
     t = loader.get_template('metadata/datatype_detail.html')
-    c = Context(
+    c = RequestContext(
+        request,
         {
             "datatype": this_datatype,
-            "constraints": this_datatype.basic_constraints.all(),
-            "user": request.user
+            "constraints": this_datatype.basic_constraints.all()
         })
-    c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 
@@ -166,10 +168,11 @@ def compound_datatypes(request):
     """
     Render list of all CompoundDatatypes
     """
-    compound_datatypes = CompoundDatatype.objects.all()
+    # Cast request.user to class KiveUser.
+    curr_user = KiveUser.kiveify(request.user)
+    compound_datatypes = CompoundDatatype.objects.filter(curr_user.access_query())
     t = loader.get_template('metadata/compound_datatypes.html')
-    c = Context({'compound_datatypes': compound_datatypes, "user": request.user})
-    c.update(csrf(request))
+    c = RequestContext(request, {'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))
 
 
@@ -186,10 +189,10 @@ def make_cdm_forms(request, cdt):
         data = {'datatype': query['datatype_'+str(i)], 'column_name': query['column_name_'+str(i)]}
         auto_id = 'id_%s_' + str(i)
 
-        cdm_form = CompoundDatatypeMemberForm(auto_id=auto_id, initial=data)
+        cdm_form = CompoundDatatypeMemberForm(user=request.user, auto_id=auto_id, initial=data)
         if cdt is not None:
             dummy_member = CompoundDatatypeMember(compounddatatype=cdt, column_idx=i+1)
-            cdm_form = CompoundDatatypeMemberForm(data, auto_id=auto_id, instance=dummy_member)
+            cdm_form = CompoundDatatypeMemberForm(data, user=request.user, auto_id=auto_id, instance=dummy_member)
 
         # Note: do not validate here!
         cdm_forms.append(cdm_form)
@@ -206,18 +209,23 @@ def compound_datatype_add(request):
     """
     Add CompoundDatatype from a dynamic set of CompoundDatatypeMember forms.
     """
-    c = Context({"user": request.user})
+    c = RequestContext(request)
     if request.method == 'POST':
         # Create a parent CDT object so we can define its members.
         dummy_cdt = CompoundDatatype(user=request.user)
-        cdt_form = CompoundDatatypeForm(None, None, request.POST, instance=dummy_cdt)
+        cdt_form = CompoundDatatypeForm(request.POST, instance=dummy_cdt)
         member_forms = make_cdm_forms(request, cdt=None)
         try:
             with transaction.atomic():
-                if not cdt_form.is_valid():
-                    # Note that this has already done all the hard work for us of annotating
-                    # cdt_form with errors.
+                try:
+                    if not cdt_form.is_valid():
+                        # Note that this has already done all the hard work for us of annotating
+                        # cdt_form with errors.
+                        raise CDTDefException()
+                except ValidationError as e:
+                    cdt_form.add_error(None, e)
                     raise CDTDefException()
+
                 compound_datatype = cdt_form.save()
                 compound_datatype.full_clean()
 
@@ -231,7 +239,8 @@ def compound_datatype_add(request):
                         else:
                             all_good = False
                     except ValidationError as e:
-                        raise CDTDefException()
+                        member_form.add_error(None, e)
+                        raise e
 
                 if not all_good:
                     raise CDTDefException()
@@ -240,17 +249,18 @@ def compound_datatype_add(request):
 
             # Success!
             return HttpResponseRedirect('/compound_datatypes')
-        except (CDTDefException, ValidationError) as e:
+        except CDTDefException as e:
             pass
+        except ValidationError as e:
+            cdt_form.add_error(None, e)
     else:
         # Make initial blank forms.
-        cdt_form = CompoundDatatypeForm(None, None)
-        member_forms = [CompoundDatatypeMemberForm(auto_id='id_%s_0')]
+        cdt_form = CompoundDatatypeForm()
+        member_forms = [CompoundDatatypeMemberForm(user=request.user, auto_id='id_%s_0')]
 
     # Note that even if there were exceptions thrown the forms have been properly annotated with errors.
     t = loader.get_template('metadata/compound_datatype_add.html')
     c.push({"cdt_form": cdt_form, 'cdm_forms': member_forms})
-    c.update(csrf(request))
 
     return HttpResponse(t.render(c))
 

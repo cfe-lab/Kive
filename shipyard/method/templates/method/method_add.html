@@ -150,11 +150,11 @@
         <tr>
         <td>{{ forloop.counter }}
             <div class="errortext">{{ xput_form.non_field_errors }}</div>
-            <div class="errortext">{{ struct_form.non_field_errors }}</div>
         </td>
         <td>{{ xput_form.dataset_name }}<div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
         <td>{{ struct_form.compounddatatype }}
             <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
         </td>
         <td>{{ struct_form.min_row }}<div class="errortext">{{ struct_form.min_row.errors }}</div></td>
         <td>{{ struct_form.max_row }}<div class="errortext">{{ struct_form.max_row.errors }}</div></td>
@@ -179,11 +179,11 @@
         <tr>
         <td>{{ forloop.counter }}
             <div class="errortext">{{ xput_form.non_field_errors }}</div>
-            <div class="errortext">{{ struct_form.non_field_errors }}</div>
         </td>
         <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
         <td>{{ struct_form.compounddatatype }}
             <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
         </td>
         <td>{{ struct_form.min_row }}<div class="errortext">{{ struct_form.min_row.errors }}</div></td>
         <td>{{ struct_form.max_row }}<div class="errortext">{{ struct_form.max_row.errors }}</div></td>

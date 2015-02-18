@@ -2,12 +2,14 @@
 Generate an HTML form to create a new Datatype object
 """
 
+from django.http import Http404
 from django import forms
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
-from metadata.models import CompoundDatatype
+from metadata.models import CompoundDatatype, KiveUser
 from transformation.models import TransformationInput, XputStructure
 from django.contrib.auth.models import User, Group
 from metadata.forms import AccessControlForm
+from django.db.models import Q
 
 import logging
 
@@ -75,16 +77,20 @@ class CodeResourceRevisionForm(AccessControlForm):
     )
 
 
-def _get_code_resource_list(but_not_this_one=None):
+def _get_code_resource_list(user, but_not_this_one=None):
     """
     Gets all CodeResources other than that of the specified one.
+
+    This is required to refresh the list of eligible CodeResources during the
+    addition of a new CodeResourceDependency.
     """
-    # required to refresh list on addition of a new CodeResource
-    if but_not_this_one is None:
-        queryset = CodeResource.objects.all()
-    else:
-        queryset = CodeResource.objects.exclude(pk=but_not_this_one)
-    # logger.debug(queryset.query)
+    query_obj = Q()
+    if user is not None:
+        curr_user = KiveUser.objects.get(pk=user.pk)
+        query_obj = curr_user.access_query()
+    queryset = CodeResource.objects.filter(query_obj).distinct()
+    if but_not_this_one is not None:
+        queryset = queryset.exclude(pk=but_not_this_one)
     return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
 
@@ -116,19 +122,38 @@ class CodeResourceDependencyForm(forms.Form):
         required=False
     )
 
-    def __init__(self, data=None, initial=None, parent=None, *args, **kwargs):
-        super(CodeResourceDependencyForm, self).__init__(data, *args, initial=initial, **kwargs)
+    def __init__(self, data=None, user=None, initial=None, parent=None, *args, **kwargs):
+        super(CodeResourceDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
 
-        self.fields['coderesource'].choices = _get_code_resource_list(parent)
-        if initial:
+        # Cast user to a KiveUser.
+        curr_user = KiveUser.objects.get(pk=user.pk)
+        eligible_crs = _get_code_resource_list(user, parent)
+        self.fields['coderesource'].choices = eligible_crs
+
+        # Re-populate drop-downs before rendering if possible.
+        populator = None
+        if data is not None:
+            populator = data
+        elif initial is not None:
+            populator = initial
+
+        if populator is not None:
             # Re-populate drop-downs before rendering the template.
-            cr = CodeResource.objects.get(pk=initial['coderesource'])
+            cr = CodeResource.objects.get(pk=populator['coderesource'])
 
-            rev = CodeResourceRevision.objects.filter(coderesource=cr)
+            if cr.pk not in [x[0] for x in eligible_crs]:
+                raise Http404("CodeResource with ID {} used in dependency definition is invalid".format(
+                    populator["coderesource"]
+                ))
+
+            rev = CodeResourceRevision.objects.filter(curr_user.access_query(), coderesource=cr).distinct()
             self.fields['revisions'].widget.choices = [(x.pk, x.revision_name) for x in rev]
-            if initial.has_key("revisions"):
-                assert initial.has_key("coderesource")
-                assert initial["revisions"] in [x.pk for x in rev]
+            if populator.has_key("revisions"):
+                try:
+                    assert populator.has_key("coderesource")
+                    assert int(populator["revisions"]) in [x.pk for x in rev]
+                except AssertionError as e:
+                    raise Http404(e)
 
 
 # Method forms.
@@ -179,18 +204,21 @@ class MethodForm(MethodReviseForm):
         widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
     )
 
-    def __init__(self, *args, **kwargs):
-        super(MethodForm, self).__init__(*args, **kwargs)
+    def __init__(self, data=None, user=None, *args, **kwargs):
+        super(MethodForm, self).__init__(data, *args, **kwargs)
 
         # This is required to re-populate the drop-down with CRs created since first load.
-        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + \
-                                              [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')]
+        if user is not None:
+            kive_user = KiveUser.objects.get(pk=user.pk)
+            self.fields["coderesource"].choices = (
+                [('', '--- CodeResource ---')] +
+                [(x.id, x.name) for x in CodeResource.objects.filter(kive_user.access_query()).order_by('name')]
+            )
 
 
-class TransformationXputForm (forms.ModelForm):
-    class Meta:
-        model = TransformationInput  # derived from abstract class TransformationXput
-        fields = ('dataset_name', )
+class TransformationXputForm (forms.Form):
+
+    dataset_name = forms.CharField()
 
 
 class XputStructureForm (forms.Form):
@@ -213,10 +241,15 @@ class XputStructureForm (forms.Form):
         required=False,
         widget=forms.NumberInput(attrs={"class": "shortIntField"}))
 
-    def __init__(self, *args, **kwargs):
-        super(XputStructureForm, self).__init__(*args, **kwargs)
-        self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + \
-                                                  [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
+    def __init__(self, data=None, user=None, *args, **kwargs):
+        super(XputStructureForm, self).__init__(data=data, *args, **kwargs)
+
+        more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
+        if user is not None:
+            user_plus = KiveUser.kiveify(user)
+            more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.filter(user_plus.access_query())]
+
+        self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 
 
 class MethodFamilyForm (forms.Form):

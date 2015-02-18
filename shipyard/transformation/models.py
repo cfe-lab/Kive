@@ -32,8 +32,7 @@ class TransformationFamily(metadata.models.AccessControl):
     name = models.CharField(
         "Transformation family name",
         max_length=maxlengths.MAX_NAME_LENGTH,
-        help_text="The name given to a group of methods/pipelines",
-        unique=True)
+        help_text="The name given to a group of methods/pipelines")
 
     description = models.TextField(
         "Transformation family description",
@@ -48,6 +47,7 @@ class TransformationFamily(metadata.models.AccessControl):
     class Meta:
         abstract = True
         ordering = ('name', )
+        unique_together = ("name", "user")
 
     @classmethod
     @transaction.atomic
@@ -139,6 +139,11 @@ class Transformation(metadata.models.AccessControl):
         """Validate transformation inputs and outputs, and reject if it is neither Method nor Pipeline."""
         if not self.is_pipeline and not self.is_method:
             raise ValidationError("Transformation with pk={} is neither Method nor Pipeline".format(self.pk))
+
+        for curr_input in self.inputs.all():
+            curr_input.clean()
+        for curr_output in self.outputs.all():
+            curr_output.clean()
         self.check_input_indices()
         self.check_output_indices()
 
@@ -147,6 +152,9 @@ class Transformation(metadata.models.AccessControl):
 
         Ignores names (compares inputs and outputs only).
         """
+        if self.user != other.user:
+            return False
+
         my_xputs = itertools.chain(self.inputs.order_by("dataset_idx"), self.outputs.order_by("dataset_idx"))
         other_xputs = itertools.chain(other.inputs.order_by("dataset_idx"), other.outputs.order_by("dataset_idx"))
         for my_xput, other_xput in itertools.izip_longest(my_xputs, other_xputs, fillvalue=None):
@@ -198,7 +206,7 @@ class Transformation(metadata.models.AccessControl):
 
     @transaction.atomic
     def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
-                    input=True):
+                    input=True, clean=True):
         """Create a TranformationXput for this Transformation.
 
         Decides whether the created TransformationXput should have a
@@ -224,20 +232,23 @@ class Transformation(metadata.models.AccessControl):
 
         xputs = self.inputs if input else self.outputs
         new_xput = xputs.create(dataset_name=dataset_name, dataset_idx=dataset_idx or xputs.count()+1, x=x, y=y)
-        new_xput.full_clean()
+        if clean:
+            new_xput.full_clean()
         if compounddatatype:
-            new_xput.add_structure(compounddatatype, min_row, max_row)
+            new_xput.add_structure(compounddatatype, min_row, max_row, clean=clean)
         return new_xput
 
     def create_input(self, dataset_name, dataset_idx=None, compounddatatype=None,
-                     min_row=None, max_row=None, x=0, y=0):
+                     min_row=None, max_row=None, x=0, y=0, clean=True):
         """Create a TransformationInput for this Transformation."""
-        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True)
+        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True,
+                                clean=clean)
     
     def create_output(self, dataset_name, dataset_idx=None, compounddatatype=None,
-                     min_row=None, max_row=None, x=0, y=0):
+                     min_row=None, max_row=None, x=0, y=0, clean=True):
         """Create a TransformationOutput for this Transformation."""
-        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False)
+        return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False,
+                                clean=clean)
 
 
 @python_2_unicode_compatible
@@ -284,7 +295,9 @@ class TransformationXput(models.Model):
     def clean(self):
         """Make sure this is either a TransformationInput or TransformationOutput."""
         if not self.is_input and not self.is_output:
-            return ValidationError("TransformationXput with pk={} is neither an input nor an output".format(self.pk))
+            raise ValidationError("TransformationXput with pk={} is neither an input nor an output".format(self.pk))
+        if self.has_structure:
+            self.structure.clean()
 
     def __str__(self):
         return "{}: {}".format(self.definite.dataset_idx, self.definite.dataset_name)
@@ -333,7 +346,7 @@ class TransformationXput(models.Model):
         return True
 
     @transaction.atomic
-    def add_structure(self, compounddatatype, min_row, max_row):
+    def add_structure(self, compounddatatype, min_row, max_row, clean=True):
         """Add an XputStructure to this TransformationXput.
 
         ASSUMPTIONS
@@ -345,7 +358,8 @@ class TransformationXput(models.Model):
         new_structure = XputStructure(transf_xput=self,
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
-        new_structure.full_clean()
+        if clean:
+            new_structure.full_clean()
         new_structure.save()
 
     def represent_as_dict(self):
@@ -400,6 +414,15 @@ class XputStructure(models.Model):
         help_text="Maximum number of rows this input/output returns",
         null=True,
         blank=True)
+
+    def clean(self):
+        tr = self.transf_xput.definite.transformation
+        tr.validate_restrict_access([self.compounddatatype])
+
+        if self.min_row is not None and self.max_row is not None:
+            if self.min_row > self.max_row:
+                raise ValidationError("Minimum row must not exceed maximum row",
+                                      code="min_max")
 
     def is_identical(self, other):
         """Is this XputStructure identical to another one?"""

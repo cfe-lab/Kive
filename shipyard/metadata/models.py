@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
+from django.db.models import Q
 
 import re
 import csv
@@ -232,6 +233,25 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     return rownum, failing_cells
 
 
+class KiveUser(User):
+    """
+    Proxy model that has some convenience functions for Users.
+    """
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def kiveify(cls, user):
+        return KiveUser.objects.get(pk=user.pk)
+
+    def access_query(self):
+        everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+        query_object = Q(user=self) | Q(users_allowed=self) | Q(groups_allowed=everyone_group)
+        for group in self.groups.all():
+            query_object = query_object | Q(groups_allowed=group)
+        return query_object
+
+
 class AccessControl(models.Model):
     """
     Represents anything that belongs to a certain user.
@@ -261,6 +281,9 @@ class AccessControl(models.Model):
         """
         True if user can access this object; False otherwise.
         """
+        if self.shared_with_everyone:
+            return True
+
         if self.user == user or self.users_allowed.filter(pk=user.pk).exists():
             return True
 
@@ -270,6 +293,61 @@ class AccessControl(models.Model):
 
         return False
 
+    def extra_users_groups(self, acs):
+        """
+        Returns a list of what users/groups can access this object that cannot access all of those specified.
+
+        acs: a list of AccessControl instances.
+        """
+        self_users_allowed = set([self.user]).union(set(self.users_allowed.all()))
+
+        ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
+        ac_groups_allowed = set(acs[0].groups_allowed.all())
+        for ac in acs[1:]:
+            ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
+            ac_groups_allowed.intersection_update(ac.groups_allowed.all())
+
+        # Special case: everyone is allowed access to all of the elements of acs.
+        everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+        if everyone_group in ac_groups_allowed:
+            return set(), set()
+
+        users_difference = self_users_allowed.difference(ac_users_allowed)
+        groups_difference = set(self.groups_allowed.all()).difference(ac_groups_allowed)
+        return users_difference, groups_difference
+
+    def validate_restrict_access(self, acs):
+        """
+        Checks whether access is restricted to those that can access all of the specified objects.
+        """
+        # Trivial case: no objects to restrict.
+        if len(acs) == 0:
+            return
+
+        extra_users, extra_groups = self.extra_users_groups(acs)
+        users_error = None
+        groups_error = None
+        if len(extra_users) > 0:
+            # FIXME sometime in the future this stuff should be converted to use gettext for translation!
+            users_error = ValidationError(
+                'Users in %(users)s cannot be granted access',
+                code="extra_users",
+                params={"users": extra_users}
+            )
+        if len(extra_groups) > 0:
+            groups_error = ValidationError(
+                'Groups in %(groups)s cannot be granted access',
+                code="extra_groups",
+                params={"groups": extra_groups}
+            )
+
+        if users_error is not None and groups_error is not None:
+            raise ValidationError([users_error, groups_error])
+        elif users_error is not None:
+            raise users_error
+        elif groups_error is not None:
+            raise groups_error
+
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):
@@ -278,7 +356,7 @@ class Datatype(AccessControl):
     Related to :model:`metadata.models.CompoundDatatype`
     """
     name = models.CharField("Datatype name", max_length=maxlengths.MAX_NAME_LENGTH, 
-            help_text="The name for this Datatype", unique=True)
+            help_text="The name for this Datatype")
     description = models.TextField("Datatype description", help_text="A description for this Datatype",
             max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
@@ -287,6 +365,9 @@ class Datatype(AccessControl):
 
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
+
+    class Meta:
+        unique_together = ("user", "name")
 
     @property
     def restricts_str(self):
@@ -639,14 +720,18 @@ class Datatype(AccessControl):
         1) This Datatype has at least one supertype
         """
         # Check numerical constraints for coherence against the supertypes' constraints.
-        self._check_num_constraint_against_supertypes(BasicConstraint.MIN_VAL,
-                'Datatype "{}" has MIN_VAL {}, but its supertype "{}" has a larger or equal MIN_VAL of {}')
-        self._check_num_constraint_against_supertypes(BasicConstraint.MAX_VAL,
-                'Datatype "{}" has MAX_VAL {}, but its supertype "{}" has a smaller or equal MAX_VAL of {}')
-        self._check_num_constraint_against_supertypes(BasicConstraint.MIN_LENGTH,
-                'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}')
-        self._check_num_constraint_against_supertypes(BasicConstraint.MAX_LENGTH,
-                'Datatype "{}" has MAX_LENGTH {}, but its supertype "{}" has a shorter or equal MAX_LENGTH of {}')
+        self._check_num_constraint_against_supertypes(
+            BasicConstraint.MIN_VAL,
+            'Datatype "{}" has MIN_VAL {}, but its supertype "{}" has a larger or equal MIN_VAL of {}')
+        self._check_num_constraint_against_supertypes(
+            BasicConstraint.MAX_VAL,
+            'Datatype "{}" has MAX_VAL {}, but its supertype "{}" has a smaller or equal MAX_VAL of {}')
+        self._check_num_constraint_against_supertypes(
+            BasicConstraint.MIN_LENGTH,
+            'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}')
+        self._check_num_constraint_against_supertypes(
+            BasicConstraint.MAX_LENGTH,
+            'Datatype "{}" has MAX_LENGTH {}, but its supertype "{}" has a shorter or equal MAX_LENGTH of {}')
         self._check_datetime_constraint_against_supertypes()
 
     def _check_constraint_intervals(self):
@@ -758,6 +843,10 @@ class Datatype(AccessControl):
         if self.has_custom_constraint():
             self.logger.debug('Checking custom constraint for Datatype "{}"'.format(self))
             self.custom_constraint.clean()
+
+            # Check that the users with access to this Datatype must have access to the
+            # verification method.
+            self.validate_restrict_access([self.custom_constraint.verification_method])
 
         if self.has_prototype():
             self.logger.debug('Cleaning prototype for Datatype "{}"'.format(self))
@@ -1113,10 +1202,10 @@ class CustomConstraint(models.Model):
         # TODO: Quick and dirty check, test later.
         if verif_method_in[0].is_raw():
             raise ValidationError(
-                    'Verification method for CustomConstraint "{}" has a raw input'.format(self))
+                'Verification method for CustomConstraint "{}" has a raw input'.format(self))
         if verif_method_out[0].is_raw():
             raise ValidationError(
-                    'Verification method for CustomConstraint "{}" has a raw output'.format(self))
+                'Verification method for CustomConstraint "{}" has a raw output'.format(self))
         if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
             raise ValidationError(
                 "CustomConstraint \"{}\" verification method does not have an input CDT identical to VERIF_IN".
@@ -1234,40 +1323,17 @@ class CompoundDatatype(AccessControl):
         """
         Check if Datatype members have consecutive indices from 1 to n
         """
-        users_with_access = []
-        groups_with_access = []
+        member_dts = []
         for i, member in enumerate(self.members.order_by("column_idx"), start=1):
             member.full_clean()
             if member.column_idx != i:
                 raise ValidationError(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'
                                        .format(self)))
-
-            curr_users_with_access = [member.datatype.user] + list(member.datatype.users_allowed.all())
-            curr_groups_with_access = list(member.datatype.groups_allowed.all())
-            if i == 1:
-                users_with_access = curr_users_with_access
-                groups_with_access = curr_groups_with_access
-            else:
-                users_with_access = users_with_access.intersection(curr_users_with_access)
-                groups_with_access = groups_with_access.intersection(curr_groups_with_access)
+            member_dts.append(member.datatype)
 
         # Check that the permissions defined on this CDT don't overstep those on its members.
-        if self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
-            return
-
-        groups_with_access_pks = [x.pk for x in groups_with_access]
-        for user in self.users_allowed.all():
-            if (user not in users_with_access and
-                    not user.groups.filter(pk__in=groups_with_access_pks.exists())):
-                raise ValidationError(
-                    "User {} does not have access to all of the Datatypes used in CompoundDatatype {}".format(
-                        user, self))
-
-        for group in self.groups_allowed.all():
-            if group not in groups_with_access:
-                raise ValidationError(
-                    "Group {} does not have access to all of the Datatypes used in CompoundDatatype {}".format(self)
-                )
+        if self.pk:
+            self.validate_restrict_access(member_dts)
 
 
     def is_restriction(self, other_CDT):
