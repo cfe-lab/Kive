@@ -94,8 +94,10 @@ class RunToProcess(models.Model):
         """
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
-            return "Terminated: requested too many threads ({} requested, {} available)".format(
-                esc.threads_requested, esc.max_available
+            return "Too many threads ({} from {})-{}".format(
+                esc.threads_requested,
+                esc.max_available,
+                self.display_name
             )
         
         if not self.started:
