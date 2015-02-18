@@ -341,7 +341,7 @@ def resource_revision_view(request, id):
     if not revision.can_be_accessed(request.user):
         four_oh_four = True
 
-    if four_oh_four
+    if four_oh_four:
         raise Http404("ID {} is not accessible".format(id))
 
     t = loader.get_template("method/resource_revision_view.html")
