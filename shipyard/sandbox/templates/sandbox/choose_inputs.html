@@ -41,12 +41,12 @@
 		<strong>No results were found.</strong>
 	</div>
 
-	<div class="results" data-pkey="pk" data-displaycols="2,3" data-ajax-url="filter_datasets">
+	<div class="results" data-pkey="symbolicdataset_id" data-displaycols="2,3" data-ajax-url="filter_datasets">
 		<table data-compounddatatype="{{ input.structure.compounddatatype }}">
                 <caption>showing most recent {{ datasets|length }} datasets</caption>
 		<thead>
 			<tr>
-				<th>pk</th>
+				<th>symbolicdataset_id</th>
 				<th>Name</th>
 				<th>Date</th>
 			</tr>
@@ -54,7 +54,7 @@
 		<tbody>
 			{% for dataset in datasets %}
 			<tr>
-				<td>{{ dataset.pk }}</td>
+				<td>{{ dataset.symbolicdataset_id }}</td>
 				<td>{{ dataset.name }}</td>
 				<td>{{ dataset.date_created|date:"b d, Y, P"|capfirst}}</td>
 			</tr>

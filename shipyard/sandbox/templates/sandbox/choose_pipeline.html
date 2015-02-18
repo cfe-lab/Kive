@@ -38,42 +38,49 @@ var mNodeWidth = 40,
 $(function() {
     // initialize animated canvas
     canvas = document.getElementById('pipeline_preview_canvas');
-    var canvasWidth  = canvas.width  = 200,
-        canvasHeight = canvas.height = 150;
+    var canvasWidth  = canvas.width  = 160,
+        canvasHeight = canvas.height = 120;
 
     canvasState = new CanvasState(canvas);
-    canvasState.setScale(0.25);
+    canvasState.setScale(0.20);
     canvasState.enable_labels = false;
     
     // change pipeline revision drop-down triggers ajax to redraw canvas
     $('.tbselect-value').on('change', function () {
-        $.ajax({
-            type: "POST",
-            url: "/get_pipeline/",
-            data: { pipeline_id: $('.tbselect-value').val() },
-            datatype: "json",
-            success: function(result) {
-                // prepare to redraw canvas
-                // remove all objects from canvas
-                canvasState.clear();
-                // reset containers to reflect canvas
-                canvasState.shapes = [];
-                canvasState.connectors = [];
-                canvasState.exec_order = [];
-                canvasState.selection = [];
+        if ($('.tbselect-value').val() !== '') {
+            $.ajax({
+                type: "POST",
+                url: "/get_pipeline/",
+                data: { pipeline_id: $('.tbselect-value').val() },
+                datatype: "json",
+                success: function(result) {
+                    $("#pipeline_preview_container").show();
+                    
+                    // prepare to redraw canvas
+                    // remove all objects from canvas
+                    canvasState.clear();
+                    // reset containers to reflect canvas
+                    canvasState.shapes = [];
+                    canvasState.connectors = [];
+                    canvasState.exec_order = [];
+                    canvasState.selection = [];
         
-                submit_to_url = result['family_pk'];
-                var i, j, k; // counters
-                var node, cables, cable, connector, shape, source, magnet;
+                    submit_to_url = result['family_pk'];
+                    var i, j, k; // counters
+                    var node, cables, cable, connector, shape, source, magnet;
         
-                draw_inputs(result);
-                canvasState.testExecutionOrder();
-        
-                for (var i = 0; i < canvasState.shapes.length; i++) {
-                    canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                    draw_inputs(result);
+                    canvasState.testExecutionOrder();
+                    
+                    for (var i = 0; i < canvasState.shapes.length; i++) {
+                        canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                    }
                 }
-            }
-        });
+            });
+        }
+        else {
+            $("#pipeline_preview_container").hide();
+        }
     }).change();
 });
 
@@ -92,7 +99,7 @@ Select a pipeline
 </p>
 
 {% if pipeline_forms|length > 0 %}
-    <div>
+    <div id="pipeline_preview_container">
         <h3>Currently selected: (thumbnail)</h3>
         <canvas id="pipeline_preview_canvas">Warning: Kive does not support your web browser.</canvas>
     </div>

@@ -272,6 +272,12 @@ Once you have set up your production server, this is how to deploy a new release
     comparison of `hostfile`.
 7. Recreate the database as described in the Initialize Database section, and
     deploy the static files.
+    
+        ssh user@server
+        cd /usr/local/share/Shipyard/shipyard
+        ./manage.py migrate
+        sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./manage.py collectstatic
+        
 8. TODO: Check whether an apache restart is needed. What about the fleet manager?
 
         ps aux | grep runfleet

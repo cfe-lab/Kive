@@ -33,8 +33,8 @@ function draw_inputs(pipeline) {
             canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvas.width / canvasState.scale, node.y * canvas.height / canvasState.scale, cdtNodeWidth, cdtNodeHeight, null, null, null, node.dataset_name));
         }
         canvasState.dragging = true;
-        canvasState.selection.push(canvasState.shapes[canvasState.shapes.length-1]);
-        canvasState.doUp();
+        //canvasState.selection.push(canvasState.shapes[canvasState.shapes.length-1]);
+//        canvasState.doUp();
     }
     draw_steps(pipeline, pipeline_inputs.length);
 }

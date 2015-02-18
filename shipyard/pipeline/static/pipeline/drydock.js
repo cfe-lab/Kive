@@ -267,6 +267,7 @@ CanvasState.prototype.doMove = function(e) {
                                 connector_carrying_cdt == in_magnet.cdt) {
                                 // light up magnet
                                 in_magnet.fill = '#ff8';
+                                in_magnet.acceptingConnector = true;
                                 if (in_magnet.connected.length == 0 
                                     && in_magnet.contains(sel.x, sel.y)
                                     ) {
@@ -470,6 +471,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
 CanvasState.prototype.doUp = function(e) {
     this.valid = false;
     var index, sel;
+    $(this.canvas).css("cursor", "auto");
     
     // Collision detection!
     if (this.dragging && this.selection.length > 0) {
@@ -586,6 +588,7 @@ CanvasState.prototype.doUp = function(e) {
             for (var j = 0; j < in_magnets.length; j++) {
                 in_magnet = in_magnets[j];
                 in_magnet.fill = 'white';
+                in_magnet.acceptingConnector = false;
             }
         }
     }
@@ -802,7 +805,11 @@ CanvasState.prototype.draw = function() {
             } else {
                 // add information about execution order
                 var L = shapes[i].getLabel(),
-                    flat_exec_order = Array.concat.apply(null, this.exec_order); //"flatten" 2d array into 1d by concatenation.
+                    flat_exec_order = [];
+                for( j in this.exec_order) {
+                    //"flatten" 2d array into 1d by concatenation.
+                    flat_exec_order = flat_exec_order.concat(this.exec_order[j]);
+                }
                 L.label = (flat_exec_order.indexOf(shape) + 1) +': '+ L.label;
                 labels.push(L);
             }

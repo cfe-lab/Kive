@@ -1,9 +1,11 @@
-from django.test import TestCase
-from fleet.models import RunToProcess, RunToProcessInput
-from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
-from pipeline.models import Pipeline
 from django.contrib.auth.models import User
+from django.test import TestCase
+from django.utils.dateparse import parse_datetime
+
+from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
+from fleet.models import RunToProcess, RunToProcessInput
 from librarian.models import ExecRecord, SymbolicDataset
+from pipeline.models import Pipeline
 
 
 class RunToProcessTest(TestCase):
@@ -13,7 +15,7 @@ class RunToProcessTest(TestCase):
     : - ready
     + - running
     * - complete
-    Overall format is steps-outcables-inputname
+    Overall format is steps-outcables-displayname
     """
     fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
     def test_run_progress_no_run(self):
@@ -21,7 +23,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('?', progress)
+        self.assertSequenceEqual('?-Run', progress)
 
     def create_with_empty_pipeline(self):
         pipeline = Pipeline()
@@ -33,7 +35,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('-', progress)
+        self.assertSequenceEqual('--Run', progress)
 
     def create_with_pipeline_step(self):
         pipeline=Pipeline.objects.get(pk=2)
@@ -48,7 +50,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('.-.', progress)
+        self.assertSequenceEqual('.-.-Fasta2CSV', progress)
 
     def add_exec_log(self, run_component):
         ExecLog.create(record=run_component,
@@ -78,7 +80,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual(':-.', progress)
+        self.assertSequenceEqual(':-.-Fasta2CSV', progress)
 
     def create_with_started_run_step(self):
         run_tracker = self.create_with_run_step()
@@ -102,14 +104,14 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('+-.', progress)
+        self.assertSequenceEqual('+-.-Fasta2CSV', progress)
 
     def test_run_progress_completed_steps(self):
         run_tracker = self.create_with_completed_run_step()
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-.', progress)
+        self.assertSequenceEqual('*-.-Fasta2CSV', progress)
 
     def test_run_progress_failed_steps(self):
         run_tracker = self.create_with_completed_run_step()
@@ -120,7 +122,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('!-.', progress)
+        self.assertSequenceEqual('!-.-Fasta2CSV', progress)
 
     def test_run_progress_output_ready(self):
         run_tracker = self.create_with_completed_run_step()
@@ -131,7 +133,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-:', progress)
+        self.assertSequenceEqual('*-:-Fasta2CSV', progress)
 
     def test_run_progress_output_running(self):
         run_tracker = self.create_with_completed_run_step()
@@ -144,7 +146,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-+', progress)
+        self.assertSequenceEqual('*-+-Fasta2CSV', progress)
 
     def test_run_progress_complete(self):
         run_tracker = self.create_with_completed_run_step()
@@ -158,7 +160,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-*', progress)
+        self.assertSequenceEqual('*-*-Fasta2CSV', progress)
 
     def add_input(self, run_tracker):
         run_tracker.save()
@@ -168,15 +170,15 @@ class RunToProcessTest(TestCase):
                                       index=1)
         run_input.save()
         
-    def test_run_progress_input_name(self):
+    def test_run_progress_display_name(self):
         run_tracker = self.create_with_pipeline_step()
         self.add_input(run_tracker)
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('.-.-TestFASTA', progress)
+        self.assertSequenceEqual('.-.-Fasta2CSV on TestFASTA', progress)
 
-    def test_run_progress_input_name_but_no_run(self):
+    def test_run_progress_display_name_but_no_run(self):
         pipeline=Pipeline.objects.get(pk=2)
         user = User.objects.first()
         run_tracker = RunToProcess(user=user, pipeline=pipeline)
@@ -184,4 +186,27 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('?-TestFASTA', progress)
+        self.assertSequenceEqual('?-Fasta2CSV on TestFASTA', progress)
+
+    def test_display_name(self):
+        pipeline=Pipeline.objects.get(pk=2)
+        user = User.objects.first()
+        run_tracker = RunToProcess(user=user, pipeline=pipeline)
+        self.add_input(run_tracker)
+        
+        display_name = run_tracker.display_name
+
+        self.assertSequenceEqual(u'Fasta2CSV on TestFASTA', display_name)
+
+    def test_display_name_no_input(self):
+        pipeline=Pipeline.objects.get(pk=2)
+        user = User.objects.first()
+        run_tracker = RunToProcess(user=user, pipeline=pipeline)
+        run_tracker.save()
+        run_tracker.time_queued = parse_datetime('2015-01-13 00:00:00Z')
+        run_tracker.save()
+        
+        display_name = run_tracker.display_name
+
+        self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
+                                 display_name)
