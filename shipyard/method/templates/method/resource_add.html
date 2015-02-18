@@ -16,6 +16,8 @@
 
 <h2>Add a new code resource</h2>
 
+{{ resource_form.non_field_errors }}
+
 <!-- Form for inserting new CodeResources -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <table>
@@ -37,6 +39,18 @@
             <td>{{ resource_form.resource_desc }}</td>
             <td><div class="errortext">{{ resource_form.resource_desc.errors }}</div></td>
         </tr>
+        <tr>
+            <th>{{ resource_form.users_allowed.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.users_allowed.help_text }}</div></td>
+            <td>{{ resource_form.users_allowed }}</td>
+            <td><div class="errortext">{{ resource_form.users_allowed.errors }}</div></td>
+        </tr>
+        <tr>
+            <th>{{ resource_form.groups_allowed.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.groups_allowed.help_text }}</div></td>
+            <td>{{ resource_form.groups_allowed }}</td>
+            <td><div class="errortext">{{ resource_form.groups_allowed.errors }}</div></td>
+        </tr>
 
     </table>
 
@@ -56,10 +70,19 @@
         <tbody id="dependencyForms">
             {% for dep_form in dep_forms %}
             <tr>
-                <td>{{ dep_form.coderesource }}</td>
-                <td>{{ dep_form.revisions }}</td>
-                <td>{{ dep_form.depPath }}</td>
-                <td>{{ dep_form.depFileName }}</td>
+                <td>{{ dep_form.coderesource }}
+                    <div class="errortext">{{ dep_form.non_field_errors }}</div>
+                    <div class="errortext">{{ dep_form.coderesource.errors }}</div>
+                </td>
+                <td>{{ dep_form.revisions }}
+                    <div class="errortext">{{ dep_form.revisions.errors }}</div>
+                </td>
+                <td>{{ dep_form.depPath }}
+                    <div class="errortext">{{ dep_form.depPath.errors }}</div>
+                </td>
+                <td>{{ dep_form.depFileName }}
+                    <div class="errortext">{{ dep_form.depFileName.errors }}</div>
+                </td>
             </tr>
             {% endfor %}
         </tbody>

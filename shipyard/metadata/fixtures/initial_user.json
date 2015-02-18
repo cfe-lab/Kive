@@ -1,0 +1,24 @@
+[
+{
+    "fields": {
+        "username": "shipyard",
+        "first_name": "",
+        "last_name": "",
+        "is_active": true,
+        "is_superuser": false,
+        "is_staff": false,
+        "last_login": "2014-06-03T22:21:29.826Z",
+        "groups": [
+            1,
+            2,
+            3
+        ],
+        "user_permissions": [],
+        "password": "pbkdf2_sha256$15000$wUQORAXzY248$ALtOzN1uVAELk/j5fBYHHRwt0qZaEOT0xlMycj+rAfg=",
+        "email": "",
+        "date_joined": "2014-06-03T22:21:29.826Z"
+    },
+    "model": "auth.user",
+    "pk": 1
+}
+]

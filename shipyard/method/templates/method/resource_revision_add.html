@@ -16,6 +16,7 @@
 
 <h2>Add revision of {{ coderesource }}</h2>
 
+{{ revision_form.non_field_errors }}
 
 <!-- Form for inserting new Datatypes -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
@@ -27,29 +28,63 @@
             <th><i>Revision</i> ({{ coderesource.num_revisions|add:"1" }})</th>
         </tr>
         <tr>
-            <th>{{ resource_form.content_file.label }} <div class="helptext">{{ resource_form.content_file.help_text }}</div></th>
+            <th>{{ revision_form.content_file.label }} <div class="helptext">{{ revision_form.content_file.help_text }}</div></th>
             <td style="font-style:italic">{{ parent_revision.filename }}</td>
-            <td>{{ resource_form.content_file }}<br>
-                <div style="color:red">{{ resource_form.content_file.errors }}</div></td>
+            <td>{{ revision_form.content_file }}<br>
+                <div class="errortext">{{ revision_form.content_file.errors }}</div></td>
         </tr>
         <tr>
             <th>
-                {{ resource_form.revision_name.label }}
-                <div class="helptext">{{ resource_form.revision_name.help_text }}</div>
+                {{ revision_form.revision_name.label }}
+                <div class="helptext">{{ revision_form.revision_name.help_text }}</div>
                 <br/>
                 <i>&nbsp;Optional</i>
             </th>
             <td></td>
-            <td>{{ resource_form.revision_name }}
-                <div style="color:red">{{ resource_form.revision_name.errors }}</div>
+            <td>{{ revision_form.revision_name }}
+                <div class="errortext">{{ revision_form.revision_name.errors }}</div>
             </td>
 
         </tr>
         <tr>
-            <th>{{ resource_form.revision_desc.label }} <div class="helptext">{{ resource_form.revision_desc.help_text }}</div></th>
+            <th>{{ revision_form.revision_desc.label }} <div class="helptext">{{ revision_form.revision_desc.help_text }}</div></th>
             <td style="font-style:italic">{{ parent_revision.revision_desc }}</td>
-            <td>{{ resource_form.revision_desc }}<br>
-                <div style="color:red">{{ resource_form.revision_desc.errors }}</div>
+            <td>{{ revision_form.revision_desc }}<br>
+                <div class="errortext">{{ revision_form.revision_desc.errors }}</div>
+            </td>
+        </tr>
+        <tr>
+            <th>{{ revision_form.users_allowed.label }} <div class="helptext">{{ revision_form.users_allowed.help_text }}</div></th>
+            <td style="font-style:italic">
+                {% if parent_revision.users_allowed.exists %}
+                <ul>
+                {% for user in parent_revision.users_allowed.all %}
+                    <li>{{ user }}</li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                    None
+                {% endif %}
+            </td>
+            <td>{{ revision_form.users_allowed }}<br>
+                <div class="errortext">{{ revision_form.users_allowed.errors }}</div>
+            </td>
+        </tr>
+        <tr>
+            <th>{{ revision_form.groups_allowed.label }} <div class="helptext">{{ revision_form.groups_allowed.help_text }}</div></th>
+            <td style="font-style:italic">
+                {% if parent_revision.groups_allowed.exists %}
+                <ul>
+                {% for group in parent_revision.groups_allowed.all %}
+                    <li>{{ group }}</li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                    None
+                {% endif %}
+            </td>
+            <td>{{ revision_form.groups_allowed }}<br>
+                <div class="errortext">{{ revision_form.groups_allowed.errors }}</div>
             </td>
         </tr>
     </table>
@@ -67,10 +102,19 @@
         <tbody id="dependencyForms">
             {% for dep_form in dep_forms %}
             <tr>
-                <td>{{ dep_form.coderesource }}</td>
-                <td>{{ dep_form.revisions }}</td>
-                <td>{{ dep_form.depPath }}</td>
-                <td>{{ dep_form.depFileName }}</td>
+                <td>{{ dep_form.coderesource }}
+                    <div class="errortext">{{ dep_form.non_field_errors }}</div>
+                    <div class="errortext">{{ dep_form.coderesource.errors }}</div>
+                </td>
+                <td>{{ dep_form.revisions }}
+                    <div class="errortext">{{ dep_form.revisions.errors }}</div>
+                </td>
+                <td>{{ dep_form.depPath }}
+                    <div class="errortext">{{ dep_form.depPath.errors }}</div>
+                </td>
+                <td>{{ dep_form.depFileName }}
+                    <div class="errortext">{{ dep_form.depFileName.errors }}</div>
+                </td>
             </tr>
             {% endfor %}
         </tbody>

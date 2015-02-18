@@ -3,9 +3,11 @@ Handle Ajax transaction requests from metadata templates.
 """
 
 from django.http import HttpResponse, Http404
-from metadata.models import Datatype, get_builtin_types
 from django.core import serializers
+
 import json
+
+from metadata.models import Datatype, get_builtin_types
 
 def get_python_type(request):
     """

@@ -96,6 +96,7 @@ def _filter_datasets(request):
     response_data = []
     for dataset in query.all():
         response_data.append({"pk": dataset.pk, 
+                              "symbolicdataset_id": dataset.symbolicdataset_id,
                               "Name": dataset.name, 
                               "Date": dataset.date_created.strftime("%b %e, %Y, %l:%M %P")})
     return json.dumps(response_data)
@@ -142,14 +143,14 @@ def filter_pipelines(request):
 def _load_status():
     try:
         recent_time = timezone.now() - timedelta(minutes=5)
-        runs = fleet.models.RunToProcess.objects.all().filter(
+        old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
+            'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
+        runs = fleet.models.RunToProcess.objects.filter(
             Q(run_id__isnull=True)|
             Q(run__end_time__isnull=True)|
-            Q(run__end_time__gte=recent_time)).order_by(
-                'time_queued')
-        run_reports = []
-        for run in runs:
-            run_reports.append(run.get_run_progress())
+            Q(run__end_time__gte=recent_time)).exclude(
+            pk__in=old_aborted_runs).order_by('time_queued')
+        run_reports = [run.get_run_progress() for run in runs]
         
         status = '\n'.join(run_reports)
     except StandardError as e:
@@ -183,7 +184,7 @@ def _poll_run_progress(request):
         # ajax_logger.debug("rtp.finished: {}".format(rtp.finished))
         # ajax_logger.debug("run PK: {}".format(None if rtp.run is None else rtp.run.pk))
 
-    success = rtp.started and rtp.run.successful_execution()
+    success = rtp.started and rtp.run and rtp.run.successful_execution()
 
     run_pk = None if rtp.run is None else rtp.run.pk
     return_val = json.dumps({"status": status, "run": run_pk, "finished": len(status) == 0, "success": success,

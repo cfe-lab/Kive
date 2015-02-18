@@ -786,6 +786,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // Now we're ready to start
         var form_data = {};
 
+        // For the moment, everything is shared with all users.
+        // The "Everyone" group has pk = 1.
+        form_data["users_allowed"] = [];
+        form_data["groups_allowed"] = [1];
+
         // There is no PipelineFamily yet; we're going to create one.
         form_data["family_pk"] = null;
         form_data['family_name'] = family_name;

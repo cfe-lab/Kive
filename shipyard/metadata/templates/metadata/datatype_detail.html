@@ -28,12 +28,40 @@
     <td>Description</td>
     <td>{{ datatype.description }}</td>
 </tr>
-{% for r in datatype.restricts.all %}
+{% if datatype.restricts.exists %}
 <tr>
     <td>Restricts</td>
-    <td>{{ r }}</td>
+    <td><ul>
+        {% for r in datatype.restricts.all %}
+        <li>{{ r }}</li>
+        {% endfor %}
+    </ul></td>
 </tr>
-{% endfor %}
+{% endif %}
+<tr>
+    <td>Creator</td>
+    <td>{{ datatype.user }}</td>
+</tr>
+{% if datatype.users_allowed.exists %}
+<tr>
+    <td>Users allowed</td>
+    <td><ul>
+        {% for user in datatype.users_allowed.all %}
+        <li>{{ user }}</li>
+        {% endfor %}
+    </ul></td>
+</tr>
+{% endif %}
+{% if datatype.groups_allowed.exists %}
+<tr>
+    <td>Groups allowed</td>
+    <td><ul>
+        {% for group in datatype.groups_allowed.all %}
+        <li>{{ group }}</li>
+        {% endfor %}
+    </ul></td>
+</tr>
+{% endif %}
 </table>
 
 {% if constraints %}

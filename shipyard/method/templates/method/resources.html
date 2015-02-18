@@ -25,6 +25,10 @@ To upload a revision of an existing code resource branch, click on the name of
 in the following table.
 </p>
 
+{% if no_access %}
+    <p>You do not have access to the CodeResource with id={{ no_access }}.</p>
+{% endif %}
+
 <table>
 <thead>
 	<tr>

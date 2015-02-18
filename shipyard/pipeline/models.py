@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
+from django.contrib.auth.models import User, Group
 
 import csv
 import exceptions
@@ -236,6 +237,10 @@ class Pipeline(transformation.models.Transformation):
         Creates a dict-based representation of this Pipeline.
 
         This dict will be structured as:
+         - user: PK of creating user
+         - users_allowed: list of PKs of users allowed access
+         - groups_allowed: list of PKs of groups allowed access
+
          - family_pk: None if no PipelineFamily exists yet; otherwise, its PK
          - family_name: string
          - family_desc: string
@@ -253,6 +258,10 @@ class Pipeline(transformation.models.Transformation):
          - pipeline_outputs: list of dicts as produced by the represent_as_dict method of PipelineOutputCable.
         """
         dict_repr = {
+            "user": self.user.pk,
+            "users_allowed": [u.pk for u in self.users_allowed.all()],
+            "groups_allowed": [g.pk for g in self.groups_allowed.all()],
+
             "family_pk": self.family.pk,
             "family_name": self.family.name,
             "family_desc": self.family.description,
@@ -306,6 +315,18 @@ class Pipeline(transformation.models.Transformation):
         self.steps.all().delete()
         self.outcables.all().delete()
 
+        # Update the access control data.
+        creating_user = User.objects.get(pk=pipeline_dict_repr["user"])
+        users_allowed = [User.objects.get(pk=x) for x in pipeline_dict_repr["users_allowed"]]
+        groups_allowed = [Group.objects.get(pk=x) for x in pipeline_dict_repr["groups_allowed"]]
+
+        self.user = creating_user
+        for u in users_allowed:
+            self.users_allowed.add(u)
+        for g in groups_allowed:
+            self.groups_allowed.add(g)
+        self.save()
+
         # Now pass the dict representation to the function that fills out a Pipeline.
         return Pipeline.create_from_dict(pipeline_dict_repr, self)
 
@@ -320,13 +341,24 @@ class Pipeline(transformation.models.Transformation):
         This will raise a ValueError if the Pipeline has ever been run or revised
         (and therefore it should never be changed).
         """
+        # First get the access control data in order.
+        creating_user = User.objects.get(pk=pipeline_dict_repr["user"])
+        users_allowed = [User.objects.get(pk=x) for x in pipeline_dict_repr["users_allowed"]]
+        groups_allowed = [Group.objects.get(pk=x) for x in pipeline_dict_repr["groups_allowed"]]
+
         # Make a new revision.
         new_revision = self.family.members.create(
             revision_parent=self,
             revision_number=self.family.num_revisions+1,
             revision_name=pipeline_dict_repr['revision_name'],
-            revision_desc=pipeline_dict_repr['revision_desc']
+            revision_desc=pipeline_dict_repr['revision_desc'],
+            user=creating_user,
         )
+        for u in users_allowed:
+            new_revision.users_allowed.add(u)
+        for g in groups_allowed:
+            new_revision.groups_allowed.add(g)
+        new_revision.save()
 
         # Now pass the dict representation to the function that fills out a Pipeline.
         return Pipeline.create_from_dict(pipeline_dict_repr, new_revision)
@@ -444,13 +476,17 @@ class Pipeline(transformation.models.Transformation):
         Creates a fresh Pipeline with a new PipelineFamily from a dict.
 
         If the pipeline parameter is specified, we fill it in rather than creating a fresh one.
-        Otherwise, form_data must contain fields revision_name, revision_desc,
+        Otherwise, pipeline_dict_repr must contain fields revision_name, revision_desc,
         family_name, and family_desc.
 
         The form_data dict should be structured the same way represent_as_dict produces them.
 
         This raises a PipelineSerializationException if anything goes wrong.
         """
+        creating_user = User.objects.get(pk=form_data["user"])
+        users_allowed = [User.objects.get(pk=x) for x in form_data["users_allowed"]]
+        groups_allowed = [Group.objects.get(pk=x) for x in form_data["groups_allowed"]]
+
         if pipeline is None:
             # Does Pipeline family with this name already exist?
             if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
@@ -459,8 +495,13 @@ class Pipeline(transformation.models.Transformation):
             # Make a new PipelineFamily.
             pl_family = PipelineFamily(
                 name=form_data['family_name'],
-                description=form_data['family_desc']
+                description=form_data['family_desc'],
+                user=creating_user
             )
+            for u in users_allowed:
+                pl_family.users_allowed.add(u)
+            for g in groups_allowed:
+                pl_family.groups_allowed.add(g)
             pl_family.save()
 
             # Make a new Pipeline revision within this PipelineFamily.
@@ -469,8 +510,14 @@ class Pipeline(transformation.models.Transformation):
                 revision_name=form_data['revision_name'],
                 revision_desc=form_data['revision_desc'],
                 revision_parent=(None if form_data["revision_parent_pk"] is None
-                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"]))
+                                 else Pipeline.objects.get(pk=form_data["revision_parent_pk"])),
+                user=creating_user
             )
+            for u in users_allowed:
+                pipeline.users_allowed.add(u)
+            for g in groups_allowed:
+                pipeline.groups_allowed.add(g)
+            pipeline.save()
 
         # Create the inputs for the Pipeline.
         for new_input in form_data["pipeline_inputs"]:

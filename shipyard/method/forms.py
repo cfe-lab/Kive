@@ -2,24 +2,30 @@
 Generate an HTML form to create a new Datatype object
 """
 
+from django.http import Http404
 from django import forms
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
-from metadata.models import CompoundDatatype
-from transformation.models import TransformationInput, TransformationOutput, XputStructure
+from metadata.models import CompoundDatatype, KiveUser
+from transformation.models import TransformationInput, XputStructure
+from django.contrib.auth.models import User, Group
+from metadata.forms import AccessControlForm
+from django.db.models import Q
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-# code resource forms
-class CodeResourceMinimalForm (forms.Form):
+
+# CodeResource forms.
+class CodeResourceMinimalForm(AccessControlForm):
     """
     use for validating only two entries
     """
     revision_name = forms.CharField(max_length=255)
     revision_desc = forms.CharField(max_length=255)
 
-class CodeResourcePrototypeForm (forms.ModelForm):
+
+class CodeResourcePrototypeForm(AccessControlForm):
     """
     A form for submitting the first version of a CodeResource, which
     we refer to as the "prototype".  We require two sets of names and
@@ -30,178 +36,227 @@ class CodeResourcePrototypeForm (forms.ModelForm):
     revision names that are only meant to tell different version apart,
     (e.g., "Scarlet (1)", "Bicycle (2)", "Henry (3)").
     """
-    # additional form fields for CodeResource object
-    resource_name = forms.CharField(max_length=255,
-                                    label='Resource name',
-                                    help_text='A name that refers to the actual function of the CodeResource.')
-    resource_desc = forms.CharField(widget = forms.Textarea(attrs={'rows':5}),
-                                    label = 'Resource description',
-                                    help_text='A brief description of what this CodeResource (this and all subsequent '
-                                              'versions) is supposed to do')
+    # Form fields for the parent CodeResource object.
+    resource_name = forms.CharField(
+        max_length=255,
+        label='Resource name',
+        help_text='A name that refers to the actual function of the CodeResource.'
+    )
 
-    def __init__(self, *args, **kwargs):
-        super(CodeResourcePrototypeForm, self).__init__(*args, **kwargs)
-        self.fields['revision_name'].label = 'Prototype name'
-        self.fields['revision_name'].help_text = 'A short name for this prototype, ' \
-                                                 'used only to differentiate it from subsequent versions.'
+    resource_desc = forms.CharField(
+        widget=forms.Textarea(attrs={'rows':5}),
+        label='Resource description',
+        help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do'
+    )
 
-        self.fields['revision_desc'].label = 'Prototype description'
-        self.fields['revision_desc'].help_text = 'A brief description of this prototype'
-        self.fields['revision_desc'].initial = 'Prototype version'
-        self.fields['revision_desc'].widget = forms.Textarea(attrs={'rows': 2})
-
-        self.fields['content_file'].help_text = 'File containing this new code resource'
-    class Meta:
-        model = CodeResourceRevision
-        fields = ('resource_name', 'resource_desc', 'content_file', 'revision_name', 'revision_desc')
-        #exclude = ('revision_parent', 'coderesource', 'MD5_checksum',)
-
-class CodeResourceRevisionForm (forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(CodeResourceRevisionForm, self).__init__(*args, **kwargs)
-        self.fields['content_file'].label = 'File'
-    class Meta:
-        model = CodeResourceRevision
-        fields = ('content_file', 'revision_name', 'revision_desc', )
+    # Stuff that goes directly into the CodeResourceRevision.
+    content_file = forms.FileField(
+        label="File",
+        help_text="File containing this new code resource"
+    )
 
 
-class CodeResourceDependencyForm (forms.ModelForm):
+class CodeResourceRevisionForm(AccessControlForm):
+
+    # Stuff that goes directly into the CodeResourceRevision.
+    content_file = forms.FileField(
+        label="File",
+        help_text="File contents of this code resource revision"
+    )
+
+    revision_name = forms.CharField(
+        label="Revision name",
+        help_text="A short name to differentiate this revision from previous versions."
+    )
+
+    revision_desc = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2}),
+        label="Revision description",
+        help_text="A brief description of this version of the resource",
+        initial=""
+    )
+
+
+def _get_code_resource_list(user, but_not_this_one=None):
     """
-    ModelForm for submitting a CodeResourceDependency
+    Gets all CodeResources other than that of the specified one.
+
+    This is required to refresh the list of eligible CodeResources during the
+    addition of a new CodeResourceDependency.
+    """
+    query_obj = Q()
+    if user is not None:
+        curr_user = KiveUser.objects.get(pk=user.pk)
+        query_obj = curr_user.access_query()
+    queryset = CodeResource.objects.filter(query_obj).distinct()
+    if but_not_this_one is not None:
+        queryset = queryset.exclude(pk=but_not_this_one)
+    return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
+
+
+class CodeResourceDependencyForm(forms.Form):
+    """
+    Form for submitting a CodeResourceDependency.
+
     initial:  A dictionary to pass initial values from view function
     parent:  Primary key (ID) of CodeResource having this dependency.
     """
-    def __init__(self, initial=None, parent=None, *args, **kwargs):
-        super(CodeResourceDependencyForm, self).__init__(*args, **kwargs)
-        self.fields['coderesource'].widget = forms.Select(attrs={'class': 'coderesource'})
-        self.fields['coderesource'].choices = self.get_code_resource_list(parent)
-        if initial:
-            # populate drop-downs before rendering template
-            cr= CodeResource.objects.get(pk=initial['coderesource'])
-            self.fields['coderesource'].initial = cr.pk
+    # The attrs to the widget are to enhance the resulting HTML output.
+    coderesource = forms.ChoiceField(
+        widget=forms.Select(attrs={'class': 'coderesource'}),
+        choices=[('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+    )
 
-            rev = CodeResourceRevision.objects.get(coderesource=cr)
-            if type(rev) is list:
-                self.fields['revisions'].choices = [(x.pk, x.revision_name) for x in rev]
-                self.fields['revisions'].initial = initial['revisions']
-            else:
-                self.fields['revisions'].choices = [(rev.pk, rev.revision_name)]
+    # We override this field so that it doesn't try to validate.
+    revisions = forms.IntegerField(widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
 
-            self.fields['depPath'].initial = initial['depPath']
-            self.fields['depFileName'].initial = initial['depFileName']
+    depPath = forms.CharField(
+        label="Dependency path",
+        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
+        required=False
+    )
+
+    depFileName = forms.CharField(
+        label="Dependency file name",
+        help_text="The file name the dependency is given on the sandbox at execution",
+        required=False
+    )
+
+    def __init__(self, data=None, user=None, initial=None, parent=None, *args, **kwargs):
+        super(CodeResourceDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
+
+        # Cast user to a KiveUser.
+        curr_user = KiveUser.objects.get(pk=user.pk)
+        eligible_crs = _get_code_resource_list(user, parent)
+        self.fields['coderesource'].choices = eligible_crs
+
+        # Re-populate drop-downs before rendering if possible.
+        populator = None
+        if data is not None:
+            populator = data
+        elif initial is not None:
+            populator = initial
+
+        if populator is not None:
+            # Re-populate drop-downs before rendering the template.
+            cr = CodeResource.objects.get(pk=populator['coderesource'])
+
+            if cr.pk not in [x[0] for x in eligible_crs]:
+                raise Http404("CodeResource with ID {} used in dependency definition is invalid".format(
+                    populator["coderesource"]
+                ))
+
+            rev = CodeResourceRevision.objects.filter(curr_user.access_query(), coderesource=cr).distinct()
+            self.fields['revisions'].widget.choices = [(x.pk, x.revision_name) for x in rev]
+            if populator.has_key("revisions"):
+                try:
+                    assert populator.has_key("coderesource")
+                    assert int(populator["revisions"]) in [x.pk for x in rev]
+                except AssertionError as e:
+                    raise Http404(e)
 
 
-    def get_code_resource_list(self, parent):
-        # required to refresh list on addition of a new CodeResource
-        if parent is None:
-            queryset = CodeResource.objects.all()
-        else:
-            queryset = CodeResource.objects.exclude(pk=parent)
-        logger.debug(queryset.query)
-        return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
+# Method forms.
+class MethodReviseForm(AccessControlForm):
+    """Revise an existing method.  No need to specify the CodeResource."""
+    # This is populated by the calling view.
+    revisions = forms.ChoiceField()
 
-    coderesource = forms.ChoiceField(choices=[('', '--- CodeResource ---')] +
-                                             [(x.id, x.name) for x in CodeResource.objects.all()])
-    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
+    revision_name = forms.CharField(
+        label="Name",
+        help_text="A short name for this new method"
+    )
 
-    class Meta:
-        model = CodeResourceDependency
-        #exclude = ('coderesourcerevision', 'requirement')
-        fields = ('coderesource', 'revisions', 'depPath', 'depFileName')
+    revision_desc = forms.CharField(
+        label="Description",
+        help_text="A detailed description for this new method",
+        widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'})
+    )
 
+    reusable = forms.ChoiceField(
+        choices=Method.REUSABLE_CHOICES,
+        help_text="""Is the output of this method the same if you run it again with the same inputs?
 
-class MethodForm (forms.ModelForm):
+deterministic: always exactly the same
 
-    # We override the threads field.
+reusable: the same but with some insignificant differences (e.g., rows are shuffled)
+
+non-reusable: no -- there may be meaningful differences each time (e.g., timestamp)
+""")
+
     threads = forms.IntegerField(min_value=1, initial=1,
                                  help_text="Number of threads used during execution")
 
-    def __init__(self, *args, **kwargs):
-        super(MethodForm, self).__init__(*args, **kwargs)
 
-        # this is required to re-populate the drop-down with CRs created since first load
-        self.fields['coderesource'].choices = [('', '--- CodeResource ---')] + \
-                                              [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')]
-        self.fields['coderesource'].label = 'Code resource'
-        self.fields['coderesource'].help_text = 'The code resource for which this method is a set of instructions.'
+class MethodForm(MethodReviseForm):
+    """
+    Form used in creating a Method.
+    """
+    coderesource = forms.ChoiceField(
+        choices = ([('', '--- CodeResource ---')] +
+                   [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')]),
+        label="Code resource",
+        help_text="The code resource for which this method is a set of instructions.",
+        required=True)
 
-        self.fields['revision_name'].label = 'Name'
-        self.fields['revision_name'].help_text = 'A short name for this new method'
+    # We override this field.
+    revisions = forms.IntegerField(
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
+    )
 
-        self.fields['revision_desc'].label = 'Description'
-        self.fields['revision_desc'].help_text = 'A detailed description for this new method'
+    def __init__(self, data=None, user=None, *args, **kwargs):
+        super(MethodForm, self).__init__(data, *args, **kwargs)
 
-    coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] +
-                                               [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')])
-    revisions = forms.ChoiceField(choices=[('', '--- select a CodeResource first ---')])
-
-    class Meta:
-        model = Method
-        fields = ('coderesource', 'revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
-        widgets = {
-            'revision_desc': forms.Textarea(attrs={'rows': 5,
-                                                   'cols': 30,
-                                                   'style': 'height: 5em;'}),
-        }
-
-
-class MethodReviseForm (forms.ModelForm):
-    """Revise an existing method.  No need to specify MethodFamily."""
-
-    # We override the threads field.
-    threads = forms.IntegerField(min_value=1, initial=1,
-                                 help_text="Number of threads used during execution")
-
-    def __init__(self, *args, **kwargs):
-        super(MethodReviseForm, self).__init__(*args, **kwargs)
-
-        self.fields['revision_name'].label = 'Name'
-        self.fields['revision_name'].help_text = 'A short name for this new method'
-
-        self.fields['revision_desc'].label = 'Description'
-        self.fields['revision_desc'].help_text = 'A detailed description for this new method'
-
-    #coderesource = forms.ChoiceField(choices = [('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()])
-    revisions = forms.ChoiceField() # to be populated by view function
-
-    class Meta:
-        model = Method
-        fields = ('revisions', 'revision_name', 'revision_desc', 'reusable', "threads")
+        # This is required to re-populate the drop-down with CRs created since first load.
+        if user is not None:
+            kive_user = KiveUser.objects.get(pk=user.pk)
+            self.fields["coderesource"].choices = (
+                [('', '--- CodeResource ---')] +
+                [(x.id, x.name) for x in CodeResource.objects.filter(kive_user.access_query()).order_by('name')]
+            )
 
 
-class TransformationXputForm (forms.ModelForm):
-    input_output = forms.ChoiceField(choices=[('input', 'IN'), ('output', 'OUT')])
-    class Meta:
-        model = TransformationInput # derived from abstract class TransformationXput
-        fields = ('dataset_name', )
+class TransformationXputForm (forms.Form):
+
+    dataset_name = forms.CharField()
 
 
-class XputStructureForm (forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(XputStructureForm, self).__init__(*args, **kwargs)
-        self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + \
-                                                  [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
-        self.fields['min_row'].widget.attrs['class'] = 'shortIntField'
-        self.fields['max_row'].widget.attrs['class'] = 'shortIntField'
+class XputStructureForm (forms.Form):
+    XS_CHOICES = [('', '--------'), ('__raw__', 'Unstructured')]
+    XS_CHOICES.extend([(x.id, str(x)) for x in CompoundDatatype.objects.all()])
 
-    choices = [('', '--------'), ('__raw__', 'Unstructured')]
-    choices.extend([(x.id, str(x)) for x in CompoundDatatype.objects.all()])
+    compounddatatype = forms.ChoiceField(choices=XS_CHOICES)
 
-    compounddatatype = forms.ChoiceField(choices=choices)
-    class Meta:
-        model = XputStructure
-        fields = ('compounddatatype', 'min_row', 'max_row')
+    min_row = forms.IntegerField(
+        min_value=0, initial=0,
+        label="Minimum rows",
+        help_text="Minimum number of rows this input/output returns",
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "shortIntField"}))
 
-class MethodFamilyForm (forms.ModelForm):
-    """Form to create a new MethodFamily"""
-    def __init__ (self, *args, **kwargs):
-        super(MethodFamilyForm, self).__init__(*args, **kwargs)
-        self.fields['name'].label = 'Family name'
-        self.fields['description'].label = 'Family description'
-    class Meta:
-        model = MethodFamily
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 5,
-                                                   'cols': 30,
-                                                   'style': 'height: 5em;'}),
-        }
+    max_row = forms.IntegerField(
+        min_value=1,
+        label="Maximum rows",
+        help_text="Maximum number of rows this input/output returns",
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "shortIntField"}))
+
+    def __init__(self, data=None, user=None, *args, **kwargs):
+        super(XputStructureForm, self).__init__(data=data, *args, **kwargs)
+
+        more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
+        if user is not None:
+            user_plus = KiveUser.kiveify(user)
+            more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.filter(user_plus.access_query())]
+
+        self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
+
+
+class MethodFamilyForm (forms.Form):
+    """Form used in creating a new MethodFamily."""
+    name = forms.CharField(label="Family name")
+
+    description = forms.CharField(
+        label="Family description",
+        widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'}),
+    )

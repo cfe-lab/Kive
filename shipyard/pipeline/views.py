@@ -2,16 +2,19 @@
 pipeline views
 """
 
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.template import loader, Context
 from django.core.context_processors import csrf
 from method.models import *
 from metadata.models import *
 from pipeline.models import *
-from django.core.exceptions import ValidationError
+
 import json
 
+from constants import groups
+
 logger = logging.getLogger(__name__)
+
 
 def pipelines(request):
     """
@@ -28,6 +31,21 @@ def pipelines(request):
     return HttpResponse(t.render(c))
 
 
+def prepare_pipeline_dict(request):
+    """
+    Helper that creates a dictionary representation of a Pipeline.
+
+    For now, everything we produce is shared, with no users or groups granted
+    any special privileges.
+    """
+    form_data = json.loads(request.body)
+
+    # Add user information to form_data.
+    form_data["user"] = request.user.pk
+
+    return form_data
+
+
 def pipeline_add(request):
     """
     Most of the heavy lifting is done by JavaScript and HTML5.
@@ -40,7 +58,7 @@ def pipeline_add(request):
     c.update(csrf(request))
 
     if request.method == 'POST':
-        form_data = json.loads(request.body)
+        form_data = prepare_pipeline_dict(request)
         try:
             Pipeline.create_from_dict(form_data)
             response_data = {"status": "success", "error_msg": ""}
@@ -71,7 +89,7 @@ def pipeline_revise(request, id):
     c.update(csrf(request))
 
     if request.method == 'POST':
-        form_data = json.loads(request.body)
+        form_data = prepare_pipeline_dict(request)
         try:
             parent_pk = form_data['revision_parent_pk']
             parent_revision = Pipeline.objects.get(pk=parent_pk)

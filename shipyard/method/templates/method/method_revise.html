@@ -23,39 +23,84 @@ Add a revision of this Method based on a revision of the same CodeResource.
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
 
+<div class="errortext">
+    {{ family_form.non_field_errors }}
+    {{ method_form.non_field_errors }}
+</div>
+
 <table>
     <tr>
         <th>Code resource</th>
         <td>
             {{ coderesource }}
         </td>
-        <th>{{ method_form.revisions.label }}</th>
+        <th>{{ method_revise_form.revisions.label }}</th>
         <td>
-            {{ method_form.revisions }}
-            <div class="helptext">{{ method_form.revisions.help_text }}</div>
+            {{ method_revise_form.revisions }}
+            <div class="helptext">{{ method_revise_form.revisions.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.revisions.errors }}</div>
-            <br/>
+            <div class="errortext">{{ method_revise_form.revisions.errors }}</div>
         </td>
     </tr>
 
     <tr>
-        <th>{{ method_form.reusable.label }}</th>
+        <th>{{ method_revise_form.reusable.label }}</th>
         <td>
-            {{ method_form.reusable }}
-            <div class="helptext">{{ method_form.reusable.help_text|escape|linebreaks }}</div>
+            {{ method_revise_form.reusable }}
+            <div class="helptext">{{ method_revise_form.reusable.help_text|escape|linebreaks }}</div>
+            <br/>
+            <div class="errortext">{{ method_revise_form.reusable.errors }}</div>
         </td>
         <th></th>
         <td></td>
     </tr>
 
     <tr>
-        <th>{{ method_form.threads.label }}</th>
+        <th>{{ method_revise_form.users_allowed.label }}
+            <div class="helptext">{{ method_revise_form.users_allowed.help_text }}</div>
+        </th>
+        <td style="font-style:italic">
+            {% if parent.users_allowed.exists %}
+            <ul>
+            {% for user in parent.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+        </td>
+        <td>{{ method_revise_form.users_allowed }}<br>
+            <div style="color:red">{{ method_revise_form.users_allowed.errors }}</div>
+        </td>
+    </tr>
+    <tr>
+        <th>{{ method_revise_form.groups_allowed.label }}
+            <div class="helptext">{{ method_revise_form.groups_allowed.help_text }}</div>
+        </th>
+        <td style="font-style:italic">
+            {% if parent.groups_allowed.exists %}
+            <ul>
+            {% for group in parent.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+        </td>
+        <td>{{ method_revise_form.groups_allowed }}<br>
+            <div style="color:red">{{ method_revise_form.groups_allowed.errors }}</div>
+        </td>
+    </tr>
+
+    <tr>
+        <th>{{ method_revise_form.threads.label }}</th>
         <td>
-            {{ method_form.threads }}
-            <div class="helptext">{{ method_form.threads.help_text }}</div>
+            {{ method_revise_form.threads }}
+            <div class="helptext">{{ method_revise_form.threads.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.threads.errors }}</div>
+            <div class="errortext">{{ method_revise_form.threads.errors }}</div>
             <br/>
         </td>
         <th></th>
@@ -64,19 +109,19 @@ Add a revision of this Method based on a revision of the same CodeResource.
 
     <tr>
         <th>Method<br/> revision name<br/><span class="smalltxt">Optional</span></i></th>
-                    <td>
-                        {{ method_form.revision_name }}
-                        <div class="helptext">{{ method_form.revision_name.help_text }}</div>
-                        <br/>
-                        <div class="errortext">{{ method_form.errors.name }}</div>
-                    </td>
-        <th>{{ method_form.revision_desc.label }}</th>
-                    <td>
-                        {{ method_form.revision_desc }}
-                        <div class="helptext">{{ method_form.revision_desc.help_text }}</div>
-                        <br/>
-                        <div class="errortext">{{ method_form.errors.description }}</div>
-                    </td>
+            <td>
+                {{ method_revise_form.revision_name }}
+                <div class="helptext">{{ method_revise_form.revision_name.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_revise_form.revision_name.errors }}</div>
+            </td>
+        <th>{{ method_revise_form.revision_desc.label }}</th>
+            <td>
+                {{ method_revise_form.revision_desc }}
+                <div class="helptext">{{ method_revise_form.revision_desc.help_text }}</div>
+                <br/>
+                <div class="errortext">{{ method_revise_form.revision_desc.errors }}</div>
+            </td>
     </tr>
 </table>
 
@@ -93,11 +138,20 @@ Add a revision of this Method based on a revision of the same CodeResource.
     <tbody id="extraInputForms">
     {% for xput_form, struct_form in input_forms %}
         <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
-        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
-        <td>{{ struct_form.min_row }}</td>
-        <td>{{ struct_form.max_row }}</td>
+        <td>{{ forloop.counter }}
+            <div class="errortext">{{ xput_form.non_field_errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
+        </td>
+        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
+        <td>{{ struct_form.compounddatatype }}
+            <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+        </td>
+        <td>{{ struct_form.min_row }}
+            <div class="errortext">{{ struct_form.min_row.errors }}</div>
+        </td>
+        <td>{{ struct_form.max_row }}
+            <div class="errortext">{{ struct_form.max_row.errors }}</div>
+        </td>
         </tr>
     {% endfor %}
     </tbody>
@@ -114,11 +168,20 @@ Add a revision of this Method based on a revision of the same CodeResource.
     <tbody id="extraOutputForms">
     {% for xput_form, struct_form in output_forms %}
         <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
-        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
-        <td>{{ struct_form.min_row }}</td>
-        <td>{{ struct_form.max_row }}</td>
+        <td>{{ forloop.counter }}
+            <div class="errortext">{{ xput_form.non_field_errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
+        </td>
+        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
+        <td>{{ struct_form.compounddatatype }}
+            <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+        </td>
+        <td>{{ struct_form.min_row }}
+            <div class="errortext">{{ struct_form.min_row.errors }}</div>
+        </td>
+        <td>{{ struct_form.max_row }}
+            <div class="errortext">{{ struct_form.max_row.errors }}</div>
+        </td>
         </tr>
     {% endfor %}
     </tbody>

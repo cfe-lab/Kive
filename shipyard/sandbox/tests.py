@@ -4,36 +4,42 @@ import sys
 import tempfile
 
 from django.core.files import File
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.test import TransactionTestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, AccessControl
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 
 from method.tests import samplecode_path
-from constants import datatypes
+from constants import datatypes, groups
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 class ExecuteTests(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
 
 		# Users + method/pipeline families
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
-        self.mf = MethodFamily(name="self.mf",description="self.mf desc"); self.mf.save()
-        self.pf = PipelineFamily(name="self.pf", description="self.pf desc"); self.pf.save()
+        self.myUser.groups.add(everyone_group)
+        self.myUser.save()
+
+        self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser); self.mf.save()
+        self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser); self.pf.save()
 
 		# Code on file system
-        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py")
+        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py", user=self.myUser)
         self.mA_cr.save()
-        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc")
+        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc",
+                                           user=self.myUser)
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
             self.mA_crr.content_file.save("generic_script.py",File(f))
         self.mA_crr.save()
@@ -43,37 +49,41 @@ class ExecuteTests(TransactionTestCase):
         self.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
 
 		# Basic CDTs
-        self.pX_in_cdt = CompoundDatatype()
+        self.pX_in_cdt = CompoundDatatype(user=self.myUser)
         self.pX_in_cdt.save()
         self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_a",column_idx=1)
         self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_b",column_idx=2)
         self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt,column_name="pX_c",column_idx=3)
 
-        self.mA_in_cdt = CompoundDatatype()
+        self.mA_in_cdt = CompoundDatatype(user=self.myUser)
         self.mA_in_cdt.save()
         self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
         self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
 
-        self.mA_out_cdt = CompoundDatatype()
+        self.mA_out_cdt = CompoundDatatype(user=self.myUser)
         self.mA_out_cdt.save()
         self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
         self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
 
         self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
-            description="input to pipeline pX", cdt=self.pX_in_cdt)
+                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
+                                               user=self.myUser, cdt=self.pX_in_cdt,
+                                               name="pX_in_symDS", description="input to pipeline pX")
         self.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-            "input_for_test_C_twostep_with_subpipeline.csv"), user=self.myUser, name="pX_in_symDS",
-            description="input to pipeline pX", cdt=None)
+                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
+                                               user=self.myUser, cdt=None, name="pX_in_symDS",
+                                               description="input to pipeline pX")
 
         # Method + input/outputs
-        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr)
+        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+                         user=self.myUser)
         self.mA.save()
         self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
         self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
 
         # Define pipeline containing the method, and its input + outcables
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X",
+                           user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -88,9 +98,10 @@ class ExecuteTests(TransactionTestCase):
         self.pX.create_outputs()
 
         # Pipeline with raw input.
-        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X")
+        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X", user=self.myUser)
         pX_raw.save()
-        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr)
+        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+                        user=self.myUser)
         mA_raw.save()
         mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
         mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
@@ -115,33 +126,37 @@ class ExecuteTests(TransactionTestCase):
         for dataset in Dataset.objects.all():
             dataset.delete()
 
-    def find_raw_pipeline(self):
+    def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""
-        for p in Pipeline.objects.all():
-            for step in p.steps.all():
-                for incable in step.cables_in.all():
-                    if incable.source_step == 0 and incable.source.is_raw():
-                        return p
+        for p in Pipeline.objects.filter(user=user):
+            for input in p.inputs.all():
+                if input.is_raw():
+                    return p
 
     def find_inputs_for_pipeline(self, pipeline):
         """Find appropriate input SymbolicDatasets for a Pipeline."""
-        inputs = []
-        for step in pipeline.steps.all():
-            for incable in step.cables_in.all():
-                if incable.source_step == 0:
-                    source = incable.source
+        input_SDs = []
+        pipeline_owner = pipeline.user
+        for input in pipeline.inputs.all():
+            if input.is_raw():
+                candidate_SDs = SymbolicDataset.objects.filter(user=pipeline_owner)
+                if candidate_SDs.exists():
+                    for sd in candidate_SDs:
+                        if sd.is_raw():
+                            dataset = sd
+                            break
+                else:
                     dataset = None
-                    if source.is_raw():
-                        for sd in SymbolicDataset.objects.all():
-                            if sd.is_raw():
-                                dataset = sd
-                                break
-                    else:
-                        datatype = incable.source.structure.compounddatatype
-                        structure = DatasetStructure.objects.filter(compounddatatype=datatype)[0]
-                        dataset = structure.symbolicdataset
-                    inputs.append(dataset)
-        return inputs
+            else:
+                datatype = input.structure.compounddatatype
+                structure = DatasetStructure.objects.filter(
+                    compounddatatype=datatype, symbolicdataset__user=pipeline_owner)
+                if structure.exists():
+                    dataset = structure.first().symbolicdataset
+                else:
+                    dataset = None
+            input_SDs.append(dataset)
+        return input_SDs
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -156,7 +171,7 @@ class ExecuteTests(TransactionTestCase):
         """Two step pipeline with second step identical to the first"""
 
         # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
@@ -176,7 +191,7 @@ class ExecuteTests(TransactionTestCase):
         self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
 
         # Define CDT for the second output (first output is defined by a trivial cable)
-        self.pipeline_out2_cdt = CompoundDatatype()
+        self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
         self.pipeline_out2_cdt.save()
         self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
         self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
@@ -204,17 +219,17 @@ class ExecuteTests(TransactionTestCase):
         """Two step pipeline with second step identical to the first"""
 
         # Define 2 member input and 1 member output CDTs for inner pipeline pY
-        self.pY_in_cdt = CompoundDatatype()
+        self.pY_in_cdt = CompoundDatatype(user=self.myUser)
         self.pY_in_cdt.save()
         self.pY_in_cdtm_1 = self.pY_in_cdt.members.create(column_name="pYA",column_idx=1,datatype=self.int_dt)
         self.pY_in_cdtm_2 = self.pY_in_cdt.members.create(column_name="pYB",column_idx=2,datatype=self.string_dt)
 
-        self.pY_out_cdt = CompoundDatatype()
+        self.pY_out_cdt = CompoundDatatype(user=self.myUser)
         self.pY_out_cdt.save()
         self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
 
         # Define 1-step inner pipeline pY
-        self.pY = Pipeline(family=self.pf, revision_name="pY_revision", revision_desc="Y")
+        self.pY = Pipeline(family=self.pf, revision_name="pY_revision", revision_desc="Y", user=self.myUser)
         self.pY.save()
         self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
 
@@ -232,19 +247,19 @@ class ExecuteTests(TransactionTestCase):
         self.pY.create_outputs()
 
         # Define CDTs for the output of pX
-        self.pX_out_cdt_1 = CompoundDatatype()
+        self.pX_out_cdt_1 = CompoundDatatype(user=self.myUser)
         self.pX_out_cdt_1.save()
         self.pX_out_cdt_1_cdtm_1 = self.pX_out_cdt_1.members.create(column_name="pXq", column_idx=1,
                                                                     datatype=self.int_dt)
 
-        self.pX_out_cdt_2 = CompoundDatatype()
+        self.pX_out_cdt_2 = CompoundDatatype(user=self.myUser)
         self.pX_out_cdt_2.save()
         self.pX_out_cdt_2_cdtm_1 = self.pX_out_cdt_2.members.create(
             column_name="pXr", column_idx=1, datatype=self.string_dt
         )
 
         # Define outer 2-step pipeline with mA at step 1 and pY at step 2
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X")
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
         self.pX_step_1 = self.pX.steps.create(transformation=self.mA, step_num=1)
@@ -276,12 +291,12 @@ class ExecuteTests(TransactionTestCase):
 
         # Dataset for input during execution of pipeline
         input_SD = SymbolicDataset.create_SD(
-            file_path=os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
-            cdt=self.pX_in_cdt,
-            make_dataset=True,
+            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
             user=self.myUser,
-            name="input_dataset",
-            description="symDS description")
+            cdt=self.pX_in_cdt,
+            make_dataset=True, name="input_dataset",
+            description="symDS description"
+        )
 
         # Execute pipeline
         pipeline = self.pX
@@ -305,13 +320,12 @@ class ExecuteTests(TransactionTestCase):
     def test_pipeline_all_inputs_OK_raw(self):
         """Execute a Pipeline with OK raw inputs."""
         # Find a Pipeline with a raw input.
-        pipeline = self.find_raw_pipeline()
+        pipeline = self.find_raw_pipeline(self.myUser)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
-        user = User.objects.first()
-        run = Sandbox(user, pipeline, inputs).execute_pipeline()
+        run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
         self.assertTrue(run.successful_execution())
         self.assertIsNone(run.clean())
@@ -329,7 +343,7 @@ class ExecuteTests(TransactionTestCase):
         for i, sd in enumerate(inputs, start=1):
             if not sd.is_raw():
                 bad_input, bad_index = sd, i
-                bad_ccl = ContentCheckLog(symbolicdataset=sd)
+                bad_ccl = ContentCheckLog(symbolicdataset=sd, user=user)
                 bad_ccl.save()
                 bad_ccl.add_missing_output()
                 break
@@ -346,7 +360,7 @@ class ExecuteTests(TransactionTestCase):
     def test_pipeline_inputs_not_OK_raw(self):
         """Can't execute a Pipeline with non-OK raw inputs."""
         user = User.objects.first()
-        pipeline = self.find_raw_pipeline()
+        pipeline = self.find_raw_pipeline(self.myUser)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
@@ -356,7 +370,7 @@ class ExecuteTests(TransactionTestCase):
         for i, sd in enumerate(inputs, start=1):
             if sd.is_raw():
                 bad_input, bad_index = sd, i
-                bad_icl = IntegrityCheckLog(symbolicdataset=sd)
+                bad_icl = IntegrityCheckLog(symbolicdataset=sd, user=user)
                 bad_icl.save()
                 MD5Conflict(integritychecklog=bad_icl, conflicting_SD=sd).save()
                 break
@@ -372,13 +386,13 @@ class ExecuteTests(TransactionTestCase):
 
 
 class SandboxTests(ExecuteTests):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def test_sandbox_no_input(self):
         """
         A Sandbox cannot be created if the pipeline has inputs but none are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
@@ -389,7 +403,7 @@ class SandboxTests(ExecuteTests):
         """
         A Sandbox cannot be created if the pipeline has fewer inputs than are supplied.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
@@ -399,7 +413,7 @@ class SandboxTests(ExecuteTests):
         """
         We can create a Sandbox if the supplied inputs match the pipeline inputs.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 8, max_row = 12)
@@ -410,7 +424,7 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects raw input and we give it nonraw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -422,13 +436,14 @@ class SandboxTests(ExecuteTests):
         """
         Can't create a Sandbox if the pipeline expects non-raw input and we give it raw.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo", description="bar")
+        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo",
+                                              description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
@@ -440,7 +455,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
         self.assertRaisesRegexp(ValueError,
@@ -454,7 +469,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 2, max_row = 4)
@@ -468,7 +483,7 @@ class SandboxTests(ExecuteTests):
         Can't create a Sandbox if the pipeline expects an input with one CDT
         and we give it the wrong one.
         """
-        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah")
+        p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
             min_row = 20)

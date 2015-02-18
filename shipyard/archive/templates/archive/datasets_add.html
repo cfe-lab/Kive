@@ -14,7 +14,6 @@
 
 <h2>Add Datasets</h2>
 
-
     <form id="datasetAddForm" name="datasetAddForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
         <fieldset class="multiFieldSet">
             <legend>Add Single Dataset</legend>
@@ -35,10 +34,22 @@
                     <td>{{ singleDataset.compound_datatype }}</td>
                     <td class="errortext">{{ singleDataset.compound_datatype.errors }}</td>
                 </tr>
+                <tr><td><label>{{ singleDataset.users_allowed.label }}</label></td>
+                    <td>{{ singleDataset.users_allowed }}</td>
+                    <td class="errortext">{{ singleDataset.users_allowed.errors }}</td>
+                </tr>
+                <tr><td><label>{{ singleDataset.groups_allowed.label }}</label></td>
+                    <td>{{ singleDataset.groups_allowed }}</td>
+                    <td class="errortext">{{ singleDataset.groups_allowed.errors }}</td>
+                </tr>
             </table>
         </fieldset>
         <input type="submit" name="singleSubmit" value="Submit Single Dataset">
-        <div class="errorStrip errortext">{{ create_error }}</div>
+        <div class="errorStrip errortext">
+        {% if singleDataset.non_field_errors %}
+            Error while adding datasets:
+        {% endif %}
+        {{ singleDataset.non_field_errors }}</div>
 </form>
 
 

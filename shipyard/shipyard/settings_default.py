@@ -212,3 +212,6 @@ LOGGING = {
 FLEET_POLLING_INTERVAL = 30 # in seconds
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+
+LOGIN_URL="login"
+LOGIN_REDIRECT_URL="home"

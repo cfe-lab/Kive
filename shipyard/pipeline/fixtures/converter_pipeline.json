@@ -5,7 +5,8 @@
     "fields": {
         "published_version": null,
         "name": "Fasta2CSV",
-        "description": "One-step pipeline wrapper for Fasta2CSV Method"
+        "description": "One-step pipeline wrapper for Fasta2CSV Method",
+        "user": 1
     }
 },
 {

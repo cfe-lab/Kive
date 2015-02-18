@@ -1,28 +1,26 @@
 from django import forms
 from django.forms.widgets import ClearableFileInput
-from metadata.models import CompoundDatatype
-from archive.models import Dataset
 from django.contrib.auth.models import User
-from librarian.models import SymbolicDataset
+from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 
 import logging
+from datetime import datetime
+
+from metadata.models import CompoundDatatype
+from archive.models import Dataset
+from librarian.models import SymbolicDataset
+import metadata.forms
+
 
 from constants import maxlengths
-from datetime import datetime
-from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 """
 Generate an HTML form to create a new DataSet object
 """
 
-
-
-
 LOGGER = logging.getLogger(__name__)
 
 
-
-
-class DatasetForm (forms.Form):
+class DatasetForm (metadata.forms.AccessControlForm):
     """
     User-entered single dataset.  We avoid using ModelForm since we can't set Dataset.user and Dataset.symbolicdataset
     before checking if the ModelForm.is_valid().  As a result, the internal calls to Model.clean() fail.
@@ -38,25 +36,23 @@ class DatasetForm (forms.Form):
         compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    def create_dataset(self):
+    def create_dataset(self, user):
         """
         Creates and commits the Dataset and its associated SymbolicDataset to db.
         Expects that DatasetForm.is_valid() has been called so that DatasetForm.cleaned_data dict has been populated
         with validated data.
         """
-
-        username = 'shipyard'   # TODO:  do not hardcode this
-        user = User.objects.get(username=username)
-
         compound_datatype_obj = None
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        symbolicdataset = SymbolicDataset.create_SD(file_path=None, file_handle=self.cleaned_data['dataset_file'],
+        symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
+                                                    users_allowed=self.cleaned_data["users_allowed"],
+                                                    groups_allowed=self.cleaned_data["groups_allowed"],
                                                     cdt=compound_datatype_obj,
-                                                    make_dataset=True, user=user, name=self.cleaned_data['name'],
-                                                    description=self.cleaned_data['description'],
-                                                    created_by=None, check=True)
+                                                    make_dataset=True, name=self.cleaned_data['name'],
+                                                    description=self.cleaned_data['description'], created_by=None,
+                                                    check=True, file_handle=self.cleaned_data['dataset_file'])
 
         return symbolicdataset
 
@@ -84,10 +80,9 @@ class BulkDatasetUpdateForm (forms.Form):
         self.dataset = Dataset()
         self.status = 0
 
-
     def update(self):
         if self.cleaned_data['id']:
-            dataset = Dataset.objects.filter(id=self.cleaned_data['id']).get()
+            dataset = Dataset.objects.get(id=self.cleaned_data['id'])
             dataset.name = self.cleaned_data['name']
             dataset.description = self.cleaned_data['description']
             dataset.save()
@@ -95,10 +90,9 @@ class BulkDatasetUpdateForm (forms.Form):
         return None
 
 
-
-
-
-class BulkCSVDatasetForm (forms.Form):
+# FIXME: This was modified to support users and groups, but is not called by any view.
+# If you get to implementing a view using this, beware that it was not tested!
+class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
     """
     Creates multiple datasets from a CSV.
     Expects that BulkDatasetForm.is_valid() has been called so that BulkDatasetForm.cleaned_data dict has been populated
@@ -114,20 +108,17 @@ class BulkCSVDatasetForm (forms.Form):
         compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    def create_datasets(self):
-
-        username = 'shipyard'   # TODO:  do not hardcode this
-        user = User.objects.get(username=username)
+    def create_datasets(self, user):
 
         compound_datatype_obj = None
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        SymbolicDataset.create_SD_bulk(csv_file_path=None, csv_file_handle=self.cleaned_data['datasets_csv'],
-                                       cdt=compound_datatype_obj, make_dataset=True,
-                                       user=user, created_by=None, check=True)
-
-
+        SymbolicDataset.create_SD_bulk(csv_file_path=None, user=user,
+                                       users_allowed=self.cleaned_data["users_allowed"],
+                                       groups_allowed=self.cleaned_data["groups_allowed"],
+                                       csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
+                                       make_dataset=True, created_by=None, check=True)
 
 
 class MultiFileField(forms.Field):
@@ -163,7 +154,7 @@ class MultiFileField(forms.Field):
         return clean_data
 
 
-class BulkAddDatasetForm (forms.Form):
+class BulkAddDatasetForm (metadata.forms.AccessControlForm):
     """
     Uploads multiple datasets at once.
     Appends the date and time to the name_prefix to make the dataset name unique.
@@ -200,7 +191,7 @@ class BulkAddDatasetForm (forms.Form):
             # If we don't do this, then only the first file in the list is assigned to dataset_files
             self.files = {"dataset_files": files.getlist("dataset_files")}
 
-    def create_datasets(self):
+    def create_datasets(self, user):
         """
         Creates the Datasets and the corresponding SymbolicDatasets in same order as cleaned_data["dataset_files"].
         Will still save successful Datasets to database even if some of the Datasets fail to create.
@@ -208,9 +199,6 @@ class BulkAddDatasetForm (forms.Form):
         :return:  a list of the created Dataset objects in the same order as cleaned_data["dataset_files"].
             If the Dataset failed to create, then the list element contains error message.
         """
-        username = 'shipyard'   # TODO:  do not hardcode this
-        user = User.objects.get(username=username)
-
         compound_datatype_obj = None
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
@@ -232,11 +220,12 @@ class BulkAddDatasetForm (forms.Form):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(file_path=None, file_handle=uploaded_file,
-                                                            cdt=compound_datatype_obj,
-                                                            make_dataset=True, user=user,
+                symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
+                                                            users_allowed=self.cleaned_data["users_allowed"],
+                                                            groups_allowed=self.cleaned_data["groups_allowed"],
+                                                            cdt=compound_datatype_obj, make_dataset=True,
                                                             name=auto_name, description=auto_description,
-                                                            created_by=None, check=True)
+                                                            created_by=None, check=True, file_handle=uploaded_file)
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)

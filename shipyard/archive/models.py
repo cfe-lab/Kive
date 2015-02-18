@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.db.models.signals import post_delete
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.utils.encoding import python_2_unicode_compatible
@@ -23,11 +23,12 @@ from operator import attrgetter, itemgetter
 
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import stopwatch.models
+import metadata.models
 from constants import maxlengths
 import archive.signals
 
 @python_2_unicode_compatible
-class Run(stopwatch.models.Stopwatch):
+class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
     Stores data associated with an execution of a pipeline.
 
@@ -35,7 +36,7 @@ class Run(stopwatch.models.Stopwatch):
     Related to :model:`archive.models.RunStep`
     Related to :model:`archive.models.Dataset`
     """
-    user = models.ForeignKey(User, help_text="User who performed this run")
+    # user = models.ForeignKey(User, help_text="User who performed this run")
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
                                  help_text="Pipeline used in this run")
 
@@ -1851,7 +1852,10 @@ class Dataset(models.Model):
     """
     UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
 
-    user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
+    # The user who created this Dataset is now stored in one of
+    # a) the SymbolicDataset of this Dataset (if it's uploaded)
+    # b) the parent Run of created_by (if it's generated)
+    # user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, help_text="Name of this Dataset.")
     description = models.TextField(help_text="Description of this Dataset.",
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
@@ -1873,6 +1877,12 @@ class Dataset(models.Model):
 
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
+
+    @property
+    def user(self):
+        if self.created_by is None:
+            return self.symbolicdataset.user
+        return self.created_by.parent_run.user
 
     def __str__(self):
         """

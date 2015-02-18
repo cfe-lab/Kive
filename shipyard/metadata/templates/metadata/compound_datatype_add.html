@@ -17,6 +17,24 @@
 <h2>Add a new compound datatype</h2>
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+
+    <table>
+        <tr>
+            <th>{{ cdt_form.users_allowed.label_tag }}</th>
+            <td><div class="helptext">{{ cdt_form.users_allowed.help_text }}</div></td>
+            <td>{{ cdt_form.users_allowed }}</td>
+            <td class="errortext">{{ cdt_form.users_allowed.errors }}</td>
+        </tr>
+        <tr>
+            <th>{{ cdt_form.groups_allowed.label_tag }}</th>
+            <td><div class="helptext">{{ cdt_form.groups_allowed.help_text }}</div></td>
+            <td>{{ cdt_form.groups_allowed }}</td>
+            <td class="errortext">{{ cdt_form.groups_allowed.errors }}</td>
+        </tr>
+    </table>
+
+    {{ cdt_form.non_field_errors }}
+
     <p>
     <input type="button" id="addForm" value="+" class="add" /><input type="button" id="removeForm" value="&minus;" class="remove" />
     <small>Add/subtract form fields</small>
@@ -38,7 +56,7 @@
                 <td>{{ forloop.counter }}</td>
                 <td>{{ cdm_form.datatype }}</td>
                 <td>{{ cdm_form.column_name }}</td>
-                <td>{{ cdm_form.errors.Errors }}</td>
+                <td class="errortext">{{ cdm_form.errors }}</td>
             </tr>
             {% endfor %}
         </tbody>

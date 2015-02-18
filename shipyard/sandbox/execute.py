@@ -216,7 +216,8 @@ class Sandbox:
         end_time        time when we finished checking for missing output
         """
         self.logger.error("File doesn't exist - creating CCL with BadData")
-        ccl = output_SD.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog)
+        ccl = output_SD.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog,
+                                              user=self.user)
         ccl.add_missing_output()
 
     def execute_cable(self, cable, parent_record, recovering_record=None, input_SD=None, output_path=None):
@@ -501,6 +502,7 @@ class Sandbox:
             return curr_RS
 
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
+
         # This is only meant for single-threaded use so we just say the worker rank is 1.
         return _finish_step_h(1, self.user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
                               output_paths, log_dir, recovering_record, sandbox_to_update=self)
@@ -1538,10 +1540,10 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     if cable.is_trivial():
                         output_SD = input_SD
                     if execrecord is None:
-                        output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
+                        output_SD = librarian.models.SymbolicDataset.create_empty(user, output_CDT)
                     else:
                         output_SD = execrecord.execrecordouts.first().symbolicdataset
-                    output_SD.mark_missing(start_time, end_time, curr_log)
+                    output_SD.mark_missing(start_time, end_time, curr_log, user)
                     missing_output = True
 
                 elif cable.is_trivial():
@@ -1562,8 +1564,8 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
                     else:
                         output_SD = librarian.models.SymbolicDataset.create_SD(
-                            output_path, output_CDT, make_dataset, user,
-                            dataset_name, dataset_desc, curr_record, False)
+                            output_path, user, cdt=output_CDT, make_dataset=make_dataset,
+                            name=dataset_name, description=dataset_desc, created_by=curr_record, check=False)
 
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
@@ -1604,7 +1606,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
             summary_path = "{}_summary".format(output_path)
             # Perform content check.
             output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                          cable.max_rows_out, curr_log)
+                                          cable.max_rows_out, curr_log, user)
 
         # If a sandbox was specified and we were successful, update the sandbox.
         if sandbox_to_update is not None and output_SD.is_OK() and not recover:
@@ -1767,8 +1769,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             if preexisting_ER:
                                 output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_empty(output_CDT)
-                            output_SD.mark_missing(start_time, end_time, curr_log)
+                                output_SD = librarian.models.SymbolicDataset.create_empty(user, output_CDT)
+                            output_SD.mark_missing(start_time, end_time, curr_log, user)
 
                             bad_output_found = True
 
@@ -1793,8 +1795,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
                             else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(
-                                    output_path, output_CDT, make_dataset,
-                                    user, dataset_name, dataset_desc, runstep, False
+                                    output_path, user, cdt=output_CDT, make_dataset=make_dataset,
+                                    name=dataset_name, description=dataset_desc, created_by=runstep,
+                                    check=False
                                 )
                                 logger.debug("[%d] First time seeing file: saved md5 %s",
                                              worker_rank, output_SD.MD5_checksum)
@@ -1836,7 +1839,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 start_time = timezone.now()
                 if not file_access_utils.file_exists(output_path):
                     end_time = timezone.now()
-                    check = output_SD.mark_missing(start_time, end_time, curr_log)
+                    check = output_SD.mark_missing(start_time, end_time, curr_log, user)
                     logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
                     file_is_present = False
 
@@ -1866,7 +1869,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
             logger.debug("[%d] %s is new data - performing content check", worker_rank, output_SD)
             summary_path = "{}_summary".format(output_path)
             check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
-                                                  curr_output.get_max_row(), curr_log)
+                                                  curr_output.get_max_row(), curr_log, user)
 
         # Check OK? No.
         if check and check.is_fail():

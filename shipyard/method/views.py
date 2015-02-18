@@ -2,88 +2,180 @@
 method.views
 """
 
-from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, Context, RequestContext
+from django.core.context_processors import csrf
+from django.core.exceptions import ValidationError
+from django.contrib.auth.models import Group
+from django.db import transaction
+from django.contrib.auth.decorators import login_required
+
+from datetime import datetime
+
+import metadata.models
 from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
 from method.forms import *
 from transformation.models import *
-#from django.shortcuts import render, render_to_response
-from django.core.context_processors import csrf
-from django.core.exceptions import ValidationError
-from django.forms.util import ErrorList
-from datetime import datetime
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
+import metadata.views
+
+from constants import groups, users
+
+everyone = Group.objects.get(pk=groups.EVERYONE_PK)
+shipyard_user = User.objects.get(pk=users.SHIPYARD_USER_PK)
 
 
+@login_required
 def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = CodeResource.objects.all()
+    # Cast request.user to KiveUser.
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    resources = CodeResource.objects.filter(curr_user.access_query()).distinct()
 
     t = loader.get_template('method/resources.html')
-    c = Context({'resources': resources})
-    c.update(csrf(request))
+    c = RequestContext(request, {'resources': resources})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def resource_revisions(request, id):
     """
     Display a list of all revisions of a specific Code Resource in database.
     """
-    coderesource = CodeResource.objects.get(pk=id)
-    revisions = coderesource.revisions.order_by('-revision_number')
+    c = RequestContext(request)
+    four_oh_four = False
+    try:
+        coderesource = CodeResource.objects.get(pk=id)
+    except CodeResource.DoesNotExist:
+        four_oh_four = True
+
+    if not coderesource.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    # Cast request.user to class KiveUser.
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    revisions = coderesource.revisions.filter(curr_user.access_query()).distinct().order_by(
+        '-revision_number')
     t = loader.get_template('method/resource_revisions.html')
-    c = Context({'coderesource': coderesource, 'revisions': revisions})
-    c.update(csrf(request))
+    c.update({'coderesource': coderesource, 'revisions': revisions})
     return HttpResponse(t.render(c))
 
 
-def return_crv_forms(query, exceptions, is_new):
+def _make_dep_forms(query_dict, user):
     """
-    A helper function for resource_revise() to populate forms with user-submitted values
-    and form validation errors to be returned as HttpResponse.
-    NOTE: cannot set default value of FileField due to security.
-    :param query: Dictionary containing POST data
-    :param exceptions: Dictionary containing exception messages with custom keys
-    :param is_new: modify form if user is attempting to create a new CodeResource
-        (prototype) or revising an existing one (revision)
-    :return: populated Form objects to render in context
+    Helper for resource_add and resource_revision_add that creates the CodeResourceDependencyForms.
     """
-
-    if is_new:
-        # creating a new CodeResource
-        crv_form = CodeResourcePrototypeForm(initial={'resource_name': query['resource_name'],
-                                                      'resource_desc': query['resource_desc']})
-        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
-                                'resource_name': exceptions.get('name', ''),
-                                'resource_desc': exceptions.get('description', '')})
-    else:
-        # revising a code resource
-        crv_form = CodeResourceRevisionForm(initial={'revision_name': query['revision_name'],
-                                                     'revision_desc': query['revision_desc']})
-        crv_form.errors.update({'content_file': exceptions.get('content_file', ''),
-                                'revision_name': exceptions.get('revision_name', ''),
-                                'revision_desc': exceptions.get('revision_desc', '')})
-
-    num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
+    num_dep_forms = sum([1 for k in query_dict.iterkeys() if k.startswith('coderesource_')])
     dep_forms = []
     for i in range(num_dep_forms):
-        if query['coderesource_'+str(i)]:
-            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
-                                                  initial={'coderesource': query['coderesource_'+str(i)],
-                                                           'revisions': query['revisions_'+str(i)],
-                                                           'depPath': query['depPath_'+str(i)],
-                                                           'depFileName': query['depFileName_'+str(i)]})
-        else:
-            dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i))
-        dep_form.errors['Errors'] = ErrorList(exceptions.get(i, ''))
-        dep_forms.append(dep_form)
+        this_cr = query_dict['coderesource_'+str(i)]  # PK of CodeResource
+        if this_cr == '':
+            # Ignore blank CR dependency forms.
+            dep_forms.append(None)
+            continue
 
-    return crv_form, dep_forms
+        dep_forms.append(
+            CodeResourceDependencyForm(
+                {
+                    'coderesource': query_dict['coderesource_'+str(i)],
+                    'revisions': query_dict['revisions_'+str(i)],
+                    'depPath': query_dict['depPath_'+str(i)],
+                    'depFileName': query_dict['depFileName_'+str(i)]
+                },
+                user=user,
+                auto_id='id_%s_'+str(i)
+            )
+        )
+    return dep_forms
 
 
+@transaction.atomic
+def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revision=None):
+    """
+    Helper that creates a CodeResourceRevision (and a CodeResource as well if appropriate).
+    """
+    assert isinstance(crv_form, (CodeResourcePrototypeForm, CodeResourceRevisionForm))
+    # If parent_revision is specified, we are only making a CodeResourceRevision and not its parent CodeResource.
+    assert not (parent_revision is None and isinstance(crv_form, CodeResourceRevision))
+    for dep_form in dep_forms:
+        assert isinstance(dep_form, CodeResourceDependencyForm) or dep_form is None
+
+    if parent_revision is None:
+        # crv_form is a CodeResourcePrototypeForm.
+        code_resource = CodeResource(
+            name=crv_form.cleaned_data['resource_name'],
+            description=crv_form.cleaned_data['resource_desc'],
+            filename=file_in_memory.name,
+            user=creating_user
+        )
+        # Skip the clean until later; after all, we're protected by a transaction here.
+        code_resource.save()
+
+        for user in crv_form.cleaned_data["users_allowed"]:
+            code_resource.users_allowed.add(user)
+        for group in crv_form.cleaned_data["groups_allowed"]:
+            code_resource.groups_allowed.add(group)
+
+        rev_name = "Prototype"
+        rev_desc = crv_form.cleaned_data["resource_desc"]
+    else:
+        code_resource = parent_revision.coderesource
+        rev_name = crv_form.cleaned_data["revision_name"]
+        rev_desc = crv_form.cleaned_data["revision_desc"]
+
+    # Modify actual filename prior to saving revision object.
+    file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+    revision = CodeResourceRevision(
+        revision_name=rev_name,
+        revision_desc=rev_desc,
+        coderesource=code_resource,
+        content_file=file_in_memory,
+        user=creating_user
+    )
+    revision.save()
+
+    for user in crv_form.cleaned_data["users_allowed"]:
+        revision.users_allowed.add(user)
+    for group in crv_form.cleaned_data["groups_allowed"]:
+        revision.groups_allowed.add(group)
+
+    revision.save()
+
+    # Bind CR dependencies.
+    for i in range(len(dep_forms)):
+        if dep_forms[i] is None:
+            continue
+        try:
+            on_revision = CodeResourceRevision.objects.get(pk=dep_forms[i].cleaned_data["revisions"])
+            dependency = CodeResourceDependency(
+                coderesourcerevision=revision,
+                requirement = on_revision,
+                depPath=dep_forms[i].cleaned_data["depPath"],
+                depFileName=dep_forms[i].cleaned_data["depFileName"]
+            )
+            dependency.full_clean()
+            dependency.save()
+        except ValidationError as e:
+            dep_forms[i].add_error(None, e)
+            raise e
+
+    try:
+        code_resource.full_clean()
+        revision.full_clean()
+    except ValidationError as e:
+        crv_form.add_error(None, e)
+        raise e
+
+    return revision
+
+
+@login_required
 def resource_add(request):
     """
     Add a new code resource with a prototype (no revisions).  The FILENAME of the prototype will
@@ -94,445 +186,531 @@ def resource_add(request):
     NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
     t = loader.get_template('method/resource_add.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
     if request.method == 'POST':
-        query = request.POST.dict()
+        # Using forms here provides validation and better parsing of parameters in the request.
+        resource_form = CodeResourcePrototypeForm(request.POST, request.FILES)
+        dep_forms = _make_dep_forms(request.POST.dict(), creating_user)
 
-        exceptions = {}
-        new_code_resource = None
-        prototype = None
+        # Note that entries of dep_forms may be None -- we simply skip these.
+        all_good = True
+        if not resource_form.is_valid():
+            all_good = False
+        for dep_form in [x for x in dep_forms if x is not None]:
+            if not dep_form.is_valid():
+                all_good = False
 
-        try:
-            try:
-                file_in_memory = request.FILES['content_file']
-            except:
-                exceptions.update({'content_file': 'You must specify a file upload.'})
-                raise  # content_file required for next steps
-
-            try:
-                new_code_resource = CodeResource(name=query['resource_name'],
-                                                 description=query['resource_desc'],
-                                                 filename=file_in_memory.name)
-                new_code_resource.full_clean()
-                new_code_resource.save()
-            except ValidationError as e:
-                for key, msg in e.message_dict.iteritems():
-                    exceptions.update({key: str(msg[0])})
-                raise  # CodeResource object required for next steps
-
-            # modify actual filename prior to saving revision object
-            file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
-
-            try:
-                prototype = CodeResourceRevision(revision_name='Prototype', revision_desc=query['resource_desc'],
-                        coderesource=new_code_resource, content_file=file_in_memory)
-                prototype.full_clean()
-                prototype.save()
-            except ValidationError as e:
-                for key, msg in e.message_dict.iteritems():
-                    exceptions.update({key: str(msg[0])})
-                raise  # CodeResourceRevision object required for next steps
-
-            # bind CR dependencies
-            num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
-            to_save = []
-            for i in range(num_dep_forms):
-                this_cr = query['coderesource_'+str(i)]  # PK of CodeResource
-                if this_cr == '':
-                    # ignore blank CR dependency forms
-                    continue
-                try:
-                    on_revision = CodeResourceRevision.objects.get(pk=query['revisions_'+str(i)])
-                    dependency = CodeResourceDependency(coderesourcerevision=prototype,
-                                                    requirement = on_revision,
-                                                    depPath=query['depPath_'+str(i)],
-                                                    depFileName=query['depFileName_'+str(i)])
-                    dependency.full_clean()
-                    to_save.append(dependency)
-                except ValidationError as e:
-                    exceptions.update({i: e.messages})
-
-        except:
-            if hasattr(new_code_resource, 'id') and new_code_resource.id is not None:
-                new_code_resource.delete()
-            if hasattr(prototype, 'id') and prototype.id is not None:
-                prototype.delete()  # roll back CodeResourceRevision object
-
-            crv_form, dep_forms = return_crv_forms(query, exceptions, True)
-            c = Context({'resource_form': crv_form, 'dep_forms': dep_forms})
-            c.update(csrf(request))
+        if not all_good:
+            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
             return HttpResponse(t.render(c))
 
-        # success!
-        for dependency in to_save:
-            dependency.save()
+        # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
+        try:
+            _make_crv(request.FILES["content_file"], creating_user, resource_form, dep_forms)
+        except ValidationError as e:
+            # All forms have the appropriate errors attached.
+            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
+            return HttpResponse(t.render(c))
 
+        # Success -- return to the resources root page.
         return HttpResponseRedirect('/resources')
-
     else:
-        form = CodeResourcePrototypeForm()
-        dep_forms = [CodeResourceDependencyForm(auto_id='id_%s_0')]
+        resource_form = CodeResourcePrototypeForm()
+        dep_forms = [CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0')]
 
-    c = Context({'resource_form': form, 'dep_forms': dep_forms})
-    c.update(csrf(request))
+    c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def resource_revision_add(request, id):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
     revision to this code resource.
     """
     t = loader.get_template('method/resource_revision_add.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
-    # use POST information (id) to retrieve CRv being revised
-    parent_revision = CodeResourceRevision.objects.get(pk=id)
+    # Use POST information (id) to retrieve the CRv being revised.
+    four_oh_four = False
+    try:
+        parent_revision = CodeResourceRevision.objects.get(pk=id)
+    except CodeResourceRevision.DoesNotExist:
+        four_oh_four = True
+        raise Http404("ID {} cannot be accessed".format(id))
+
     coderesource = parent_revision.coderesource
 
+    if not parent_revision.can_be_accessed(creating_user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
+
     if request.method == 'POST':
-        query = request.POST.dict()
-        exceptions = {}
-        revision = None
+        # Use forms here, just as in resource_add.  Again note that entries of dep_forms may be None.
+        revision_form = CodeResourceRevisionForm(request.POST, request.FILES)
+        dep_forms = _make_dep_forms(request.POST.dict(), creating_user)
+
+        all_good = True
+        if not revision_form.is_valid():
+            all_good = False
+        for dep_form in [x for x in dep_forms if x is not None]:
+            if not dep_form.is_valid():
+                all_good = False
+
+        if not all_good:
+            c.update({
+                'revision_form': revision_form,
+                'parent_revision': parent_revision,
+                'coderesource': coderesource,
+                'dep_forms': dep_forms
+            })
+            return HttpResponse(t.render(c))
+
 
         try:
-            try:
-                file_in_memory = request.FILES['content_file']
-                # modify actual filename prior to saving revision object
-                file_in_memory.name += datetime.now().strftime('_%Y%m%d%H%M%S')
-            except:
-                exceptions.update({'content_file': 'You must specify a file upload.'})
-                raise  # content_file required for next steps
+            _make_crv(request.FILES['content_file'], creating_user, revision_form, dep_forms,
+                      parent_revision=parent_revision)
+        except ValidationError as e:
+            # The forms have all been updated with the appropriate errors.
+            c.update(
+                {
+                    'revision_form': revision_form,
+                    'parent_revision': parent_revision,
+                    'coderesource': coderesource,
+                    'dep_forms': dep_forms
+                })
+            return HttpResponse(t.render(c)) # CodeResourceRevision object required for next steps
 
-            # is this file identical to another CodeResourceRevision?
-            try:
-                revision = CodeResourceRevision(revision_parent=parent_revision,
-                                                revision_name=query['revision_name'],
-                                                revision_desc=query['revision_desc'],
-                                                coderesource=coderesource,
-                                                content_file=file_in_memory)
-                revision.full_clean()
-                revision.save()
-            except ValidationError as e:
-                for key, msg in e.message_dict.iteritems():
-                    exceptions.update({key: str(msg[0])})
-                raise  # CodeResourceRevision object required for next steps
+        # Success; return to the resources page.
+        return HttpResponseRedirect('/resources')
 
-            # bind CR dependencies
-            num_dep_forms = sum([1 for k in query.iterkeys() if k.startswith('coderesource_')])
-            to_save = []
-            for i in range(num_dep_forms):
-                crv_id = query['revisions_'+str(i)]
-                if crv_id == '':
-                    # blank form, ignore
-                    continue
-                try:
-                    on_revision = CodeResourceRevision.objects.get(pk=crv_id)
-                    dependency = CodeResourceDependency(coderesourcerevision=revision,
-                                                        requirement = on_revision,
-                                                        depPath=query['depPath_'+str(i)],
-                                                        depFileName=query['depFileName_'+str(i)])
-                    dependency.full_clean()
-                    to_save.append(dependency)
-                except ValidationError as e:
-                    exceptions.update({i: e.messages})
+    # Having reached here, we know that this CR is being revised.  Return a form pre-populated
+    # with default info.
+    crv_form = CodeResourceRevisionForm()
 
-            if len(exceptions) > 0:
-                # one or more ValidationErrors were raised
-                raise
+    # TODO: do not allow CR to depend on itself
+    dependencies = parent_revision.dependencies.all()
+    dep_forms = []
+    for i, dependency in enumerate(dependencies):
+        its_crv = dependency.requirement
+        its_cr = its_crv.coderesource
+        if its_cr:
+            dep_form = CodeResourceDependencyForm(
+                user=creating_user,
+                auto_id='id_%s_'+str(i),
+                initial={
+                    'coderesource': its_cr.pk,
+                    'revisions': its_crv.pk,
+                    'depPath': dependency.depPath,
+                    'depFileName': dependency.depFileName
+                },
+                parent=coderesource.id)
+        else:
+            dep_form = CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_'+str(i))
+        dep_forms.append(dep_form)
 
-            # success!
-            for dependency in to_save:
-                dependency.save()
+    # in case the parent revision has no CR dependencies, add a blank form
+    if len(dep_forms) == 0:
+        dep_forms.append(CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0', parent=coderesource.id))
 
-            return HttpResponseRedirect('/resources')
-
-        except:
-            if hasattr(revision, 'id') and revision.id is not None:
-                revision.delete()
-
-            crv_form, dep_forms = return_crv_forms(query, exceptions, False)
-            # fall through to return statement below
-
-    else:
-        # this CR is being revised
-        crv_form = CodeResourceRevisionForm()
-
-        # TODO: do not allow CR to depend on itself
-        dependencies = parent_revision.dependencies.all()
-        dep_forms = []
-        for i, dependency in enumerate(dependencies):
-            its_crv = dependency.requirement
-            its_cr = its_crv.coderesource
-            if its_cr:
-                dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i),
-                                                      initial={'coderesource': its_cr.pk,
-                                                               'revisions': its_crv.pk,
-                                                               'depPath': dependency.depPath,
-                                                               'depFileName': dependency.depFileName},
-                                                      parent=coderesource.id)
-            else:
-                dep_form = CodeResourceDependencyForm(auto_id='id_%s_'+str(i))
-            dep_forms.append(dep_form)
-
-        # in case the parent revision has no CR dependencies, add a blank form
-        if len(dep_forms) == 0:
-            dep_forms.append(CodeResourceDependencyForm(auto_id='id_%s_0',
-                                                        parent=coderesource.id))
-
-    c = Context({'resource_form': crv_form, 'parent_revision': parent_revision,
-                 'coderesource': coderesource, 'dep_forms': dep_forms})
-    c.update(csrf(request))
+    c.update(
+        {
+            'revision_form': crv_form,
+            'parent_revision': parent_revision,
+            'coderesource': coderesource,
+            'dep_forms': dep_forms
+        }
+    )
     return HttpResponse(t.render(c))
 
 
+@login_required
+def resource_revision_view(request, id):
+    four_oh_four = False
+    try:
+        revision = CodeResourceRevision.objects.get(pk=id)
+    except CodeResourceRevision.DoesNotExist:
+        four_oh_four = True
+
+    if not revision.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} is not accessible".format(id))
+
+    t = loader.get_template("method/resource_revision_view.html")
+    c = RequestContext(request, {"revision": revision})
+    return HttpResponse(t.render(c))
+
+
+@login_required
 def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
     """
-    families = MethodFamily.objects.all()
+    curr_user = metadata.models.KiveUser.kiveify(request.user)
+    families = MethodFamily.objects.filter(curr_user.access_query()).distinct()
     t = loader.get_template('method/method_families.html')
-    c = Context({'families': families})
-    c.update(csrf(request))
+    c = RequestContext(request, {'families': families})
     return HttpResponse(t.render(c))
 
 
+@login_required
 def methods(request, id):
     """
     Display a list of all Methods within a given MethodFamily.
     """
-    family = MethodFamily.objects.get(pk=id)
-    its_methods = family.members.all()
+    four_oh_four = False
+    try:
+        family = MethodFamily.objects.get(pk=id)
+    except MethodFamily.DoesNotExist:
+        four_oh_four = True
+
+    if not family.can_be_accessed(request.user):
+        four_oh_four = True
+
+    if four_oh_four:
+        # Redirect back to the resources page.
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    user_plus = metadata.models.KiveUser.kiveify(request.user)
+    its_methods = family.members.filter(user_plus.access_query()).distinct()
 
     t = loader.get_template('method/methods.html')
-    c = Context({'methods': its_methods, 'family': family})
-    c.update(csrf(request))
+    c = RequestContext(request, {'methods': its_methods, 'family': family})
     return HttpResponse(t.render(c))
 
 
-def return_method_forms (query, exceptions):
+def create_method_forms(request_post, user):
     """
-    Helper function for method_add()
-    Send HttpResponse Context with forms filled out with previous values including error messages
-    """    
-    if 'name' in query:
-        family_form = MethodFamilyForm(initial={'name': query['name'],
-                                                'description': query['description']})
+    Helper function for method_add() that creates Forms from the provided information and validates them.
+    """
+    query_dict = request_post.dict()
+    if 'name' in query_dict:
+        family_form = MethodFamilyForm(request_post)
+        family_form.is_valid()
     else:
         family_form = MethodFamilyForm()
 
-    for key, msg in exceptions.iteritems():
-        family_form.errors.update({key: msg})
+    # Populate main form with submitted values.
+    if "coderesource" in query_dict:
+        method_form = MethodForm(request_post, user=user)
+    else:
+        method_form = MethodReviseForm(request_post, user=user)
+    method_form.is_valid()
 
-    # populate main form with submitted values
-    method_form = MethodForm(initial={'revision_name': query['revision_name'],
-                                      'revision_desc': query['revision_desc'],
-                                      'coderesource': query['coderesource'],
-                                      'revisions': query['revisions'],
-                                      'reusable': query['reusable']})
-
-    for key, msg in exceptions.iteritems():
-        method_form.errors.update({key: msg})
-
-    # populate in/output forms with submitted values
-    xput_forms = []
+    # Populate in/output forms with submitted values.
+    input_forms = []
+    output_forms = []
     for xput_type in ["in", "out"]:
-        num_forms = sum(k.startswith('dataset_name_{}_'.format(xput_type)) for k in query)
-        forms = []
-        error_key = "{}puts".format(xput_type)
+        num_forms = sum(k.startswith('dataset_name_{}_'.format(xput_type)) for k in query_dict)
+
         for i in range(num_forms):
             auto_id = "id_%s_{}_{}".format(xput_type, i)
-            t_form = TransformationXputForm(auto_id=auto_id,
-                    initial={'dataset_name': query['dataset_name_{}_{}'.format(xput_type, i)]})
-            xs_form = XputStructureForm(auto_id=auto_id,
-                    initial={'compounddatatype': query['compounddatatype_{}_{}'.format(xput_type, i)],
-                             'min_row': query['min_row_{}_{}'.format(xput_type, i)],
-                             'max_row': query['max_row_{}_{}'.format(xput_type, i)]})
+            t_form = TransformationXputForm(
+                {'dataset_name': query_dict['dataset_name_{}_{}'.format(xput_type, i)]},
+                auto_id=auto_id)
+            t_form.is_valid()
 
-            if i in exceptions['inputs']: 
-                if 'dataset_name' in exceptions[error_key][i]:
-                    t_form.errors.update({'dataset_name': exceptions[error_key][i]['dataset_name']})
-                if 'compounddatatype' in exceptions[error_key][i]:
-                    xs_form.errors.update({'compounddatatype': exceptions[error_key][i]['compounddatatype']})
+            xs_form = XputStructureForm(
+                {'compounddatatype': query_dict['compounddatatype_{}_{}'.format(xput_type, i)],
+                 'min_row': query_dict['min_row_{}_{}'.format(xput_type, i)],
+                 'max_row': query_dict['max_row_{}_{}'.format(xput_type, i)]},
+                user=user,
+                auto_id=auto_id)
+            xs_form.is_valid()
 
-            forms.append((t_form, xs_form))
-        xput_forms.append(forms)
+            input_forms.append((t_form, xs_form)) if xput_type == "in" else output_forms.append((t_form, xs_form))
 
-    return family_form, method_form, xput_forms[0], xput_forms[1]
+    return family_form, method_form, input_forms, output_forms
 
 
-def parse_method_form(query, family=None, parent_method=None):
-    """Parse user input for adding or revising Methods.
-    
-    Return a dictionary of exceptions, or None if everything
-    went smoothly.
-
-    PARAMETERS
-    family          MethodFamily to add new Method to (None for new
-                    family)
-    parent_method   parent revision for new Method (None for no parent)
+def create_method_from_forms(family_form, method_form, input_forms, output_forms, creating_user,
+                             family=None, parent_method=None):
     """
-    exceptions = {"inputs": {}, "outputs": {}}
-    num_input_forms = sum(k.startswith('dataset_name_in_') for k in query)
-    num_output_forms = sum(k.startswith('dataset_name_out_') for k in query)
+    Given Forms representing the MethodFamily, Method, inputs, and outputs, create a Method.
 
-    # retrieve CodeResource revision as driver
+    Return the same forms, updated with errors if there are any.
+    """
+    # This assures that not both family_form and family are None.
+    assert family is not None or family_form is not None
+
+    # Retrieve the CodeResource revision as driver.
     try:
-        coderesource_revision = CodeResourceRevision.objects.get(pk=query['revisions'])
-    except ValueError:
-        exceptions.update({'coderesource': 'Must specify code resource'})
+        coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['revisions'])
+    except (ValueError, CodeResourceRevision.DoesNotExist) as e:
+        method_form.add_error("revisions", e)
+        return None
 
-    # attempt to make in/outputs
-    names = []
-    compounddatatypes = []
-    row_limits = []
-    num_inputs = 0
-    num_outputs = 0
-    for i in range(num_input_forms + num_output_forms):
-        xput_type = "in" if i < num_input_forms else "out"
-        xput_idx = i-num_input_forms if i>=num_input_forms else i
-        dataset_name = query['dataset_name_{}_{}'.format(xput_type, xput_idx)]
-        cdt_id = query['compounddatatype_{}_{}'.format(xput_type, xput_idx)]
-
-        if dataset_name == '' and cdt_id == '':
-            # ignore blank form
-            continue
-
-        if i < num_input_forms:
-            num_inputs += 1
-        else:
-            num_outputs += 1
-
-        names.append(dataset_name)
-        my_compound_datatype = None
-        min_row = None
-        max_row = None
-        if cdt_id != '__raw__':
-            try:
-                my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
-            except ValueError:
-                error_key = "{}puts".format(xput_type)
-                exceptions[error_key][i].update({'compounddatatype': 'You must select a Compound Datatype.'})
-            min_row = query['min_row_{}_{}'.format(xput_type, xput_idx)]
-            max_row = query['max_row_{}_{}'.format(xput_type, xput_idx)]
-
-        compounddatatypes.append(my_compound_datatype)
-        row_limits.append((min_row or None, max_row or None))
-
-    if num_outputs == 0 and len(exceptions['outputs']) == 0:
-        exceptions['outputs'].update({0: {'dataset_name': 'You must specify at least one output.'}})
-
-    if len(exceptions['inputs']) > 0 or len(exceptions['outputs']) > 0 or len(exceptions) > 2:
-        # if there are more keys than 'inputs' and 'outputs' then
-        # one or more input/output form exceptions have been raised
-        return exceptions
-
+    new_method = None
     try:
+        # Note how the except blocks re-raise their exception: that is to terminate
+        # this transaction.
         with transaction.atomic():
             if family is None:
-                family = MethodFamily.create(name=query['name'], description=query['description'])
-            new_method = Method.create(names, 
-                    compounddatatypes=compounddatatypes, 
-                    row_limits=row_limits,
-                    num_inputs=num_inputs,
-                    family=family,
-                    revision_name=query['revision_name'],
-                    revision_desc=query['revision_desc'],
-                    revision_parent=parent_method,
-                    driver=coderesource_revision,
-                    reusable=query['reusable'])
-            return None
+                try:
+                    family = MethodFamily.create(
+                        name=family_form.cleaned_data["name"],
+                        description=family_form.cleaned_data['description'],
+                        user=creating_user)
 
-    except ValidationError as e:
-        if hasattr(e, "error_dict"):
-            for key, msg in e.message_dict.iteritems():
-                exceptions.update({key: str(msg[0])})
-        else:
-            # TODO: where to display our own (non-Django) ValidationErrors?
-            if parent_method:
-                exceptions["name"] = e.messages[0]
-            else:
-                exceptions["revision_name"] = e.messages[0]
+                    for user in method_form.cleaned_data["users_allowed"]:
+                        family.users_allowed.add(user)
+                    for group in method_form.cleaned_data["groups_allowed"]:
+                        family.groups_allowed.add(group)
 
-    return exceptions
+                except ValidationError as e:
+                    family_form.add_error(None, e)
+                    raise e
+
+            new_method = Method(
+                family=family,
+                revision_name=method_form.cleaned_data['revision_name'],
+                revision_desc=method_form.cleaned_data['revision_desc'],
+                revision_parent=parent_method,
+                driver=coderesource_revision,
+                reusable=method_form.cleaned_data['reusable'],
+                user=creating_user
+            )
+            new_method.save()
+
+            for user in method_form.cleaned_data["users_allowed"]:
+                new_method.users_allowed.add(user)
+            for group in method_form.cleaned_data["groups_allowed"]:
+                new_method.groups_allowed.add(group)
+
+            # Attempt to make in/outputs.
+            num_outputs = len(output_forms)
+            if num_outputs == 0:
+                method_form.add_error(None, "You must specify at least one output.")
+                raise ValidationError("You must specify at least one output.")
+
+            for xput_type in ("in", "out"):
+                curr_forms = input_forms
+                if xput_type == "out":
+                    curr_forms = output_forms
+
+                for form_tuple in curr_forms:
+                    t_form = form_tuple[0]
+                    xs_form = form_tuple[1]
+                    dataset_name = t_form.cleaned_data["dataset_name"]
+                    cdt_id = xs_form.cleaned_data["compounddatatype"]
+
+                    if dataset_name == '' and cdt_id == '':
+                        # ignore blank form
+                        continue
+
+                    my_compound_datatype = None
+                    min_row = None
+                    max_row = None
+                    if cdt_id != '__raw__':
+                        try:
+                            my_compound_datatype = CompoundDatatype.objects.get(pk=cdt_id)
+                            min_row = xs_form.cleaned_data["min_row"]
+                            max_row = xs_form.cleaned_data["max_row"]
+                        except (ValueError, CompoundDatatype.DoesNotExist) as e:
+                            xs_form.add_error("compounddatatype", e)
+                            raise e
+
+                    curr_xput = new_method.create_xput(
+                        dataset_name=dataset_name,
+                        compounddatatype=my_compound_datatype,
+                        row_limits=(min_row, max_row),
+                        input=(xput_type == "in"),
+                        clean=False
+                    )
+
+                    if cdt_id != "__raw__":
+                        try:
+                            curr_xput.structure.clean()
+                        except ValidationError as e:
+                            xs_form.add_error(None, e)
+                            raise e
+
+                    try:
+                        curr_xput.clean()
+                    except ValidationError as e:
+                        t_form.add_error(None, e)
+                        raise e
+
+            try:
+                new_method.complete_clean()
+            except ValidationError as e:
+                method_form.add_error(None, e)
+                raise e
+
+    except ValidationError:
+        return None
+
+    return new_method
 
 
+def _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
+    """
+    Helper that validates all forms returned from create_method_forms.
+    """
+    in_xput_forms, in_struct_forms = zip(*input_form_tuples)
+    out_xput_forms, out_struct_forms = zip(*output_form_tuples)
+    all_forms = ([family_form] + [method_form] + list(in_xput_forms) + list(in_struct_forms) +
+                 list(out_xput_forms) + list(out_struct_forms))
+    return all(x.is_valid() for x in all_forms)
+
+
+@login_required
 def method_add(request, id=None):
     """
     Generate forms for adding Methods, and validate and process POST data returned
     by the user.  Allows for an arbitrary number of input and output forms.
 
-    [id] : User is not creating a new MethodFamily, but adding to an existing family
-            without a specified parent Method (different CodeResource)
-            If ID is not specified, then user is creating a new MethodFamily.
+    [id] : User is adding a new Method to an existing family
+           without a specified parent Method (different CodeResource)
+           If id is None, then user is creating a new MethodFamily.
     """
+    creating_user = request.user
     if id:
-        this_family = MethodFamily.objects.get(pk=id)
+        four_oh_four = False
+        try:
+            this_family = MethodFamily.objects.get(pk=id)
+        except MethodFamily.DoesNotExist:
+            four_oh_four = True
+        if not this_family.can_be_accessed(creating_user):
+            four_oh_four = True
+        if four_oh_four:
+            raise Http404("ID {} is inaccessible".format(id))
         header = "Add a new Method to MethodFamily '%s'" % this_family.name
     else:
         this_family = None
         header = 'Start a new MethodFamily with an initial Method'
 
     t = loader.get_template('method/method_add.html')
+    c = RequestContext(request)
     if request.method == 'POST':
-        query = request.POST.dict()
-        exceptions = parse_method_form(query, this_family)
-        if exceptions is None:
-            # success!
+        family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
+            request.POST, creating_user)
+        if not _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
+            # Bail out now if there are any problems.
+            c.update(
+                {
+                    'family_form': family_form,
+                    'method_form': method_form,
+                    'input_forms': input_form_tuples,
+                    'output_forms': output_form_tuples,
+                    'family': this_family,
+                    'header': header
+                })
+            return HttpResponse(t.render(c))
+
+        # Next, attempt to build the Method and its associated MethodFamily (if necessary),
+        # inputs, and outputs.
+        new_method = create_method_from_forms(
+            family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
+            family=this_family
+        )
+
+        if _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
+            # Success!
             if id:
                 return HttpResponseRedirect('/methods/{}'.format(id))
             else:
                 return HttpResponseRedirect('/method_families')
-        family_form, method_form, input_forms, output_forms = return_method_forms(query, exceptions)
-    else:
-        # first set of forms
-        family_form = MethodFamilyForm()
-        method_form = MethodForm()
-        input_forms = [(TransformationXputForm(auto_id='id_%s_in_0'),
-                       XputStructureForm(auto_id='id_%s_in_0'))]
-        output_forms = [(TransformationXputForm(auto_id='id_%s_out_0'),
-                       XputStructureForm(auto_id='id_%s_out_0'))]
 
-    c = Context({'family_form': family_form,
-                 'method_form': method_form,
-                 'input_forms': input_forms,
-                 'output_forms': output_forms,
-                 'family': this_family,
-                 'header': header})
-    c.update(csrf(request))
+    else:
+        # Prepare a blank set of forms for rendering.
+        family_form = MethodFamilyForm()
+        method_form = MethodForm(user=creating_user)
+        input_form_tuples = [
+            (TransformationXputForm(auto_id='id_%s_in_0'), XputStructureForm(user=creating_user,
+                                                                             auto_id='id_%s_in_0'))
+        ]
+        output_form_tuples = [
+            (TransformationXputForm(auto_id='id_%s_out_0'), XputStructureForm(user=creating_user,
+                                                                              auto_id='id_%s_out_0'))
+        ]
+
+    c.update(
+        {
+            'family_form': family_form,
+            'method_form': method_form,
+            'input_forms': input_form_tuples,
+            'output_forms': output_form_tuples,
+            'family': this_family,
+            'header': header
+        })
     return HttpResponse(t.render(c))
 
 
+@login_required
 def method_revise(request, id):
     """
     Add a revision of an existing Method.  revision_parent is defined by the
     previous version.
     """
     t = loader.get_template('method/method_revise.html')
+    c = RequestContext(request)
+    creating_user = request.user
 
-    # retrieve the most recent member of this Method's family
-    parent_method = Method.objects.get(pk=id)
+    # Retrieve the most recent member of this Method's family.
+    four_oh_four = False
+    try:
+        parent_method = Method.objects.get(pk=id)
+    except Method.DoesNotExist:
+        four_oh_four = True
+
+    if not parent_method.can_be_accessed(creating_user):
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} is inaccessible".format(id))
+
     family = parent_method.family
 
-    # retrieve the most recent revision of the corresponding CR
+    # Retrieve the most recent revision of the corresponding CR.
     parent_revision = parent_method.driver
     this_code_resource = parent_revision.coderesource
-    all_revisions = this_code_resource.revisions.order_by('-revision_DateTime')
+    # Filter the available revisions by user.
+    user_plus = metadata.models.KiveUser.kiveify(creating_user)
+    all_revisions = this_code_resource.revisions.filter(user_plus.access_query()).order_by('-revision_DateTime')
 
     if request.method == 'POST':
-        query = request.POST.dict()
-        query.update({u'coderesource': this_code_resource})  # so we can pass it back to the form
+        # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
+        family_form, method_revise_form, input_form_tuples, output_form_tuples = create_method_forms(
+            request.POST, creating_user)
+        if not _method_forms_check_valid(family_form, method_revise_form, input_form_tuples, output_form_tuples):
+            # Bail out now if there are any problems.
+            c.update(
+                {
+                    'coderesource': this_code_resource,
+                    'method_revise_form': method_revise_form,
+                    'input_forms': input_form_tuples,
+                    'output_forms': output_form_tuples,
+                    'family': family,
+                    'parent': parent_method
+                })
+            return HttpResponse(t.render(c))
 
-        exceptions = parse_method_form(query, family=family, parent_method=parent_method)
-        if exceptions is None:
-            # success!
-            return HttpResponseRedirect('/methods/%d' % family.pk)
-        family_form, method_form, input_forms, output_forms = return_method_forms(query, exceptions)
+        # Next, attempt to build the Method and add it to family.
+        new_revision = create_method_from_forms(
+            family_form, method_revise_form, input_form_tuples, output_form_tuples, creating_user,
+            family=family, parent_revision=parent_revision
+        )
+        if _method_forms_check_valid(family_form, method_revise_form, input_form_tuples, output_form_tuples):
+            # Success!
+            return HttpResponseRedirect('/methods/{}'.format(family.pk))
+
     else:
         # initialize forms with values of parent Method
-        method_form = MethodReviseForm(initial={#'revision_name': parent_method.revision_name,
-                                                'revision_desc': parent_method.revision_desc,
-                                                'revisions': parent_revision.pk,
-                                                'reusable': parent_method.reusable})
+        method_revise_form = MethodReviseForm(
+            initial={
+                'revision_desc': parent_method.revision_desc,
+                'revisions': parent_revision.pk,
+                'reusable': parent_method.reusable
+            })
         xput_forms = []
         inputs = parent_method.inputs.order_by("dataset_idx")
         outputs = parent_method.outputs.order_by("dataset_idx")
@@ -540,43 +718,38 @@ def method_revise(request, id):
             forms = []
             for xput in xputs:
                 tx_form = TransformationXputForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
-                                                initial={'dataset_name': xput.dataset_name,
-                                                         'dataset_idx': xput.dataset_idx})
+                                                 initial={'dataset_name': xput.dataset_name,
+                                                          'dataset_idx': xput.dataset_idx})
                 if xput.has_structure:
                     structure = xput.structure
-                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
-                                            initial={'compounddatatype': structure.compounddatatype.id,
-                                                     'min_row': structure.min_row,
-                                                     'max_row': structure.max_row})
+                    xs_form = XputStructureForm(user=creating_user,
+                                                auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
+                                                initial={'compounddatatype': structure.compounddatatype.id,
+                                                         'min_row': structure.min_row,
+                                                         'max_row': structure.max_row})
                 else:
-                    xs_form = XputStructureForm(auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
-                                            initial={'compounddatatype': '__raw__'})
+                    xs_form = XputStructureForm(user=creating_user,
+                                                auto_id='id_%s_{}_{}'.format(xput_type, len(forms)),
+                                                initial={'compounddatatype': '__raw__'})
 
                 forms.append((tx_form, xs_form))
             xput_forms.append(forms)
 
-        input_forms, output_forms = xput_forms
+        input_form_tuples, output_form_tuples = xput_forms
         # if previous Method has no inputs, provide blank forms
-        if len(input_forms) == 0:
+        if len(input_form_tuples) == 0:
             tx_form = TransformationXputForm(auto_id='id_%s_in_0')
-            xs_form = XputStructureForm(auto_id='id_%s_in_0')
-            input_forms.append((tx_form, xs_form))
+            xs_form = XputStructureForm(user=creating_user, auto_id='id_%s_in_0')
+            input_form_tuples.append((tx_form, xs_form))
 
-    method_form.fields['revisions'].choices = [(x.id, '%d: %s' % (x.revision_number, x.revision_name))
-                                               for x in all_revisions]
+    method_revise_form.fields['revisions'].widget.choices = [
+        (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
+    ]
     c = Context({'coderesource': this_code_resource,
-                 'method_form': method_form,
-                 'input_forms': input_forms,
-                 'output_forms': output_forms,
+                 'method_revise_form': method_revise_form,
+                 'input_forms': input_form_tuples,
+                 'output_forms': output_form_tuples,
                  'family': family,
                  'parent': parent_method})
-    c.update(csrf(request))
-    return HttpResponse(t.render(c))
-
-
-def resource_revision_view(request, id):
-    revision = CodeResourceRevision.objects.get(pk=id)
-    t = loader.get_template("method/resource_revision_view.html")
-    c = Context({"revision": revision})
     c.update(csrf(request))
     return HttpResponse(t.render(c))

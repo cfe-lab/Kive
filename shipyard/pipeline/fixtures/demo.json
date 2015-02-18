@@ -4,7 +4,8 @@
     "model": "pipeline.pipelinefamily", 
     "fields": {
         "name": "Sums and Products", 
-        "description": ""
+        "description": "",
+        "user": 1
     }
 },
 {
@@ -68,7 +69,8 @@
     "fields": {
         "published_version": 13,
         "name": "MiSeq",
-        "description": ""
+        "description": "",
+        "user": 1
     }
 },
 {

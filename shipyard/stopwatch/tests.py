@@ -13,7 +13,7 @@ import metadata.tests
 
 
 class StopwatchTests(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     # create_archive_test_environment creates self.pE_run, which is a
     # Stopwatch.  We'll use this as our Stopwatch.

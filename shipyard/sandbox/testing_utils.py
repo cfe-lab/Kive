@@ -6,10 +6,10 @@ import subprocess
 import tempfile
 import time
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.files import File
 
-from constants import datatypes
+from constants import datatypes, groups
 import file_access_utils
 from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype, Datatype
@@ -18,40 +18,49 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from pipeline.models import Pipeline, PipelineFamily
 import sandbox.execute
 
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+
 
 def create_sandbox_testing_tools_environment(case):
     case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
+    # An ordinary user.
+    case.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
+    case.user_bob.save()
+    case.user_bob.groups.add(everyone_group)
+    case.user_bob.save()
+
     # Predefined datatypes.
-    case.datatype_str = new_datatype("my_string", "sequences of ASCII characters", case.STR)
+    case.datatype_str = new_datatype("my_string", "sequences of ASCII characters", case.STR, case.user_bob)
 
     # A CDT composed of only one column, strings.
-    case.cdt_string = CompoundDatatype()
+    case.cdt_string = CompoundDatatype(user=case.user_bob)
     case.cdt_string.save()
     case.cdt_string.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
 
     # A code resource which does nothing.
-    case.coderev_noop = make_first_revision("noop", "a script to do nothing", "noop.sh",
-            '#!/bin/bash\n cat "$1" > "$2"')
+    case.coderev_noop = make_first_revision(
+        "noop", "a script to do nothing", "noop.sh",
+        '#!/bin/bash\n cat "$1" > "$2"',
+        case.user_bob)
 
     # A Method telling Shipyard how to use the noop code on string data.
-    case.method_noop = make_first_method("string noop", "a method to do nothing to strings", case.coderev_noop)
+    case.method_noop = make_first_method("string noop", "a method to do nothing to strings", case.coderev_noop,
+                                         case.user_bob)
     simple_method_io(case.method_noop, case.cdt_string, "strings", "same_strings")
 
     # Another totally different Method that uses the same CodeRevision and yes it does the same thing.
     case.method_trivial = make_first_method(
         "string trivial",
         "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone",
-        case.coderev_noop)
+        case.coderev_noop,
+        case.user_bob)
     simple_method_io(case.method_trivial, case.cdt_string, "strings", "untouched_strings")
 
     # A third one, only this one takes raw input.
-    case.method_noop_raw = make_first_method("raw noop", "do nothing to raw data", case.coderev_noop)
+    case.method_noop_raw = make_first_method("raw noop", "do nothing to raw data", case.coderev_noop,
+                                             case.user_bob)
     simple_method_io(case.method_noop_raw, None, "raw", "same raw")
-
-    # An ordinary user.
-    case.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
-    case.user_bob.save()
 
 
 def destroy_sandbox_testing_tools_environment(case):
@@ -67,20 +76,23 @@ def create_sequence_manipulation_environment(case):
     # Alice is a Shipyard user.
     case.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
     case.user_alice.save()
+    case.user_alice.groups.add(everyone_group)
+    case.user_alice.save()
 
     # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
     # She wants to create a pipeline for each. In the background, this also creates
     # two new pipeline families.
-    case.pipeline_complement = make_first_pipeline("DNA complement", "a pipeline to complement DNA")
-    case.pipeline_reverse = make_first_pipeline("DNA reverse", "a pipeline to reverse DNA")
-    case.pipeline_revcomp = make_first_pipeline("DNA revcomp", "a pipeline to reverse and complement DNA")
+    case.pipeline_complement = make_first_pipeline("DNA complement", "a pipeline to complement DNA", case.user_alice)
+    case.pipeline_reverse = make_first_pipeline("DNA reverse", "a pipeline to reverse DNA", case.user_alice)
+    case.pipeline_revcomp = make_first_pipeline("DNA revcomp", "a pipeline to reverse and complement DNA",
+                                                case.user_alice)
 
     # Alice is only going to be manipulating DNA, so she creates a "DNA"
     # data type. A "string" datatype, which she will use for the headers,
     # has been predefined in Shipyard. She also creates a compound "record"
     # datatype for sequence + header.
-    case.datatype_dna = new_datatype("DNA", "sequences of ATCG", case.STR)
-    case.cdt_record = CompoundDatatype()
+    case.datatype_dna = new_datatype("DNA", "sequences of ATCG", case.STR, case.user_alice)
+    case.cdt_record = CompoundDatatype(user=case.user_alice)
     case.cdt_record.save()
     case.cdt_record.members.create(datatype=case.datatype_str, column_name="header", column_idx=1)
     case.cdt_record.members.create(datatype=case.datatype_dna, column_name="sequence", column_idx=2)
@@ -93,21 +105,25 @@ def create_sequence_manipulation_environment(case):
         "complement.sh",
         """#!/bin/bash
         cat "$1" | cut -d ',' -f 2 | tr 'ATCG' 'TAGC' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-        """)
+        """,
+        case.user_alice)
     case.coderev_reverse = make_first_revision(
         "DNA reverse", "a script to reverse DNA", "reverse.sh",
         """#!/bin/bash
         cat "$1" | cut -d ',' -f 2 | rev | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-        """)
+        """,
+        case.user_alice)
 
     # To tell the system how to use her code, Alice creates two Methods,
     # one for each CodeResource. In the background, this creates two new
     # MethodFamilies with her Methods as the first member of each.
     case.method_complement = make_first_method("DNA complement", "a method to complement strings of DNA",
-                                               case.coderev_complement)
+                                               case.coderev_complement,
+                                               case.user_alice)
     simple_method_io(case.method_complement, case.cdt_record, "DNA_to_complement", "complemented_DNA")
     case.method_reverse = make_first_method("DNA reverse", "a method to reverse strings of DNA",
-                                            case.coderev_complement)
+                                            case.coderev_complement,
+                                            case.user_alice)
     simple_method_io(case.method_reverse, case.cdt_record, "DNA_to_reverse", "reversed_DNA")
 
     # Now Alice is ready to define her pipelines. She uses the GUI to drag
@@ -133,8 +149,9 @@ def create_sequence_manipulation_environment(case):
     case.datafile.close()
 
     # Alice uploads the data to the system.
-    case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, name="lab data", cdt=case.cdt_record,
-                                                   user=case.user_alice, description="data from the lab",
+    case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, user=case.user_alice,
+                                                   name="lab data", cdt=case.cdt_record,
+                                                   description="data from the lab",
                                                    make_dataset=True)
 
     # Now Alice is ready to run her pipelines. The system creates a Sandbox
@@ -144,7 +161,7 @@ def create_sequence_manipulation_environment(case):
 
     # A second version of the complement Pipeline which doesn't keep any output.
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",
-                                           revision_desc="second version")
+                                           revision_desc="second version", user=case.user_alice)
     case.pipeline_complement_v2.save()
     create_linear_pipeline(case.pipeline_complement_v2, [case.method_complement], "lab data",
                                 "complemented lab data")
@@ -155,7 +172,7 @@ def create_sequence_manipulation_environment(case):
     # A second version of the reverse/complement Pipeline which doesn't keep
     # intermediate or final output.
     case.pipeline_revcomp_v2 = Pipeline(family=case.pipeline_revcomp.family, revision_name="2",
-                                        revision_desc="second version")
+                                        revision_desc="second version", user=case.user_alice)
     case.pipeline_revcomp_v2.save()
     create_linear_pipeline(case.pipeline_revcomp_v2, [case.method_reverse, case.method_complement],
                                  "lab data", "revcomped lab data")
@@ -167,7 +184,7 @@ def create_sequence_manipulation_environment(case):
     # A third version of the reverse/complement Pipeline which keeps
     # final output, but not intermediate.
     case.pipeline_revcomp_v3 = Pipeline(family=case.pipeline_revcomp.family, revision_name="3",
-                                        revision_desc="third version")
+                                        revision_desc="third version", user=case.user_alice)
     case.pipeline_revcomp_v3.save()
     create_linear_pipeline(case.pipeline_revcomp_v3, [case.method_reverse, case.method_complement],
                                  "lab data", "revcomped lab data")
@@ -178,16 +195,19 @@ def create_sequence_manipulation_environment(case):
     case.coderev_DNA2RNA = make_first_revision("DNA to RNA", "a script to reverse DNA", "DNA2RNA.sh",
             """#!/bin/bash
             cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-            """)
+            """,
+            case.user_alice)
     case.method_DNA2RNA = make_first_method("DNA to RNA", "a method to turn strings of DNA into RNA",
-                                                 case.coderev_DNA2RNA)
+                                            case.coderev_DNA2RNA, case.user_alice)
     simple_method_io(case.method_DNA2RNA, case.cdt_record, "DNA_to_convert", "RNA")
 
     # A pipeline which reverses DNA, then turns it into RNA.
-    case.pipeline_revRNA = make_first_pipeline("DNA to reversed RNA",
-                                                     "a pipeline to reverse DNA and translate it to RNA")
+    case.pipeline_revRNA = make_first_pipeline(
+        "DNA to reversed RNA",
+        "a pipeline to reverse DNA and translate it to RNA",
+        case.user_alice)
     create_linear_pipeline(case.pipeline_revRNA, [case.method_reverse, case.method_DNA2RNA], "lab data",
-                                 "RNA'd lab data")
+                           "RNA'd lab data")
     case.pipeline_revRNA.create_outputs()
 
     # Separator to print between Pipeline executions, to make viewing logs easier.
@@ -224,37 +244,40 @@ def create_word_reversal_environment(case):
          "  reader = csv.reader(infile)\n"
          "  writer = csv.writer(outfile)\n"
          "  for row in reader:\n"
-         "      writer.writerow([row[1][::-1], row[0][::-1]])\n"))
+         "      writer.writerow([row[1][::-1], row[0][::-1]])\n"),
+        case.user_bob)
 
     # A CDT with two columns, word and drow.
-    case.cdt_wordbacks = CompoundDatatype()
+    case.cdt_wordbacks = CompoundDatatype(user=case.user_bob)
     case.cdt_wordbacks.save()
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="drow", column_idx=2)
 
     # A second CDT, much like the first :]
-    case.cdt_backwords = CompoundDatatype()
+    case.cdt_backwords = CompoundDatatype(user=case.user_bob)
     case.cdt_backwords.save()
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="drow", column_idx=1)
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="word", column_idx=2)
 
     # Methods for the reverse CRR, and noop CRR.
     case.method_reverse = make_first_method("string reverse", "a method to reverse strings",
-                                            case.coderev_reverse)
+                                            case.coderev_reverse, case.user_bob)
     simple_method_io(case.method_reverse, case.cdt_wordbacks, "words_to_reverse", "reversed_words")
     case.method_re_reverse = make_first_method("string re-reverse", "a method to re-reverse strings",
-                                               case.coderev_reverse)
+                                               case.coderev_reverse, case.user_bob)
     simple_method_io(case.method_re_reverse, case.cdt_backwords, "words_to_rereverse", "rereversed_words")
 
     case.method_noop_wordbacks = make_first_method(
         "noop wordback",
         "a method to do nothing on two columns (word, drow)",
-        case.coderev_noop)
+        case.coderev_noop,
+        case.user_bob)
     simple_method_io(case.method_noop_wordbacks, case.cdt_wordbacks, "words", "more_words")
     case.method_noop_backwords = make_first_method(
         "noop backword",
         "a method to do nothing on two columns",
-        case.coderev_noop)
+        case.coderev_noop,
+        case.user_bob)
     simple_method_io(case.method_noop_backwords, case.cdt_backwords, "backwords", "more_backwords")
 
     # Some data of type (case.datatype_str: word).
@@ -295,12 +318,14 @@ def create_word_reversal_environment(case):
         writer.writerow([word[::-1], word])
     case.backwords_datafile.close()
 
-    case.symds_wordbacks = SymbolicDataset.create_SD(case.wordbacks_datafile.name,
-        name="wordbacks", cdt=case.cdt_wordbacks, user=case.user_bob,
+    case.symds_wordbacks = SymbolicDataset.create_SD(
+        case.wordbacks_datafile.name, user=case.user_bob,
+        name="wordbacks", cdt=case.cdt_wordbacks,
         description="random reversed words", make_dataset=True)
 
-    case.symds_backwords = SymbolicDataset.create_SD(case.backwords_datafile.name,
-        name="backwords", cdt=case.cdt_backwords, user=case.user_bob,
+    case.symds_backwords = SymbolicDataset.create_SD(
+        case.backwords_datafile.name, user=case.user_bob,
+        name="backwords", cdt=case.cdt_backwords,
         description="random reversed words", make_dataset=True)
 
 
@@ -323,23 +348,22 @@ def make_crisscross_cable(cable):
                               dest_pin=dest_cdt.members.get(column_idx=1))
 
 
-def new_datatype(dtname, dtdesc, shipyardtype):
+def new_datatype(dtname, dtdesc, shipyardtype, user):
     """
     Helper function to create a new datatype.
     """
-    datatype = Datatype(name=dtname, description=dtdesc)
+    datatype = Datatype(name=dtname, description=dtdesc, user=user)
     datatype.save()
     datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
     datatype.complete_clean()
     return datatype
 
 
-def make_first_revision(resname, resdesc, resfn, contents):
+def make_first_revision(resname, resdesc, resfn, contents, user):
     """
     Helper function to make a CodeResource and the first version.
     """
-    resource = CodeResource(name=resname, description=resdesc,
-        filename=resfn)
+    resource = CodeResource(name=resname, description=resdesc, filename=resfn, user=user)
     resource.clean()
     resource.save()
     with tempfile.TemporaryFile() as f:
@@ -348,25 +372,27 @@ def make_first_revision(resname, resdesc, resfn, contents):
             coderesource=resource,
             revision_name="1",
             revision_desc="first version",
-            content_file=File(f))
+            content_file=File(f),
+            user=user)
         revision.clean()
         revision.save()
     resource.clean()
     return revision
 
 
-def make_first_method(famname, famdesc, driver):
+def make_first_method(famname, famdesc, driver, user):
     """
     Helper function to make a new MethodFamily for a new Method.
     """
-    family = MethodFamily(name=famname, description=famdesc)
+    family = MethodFamily(name=famname, description=famdesc, user=user)
     family.clean()
     family.save()
     method = Method(
         revision_name="v1",
         revision_desc="first version",
         family=family,
-        driver=driver)
+        driver=driver,
+        user=user)
     method.clean()
     method.save()
     family.clean()
@@ -391,15 +417,15 @@ def simple_method_io(method, cdt, indataname, outdataname):
     return minput, moutput
 
 
-def make_first_pipeline(pname, pdesc):
+def make_first_pipeline(pname, pdesc, user):
     """
     Helper function to make a new PipelineFamily and the first Pipeline
     member.
     """
-    family = PipelineFamily(name=pname, description=pdesc)
+    family = PipelineFamily(name=pname, description=pdesc, user=user)
     family.clean()
     family.save()
-    pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version")
+    pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=user)
     pipeline.clean()
     pipeline.save()
     family.clean()
@@ -412,7 +438,8 @@ def make_second_pipeline(pipeline):
     without making any changes. Hook up the steps to each other, but don't
     create inputs and outputs for the new Pipeline.
     """
-    new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version")
+    new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version",
+                            user=pipeline.user)
     new_pipeline.save()
 
     for step in pipeline.steps.all():
@@ -475,6 +502,8 @@ def make_words_symDS(case):
     case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
         description="blahblahblah", make_dataset=True)
+    case.symds_words.groups_allowed.add(everyone_group)
+    case.symds_words.save()
 
     os.remove(string_datafile.name)
 
@@ -488,33 +517,39 @@ def create_grandpa_sandbox_environment(case):
     # May 20, 2014: he's doing his best, man -- RL
     case.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
     case.user_grandpa.save()
+    case.user_grandpa.groups.add(everyone_group)
+    case.user_grandpa.save()
 
     # A code resource, method, and pipeline which are empty.
     case.coderev_faulty = make_first_revision(
         "faulty",
         "a script...?",
-        "faulty.sh", ""
+        "faulty.sh", "",
+        case.user_grandpa
     )
     case.method_faulty = make_first_method(
         "faulty",
         "a method to... uh...",
-        case.coderev_faulty
+        case.coderev_faulty,
+        case.user_grandpa
     )
     case.method_faulty.clean()
     simple_method_io(case.method_faulty, case.cdt_string, "strings", "i don't know")
-    case.pipeline_faulty = make_first_pipeline("faulty pipeline", "a pipeline to do nothing")
+    case.pipeline_faulty = make_first_pipeline("faulty pipeline", "a pipeline to do nothing", case.user_grandpa)
     create_linear_pipeline(case.pipeline_faulty, [case.method_faulty, case.method_noop], "data", "the abyss")
     case.pipeline_faulty.create_outputs()
 
     # A code resource, method, and pipeline which fail.
     case.coderev_fubar = make_first_revision(
         "fubar", "a script which always fails",
-        "fubar.sh", "#!/bin/bash\nexit 1"
+        "fubar.sh", "#!/bin/bash\nexit 1",
+        case.user_grandpa
     )
-    case.method_fubar = make_first_method("fubar", "a method which always fails", case.coderev_fubar)
+    case.method_fubar = make_first_method("fubar", "a method which always fails", case.coderev_fubar,
+                                          case.user_grandpa)
     case.method_fubar.clean()
     simple_method_io(case.method_fubar, case.cdt_string, "strings", "broken strings")
-    case.pipeline_fubar = make_first_pipeline("fubar pipeline", "a pipeline which always fails")
+    case.pipeline_fubar = make_first_pipeline("fubar pipeline", "a pipeline which always fails", case.user_grandpa)
     create_linear_pipeline(case.pipeline_fubar,
                            [case.method_noop, case.method_fubar, case.method_noop], "indata", "outdata")
     case.pipeline_fubar.create_outputs()
@@ -527,8 +562,9 @@ def create_grandpa_sandbox_environment(case):
         i = random.randint(1,99171)
         case.grandpa_datafile.write("{}\n".format(i))
     case.grandpa_datafile.close()
-    case.symds_grandpa = SymbolicDataset.create_SD(case.grandpa_datafile.name,
-        name="numbers", cdt=case.cdt_string, user=case.user_grandpa,
+    case.symds_grandpa = SymbolicDataset.create_SD(
+        case.grandpa_datafile.name, user=case.user_grandpa,
+        name="numbers", cdt=case.cdt_string,
         description="numbers which are actually strings", make_dataset=True)
     case.symds_grandpa.clean()
 
@@ -544,9 +580,8 @@ def make_SD(contents, CDT, make_dataset, user, name, description, created_by, ch
     """
     with tempfile.TemporaryFile() as f:
         f.write(contents)
-        test_SD = SymbolicDataset.create_SD(None, CDT, make_dataset=make_dataset,
-                                            user=user, name=name,
-                                            description=description, created_by=created_by,
+        test_SD = SymbolicDataset.create_SD(None, user, cdt=CDT, make_dataset=make_dataset,
+                                            name=name, description=description, created_by=created_by,
                                             check=check, file_handle=f)
 
     return test_SD

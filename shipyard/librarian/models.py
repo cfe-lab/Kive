@@ -35,7 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @python_2_unicode_compatible
-class SymbolicDataset(models.Model):
+class SymbolicDataset(metadata.models.AccessControl):
     """
     Symbolic representation of a (possibly temporary) data file.
 
@@ -210,7 +210,7 @@ class SymbolicDataset(models.Model):
         dataset.clean()
         dataset.save()
 
-    def mark_missing(self, start_time, end_time, execlog):
+    def mark_missing(self, start_time, end_time, execlog, checking_user):
         """Mark a SymbolicDataset as missing output.
 
         INPUTS
@@ -218,13 +218,14 @@ class SymbolicDataset(models.Model):
         end_time        time when check for file finished
         execlog         ExecLog of execution which did not produce 
                         output
+        checking_user   user that discovered the missing output
         """
-        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog)
+        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog, user=checking_user)
         ccl.add_missing_output()
         return ccl
 
     @classmethod
-    def create_empty(cls, compound_datatype=None):
+    def create_empty(cls, user, compound_datatype=None, users_allowed=None, groups_allowed=None):
         """Create an empty SymbolicDataset.
 
         INPUTS
@@ -235,17 +236,27 @@ class SymbolicDataset(models.Model):
         empty_SD            SymbolicDataset with a blank MD5 and an
                             appropriate DatasetStructure
         """
-        empty_SD = cls(MD5_checksum="")
+        users_allowed = users_allowed or []
+        groups_allowed = groups_allowed or []
+
+        empty_SD = cls(user=user, MD5_checksum="")
         empty_SD.clean()
         empty_SD.save()
         if compound_datatype:
             empty_SD.create_structure(compound_datatype)
+
+        for user in users_allowed:
+            empty_SD.users_allowed.add(user)
+        for group in groups_allowed:
+            empty_SD.groups_allowed.add(group)
+        empty_SD.save()
+
         return empty_SD
         
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, cdt=None, make_dataset=True, user=None,
-                  name=None, description=None, created_by=None, check=True, file_handle=None):
+    def create_SD(cls, file_path, user, users_allowed=None, groups_allowed=None, cdt=None,
+                  make_dataset=True, name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
     
@@ -268,7 +279,8 @@ class SymbolicDataset(models.Model):
             raise Exception("Must supply either the file path or file handle")
 
         with transaction.atomic():
-            symDS = cls.create_empty(cdt)
+            symDS = cls.create_empty(user, compound_datatype=cdt,
+                                     users_allowed=users_allowed, groups_allowed=groups_allowed)
 
             if symDS.is_raw():
                 symDS.set_MD5(file_path, file_handle)
@@ -278,8 +290,13 @@ class SymbolicDataset(models.Model):
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
                 content_check = symDS.check_file_contents(
-                    file_path_to_check=file_path, file_handle=file_handle,
-                    summary_path=run_dir, min_row=None, max_row=None, execlog=None
+                    file_path_to_check=file_path,
+                    file_handle=file_handle,
+                    summary_path=run_dir,
+                    min_row=None,
+                    max_row=None,
+                    execlog=None,
+                    checking_user=user
                 )
                 shutil.rmtree(run_dir)
                 if content_check.is_fail():
@@ -307,6 +324,11 @@ class SymbolicDataset(models.Model):
             if make_dataset:
                 symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
                                        description=description, created_by=created_by)
+            else:
+                if symDS.is_raw():
+                    symDS.set_MD5(file_name, file_handle)
+                else:
+                    symDS.set_MD5_and_count_rows(file_name, file_handle)
 
             symDS.clean()
             if not symDS.is_raw():
@@ -316,8 +338,9 @@ class SymbolicDataset(models.Model):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD_bulk(cls, csv_file_path, csv_file_handle=None, cdt=None, make_dataset=True, user=None,
-                       created_by=None, check=True):
+    def create_SD_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None,
+                       csv_file_handle=None, cdt=None, make_dataset=True, created_by=None,
+                       check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
         Instead of specifying datasets one by one,
@@ -373,8 +396,9 @@ class SymbolicDataset(models.Model):
                         if not (name and desc and file_name):
                             raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
-                        symDS = SymbolicDataset.create_SD(file_name, cdt=cdt, make_dataset=True, user=user, name=name,
-                                                          description=desc, created_by=None, check=True)
+                        symDS = SymbolicDataset.create_SD(file, user=user, users_allowed=users_allowed,
+                                                          groups_allowed=groups_allowed, cdt=cdt, make_dataset=True,
+                                                          name=name, description=desc, created_by=None, check=True)
 
                         symDSs.extend([symDS])
             except Exception, e:
@@ -387,7 +411,8 @@ class SymbolicDataset(models.Model):
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
-    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog, file_handle=None):
+    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog,
+                            checking_user, file_handle=None):
         """
         Performs content check on a file, generates a CCL, and sets this
         SD's num_rows.
@@ -416,7 +441,7 @@ class SymbolicDataset(models.Model):
         """
         self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
                           .format(file_path_to_check))
-        ccl = self.content_checks.create(execlog=execlog)
+        ccl = self.content_checks.create(execlog=execlog, user=checking_user)
         ccl.start()
 
         if self.is_raw():
@@ -495,7 +520,7 @@ class SymbolicDataset(models.Model):
         # end time of an integrity check?  Is the check just the comparison
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
-        icl = self.integrity_checks.create(execlog=execlog)
+        icl = self.integrity_checks.create(execlog=execlog, user=checking_user)
         icl.start()
 
         if newly_computed_MD5 == None:
@@ -507,12 +532,9 @@ class SymbolicDataset(models.Model):
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
-            evil_twin = SymbolicDataset.create_SD(
-                    new_file_path,
-                    cdt=None,
-                    user=checking_user,
-                    name="{}eviltwin".format(self),
-                    description="MD5 conflictor of {}".format(self))
+            evil_twin = SymbolicDataset.create_SD(new_file_path, user=checking_user, cdt=None,
+                                                  name="{}eviltwin".format(self),
+                                                  description="MD5 conflictor of {}".format(self))
 
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()

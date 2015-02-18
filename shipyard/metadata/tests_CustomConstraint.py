@@ -19,12 +19,14 @@ import sandbox.testing_utils as tools
 
 from constants import datatypes, CDTs
 
+shipyard_user = User.objects.get(pk=1)
+
 
 class CustomConstraintTests(TransactionTestCase):
     """
     Test the creation and use of custom constraints.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -32,13 +34,12 @@ class CustomConstraintTests(TransactionTestCase):
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
-        self.dt_basic = self._setup_datatype("alpha", "strings of letters", 
-                [("regexp", "^[A-Za-z]+$")], 
-                [Datatype.objects.get(pk=datatypes.STR_PK)])
+        self.dt_basic = self._setup_datatype("alpha", "strings of letters", self.user_oscar,
+                                             [("regexp", "^[A-Za-z]+$")], [Datatype.objects.get(pk=datatypes.STR_PK)])
         
         # A Datatype with custom constraints restricting the basic datatype.
-        self.dt_custom = self._setup_datatype("words", 
-                "correctly spelled words", [], [self.dt_basic])
+        self.dt_custom = self._setup_datatype("words", "correctly spelled words", self.user_oscar,
+                                              [], [self.dt_basic])
 
         # Set up the custom constraint, a spell checker.
         self._setup_custom_constraint(
@@ -56,13 +57,13 @@ class CustomConstraintTests(TransactionTestCase):
               fi  
               row_num=$(($row_num+1))
             done""",
-            self.dt_custom)
+            self.dt_custom,
+            self.user_oscar)
 
         # A compound datatype composed of alphabetic strings and correctly
         # spelled words.
         self.cdt_constraints = self._setup_compounddatatype(
-                [self.dt_basic, self.dt_custom],
-                ["letter strings", "words"])
+            [self.dt_basic, self.dt_custom], ["letter strings", "words"], self.user_oscar)
 
         # A file conforming to the compound datatype.
         self.good_datafile = self._setup_datafile(self.cdt_constraints,
@@ -99,11 +100,10 @@ class CustomConstraintTests(TransactionTestCase):
         script  contents of CodeResourceRevision which will drive the method
         cdt     CompoundDatatype used throughout the pipeline
         """
-        coderev = tools.make_first_revision(name, desc,
-                "{}.sh".format(name), script)
-        method = tools.make_first_method(name, desc, coderev)
+        coderev = tools.make_first_revision(name, desc, "{}.sh".format(name), script, self.user_oscar)
+        method = tools.make_first_method(name, desc, coderev, self.user_oscar)
         tools.simple_method_io(method, cdt, "in data", "out data")
-        pipeline = tools.make_first_pipeline(name, desc)
+        pipeline = tools.make_first_pipeline(name, desc, self.user_oscar)
         tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
         pipeline.create_outputs()
         return pipeline
@@ -121,13 +121,13 @@ class CustomConstraintTests(TransactionTestCase):
         datafile.close()
         return datafile.name
 
-    def _setup_datatype(self, name, desc, basic_constraints, restricts):
+    def _setup_datatype(self, name, desc, user, basic_constraints, restricts):
         """
         Helper function to set up a Datatype, given a list of basic
         constraints (which are tuples (ruletype, rule)), and a list
         of other datatypes to restrict.
         """
-        datatype = Datatype(name=name, description=desc)
+        datatype = Datatype(name=name, description=desc, user=user)
         datatype.save()
         for supertype in restricts:
             datatype.restricts.add(supertype)
@@ -135,12 +135,12 @@ class CustomConstraintTests(TransactionTestCase):
             datatype.basic_constraints.create(ruletype=ruletype, rule=rule)
         return(datatype)
 
-    def _setup_compounddatatype(self, datatypes, column_names):
+    def _setup_compounddatatype(self, datatypes, column_names, user):
         """
         Helper function to create a compound datatype, given a list of members
         and column names.
         """
-        compounddatatype = CompoundDatatype()
+        compounddatatype = CompoundDatatype(user=user)
         compounddatatype.save()
         for i in range(len(datatypes)):
             compounddatatype.members.create(datatype=datatypes[i],
@@ -148,7 +148,7 @@ class CustomConstraintTests(TransactionTestCase):
         compounddatatype.save()
         return compounddatatype
 
-    def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype):
+    def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype, user):
         """
         Helper function to set up a custom constraint on a datatype.
         
@@ -162,16 +162,18 @@ class CustomConstraintTests(TransactionTestCase):
         scriptfile.write(script)
         scriptfile.close()
 
-        coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc)
+        coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc, user=user)
         coderesource.save()
         with open(scriptfile.name, "rb") as f:
             revision = coderesource.revisions.create(revision_name="1", revision_number=1,
                                                      revision_desc="first version",
-                                                     content_file=File(f))
+                                                     content_file=File(f),
+                                                     user=user)
             revision.save()
-        methodfamily = MethodFamily(name=famname, description=famdesc)
+        methodfamily = MethodFamily(name=famname, description=famdesc, user=user)
         methodfamily.save()
-        method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1)
+        method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1,
+                                             user=user)
         method.create_input("to_test", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
         method.create_output("failed_row", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK))
         method.save()
@@ -185,9 +187,9 @@ class CustomConstraintTests(TransactionTestCase):
         Helper function to create a SymbolicDataset and ContentCheckLog
         for a given CompoundDatatype.
         """
-        symbolicdataset = SymbolicDataset.create_SD(datafile, cdt=cdt,
-                user=user, name=name, description=desc)
-        log = ContentCheckLog(symbolicdataset=symbolicdataset)
+        symbolicdataset = SymbolicDataset.create_SD(datafile, user=user, cdt=cdt, name=name,
+                                                    description=desc)
+        log = ContentCheckLog(symbolicdataset=symbolicdataset, user=user)
         log.save()
         return log
 
@@ -195,23 +197,26 @@ class CustomConstraintTests(TransactionTestCase):
         """
         A verification method which produces no output should throw a ValueError.
         """
-        dt_no_output = self._setup_datatype("numerics", "strings of digits",
-                [("regexp", "^[0-9]+$")],
-                [Datatype.objects.get(pk=datatypes.INT_PK)])
+        dt_no_output = self._setup_datatype("numerics", "strings of digits", self.user_oscar,
+                                            [("regexp", "^[0-9]+$")],
+                                            [Datatype.objects.get(pk=datatypes.INT_PK)])
         self._setup_custom_constraint(
             "empty", "Methods producing no output",
-            "empty", "a script producing no output", "#!/bin/bash", dt_no_output)
+            "empty", "a script producing no output", "#!/bin/bash", dt_no_output,
+            self.user_oscar)
         cdt_no_output = self._setup_compounddatatype( 
-                [dt_no_output, self.dt_basic],
-                ["numerics", "letter strings"])
+            [dt_no_output, self.dt_basic],
+            ["numerics", "letter strings"],
+            self.user_oscar)
         no_output_datafile = self._setup_datafile(cdt_no_output,
                 [[123, "foo"], [456, "bar"], [789, "baz"]])
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Verification method for Datatype "{}" produced no output'
-                                          .format(dt_no_output)),
-                                lambda: SymbolicDataset.create_SD(no_output_datafile, cdt_no_output, self.user_oscar,
-                                                                  "no output", "data with a bad verifier"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Verification method for Datatype "{}" produced no output'.format(dt_no_output)),
+            lambda: SymbolicDataset.create_SD(no_output_datafile, self.user_oscar, cdt=cdt_no_output,
+                                              name="no output", description="data with a bad verifier")
+        )
         os.remove(no_output_datafile)
 
     def test_verification_method_failed_row_too_large(self):
@@ -219,35 +224,41 @@ class CustomConstraintTests(TransactionTestCase):
         If a verification method produces a row which is greater than the number
         of rows in the input, a ValueError should be raised.
         """
-        dt_big_row = self._setup_datatype("barcodes",
-                "strings of upper case alphanumerics of length between 10 and 12", 
-                [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
-                [Datatype.objects.get(pk=datatypes.STR_PK)])
+        dt_big_row = self._setup_datatype(
+            "barcodes",
+            "strings of upper case alphanumerics of length between 10 and 12",
+            self.user_oscar,
+            [("regexp", "^[A-Z0-9]+$"), ("minlen", 10), ("maxlen", 12)],
+            [Datatype.objects.get(pk=datatypes.STR_PK)])
         self._setup_custom_constraint(
             "bigrow",
             "methods outputting a big row number",
             "bigrow",
             "a script outputting a big row number",
             '#!/bin/bash\necho -e "failed_row\\n1000" > "$2"',
-            dt_big_row)
-        cdt_big_row = self._setup_compounddatatype(
-                [dt_big_row, self.dt_custom], ["barcodes", "words"])
+            dt_big_row,
+            self.user_oscar)
+        cdt_big_row = self._setup_compounddatatype([dt_big_row, self.dt_custom], ["barcodes", "words"],
+                                                   self.user_oscar)
         big_row_datafile = self._setup_datafile(cdt_big_row,
                 [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
-                                          'only {} rows were checked'.format(dt_big_row, 1000, 2)),
-                                lambda: SymbolicDataset.create_SD(big_row_datafile, cdt=cdt_big_row,
-                                    user=self.user_oscar, name="big row", 
-                                    description="data with a verifier outputting too high a row number"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
+                      'only {} rows were checked'.format(dt_big_row, 1000, 2)),
+            lambda: SymbolicDataset.create_SD(big_row_datafile,
+                                              user=self.user_oscar, cdt=cdt_big_row, name="big row",
+                                              description="data with a verifier outputting too high a row number")
+        )
         os.remove(big_row_datafile)
 
     def test_summarize_correct_datafile(self):
         """
         A conforming datafile should return a CSV summary with no errors.
         """
-        log = self._setup_content_check_log(self.good_datafile,
+        log = self._setup_content_check_log(
+            self.good_datafile,
             self.cdt_constraints, self.user_oscar, "constraint data",
             "data to test custom constraint checking")
         with open(self.good_datafile) as f:
@@ -266,12 +277,15 @@ class CustomConstraintTests(TransactionTestCase):
         We sholudn't be allowed to create a SymbolicDataset from a file
         which does not conform to the Datatype's CustomConstraints.
         """
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                          'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
-                                lambda: SymbolicDataset.create_SD(self.bad_datafile, cdt=self.cdt_constraints,
-                                    user=self.user_oscar, name="bad data", 
-                                    description="invalid data to test custom constraint checking"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
+                      'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
+                      lambda: SymbolicDataset.create_SD(self.bad_datafile,
+                                                        user=self.user_oscar, cdt=self.cdt_constraints,
+                                                        name="bad data",
+                                                        description="invalid data to test custom constraint checking")
+        )
 
     def _test_content_check_integrity(self, content_check, execlog, symds):
         """
@@ -291,20 +305,18 @@ class CustomConstraintTests(TransactionTestCase):
         """
         Helper function to upload good data.
         """
-        symds_good = SymbolicDataset.create_SD(self.good_datafile,
-                cdt=self.cdt_constraints, user=self.user_oscar,
-                name="good data",
-                description="data which conforms to all its constraints")
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar,
+                                               cdt=self.cdt_constraints, name="good data",
+                                               description="data which conforms to all its constraints")
         return symds_good
 
     def _test_upload_data_bad(self):
         """
         Helper function to upload bad data.
         """
-        symds_bad = SymbolicDataset.create_SD(self.bad_datafile,
-                cdt=self.cdt_constraints, user=self.user_oscar,
-                name="bad data",
-                description="data which violates its constraints")
+        symds_bad = SymbolicDataset.create_SD(self.bad_datafile, user=self.user_oscar,
+                                              cdt=self.cdt_constraints, name="good data",
+                                              description="data which conforms to all its constraints")
         return symds_bad
 
     def _test_setup_prototype_good(self):
@@ -312,17 +324,16 @@ class CustomConstraintTests(TransactionTestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "True"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
-                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
-                description="working prototype for constraint CDT")
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
+                                                 cdt=prototype_cdt, name="good prototype",
+                                                 description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT, and make a new CDT.
         self.dt_custom.prototype = prototype_SD.dataset
         self.dt_custom.save()
-        cdt = self._setup_compounddatatype(
-                [self.dt_basic, self.dt_custom],
-                ["letter strings", "words"])
+        cdt = self._setup_compounddatatype([self.dt_basic, self.dt_custom], ["letter strings", "words"],
+                                           self.user_oscar)
         return cdt
 
     def _test_setup_prototype_bad(self):
@@ -330,9 +341,9 @@ class CustomConstraintTests(TransactionTestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "False"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, 
-                cdt=prototype_cdt, user=self.user_oscar, name="good prototype",
-                description="working prototype for constraint CDT")
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
+                                                 cdt=prototype_cdt, name="good prototype",
+                                                 description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT.
@@ -440,9 +451,9 @@ class CustomConstraintTests(TransactionTestCase):
         CustomConstraints is uploaded with a working prototype.
         """
         cdt = self._test_setup_prototype_good()
-        symds_good = SymbolicDataset.create_SD(self.good_datafile,
-                cdt=cdt, user=self.user_oscar, name="good data",
-                description="data which conforms to all its constraints")
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar, cdt=cdt,
+                                               name="good data",
+                                               description="data which conforms to all its constraints")
         self.assertEqual(symds_good.clean(), None)
         content_check = symds_good.content_checks.first()
         self._test_content_check_integrity(content_check, None, symds_good)

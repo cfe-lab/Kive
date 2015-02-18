@@ -1,16 +1,14 @@
-from django.conf.urls import patterns, include, url
-from django import forms
+from django.conf.urls import patterns, url
 from portal.forms import *
 from metadata.forms import *
 from method.forms import *
-
-#from copperfish.preview import *
 
 # Uncomment the next two lines to enable the admin:
 #from django.contrib import admin
 #admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = patterns(
+    '',
     # Examples:
     # url(r'^$', 'shipyard.views.home', name='home'),
     # url(r'^shipyard/', include('shipyard.foo.urls')),
@@ -21,6 +19,10 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'portal.views.home', name='home'),
+    url(r'^login/$', 'django.contrib.auth.views.login',
+        {"template_name": "portal/login.html", "current_app": "portal"}, name='login'),
+    url(r'^logout_then_login/$', 'django.contrib.auth.views.logout_then_login',
+        {"current_app": "portal"}, name='logout'),
 
     url(r'^dev.html$', 'portal.views.dev', name='dev'),
 
@@ -65,8 +67,6 @@ urlpatterns = patterns('',
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'archive.views.datasets_add_bulk', name='datasets_add_bulk'),
     url(r'^datasets_bulk', 'archive.views.datasets_bulk', name='datasets_bulk'),
-
-
 
     url(r'^choose_pipeline$', 'sandbox.views.choose_pipeline', name='choose_pipeline'),
     url(r'^choose_inputs$', 'sandbox.views.choose_inputs', name='choose_inputs'),

@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.encoding import python_2_unicode_compatible
+from django.contrib.auth.models import User
 
 import stopwatch.models
 
@@ -28,6 +29,9 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
 
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
+
+    # The user performing the check.
+    user = models.ForeignKey(User)
 
     # Implicit through inheritance: start_time, end_time.
 
@@ -59,12 +63,17 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
         Check coherence of this ContentCheckLog.
 
         First, this calls clean on any BadData associated to it.  Second,
-        it checks that end_time is later than start_time.
+        it checks that end_time is later than start_time.  Last, it checks that
+        the user has access to the parent SymbolicDataset.
         """
         if self.is_fail():
             self.baddata.clean()
 
         stopwatch.models.Stopwatch.clean(self)
+
+        if not self.symbolicdataset.can_be_accessed(self.user):
+            raise ValidationError('User "{}" does not have access to SymbolicDataset "{}"'.
+                                  format(self.user, self.symbolicdataset))
 
     def is_complete(self):
         """
@@ -253,6 +262,9 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="integrity_checks")
 
+    # The user performing the check.
+    user = models.ForeignKey(User)
+
     # Implicit through inheritance: start_time, end_time.
 
     def __str__(self):
@@ -271,6 +283,10 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
             self.usurper.clean()
 
         stopwatch.models.Stopwatch.clean(self)
+
+        if not self.symbolicdataset.can_be_accessed(self.user):
+            raise ValidationError('User "{}" does not have access to SymbolicDataset "{}"'.
+                                  format(self.user, self.symbolicdataset))
 
     def is_complete(self):
         """

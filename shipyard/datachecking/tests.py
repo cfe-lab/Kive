@@ -6,23 +6,27 @@ Replace this with more appropriate tests for your application.
 """
 
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 import shutil
 import tempfile
 
-from constants import datatypes
+from constants import datatypes, groups
 import metadata.models
 from datachecking.models import *
 from librarian.models import *
 import sandbox.testing_utils as tools
 
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+
 
 class BlankableTestCase(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         self.user_doug = User.objects.create_user('doug', 'dford@deco.com', 'durrrrr')
+        self.user_doug.save()
+        self.user_doug.groups.add(everyone_group)
         self.user_doug.save()
 
         self.INT = metadata.models.Datatype.objects.get(pk=datatypes.INT_PK)
@@ -41,7 +45,7 @@ class BlankableColumn(BlankableTestCase):
 
     def setUp(self):
         BlankableTestCase.setUp(self)
-        self.blankable_CDT = metadata.models.CompoundDatatype()
+        self.blankable_CDT = metadata.models.CompoundDatatype(user=self.user_doug)
         self.blankable_CDT.save()
         self.blankable_CDT.members.create(datatype=self.INT, column_name="firstcol", column_idx=1,
                                           blankable=True)
@@ -56,7 +60,8 @@ class BlankableColumn(BlankableTestCase):
             self.good_SD.dataset.dataset_file.open("rb")
             self.ccl = self.good_SD.check_file_contents(
                 file_path_to_check=None, file_handle=self.good_SD.dataset.dataset_file,
-                summary_path=run_dir, min_row=None, max_row=None, execlog=None
+                summary_path=run_dir, min_row=None, max_row=None, execlog=None,
+                checking_user=self.user_doug
             )
         finally:
             self.good_SD.dataset.dataset_file.close()
@@ -89,7 +94,7 @@ class BlankCellNonBlankable(BlankableTestCase):
 
     def setUp(self):
         BlankableTestCase.setUp(self)
-        self.test_CDT = metadata.models.CompoundDatatype()
+        self.test_CDT = metadata.models.CompoundDatatype(user=self.user_doug)
         self.test_CDT.save()
         self.test_CDT.members.create(datatype=self.INT, column_name="firstcol", column_idx=1)
         self.test_CDT.clean()
@@ -103,7 +108,8 @@ class BlankCellNonBlankable(BlankableTestCase):
             self.bad_SD.dataset.dataset_file.open("rb")
             self.ccl = self.bad_SD.check_file_contents(
                 file_path_to_check=None, file_handle=self.bad_SD.dataset.dataset_file,
-                summary_path=run_dir, min_row=None, max_row=None, execlog=None
+                summary_path=run_dir, min_row=None, max_row=None,
+                execlog=None, checking_user=self.user_doug
             )
         finally:
             self.bad_SD.dataset.dataset_file.close()

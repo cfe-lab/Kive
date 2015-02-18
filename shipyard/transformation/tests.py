@@ -1,16 +1,26 @@
 from django.test import TestCase
+from django.contrib.auth.models import User, Group
 
 from transformation.models import *
 from metadata.models import *
 
+from constants import groups
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+
 
 class TransformationTestCase(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
+        self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')
+        self.transf_user.save()
+        self.transf_user.groups.add(everyone_group)
+        self.transf_user.save()
+
         # Create some objects.
-        t = Transformation(); t.save()
-        Transformation().save()
+        t = Transformation(user=self.transf_user); t.save()
+        Transformation(user=self.transf_user).save()
 
         for i in range(4):
             TransformationInput(transformation=t, dataset_idx=i+1, dataset_name=str(i)).save()

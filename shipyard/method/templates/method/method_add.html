@@ -29,6 +29,11 @@
 </p>
 -->
 
+<div class="errortext">
+    {{ family_form.non_field_errors }}
+    {{ method_form.non_field_errors }}
+</div>
+
 <table>
     <tr>
         <th>{{ method_form.coderesource.label }}</th>
@@ -53,6 +58,8 @@
         <td>
             {{ method_form.reusable }}
             <div class="helptext">{{ method_form.reusable.help_text|escape|linebreaks }}</div>
+            <br/>
+            <div class="errortext">{{ method_form.reusable.errors }}</div>
         </td>
         <th></th>
         <td></td>
@@ -65,10 +72,23 @@
             <div class="helptext">{{ method_form.threads.help_text }}</div>
             <br/>
             <div class="errortext">{{ method_form.threads.errors }}</div>
-            <br/>
         </td>
         <th></th>
         <td></td>
+    </tr>
+
+    <tr>
+        <th>{{ method_form.users_allowed.label_tag }}</th>
+        <td><div class="helptext">{{ method_form.users_allowed.help_text }}</div></td>
+        <td>{{ method_form.users_allowed }}</td>
+        <td><div class="errortext">{{ method_form.users_allowed.errors }}</div></td>
+    </tr>
+
+    <tr>
+        <th>{{ method_form.groups_allowed.label_tag }}</th>
+        <td><div class="helptext">{{ method_form.groups_allowed.help_text }}</div></td>
+        <td>{{ method_form.groups_allowed }}</td>
+        <td><div class="errortext">{{ method_form.groups_allowed.errors }}</div></td>
     </tr>
 
     <tr>
@@ -82,7 +102,7 @@
             {% endif %}
             <div class="helptext">A name for this Method Family</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.name }}</div>
+            <div class="errortext">{{ family_form.name.errors }}</div>
         </td>
         <th>Family<br/>description</th>
         <td>
@@ -94,7 +114,7 @@
             {% endif %}
             <div class="helptext">Description of this Method Family</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.description }}</div>
+            <div class="errortext">{{ family_form.description.errors }}</div>
         </td>
     </tr>
     <tr>
@@ -103,18 +123,17 @@
             {{ method_form.revision_name }}
             <div class="helptext">{{ method_form.revision_name.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.revision_name }}</div>
+            <div class="errortext">{{ method_form.revision_name.errors }}</div>
         </td>
         <th>Method<br/> description</th>
         <td>
             {{ method_form.revision_desc }}
             <div class="helptext">{{ method_form.revision_desc.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.errors.revision_desc }}</div>
+            <div class="errortext">{{ method_form.revision_desc.errors }}</div>
         </td>
     </tr>
 </table>
-
 
 
 <h3>Inputs</h3>
@@ -129,15 +148,23 @@
     <tbody id="extraInputForms">
     {% for xput_form, struct_form in input_forms %}
         <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
-        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
-        <td>{{ struct_form.min_row }}</td>
-        <td>{{ struct_form.max_row }}</td>
+        <td>{{ forloop.counter }}
+            <div class="errortext">{{ xput_form.non_field_errors }}</div>
+        </td>
+        <td>{{ xput_form.dataset_name }}<div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
+        <td>{{ struct_form.compounddatatype }}
+            <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
+        </td>
+        <td>{{ struct_form.min_row }}<div class="errortext">{{ struct_form.min_row.errors }}</div></td>
+        <td>{{ struct_form.max_row }}<div class="errortext">{{ struct_form.max_row.errors }}</div></td>
         </tr>
     {% endfor %}
     </tbody>
     </table>
+    <div class="errortext">
+
+    </div>
 
 <h3>Outputs</h3>
     <input type="button" id="addOutputForm" class="add" value="+"/><input type="button" id="removeOutputForm" class="remove" value="&minus;"/>
@@ -150,11 +177,16 @@
     <tbody id="extraOutputForms">
     {% for xput_form, struct_form in output_forms %}
         <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.errors.dataset_name }} </div></td>
-        <td>{{ struct_form.compounddatatype }}<div class="errortext">{{ struct_form.errors.compounddatatype }} </div></td>
-        <td>{{ struct_form.min_row }}</td>
-        <td>{{ struct_form.max_row }}</td>
+        <td>{{ forloop.counter }}
+            <div class="errortext">{{ xput_form.non_field_errors }}</div>
+        </td>
+        <td>{{ xput_form.dataset_name }}<br/><div class="errortext">{{ xput_form.dataset_name.errors }}</div></td>
+        <td>{{ struct_form.compounddatatype }}
+            <div class="errortext">{{ struct_form.compounddatatype.errors }}</div>
+            <div class="errortext">{{ struct_form.non_field_errors }}</div>
+        </td>
+        <td>{{ struct_form.min_row }}<div class="errortext">{{ struct_form.min_row.errors }}</div></td>
+        <td>{{ struct_form.max_row }}<div class="errortext">{{ struct_form.max_row.errors }}</div></td>
         </tr>
     {% endfor %}
     </tbody>

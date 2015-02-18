@@ -97,7 +97,7 @@ class ArchiveTestCaseHelpers:
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log)
+        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic": return
 
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
@@ -120,7 +120,7 @@ class ArchiveTestCaseHelpers:
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
+        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         if bp == "second_runstep_complete": return
 
         # Associate and complete sub-Pipeline.
@@ -131,8 +131,8 @@ class ArchiveTestCaseHelpers:
                                         [self.D1_in_symDS, self.singlet_symDS])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
+        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
         C1_ccl = self.C1_in_symDS.content_checks.first()
@@ -143,7 +143,7 @@ class ArchiveTestCaseHelpers:
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
+        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
 
         if bp == "sub_pipeline": return
 
@@ -166,7 +166,7 @@ class ArchiveTestCaseHelpers:
         if bp == "first_cable_created": return
 
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -198,7 +198,7 @@ class ArchiveTestCaseHelpers:
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -214,11 +214,11 @@ class ArchiveTestCaseHelpers:
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -232,7 +232,7 @@ class ArchiveTestCaseHelpers:
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log)
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -248,7 +248,7 @@ class ArchiveTestCaseHelpers:
 
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
+        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -290,11 +290,11 @@ class ArchiveTestCaseHelpers:
 
         # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
         # and C3_out_symDS.
-        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log)
+        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log)
+        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -322,7 +322,7 @@ class ArchiveTestCaseHelpers:
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
         # C1_in_symDS is not created by this RSIC, so associate an ICL.
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log)
+        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
                                                   [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
         # Associate the CCL of C1_out_symDS with step_E3_RS.
@@ -362,7 +362,7 @@ class ArchiveTestCaseHelpers:
         self.C1_in_DS.created_by = self.D11_21_ROC
         self.C1_in_DS.save()
         self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
-                                               end_time=timezone.now())
+                                               end_time=timezone.now(), user=self.myUser)
         self.D11_21_ROC.stop()
         if bp == "subrun_complete": return
 
@@ -370,14 +370,14 @@ class ArchiveTestCaseHelpers:
         """
         Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
         """
-        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
         tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.myUser)
         tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
@@ -394,21 +394,21 @@ class ArchiveTestCaseHelpers:
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
         self.sandbox_two.execute_pipeline()
 
-    def _setup_deep_nested_run(self):
+    def _setup_deep_nested_run(self, user):
         """Set up a pipeline with sub-sub-pipelines to test recursion."""
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
-        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline")
+        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
         tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
         p_basic.create_outputs()
         p_basic.save()
 
-        p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline")
+        p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
         tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
         p_sub.create_outputs()
         p_sub.save()
 
-        p_top = tools.make_first_pipeline("p_top", "top-level pipeline")
+        p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
         tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
         p_top.create_outputs()
         p_top.save()
@@ -422,7 +422,7 @@ class ArchiveTestCaseHelpers:
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_archive_test_environment(self)
@@ -432,7 +432,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
 
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_archive_test_environment(self)
@@ -1161,14 +1161,15 @@ class RunComponentTooManyChecks(TransactionTestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
     """
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_word_reversal_environment(self)
 
         # Set up and run a Pipeline that throws away its intermediate data.
         self.two_step_pl = tools.make_first_pipeline("Two-step pipeline",
-                                                     "Toy pipeline for testing data check cleaning of RunSteps.")
+                                                     "Toy pipeline for testing data check cleaning of RunSteps.",
+                                                     self.user_bob)
         tools.create_linear_pipeline(self.two_step_pl, [self.method_noop_wordbacks, self.method_noop_wordbacks],
                                      "data", "samedata")
         first_step = self.two_step_pl.steps.get(step_num=1)
@@ -1182,7 +1183,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
         # and is able to reuse the input cable from the first Pipeline's second step.)
         self.following_pl = tools.make_first_pipeline(
             "Pipeline that will follow the first",
-            "Toy pipeline that will need to recover its first step when following the above."
+            "Toy pipeline that will need to recover its first step when following the above.",
+            self.user_bob
         )
         tools.create_linear_pipeline(self.following_pl, [self.method_noop_wordbacks, self.method_reverse],
                                      "data", "reversed_data")
@@ -1208,8 +1210,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1226,8 +1228,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         for log in runstep.invoked_logs.all():
             sd = log.record.execrecord.execrecordouts.first().symbolicdataset
-            extra_check_1 = log.integrity_checks.create(symbolicdataset=sd)
-            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd)
+            extra_check_1 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
+            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                               'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1245,8 +1247,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.content_checks.create(symbolicdataset=sd)
+        log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+        log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1263,8 +1265,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         for log in runstep.invoked_logs.all():
             sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-            extra_check_1 = log.content_checks.create(symbolicdataset=sd)
-            extra_check_2 = log.content_checks.create(symbolicdataset=sd)
+            extra_check_1 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+            extra_check_2 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                               'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1282,11 +1284,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd)
-        log.integrity_checks.create(symbolicdataset=sd)
-        # # Make sure log and runstep are up-to-date.
-        # runstep = RunStep.objects.get(pk=runstep.pk)
-        # log = ExecLog.objects.get(pk=log.pk)
+        log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+        log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1303,8 +1302,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
                 break
         for log in runstep.invoked_logs.all():
             sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-            extra_check_1 = log.content_checks.create(symbolicdataset=sd)
-            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd)
+            extra_check_1 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple Integrity/ContentCheckLogs for output '
                                               'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1982,8 +1981,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.log
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.integrity_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -1998,8 +1997,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.invoked_logs.last()
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.integrity_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2016,8 +2015,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.log
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2032,8 +2031,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.invoked_logs.last()
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2050,8 +2049,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.log
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2066,8 +2065,8 @@ class RunSICTests(ArchiveTestCase):
     #             break
     #     log = runsic.invoked_logs.last()
     #     sd = runsic.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunSIC "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(runsic, sd, log)),
@@ -2543,8 +2542,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.log
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.integrity_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2559,8 +2558,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.invoked_logs.last()
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.integrity_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2577,8 +2576,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.log
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2593,8 +2592,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.invoked_logs.last()
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.content_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2611,8 +2610,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.log
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2627,8 +2626,8 @@ class RunOutputCableTests(ArchiveTestCase):
     #             break
     #     log = roc.invoked_logs.last()
     #     sd = roc.execrecord.execrecordouts.first().symbolicdataset
-    #     log.content_checks.create(symbolicdataset=sd)
-    #     log.integrity_checks.create(symbolicdataset=sd)
+    #     log.content_checks.create(symbolicdataset=sd, user=self.myUser)
+    #     log.integrity_checks.create(symbolicdataset=sd, user=self.myUser)
     #     self.assertRaisesRegexp(ValidationError,
     #                             re.escape('RunOutputCable "{}" has multiple Integrity/ContentCheckLogs for output '
     #                                       'SymbolicDataset {} of ExecLog "{}"'.format(roc, sd, log)),
@@ -2636,7 +2635,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
 
 class DatasetTests(TestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         librarian.tests.create_librarian_test_environment(self)
@@ -2883,7 +2882,7 @@ class GetCoordinatesTests(ArchiveTransactionTestCase):
 
     def test_get_coordinates_nested_runs(self):
         """Test get_coordinates for a deeper-nested sub-run."""
-        self._setup_deep_nested_run()
+        self._setup_deep_nested_run(self.myUser)
 
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
@@ -2923,7 +2922,7 @@ class GetCoordinatesTests(ArchiveTransactionTestCase):
 
     def test_get_coordinates_nested_runstep(self):
         """Test get_coordinates for deeper-nested RunSteps."""
-        self._setup_deep_nested_run()
+        self._setup_deep_nested_run(self.myUser)
 
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
@@ -2965,7 +2964,7 @@ class GetCoordinatesTests(ArchiveTransactionTestCase):
 
     def test_get_coordinates_nested_rsic(self):
         """Test get_coordinates for deeper-nested RSICs."""
-        self._setup_deep_nested_run()
+        self._setup_deep_nested_run(self.myUser)
 
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
@@ -3010,7 +3009,7 @@ class GetCoordinatesTests(ArchiveTransactionTestCase):
 
     def test_get_coordinates_nested_roc(self):
         """Test get_coordinates for deeper-nested sub-ROCs."""
-        self._setup_deep_nested_run()
+        self._setup_deep_nested_run(self.myUser)
 
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
@@ -3144,7 +3143,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
         other_cable = other_step1.RSICs.first()
-        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -3169,7 +3168,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
         self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
 
-        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log)
+        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -3226,7 +3225,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # screwed with in between.
-        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
         tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
@@ -3246,7 +3245,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
         tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
@@ -3273,7 +3272,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
         iteration_count = 100000
-        pythonCode = """\
+        python_code = """\
 #! /usr/bin/python
 import sys
 
@@ -3282,19 +3281,21 @@ for i in range(%d):
 """ % iteration_count
         expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
 
-        codeRevision = tools.make_first_revision(
+        code_revision = tools.make_first_revision(
             "long_out", 
             "a script with lots of output", 
             "long_out.py",
-            pythonCode)
+            python_code,
+            self.user_bob)
         
         # A Method telling Shipyard how to use the noop code on string data.
         method = tools.make_first_method(
             "string long_out", 
             "a method with lots of output", 
-            codeRevision)
+            code_revision,
+            self.user_bob)
         tools.simple_method_io(method, self.cdt_string, "strings", "expected")
-        pipeline = tools.make_first_pipeline("pipe", "noisy")
+        pipeline = tools.make_first_pipeline("pipe", "noisy", self.user_bob)
         tools.create_linear_pipeline(pipeline, [method], "in", "out")
         pipeline.create_outputs()
         pipeline.save()
@@ -3324,7 +3325,7 @@ for i in range(%d):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
-        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
         tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
@@ -3352,7 +3353,7 @@ echo "This is not what's supposed to be output here" > $2
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
         tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
@@ -3381,7 +3382,7 @@ echo "This is not what's supposed to be output here" > $2
         """Testing of a RunComponent which has a failed content check (missing data) during recovery."""
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # changed and the output is different now.
-        p_one = tools.make_first_pipeline("p_one", "two no-ops")
+        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
         tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
@@ -3408,7 +3409,7 @@ echo
             self.coderev_noop.content_file=File(f)
             self.coderev_noop.save()
 
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial")
+        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
         tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
@@ -3495,11 +3496,11 @@ echo
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log)
+        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log)
+        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start()
         icl.stop()
         icl.save()
@@ -3650,7 +3651,7 @@ class TopLevelRunTests(ArchiveTransactionTestCase):
 
     def test_deep_nested_run(self):
         """Test on all elements of a deep-nested run."""
-        self._setup_deep_nested_run()
+        self._setup_deep_nested_run(self.myUser)
 
         # Recurse down all elements of this run and make sure that they all have
         # top_level_run equal to self.deep_nested_run.
@@ -3672,7 +3673,7 @@ class TopLevelRunTests(ArchiveTransactionTestCase):
 
 
 class RunStepReuseFailedExecRecordTests(TransactionTestCase):
-    fixtures = ["initial_data"]
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
@@ -3688,7 +3689,8 @@ class RunStepReuseFailedExecRecordTests(TransactionTestCase):
         # The environment provides a method that always fails called method_fubar, which takes in data
         # with CDT cdt_string (string: "word"), and puts out data with the same CDT in principle.
 
-        failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails")
+        failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails",
+                                                     self.user_grandpa)
         tools.create_linear_pipeline(
             failing_pipeline,
             [self.method_fubar, self.method_noop], "indata", "outdata"
@@ -3699,7 +3701,8 @@ class RunStepReuseFailedExecRecordTests(TransactionTestCase):
         first_step.add_deletion(self.method_fubar.outputs.first())
 
         # This Pipeline is identical to the first but doesn't discard output.
-        failing_pl_2 = tools.make_first_pipeline("failing pipeline 2", "another pipeline which always fails")
+        failing_pl_2 = tools.make_first_pipeline("failing pipeline 2", "another pipeline which always fails",
+                                                 self.user_grandpa)
         tools.create_linear_pipeline(
             failing_pl_2,
             [self.method_fubar, self.method_noop], "indata", "outdata"
