@@ -169,7 +169,7 @@ Exit `psql` with the `\q` command, then exit from the postgres user's shell to
 get back to your regular prompt.
 
 On a Mac, the PostgreSQL database defaults to accept connections from any user,
-so you are finished. On Ubuntu or CentOS, however, the default is to only accept
+so you are finished creating the database.  On Ubuntu or CentOS, however, the default is to only accept
 connections from system users. To allow the shipyard database user to connect,
 you have to change the [authentication setting][pg_hba] in PostgreSQL's
 configuration file. Replace 9.3 with whichever version you have.
@@ -186,6 +186,9 @@ with `psql` and then exit.
     psql shipyard shipyard
     \q
 
+
+Creating database tables
+------------------------
 Having created the database, we must now create the tables that will be used by
 Shipyard.  This is handled by the `migrate` command to the `manage.py` script,
 which follows instructions created by the developers on how to lay out the tables:
@@ -206,6 +209,7 @@ shipyard database, and skipping the already-done configuration steps.
 [digitalocean]: https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-django-with-postgres-nginx-and-gunicorn
 [test-permission]: http://stackoverflow.com/q/14186055/4794
 [pg_hba]: http://stackoverflow.com/a/18664239/4794
+
 
 Remove test database (if necessary)
 -----------------------------------
@@ -250,7 +254,9 @@ This is a database that must be created by an administrator prior to using
 Shipyard.
 
 Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
-working files for the server and any uploaded files. You may also wish to modify
+working files for the server and any uploaded files. 
+
+You may also wish to modify
 the `TIME_ZONE` setting to your region, although this localization is not
 strictly necessary.
 
