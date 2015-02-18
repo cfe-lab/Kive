@@ -26,9 +26,72 @@ You will likely need to run this using `sudo` unless you only installed Django l
 system-wide.  Also, many systems have multiple Python installations, so make sure that 
 `pip` is using the correct one.
 
+Installing PostgreSQL
+---------------------
 Instructions for downloading and installing PostgreSQL may be found at [postgresql.org](http://www.postgresql.org/).
+PostgreSQL is available as pre-compiled binary executables.  On Linux systems, the easiest way to obtain the binaries is to use a package manager such as `yum` or `apt-get`, depending on your distribution.  On Mac OS-X, there are number of methods including third-party installers and package managers such as `MacPorts` or `homebrew`.  The only option listed on the PostgreSQL website for installing PostgreSQL for Windows is a third-party installer distributed by [EnterpriseDB](http://www.enterprisedb.com/).
 
+#### Installation on OS-X with MacPorts
+[MacPorts](https://www.macports.org/) is a package manager for OS-X that installs packages into a separate directory at `/opt` so that any files installed by MacPorts can be removed without compromising the original filesystem.
+Instructions for installing MacPorts can be found [here](https://www.macports.org/install.php).
+
+Install the PostgreSQL server port by the following:
+```
+sudo port install postgresql93-server
+```
+This will create a new user on your system called `postgres`.  To confirm that this user account has been created, use the command
+```
+dscl . list /Users | grep postgres
+```
+which should return `postgres`.  
+MacPorts will have installed a number of files in different locations under the `/opt` tree including  `/opt/local/bin`, `/opt/local/include/postgresql93` and `/opt/local/lib/postgresql93`.  
+A number of utility programs are installed at `/opt/local/lib/postgresql93/bin`.  To make it more convenient to access these utilities, add this path to the `postgres` user's `$PATH` environment variable, log in as `postgres` and create a bash profile:
+```
+sudo su - postgres
+vi .profile
+```
+In the `vi` editor, type `O` to open the file for editing and write this line:
+```
+export PATH=/opt/local/lib/postgresql93/bin:$PATH
+```
+
+
+To create a database install, MacPorts also provides the following instructions:
+```
+ sudo mkdir -p /opt/local/var/db/postgresql93/defaultdb
+ sudo chown postgres:postgres /opt/local/var/db/postgresql93/defaultdb
+ sudo su postgres -c '/opt/local/lib/postgresql93/bin/initdb -D /opt/local/var/db/postgresql93/defaultdb' 
+```
+This creates a new folder under the `/opt` MacPorts tree that is owned by the `postgres` user, and then initializes a new PostgreSQL database in this new folder called `defaultdb`.  Note that the path (`/opt/local/var/db/postgresql93`) and name (`defaultdb`) for the database are optional.
+
+Now that we've created a database, we need to start a server to handle database transactions.  Based on the instructions provided on the [PostgreSQL website](http://www.postgresql.org/docs/9.3/static/creating-cluster.html), transfer ownership of the `postgres` user's home directory to itself:
+```
+sudo chown postgres:postgres /opt/local/var/db/postgresql93
+```
+
+login as the `postgres` user
+```
+sudo su - postgres
+```
+and start the server as a background process by this command
+```
+postgres -D /opt/local/var/db/postgresql93/defaultdb >logfile 2>&1 &
+```
+which redirects standard output and error messages to a file `logfile`.
+A slightly less obtuse way to issue this command is to call the `pg_ctl` utility from the `postgres` user home directory:
+```
+pg_ctl -D defaultdb -l logfile start
+```
+
+The PostgreSQL server will be automatically started when you reboot your system through a LaunchDaemon script that was installed by MacPorts at `/Library/LaunchDaemons/org.macports.postgresql93-server.plist`.  To inspect what this script is actually doing, you can look at the contents of the wrapper `/opt/local/etc/LaunchDaemons/org.macports.postgresql93-server/postgresql93-server.wrapper`.
+Note that if you used a database location or name other than the MacPorts default, then you may need to modify this wrapper accordingly.
+
+
+
+Installing psycopg
+------------------
 Instructions for downloading and installing psycopg may be found at [initd.org](http://initd.org/psycopg/).
+
 
 Project structure
 -----------------
