@@ -96,6 +96,7 @@ def _filter_datasets(request):
     response_data = []
     for dataset in query.all():
         response_data.append({"pk": dataset.pk, 
+                              "symbolicdataset_id": dataset.symbolicdataset_id,
                               "Name": dataset.name, 
                               "Date": dataset.date_created.strftime("%b %e, %Y, %l:%M %P")})
     return json.dumps(response_data)

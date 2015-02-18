@@ -30,15 +30,16 @@ def choose_inputs(request):
 
         # Find all compatible datasets for each input.
         for my_input in my_pipeline.inputs.order_by("dataset_idx"):
+            query = archive.models.Dataset.objects.order_by("-date_created")
             if my_input.is_raw():
-                query = archive.models.Dataset.objects.filter(symbolicdataset__structure__isnull=True)
+                query = query.filter(symbolicdataset__structure__isnull=True)
             else:
                 compound_datatype = my_input.get_cdt()
-                query = archive.models.Dataset.objects.filter(
+                query = query.filter(
                     symbolicdataset__structure__compounddatatype=compound_datatype)
             count = query.count()
-            query = query.order_by("created_by", "date_created")[:10]
-            response_data.append((my_input, query, count))
+            datasets = query[:10]
+            response_data.append((my_input, datasets, count))
 
         context = Context({"input_data": response_data})
         context.update(csrf(request))
