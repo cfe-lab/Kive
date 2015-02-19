@@ -348,8 +348,14 @@ class Pipeline(transformation.models.Transformation):
         """
         # First get the access control data in order.
         creating_user = User.objects.get(pk=pipeline_dict_repr["user"])
-        users_allowed = [User.objects.get(pk=x) for x in pipeline_dict_repr["users_allowed"]]
-        groups_allowed = [Group.objects.get(pk=x) for x in pipeline_dict_repr["groups_allowed"]]
+        if pipeline_dict_repr["users_allowed"]:
+            users_allowed = User.objects.filter(pk__in=pipeline_dict_repr["users_allowed"])
+        else:
+            users_allowed = []
+        if pipeline_dict_repr["groups_allowed"]:
+            groups_allowed = Group.objects.filter(pk__in=pipeline_dict_repr["groups_allowed"])
+        else:
+            groups_allowed = []
 
         # Make a new revision.
         new_revision = self.family.members.create(
@@ -489,12 +495,14 @@ class Pipeline(transformation.models.Transformation):
         This raises a PipelineSerializationException if anything goes wrong.
         """
         creating_user = User.objects.get(pk=form_data["user"])
-        users_allowed = (
-            [] if form_data["users_allowed"] is None else
-            [User.objects.get(pk=x) for x in form_data["users_allowed"]])
-        groups_allowed = (
-            [] if form_data["groups_allowed"] is None else
-            [Group.objects.get(pk=x) for x in form_data["groups_allowed"]])
+        if form_data["users_allowed"]:
+            users_allowed = User.objects.filter(pk__in=form_data["users_allowed"])
+        else:
+            users_allowed = []
+        if form_data["groups_allowed"]:
+            groups_allowed = Group.objects.filter(pk__in=form_data["groups_allowed"])
+        else:
+            groups_allowed = []
 
         if pipeline is None:
             # Does Pipeline family with this name already exist?

@@ -44,7 +44,8 @@ class CodeResourcePrototypeForm(AccessControlForm):
     resource_desc = forms.CharField(
         widget=forms.Textarea(attrs={'rows':5}),
         label='Resource description',
-        help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do'
+        help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do',
+        required=False
     )
 
     # Stuff that goes directly into the CodeResourceRevision.

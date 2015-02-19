@@ -2,21 +2,23 @@
 method.views
 """
 
-from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, Context, RequestContext
+from django.db import transaction
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import Group
-from django.db import transaction
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User, Group
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, Context, RequestContext
 
 from datetime import datetime
 
 import metadata.models
-from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method
-from method.forms import *
-from transformation.models import *
-import metadata.views
+from metadata.models import CompoundDatatype
+from method.models import CodeResource, CodeResourceDependency, Method, \
+    MethodFamily, CodeResourceRevision
+from method.forms import CodeResourceDependencyForm, \
+    CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
+    MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
 
 from constants import groups, users
 
@@ -208,7 +210,7 @@ def resource_add(request):
         # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
         try:
             _make_crv(request.FILES["content_file"], creating_user, resource_form, dep_forms)
-        except ValidationError as e:
+        except ValidationError:
             # All forms have the appropriate errors attached.
             c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
             return HttpResponse(t.render(c))
@@ -273,7 +275,7 @@ def resource_revision_add(request, id):
         try:
             _make_crv(request.FILES['content_file'], creating_user, revision_form, dep_forms,
                       parent_revision=parent_revision)
-        except ValidationError as e:
+        except ValidationError:
             # The forms have all been updated with the appropriate errors.
             c.update(
                 {
@@ -423,7 +425,10 @@ def create_method_forms(request_post, user, family=None):
                 auto_id=auto_id)
             xs_form.is_valid()
 
-            input_forms.append((t_form, xs_form)) if xput_type == "in" else output_forms.append((t_form, xs_form))
+            if xput_type == "in":
+                input_forms.append((t_form, xs_form))
+            else:
+                output_forms.append((t_form, xs_form))
 
     return family_form, method_form, input_forms, output_forms
 
@@ -606,7 +611,7 @@ def method_add(request, id=None):
 
         # Next, attempt to build the Method and its associated MethodFamily (if necessary),
         # inputs, and outputs.
-        new_method = create_method_from_forms(
+        create_method_from_forms(
             family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
             family=this_family
         )
@@ -692,7 +697,7 @@ def method_revise(request, id):
             return HttpResponse(t.render(c))
 
         # Next, attempt to build the Method and add it to family.
-        new_revision = create_method_from_forms(
+        create_method_from_forms(
             family_form, method_revise_form, input_form_tuples, output_form_tuples, creating_user,
             family=family, parent_method=parent_method
         )

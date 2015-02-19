@@ -2,7 +2,7 @@
 pipeline views
 """
 
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.template import loader, RequestContext
 from django.contrib.auth.decorators import login_required
 
