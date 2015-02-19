@@ -26,7 +26,7 @@ def populate_revision_dropdown(request):
                     "json",
                     CodeResourceRevision.objects.filter(
                         curr_user.access_query(), coderesource=coderesource
-                    ).order_by('-revision_number'),
+                    ).distinct().order_by('-revision_number'),
                     fields=('pk', 'revision_number', 'revision_name')
                 )
             )

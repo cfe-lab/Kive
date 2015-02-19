@@ -3,7 +3,6 @@
     "fields": {
         "name": "string",
         "restricts": [],
-        "custom_constraint": null,
         "date_created": "2013-11-13T19:47:19.853Z",
         "prototype": null,
         "description": "basic string type",
@@ -20,7 +19,6 @@
         "restricts": [
             1
         ],
-        "custom_constraint": null,
         "date_created": "2013-11-13T19:47:19.856Z",
         "prototype": null,
         "description": "basic boolean type",
@@ -37,7 +35,6 @@
         "restricts": [
             1
         ],
-        "custom_constraint": null,
         "date_created": "2013-11-13T19:47:19.874Z",
         "prototype": null,
         "description": "basic float type",
@@ -54,7 +51,6 @@
         "restricts": [
             3
         ],
-        "custom_constraint": null,
         "date_created": "2013-11-13T19:47:19.882Z",
         "prototype": null,
         "description": "basic integer type",
@@ -71,7 +67,6 @@
         "restricts": [
             4
         ],
-        "custom_constraint": null,
         "date_created": "2013-11-13T19:47:19.890Z",
         "prototype": null,
         "description": "positive integer",
@@ -88,7 +83,6 @@
         "restricts": [
             1
         ],
-        "custom_constraint": null,
         "date_created": "2014-06-10T16:36:44.948Z",
         "prototype": null,
         "description": "String of IUPAC symbols representing either the primary protein sequence (amino acids) or a nucleotide sequence (RNA or DNA).  Only standard placeholders permitted (gap character '-', ambiguous amino acid '?', stop codon '*').",
@@ -105,7 +99,6 @@
         "restricts": [
             1
         ],
-        "custom_constraint": null,
         "date_created": "2014-06-10T18:32:15.268Z",
         "prototype": null,
         "description": "A string of IUPAC symbols representing DNA or RNA, including ambiguous bases.",

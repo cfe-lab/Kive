@@ -7,7 +7,7 @@ paraphernalia, CompoundDatatypes, etc.
 from __future__ import unicode_literals
 
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
@@ -330,15 +330,15 @@ class AccessControl(models.Model):
         if len(extra_users) > 0:
             # FIXME sometime in the future this stuff should be converted to use gettext for translation!
             users_error = ValidationError(
-                'Users in %(users)s cannot be granted access',
+                'User(s) %(users_str)s cannot be granted access',
                 code="extra_users",
-                params={"users": extra_users}
+                params={"users_str": ", ".join([str(x) for x in extra_users])}
             )
         if len(extra_groups) > 0:
             groups_error = ValidationError(
-                'Groups in %(groups)s cannot be granted access',
+                'Group(s) %(groups_str)s cannot be granted access',
                 code="extra_groups",
-                params={"groups": extra_groups}
+                params={"groups_str": ", ".join([str(x) for x in extra_groups])}
             )
 
         if users_error is not None and groups_error is not None:
@@ -366,6 +366,8 @@ class Datatype(AccessControl):
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
 
+    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled")
+
     class Meta:
         unique_together = ("user", "name")
 
@@ -373,9 +375,12 @@ class Datatype(AccessControl):
     def restricts_str(self):
         return ','.join([dt['name'] for dt in self.restricts.values()])
 
-    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled")
-    # TODO: related_name for custom_constraint?
-    custom_constraint = models.OneToOneField("metadata.CustomConstraint", null=True, blank=True)
+    @property
+    def custom_constraint(self):
+        try:
+            return self.custom_constraint
+        except ObjectDoesNotExist:
+            return None
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -438,7 +443,11 @@ class Datatype(AccessControl):
         """
         Does this Datatype have a custom constraint?
         """
-        return self.custom_constraint is not None
+        try:
+            self.custom_constraint
+        except ObjectDoesNotExist:
+            return False
+        return True
 
     def is_numeric(self):
         """
@@ -833,6 +842,8 @@ class Datatype(AccessControl):
             self.logger.debug('Cleaning restrictions on Datatype "{}"'.format(self))
             self._clean_restrictions()
 
+            self.validate_restrict_access(self.restricts.all())
+
         if self.has_basic_constraints():
             self.logger.debug('Cleaning basic constraints for Datatype "{}"'.format(self))
             self._clean_basic_constraints()
@@ -843,10 +854,6 @@ class Datatype(AccessControl):
         if self.has_custom_constraint():
             self.logger.debug('Checking custom constraint for Datatype "{}"'.format(self))
             self.custom_constraint.clean()
-
-            # Check that the users with access to this Datatype must have access to the
-            # verification method.
-            self.validate_restrict_access([self.custom_constraint.verification_method])
 
         if self.has_prototype():
             self.logger.debug('Cleaning prototype for Datatype "{}"'.format(self))
@@ -968,6 +975,7 @@ class Datatype(AccessControl):
         1) this Datatype has a CustomConstraint.
         2) summary_path has been set up using setup_verification_path.
         """
+        assert self.has_custom_constraint()
         # We need to invoke the verification method using run_code.
         verif_method = self.custom_constraint.verification_method
 
@@ -1173,6 +1181,7 @@ class CustomConstraint(models.Model):
     Datatypes) and return a CSV of integers indicating which rows
     contain invalid values.
     """
+    datatype = models.OneToOneField(Datatype, related_name="custom_constraint")
     verification_method = models.ForeignKey("method.Method", related_name="custom_constraints")
 
     # Clean: Methods which function as CustomConstraints must take in
@@ -1190,6 +1199,10 @@ class CustomConstraint(models.Model):
         a CDT looking like (string to_test); it must return
         as output a CDT looking like (bool is_valid).
         """
+        # Check that the users with access to this Datatype must have access to the
+        # verification method.
+        self.datatype.validate_restrict_access([self.verification_method])
+
         # Pre-defined CDTs that the verification method must use.
         VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
         VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
@@ -1250,6 +1263,9 @@ class CompoundDatatypeMember(models.Model):
     class Meta:
         unique_together = (("compounddatatype", "column_name"),
                            ("compounddatatype", "column_idx"))
+
+    def clean(self):
+        self.compounddatatype.validate_restrict_access([self.datatype])
 
     def __str__(self):
         """
@@ -1330,10 +1346,6 @@ class CompoundDatatype(AccessControl):
                 raise ValidationError(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'
                                        .format(self)))
             member_dts.append(member.datatype)
-
-        # Check that the permissions defined on this CDT don't overstep those on its members.
-        if self.pk:
-            self.validate_restrict_access(member_dts)
 
 
     def is_restriction(self, other_CDT):

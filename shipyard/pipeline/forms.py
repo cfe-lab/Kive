@@ -3,7 +3,9 @@ Forms for creating Pipeline objects.
 """
 
 from django import forms
+
 from pipeline.models import PipelineStep
+
 
 class PipelineStepForm (forms.ModelForm):
     """
@@ -16,6 +18,7 @@ class PipelineStepForm (forms.ModelForm):
     class Meta:
         model = PipelineStep
         exclude = (pipeline, )
+
 
 class PipelineStepInputCableForm (forms.ModelForm):
     pass

@@ -3,62 +3,62 @@ pipeline views
 """
 
 from django.http import HttpResponse
-from django.template import loader, Context
-from django.core.context_processors import csrf
-from method.models import *
-from metadata.models import *
-from pipeline.models import *
+from django.template import loader, RequestContext
+from django.contrib.auth.decorators import login_required
 
 import json
+import logging
 
-from constants import groups
+from method.models import MethodFamily
+from metadata.models import CompoundDatatype, KiveUser
+from pipeline.models import Pipeline, PipelineFamily, PipelineSerializationException
+import metadata.forms
 
 logger = logging.getLogger(__name__)
 
 
+@login_required
 def pipelines(request):
     """
     Display existing pipeline families, represented by the
     root members (without parent).
     """
     t = loader.get_template('pipeline/pipelines.html')
-    families = PipelineFamily.objects.all()
-    pipelines = Pipeline.objects.all()
+    user_plus = KiveUser.kiveify(request.user)
+    families = PipelineFamily.objects.filter(user_plus.access_query()).distinct()
 
-    #pipelines = Pipeline.objects.filter(revision_parent=None)
-    c = Context({'families': families})
-    c.update(csrf(request))
+    c = RequestContext(request, {'families': families})
     return HttpResponse(t.render(c))
 
 
-def prepare_pipeline_dict(request):
+def prepare_pipeline_dict(request_body, user):
     """
     Helper that creates a dictionary representation of a Pipeline.
 
     For now, everything we produce is shared, with no users or groups granted
     any special privileges.
     """
-    form_data = json.loads(request.body)
-
-    # Add user information to form_data.
-    form_data["user"] = request.user.pk
-
+    form_data = json.loads(request_body)
+    form_data["user"] = user.pk
     return form_data
 
 
+@login_required
 def pipeline_add(request):
     """
     Most of the heavy lifting is done by JavaScript and HTML5.
     I don't think we need to use forms here.
     """
     t = loader.get_template('pipeline/pipeline_add.html')
-    method_families = MethodFamily.objects.all().order_by('name')
-    compound_datatypes = CompoundDatatype.objects.all()
-    c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
-    c.update(csrf(request))
+    user_plus = KiveUser.kiveify(request.user)
+    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct().order_by('name')
+    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    acf = metadata.forms.AccessControlForm()
+    c = RequestContext(request, {'method_families': method_families, 'compound_datatypes': compound_datatypes,
+                                 "access_control_form": acf})
 
     if request.method == 'POST':
-        form_data = prepare_pipeline_dict(request)
+        form_data = prepare_pipeline_dict(request.body, request.user)
         try:
             Pipeline.create_from_dict(form_data)
             response_data = {"status": "success", "error_msg": ""}
@@ -69,6 +69,7 @@ def pipeline_add(request):
         return HttpResponse(t.render(c))
 
 
+@login_required
 def pipeline_revise(request, id):
     """
     Display all revisions in this PipelineFamily.
@@ -77,19 +78,33 @@ def pipeline_revise(request, id):
     objects.
     """
     t = loader.get_template('pipeline/pipeline_revise.html')
-    method_families = MethodFamily.objects.all().order_by('name')
-    compound_datatypes = CompoundDatatype.objects.all()
+    user_plus = KiveUser.kiveify(request.user)
+    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct().order_by('name')
+    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    acf = metadata.forms.AccessControlForm()
 
-    # retrieve this pipeline from database
-    family = PipelineFamily.objects.filter(pk=id)[0]
-    revisions = Pipeline.objects.filter(family=family)
+    # Retrieve this pipeline from database.
 
-    c = Context({'family': family, 'revisions': revisions,
-                 'method_families': method_families, 'compound_datatypes': compound_datatypes})
-    c.update(csrf(request))
+    four_oh_four = False
+    try:
+        family = PipelineFamily.objects.get(pk=id)
+        if not family.can_be_accessed(request.user):
+            four_oh_four = True
+    except PipelineFamily.DoesNotExist:
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    revisions = Pipeline.objects.filter(user_plus.access_query(), family=family).distinct()
+
+    c = RequestContext(
+        request,
+        {'family': family, 'revisions': revisions, 'method_families': method_families,
+         'compound_datatypes': compound_datatypes, "access_control_form": acf})
 
     if request.method == 'POST':
-        form_data = prepare_pipeline_dict(request)
+        form_data = prepare_pipeline_dict(request.body, request.user)
         try:
             parent_pk = form_data['revision_parent_pk']
             parent_revision = Pipeline.objects.get(pk=parent_pk)
@@ -102,11 +117,12 @@ def pipeline_revise(request, id):
     return HttpResponse(t.render(c))
 
 
+@login_required
 def pipeline_exec(request):
     t = loader.get_template('pipeline/pipeline_exec.html')
-    method_families = MethodFamily.objects.all()
-    compound_datatypes = CompoundDatatype.objects.all()
-    c = Context({'method_families': method_families, 'compound_datatypes': compound_datatypes})
-    c.update(csrf(request))
+    user_plus = KiveUser.kiveify(request.user)
+    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct()
+    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    c = RequestContext(request, {'method_families': method_families, 'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))
 

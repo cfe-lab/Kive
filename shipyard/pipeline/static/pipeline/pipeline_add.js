@@ -22,7 +22,7 @@ var mNodeWidth = 80,
     mNodeOffset = 10;
 
 var submitError = function(error) {
-    $('#id_submit_error').show().html(error);
+    $('#id_submit_error').show().text(error);
 };
 
 jQuery.fn.extend({
@@ -764,7 +764,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
         var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
             revision_name = $('#id_revision_name').val(),
-            revision_desc = $('#id_revision_desc').val();
+            revision_desc = $('#id_revision_desc').val(),
+            users_allowed = $("#id_users_allowed").val(),
+            groups_allowed = $("#id_groups_allowed").val();
 
 
         // Form validation
@@ -786,10 +788,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // Now we're ready to start
         var form_data = {};
 
-        // For the moment, everything is shared with all users.
-        // The "Everyone" group has pk = 1.
-        form_data["users_allowed"] = [];
-        form_data["groups_allowed"] = [1];
+        form_data["users_allowed"] = users_allowed;
+        form_data["groups_allowed"] = groups_allowed;
 
         // There is no PipelineFamily yet; we're going to create one.
         form_data["family_pk"] = null;

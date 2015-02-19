@@ -47,10 +47,9 @@ def resource_revisions(request, id):
     four_oh_four = False
     try:
         coderesource = CodeResource.objects.get(pk=id)
+        if not coderesource.can_be_accessed(request.user):
+            four_oh_four = True
     except CodeResource.DoesNotExist:
-        four_oh_four = True
-
-    if not coderesource.can_be_accessed(request.user):
         four_oh_four = True
 
     if four_oh_four:
@@ -238,18 +237,16 @@ def resource_revision_add(request, id):
     four_oh_four = False
     try:
         parent_revision = CodeResourceRevision.objects.get(pk=id)
+        if not parent_revision.can_be_accessed(creating_user):
+            four_oh_four = True
     except CodeResourceRevision.DoesNotExist:
-        four_oh_four = True
-        raise Http404("ID {} cannot be accessed".format(id))
-
-    coderesource = parent_revision.coderesource
-
-    if not parent_revision.can_be_accessed(creating_user):
         four_oh_four = True
 
     if four_oh_four:
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
+
+    coderesource = parent_revision.coderesource
 
     if request.method == 'POST':
         # Use forms here, just as in resource_add.  Again note that entries of dep_forms may be None.
@@ -335,10 +332,9 @@ def resource_revision_view(request, id):
     four_oh_four = False
     try:
         revision = CodeResourceRevision.objects.get(pk=id)
+        if not revision.can_be_accessed(request.user):
+            four_oh_four = True
     except CodeResourceRevision.DoesNotExist:
-        four_oh_four = True
-
-    if not revision.can_be_accessed(request.user):
         four_oh_four = True
 
     if four_oh_four:
@@ -369,10 +365,9 @@ def methods(request, id):
     four_oh_four = False
     try:
         family = MethodFamily.objects.get(pk=id)
+        if not family.can_be_accessed(request.user):
+            four_oh_four = True
     except MethodFamily.DoesNotExist:
-        four_oh_four = True
-
-    if not family.can_be_accessed(request.user):
         four_oh_four = True
 
     if four_oh_four:
@@ -387,16 +382,18 @@ def methods(request, id):
     return HttpResponse(t.render(c))
 
 
-def create_method_forms(request_post, user):
+def create_method_forms(request_post, user, family=None):
     """
     Helper function for method_add() that creates Forms from the provided information and validates them.
     """
     query_dict = request_post.dict()
     if 'name' in query_dict:
+        assert family is None
         family_form = MethodFamilyForm(request_post)
-        family_form.is_valid()
     else:
-        family_form = MethodFamilyForm()
+        assert family is not None
+        family_form = MethodFamilyForm({"name": family.name, "description": family.description})
+    family_form.is_valid()
 
     # Populate main form with submitted values.
     if "coderesource" in query_dict:
@@ -577,12 +574,13 @@ def method_add(request, id=None):
         four_oh_four = False
         try:
             this_family = MethodFamily.objects.get(pk=id)
+            if not this_family.can_be_accessed(creating_user):
+                four_oh_four = True
         except MethodFamily.DoesNotExist:
-            four_oh_four = True
-        if not this_family.can_be_accessed(creating_user):
             four_oh_four = True
         if four_oh_four:
             raise Http404("ID {} is inaccessible".format(id))
+
         header = "Add a new Method to MethodFamily '%s'" % this_family.name
     else:
         this_family = None
@@ -592,7 +590,7 @@ def method_add(request, id=None):
     c = RequestContext(request)
     if request.method == 'POST':
         family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
-            request.POST, creating_user)
+            request.POST, creating_user, family=this_family)
         if not _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
             c.update(
@@ -659,10 +657,9 @@ def method_revise(request, id):
     four_oh_four = False
     try:
         parent_method = Method.objects.get(pk=id)
+        if not parent_method.can_be_accessed(creating_user):
+            four_oh_four = True
     except Method.DoesNotExist:
-        four_oh_four = True
-
-    if not parent_method.can_be_accessed(creating_user):
         four_oh_four = True
 
     if four_oh_four:
@@ -680,7 +677,7 @@ def method_revise(request, id):
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
         family_form, method_revise_form, input_form_tuples, output_form_tuples = create_method_forms(
-            request.POST, creating_user)
+            request.POST, creating_user, family=family)
         if not _method_forms_check_valid(family_form, method_revise_form, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
             c.update(
@@ -697,7 +694,7 @@ def method_revise(request, id):
         # Next, attempt to build the Method and add it to family.
         new_revision = create_method_from_forms(
             family_form, method_revise_form, input_form_tuples, output_form_tuples, creating_user,
-            family=family, parent_revision=parent_revision
+            family=family, parent_method=parent_method
         )
         if _method_forms_check_valid(family_form, method_revise_form, input_form_tuples, output_form_tuples):
             # Success!

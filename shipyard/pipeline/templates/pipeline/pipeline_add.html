@@ -56,6 +56,12 @@
 
                 <label for="id_family_desc" class="text-field-label">Family description</label>
                 <textarea id="id_family_desc" name="family_desc"></textarea>
+                <p>Users allowed:
+                {{ access_control_form.users_allowed }}
+                </p>
+                <p>Groups allowed:
+                {{ access_control_form.groups_allowed }}
+                </p>
             </div>
 
             <div id="id_meta_ctrl" class="ctrl_menu">

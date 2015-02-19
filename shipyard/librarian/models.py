@@ -93,19 +93,27 @@ class SymbolicDataset(metadata.models.AccessControl):
 
         Note that the MD5 checksum is already checked via a validator.
         """
+        if self.has_structure():
+            self.structure.clean()
+
         if self.has_data():
             self.dataset.clean()
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
-        # if not hasattr(self, "dataset"):
-        #     return False
-        # return self.dataset.pk is not None
         try:
             self.dataset
         except ObjectDoesNotExist:
             return False
         return self.dataset.pk is not None
+
+    def has_structure(self):
+        """True if associated DatasetStructure exists; False otherwise."""
+        try:
+            self.structure
+        except ObjectDoesNotExist:
+            return False
+        return self.structure.pk is not None
 
     def is_raw(self):
         """True if this SymbolicDataset is raw, i.e. not a CSV file."""
@@ -397,14 +405,15 @@ class SymbolicDataset(metadata.models.AccessControl):
                             raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
 
                         symDS = SymbolicDataset.create_SD(file, user=user, users_allowed=users_allowed,
-                                                          groups_allowed=groups_allowed, cdt=cdt, make_dataset=True,
-                                                          name=name, description=desc, created_by=None, check=True)
+                                                          groups_allowed=groups_allowed, cdt=cdt,
+                                                          make_dataset=make_dataset,
+                                                          name=name, description=desc, created_by=created_by,
+                                                          check=check)
 
                         symDSs.extend([symDS])
             except Exception, e:
                 LOGGER.exception("Error while parsing line " + str(line) + ":\n" + str(row))
                 raise ValueError("Error while parsing line " + str(line) + ":\n" + str(row) + ":\n" + str(e)), None, sys.exc_info()[2]
-
 
         return symDSs
 
@@ -605,6 +614,9 @@ class DatasetStructure(models.Model):
 
     # A value of -1 means the file is missing or num rows has never been counted
     num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
+
+    def clean(self):
+        self.symbolicdataset.validate_restrict_access([self.compounddatatype])
 
 
 @python_2_unicode_compatible

@@ -146,12 +146,17 @@ class Pipeline(transformation.models.Transformation):
         - Pipeline STEPS must be consecutively starting from 1
         - Steps are clean
         - PipelineOutputCables are appropriately mapped from the pipeline's steps
+        - Users/groups with access do not exceed those of the parent PipelineFamily.
         """
         # Transformation.clean() - check for consecutive numbering of
-        # input/outputs for this pipeline as a whole
+        # input/outputs for this pipeline as a whole.  This also checks for
+        # coherence of permissions on the inputs/outputs, and therefore on
+        # all the cables.
         super(self.__class__, self).clean()
 
-        # Internal pipeline STEP numbers must be consecutive from 1 to n
+        self.validate_restrict_access([self.family])
+
+        # Internal PipelineSteps must be numbered consecutively from 1 to n.
         # Check that steps are clean; this also checks the cabling between steps.
         # Note: we don't call *complete_clean* because this may refer to a
         # "transient" state of the Pipeline whereby it is not complete yet.
@@ -484,8 +489,12 @@ class Pipeline(transformation.models.Transformation):
         This raises a PipelineSerializationException if anything goes wrong.
         """
         creating_user = User.objects.get(pk=form_data["user"])
-        users_allowed = [User.objects.get(pk=x) for x in form_data["users_allowed"]]
-        groups_allowed = [Group.objects.get(pk=x) for x in form_data["groups_allowed"]]
+        users_allowed = (
+            [] if form_data["users_allowed"] is None else
+            [User.objects.get(pk=x) for x in form_data["users_allowed"]])
+        groups_allowed = (
+            [] if form_data["groups_allowed"] is None else
+            [Group.objects.get(pk=x) for x in form_data["groups_allowed"]])
 
         if pipeline is None:
             # Does Pipeline family with this name already exist?
@@ -498,11 +507,11 @@ class Pipeline(transformation.models.Transformation):
                 description=form_data['family_desc'],
                 user=creating_user
             )
+            pl_family.save()
             for u in users_allowed:
                 pl_family.users_allowed.add(u)
             for g in groups_allowed:
                 pl_family.groups_allowed.add(g)
-            pl_family.save()
 
             # Make a new Pipeline revision within this PipelineFamily.
             pipeline = pl_family.members.create(
@@ -537,7 +546,7 @@ class Pipeline(transformation.models.Transformation):
             pipeline.clean()
             pipeline.save()
         except ValidationError as e:
-            raise PipelineSerializationException("Pipeline is invalid: {}".format(e))
+            raise PipelineSerializationException("Pipeline is invalid: {}".format("; ".join(e.messages)))
 
         return pipeline
 
@@ -698,8 +707,13 @@ class PipelineStep(models.Model):
         checks coherency rather than completeness, for which we call
         complete_clean() - such as cabling.
         """
+        # Check the permissions on the parent Pipeline.
+        self.pipeline.validate_restrict_access([self.transformation])
+
         # Check recursively to see if this step's transformation contains
         # the specified pipeline at all.
+        self.pipeline.validate_restrict_access([self.transformation])
+
         if self.recursive_pipeline_check(self.pipeline):
             raise ValidationError("Step {} contains the parent pipeline".
                                   format(self.step_num))

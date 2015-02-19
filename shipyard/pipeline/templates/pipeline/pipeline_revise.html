@@ -117,6 +117,13 @@ $(function() {
                 <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
 
+                <p>Users allowed:
+                {{ access_control_form.users_allowed }}
+                </p>
+                <p>Groups allowed:
+                {{ access_control_form.groups_allowed }}
+                </p>
+
                 <input id="id_publish" type="button" value="Make published version">
             </div>
         </form>

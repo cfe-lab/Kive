@@ -81,6 +81,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
            which are associated (ie. at least in progress), and must
            be clean
         """
+        # Access to this Run must not exceed that of the pipeline.
+        self.validate_restrict_access([self.pipeline])
+
         # Check that start- and end-time are coherent.
         stopwatch.models.Stopwatch.clean(self)
 
@@ -312,8 +315,6 @@ class RunComponent(stopwatch.models.Stopwatch):
         try:
             self.runstep
         except RunStep.DoesNotExist:
-            # Note that we use self.__class__ here because this could be called
-            # on any of RunStep, RunSIC, or RunOutputCable.
             return False
         return True
 
@@ -587,6 +588,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     def clean(self):
         """Confirm that this is one of RunStep or RunCable."""
+        # If the ExecRecord is set, check that the permissions here do not exceed those on the ExecRecord.
+        # FIXME continue from here -- RL Feb 18, 2015
+
         if not self.is_step and not self.is_cable:
             raise ValidationError("RunComponent with pk={} is neither a step nor a cable".format(self.pk))
 
@@ -1930,7 +1934,17 @@ class Dataset(models.Model):
             return str(self.dataset_file.size) + ' B'
 
     def clean(self):
-        """If this Dataset has an MD5 set, verify the dataset file integrity"""
+        """
+        Validate this Dataset for putting into the database.
+
+        If this Dataset has an MD5 set, verify the dataset file integrity.
+        Also, make sure its permissions match those of the creating RunComponent
+        if there is one.
+        """
+        if self.created_by is not None:
+            self.symbolicdataset.validate_restrict_access([self.created_by.top_level_run])
+            self.created_by.top_level_run.validate_restrict_access(self.symbolicdataset)
+
         if not self.check_md5():
             raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
                                   '"{}"'.format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))

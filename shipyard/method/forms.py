@@ -160,7 +160,9 @@ class CodeResourceDependencyForm(forms.Form):
 class MethodReviseForm(AccessControlForm):
     """Revise an existing method.  No need to specify the CodeResource."""
     # This is populated by the calling view.
-    revisions = forms.ChoiceField()
+    revisions = forms.IntegerField(
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
+    )
 
     revision_name = forms.CharField(
         label="Name",
@@ -200,11 +202,6 @@ class MethodForm(MethodReviseForm):
         label="Code resource",
         help_text="The code resource for which this method is a set of instructions.",
         required=True)
-
-    # We override this field.
-    revisions = forms.IntegerField(
-        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
-    )
 
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(MethodForm, self).__init__(data, *args, **kwargs)

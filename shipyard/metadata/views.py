@@ -144,10 +144,9 @@ def datatype_detail(request, id):
     four_oh_four = False
     try:
         this_datatype = Datatype.objects.get(pk=id)
+        if not this_datatype.can_be_accessed(request.user):
+            four_oh_four = True
     except Datatype.DoesNotExist as e:
-        four_oh_four = True
-
-    if not this_datatype.can_be_accessed(request.user):
         four_oh_four = True
 
     if four_oh_four:
