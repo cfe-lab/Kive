@@ -702,6 +702,9 @@ class ExecRecord(models.Model):
         If this ER represents a trivial cable, then the single ERI and
         ERO should have the same SymbolicDataset.
         """
+        # Check that the permissions on the generating Run do not exceed those of the inputs FIXME continue from here
+
+
         eris = self.execrecordins.all()
         eros = self.execrecordouts.all()
 

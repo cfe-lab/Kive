@@ -1942,8 +1942,8 @@ class Dataset(models.Model):
         if there is one.
         """
         if self.created_by is not None:
-            self.symbolicdataset.validate_restrict_access([self.created_by.top_level_run])
-            self.created_by.top_level_run.validate_restrict_access(self.symbolicdataset)
+            self.symbolicdataset.validate_restrict_access([self.created_by.definite.top_level_run])
+            self.created_by.definite.top_level_run.validate_restrict_access([self.symbolicdataset])
 
         if not self.check_md5():
             raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
