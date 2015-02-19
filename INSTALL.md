@@ -282,6 +282,17 @@ You can leave the load parameter off, or set it to other fixture names, like
 `converter_pipeline`.  `demo` refers to a set of fixture files that populate the database
 with two pipelines that were used in the development of Kive, and for demonstrating the software.
 
+Finally, you need to create a Kive user account.  Open a Django shell session with the command:
+
+    ./manage.py shell
+
+and at the prompt enter the following lines:
+
+    from django.contrib.auth.models import User
+    User.objects.create_user('admin', 'admin@domain.com', 'password')
+
+where the positional arguments of `create_user()` correspond to the user name, e-mail address and password, respectively.
+
 You are now ready to run a local Django webserver:
 
     python manage.py runserver
