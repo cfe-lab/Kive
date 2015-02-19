@@ -402,7 +402,7 @@ def create_method_forms(request_post, user):
     if "coderesource" in query_dict:
         method_form = MethodForm(request_post, user=user)
     else:
-        method_form = MethodReviseForm(request_post, user=user)
+        method_form = MethodReviseForm(request_post)
     method_form.is_valid()
 
     # Populate in/output forms with submitted values.

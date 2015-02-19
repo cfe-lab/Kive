@@ -4,10 +4,8 @@ Generate an HTML form to create a new Datatype object
 
 from django.http import Http404
 from django import forms
-from method.models import CodeResource, CodeResourceRevision, CodeResourceDependency, Method, MethodFamily
+from method.models import CodeResource, CodeResourceRevision, Method
 from metadata.models import CompoundDatatype, KiveUser
-from transformation.models import TransformationInput, XputStructure
-from django.contrib.auth.models import User, Group
 from metadata.forms import AccessControlForm
 from django.db.models import Q
 
@@ -66,14 +64,16 @@ class CodeResourceRevisionForm(AccessControlForm):
 
     revision_name = forms.CharField(
         label="Revision name",
-        help_text="A short name to differentiate this revision from previous versions."
+        help_text="A short name to differentiate this revision from previous versions.",
+        required=False
     )
 
     revision_desc = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2}),
         label="Revision description",
         help_text="A brief description of this version of the resource",
-        initial=""
+        initial="",
+        required=False
     )
 
 
@@ -164,13 +164,15 @@ class MethodReviseForm(AccessControlForm):
 
     revision_name = forms.CharField(
         label="Name",
-        help_text="A short name for this new method"
+        help_text="A short name for this new method",
+        required=False
     )
 
     revision_desc = forms.CharField(
         label="Description",
         help_text="A detailed description for this new method",
-        widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'})
+        widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'}),
+        required=False
     )
 
     reusable = forms.ChoiceField(
@@ -259,4 +261,5 @@ class MethodFamilyForm (forms.Form):
     description = forms.CharField(
         label="Family description",
         widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'}),
+        required=False
     )
