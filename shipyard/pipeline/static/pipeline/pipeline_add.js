@@ -842,8 +842,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // MethodNodes are now sorted live, prior to pipeline submission —JN
         //
         var sorted_elements = [];
-        for (i = 0; i < canvasState.exec_order.length; i++) {
-            sorted_elements.concat(canvasState.exec_order[i]);
+        for (i in canvasState.exec_order) {
+            sorted_elements = sorted_elements.concat(canvasState.exec_order[i]);
         }
 
         // add arguments for input cabling
