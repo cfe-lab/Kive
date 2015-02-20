@@ -207,6 +207,8 @@ class SymbolicDataset(metadata.models.AccessControl):
         self must not have a Dataset already associated
         """
         assert not self.has_data()
+        if created_by is not None:
+            assert user == created_by.user
 
         dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=self)
         if created_by:
@@ -233,11 +235,12 @@ class SymbolicDataset(metadata.models.AccessControl):
         return ccl
 
     @classmethod
-    def create_empty(cls, user, compound_datatype=None, users_allowed=None, groups_allowed=None):
+    def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
+                     created_by=None):
         """Create an empty SymbolicDataset.
 
         INPUTS
-        compound_datatype   CompoundDatatype for the new SymbolicDataset
+        cdt   CompoundDatatype for the new SymbolicDataset
                             (None indicates a raw SymbolicDataset)
 
         OUTPUTS
@@ -247,11 +250,21 @@ class SymbolicDataset(metadata.models.AccessControl):
         users_allowed = users_allowed or []
         groups_allowed = groups_allowed or []
 
+        if user is None:
+            assert created_by is not None
+            user = created_by.top_level_run.user
+            users_allowed = created_by.top_level_run.users_allowed.all()
+            groups_allowed = created_by.top_level_run.groups_allowed.all()
+        elif created_by is not None:
+            assert user == created_by.top_level_run.user
+            assert set(users_allowed) == set(created_by.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(created_by.top_level_run.groups_allowed.all())
+
         empty_SD = cls(user=user, MD5_checksum="")
         empty_SD.clean()
         empty_SD.save()
-        if compound_datatype:
-            empty_SD.create_structure(compound_datatype)
+        if cdt:
+            empty_SD.create_structure(cdt)
 
         for user in users_allowed:
             empty_SD.users_allowed.add(user)
@@ -263,7 +276,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, user, users_allowed=None, groups_allowed=None, cdt=None,
+    def create_SD(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None,
                   make_dataset=True, name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
@@ -277,6 +290,19 @@ class SymbolicDataset(metadata.models.AccessControl):
     
         Returns the SymbolicDataset created.
         """
+        users_allowed = users_allowed or []
+        groups_allowed = groups_allowed or []
+
+        if user is None:
+            assert created_by is not None
+            user = created_by.top_level_run.user
+            users_allowed = created_by.top_level_run.users_allowed.all()
+            groups_allowed = created_by.top_level_run.groups_allowed.all()
+        elif created_by is not None:
+            assert user == created_by.top_level_run.user
+            assert set(users_allowed) == set(created_by.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(created_by.top_level_run.groups_allowed.all())
+
         if file_path:
             LOGGER.debug("Creating SymbolicDataset from file {}".format(file_path))
             file_name = file_path
@@ -287,7 +313,7 @@ class SymbolicDataset(metadata.models.AccessControl):
             raise Exception("Must supply either the file path or file handle")
 
         with transaction.atomic():
-            symDS = cls.create_empty(user, compound_datatype=cdt,
+            symDS = cls.create_empty(user, cdt=cdt,
                                      users_allowed=users_allowed, groups_allowed=groups_allowed)
 
             if symDS.is_raw():
@@ -702,9 +728,6 @@ class ExecRecord(models.Model):
         If this ER represents a trivial cable, then the single ERI and
         ERO should have the same SymbolicDataset.
         """
-        # Check that the permissions on the generating Run do not exceed those of the inputs FIXME continue from here
-
-
         eris = self.execrecordins.all()
         eros = self.execrecordouts.all()
 
@@ -712,6 +735,12 @@ class ExecRecord(models.Model):
             eri.clean()
         for ero in eros:
             ero.clean()
+
+        # Check that the permissions on the generating Run do not exceed those of the inputs.
+        # (That the output permissions are the same as the generating Run will be checked
+        # by the output SymbolicDatasets themselves.)
+        input_SDs = [x.symbolicdataset for x in self.execrecordouts.all()]
+        self.generating_run.validate_restrict_access(input_SDs)
 
         if not isinstance(self.general_transf(), method.models.Method):
             # If the cable is quenched:
@@ -800,6 +829,10 @@ class ExecRecord(models.Model):
         else:
             # This is a Method.
             return self.generator.record.component.transformation.definite
+
+    @property
+    def generating_run(self):
+        return self.generator.record.top_level_run
 
     def provides_outputs(self, outputs):
         """
@@ -905,6 +938,10 @@ class ExecRecordIn(models.Model):
         Also, if symbolicdataset refers to existent data, check that it
         is compatible with the input represented.
         """
+        # Check that the SymbolicDataset has the same access as the generating run.
+        self.symbolicdataset.validate_restrict_access([self.execrecord.generating_run])
+        self.execrecord.generating_run.validate_restrict_access([self.symbolicdataset])
+
         parent_transf = self.execrecord.general_transf()
 
         # If ER links to POC, ERI must link to TO which the outcable runs from.
@@ -1042,6 +1079,9 @@ class ExecRecordOut(models.Model):
           belongs to the ExecRecord's Method.
         - The SymbolicDataset is compatible with generic_output. (??)
         """
+        # Outputs must have the same access as the generating run.
+        self.symbolicdataset.validate_identical_access(self.execrecord.generating_run)
+
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
             parent_er_outcable = self.execrecord.general_transf()

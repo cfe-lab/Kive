@@ -58,7 +58,7 @@ class Sandbox:
         
     # cable_map maps cables to ROC/RSIC.
 
-    def __init__(self, user, my_pipeline, inputs, sandbox_path=None):
+    def __init__(self, user, my_pipeline, inputs, users_allowed=None, groups_allowed=None, sandbox_path=None):
         """
         Sets up a sandbox environment to run a Pipeline: space on
         the file system, along with sd_fs_map/socket_map/etc.
@@ -73,8 +73,13 @@ class Sandbox:
         inputs must have real data
         """
         assert all([i.has_data() for i in inputs])
+        users_allowed = users_allowed or []
+        groups_allowed = groups_allowed or []
 
         self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
+        self.run.users_allowed.add(*users_allowed)
+        self.run.groups_allowed.add(*groups_allowed)
+        self.run.save()
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
@@ -531,6 +536,8 @@ class Sandbox:
             pipeline.check_inputs(input_SDs)
             self.logger.debug("executing a sub-pipeline with input_SDs {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
+            curr_run.users_allowed.add(self.run.users_allowed.all())
+            curr_run.groups_allowed.add(self.run.groups_allowed.all())
         else:
             pipeline = self.pipeline
 
@@ -1200,6 +1207,8 @@ class Sandbox:
                 self.logger.debug("Executing a sub-pipeline with input_SD(s): {}".format(inputs_after_cable))
                 subpipeline_to_run = pipelinestep.transformation.definite
                 curr_run = subpipeline_to_run.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
+                curr_run.users_allowed.add(self.run.users_allowed.all())
+                curr_run.groups_allowed.add(self.run.groups_allowed.all())
                 self.advance_pipeline(run_to_start=curr_run)
                 return curr_RS
 
@@ -1540,7 +1549,10 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     if cable.is_trivial():
                         output_SD = input_SD
                     if execrecord is None:
-                        output_SD = librarian.models.SymbolicDataset.create_empty(user, output_CDT)
+                        output_SD = librarian.models.SymbolicDataset.create_empty(
+                            cdt=output_CDT,
+                            created_by=curr_record
+                        )
                     else:
                         output_SD = execrecord.execrecordouts.first().symbolicdataset
                     output_SD.mark_missing(start_time, end_time, curr_log, user)
@@ -1564,8 +1576,9 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
                     else:
                         output_SD = librarian.models.SymbolicDataset.create_SD(
-                            output_path, user, cdt=output_CDT, make_dataset=make_dataset,
-                            name=dataset_name, description=dataset_desc, created_by=curr_record, check=False)
+                            output_path, cdt=output_CDT, make_dataset=make_dataset,
+                            name=dataset_name, description=dataset_desc, created_by=curr_record,
+                            check=False)
 
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
@@ -1769,7 +1782,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             if preexisting_ER:
                                 output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_empty(user, output_CDT)
+                                output_SD = librarian.models.SymbolicDataset.create_empty(
+                                    cdt=output_CDT, created_by=runstep)
                             output_SD.mark_missing(start_time, end_time, curr_log, user)
 
                             bad_output_found = True
@@ -1790,12 +1804,13 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                         pk=output_ERO.symbolicdataset.pk
                                     ).first()
                                     if make_dataset and not output_SD.has_data():
-                                        output_SD.register_dataset(output_path, user, dataset_name, dataset_desc,
-                                                                   runstep)
+                                        output_SD.register_dataset(
+                                            output_path, user, dataset_name, dataset_desc,
+                                            runstep)
 
                             else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(
-                                    output_path, user, cdt=output_CDT, make_dataset=make_dataset,
+                                    output_path, cdt=output_CDT, make_dataset=make_dataset,
                                     name=dataset_name, description=dataset_desc, created_by=runstep,
                                     check=False
                                 )

@@ -1,26 +1,35 @@
-from django.template import loader, Context
-from django.core.context_processors import csrf
-from django.http import HttpResponse
+from django.template import loader, RequestContext
+from django.http import HttpResponse, Http404
+from django.contrib.auth.decorators import login_required
 
 import archive.models
 import pipeline.models
 from sandbox.forms import PipelineSelectionForm
+from metadata.models import KiveUser
 
 
+@login_required
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
+    context = RequestContext(request)
+    user_plus = KiveUser.kiveify(request.user)
     template = loader.get_template("sandbox/choose_pipeline.html")
-    families = pipeline.models.PipelineFamily.objects.all()
+    families = pipeline.models.PipelineFamily.objects.filter(user_plus.access_query()).distinct()
     forms = []
     for family in families:
         if len(family.complete_members) > 0:
             forms.append(PipelineSelectionForm(pipeline_family_pk=family.pk))
-    context = Context({"pipeline_forms": forms})
-    context.update(csrf(request))
+    context.update({"pipeline_forms": forms})
     return HttpResponse(template.render(context))
 
+
+@login_required
 def choose_inputs(request):
     """Load the input selection page."""
+    context = RequestContext(request)
+    user_plus = KiveUser.kiveify(request.user)
+    acf = metadata.forms.AccessControlForm()
+
     if request.method == "GET":
         template = loader.get_template("sandbox/choose_inputs.html")
         pipeline_pk = int(request.GET.get("pipeline"))
@@ -30,7 +39,7 @@ def choose_inputs(request):
 
         # Find all compatible datasets for each input.
         for my_input in my_pipeline.inputs.order_by("dataset_idx"):
-            query = archive.models.Dataset.objects.order_by("-date_created")
+            query = archive.models.Dataset.objects.filter(user_plus.access_query()).distinct().order_by("-date_created")
             if my_input.is_raw():
                 query = query.filter(symbolicdataset__structure__isnull=True)
             else:
@@ -41,17 +50,28 @@ def choose_inputs(request):
             datasets = query[:10]
             response_data.append((my_input, datasets, count))
 
-        context = Context({"input_data": response_data})
-        context.update(csrf(request))
+        context.update({"input_data": response_data, "access_control_form": acf})
         return HttpResponse(template.render(context))
     else:
         # Method not allowed
         return HttpResponse(status=405)
 
+
+@login_required
 def view_results(request, run_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
-    run = archive.models.Run.objects.get(pk=run_id)
-    context = Context({"run": run})
-    context.update(csrf(request))
+    context = RequestContext(request)
+
+    four_oh_four = False
+    try:
+        run = archive.models.Run.objects.get(pk=run_id)
+        if not run.can_be_accessed(request.user):
+            four_oh_four = True
+    except archive.models.Run.DoesNotExist:
+        four_oh_four = False
+
+    if four_oh_four:
+        raise Http404("ID {} is not accessible".format(run_id))
+    context.update({"run": run})
     return HttpResponse(template.render(context))

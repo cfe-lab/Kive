@@ -83,6 +83,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Access to this Run must not exceed that of the pipeline.
         self.validate_restrict_access([self.pipeline])
 
+        # If this is not a top-level run it must have the same access as the top-level run.
+        my_top_level_run = self.top_level_run
+        if self != my_top_level_run:
+            self.validate_identical_access(my_top_level_run)
+
         # Check that start- and end-time are coherent.
         stopwatch.models.Stopwatch.clean(self)
 
@@ -294,12 +299,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     @property
     def component(self):
         """Pipeline component represented by this RunComponent."""
-        if self.is_step:
-            return self.runstep.component
-        elif self.is_incable:
-            return self.runsic.component
-        elif self.is_outcable:
-            return self.runoutputcable.component
+        return self.definite.component
 
     @property
     def parent_run(self):
@@ -307,7 +307,11 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         This is abstract and must be overridden.
         """
-        pass
+        return self.definite.parent_run
+
+    @property
+    def top_level_run(self):
+        return self.definite.top_level_run
 
     @property
     def is_step(self):
@@ -587,8 +591,10 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     def clean(self):
         """Confirm that this is one of RunStep or RunCable."""
-        # If the ExecRecord is set, check that the permissions here do not exceed those on the ExecRecord.
-        # FIXME continue from here -- RL Feb 18, 2015
+        # If the ExecRecord is set, check that access on the top level Run does not exceed
+        # that on the ExecRecord.
+        if self.execrecord is not None:
+            self.top_level_run.validate_restrict_access([self.execrecord.generating_run])
 
         if not self.is_step and not self.is_cable:
             raise ValidationError("RunComponent with pk={} is neither a step nor a cable".format(self.pk))
@@ -1146,7 +1152,8 @@ class RunStep(RunComponent):
         return run_coords + (self.pipelinestep.step_num,)
 
     def find_compatible_ERs(self, inputs_after_cable):
-        return self.pipelinestep.transformation.definite.find_compatible_ERs(inputs_after_cable)
+        assert self.transformation.is_method
+        return self.pipelinestep.transformation.definite.find_compatible_ERs(inputs_after_cable, self)
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):
@@ -1534,7 +1541,7 @@ class RunCable(RunComponent):
         OUTPUTS
         list of ExecRecords that are compatible with this cable and input (may be empty).
         """
-        return self.component.find_compatible_ERs(input_SD)
+        return self.component.find_compatible_ERs(input_SD, self)
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):
@@ -1855,10 +1862,10 @@ class Dataset(models.Model):
     """
     UPLOAD_DIR = "Datasets"  # This is relative to shipyard.settings.MEDIA_ROOT
 
-    # The user who created this Dataset is now stored in one of
+    # The user who created this Dataset is stored in one of
     # a) the SymbolicDataset of this Dataset (if it's uploaded)
-    # b) the parent Run of created_by (if it's generated)
-    # user = models.ForeignKey(User, help_text="User that uploaded this Dataset.")
+    # b) the parent Run of created_by (if it's generated) -- note that this may not be the same
+    #    user that created the parent SymbolicDataset.
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, help_text="Name of this Dataset.")
     description = models.TextField(help_text="Description of this Dataset.",
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
@@ -1952,7 +1959,7 @@ class Dataset(models.Model):
         if there is one.
         """
         if self.created_by is not None:
-            self.symbolicdataset.validate_restrict_access([self.created_by.definite.top_level_run])
+            # Whatever run created this Dataset must have had access to the parent SymbolicDataset.
             self.created_by.definite.top_level_run.validate_restrict_access([self.symbolicdataset])
 
         if not self.check_md5():
@@ -2030,7 +2037,7 @@ class ExecLog(stopwatch.models.Stopwatch):
                 'ExecLog "{}" does not correspond to a Method or cable'.
                 format(self))
 
-        if self.record.definite.top_level_run != self.invoking_record.definite.top_level_run:
+        if self.record.top_level_run != self.invoking_record.top_level_run:
             raise ValidationError(
                 'ExecLog "{}" belongs to a different Run than its invoking RunStep/RSIC/ROC'.
                 format(self)

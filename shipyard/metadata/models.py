@@ -348,6 +348,27 @@ class AccessControl(models.Model):
         elif groups_error is not None:
             raise groups_error
 
+    def validate_identical_access(self, ac):
+        """
+        Check that this instance has the same access as the specified one.
+        """
+        if self.user != ac.user:
+            raise ValidationError(
+                "Instances have different users", code="different_user"
+            )
+
+        non_overlapping_users_allowed = set(self.users_allowed.all()).symmetric_difference(ac.users_allowed.all())
+        if len(non_overlapping_users_allowed) > 0:
+            raise ValidationError(
+                "Instances allow different users access", code="different_users_allowed"
+            )
+
+        non_overlapping_groups_allowed = set(self.groups_allowed.all()).symmetric_difference(ac.groups_allowed.all())
+        if len(non_overlapping_groups_allowed) > 0:
+            raise ValidationError(
+                "Instances allow different groups access", code="different_groups_allowed"
+            )
+
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):

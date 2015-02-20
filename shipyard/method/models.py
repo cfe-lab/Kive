@@ -507,9 +507,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         Methods already exist in the database.
         """
         self.clean()
-        for other_method in Method.objects.filter(driver=self.driver).exclude(pk=self.pk):
-            if self.is_identical(other_method):
-                raise ValidationError("An identical method already exists")
+        # for other_method in Method.objects.filter(driver=self.driver).exclude(pk=self.pk):
+        #     if self.is_identical(other_method):
+        #         raise ValidationError("An identical method already exists")
 
     def copy_io_from_parent(self):
         """
@@ -544,9 +544,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
                     ).save()
 
-    def find_compatible_ERs(self, input_SDs):
+    def find_compatible_ERs(self, input_SDs, runstep):
         """
-        Given a set of input SDs, find any ExecRecords that use these inputs.
+        Given a set of input SDs, find any ExecRecords that use these inputs that
+        are accessible by the calling RunStep.
 
         Note that this ExecRecord may be a failure, which the calling function
         would then handle appropriately.
@@ -563,6 +564,11 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     reused=False,
                     execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
+
+                # Check that this ER is accessible by runstep.
+                extra_users, extra_groups = runstep.extra_users_groups([candidate_ER.generating_run])
+                if len(extra_users) > 0 or len(extra_groups) > 0:
+                    continue
 
                 # Check if inputs match.
                 ER_matches = True

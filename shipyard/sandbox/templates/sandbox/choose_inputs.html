@@ -69,6 +69,14 @@
 </ul>
 
 <form action="run_pipeline" id="run_pipeline" method="post">
+
+    <p>Users allowed:
+    {{ access_control_form.users_allowed }}
+    </p>
+    <p>Groups allowed:
+    {{ access_control_form.groups_allowed }}
+    </p>
+
     <input type="hidden" name="pipeline" value="{{ input_data.0.0.transformation.definite.pk }}">
     <!--Annoyingly, some browsers will disallow form submission unless >= 1 user input field is present. -->
     <input type="text" style="display: none;">

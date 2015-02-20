@@ -2,13 +2,13 @@ import sys
 import threading
 
 from django.db import models, transaction
-from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 
 from archive.models import ExecLog, Run
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline
+import metadata.models
 
 # This is an experimental replacement for the runfleet admin command.
 # Disable it by setting worker_count to 0.
@@ -26,7 +26,7 @@ if worker_count > 0 and sys.argv[-1] == "runserver":
 
 
 # Create your models here.
-class RunToProcess(models.Model):
+class RunToProcess(metadata.models.AccessControl):
     """
     Represents a run that is ready to be processed.
 
@@ -34,6 +34,8 @@ class RunToProcess(models.Model):
     then be served by the Manager of the fleet.  The required information to start
     a run are:
      - user
+     - users allowed access
+     - groups allowed access
      - pipeline
      - inputs
      - sandbox path (default None)
@@ -43,17 +45,21 @@ class RunToProcess(models.Model):
     Occasionally we should reap this table to remove stuff that's finished.
     """
     # The information needed to perform a run:
-    # - user
     # - pipeline
     # - inputs
     # - sandbox_path (default is None)
-    user = models.ForeignKey(User)
+    # (access information is in the superclass).
     pipeline = models.ForeignKey(Pipeline)
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(auto_now_add=True)
     run = models.ForeignKey(Run, null=True)
 
     def clean(self):
+        self.validate_restrict_access([self.pipeline])
+
+        for rtp_input in self.inputs.all():
+            rtp_input.clean()
+
         if hasattr(self, "not_enough_CPUs"):
             self.not_enough_CPUs.clean()
 
@@ -154,6 +160,9 @@ class RunToProcessInput(models.Model):
     runtoprocess = models.ForeignKey(RunToProcess, related_name="inputs")
     symbolicdataset = models.ForeignKey(SymbolicDataset)
     index = models.PositiveIntegerField()
+
+    def clean(self):
+        self.runtoprocess.validate_restrict_access([self.symbolicdataset])
 
 
 class ExceedsSystemCapabilities(models.Model):

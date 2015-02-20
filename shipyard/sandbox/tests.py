@@ -9,7 +9,7 @@ from django.test import TransactionTestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
-from metadata.models import Datatype, CompoundDatatype, AccessControl
+from metadata.models import Datatype, CompoundDatatype
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox

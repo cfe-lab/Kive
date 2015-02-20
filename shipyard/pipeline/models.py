@@ -1172,7 +1172,7 @@ class PipelineCable(models.Model):
 
         return new_wire
 
-    def find_compatible_ERs(self, input_SD):
+    def find_compatible_ERs(self, input_SD, runcable):
         """Find an ExecRecord which may be reused by this PipelineCable.
 
         INPUTS
@@ -1191,6 +1191,11 @@ class PipelineCable(models.Model):
             candidate_component = candidate_execrecord.general_transf()
 
             if not candidate_component.is_cable:
+                continue
+
+            # Check that this ER is accessible by runcable.
+            extra_users, extra_groups = runcable.extra_users_groups([candidate_execrecord.generating_run])
+            if len(extra_users) > 0 or len(extra_groups) > 0:
                 continue
 
             if self.definite.is_compatible(candidate_component):

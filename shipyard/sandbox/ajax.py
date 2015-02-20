@@ -4,17 +4,18 @@ import json
 import logging
 import time
 
-from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 
 from archive.models import Dataset, Run
 import fleet.models
-from forms import PipelineSelectionForm
+from forms import PipelineSelectionForm, PipelineSubmissionForm, InputSubmissionForm
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
+import metadata.models
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -39,28 +40,29 @@ class AJAXRequestHandler:
 
 
 def _run_pipeline(request):
-    """Run a Pipeline as the global Shipyard user.
+    """Run a Pipeline.
     
     Request parameters are:
     
     * pipeline - the pipeline id
     * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
     """
-    pipeline_pk = request.GET.get("pipeline")
-    pipeline = Pipeline.objects.get(pk=pipeline_pk)
+    pipeline_submission = PipelineSubmissionForm(request.GET)
+    pipeline_submission.is_valid()
+    pipeline = Pipeline.objects.get(pk=pipeline_submission.cleaned_data["pipeline_pk"])
 
     symbolic_datasets = []
     for i in range(1, pipeline.inputs.count()+1):
-        pk = int(request.GET.get("input_{}".format(i)))
-        symbolic_datasets.append(SymbolicDataset.objects.get(pk=pk))
-
-    # TODO: for now this is just using the global Shipyard user
-    user = User.objects.get(username="shipyard")
+        curr_input_form = InputSubmissionForm({"input_pk": request.GET.get("input_{}".format(i))})
+        curr_input_form.is_valid()
+        symbolic_datasets.append(SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"]))
 
     # Inform the fleet that this is to be processed.
     with transaction.atomic():
-        run_to_start = fleet.models.RunToProcess(user=user, pipeline=pipeline)
+        run_to_start = fleet.models.RunToProcess(user=request.user, pipeline=pipeline)
         run_to_start.save()
+        run_to_start.users_allowed.add(pipeline_submission.cleaned_data["users_allowed"])
+        run_to_start.groups_allowed.add(pipeline_submission.cleaned_data["groups_allowed"])
 
         for i, sd in enumerate(symbolic_datasets):
             run_to_start.inputs.create(symbolicdataset=sd, index=i)
@@ -69,6 +71,7 @@ def _run_pipeline(request):
                        "queue_placeholder": run_to_start.pk, "crashed": False})
 
 
+@login_required
 def run_pipeline(request):
     return AJAXRequestHandler(request, _run_pipeline).response
 
@@ -102,6 +105,7 @@ def _filter_datasets(request):
     return json.dumps(response_data)
 
 
+@login_required
 def filter_datasets(request):
     return AJAXRequestHandler(request, _filter_datasets).response
 
@@ -125,6 +129,7 @@ def _filter_pipelines(request):
     return json.dumps(response_data)
 
 
+@login_required
 def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
@@ -140,15 +145,17 @@ def filter_pipelines(request):
 #     return not rtp.run.is_complete()
 
 
-def _load_status():
+def _load_status(user):
+    user_plus = metadata.models.KiveUser.kiveify(user)
     try:
         recent_time = timezone.now() - timedelta(minutes=5)
         old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
             'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
         runs = fleet.models.RunToProcess.objects.filter(
+            user_plus.access_query(),
             Q(run_id__isnull=True)|
             Q(run__end_time__isnull=True)|
-            Q(run__end_time__gte=recent_time)).exclude(
+            Q(run__end_time__gte=recent_time)).distinct().exclude(
             pk__in=old_aborted_runs).order_by('time_queued')
         run_reports = [run.get_run_progress() for run in runs]
         
@@ -157,6 +164,7 @@ def _load_status():
         status = str(e)
         ajax_logger.error('Status report failed.', exc_info=e)
     return status
+
 
 def _poll_run_progress(request):
     """
@@ -176,7 +184,7 @@ def _poll_run_progress(request):
 
     # Arrrgh I hate sleeping. Find a better way.
     while True:
-        status = _load_status()
+        status = _load_status(request.user)
         if status != last_status or not status:
             break
         time.sleep(1)
@@ -193,6 +201,7 @@ def _poll_run_progress(request):
     return return_val
 
 
+@login_required
 def poll_run_progress(request):
     return AJAXRequestHandler(request, _poll_run_progress).response
 
@@ -232,5 +241,6 @@ def _get_failed_output(request):
     return json.dumps(response_data)
 
 
+@login_required
 def get_failed_output(request):
     return AJAXRequestHandler(request, _get_failed_output).response
