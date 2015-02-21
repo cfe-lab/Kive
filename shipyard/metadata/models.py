@@ -245,10 +245,8 @@ class KiveUser(User):
         return KiveUser.objects.get(pk=user.pk)
 
     def access_query(self):
-        everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
-        query_object = Q(user=self) | Q(users_allowed=self) | Q(groups_allowed=everyone_group)
-        for group in self.groups.all():
-            query_object = query_object | Q(groups_allowed=group)
+        query_object = (Q(user=self) | Q(users_allowed=self) | Q(groups_allowed=groups.EVERYONE_PK) |
+                        Q(groups_allowed__in=self.groups.all()))
         return query_object
 
 

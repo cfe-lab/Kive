@@ -47,7 +47,7 @@ def _run_pipeline(request):
     * pipeline - the pipeline id
     * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
     """
-    pipeline_submission = PipelineSubmissionForm(request.GET)
+    pipeline_submission = PipelineSubmissionForm({"pipeline_pk": request.GET.get("pipeline")})
     pipeline_submission.is_valid()
     pipeline = Pipeline.objects.get(pk=pipeline_submission.cleaned_data["pipeline_pk"])
 
@@ -61,8 +61,8 @@ def _run_pipeline(request):
     with transaction.atomic():
         run_to_start = fleet.models.RunToProcess(user=request.user, pipeline=pipeline)
         run_to_start.save()
-        run_to_start.users_allowed.add(pipeline_submission.cleaned_data["users_allowed"])
-        run_to_start.groups_allowed.add(pipeline_submission.cleaned_data["groups_allowed"])
+        run_to_start.users_allowed.add(*pipeline_submission.cleaned_data["users_allowed"])
+        run_to_start.groups_allowed.add(*pipeline_submission.cleaned_data["groups_allowed"])
 
         for i, sd in enumerate(symbolic_datasets):
             run_to_start.inputs.create(symbolicdataset=sd, index=i)

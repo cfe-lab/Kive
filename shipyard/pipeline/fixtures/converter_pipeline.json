@@ -6,7 +6,8 @@
         "published_version": null,
         "name": "Fasta2CSV",
         "description": "One-step pipeline wrapper for Fasta2CSV Method",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {

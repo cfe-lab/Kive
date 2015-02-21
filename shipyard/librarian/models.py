@@ -74,11 +74,6 @@ class SymbolicDataset(metadata.models.AccessControl):
         return "S{}{}".format(self.pk, has_data_suffix)
 
     @property
-    def is_missing(self):
-        """Is this SymbolicDataset missing data?"""
-        return 
-
-    @property
     def compounddatatype(self):
         if self.is_raw(): return None
         return self.structure.compounddatatype
@@ -208,7 +203,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         """
         assert not self.has_data()
         if created_by is not None:
-            assert user == created_by.user
+            assert user == created_by.top_level_run.user
 
         dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=self)
         if created_by:
@@ -1171,27 +1166,30 @@ class ExecRecordOut(models.Model):
                         'CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'.
                         format(input_SD, self.generic_output))
 
-            if (self.generic_output.get_min_row() != None and
-                    input_SD.num_rows() < self.generic_output.get_min_row()):
-                if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
-                    raise ValidationError(
-                        "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
-                        format(input_SD, self.generic_output))
-                else:
-                    raise ValidationError(
-                        "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
-                        format(input_SD, self.generic_output))
+            # If the input SD has a number of rows, then check that it is coherent.  (If it is -1,
+            # then we can't check this.)
+            if input_SD.num_rows() != -1:
+                if (self.generic_output.get_min_row() != None and
+                        input_SD.num_rows() < self.generic_output.get_min_row()):
+                    if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
+                        raise ValidationError(
+                            "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
+                            format(input_SD, self.generic_output))
+                    else:
+                        raise ValidationError(
+                            "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
+                            format(input_SD, self.generic_output))
 
-            if (self.generic_output.get_max_row() != None and 
-                    input_SD.num_rows() > self.generic_output.get_max_row()):
-                if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
-                    raise ValidationError(
-                        "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
-                        format(input_SD, self.generic_output))
-                else:
-                    raise ValidationError(
-                        "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
-                        format(input_SD, self.generic_output))
+                if (self.generic_output.get_max_row() != None and
+                        input_SD.num_rows() > self.generic_output.get_max_row()):
+                    if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
+                        raise ValidationError(
+                            "SymbolicDataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
+                            format(input_SD, self.generic_output))
+                    else:
+                        raise ValidationError(
+                            "SymbolicDataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
+                            format(input_SD, self.generic_output))
 
         self.logger.debug("ERO is clean")
 

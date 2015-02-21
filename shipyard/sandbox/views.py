@@ -2,10 +2,12 @@ from django.template import loader, RequestContext
 from django.http import HttpResponse, Http404
 from django.contrib.auth.decorators import login_required
 
+import librarian.models
 import archive.models
 import pipeline.models
 from sandbox.forms import PipelineSelectionForm
 from metadata.models import KiveUser
+import metadata.forms
 
 
 @login_required
@@ -39,7 +41,9 @@ def choose_inputs(request):
 
         # Find all compatible datasets for each input.
         for my_input in my_pipeline.inputs.order_by("dataset_idx"):
-            query = archive.models.Dataset.objects.filter(user_plus.access_query()).distinct().order_by("-date_created")
+            viewable_SDs = librarian.models.SymbolicDataset.objects.filter(user_plus.access_query()).distinct()
+            query = archive.models.Dataset.objects.filter(symbolicdataset__in=viewable_SDs).distinct().order_by(
+                "-date_created")
             if my_input.is_raw():
                 query = query.filter(symbolicdataset__structure__isnull=True)
             else:

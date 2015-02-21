@@ -6,7 +6,8 @@
         "revision_DateTime": "2014-08-07T21:52:47.509Z", 
         "revision_desc": "", 
         "revision_name": "script_1_sum_and_products",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -16,7 +17,8 @@
         "revision_DateTime": "2014-08-07T21:57:44.989Z", 
         "revision_desc": "", 
         "revision_name": "Sums and Products",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -134,7 +136,8 @@
         "revision_DateTime": "2014-08-11T19:05:56.425Z", 
         "revision_desc": "", 
         "revision_name": "prelim_map",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -205,7 +208,8 @@
         "revision_DateTime": "2014-08-11T19:26:50.681Z", 
         "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.", 
         "revision_name": "remap",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -357,7 +361,8 @@
         "revision_DateTime": "2014-08-11T21:34:09.900Z", 
         "revision_desc": "Conversion of SAM data into aligned format.", 
         "revision_name": "sam2aln",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -448,7 +453,8 @@
         "revision_DateTime": "2014-08-11T22:46:19.889Z", 
         "revision_desc": "Post-processing of short-read alignments.", 
         "revision_name": "aln2counts",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -609,7 +615,8 @@
         "revision_DateTime": "2014-08-12T00:04:53.535Z", 
         "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.", 
         "revision_name": "sam_g2p.sh",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -673,7 +680,8 @@
         "revision_DateTime": "2014-08-12T00:25:49.583Z", 
         "revision_desc": "", 
         "revision_name": "MiSeq",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -853,7 +861,8 @@
         "revision_DateTime": "2014-08-12T18:43:20.837Z", 
         "revision_desc": "Plot coverage for each region in a sample.", 
         "revision_name": "coverage_plots",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -863,7 +872,8 @@
         "revision_DateTime": "2014-08-12T18:45:44.829Z", 
         "revision_desc": "", 
         "revision_name": "added coverage plots",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -1300,7 +1310,8 @@
         "revision_DateTime": "2014-12-05T20:17:01.510Z", 
         "revision_desc": "", 
         "revision_name": "",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {

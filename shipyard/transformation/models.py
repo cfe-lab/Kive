@@ -363,7 +363,8 @@ class TransformationXput(models.Model):
         new_structure.save()
 
     def represent_as_dict(self):
-        """
+        """,
+        "groups_allowed": [1]
         Make a dict serialization of this TransformationXput.
 
         These will be dicts with the following fields:

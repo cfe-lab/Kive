@@ -2,7 +2,7 @@
 {
     "fields": {
         "description": "Take in two integers, output sums and products.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "script_1_sum_and_products.py",
         "users_allowed": [],
         "user": 1,
@@ -14,7 +14,7 @@
 {
     "fields": {
         "description": "To make pipeline portable, allow user to specify local paths and thread counts.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "settings.py",
         "users_allowed": [],
         "user": 1,
@@ -26,7 +26,7 @@
 {
     "fields": {
         "description": "Standard configuration for logging",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "miseq_logging.py",
         "users_allowed": [],
         "user": 1,
@@ -38,7 +38,7 @@
 {
     "fields": {
         "description": "Reference sequences",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "projects.json",
         "users_allowed": [],
         "user": 1,
@@ -50,7 +50,7 @@
 {
     "fields": {
         "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "prelim_map.py",
         "users_allowed": [],
         "user": 1,
@@ -62,7 +62,7 @@
 {
     "fields": {
         "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "remap.py",
         "users_allowed": [],
         "user": 1,
@@ -74,7 +74,7 @@
 {
     "fields": {
         "description": "Conversion of SAM data into aligned format.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "sam2aln.py",
         "users_allowed": [],
         "user": 1,
@@ -86,7 +86,7 @@
 {
     "fields": {
         "description": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "hyphyAlign.py",
         "users_allowed": [],
         "user": 1,
@@ -98,7 +98,7 @@
 {
     "fields": {
         "description": "Post-processing of short-read alignments.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "aln2counts.py",
         "users_allowed": [],
         "user": 1,
@@ -110,7 +110,7 @@
 {
     "fields": {
         "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "sam_g2p.rb",
         "users_allowed": [],
         "user": 1,
@@ -122,7 +122,7 @@
 {
     "fields": {
         "description": "Written by Conan",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "pssm_lib.rb",
         "users_allowed": [],
         "user": 1,
@@ -134,7 +134,7 @@
 {
     "fields": {
         "description": "Compiled version of alignment.cpp",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "alignment.so",
         "users_allowed": [],
         "user": 1,
@@ -146,7 +146,7 @@
 {
     "fields": {
         "description": "",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "g2p.matrix",
         "users_allowed": [],
         "user": 1,
@@ -158,7 +158,7 @@
 {
     "fields": {
         "description": "",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "g2p_fpr.txt",
         "users_allowed": [],
         "user": 1,
@@ -170,7 +170,7 @@
 {
     "fields": {
         "description": "Shell script to  launch Ruby version",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "sam_g2p.sh",
         "users_allowed": [],
         "user": 1,
@@ -182,7 +182,7 @@
 {
     "fields": {
         "description": "Plot coverage for each region in a sample.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "coverage_plots.R",
         "users_allowed": [],
         "user": 1,
@@ -194,7 +194,7 @@
 {
     "fields": {
         "description": "Load MiSeq project configurations from a JSON file.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "filename": "project_config.py",
         "users_allowed": [],
         "user": 1,
@@ -221,7 +221,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Take in two integers, output sums and products.",
         "coderesource": 2,
         "MD5_checksum": "5d454fec2eb55b5e643afa6c988ac974",
@@ -238,7 +238,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "To make pipeline portable, allow user to specify local paths and thread counts.",
         "coderesource": 3,
         "MD5_checksum": "7121a7e639218c633578babb84fae75a",
@@ -255,7 +255,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Standard configuration for logging",
         "coderesource": 4,
         "MD5_checksum": "d98e48f57cc791eb7b68230af283dd3b",
@@ -272,7 +272,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Reference sequences",
         "coderesource": 5,
         "MD5_checksum": "8c0164addbd76439b5979f4040a251c6",
@@ -289,7 +289,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
         "coderesource": 6,
         "MD5_checksum": "ceab4d9a4ba011cf872b079fd6e63d8a",
@@ -306,7 +306,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
         "coderesource": 7,
         "MD5_checksum": "4776a35064ff5404b8df73481c4bf3e9",
@@ -323,7 +323,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Conversion of SAM data into aligned format.",
         "coderesource": 8,
         "MD5_checksum": "474bfa052bd9345860b589b666857ff0",
@@ -340,7 +340,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Perform pairwise alignment of sequence against a reference using the HyPhy shared library function AlignSequences().",
         "coderesource": 10,
         "MD5_checksum": "3563b23f2e275d184865e2907e50034b",
@@ -357,7 +357,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Post-processing of short-read alignments.",
         "coderesource": 11,
         "MD5_checksum": "d88a5186405b9ccaa0314a050c618113",
@@ -374,7 +374,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
         "coderesource": 14,
         "MD5_checksum": "cc361585b84ffd4b92b12153f4e563f2",
@@ -391,7 +391,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Written by Conan",
         "coderesource": 15,
         "MD5_checksum": "173be3144ccf7a6f073c85db53e25821",
@@ -408,7 +408,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Compiled version of alignment.cpp",
         "coderesource": 16,
         "MD5_checksum": "334778bd1bdb04bb615d2029f45dab62",
@@ -425,7 +425,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "",
         "coderesource": 17,
         "MD5_checksum": "b4c8b3013b1b6822d056f5958115f50a",
@@ -442,7 +442,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "",
         "coderesource": 18,
         "MD5_checksum": "c7aad4c7db95f0fc797806895a76a449",
@@ -459,7 +459,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Shell script to  launch Ruby version",
         "coderesource": 19,
         "MD5_checksum": "6eed3db03077b725408f14ceb78c1c9f",
@@ -476,7 +476,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Plot coverage for each region in a sample.",
         "coderesource": 21,
         "MD5_checksum": "77a11448dd4cc72e0ca9e1c2fb0ffb43",
@@ -493,7 +493,7 @@
     "fields": {
         "revision_name": "Prototype",
         "revision_parent": null,
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "revision_desc": "Load MiSeq project configurations from a JSON file.",
         "coderesource": 22,
         "MD5_checksum": "0f7bedb2a7de87b49a427004d709c34c",
@@ -843,7 +843,7 @@
 {
     "fields": {
         "description": "",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "Sums and Products"
@@ -854,7 +854,7 @@
 {
     "fields": {
         "description": "Shipyard-style bowtie2\r\nRun bowtie2 on paired-end FASTQ data sets with user-supplied *.bt2\r\nbowtie2 SAM format output to <stdout> for redirection via subprocess.Popen\r\nSort outputs by refname.\r\nConvert to CSV format and write to file.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "prelim_map"
@@ -865,7 +865,7 @@
 {
     "fields": {
         "description": "Shipyard-style MiSeq pipeline, step 2\r\nTakes preliminary SAM as CSV input.  Iterative re-mapping of reads from\r\noriginal FASTQ files.\r\nAlso report the number of reads mapped before and after processing.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "remap"
@@ -876,7 +876,7 @@
 {
     "fields": {
         "description": "Conversion of SAM data into aligned format.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "sam2aln"
@@ -887,7 +887,7 @@
 {
     "fields": {
         "description": "Post-processing of short-read alignments.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "aln2counts"
@@ -898,7 +898,7 @@
 {
     "fields": {
         "description": "Iterate through a CSV (produced by remap)\r\nRestrict to sequences of HIV env V3 (region == V3LOOP).\r\nApply Conan's implementation of the geno2pheno (g2p) coreceptor\r\ntropism prediction algorithm to each entry.  Output tuples of header,\r\ng2p score, FPR, and g2p-aligned protein sequence.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "sam_g2p.sh"
@@ -909,7 +909,7 @@
 {
     "fields": {
         "description": "Plot coverage for each region in a sample.",
-        "groups_allowed": [],
+        "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
         "name": "coverage_plots"

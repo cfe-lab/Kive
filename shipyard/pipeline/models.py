@@ -1194,7 +1194,8 @@ class PipelineCable(models.Model):
                 continue
 
             # Check that this ER is accessible by runcable.
-            extra_users, extra_groups = runcable.extra_users_groups([candidate_execrecord.generating_run])
+            extra_users, extra_groups = runcable.top_level_run.extra_users_groups(
+                [candidate_execrecord.generating_run])
             if len(extra_users) > 0 or len(extra_groups) > 0:
                 continue
 

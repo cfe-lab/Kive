@@ -5,7 +5,8 @@
     "fields": {
         "name": "Sums and Products", 
         "description": "",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
@@ -70,7 +71,8 @@
         "published_version": 13,
         "name": "MiSeq",
         "description": "",
-        "user": 1
+        "user": 1,
+        "groups_allowed": [1]
     }
 },
 {
