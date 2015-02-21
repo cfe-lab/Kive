@@ -1,12 +1,11 @@
 """
 archive views
 """
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, Context
 from django.core.context_processors import csrf
 from django.core.servers.basehttp import FileWrapper
 from django.core.exceptions import ValidationError
-from django.forms.models import modelformset_factory
 from django.forms.formsets import formset_factory
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
@@ -56,12 +55,8 @@ def dataset_view(request, dataset_id):
     """
     t = loader.get_template("archive/dataset_view.html")
     dataset = Dataset.objects.filter(id=dataset_id).get()
-    header = []
-    if not dataset.symbolicdataset.is_raw():
-        for column in dataset.symbolicdataset.compounddatatype.members.order_by("column_idx"):
-            header.append(column.column_name)
 
-    c = Context({"dataset": dataset, "header": header, "user": request.user})
+    c = Context({"dataset": dataset, "user": request.user})
     c.update(csrf(request))
     return HttpResponse(t.render(c))
 

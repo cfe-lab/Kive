@@ -8,7 +8,6 @@ from __future__ import unicode_literals
 
 from django.db import models, transaction
 from django.db.models.signals import post_delete
-from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.utils.encoding import python_2_unicode_compatible
@@ -1896,11 +1895,22 @@ class Dataset(models.Model):
         """
         return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
 
+    def header(self):
+        rows = self.all_rows()
+        return next(rows)
+
     def rows(self):
-        reader = csv.reader(self.dataset_file)
-        next(reader)
-        for row in reader:
+        rows = self.all_rows()
+        next(rows) # skip header
+        for row in rows:
             yield row
+
+    def all_rows(self):
+        self.dataset_file.open('rU')
+        with self.dataset_file:
+            reader = csv.reader(self.dataset_file)
+            for row in reader:
+                yield row
 
     def validate_unique(self, *args, **kwargs):
         query = Dataset.objects.filter(symbolicdataset__MD5_checksum=self.symbolicdataset.MD5_checksum,
