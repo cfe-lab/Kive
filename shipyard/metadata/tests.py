@@ -1,24 +1,28 @@
 """
 Unit tests for Shipyard metadata models.
 """
-from django.test import TestCase, TransactionTestCase
+import os
+import re
+
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
+from django.test import TestCase, TransactionTestCase
 
-from metadata.models import *
+from metadata.models import BasicConstraint, CompoundDatatype, Datatype
 from method.models import CodeResourceRevision
 from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
-
 from constants import datatypes, CDTs, groups
 
+
 samplecode_path = "../samplecode"
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
+    everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+    
     # Define a user.  This was previously in librarian/tests.py,
     # but we put it here now so all tests can use it.
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
@@ -1129,7 +1133,6 @@ class DatatypeTests(MetadataTestCase):
                 "Datatype whose constraint conflicts with parent",
                 BC_type, constr_val)
 
-        err_msg_key = ""
         if BC_type == BasicConstraint.MIN_LENGTH:
             error_msg = 'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}'
         elif BC_type == BasicConstraint.MAX_LENGTH:
@@ -1187,7 +1190,7 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on the case where a Datatype has a DATETIMEFORMAT but so does its supertype.
         """
-        super_DT, constr_DT = self._setup_inheriting_datatype("DateTimeDT", "String with a DATETIMEFORMAT",
+        _super_DT, constr_DT = self._setup_inheriting_datatype("DateTimeDT", "String with a DATETIMEFORMAT",
                 BasicConstraint.DATETIMEFORMAT, "%Y %b %d", self.STR, "OverwritingDateTimeDT",
                 "String with a DATETIMEFORMAT whose parent also has one", 
                 BasicConstraint.DATETIMEFORMAT, "%Y-%b-%d")
@@ -1202,7 +1205,7 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on the case where a Datatype has several supertypes with DATETIMEFORMATs.
         """
         dtf = BasicConstraint.DATETIMEFORMAT
-        super_DT, second_DT, constr_DT = self._setup_inheriting_datatype2(
+        _super_DT, _second_DT, constr_DT = self._setup_inheriting_datatype2(
                 "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
                 "OverwritingDateTimeDT", "Second string with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
                 "OverwritingDateTimeChildDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %b %d")
@@ -1217,7 +1220,7 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on the case where a Datatype has a DATETIMEFORMAT and several supertypes, one which has one.
         """
         dtf = BasicConstraint.DATETIMEFORMAT
-        super_DT, second_DT, constr_DT = self._setup_inheriting_datatype2(
+        _super_DT, _second_DT, constr_DT = self._setup_inheriting_datatype2(
                 "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
                 "OtherDT", "String by a different name", None, None, self.STR,
                 "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %d")
@@ -1232,7 +1235,7 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on a DATETIMEFORMATted Datatype with two supertypes: STR and another DTFd Datatype.
         """
         dtf = BasicConstraint.DATETIMEFORMAT
-        super_DT, constr_DT = self._setup_inheriting_datatype(
+        _super_DT, constr_DT = self._setup_inheriting_datatype(
             "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
             "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %d")
         constr_DT.restricts.add(self.STR)
@@ -2143,10 +2146,10 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.save()
         my_DT.restricts.add(self.STR)
 
-        my_min_length = my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="4")
-        my_max_length = my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="7")
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="foo...")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="...bar")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="4")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="7")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="foo...")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="...bar")
 
         self.assertEquals(my_DT.check_basic_constraints("foobar"), [])
 
@@ -2159,9 +2162,9 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.save()
         my_DT.restricts.add(self.STR)
 
-        my_min_length = my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="4")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="4")
         my_max_length = my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="5")
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="foo...")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="foo...")
         my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="...baz")
 
         constr_fail = my_DT.check_basic_constraints("foobar")
@@ -2178,9 +2181,9 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.save()
         my_DT.restricts.add(self.FLOAT)
 
-        my_min_val = my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="1999")
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..14")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="1999")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..14")
 
         self.assertEquals(my_DT.check_basic_constraints("2014"), [])
 
@@ -2194,8 +2197,8 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.restricts.add(self.FLOAT)
 
         my_min_val = my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="1999")
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..14")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..14")
 
         self.assertEquals(my_DT.check_basic_constraints("2014"), [my_min_val])
 
@@ -2208,9 +2211,9 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.save()
         my_DT.restricts.add(self.INT)
 
-        my_max_val = my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="2099")
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..35")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="2099")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="..35")
 
         self.assertEquals(my_DT.check_basic_constraints("2035"), [])
 
@@ -2225,7 +2228,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
 
         my_min_val = my_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="2099")
         my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="^....$")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="35")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="35")
 
         constr_fail = my_DT.check_basic_constraints("935")
         self.assertEquals(len(constr_fail), 2)
@@ -2241,8 +2244,8 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         my_DT.save()
         my_DT.restricts.add(self.BOOL)
 
-        my_regexp = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="T...")
-        my_regexp_2 = my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="rue|RUE")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="T...")
+        my_DT.basic_constraints.create(ruletype=BasicConstraint.REGEXP, rule="rue|RUE")
 
         self.assertEquals(my_DT.check_basic_constraints("True"), [])
 
@@ -2301,7 +2304,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.STR)
-        my_min_length = super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="2")
+        super_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="2")
 
         my_DT = Datatype(name="MyDT", description="Datatype inheriting a restriction", user=self.myUser)
         my_DT.full_clean()
@@ -2356,7 +2359,7 @@ class DatatypeCheckBasicConstraints(MetadataTestCase):
         super_DT.full_clean()
         super_DT.save()
         super_DT.restricts.add(self.INT)
-        super_max_val = super_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="999")
+        super_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="999")
 
         my_DT = Datatype(name="MyDT", description="Datatype inheriting restrictions", user=self.myUser)
         my_DT.full_clean()
