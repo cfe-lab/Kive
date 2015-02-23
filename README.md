@@ -26,6 +26,6 @@ What are we working on?
 
 You can see active tasks on [our project board][waffle], or look at the [current milestone's burndown][burndown].
 
-[waffle]: https://waffle.io/artpoon/shipyard
-[burndown]: http://burndown.io/#ArtPoon/Shipyard
+[waffle]: https://waffle.io/artpoon/kive
+[burndown]: http://burndown.io/#ArtPoon/Kive
 

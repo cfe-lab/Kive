@@ -301,10 +301,8 @@ class Sandbox:
                                 self.update_cable_maps(curr_record, output_SD, output_path)
                                 return curr_record
                     succeeded_yet = True
-                except (OperationalError, InternalError) as e:
+                except (OperationalError, InternalError):
                     wait_time = random.random()
-                    # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                    #                   exc_info=e)
                     self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
 
@@ -473,10 +471,8 @@ class Sandbox:
                             curr_RS.reused = False
                             curr_RS.save()
                 succeeded_yet = True
-            except (OperationalError, InternalError) as e:
+            except (OperationalError, InternalError):
                 wait_time = random.random()
-                # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                #                   exc_info=e)
                 self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
@@ -1051,10 +1047,8 @@ class Sandbox:
                             self.update_cable_maps(curr_record, output_SD, output_path)
                             return_now = True
                 succeeded_yet = True
-            except (OperationalError, InternalError) as e:
+            except (OperationalError, InternalError):
                 wait_time = random.random()
-                # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                #                   exc_info=e)
                 self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
@@ -1131,7 +1125,7 @@ class Sandbox:
         Outputs written to: [step run dir]/output_data/step[step num]_[output name]
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
-        curr_RS = archive.models.RunStep.create(pipelinestep, parent_run)
+        curr_RS = archive.models.RunStep.create(pipelinestep, parent_run, user=parent_run.user)
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)
@@ -1243,10 +1237,8 @@ class Sandbox:
                         curr_RS.reused = False
                         curr_RS.save()
                     succeeded_yet = True
-                except (OperationalError, InternalError) as e:
+                except (OperationalError, InternalError):
                     wait_time = random.random()
-                    # self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time,
-                    #                   exc_info=e)
                     self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
 
@@ -1464,10 +1456,8 @@ def finish_cable(cable_execute_dict, worker_rank):
                         curr_record.complete_clean()
                         return curr_record
             succeeded_yet = True
-        except (OperationalError, InternalError) as e:
+        except (OperationalError, InternalError):
             wait_time = random.random()
-            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-            #              worker_rank, wait_time, exc_info=e)
             logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
                          worker_rank, wait_time)
             time.sleep(wait_time)
@@ -1594,10 +1584,8 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
                                  worker_rank)
             succeeded_yet = True
-        except (OperationalError, InternalError) as e:
+        except (OperationalError, InternalError):
             wait_time = random.random()
-            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-            #              worker_rank, wait_time, exc_info=e)
             logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
                          worker_rank, wait_time)
             time.sleep(wait_time)
@@ -1720,10 +1708,8 @@ def finish_step(step_execute_dict, worker_rank):
                     curr_RS.reused = False
                     curr_RS.save()
                 succeeded_yet = True
-            except (OperationalError, InternalError) as e:
+            except (OperationalError, InternalError):
                 wait_time = random.random()
-                # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                #              worker_rank, wait_time, exc_info=e)
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
                              worker_rank, wait_time)
                 time.sleep(wait_time)
@@ -1829,10 +1815,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                     runstep.link_execrecord(execrecord, False)
 
             succeeded_yet = True
-        except (OperationalError, InternalError) as e:
+        except (OperationalError, InternalError):
             wait_time = random.random()
-            # logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time,
-            #              exc_info=e)
             logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
             time.sleep(wait_time)
 
