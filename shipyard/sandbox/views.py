@@ -60,6 +60,13 @@ def choose_inputs(request):
         # Method not allowed
         return HttpResponse(status=405)
 
+@login_required
+def active_runs(request):
+    """Display all active runs for this user."""
+    context = RequestContext(request)
+    template = loader.get_template("sandbox/active_runs.html")
+    return HttpResponse(template.render(context))
+
 
 @login_required
 def view_results(request, run_id):

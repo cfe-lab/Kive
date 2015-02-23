@@ -1,7 +1,7 @@
 <!-- Django template -->
 
 {% extends "portal/base.html" %}
-{% block title %}Shipyard developer portal{% endblock %}
+{% block title %}Shipyard user portal{% endblock %}
 
 {% block content %}
 <a href="/" rel="prev">Return to homepage</a>
@@ -10,7 +10,7 @@
 
 
 <nav><ul>
-<li>
+    <li>
         <a href="/datasets">
         <h4 class="menu-item">Datasets</h4>
         <p class="menu-description">Upload a new dataset</p>
@@ -21,7 +21,14 @@
         <h4 class="menu-item">Analysis</h4>
         <p class="menu-description">Apply a pipeline to one or more datasets.</p>
         </a>
-</li>
+    </li>
+    <li>
+        <a href="/active_runs">
+        <h4 class="menu-item">Active Runs</h4>
+        <p class="menu-description">View the status of
+        runs that are currently processing.</p>
+        </a>
+    </li>
 </ul></nav>
 
 {% endblock %}
