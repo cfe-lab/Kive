@@ -67,6 +67,8 @@ class Sandbox:
         user          User running the pipeline.
         my_pipeline   Pipeline to run.
         inputs        List of SDs to feed into the pipeline.
+        users_allowed   Iterable (e.g. list or QuerySet) of Users
+        groups_allowed  Iterable of Groups
         sandbox_path  Where on the filesystem to execute.
 
         PRECONDITIONS

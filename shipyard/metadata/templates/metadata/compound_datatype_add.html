@@ -46,6 +46,7 @@
                 <th>Index</th>
                 <th>Datatype <div class="helptext">{{ first_form.datatype.help_text }}</div></th>
                 <th>Name <div class="helptext">{{ first_form.column_name.help_text }}</div></th>
+                <th>Optional <div class="helptext">{{ first_form.blankable.help_text }}</div></th>
                 <th></th>
             </tr>
         </thead>
@@ -54,9 +55,16 @@
             {% for cdm_form in cdm_forms %}
             <tr>
                 <td>{{ forloop.counter }}</td>
-                <td>{{ cdm_form.datatype }}</td>
-                <td>{{ cdm_form.column_name }}</td>
-                <td class="errortext">{{ cdm_form.errors }}</td>
+                <td>{{ cdm_form.datatype }}
+                    <div class="errortext">{{ cdm_form.datatype.errors }}</div>
+                </td>
+                <td>{{ cdm_form.column_name }}
+                    <div class="errortext">{{ cdm_form.column_name.errors }}</div>
+                </td>
+                <td>{{ cdm_form.blankable }}
+                    <div class="errortext">{{ cdm_form.blankable.errors }}</div>
+                </td>
+                <td class="errortext">{{ cdm_form.non_field_errors }}</td>
             </tr>
             {% endfor %}
         </tbody>

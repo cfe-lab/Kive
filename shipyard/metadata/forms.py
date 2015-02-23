@@ -5,7 +5,7 @@ metadata.forms
 from django import forms
 from django.contrib.auth.models import User, Group
 
-from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype, KiveUser
+from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
 
 
 def setup_form_users_allowed(form, users_allowed):
@@ -88,16 +88,20 @@ class CompoundDatatypeMemberForm(forms.ModelForm):
     datatype = forms.ModelChoiceField(
         queryset = Datatype.objects.all(), required=True, help_text="This column's expected datatype")
 
+    blankable = forms.BooleanField(
+        required=False,
+        help_text="If a file has this CompoundDatatype, can its entries in this column be blank?"
+    )
+
     class Meta:
         model = CompoundDatatypeMember
         exclude = ('compounddatatype', 'column_idx')
 
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(CompoundDatatypeMemberForm, self).__init__(data, *args, **kwargs)
+
         if user is not None:
-            # Cast user to class KiveUser.
-            curr_user = KiveUser.kiveify(user)
-            self.fields["datatype"].queryset = Datatype.objects.filter(curr_user.access_query())
+            self.fields["datatype"].queryset = Datatype.filter_by_user(user)
 
 
 class CompoundDatatypeForm(forms.ModelForm):

@@ -272,6 +272,8 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         # Check that user/group access is coherent.
         self.validate_restrict_access([self.coderesource])
+        if self.revision_parent is not None:
+            self.validate_restrict_access([self.revision_parent])
 
     def install(self, install_path):
         """

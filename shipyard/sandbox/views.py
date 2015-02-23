@@ -6,7 +6,6 @@ import librarian.models
 import archive.models
 import pipeline.models
 from sandbox.forms import PipelineSelectionForm
-from metadata.models import KiveUser
 import metadata.forms
 
 
@@ -14,9 +13,8 @@ import metadata.forms
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
     context = RequestContext(request)
-    user_plus = KiveUser.kiveify(request.user)
     template = loader.get_template("sandbox/choose_pipeline.html")
-    families = pipeline.models.PipelineFamily.objects.filter(user_plus.access_query()).distinct()
+    families = pipeline.models.PipelineFamily.filter_by_user(request.user)
     forms = []
     for family in families:
         if len(family.complete_members) > 0:
@@ -29,7 +27,6 @@ def choose_pipeline(request):
 def choose_inputs(request):
     """Load the input selection page."""
     context = RequestContext(request)
-    user_plus = KiveUser.kiveify(request.user)
     acf = metadata.forms.AccessControlForm()
 
     if request.method == "GET":
@@ -41,8 +38,8 @@ def choose_inputs(request):
 
         # Find all compatible datasets for each input.
         for my_input in my_pipeline.inputs.order_by("dataset_idx"):
-            viewable_SDs = librarian.models.SymbolicDataset.objects.filter(user_plus.access_query()).distinct()
-            query = archive.models.Dataset.objects.filter(symbolicdataset__in=viewable_SDs).distinct().order_by(
+            viewable_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
+            query = archive.models.Dataset.objects.filter(symbolicdataset__in=viewable_SDs).order_by(
                 "-date_created")
             if my_input.is_raw():
                 query = query.filter(symbolicdataset__structure__isnull=True)

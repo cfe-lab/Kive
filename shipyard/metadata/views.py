@@ -12,7 +12,7 @@ from django.contrib.auth.models import Group
 
 import re
 
-from metadata.models import Datatype, CompoundDatatype, get_builtin_types, KiveUser
+from metadata.models import Datatype, CompoundDatatype, get_builtin_types
 from metadata.forms import *
 from constants import datatypes as dt_pks, groups
 
@@ -25,8 +25,7 @@ def datatypes(request):
     Render table and form on user request for datatypes.html
     """
     # Re-cast request.user to our proxy class.
-    curr_user = KiveUser.kiveify(request.user)
-    accessible_dts = Datatype.objects.filter(curr_user.access_query()).distinct()
+    accessible_dts = Datatype.filter_by_user(request.user)
     t = loader.get_template('metadata/datatypes.html')
     c = RequestContext(request, {'datatypes': accessible_dts})
     return HttpResponse(t.render(c))
@@ -167,9 +166,7 @@ def compound_datatypes(request):
     """
     Render list of all CompoundDatatypes
     """
-    # Cast request.user to class KiveUser.
-    curr_user = KiveUser.kiveify(request.user)
-    compound_datatypes = CompoundDatatype.objects.filter(curr_user.access_query())
+    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     t = loader.get_template('metadata/compound_datatypes.html')
     c = RequestContext(request, {'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))

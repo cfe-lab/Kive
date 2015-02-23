@@ -25,15 +25,13 @@ class DatasetForm (metadata.forms.AccessControlForm):
     User-entered single dataset.  We avoid using ModelForm since we can't set Dataset.user and Dataset.symbolicdataset
     before checking if the ModelForm.is_valid().  As a result, the internal calls to Model.clean() fail.
     """
+    RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
 
     name = forms.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
     description = forms.CharField(widget=forms.Textarea, required=False)
     dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
 
-    compound_datatypes = CompoundDatatype.objects.all()
-    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
-    for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
+    compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_dataset(self, user):
@@ -55,6 +53,15 @@ class DatasetForm (metadata.forms.AccessControlForm):
                                                     check=True, file_handle=self.cleaned_data['dataset_file'])
 
         return symbolicdataset
+
+    def __init__(self, data=None, files=None, user=None, *args, **kwargs):
+        super(DatasetForm, self).__init__(data, files, *args, **kwargs)
+        if user is None:
+            accessible_CDTs = CompoundDatatype.objects.none()
+        else:
+            accessible_CDTs = CompoundDatatype.filter_by_user(user)
+        user_specific_choices = [DatasetForm.RAW_CDT_CHOICE] + [(x.pk, x) for x in accessible_CDTs]
+        self.fields["compound_datatype"].choices = user_specific_choices
 
 
 class BulkDatasetUpdateForm (forms.Form):
@@ -102,10 +109,7 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
     datasets_csv = forms.FileField(allow_empty_file="False",  max_length=4096,
                                    widget=ClearableFileInput(attrs={"multiple": "true"}))  # multiselect files
 
-    compound_datatypes = CompoundDatatype.objects.all()
-    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
-    for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, str(compound_datatype)])
+    compound_datatype_choices = [DatasetForm.RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
     def create_datasets(self, user):
@@ -170,26 +174,24 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
 
     dataset_files = MultiFileField(allow_empty_file="False",  max_length=4096)  # multiselect files
 
-    compound_datatypes = CompoundDatatype.objects.all()
-    compound_datatype_choices = [(CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)]
-    for compound_datatype in compound_datatypes:
-        compound_datatype_choices.append([compound_datatype.pk, compound_datatype.__unicode__()])
-    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices, required=True)
+    compound_datatype_choices = [DatasetForm.RAW_CDT_CHOICE]
+    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    def __init__(self, *args, **kwargs):
-        super(BulkAddDatasetForm, self).__init__(*args, **kwargs)
-
-        files = None
-        if kwargs and "files" in kwargs:
-            files = kwargs["files"]
-        elif len(args) >= 2:
-            files = args[1]
+    def __init__(self, data=None, files=None, user=None, *args, **kwargs):
+        super(BulkAddDatasetForm, self).__init__(data, files, *args, **kwargs)
 
         if files:
             # Form validation expects that items are in dict form.
             # Create a dict where the value is the list of files uploaded by the user.
             # If we don't do this, then only the first file in the list is assigned to dataset_files
             self.files = {"dataset_files": files.getlist("dataset_files")}
+
+        if user is None:
+            accessible_CDTs = CompoundDatatype.objects.none()
+        else:
+            accessible_CDTs = CompoundDatatype.filter_by_user(user)
+        user_specific_choices = [DatasetForm.RAW_CDT_CHOICE] + [(x.pk, x) for x in accessible_CDTs]
+        self.fields["compound_datatype"].choices = user_specific_choices
 
     def create_datasets(self, user):
         """

@@ -10,7 +10,7 @@ import json
 import logging
 
 from method.models import MethodFamily
-from metadata.models import CompoundDatatype, KiveUser
+from metadata.models import CompoundDatatype
 from pipeline.models import Pipeline, PipelineFamily, PipelineSerializationException
 import metadata.forms
 
@@ -24,8 +24,7 @@ def pipelines(request):
     root members (without parent).
     """
     t = loader.get_template('pipeline/pipelines.html')
-    user_plus = KiveUser.kiveify(request.user)
-    families = PipelineFamily.objects.filter(user_plus.access_query()).distinct()
+    families = PipelineFamily.filter_by_user(request.user)
 
     c = RequestContext(request, {'families': families})
     return HttpResponse(t.render(c))
@@ -50,9 +49,8 @@ def pipeline_add(request):
     I don't think we need to use forms here.
     """
     t = loader.get_template('pipeline/pipeline_add.html')
-    user_plus = KiveUser.kiveify(request.user)
-    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct().order_by('name')
-    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    method_families = MethodFamily.filter_by_user(request.user).order_by('name')
+    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     acf = metadata.forms.AccessControlForm()
     c = RequestContext(request, {'method_families': method_families, 'compound_datatypes': compound_datatypes,
                                  "access_control_form": acf})
@@ -78,9 +76,8 @@ def pipeline_revise(request, id):
     objects.
     """
     t = loader.get_template('pipeline/pipeline_revise.html')
-    user_plus = KiveUser.kiveify(request.user)
-    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct().order_by('name')
-    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    method_families = MethodFamily.filter_by_user(request.user).order_by('name')
+    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     acf = metadata.forms.AccessControlForm()
 
     # Retrieve this pipeline from database.
@@ -96,7 +93,7 @@ def pipeline_revise(request, id):
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
 
-    revisions = Pipeline.objects.filter(user_plus.access_query(), family=family).distinct()
+    revisions = Pipeline.filter_by_user(request.user).filter(family=family)
 
     c = RequestContext(
         request,
@@ -120,9 +117,8 @@ def pipeline_revise(request, id):
 @login_required
 def pipeline_exec(request):
     t = loader.get_template('pipeline/pipeline_exec.html')
-    user_plus = KiveUser.kiveify(request.user)
-    method_families = MethodFamily.objects.filter(user_plus.access_query()).distinct()
-    compound_datatypes = CompoundDatatype.objects.filter(user_plus.access_query()).distinct()
+    method_families = MethodFamily.filter_by_user(request.user)
+    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     c = RequestContext(request, {'method_families': method_families, 'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))
 

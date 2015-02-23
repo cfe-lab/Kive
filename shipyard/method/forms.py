@@ -5,9 +5,8 @@ Generate an HTML form to create a new Datatype object
 from django.http import Http404
 from django import forms
 from method.models import CodeResource, CodeResourceRevision, Method
-from metadata.models import CompoundDatatype, KiveUser
+from metadata.models import CompoundDatatype
 from metadata.forms import AccessControlForm
-from django.db.models import Q
 
 import logging
 
@@ -85,11 +84,10 @@ def _get_code_resource_list(user, but_not_this_one=None):
     This is required to refresh the list of eligible CodeResources during the
     addition of a new CodeResourceDependency.
     """
-    query_obj = Q()
-    if user is not None:
-        curr_user = KiveUser.objects.get(pk=user.pk)
-        query_obj = curr_user.access_query()
-    queryset = CodeResource.objects.filter(query_obj).distinct()
+    if user is None:
+        queryset = CodeResource.objects.all()
+    else:
+        queryset = CodeResource.filter_by_user(user).distinct()
     if but_not_this_one is not None:
         queryset = queryset.exclude(pk=but_not_this_one)
     return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
@@ -126,8 +124,6 @@ class CodeResourceDependencyForm(forms.Form):
     def __init__(self, data=None, user=None, initial=None, parent=None, *args, **kwargs):
         super(CodeResourceDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
 
-        # Cast user to a KiveUser.
-        curr_user = KiveUser.objects.get(pk=user.pk)
         eligible_crs = _get_code_resource_list(user, parent)
         self.fields['coderesource'].choices = eligible_crs
 
@@ -140,18 +136,19 @@ class CodeResourceDependencyForm(forms.Form):
 
         if populator is not None:
             # Re-populate drop-downs before rendering the template.
-            cr = CodeResource.objects.get(pk=populator['coderesource'])
+            cr_pk = populator["coderesource"]
 
-            if cr.pk not in [x[0] for x in eligible_crs]:
-                raise Http404("CodeResource with ID {} used in dependency definition is invalid".format(
-                    populator["coderesource"]
-                ))
+            # The first entry of eligible_crs is ("", "--- CodeResource ---") so we skip it.
+            if int(cr_pk) not in [int(x[0]) for x in eligible_crs[1:]]:
+                raise Http404(
+                    "CodeResource with ID {} used in dependency definition is invalid".format(
+                        populator["coderesource"]))
 
-            rev = CodeResourceRevision.objects.filter(curr_user.access_query(), coderesource=cr).distinct()
+            rev = CodeResourceRevision.filter_by_user(user).filter(coderesource__pk=cr_pk)
             self.fields['revisions'].widget.choices = [(x.pk, x.revision_name) for x in rev]
-            if populator.has_key("revisions"):
+            if "revisions" in populator:
                 try:
-                    assert populator.has_key("coderesource")
+                    assert "coderesource" in populator
                     assert int(populator["revisions"]) in [x.pk for x in rev]
                 except AssertionError as e:
                     raise Http404(e)
@@ -209,10 +206,9 @@ class MethodForm(MethodReviseForm):
 
         # This is required to re-populate the drop-down with CRs created since first load.
         if user is not None:
-            kive_user = KiveUser.objects.get(pk=user.pk)
             self.fields["coderesource"].choices = (
                 [('', '--- CodeResource ---')] +
-                [(x.id, x.name) for x in CodeResource.objects.filter(kive_user.access_query()).order_by('name')]
+                [(x.id, x.name) for x in CodeResource.filter_by_user(user).order_by('name')]
             )
 
 
@@ -244,10 +240,10 @@ class XputStructureForm (forms.Form):
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(XputStructureForm, self).__init__(data=data, *args, **kwargs)
 
-        more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
-        if user is not None:
-            user_plus = KiveUser.kiveify(user)
-            more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.filter(user_plus.access_query())]
+        if user is None:
+            more_choices = [(x.id, str(x)) for x in CompoundDatatype.objects.all()]
+        else:
+            more_choices = [(x.id, str(x)) for x in CompoundDatatype.filter_by_user(user)]
 
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 

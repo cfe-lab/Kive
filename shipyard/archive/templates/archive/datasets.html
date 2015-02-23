@@ -25,6 +25,8 @@
         <th>Description</th>
         <th>Date Created</th>
         <th>File Size (B)</th>
+        <th>Users allowed</th>
+        <th>Groups allowed</th>
         <th></th>
 	</tr>
 </thead>
@@ -35,6 +37,28 @@
 	<td>{{ dataset.description|escape|linebreaksbr }}</td>
     <td>{{ dataset.date_created }}</td>
     <td>{{ dataset.get_filesize }}</td>
+    <td>
+        {% if dataset.symbolicdataset.users_allowed.exists %}
+            <ul>
+            {% for user in dataset.symbolicdataset.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            None
+        {% endif %}
+    </td>
+    <td>
+        {% if dataset.symbolicdataset.groups_allowed.exists %}
+            <ul>
+            {% for group in dataset.symbolicdataset.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            None
+        {% endif %}
+    </td>
     <td><a href="{{ dataset.get_absolute_url|get_view_link }}">View</a> | <a href="{{ dataset.get_absolute_url }}">Download</a></td>
 </tr>
 {% endfor %}

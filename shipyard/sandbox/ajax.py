@@ -15,7 +15,6 @@ import fleet.models
 from forms import PipelineSelectionForm, PipelineSubmissionForm, InputSubmissionForm
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
-import metadata.models
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -146,13 +145,11 @@ def filter_pipelines(request):
 
 
 def _load_status(user):
-    user_plus = metadata.models.KiveUser.kiveify(user)
     try:
         recent_time = timezone.now() - timedelta(minutes=5)
         old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
             'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
-        runs = fleet.models.RunToProcess.objects.filter(
-            user_plus.access_query(),
+        runs = fleet.models.RunToProcess.filter_by_user(user).filter(
             Q(run_id__isnull=True)|
             Q(run__end_time__isnull=True)|
             Q(run__end_time__gte=recent_time)).distinct().exclude(

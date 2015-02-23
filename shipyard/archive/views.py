@@ -1,9 +1,8 @@
 """
 archive views
 """
-from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context
-from django.core.context_processors import csrf
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, RequestContext
 from django.core.servers.basehttp import FileWrapper
 from django.core.exceptions import ValidationError
 from django.forms.formsets import formset_factory
@@ -16,6 +15,7 @@ import logging
 
 from archive.models import Dataset
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
+import librarian.models
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,9 +27,9 @@ def datasets(request):
     Display a list of all Datasets in database
     """
     t = loader.get_template('archive/datasets.html')
-    datasets = Dataset.objects.all()
-    c = Context({'datasets': datasets, "user": request.user})
-    c.update(csrf(request))
+    accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
+    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs)
+    c = RequestContext(request, {'datasets': datasets})
     return HttpResponse(t.render(c))
 
 
@@ -38,7 +38,11 @@ def dataset_download(request, dataset_id):
     """
     Retrieve the file associated with the dataset for client download.
     """
-    dataset = Dataset.objects.filter(id=dataset_id).get()
+    try:
+        accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
+        dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
+    except Dataset.DoesNotExist:
+        raise Http404("ID {} cannot be accessed".format(dataset_id))
 
     file_chunker = FileWrapper(dataset.dataset_file)  # stream file in chunks to avoid overloading memory
     mimetype = mimetypes.guess_type(dataset.dataset_file.url)[0]
@@ -53,11 +57,14 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser.
     """
-    t = loader.get_template("archive/dataset_view.html")
-    dataset = Dataset.objects.filter(id=dataset_id).get()
+    try:
+        accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
+        dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
+    except Dataset.DoesNotExist:
+        raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    c = Context({"dataset": dataset, "user": request.user})
-    c.update(csrf(request))
+    t = loader.get_template("archive/dataset_view.html")
+    c = RequestContext(request, {"dataset": dataset})
     return HttpResponse(t.render(c))
 
 
@@ -66,9 +73,9 @@ def datasets_add(request):
     """
     Add datasets to db.
     """
-
+    c = RequestContext(request)
     if request.method == 'POST':
-        single_dataset_form = DatasetForm(request.POST, request.FILES, prefix="single")
+        single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="single")
 
         success = True
         try:
@@ -80,7 +87,7 @@ def datasets_add(request):
             else:
                 success = False
 
-        except (AttributeError, ValidationError) as e:
+        except (AttributeError, ValidationError, ValueError) as e:
             LOGGER.exception(e.message)
             success = False
             single_dataset_form.add_error(None, e)
@@ -89,16 +96,14 @@ def datasets_add(request):
             return HttpResponseRedirect("datasets")
         else:
             t = loader.get_template('archive/datasets_add.html')
-            c = Context({'singleDataset': single_dataset_form})
+            c.update({'singleDataset': single_dataset_form})
 
 
     else:  # return an empty formset for the user to fill in
-        single_dataset_form = DatasetForm(prefix="single")
+        single_dataset_form = DatasetForm(user=request.user, prefix="single")
         t = loader.get_template('archive/datasets_add.html')
-        c = Context({'singleDataset': single_dataset_form})
+        c.update({'singleDataset': single_dataset_form})
 
-    c.push(user=request.user)
-    c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 
@@ -116,17 +121,17 @@ def datasets_add_bulk(request):
     Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
     """
     # Redirect to page to allow user to view status of added datasets.
+    c = RequestContext(request)
     t = loader.get_template('archive/datasets_bulk.html')
     if request.method == 'POST':
         try:
             # Add new datasets.
-            bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST, files=request.FILES)
+            bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST, files=request.FILES, user=request.user)
             if bulk_add_dataset_form.is_valid():
                 add_results = bulk_add_dataset_form.create_datasets(request.user)
             else:
                 # The form is already annotated with the appropriate errors, so we can bail.
-                c = Context({'bulkAddDatasetForm': bulk_add_dataset_form, "user": request.user})
-                c.update(csrf(request))
+                c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
                 return HttpResponse(t.render(c))
 
             # Generate response.
@@ -170,21 +175,19 @@ def datasets_add_bulk(request):
                     dataset_form.err_msg = add_results[i]
                     dataset_form.status = BulkDatasetDisplay.STATUS_FAIL
 
-            c = Context({"bulk_dataset_formset": bulk_dataset_update_formset})
+            c.update({"bulk_dataset_formset": bulk_dataset_update_formset})
 
         except ValidationError as e:
             LOGGER.exception(e.message)
             bulk_add_dataset_form.add_error(None, e)
             t = loader.get_template('archive/datasets_add_bulk.html')
-            c = Context({'bulkAddDatasetForm': bulk_add_dataset_form})
+            c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('archive/datasets_add_bulk.html')
-        bulk_dataset_form = BulkAddDatasetForm()
-        c = Context({'bulkAddDatasetForm': bulk_dataset_form})
+        bulk_dataset_form = BulkAddDatasetForm(user=request.user)
+        c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
-    c.push({"user": request.user})
-    c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 
@@ -197,6 +200,7 @@ def datasets_bulk(request):
     :param request:
     :return:
     """
+    c = RequestContext(request)
     t = loader.get_template('archive/datasets_bulk.html')
     if request.method == 'POST':
         BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm)
@@ -226,18 +230,16 @@ def datasets_bulk(request):
             return HttpResponseRedirect("datasets")
         else:
             # Failure!
-            c = Context({'bulk_dataset_formset': bulk_dataset_update_formset})
+            c.update({'bulk_dataset_formset': bulk_dataset_update_formset})
             t = loader.get_template("archive/datasets_bulk.html")
 
     else:
         # You must access the /datasets_bulk.html page by adding datasets in bulk form /datasets_add_bulk.html
         # A GET to /datasets_bulk.html will only redirect to you the /dataset_add_bulk.html page
         t = loader.get_template('archive/datasets_add_bulk.html')
-        bulk_dataset_form = BulkAddDatasetForm()
-        c = Context({'bulkAddDatasetForm': bulk_dataset_form})
+        bulk_dataset_form = BulkAddDatasetForm(user=request.user)
+        c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
-    c.push({"user": request.user})
-    c.update(csrf(request))
     return HttpResponse(t.render(c))
 
 

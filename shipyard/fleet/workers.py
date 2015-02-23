@@ -84,13 +84,15 @@ class Manager:
     def is_worker_ready(self, rank):
         return self.worker_status[rank] == Worker.READY
 
-    def start_run(self, user, pipeline_to_run, inputs, sandbox_path=""):
+    def start_run(self, user, pipeline_to_run, inputs, users_allowed=None, groups_allowed=None,
+                  sandbox_path=""):
         """
         Receive a request to start a pipeline running.
         """
         if sandbox_path == "":
             sandbox_path = None
-        new_sdbx = sandbox.execute.Sandbox(user, pipeline_to_run, inputs, sandbox_path=sandbox_path)
+        new_sdbx = sandbox.execute.Sandbox(user, pipeline_to_run, inputs, users_allowed=users_allowed,
+                                           groups_allowed=groups_allowed, sandbox_path=sandbox_path)
         new_sdbx.advance_pipeline()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
@@ -361,6 +363,8 @@ class Manager:
                     run_to_process.pipeline, run_to_process.user))
                 new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
                                           [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
+                                          users_allowed=run_to_process.users_allowed.all(),
+                                          groups_allowed=run_to_process.groups_allowed.all(),
                                           sandbox_path=run_to_process.sandbox_path)
                 run_to_process.run = new_sdbx.run
                 run_to_process.save()

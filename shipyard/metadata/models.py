@@ -367,6 +367,14 @@ class AccessControl(models.Model):
                 "Instances allow different groups access", code="different_groups_allowed"
             )
 
+    @classmethod
+    def filter_by_user(cls, user):
+        """
+        Retrieve a QuerySet of all instances of this class that are viewable by the specified user.
+        """
+        user_plus = KiveUser.kiveify(user)
+        return cls.objects.filter(user_plus.access_query()).distinct()
+
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):

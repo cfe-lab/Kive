@@ -31,9 +31,7 @@ def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    # Cast request.user to KiveUser.
-    curr_user = metadata.models.KiveUser.kiveify(request.user)
-    resources = CodeResource.objects.filter(curr_user.access_query()).distinct()
+    resources = CodeResource.filter_by_user(request.user)
 
     t = loader.get_template('method/resources.html')
     c = RequestContext(request, {'resources': resources})
@@ -133,6 +131,7 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
     file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
     revision = CodeResourceRevision(
+        revision_parent=parent_revision,
         revision_name=rev_name,
         revision_desc=rev_desc,
         coderesource=code_resource,
@@ -352,8 +351,7 @@ def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
     """
-    curr_user = metadata.models.KiveUser.kiveify(request.user)
-    families = MethodFamily.objects.filter(curr_user.access_query()).distinct()
+    families = MethodFamily.filter_by_user(request.user)
     t = loader.get_template('method/method_families.html')
     c = RequestContext(request, {'families': families})
     return HttpResponse(t.render(c))
