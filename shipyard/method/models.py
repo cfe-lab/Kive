@@ -566,7 +566,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 candidate_ER = possible_RS.execrecord
 
                 # Check that this ER is accessible by runstep.
-                extra_users, extra_groups = runstep.extra_users_groups([candidate_ER.generating_run])
+                extra_users, extra_groups = runstep.run.extra_users_groups(
+                    [candidate_ER.generating_run])
                 if len(extra_users) > 0 or len(extra_groups) > 0:
                     continue
 

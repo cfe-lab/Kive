@@ -651,7 +651,7 @@ class RunComponent(stopwatch.models.Stopwatch):
 
 
 @python_2_unicode_compatible
-class RunStep(RunComponent, metadata.models.AccessControl):
+class RunStep(RunComponent):
     """
     Annotates the execution of a pipeline step within a run.
 
@@ -718,9 +718,9 @@ class RunStep(RunComponent, metadata.models.AccessControl):
 
     @classmethod
     @transaction.atomic
-    def create(cls, pipelinestep, run, user):
+    def create(cls, pipelinestep, run):
         """Create a new RunStep from a PipelineStep."""
-        runstep = cls(pipelinestep=pipelinestep, run=run, user=user)
+        runstep = cls(pipelinestep=pipelinestep, run=run)
         runstep.start()
         runstep.clean()
         runstep.save()

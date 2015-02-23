@@ -1125,7 +1125,7 @@ class Sandbox:
         Outputs written to: [step run dir]/output_data/step[step num]_[output name]
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
-        curr_RS = archive.models.RunStep.create(pipelinestep, parent_run, user=parent_run.user)
+        curr_RS = archive.models.RunStep.create(pipelinestep, parent_run)
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)
