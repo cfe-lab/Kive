@@ -128,10 +128,21 @@ class ExecuteTests(TransactionTestCase):
 
     def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""
-        for p in Pipeline.objects.filter(user=user):
+        for p in Pipeline.filter_by_user(user):
             for input in p.inputs.all():
                 if input.is_raw():
                     return p
+
+    def find_nonraw_pipeline(self, user):
+        """Find a Pipeline with no raw input."""
+        for p in Pipeline.filter_by_user(user):
+            none_raw = True
+            for input in p.inputs.all():
+                if input.is_raw():
+                    none_raw = False
+                    break
+            if none_raw:
+                return p
 
     def find_inputs_for_pipeline(self, pipeline):
         """Find appropriate input SymbolicDatasets for a Pipeline."""
@@ -306,12 +317,11 @@ class ExecuteTests(TransactionTestCase):
 
     def test_pipeline_all_inputs_OK_nonraw(self):
         """Execute a Pipeline with OK non-raw inputs."""
-        pipeline = Pipeline.objects.first()
+        pipeline = self.find_nonraw_pipeline(self.myUser)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
-        user = User.objects.first()
-        run = Sandbox(user, pipeline, inputs).execute_pipeline()
+        run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
         self.assertTrue(run.successful_execution())
         self.assertIsNone(run.clean())
@@ -333,22 +343,21 @@ class ExecuteTests(TransactionTestCase):
 
     def test_pipeline_inputs_not_OK_nonraw(self):
         """Can't execute a Pipeline with non-OK non-raw inputs."""
-        user = User.objects.first()
-        pipeline = Pipeline.objects.first()
+        pipeline = self.find_nonraw_pipeline(self.myUser)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
-        sandbox = Sandbox(user, pipeline, inputs)
+        sandbox = Sandbox(self.myUser, pipeline, inputs)
 
         for i, sd in enumerate(inputs, start=1):
             if not sd.is_raw():
                 bad_input, bad_index = sd, i
-                bad_ccl = ContentCheckLog(symbolicdataset=sd, user=user)
+                bad_ccl = ContentCheckLog(symbolicdataset=sd, user=self.myUser)
                 bad_ccl.save()
                 bad_ccl.add_missing_output()
                 break
 
-        run = pipeline.pipeline_instances.create(user=user); run.save()
+        run = pipeline.pipeline_instances.create(user=self.myUser); run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
 
         self.assertFalse(all(i.is_OK() for i in inputs))
@@ -359,8 +368,8 @@ class ExecuteTests(TransactionTestCase):
 
     def test_pipeline_inputs_not_OK_raw(self):
         """Can't execute a Pipeline with non-OK raw inputs."""
-        user = User.objects.first()
-        pipeline = self.find_raw_pipeline(self.myUser)
+        user = self.myUser
+        pipeline = self.find_raw_pipeline(user)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))

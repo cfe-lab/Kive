@@ -8,6 +8,7 @@ import time
 
 from django.contrib.auth.models import User, Group
 from django.core.files import File
+from django.db import transaction
 
 from constants import datatypes, groups
 import file_access_utils
@@ -32,21 +33,27 @@ def create_sandbox_testing_tools_environment(case):
 
     # Predefined datatypes.
     case.datatype_str = new_datatype("my_string", "sequences of ASCII characters", case.STR, case.user_bob)
+    case.datatype_str.grant_everyone_access()
 
     # A CDT composed of only one column, strings.
     case.cdt_string = CompoundDatatype(user=case.user_bob)
     case.cdt_string.save()
     case.cdt_string.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
+    case.cdt_string.grant_everyone_access()
 
     # A code resource which does nothing.
     case.coderev_noop = make_first_revision(
         "noop", "a script to do nothing", "noop.sh",
         '#!/bin/bash\n cat "$1" > "$2"',
         case.user_bob)
+    case.coderev_noop.coderesource.grant_everyone_access()
+    case.coderev_noop.grant_everyone_access()
 
     # A Method telling Shipyard how to use the noop code on string data.
     case.method_noop = make_first_method("string noop", "a method to do nothing to strings", case.coderev_noop,
                                          case.user_bob)
+    case.method_noop.family.grant_everyone_access()
+    case.method_noop.grant_everyone_access()
     simple_method_io(case.method_noop, case.cdt_string, "strings", "same_strings")
 
     # Another totally different Method that uses the same CodeRevision and yes it does the same thing.
@@ -55,11 +62,15 @@ def create_sandbox_testing_tools_environment(case):
         "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone",
         case.coderev_noop,
         case.user_bob)
+    case.method_trivial.family.grant_everyone_access()
+    case.method_trivial.grant_everyone_access()
     simple_method_io(case.method_trivial, case.cdt_string, "strings", "untouched_strings")
 
     # A third one, only this one takes raw input.
     case.method_noop_raw = make_first_method("raw noop", "do nothing to raw data", case.coderev_noop,
                                              case.user_bob)
+    case.method_noop_raw.family.grant_everyone_access()
+    case.method_noop_raw.grant_everyone_access()
     simple_method_io(case.method_noop_raw, None, "raw", "same raw")
 
 
@@ -96,6 +107,7 @@ def create_sequence_manipulation_environment(case):
     case.cdt_record.save()
     case.cdt_record.members.create(datatype=case.datatype_str, column_name="header", column_idx=1)
     case.cdt_record.members.create(datatype=case.datatype_dna, column_name="sequence", column_idx=2)
+    case.cdt_record.grant_everyone_access()
 
     # Alice uploads code to perform each of the tasks. In the background,
     # Shipyard creates new CodeResources for these scripts and sets her
@@ -252,12 +264,14 @@ def create_word_reversal_environment(case):
     case.cdt_wordbacks.save()
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="word", column_idx=1)
     case.cdt_wordbacks.members.create(datatype=case.datatype_str, column_name="drow", column_idx=2)
+    case.cdt_wordbacks.grant_everyone_access()
 
     # A second CDT, much like the first :]
     case.cdt_backwords = CompoundDatatype(user=case.user_bob)
     case.cdt_backwords.save()
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="drow", column_idx=1)
     case.cdt_backwords.members.create(datatype=case.datatype_str, column_name="word", column_idx=2)
+    case.cdt_backwords.grant_everyone_access()
 
     # Methods for the reverse CRR, and noop CRR.
     case.method_reverse = make_first_method("string reverse", "a method to reverse strings",
@@ -286,9 +300,11 @@ def create_word_reversal_environment(case):
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
-    case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
+    case.symds_words = SymbolicDataset.create_SD(
+        string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
-        description="blahblahblah", make_dataset=True)
+        description="blahblahblah", make_dataset=True,
+        groups_allowed=[everyone_group])
 
     os.remove(string_datafile.name)
 
@@ -321,12 +337,14 @@ def create_word_reversal_environment(case):
     case.symds_wordbacks = SymbolicDataset.create_SD(
         case.wordbacks_datafile.name, user=case.user_bob,
         name="wordbacks", cdt=case.cdt_wordbacks,
-        description="random reversed words", make_dataset=True)
+        description="random reversed words", make_dataset=True,
+        groups_allowed=[everyone_group])
 
     case.symds_backwords = SymbolicDataset.create_SD(
         case.backwords_datafile.name, user=case.user_bob,
         name="backwords", cdt=case.cdt_backwords,
-        description="random reversed words", make_dataset=True)
+        description="random reversed words", make_dataset=True,
+        groups_allowed=[everyone_group])
 
 
 def destroy_word_reversal_environment(case):
@@ -355,6 +373,7 @@ def new_datatype(dtname, dtdesc, shipyardtype, user):
     datatype = Datatype(name=dtname, description=dtdesc, user=user)
     datatype.save()
     datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
+    datatype.grant_everyone_access()
     datatype.complete_clean()
     return datatype
 
@@ -366,16 +385,19 @@ def make_first_revision(resname, resdesc, resfn, contents, user):
     resource = CodeResource(name=resname, description=resdesc, filename=resfn, user=user)
     resource.clean()
     resource.save()
+    resource.grant_everyone_access()
     with tempfile.TemporaryFile() as f:
         f.write(contents)
-        revision = CodeResourceRevision(
-            coderesource=resource,
-            revision_name="1",
-            revision_desc="first version",
-            content_file=File(f),
-            user=user)
-        revision.clean()
-        revision.save()
+        with transaction.atomic():
+            revision = CodeResourceRevision(
+                coderesource=resource,
+                revision_name="1",
+                revision_desc="first version",
+                content_file=File(f),
+                user=user)
+            revision.save()
+            revision.clean()
+    revision.grant_everyone_access()
     resource.clean()
     return revision
 
@@ -387,14 +409,17 @@ def make_first_method(famname, famdesc, driver, user):
     family = MethodFamily(name=famname, description=famdesc, user=user)
     family.clean()
     family.save()
-    method = Method(
-        revision_name="v1",
-        revision_desc="first version",
-        family=family,
-        driver=driver,
-        user=user)
-    method.clean()
-    method.save()
+    family.grant_everyone_access()
+    with transaction.atomic():
+        method = Method(
+            revision_name="v1",
+            revision_desc="first version",
+            family=family,
+            driver=driver,
+            user=user)
+        method.save()
+        method.clean()
+    method.grant_everyone_access()
     family.clean()
     return method
 
@@ -425,9 +450,11 @@ def make_first_pipeline(pname, pdesc, user):
     family = PipelineFamily(name=pname, description=pdesc, user=user)
     family.clean()
     family.save()
+    family.grant_everyone_access()
     pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=user)
     pipeline.clean()
     pipeline.save()
+    pipeline.grant_everyone_access()
     family.clean()
     return pipeline
 
@@ -441,6 +468,7 @@ def make_second_pipeline(pipeline):
     new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version",
                             user=pipeline.user)
     new_pipeline.save()
+    new_pipeline.grant_everyone_access()
 
     for step in pipeline.steps.all():
         new_step = new_pipeline.steps.create(transformation=step.transformation, step_num=step.step_num)
@@ -502,7 +530,7 @@ def make_words_symDS(case):
     case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
         description="blahblahblah", make_dataset=True)
-    case.symds_words.groups_allowed.add(everyone_group)
+    case.symds_words.grant_everyone_access()
     case.symds_words.save()
 
     os.remove(string_datafile.name)

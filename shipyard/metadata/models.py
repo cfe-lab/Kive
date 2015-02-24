@@ -299,11 +299,17 @@ class AccessControl(models.Model):
         """
         self_users_allowed = set([self.user]).union(set(self.users_allowed.all()))
 
-        ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
-        ac_groups_allowed = set(acs[0].groups_allowed.all())
+        if acs[0].groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+            ac_users_allowed = set(User.objects.all())
+            ac_groups_allowed = set(Group.objects.all())
+        else:
+            ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
+            ac_groups_allowed = set(acs[0].groups_allowed.all())
+
         for ac in acs[1:]:
-            ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
-            ac_groups_allowed.intersection_update(ac.groups_allowed.all())
+            if not ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+                ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
+                ac_groups_allowed.intersection_update(ac.groups_allowed.all())
 
         # Special case: everyone is allowed access to all of the elements of acs.
         everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
@@ -320,6 +326,10 @@ class AccessControl(models.Model):
         """
         # Trivial case: no objects to restrict.
         if len(acs) == 0:
+            return
+
+        # If this instance is not saved, then bail as we can't access users_allowed or groups_allowed.
+        if not self.pk:
             return
 
         extra_users, extra_groups = self.extra_users_groups(acs)
@@ -374,6 +384,9 @@ class AccessControl(models.Model):
         """
         user_plus = KiveUser.kiveify(user)
         return cls.objects.filter(user_plus.access_query()).distinct()
+
+    def grant_everyone_access(self):
+        self.groups_allowed.add(Group.objects.get(pk=groups.EVERYONE_PK))
 
 
 @python_2_unicode_compatible

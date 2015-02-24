@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
+from django.contrib.auth.models import Group
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -22,11 +23,16 @@ import metadata.tests
 import sandbox.execute
 import sandbox.testing_utils as tools
 
+from constants import groups
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+
 
 def create_archive_test_environment(case):
     librarian.tests.create_librarian_test_environment(case)
     tools.create_sandbox_testing_tools_environment(case)
     case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
+    case.pE_run.grant_everyone_access()
 
 
 class ArchiveTestCaseHelpers:
@@ -155,6 +161,7 @@ class ArchiveTestCaseHelpers:
         # Changed May 14, 2014 to add CCLs/ICLs where appropriate.
         # Empty Runs.
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        self.pD_run.grant_everyone_access()
         if bp == "empty_runs": return
 
         # First RunStep associated.
@@ -349,6 +356,7 @@ class ArchiveTestCaseHelpers:
         self.step_E2_RS.start()
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.pD_run.parent_runstep = self.step_E2_RS
+        self.pD_run.grant_everyone_access()
         self.pD_run.save()
         self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
         self.D11_21_ROC.start()
@@ -371,6 +379,8 @@ class ArchiveTestCaseHelpers:
         Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
         """
         p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
+        p_one.family.grant_everyone_access()
+        p_one.grant_everyone_access()
         tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
@@ -378,6 +388,8 @@ class ArchiveTestCaseHelpers:
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.myUser)
+        p_two.family.grant_everyone_access()
+        p_two.grant_everyone_access()
         tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
@@ -388,10 +400,12 @@ class ArchiveTestCaseHelpers:
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_one.execute_pipeline()
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_two.execute_pipeline()
 
     def _setup_deep_nested_run(self, user):
@@ -400,23 +414,30 @@ class ArchiveTestCaseHelpers:
         # without remorse.
         p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
         tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+        p_basic.family.grant_everyone_access()
+        p_basic.grant_everyone_access()
         p_basic.create_outputs()
         p_basic.save()
 
         p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
         tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
+        p_sub.family.grant_everyone_access()
+        p_sub.grant_everyone_access()
         p_sub.create_outputs()
         p_sub.save()
 
         p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
         tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
+        p_top.family.grant_everyone_access()
+        p_top.grant_everyone_access()
         p_top.create_outputs()
         p_top.save()
 
         # Set up a dataset with words in it called self.symds_words.
         tools.make_words_symDS(self)
 
-        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words])
+        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words],
+                                              groups_allowed=[everyone_group])
         run_sandbox.execute_pipeline()
         self.deep_nested_run = run_sandbox.run
 
@@ -803,6 +824,7 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_rsic")
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
         rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
         self.make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
@@ -838,6 +860,7 @@ class RunStepTests(ArchiveTestCase):
         # To bypass the check for quenched inputs, we have to create
         # another ExecRecord which matches step_E1.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
         rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
         self.make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
@@ -906,6 +929,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("second_runstep_complete")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E2.pipelinestep_instances.create(run=other_run)
         execlog = ExecLog(record=other_runstep, invoking_record=other_runstep,
                           start_time=timezone.now(), end_time=timezone.now())
@@ -935,6 +959,7 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_rsic")
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
 
         self.step_E1_RS.execrecord = None
@@ -1176,7 +1201,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks])
+        self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
+                                                     groups_allowed=[everyone_group])
         self.two_step_sdbx.execute_pipeline()
 
         # The second one's second step will have to recover its first step.  (Its input cable is trivial
@@ -1192,7 +1218,8 @@ class RunComponentTooManyChecks(TransactionTestCase):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks])
+        self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
+                                                      groups_allowed=[everyone_group])
         self.following_sdbx.execute_pipeline()
         second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
         assert(second_step.invoked_logs.count() == 2)
@@ -1553,6 +1580,7 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = None
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
         other_rsic = self.E11_32.psic_instances.create(runstep=other_runstep)
         self.make_complete_non_reused(other_rsic, [self.doublet_symDS], [self.C2_in_symDS])
@@ -1583,6 +1611,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_created")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
 
@@ -1606,6 +1635,7 @@ class RunSICTests(ArchiveTestCase):
         self.make_complete_non_reused(runsic, [self.C1_in_symDS], [self.C1_in_symDS])
 
         run = self.pE.pipeline_instances.create(user=self.myUser)
+        run.grant_everyone_access()
         runstep = self.step_E3.pipelinestep_instances.create(run=run)
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
 
@@ -1623,6 +1653,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_created")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
@@ -1649,6 +1680,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_created")
         run = self.pE.pipeline_instances.create(user=self.myUser)
+        run.grant_everyone_access()
         runstep = self.step_E3.pipelinestep_instances.create(run=run)
         self.E11_32.keep_output = True
         self.E11_32.save()
@@ -1673,6 +1705,7 @@ class RunSICTests(ArchiveTestCase):
 
         # Make another RSIC which is reused by E11_32_RSIC.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_run.save()
         other_RS = self.step_E3.pipelinestep_instances.create(run=other_run)
 
@@ -1688,6 +1721,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_created")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
@@ -1707,6 +1741,7 @@ class RunSICTests(ArchiveTestCase):
         self.step_through_runsic_creation("rsic_created")
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_RS = self.step_E3.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS],
                                   other_RS)
@@ -2121,6 +2156,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
         # Create a compatible ExecRecord to associate.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_roc = self.E31_42.poc_instances.create(run=other_run)
         self.make_complete_non_reused(other_roc, [self.C1_out_symDS], [self.C1_out_symDS])
         self.E31_42_ROC.execrecord = other_roc.execrecord
@@ -2699,6 +2735,7 @@ class ExecLogTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_rsic")
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
 
         # Now step_E1_RS is marked as reused, and there is a dummy record of a RunStep belonging to
@@ -3140,6 +3177,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
 
         # Create another run.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
+        other_run.grant_everyone_access()
         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
         self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
         other_cable = other_step1.RSICs.first()
@@ -3235,7 +3273,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_one.execute_pipeline()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
@@ -3253,7 +3292,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_two.execute_pipeline()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
@@ -3303,9 +3343,8 @@ for i in range(%d):
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
-        active_sandbox = sandbox.execute.Sandbox(self.user_bob, 
-                                                 pipeline, 
-                                                 [self.symds_words])
+        active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.symds_words],
+                                                 groups_allowed=[everyone_group])
         active_sandbox.execute_pipeline()
 
         run_step = active_sandbox.run.runsteps.get(pipelinestep__step_num=1)
@@ -3335,7 +3374,8 @@ for i in range(%d):
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_one.execute_pipeline()
 
         tampered_script = """#!/bin/bash
@@ -3361,7 +3401,8 @@ echo "This is not what's supposed to be output here" > $2
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_two.execute_pipeline()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
@@ -3392,7 +3433,8 @@ echo "This is not what's supposed to be output here" > $2
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words])
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+                                                   groups_allowed=[everyone_group])
         self.sandbox_one.execute_pipeline()
 
         # Between runs, self.method_noop gets screwed with so that no data comes out, but still returns code 0.
@@ -3711,8 +3753,10 @@ class RunStepReuseFailedExecRecordTests(TransactionTestCase):
 
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
-        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.symds_words]).execute_pipeline()
-        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.symds_words]).execute_pipeline()
+        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.symds_words],
+                                        groups_allowed=[everyone_group]).execute_pipeline()
+        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.symds_words],
+                                        groups_allowed=[everyone_group]).execute_pipeline()
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)

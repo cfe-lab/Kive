@@ -292,7 +292,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
         if base_name != "":
             dest_path = os.path.join(install_path, base_name)
             with open(dest_path, "w") as f:
-                shutil.copyfileobj(self.content_file, f)
+                self.content_file.open()
+                with self.content_file:
+                    shutil.copyfileobj(self.content_file, f)
             # Make sure this is written with read, write, and execute
             # permission.
             os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )

@@ -933,8 +933,7 @@ class ExecRecordIn(models.Model):
         Also, if symbolicdataset refers to existent data, check that it
         is compatible with the input represented.
         """
-        # Check that the SymbolicDataset has the same access as the generating run.
-        self.symbolicdataset.validate_restrict_access([self.execrecord.generating_run])
+        # Check that the input is accessible by the generating run.
         self.execrecord.generating_run.validate_restrict_access([self.symbolicdataset])
 
         parent_transf = self.execrecord.general_transf()
@@ -1074,8 +1073,10 @@ class ExecRecordOut(models.Model):
           belongs to the ExecRecord's Method.
         - The SymbolicDataset is compatible with generic_output. (??)
         """
-        # Outputs must have the same access as the generating run.
-        self.symbolicdataset.validate_identical_access(self.execrecord.generating_run)
+        # Outputs must have the same access as the generating run if applicable.  (This is skipped if
+        # the Dataset originates from being uploaded by a user.)
+        if self.symbolicdataset.has_data() and self.symbolicdataset.dataset.created_by is not None:
+            self.symbolicdataset.validate_identical_access(self.execrecord.generating_run)
 
         # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
         if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):

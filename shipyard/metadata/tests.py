@@ -47,7 +47,7 @@ def create_metadata_test_environment(case):
     case.DNA_dt.save()
     # DNA_dt is a restricted type of string
     case.DNA_dt.restricts.add(case.string_dt)
-    case.DNA_dt.groups_allowed.add(everyone_group)
+    case.DNA_dt.grant_everyone_access()
     case.DNA_dt.basic_constraints.create(
         ruletype=BasicConstraint.REGEXP,
         rule="^[ACGTacgt]*$")
@@ -61,7 +61,7 @@ def create_metadata_test_environment(case):
     case.RNA_dt.save()
     # RNA_dt is a restricted type of string
     case.RNA_dt.restricts.add(case.string_dt)
-    case.RNA_dt.groups_allowed.add(everyone_group)
+    case.RNA_dt.grant_everyone_access()
     case.RNA_dt.basic_constraints.create(
         ruletype=BasicConstraint.REGEXP,
         rule="^[ACGUacgu]*$")
@@ -71,7 +71,7 @@ def create_metadata_test_environment(case):
     # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
     case.test_cdt = CompoundDatatype(user=case.myUser)
     case.test_cdt.save()
-    case.test_cdt.groups_allowed.add(everyone_group)
+    case.test_cdt.grant_everyone_access()
     case.test_cdt.save()
 
     case.test_cdt.members.create(
@@ -96,7 +96,7 @@ def create_metadata_test_environment(case):
         datatype=case.DNA_dt,
         column_name="SeqToComplement",
         column_idx=1)
-    case.DNAinput_cdt.groups_allowed.add(everyone_group)
+    case.DNAinput_cdt.grant_everyone_access()
     case.DNAinput_cdt.full_clean()
     case.DNAinput_cdt.save()
 
@@ -107,7 +107,7 @@ def create_metadata_test_environment(case):
         datatype=case.DNA_dt,
         column_name="ComplementedSeq",
         column_idx=1)
-    case.DNAoutput_cdt.groups_allowed.add(everyone_group)
+    case.DNAoutput_cdt.grant_everyone_access()
     case.DNAoutput_cdt.full_clean()
     case.DNAoutput_cdt.save()
 
@@ -118,7 +118,7 @@ def create_metadata_test_environment(case):
         datatype=case.RNA_dt,
         column_name="SeqToComplement",
         column_idx=1)
-    case.RNAinput_cdt.groups_allowed.add(everyone_group)
+    case.RNAinput_cdt.grant_everyone_access()
     case.RNAinput_cdt.full_clean()
     case.RNAinput_cdt.save()
 
@@ -129,7 +129,7 @@ def create_metadata_test_environment(case):
         datatype=case.RNA_dt,
         column_name="ComplementedSeq",
         column_idx=1)
-    case.RNAoutput_cdt.groups_allowed.add(everyone_group)
+    case.RNAoutput_cdt.grant_everyone_access()
     case.RNAoutput_cdt.full_clean()
     case.RNAoutput_cdt.save()
 
@@ -142,21 +142,21 @@ def create_metadata_test_environment(case):
     case.tuple_cdt.save()
     case.tuple_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
     case.tuple_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
-    case.tuple_cdt.groups_allowed.add(everyone_group)
+    case.tuple_cdt.grant_everyone_access()
 
     # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
     case.singlet_cdt = CompoundDatatype(user=case.myUser)
     case.singlet_cdt.save()
     case.singlet_cdt.members.create(
         datatype=case.string_dt, column_name="k", column_idx=1)
-    case.singlet_cdt.groups_allowed.add(everyone_group)
+    case.singlet_cdt.grant_everyone_access()
 
     case.triplet_cdt = CompoundDatatype(user=case.myUser)
     case.triplet_cdt.save()
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="a", column_idx=1)
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="b", column_idx=2)
     case.triplet_cdt.members.create(datatype=case.string_dt, column_name="c", column_idx=3)
-    case.triplet_cdt.groups_allowed.add(everyone_group)
+    case.triplet_cdt.grant_everyone_access()
 
     ####
     # This next bit is used for pipeline.tests.
@@ -167,7 +167,7 @@ def create_metadata_test_environment(case):
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="a^2", column_idx=1)
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="b^2", column_idx=2)
     case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="c^2", column_idx=3)
-    case.triplet_squares_cdt.groups_allowed.add(everyone_group)
+    case.triplet_squares_cdt.grant_everyone_access()
 
     # A CDT with mixed Datatypes
     case.mix_triplet_cdt = CompoundDatatype(user=case.myUser)
@@ -175,14 +175,14 @@ def create_metadata_test_environment(case):
     case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol1", column_idx=1)
     case.mix_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="DNACol2", column_idx=2)
     case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol3", column_idx=3)
-    case.mix_triplet_cdt.groups_allowed.add(everyone_group)
+    case.mix_triplet_cdt.grant_everyone_access()
 
     # Define CDT "doublet_cdt" with 2 members for use as an input/output
     case.doublet_cdt = CompoundDatatype(user=case.myUser)
     case.doublet_cdt.save()
     case.doublet_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
     case.doublet_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
-    case.doublet_cdt.groups_allowed.add(everyone_group)
+    case.doublet_cdt.grant_everyone_access()
 
     ####
     # Stuff from this point on is used in librarian and archive
@@ -194,13 +194,13 @@ def create_metadata_test_environment(case):
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="a", column_idx=1)
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="b", column_idx=2)
     case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="c", column_idx=3)
-    case.DNA_triplet_cdt.groups_allowed.add(everyone_group)
+    case.DNA_triplet_cdt.grant_everyone_access()
 
     case.DNA_doublet_cdt = CompoundDatatype(user=case.myUser)
     case.DNA_doublet_cdt.save()
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="x", column_idx=1)
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="y", column_idx=2)
-    case.DNA_doublet_cdt.groups_allowed.add(everyone_group)
+    case.DNA_doublet_cdt.grant_everyone_access()
 
 
 def clean_up_all_files():

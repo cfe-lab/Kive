@@ -11,11 +11,11 @@ import time
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.test import TestCase
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes
+from constants import datatypes, groups
 from librarian.models import SymbolicDataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatype
 import metadata.tests
@@ -26,6 +26,8 @@ from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 import file_access_utils
 import logging
+
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def create_librarian_test_environment(case):
@@ -41,30 +43,36 @@ def create_librarian_test_environment(case):
 
     ####
     # This is the big pipeline Eric developed that was originally
-    # used in copperfish/tests.py.        # CRs and CRRs
+    # used in copperfish/tests.py.
+    # CRs and CRRs:
     case.generic_cr = CodeResource(
         name="genericCR", description="Just a CR",
         filename="generic_script.py", user=case.myUser)
     case.generic_cr.save()
+    case.generic_cr.grant_everyone_access()
     case.generic_crRev = CodeResourceRevision(
         coderesource=case.generic_cr, revision_name="v1", revision_desc="desc",
         user=case.myUser)
     with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
         case.generic_crRev.content_file.save("generic_script.py", File(f))
     case.generic_crRev.save()
+    case.generic_crRev.grant_everyone_access()
 
     # Method family, methods, and their input/outputs
     case.mf = MethodFamily(name="method_family",description="Holds methods A/B/C", user=case.myUser)
     case.mf.save()
+    case.mf.grant_everyone_access()
     case.mA = Method(revision_name="mA_name", revision_desc="A_desc", family=case.mf, driver=case.generic_crRev,
                      user=case.myUser)
     case.mA.save()
+    case.mA.grant_everyone_access()
     case.A1_rawin = case.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
     case.A1_out = case.mA.create_output(compounddatatype=case.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
 
     case.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=case.mf, driver=case.generic_crRev,
                      user=case.myUser)
     case.mB.save()
+    case.mB.grant_everyone_access()
     case.B1_in = case.mB.create_input(compounddatatype=case.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
     case.B2_in = case.mB.create_input(compounddatatype=case.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
     case.B1_out = case.mB.create_output(compounddatatype=case.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
@@ -72,6 +80,7 @@ def create_librarian_test_environment(case):
     case.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=case.mf, driver=case.generic_crRev,
                      user=case.myUser)
     case.mC.save()
+    case.mC.grant_everyone_access()
     case.C1_in = case.mC.create_input(compounddatatype=case.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
     case.C2_in = case.mC.create_input(compounddatatype=case.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
     case.C1_out = case.mC.create_output(compounddatatype=case.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
@@ -80,12 +89,15 @@ def create_librarian_test_environment(case):
 
     # Pipeline family, pipelines, and their input/outputs
     case.pf = PipelineFamily(name="Pipeline_family", description="PF desc", user=case.myUser); case.pf.save()
+    case.pf.grant_everyone_access()
     case.pD = Pipeline(family=case.pf, revision_name="pD_name", revision_desc="D", user=case.myUser)
     case.pD.save()
+    case.pD.grant_everyone_access()
     case.D1_in = case.pD.create_input(compounddatatype=case.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
     case.D2_in = case.pD.create_input(compounddatatype=case.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
     case.pE = Pipeline(family=case.pf, revision_name="pE_name", revision_desc="E", user=case.myUser)
     case.pE.save()
+    case.pE.grant_everyone_access()
     case.E1_in = case.pE.create_input(compounddatatype=case.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
     case.E2_in = case.pE.create_input(compounddatatype=case.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
     case.E3_rawin = case.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
@@ -134,8 +146,10 @@ def create_librarian_test_environment(case):
     # Runs for the pipelines.
     case.pD_run = case.pD.pipeline_instances.create(user=case.myUser)
     case.pD_run.save()
+    case.pD_run.grant_everyone_access()
     case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
     case.pE_run.save()
+    case.pE_run.grant_everyone_access()
 
     # November 7, 2013: use a helper function (defined in
     # librarian.models) to define our SymDSs and DSs.
@@ -144,21 +158,24 @@ def create_librarian_test_environment(case):
     case.triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet.csv"),
                                                    case.myUser,
                                                    cdt=case.triplet_cdt, make_dataset=True,
-                                                   name="triplet", description="lol")
+                                                   name="triplet", description="lol",
+                                                   groups_allowed=[everyone_group])
     case.triplet_symDS_structure = case.triplet_symDS.structure
     case.triplet_DS = case.triplet_symDS.dataset
 
     case.doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_cdt.csv"),
                                                    case.myUser,
                                                    cdt=case.doublet_cdt, name="doublet",
-                                                   description="lol")
+                                                   description="lol",
+                                                   groups_allowed=[everyone_group])
     case.doublet_symDS_structure = case.doublet_symDS.structure
     case.doublet_DS = case.doublet_symDS.dataset
 
     case.singlet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "singlet_cdt_large.csv"),
                                                    case.myUser,
                                                    cdt=case.singlet_cdt, name="singlet",
-                                                   description="lol")
+                                                   description="lol",
+                                                   groups_allowed=[everyone_group])
     case.singlet_symDS_structure = case.singlet_symDS.structure
     case.singlet_DS = case.singlet_symDS.dataset
 
@@ -166,12 +183,14 @@ def create_librarian_test_environment(case):
     case.singlet_3rows_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
                                                          case.myUser,
                                                          cdt=case.singlet_cdt, name="singlet",
-                                                         description="lol")
+                                                         description="lol",
+                                                         groups_allowed=[everyone_group])
     case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
     case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
 
     case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                               user=case.myUser, cdt=None, name="raw", description="lol")
+                                               user=case.myUser, cdt=None, name="raw", description="lol",
+                                               groups_allowed=[everyone_group])
     case.raw_DS = case.raw_symDS.dataset
 
     # Added September 30, 2013: symbolic dataset that results from E01_21.
@@ -180,13 +199,15 @@ def create_librarian_test_environment(case):
     case.D1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
                                                  user=case.myUser,
                                                  cdt=case.doublet_cdt,
-                                                 make_dataset=False)
+                                                 make_dataset=False,
+                                                 groups_allowed=[everyone_group])
     case.D1_in_symDS_structure = case.D1_in_symDS.structure
 
     case.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"),
                                                  case.myUser,
                                                  cdt=case.triplet_cdt, name="C1_in_triplet",
-                                                 description="triplet 3 rows")
+                                                 description="triplet 3 rows",
+                                                 groups_allowed=[everyone_group])
     case.C1_in_symDS_structure = case.C1_in_symDS.structure
     case.C1_in_DS = case.C1_in_symDS.dataset
 
@@ -194,7 +215,8 @@ def create_librarian_test_environment(case):
     # which is the same as below.
     case.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
                                                  case.myUser,
-                                                 cdt=case.doublet_cdt, make_dataset=False)
+                                                 cdt=case.doublet_cdt, make_dataset=False,
+                                                 groups_allowed=[everyone_group])
     case.C2_in_symDS_structure = case.C2_in_symDS.structure
 
     # October 16: an alternative to C2_in_symDS, which has existent data.
@@ -202,34 +224,39 @@ def create_librarian_test_environment(case):
                                                          case.myUser,
                                                          cdt=case.doublet_cdt,
                                                          name="E11_32 output doublet",
-                                                         description="result of E11_32 fed by doublet_cdt.csv")
+                                                         description="result of E11_32 fed by doublet_cdt.csv",
+                                                         groups_allowed=[everyone_group])
     case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
     case.E11_32_output_DS = case.E11_32_output_symDS.dataset
 
     case.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
                                                   case.myUser,
-                                                  cdt=case.singlet_cdt, name="raw", description="lol")
+                                                  cdt=case.singlet_cdt, name="raw", description="lol",
+                                                  groups_allowed=[everyone_group])
     case.C1_out_symDS_structure = case.C1_out_symDS.structure
     case.C1_out_DS = case.C1_out_symDS.dataset
 
     case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="raw", description="lol")
+                                                  case.myUser, cdt=None, name="raw", description="lol",
+                                                  groups_allowed=[everyone_group])
     case.C2_out_DS = case.C2_out_symDS.dataset
 
     case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="raw", description="lol")
+                                                  case.myUser, cdt=None, name="raw", description="lol",
+                                                  groups_allowed=[everyone_group])
     case.C3_out_DS = case.C3_out_symDS.dataset
 
     case.triplet_3_rows_symDS = SymbolicDataset.create_SD(
         os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), case.myUser, cdt=case.triplet_cdt,
-        name="triplet", description="lol")
+        name="triplet", description="lol", groups_allowed=[everyone_group])
     case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
     case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
 
     # October 9, 2013: added as the result of cable E21_41.
     case.E1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
                                                   case.myUser, cdt=case.doublet_cdt, name="E1_out",
-                                                  description="doublet remuxed from triplet")
+                                                  description="doublet remuxed from triplet",
+                                                  groups_allowed=[everyone_group])
     case.E1_out_symDS_structure = case.E1_out_symDS.structure
     case.E1_out_DS = case.E1_out_symDS.dataset
 
@@ -237,21 +264,24 @@ def create_librarian_test_environment(case):
     # of cable E01_21 and E21_41.
     case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
                                                        case.myUser, cdt=case.DNA_triplet_cdt, name="DNA_triplet",
-                                                       description="DNA triplet data")
+                                                       description="DNA triplet data",
+                                                       groups_allowed=[everyone_group])
     case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
     case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
 
     case.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
         os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
         name="E01_21_DNA_doublet",
-        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21")
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
+        groups_allowed=[everyone_group])
     case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
     case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
 
     case.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
         os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
         name="E21_41_DNA_doublet",
-        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41")
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
+        groups_allowed=[everyone_group])
     case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
     case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
 
@@ -259,13 +289,14 @@ def create_librarian_test_environment(case):
     i = 0
     for step in PipelineStep.objects.all():
         if step.is_subpipeline: continue
-        run = step.pipeline.pipeline_instances.create(user=case.myUser); run.save()
+        run = step.pipeline.pipeline_instances.create(user=step.pipeline.user); run.save()
         runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
         execlog = ExecLog.create(runstep, runstep)
         execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
         execrecord = ExecRecord(generator=execlog); execrecord.save()
         for step_input in step.transformation.inputs.all():
-            sd = SymbolicDataset.objects.filter(structure__compounddatatype=step_input.compounddatatype)[0]
+            sd = SymbolicDataset.filter_by_user(step.pipeline.user).filter(
+                structure__compounddatatype=step_input.compounddatatype).first()
             execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
         runstep.execrecord = execrecord; runstep.save()
         i += 1
@@ -1246,7 +1277,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertFalse(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, runstep))
 
     def test_find_compatible_ER_failed(self):
         """Should also find a compatible ExecRecord which failed."""
@@ -1265,7 +1296,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, runstep))
 
     def test_find_compatible_ER_skips_nulls(self):
         """
@@ -1281,38 +1312,23 @@ class FindCompatibleERTests(LibrarianTestCase):
         input_SDs_decorated.sort()
         input_SDs = [entry[1] for entry in input_SDs_decorated]
 
-        # Create a method with two run steps, the first one is incomplete.
-        method = Method()
-        method.family = MethodFamily.objects.first()
-        method.driver = CodeResourceRevision.objects.first()
-        method.user = self.myUser
-        method.save()
-        
-        pipeline_step1 = PipelineStep()
-        pipeline_step1.pipeline = Pipeline.objects.first()
-        pipeline_step1.transformation = method
-        pipeline_step1.step_num = 99
-        pipeline_step1.save()
-        
-        pipeline_step2 = PipelineStep()
-        pipeline_step2.pipeline = Pipeline.objects.first()
-        pipeline_step2.transformation = method
-        pipeline_step2.step_num = 100
-        pipeline_step2.save()
-        
-        # Incomplete: no exec record
-        run_step1 = RunStep()
-        run_step1.run = Run.objects.first()
-        run_step1.pipelinestep = pipeline_step1
-        run_step1.reused = False
-        run_step1.save()
-        
-        # Complete: has an exec record
-        run_step2 = RunStep()
-        run_step2.run = Run.objects.first()
-        run_step2.pipelinestep = pipeline_step2
-        run_step2.reused = False
-        run_step2.execrecord = execrecord
-        run_step2.save()
-        
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs))
+        method = execrecord.general_transf()
+        pipeline = execrecord.generating_run.pipeline
+        ps = pipeline.steps.get(transformation=method)
+        user = method.user
+
+        # Create two RunSteps using this method.  First, an incomplete one.
+        run1 = Run(user=self.myUser, pipeline=pipeline, name="First incomplete run",
+                   description="Be patient!")
+        run1.save()
+        run1.start()
+        rs1 = run1.runsteps.create(pipelinestep=ps)
+
+        # Second, one that is looking for an ExecRecord.
+        run2 = Run(user=self.myUser, pipeline=pipeline, name="Second run in progress",
+                   description="Impatient!")
+        run2.save()
+        run2.start()
+        rs2 = run2.runsteps.create(pipelinestep=ps)
+
+        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, rs2))

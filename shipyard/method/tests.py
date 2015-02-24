@@ -72,6 +72,7 @@ def create_method_test_environment(case):
         filename="complement.py",
         user=case.myUser)
     case.comp_cr.save()
+    case.comp_cr.grant_everyone_access()
 
     # Define compv1_crRev for comp_cr
     fn = "complement.py"
@@ -85,6 +86,7 @@ def create_method_test_environment(case):
         # case.compv1_crRev.content_file.save(fn, File(f))
         case.compv1_crRev.full_clean()
         case.compv1_crRev.save()
+    case.compv1_crRev.grant_everyone_access()
 
     # Define compv2_crRev for comp_cr
     fn = "complement_v2.py"
@@ -99,6 +101,7 @@ def create_method_test_environment(case):
         # case.compv2_crRev.content_file.save(fn, File(f))
         case.compv2_crRev.full_clean()
         case.compv2_crRev.save()
+    case.compv2_crRev.grant_everyone_access()
 
     # The following is for testing code resource dependencies.
     case.test_cr_1 = CodeResource(name="test_cr_1",
@@ -106,6 +109,7 @@ def create_method_test_environment(case):
                                   description="CR1",
                                   user=case.myUser)
     case.test_cr_1.save()
+    case.test_cr_1.grant_everyone_access()
     case.test_cr_1_rev1 = CodeResourceRevision(coderesource=case.test_cr_1,
                                                revision_name="v1",
                                                revision_desc="CR1-rev1",
@@ -117,6 +121,7 @@ def create_method_test_environment(case):
                                   description="CR2",
                                   user=case.myUser)
     case.test_cr_2.save()
+    case.test_cr_2.grant_everyone_access()
     case.test_cr_2_rev1 = CodeResourceRevision(coderesource=case.test_cr_2,
                                                revision_name="v1",
                                                revision_desc="CR2-rev1",
@@ -127,6 +132,7 @@ def create_method_test_environment(case):
                                   description="CR3",
                                   user=case.myUser)
     case.test_cr_3.save()
+    case.test_cr_3.grant_everyone_access()
     case.test_cr_3_rev1 = CodeResourceRevision(coderesource=case.test_cr_3,
                                                revision_name="v1",
                                                revision_desc="CR3-rev1",
@@ -138,6 +144,7 @@ def create_method_test_environment(case):
                                   description="CR4",
                                   user=case.myUser)
     case.test_cr_4.save()
+    case.test_cr_4.grant_everyone_access()
     case.test_cr_4_rev1 = CodeResourceRevision(coderesource=case.test_cr_4,
                                                revision_name="v1",
                                                revision_desc="CR4-rev1",
@@ -153,6 +160,7 @@ def create_method_test_environment(case):
     for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
         # crr.full_clean()
         crr.save()
+        crr.grant_everyone_access()
 
     # Define DNAcomp_mf
     case.DNAcomp_mf = MethodFamily(
@@ -161,6 +169,7 @@ def create_method_test_environment(case):
         user=case.myUser)
     case.DNAcomp_mf.full_clean()
     case.DNAcomp_mf.save()
+    case.DNAcomp_mf.grant_everyone_access()
 
     # Define DNAcompv1_m (method revision) for DNAcomp_mf with driver compv1_crRev
     case.DNAcompv1_m = case.DNAcomp_mf.members.create(
@@ -168,6 +177,7 @@ def create_method_test_environment(case):
         revision_desc="First version",
         driver=case.compv1_crRev,
         user=case.myUser)
+    case.DNAcompv1_m.grant_everyone_access()
 
     # Add input DNAinput_cdt to DNAcompv1_m
     case.DNAinput_ti = case.DNAcompv1_m.create_input(
@@ -197,6 +207,7 @@ def create_method_test_environment(case):
         user=case.myUser)
     case.DNAcompv2_m.full_clean()
     case.DNAcompv2_m.save()
+    case.DNAcompv2_m.grant_everyone_access()
     case.DNAcompv2_m.copy_io_from_parent()
 
     # Define second family, RNAcomp_mf
@@ -206,6 +217,7 @@ def create_method_test_environment(case):
         user=case.myUser)
     case.RNAcomp_mf.full_clean()
     case.RNAcomp_mf.save()
+    case.RNAcomp_mf.grant_everyone_access()
 
     # Define RNAcompv1_m for RNAcomp_mf with driver compv1_crRev
     case.RNAcompv1_m = case.RNAcomp_mf.members.create(
@@ -213,6 +225,7 @@ def create_method_test_environment(case):
         revision_desc="First version",
         driver=case.compv1_crRev,
         user=case.myUser)
+    case.RNAcompv1_m.grant_everyone_access()
 
     # Add input RNAinput_cdt to RNAcompv1_m
     case.RNAinput_ti = case.RNAcompv1_m.create_input(
@@ -241,6 +254,7 @@ def create_method_test_environment(case):
     case.RNAcompv2_m.full_clean()
     case.RNAcompv2_m.save()
     case.RNAcompv2_m.copy_io_from_parent()
+    case.RNAcompv2_m.grant_everyone_access()
 
     # Create method family for script_1_method / script_2_method / script_3_method
     case.test_mf = MethodFamily(name="Test method family",
@@ -248,6 +262,7 @@ def create_method_test_environment(case):
                                 user=case.myUser)
     case.test_mf.full_clean()
     case.test_mf.save()
+    case.test_mf.grant_everyone_access()
 
     # script_1_sum_and_outputs.py
     # INPUT: 1 csv containing (x,y)
@@ -257,6 +272,7 @@ def create_method_test_environment(case):
                                     description="Addition and multiplication",
                                     user=case.myUser)
     case.script_1_cr.save()
+    case.script_1_cr.grant_everyone_access()
 
     # Add code resource revision for code resource (script_1_sum_and_products )
     case.script_1_crRev = CodeResourceRevision(
@@ -269,6 +285,7 @@ def create_method_test_environment(case):
     with open(os.path.join(samplecode_path, fn), "rb") as f:
         case.script_1_crRev.content_file.save(fn, File(f))
     case.script_1_crRev.save()
+    case.script_1_crRev.grant_everyone_access()
 
     # Establish code resource revision as a method
     case.script_1_method = Method(
@@ -278,6 +295,7 @@ def create_method_test_environment(case):
         driver = case.script_1_crRev,
         user=case.myUser)
     case.script_1_method.save()
+    case.script_1_method.grant_everyone_access()
 
     # Assign tuple as both an input and an output to script_1_method
     case.script_1_method.create_input(compounddatatype = case.tuple_cdt,
@@ -298,6 +316,7 @@ def create_method_test_environment(case):
                                     description="Square and mean - 2 CSVs",
                                     user=case.myUser)
     case.script_2_cr.save()
+    case.script_2_cr.grant_everyone_access()
 
     # Add code resource revision for code resource (script_2_square_and_means)
     fn = "script_2_square_and_means.py"
@@ -309,6 +328,7 @@ def create_method_test_environment(case):
     with open(os.path.join(samplecode_path, fn), "rb") as f:
         case.script_2_crRev.content_file.save(fn, File(f))
     case.script_2_crRev.save()
+    case.script_2_crRev.grant_everyone_access()
 
     # Establish code resource revision as a method
     case.script_2_method = Method(
@@ -318,6 +338,7 @@ def create_method_test_environment(case):
         driver = case.script_2_crRev,
         user=case.myUser)
     case.script_2_method.save()
+    case.script_2_method.grant_everyone_access()
 
     # Assign triplet as input and output,
     case.script_2_method.create_input(
@@ -344,6 +365,7 @@ def create_method_test_environment(case):
                                     description="Product of input",
                                     user=case.myUser)
     case.script_3_cr.save()
+    case.script_3_cr.grant_everyone_access()
 
     # Add code resource revision for code resource (script_3_product)
     with open(os.path.join(samplecode_path, "script_3_product.py"), "rb") as f:
@@ -354,6 +376,7 @@ def create_method_test_environment(case):
             content_file=File(f),
             user=case.myUser)
         case.script_3_crRev.save()
+    case.script_3_crRev.grant_everyone_access()
 
     # Establish code resource revision as a method
     case.script_3_method = Method(
@@ -363,6 +386,7 @@ def create_method_test_environment(case):
         driver = case.script_3_crRev,
         user=case.myUser)
     case.script_3_method.save()
+    case.script_3_method.grant_everyone_access()
 
     # Assign singlet as input and output
     case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
@@ -391,6 +415,7 @@ def create_method_test_environment(case):
         user=case.myUser)
     case.DNArecomp_mf.full_clean()
     case.DNArecomp_mf.save()
+    case.DNArecomp_mf.grant_everyone_access()
 
     # Add to MethodFamily DNArecomp_mf a method revision DNArecomp_m
     case.DNArecomp_m = case.DNArecomp_mf.members.create(
@@ -398,6 +423,7 @@ def create_method_test_environment(case):
         revision_desc="First version",
         driver=case.compv2_crRev,
         user=case.myUser)
+    case.DNArecomp_m.grant_everyone_access()
 
     # To this method revision, add inputs with CDT DNAoutput_cdt
     case.DNArecomp_m.create_input(
@@ -424,6 +450,7 @@ def create_method_test_environment(case):
         description="Given (a,b,c), outputs (a^2,b^2,c^2)",
         user=case.myUser)
     case.script_4_CR.save()
+    case.script_4_CR.grant_everyone_access()
 
     # Define CRR for this CR in order to define method
     with open(os.path.join(samplecode_path, "script_4_raw_in_CSV_out.py"), "rb") as f:
@@ -434,6 +461,7 @@ def create_method_test_environment(case):
             content_file=File(f),
             user=case.myUser)
         case.script_4_1_CRR.save()
+    case.script_4_1_CRR.grant_everyone_access()
 
     # Define MF in order to define method
     case.test_MF = MethodFamily(
@@ -442,6 +470,7 @@ def create_method_test_environment(case):
         user=case.myUser)
     case.test_MF.full_clean()
     case.test_MF.save()
+    case.test_MF.grant_everyone_access()
 
     # Establish CRR as a method within a given method family
     case.script_4_1_M = Method(
@@ -451,6 +480,7 @@ def create_method_test_environment(case):
         driver = case.script_4_1_CRR,
         user=case.myUser)
     case.script_4_1_M.save()
+    case.script_4_1_M.grant_everyone_access()
 
     case.script_4_1_M.create_input(compounddatatype=case.triplet_cdt,
         dataset_name="s4 input", dataset_idx = 1)
@@ -461,6 +491,7 @@ def create_method_test_environment(case):
 
     # Some code for a no-op method.
     resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser); resource.save()
+    resource.grant_everyone_access()
     with tempfile.NamedTemporaryFile() as f:
         f.write("#!/bin/bash\ncat $1")
         case.noop_data_file = f.name
@@ -468,22 +499,25 @@ def create_method_test_environment(case):
                                         user=case.myUser)
         revision.clean()
         revision.save()
+        revision.grant_everyone_access()
 
     # Retrieve the string type.
     string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
     string_cdt = CompoundDatatype(user=case.myUser)
     string_cdt.save()
     string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
+    string_cdt.grant_everyone_access()
     string_cdt.full_clean()
 
     mfamily = MethodFamily(name="noop", user=case.myUser); mfamily.save()
+    mfamily.grant_everyone_access()
     case.noop_method = Method(
         family=mfamily, driver=revision,
         revision_name = "1", revision_desc = "first version",
         user=case.myUser)
     case.noop_method.save()
     case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
-    case.noop_method.clean()
+    case.noop_method.grant_everyone_access()
     case.noop_method.full_clean()
 
     # Some data.
@@ -2620,28 +2654,29 @@ class MethodTests(MethodTestCase):
         m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver, user=self.myUser)
         self.assertIsNone(m.complete_clean())
 
-    def test_create_identical(self):
-        """Cannot create a duplicate Method."""
-        m = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
-        num_inputs = m.inputs.count()
-
-        xputs = itertools.chain(m.inputs.order_by("dataset_idx"), m.outputs.order_by("dataset_idx"))
-        names = []
-        compounddatatypes = []
-        row_limits = []
-        for xput in xputs:
-            names.append(xput.dataset_name)
-            compounddatatypes.append(xput.compounddatatype)
-            row_limits.append((xput.get_min_row(), xput.get_max_row()))
-
-        factory = lambda: Method.create(names, 
-                compounddatatypes=compounddatatypes, 
-                row_limits=row_limits, 
-                num_inputs=num_inputs,
-                driver=m.driver, 
-                family=m.family,
-                user=self.myUser)
-        self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
+    # The identicality constraint has been relaxed, so this test is no longer valid.
+    # def test_create_identical(self):
+    #     """Cannot create a duplicate Method."""
+    #     m = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
+    #     num_inputs = m.inputs.count()
+    #
+    #     xputs = itertools.chain(m.inputs.order_by("dataset_idx"), m.outputs.order_by("dataset_idx"))
+    #     names = []
+    #     compounddatatypes = []
+    #     row_limits = []
+    #     for xput in xputs:
+    #         names.append(xput.dataset_name)
+    #         compounddatatypes.append(xput.compounddatatype)
+    #         row_limits.append((xput.get_min_row(), xput.get_max_row()))
+    #
+    #     factory = lambda: Method.create(names,
+    #             compounddatatypes=compounddatatypes,
+    #             row_limits=row_limits,
+    #             num_inputs=num_inputs,
+    #             driver=m.driver,
+    #             family=m.family,
+    #             user=self.myUser)
+    #     self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
 
 
 class MethodFamilyTests(MethodTestCase):
@@ -2689,6 +2724,7 @@ with open(outfile, "wb") as f:
             column_name="random number", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
+        self.rng_out_cdt.grant_everyone_access()
 
         self.rng_method = tools.make_first_method("rng", "Generate a random number", self.rng,
                                                   self.user_rob)
@@ -2737,6 +2773,7 @@ with open(outfile, "wb") as f:
             column_name="number", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
+        self.increment_in_1_cdt.grant_everyone_access()
 
         self.increment_in_2_cdt = CompoundDatatype(user=self.user_rob)
         self.increment_in_2_cdt.save()
@@ -2744,6 +2781,7 @@ with open(outfile, "wb") as f:
             column_name="incrementor", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
+        self.increment_in_2_cdt.grant_everyone_access()
 
         self.increment_out_cdt = CompoundDatatype(user=self.user_rob)
         self.increment_out_cdt.save()
@@ -2751,6 +2789,7 @@ with open(outfile, "wb") as f:
             column_name="incremented number", column_idx=1,
             datatype=Datatype.objects.get(pk=datatypes.FLOAT_PK)
         )
+        self.increment_out_cdt.grant_everyone_access()
 
         self.inc_method = tools.make_first_method(
             "increment", "Increments all numbers in its first input file by the number in its second",
@@ -2811,7 +2850,7 @@ with open(outfile, "wb") as f:
         self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(
             datafile.name, name="numbers", cdt=self.increment_in_1_cdt,
             user=self.user_rob, description="1-2-3-4",
-            make_dataset=True)
+            make_dataset=True, groups_allowed=[everyone_group])
 
     def test_find_compatible_ER_non_reusable_method(self):
         """
@@ -2820,7 +2859,8 @@ with open(outfile, "wb") as f:
         sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
         sdbx.execute_pipeline()
 
-        self.assertListEqual(self.rng_method.find_compatible_ERs([]), [])
+        rng_step = self.test_nonreusable.steps.get(step_num=1)
+        self.assertListEqual(self.rng_method.find_compatible_ERs([], rng_step), [])
 
     def test_execute_does_not_reuse(self):
         """

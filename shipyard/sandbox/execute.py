@@ -534,8 +534,8 @@ class Sandbox:
             pipeline.check_inputs(input_SDs)
             self.logger.debug("executing a sub-pipeline with input_SDs {}".format(input_SDs))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
-            curr_run.users_allowed.add(self.run.users_allowed.all())
-            curr_run.groups_allowed.add(self.run.groups_allowed.all())
+            curr_run.users_allowed.add(*self.run.users_allowed.all())
+            curr_run.groups_allowed.add(*self.run.groups_allowed.all())
         else:
             pipeline = self.pipeline
 

@@ -4,12 +4,11 @@ Shipyard unit tests pertaining to Pipeline and its relatives.
 
 from django.core.exceptions import ValidationError
 from django.db.models import Count
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
 from constants import datatypes
-import json
 import os.path
 import re
 import shutil
@@ -21,7 +20,7 @@ from pipeline.models import Pipeline, PipelineFamily, \
     PipelineSerializationException, PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
 from librarian.models import SymbolicDataset
-from archive.models import Dataset, ExecLog, User
+from archive.models import Dataset, ExecLog
 import method.tests
 import sandbox.testing_utils as tools
 
@@ -97,8 +96,7 @@ def create_pipeline_test_environment(case):
     case.test_PF.save()
 
     # Set up an empty Pipeline.
-    family = PipelineFamily.objects.first()
-    CompoundDatatype.objects.first()
+    family = PipelineFamily.filter_by_user(case.user).first()
 
     # Nothing defined.
     p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version", user=case.user)
@@ -3476,28 +3474,32 @@ class CustomWiringTests(PipelineTestCase):
                                         description="A datatype not having anything to do with anything",
                                         user=self.user)
         self.incompatible_dt.save()
+        self.incompatible_dt.grant_everyone_access()
         self.incompatible_dt.restricts.add(Datatype.objects.get(pk=datatypes.STR_PK))
 
         # Define 2 CDTs that are unequal: (DNA, string, string), and (string, DNA, incompatible)
         cdt_1 = CompoundDatatype(user=self.user)
         cdt_1.save()
+        cdt_1.grant_everyone_access()
         cdt_1.members.create(datatype=self.DNA_dt,column_name="col_1",column_idx=1)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_2",column_idx=2)
         cdt_1.members.create(datatype=self.string_dt,column_name="col_3",column_idx=3)
 
         cdt_2 = CompoundDatatype(user=self.user)
         cdt_2.save()
+        cdt_2.grant_everyone_access()
         cdt_2.members.create(datatype=self.string_dt,column_name="col_1",column_idx=1)
         cdt_2.members.create(datatype=self.DNA_dt,column_name="col_2",column_idx=2)
         cdt_2.members.create(datatype=self.incompatible_dt,column_name="col_3",column_idx=3)
 
         # Define a pipeline with single pipeline input of type cdt_1
         my_pipeline = self.test_PF.members.create(revision_name="foo", revision_desc="Foo version", user=self.user)
+        my_pipeline.grant_everyone_access()
         pipeline_in = my_pipeline.create_input(compounddatatype=cdt_1,dataset_name="pipe_in_1",dataset_idx=1)
 
         # Define method to have an input with cdt_2, add it as a step, cable it
         self.testmethod.inputs.all().delete()
-        method_in = self.testmethod.create_input(dataset_name="TestIn", dataset_idx=1,compounddatatype=cdt_2)
+        method_in = self.testmethod.create_input(dataset_name="TestIn", dataset_idx=1, compounddatatype=cdt_2)
         my_step1 = my_pipeline.steps.create(transformation=self.testmethod, step_num=1)
         my_cable1 = my_step1.cables_in.create(dest=method_in, source_step=0, source=pipeline_in)
 
@@ -4023,11 +4025,13 @@ class PipelineSerializationTests(TestCase):
         self.string_doublet.save()
         self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
         self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
+        self.string_doublet.grant_everyone_access()
 
         # A CDT composed of one builtin-STR column.
         self.string_singlet = CompoundDatatype(user=self.user_bob)
         self.string_singlet.save()
         self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
+        self.string_singlet.grant_everyone_access()
 
     def tearDown(self):
         tools.destroy_sandbox_testing_tools_environment(self)

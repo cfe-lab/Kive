@@ -4,7 +4,7 @@ import re
 import os
 import shutil
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.test import TestCase, TransactionTestCase
@@ -17,9 +17,10 @@ from sandbox.execute import Sandbox
 
 import sandbox.testing_utils as tools
 
-from constants import datatypes, CDTs
+from constants import datatypes, CDTs, groups, users
 
-shipyard_user = User.objects.get(pk=1)
+shipyard_user = User.objects.get(pk=users.SHIPYARD_USER_PK)
+everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 class CustomConstraintTests(TransactionTestCase):
@@ -31,6 +32,7 @@ class CustomConstraintTests(TransactionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
+        self.user_oscar.groups.add(everyone_group)
         self.workdir = tempfile.mkdtemp()
 
         # A Datatype with basic constraints.
@@ -133,6 +135,7 @@ class CustomConstraintTests(TransactionTestCase):
             datatype.restricts.add(supertype)
         for ruletype, rule in basic_constraints:
             datatype.basic_constraints.create(ruletype=ruletype, rule=rule)
+        datatype.grant_everyone_access()
         return(datatype)
 
     def _setup_compounddatatype(self, datatypes, column_names, user):
@@ -146,6 +149,7 @@ class CustomConstraintTests(TransactionTestCase):
             compounddatatype.members.create(datatype=datatypes[i],
                     column_name = column_names[i], column_idx=i+1)
         compounddatatype.save()
+        compounddatatype.grant_everyone_access()
         return compounddatatype
 
     def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype, user):
@@ -164,23 +168,25 @@ class CustomConstraintTests(TransactionTestCase):
 
         coderesource = CodeResource(name=crname, filename="{}.sh".format(crname), description=crdesc, user=user)
         coderesource.save()
+        coderesource.grant_everyone_access()
         with open(scriptfile.name, "rb") as f:
             revision = coderesource.revisions.create(revision_name="1", revision_number=1,
                                                      revision_desc="first version",
                                                      content_file=File(f),
                                                      user=user)
             revision.save()
+        revision.grant_everyone_access()
         methodfamily = MethodFamily(name=famname, description=famdesc, user=user)
         methodfamily.save()
+        methodfamily.grant_everyone_access()
         method = methodfamily.members.create(driver=revision, revision_number=methodfamily.members.count()+1,
                                              user=user)
         method.create_input("to_test", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK))
         method.create_output("failed_row", 1, compounddatatype=CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK))
         method.save()
-        cc = CustomConstraint(verification_method = method)
+        method.grant_everyone_access()
+        cc = CustomConstraint(datatype=datatype, verification_method=method)
         cc.save()
-        datatype.custom_constraint = cc
-        datatype.save()
 
     def _setup_content_check_log(self, datafile, cdt, user, name, desc):
         """
@@ -188,7 +194,7 @@ class CustomConstraintTests(TransactionTestCase):
         for a given CompoundDatatype.
         """
         symbolicdataset = SymbolicDataset.create_SD(datafile, user=user, cdt=cdt, name=name,
-                                                    description=desc)
+                                                    description=desc, groups_allowed=[everyone_group])
         log = ContentCheckLog(symbolicdataset=symbolicdataset, user=user)
         log.save()
         return log
