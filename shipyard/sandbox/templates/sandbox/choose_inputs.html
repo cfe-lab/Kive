@@ -77,7 +77,7 @@
     {{ access_control_form.groups_allowed }}
     </p>
 
-    <input type="hidden" name="pipeline" value="{{ input_data.0.0.transformation.definite.pk }}">
+    <input type="hidden" name="pipeline_pk" value="{{ input_data.0.0.transformation.definite.pk }}">
     <!--Annoyingly, some browsers will disallow form submission unless >= 1 user input field is present. -->
     <input type="text" style="display: none;">
     {% csrf_token %}

@@ -13,10 +13,9 @@ class PipelineSelectionForm(forms.Form):
     pipeline = forms.ChoiceField()
 
     def __init__(self, pipeline_family_pk, *args, **kwargs):
-        self.family_pk = pipeline_family_pk
         super(PipelineSelectionForm, self).__init__(*args, **kwargs)
 
-        family = PipelineFamily.objects.get(pk=self.family_pk)
+        family = PipelineFamily.objects.get(pk=pipeline_family_pk)
         self.family_name = family.name
         choices = []
         for pipeline in family.complete_members:

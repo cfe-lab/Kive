@@ -57,6 +57,7 @@ def choose_inputs(request):
         # Method not allowed
         return HttpResponse(status=405)
 
+
 @login_required
 def active_runs(request):
     """Display all active runs for this user."""

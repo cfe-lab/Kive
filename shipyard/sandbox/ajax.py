@@ -46,7 +46,7 @@ def _run_pipeline(request):
     * pipeline - the pipeline id
     * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
     """
-    pipeline_submission = PipelineSubmissionForm({"pipeline_pk": request.GET.get("pipeline")})
+    pipeline_submission = PipelineSubmissionForm(request.GET)
     pipeline_submission.is_valid()
     pipeline = Pipeline.objects.get(pk=pipeline_submission.cleaned_data["pipeline_pk"])
 
