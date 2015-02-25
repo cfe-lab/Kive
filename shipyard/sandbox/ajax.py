@@ -133,70 +133,53 @@ def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
 
-# def _in_progress(queue_pk):
-#     rtp_qs = fleet.models.RunToProcess.objects.filter(pk=queue_pk)
-#     if not rtp_qs.exists():
-#         return False
-#
-#     rtp = rtp_qs.first()
-#     if not rtp.started:
-#         return False
-#     return not rtp.run.is_complete()
-
-
 def _load_status(user):
-    try:
-        recent_time = timezone.now() - timedelta(minutes=5)
-        old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
-            'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
-        runs = fleet.models.RunToProcess.filter_by_user(user).filter(
-            Q(run_id__isnull=True)|
-            Q(run__end_time__isnull=True)|
-            Q(run__end_time__gte=recent_time)).distinct().exclude(
-            pk__in=old_aborted_runs).order_by('time_queued')
-        run_reports = [run.get_run_progress() for run in runs]
-        
-        status = '\n'.join(run_reports)
-    except StandardError as e:
-        status = str(e)
-        ajax_logger.error('Status report failed.', exc_info=e)
-    return status
+    recent_time = timezone.now() - timedelta(minutes=5)
+    old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
+        'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
+    runs = fleet.models.RunToProcess.filter_by_user(user).filter(
+        Q(run_id__isnull=True)|
+        Q(run__end_time__isnull=True)|
+        Q(run__end_time__gte=recent_time)).distinct().exclude(
+        pk__in=old_aborted_runs).order_by('time_queued')
+    return [run.get_run_progress() for run in runs]
+    """ Find all active runs, and return a dict for each with the status.
+    
+    @return [{'id': run_id, 'status': status, 'name': name}]
+    """
 
+def _is_status_changed(runs, request):
+    for i, run in enumerate(runs):
+        prefix = 'previous[runs][{}]'.format(i)
+        previous_run_id = request.GET.get(prefix + '[id]')
+        previous_run_id = previous_run_id and int(previous_run_id)
+        if (run.get('id') != previous_run_id or
+            run['name'] != request.GET.get(prefix + '[name]') or 
+            run['status'] != request.GET.get(prefix + '[status]')):
+            return True
+    
+    return False
 
 def _poll_run_progress(request):
     """
     Helper to produce a JSON description of the current state of a run.
     """
-    rtp_pk = request.GET.get("queue_placeholder")
-    rtp = fleet.models.RunToProcess.objects.get(pk=rtp_pk)
+    result = {'runs': [], 'errors': []}
+    try:
+        # Arrrgh I hate sleeping. Find a better way.
+        while True:
+            runs = _load_status(request.user)
+            if _is_status_changed(runs, request):
+                break
+            time.sleep(1)
 
-    last_status = request.GET.get("status")
+        result['runs'] = runs
+    except StandardError:
+        ajax_logger.error('Status report failed.', exc_info=True)
+        result['errors'].append('Status report failed.')
 
-    # If the Run isn't done but the process is, we've crashed.
-    # FIXME we are no longer monitoring threads directly here, so we need another way to know if
-    # the pipeline has crashed.
-    #crashed = rtp.started and not rtp.finished and not rtp.running
-    # For now....
-    crashed = False
-
-    # Arrrgh I hate sleeping. Find a better way.
-    while True:
-        status = _load_status(request.user)
-        if status != last_status or not status:
-            break
-        time.sleep(1)
-        # ajax_logger.debug("status: {}".format(status))
-        # ajax_logger.debug("rtp.finished: {}".format(rtp.finished))
-        # ajax_logger.debug("run PK: {}".format(None if rtp.run is None else rtp.run.pk))
-
-    success = rtp.started and rtp.run and rtp.run.successful_execution()
-
-    run_pk = None if rtp.run is None else rtp.run.pk
-    return_val = json.dumps({"status": status, "run": run_pk, "finished": len(status) == 0, "success": success,
-                             "queue_placeholder": rtp_pk, "crashed": crashed})
-    ajax_logger.debug("Returning: {}".format(return_val))
-    return return_val
-
+    ajax_logger.debug("Returning: %r", result)
+    return json.dumps(result)
 
 @login_required
 def poll_run_progress(request):

@@ -96,19 +96,22 @@ class RunToProcess(metadata.models.AccessControl):
     @transaction.atomic
     def get_run_progress(self):
         """
-        Return a string describing the Run's current state.
+        Return a dictionary describing the Run's current state.
+    
+        @return {'id': run_id, 'status': status, 'name': name}
         """
+        result = {'name': self.display_name}
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
-            return "Too many threads ({} from {})-{}".format(
+            result['status'] = "Too many threads ({} from {})".format(
                 esc.threads_requested,
-                esc.max_available,
-                self.display_name
+                esc.max_available
             )
+            return result
         
         if not self.started:
-            status = "?-" + self.display_name
-            return status
+            result['status'] = '?'
+            return result
 
         run = self.run
 
@@ -148,9 +151,10 @@ class RunToProcess(metadata.models.AccessControl):
                 except ExecLog.DoesNotExist:
                     status += ":"
         
-        status += "-" + self.display_name
+        result['status'] = status
+        result['id'] = run.id
 
-        return status
+        return result
 
 
 class RunToProcessInput(models.Model):

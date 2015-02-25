@@ -66,20 +66,20 @@ def active_runs(request):
 
 
 @login_required
-def view_results(request, run_id):
+def view_results(request, id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
 
     four_oh_four = False
     try:
-        run = archive.models.Run.objects.get(pk=run_id)
+        run = archive.models.Run.objects.get(pk=id)
         if not run.can_be_accessed(request.user):
             four_oh_four = True
     except archive.models.Run.DoesNotExist:
-        four_oh_four = False
+        four_oh_four = True
 
     if four_oh_four:
-        raise Http404("ID {} is not accessible".format(run_id))
+        raise Http404("ID {} does not exist or is not accessible".format(id))
     context.update({"run": run})
     return HttpResponse(template.render(context))
