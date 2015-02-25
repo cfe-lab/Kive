@@ -12,9 +12,8 @@ from django.contrib.auth.decorators import login_required
 
 from archive.models import Dataset, Run
 import fleet.models
-from forms import PipelineSelectionForm, PipelineSubmissionForm, InputSubmissionForm
-from librarian.models import SymbolicDataset
-from pipeline.models import Pipeline, PipelineFamily
+from forms import PipelineSelectionForm
+from pipeline.models import PipelineFamily
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -36,43 +35,6 @@ class AJAXRequestHandler:
             self.response.write(response_fun(request, *args, **kwargs))
         else:
             self.response = HttpResponse(status=405) # Method not allowed
-
-
-def _run_pipeline(request):
-    """Run a Pipeline.
-    
-    Request parameters are:
-    
-    * pipeline - the pipeline id
-    * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
-    """
-    pipeline_submission = PipelineSubmissionForm(request.GET)
-    pipeline_submission.is_valid()
-    pipeline = Pipeline.objects.get(pk=pipeline_submission.cleaned_data["pipeline_pk"])
-
-    symbolic_datasets = []
-    for i in range(1, pipeline.inputs.count()+1):
-        curr_input_form = InputSubmissionForm({"input_pk": request.GET.get("input_{}".format(i))})
-        curr_input_form.is_valid()
-        symbolic_datasets.append(SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"]))
-
-    # Inform the fleet that this is to be processed.
-    with transaction.atomic():
-        run_to_start = fleet.models.RunToProcess(user=request.user, pipeline=pipeline)
-        run_to_start.save()
-        run_to_start.users_allowed.add(*pipeline_submission.cleaned_data["users_allowed"])
-        run_to_start.groups_allowed.add(*pipeline_submission.cleaned_data["groups_allowed"])
-
-        for i, sd in enumerate(symbolic_datasets):
-            run_to_start.inputs.create(symbolicdataset=sd, index=i)
-
-    return json.dumps({"run": None, "status": "Waiting", "finished": False, "success": True,
-                       "queue_placeholder": run_to_start.pk, "crashed": False})
-
-
-@login_required
-def run_pipeline(request):
-    return AJAXRequestHandler(request, _run_pipeline).response
 
 
 def _filter_datasets(request):

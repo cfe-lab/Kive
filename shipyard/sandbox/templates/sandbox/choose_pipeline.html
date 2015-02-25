@@ -149,7 +149,7 @@ Select a pipeline
     </div>
     <input type="hidden" class="tbselect-value" value="">
     <form action="choose_inputs" method="get" id="choose_inputs">
-        <input type="submit" value="Run pipeline">
+        <input type="submit" value="Choose inputs">
 	</form>
 {% else %}
     <div class="greyedout">
@@ -157,6 +157,7 @@ Select a pipeline
     </div>
 {% endif %}
 
+<div class="errortext">{{ error_msg }}</div>
 <div id="errors" class="errortext"></div>
 
 {% endblock %}

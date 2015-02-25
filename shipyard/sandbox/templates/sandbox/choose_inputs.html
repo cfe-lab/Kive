@@ -68,23 +68,26 @@
 {% endfor %}
 </ul>
 
+<div id="errors" class="errortext">{{ input_error_msg }}</div>
+
 <form action="run_pipeline" id="run_pipeline" method="post">
 
     <p>Users allowed:
-    {{ access_control_form.users_allowed }}
+    {{ run_submission_form.users_allowed }}
+        <div class="errortext">{{ run_submission_form.users_allowed.errors }}</div>
     </p>
     <p>Groups allowed:
-    {{ access_control_form.groups_allowed }}
+    {{ run_submission_form.groups_allowed }}
+        <div class="errortext">{{ run_submission_form.groups_allowed.errors }}</div>
     </p>
 
-    <input type="hidden" name="pipeline_pk" value="{{ input_data.0.0.transformation.definite.pk }}">
-    <!--Annoyingly, some browsers will disallow form submission unless >= 1 user input field is present. -->
-    <input type="text" style="display: none;">
+    {{ run_submission_form.pipeline }}
+        <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
+        <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
     {% csrf_token %}
     <input type="submit" id="submit" value="Go">
 </form>
 
-<div id="errors" class="errortext"></div>
 <div id="progress"></div>
 <div id="details"></div>
 

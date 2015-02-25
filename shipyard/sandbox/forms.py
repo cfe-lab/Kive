@@ -5,6 +5,7 @@ Forms for running a Pipeline.
 from django import forms
 
 from pipeline.models import PipelineFamily, Pipeline
+import fleet.models
 import metadata.forms
 
 
@@ -29,8 +30,23 @@ class InputSubmissionForm(forms.Form):
     input_pk = forms.IntegerField()
 
 
-class PipelineSubmissionForm(metadata.forms.AccessControlForm):
+class RunSubmissionForm(forms.ModelForm):
     """
     Form used for validating the request values when submitting a Pipeline to run.
     """
-    pipeline_pk = forms.IntegerField()
+    # Use Pipeline.objects.all() as the default queryset so that when creating a form without pipeline_qs
+    # specified, any pipeline will be OK.
+    pipeline = forms.ModelChoiceField(
+        widget=forms.HiddenInput,
+        queryset=Pipeline.objects.all())
+
+    class Meta:
+        model = fleet.models.RunToProcess
+        fields = ("pipeline", "users_allowed", "groups_allowed")
+
+    def __init__(self, data=None, pipeline_qs=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
+        super(RunSubmissionForm, self).__init__(data, *args, **kwargs)
+        if pipeline_qs is not None:
+            self.fields["pipeline"].queryset = pipeline_qs
+        metadata.forms.setup_form_users_allowed(self, users_allowed)
+        metadata.forms.setup_form_groups_allowed(self, groups_allowed)

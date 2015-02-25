@@ -40,35 +40,25 @@ $.fn.get_pkey = function(pkey) {
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
-    
+
     // Run a pipeline when "submit" is pressed.
     $("#run_pipeline").on("submit", function(e) {
-        e.preventDefault();
         var tbselects = $('.tbselect-value'),
             submit = $('input[type="submit"]', this);
-        
+
         // Check if all inputs have been selected
         if (tbselects.filter(function() { return this.value === ''; }).length === 0) {
             tbselects.detach().appendTo(this);
-            $('#input_forms').hide('slow');
-            $("#errors").html("");
-            
-            submit.hide().after( $('<img id="loading" src="/static/portal/loading.gif">').hide().show('slow') );
-            $("#submit").unbind("click");
-            $.getJSON("run_pipeline", $(this).serialize(),
-                function (run_data) { 
-                    window.location.href = 'active_runs';
-                }
-            );
         } else {
             display_error("Not all inputs have been set.");
+            e.preventDefault();
         }
     });
     
     $('#choose_inputs').on('submit', function(e) {
         var tbselect = $('.tbselect-value');
         
-        // Check if all inputs have been selected
+        // Check if a pipeline has been selected
         if (tbselect.val() !== '') {
             tbselect.attr('name', 'pipeline').detach().appendTo(this);
         } else {
