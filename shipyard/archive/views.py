@@ -66,7 +66,7 @@ def dataset_view(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    if dataset.symbolicdataset.is_raw:
+    if dataset.symbolicdataset.is_raw():
         return _build_raw_viewer(request, dataset.dataset_file, dataset.name)
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {"dataset": dataset})

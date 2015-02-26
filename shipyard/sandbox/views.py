@@ -152,14 +152,14 @@ def run_pipeline(request):
         return HttpResponse(template.render(context))
 
     # Success -- redirect to the active runs view.
-    return HttpResponseRedirect("/active_runs")
+    return HttpResponseRedirect("/runs")
 
 
 @login_required
-def active_runs(request):
+def runs(request):
     """Display all active runs for this user."""
     context = RequestContext(request)
-    template = loader.get_template("sandbox/active_runs.html")
+    template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
 
