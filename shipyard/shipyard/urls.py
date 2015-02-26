@@ -1,7 +1,5 @@
 from django.conf.urls import patterns, url
 from portal.forms import *
-from metadata.forms import *
-from method.forms import *
 
 # Uncomment the next two lines to enable the admin:
 #from django.contrib import admin
@@ -64,6 +62,10 @@ urlpatterns = patterns(
     url(r'^datasets$', 'archive.views.datasets', name='datasets'),
     url(r'^dataset_download/(?P<dataset_id>\d+)$', 'archive.views.dataset_download', name='dataset_download'),
     url(r'^dataset_view/(?P<dataset_id>\d+)$', 'archive.views.dataset_view', name='dataset_view'),
+    url(r'^stdout_download/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_download', name='stdout_download'),
+    url(r'^stdout_view/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_view', name='stdout_view'),
+    url(r'^stderr_download/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_download', name='stderr_download'),
+    url(r'^stderr_view/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_view', name='stderr_view'),
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'archive.views.datasets_add_bulk', name='datasets_add_bulk'),
     url(r'^datasets_bulk', 'archive.views.datasets_bulk', name='datasets_bulk'),

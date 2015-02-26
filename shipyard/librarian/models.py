@@ -673,7 +673,7 @@ class ExecRecord(models.Model):
 
     @property
     def execrecordouts_in_order(self):
-        return sorted(self.execrecordins.all(), key=lambda e: e.generic_output.definite.dataset_idx)
+        return sorted(self.execrecordouts.all(), key=lambda e: e.generic_output.definite.dataset_idx)
 
     @classmethod
     @transaction.atomic

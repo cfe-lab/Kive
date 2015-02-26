@@ -13,7 +13,7 @@ import mimetypes
 import os
 import logging
 
-from archive.models import Dataset
+from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
 import librarian.models
 
@@ -33,6 +33,14 @@ def datasets(request):
     return HttpResponse(t.render(c))
 
 
+def _build_download_response(source_file):
+    file_chunker = FileWrapper(source_file) # stream file in chunks to avoid overloading memory
+    mimetype = mimetypes.guess_type(source_file.url)[0]
+    response = HttpResponse(file_chunker, content_type=mimetype)
+    response['Content-Length'] = source_file.size
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
+    return response
+
 @login_required
 def dataset_download(request, dataset_id):
     """
@@ -44,12 +52,7 @@ def dataset_download(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    file_chunker = FileWrapper(dataset.dataset_file)  # stream file in chunks to avoid overloading memory
-    mimetype = mimetypes.guess_type(dataset.dataset_file.url)[0]
-    response = HttpResponse(file_chunker, content_type=mimetype)
-    response['Content-Length'] = dataset.get_filesize()
-    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(dataset.dataset_file.name))
-    return response
+    return _build_download_response(dataset.dataset_file)
 
 
 @login_required
@@ -63,9 +66,65 @@ def dataset_view(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
+    if dataset.symbolicdataset.is_raw:
+        return _build_raw_viewer(request, dataset.dataset_file, dataset.name)
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {"dataset": dataset})
     return HttpResponse(t.render(c))
+
+def _build_raw_viewer(request, file, name):
+    t = loader.get_template("archive/raw_view.html")
+    c = RequestContext(request, {"file": file, "name": name})
+    return HttpResponse(t.render(c))
+    
+
+@login_required
+def stdout_download(request, methodoutput_id):
+    """
+    Display the standard output associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    return _build_download_response(methodoutput.output_log)
+
+@login_required
+def stdout_view(request, methodoutput_id):
+    """
+    Display the standard output associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    return _build_raw_viewer(request, methodoutput.output_log, 'Standard out')
+
+@login_required
+def stderr_download(request, methodoutput_id):
+    """
+    Display the standard output associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    return _build_download_response(methodoutput.error_log)
+
+@login_required
+def stderr_view(request, methodoutput_id):
+    """
+    Display the standard error associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    return _build_raw_viewer(request, methodoutput.error_log, 'Standard error')
 
 
 @login_required

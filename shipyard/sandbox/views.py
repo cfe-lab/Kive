@@ -179,5 +179,38 @@ def view_results(request, id):
 
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
-    context.update({"run": run})
+    
+    outputs = [] # [(step_name, output_name, size, date, view_url, down_url)]
+    for i, outcable in enumerate(run.outcables_in_order):
+        dataset = outcable.execrecord.execrecordouts.first().symbolicdataset.dataset
+        outputs.append(((i == 0 and 'Run outputs' or ''),
+                        outcable.pipelineoutputcable.dest,
+                        dataset.dataset_file.size,
+                        dataset.date_created,
+                        "../../dataset_view/{}".format(dataset.id),
+                        "../../dataset_download/{}".format(dataset.id)))
+        
+    for runstep in run.runsteps_in_order:
+        methodoutput = runstep.log.methodoutput
+        outputs.append((runstep.pipelinestep,
+                        'Standard out',
+                        methodoutput.output_log.size,
+                        runstep.log.end_time,
+                        "../../stdout_view/{}".format(methodoutput.id),
+                        "../../stdout_download/{}".format(methodoutput.id)))
+        outputs.append(('',
+                        'Standard error',
+                        methodoutput.error_log.size,
+                        runstep.log.end_time,
+                        "../../stderr_view/{}".format(methodoutput.id),
+                        "../../stderr_download/{}".format(methodoutput.id)))
+        for output in runstep.execrecord.execrecordouts_in_order:
+            dataset = output.symbolicdataset.dataset
+            outputs.append(('',
+                            output.generic_output,
+                            dataset.dataset_file.size,
+                            dataset.date_created,
+                            "../../dataset_view/{}".format(dataset.id),
+                            "../../dataset_download/{}".format(dataset.id)))
+    context.update({"outputs": outputs})
     return HttpResponse(template.render(context))

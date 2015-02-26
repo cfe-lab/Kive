@@ -16,7 +16,6 @@
 
 <h2>{{ dataset.name }}</h2>
 
-{% if not dataset.symbolicdataset.is_raw %}
 <table>
 <thead>
     <tr>
@@ -35,10 +34,4 @@
     {% endfor %}
 </tbody>
 </table>
-{% else %}
-<pre>
-{{ dataset.dataset_file.read }}
-</pre>
-
-{% endif %}
 {% endblock %}

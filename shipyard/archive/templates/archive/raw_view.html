@@ -1,0 +1,22 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% load filters %}
+
+{% block title %}Raw file{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block content %}
+
+<a href="/datasets" rel="prev">Back to list of datasets</a>
+
+<h2>{{ name }}</h2>
+
+<pre>
+{{ file.read }}
+</pre>
+{% endblock %}
