@@ -4,7 +4,6 @@ import json
 import logging
 import time
 
-from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -96,14 +95,17 @@ def filter_pipelines(request):
 
 
 def _load_status(user):
-    recent_time = timezone.now() - timedelta(minutes=5)
-    old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
-        'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
-    runs = fleet.models.RunToProcess.filter_by_user(user).filter(
-        Q(run_id__isnull=True)|
-        Q(run__end_time__isnull=True)|
-        Q(run__end_time__gte=recent_time)).distinct().exclude(
-        pk__in=old_aborted_runs).order_by('time_queued')
+    runs = fleet.models.RunToProcess.filter_by_user(user).order_by('time_queued')
+    is_active_required = True
+    if is_active_required:
+        recent_time = timezone.now() - timedelta(minutes=5)
+        old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
+            'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
+        runs = runs.filter(
+            Q(run_id__isnull=True)|
+            Q(run__end_time__isnull=True)|
+            Q(run__end_time__gte=recent_time)).distinct().exclude(
+            pk__in=old_aborted_runs)
     return [run.get_run_progress() for run in runs]
     """ Find all active runs, and return a dict for each with the status.
     

@@ -10,7 +10,7 @@
  * - "status" is a string describing the Run's status
  */
 
-/* How long to wait for a server response. */
+/* polling interval. */
 var timeout = 1000;
 
 /* Ask the server for a progress report of the run. */
