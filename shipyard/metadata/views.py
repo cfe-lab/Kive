@@ -172,6 +172,7 @@ def compound_datatypes(request):
     return HttpResponse(t.render(c))
 
 
+# FIXME make this use a formset!
 def make_cdm_forms(request, cdt):
     """
     Helper function for initializing forms with posted values and exceptions.

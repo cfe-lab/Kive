@@ -7,6 +7,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         $('#id_datatype_' + i).attr('name', 'datatype_' + i);
         $('#id_column_name_' + i).attr('name', 'column_name_' + i);
         $('#id_column_idx_' + i).attr('name', 'column_idx_' + i);
+        $('#id_blankable_' + i).attr('name', 'blankable_' + i);
     }
 
     $("#addForm").click(function() {  // query button by id selector

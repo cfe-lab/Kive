@@ -138,6 +138,14 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
         content_file=file_in_memory,
         user=creating_user
     )
+    # This sets the MD5.
+
+    try:
+        revision.clean()
+    except ValidationError as e:
+        crv_form.add_error(None, e)
+        raise e
+
     revision.save()
 
     for user in crv_form.cleaned_data["users_allowed"]:

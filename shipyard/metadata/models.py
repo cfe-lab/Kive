@@ -336,12 +336,20 @@ class AccessControl(models.Model):
         users_error = None
         groups_error = None
         if len(extra_users) > 0:
+            access_OK = False
+            if len(extra_users) == 1 and self.user in extra_users:
+                # If this user has access via the groups allowed on all of the elements of acs,
+                # then we're OK.
+                if all([x.can_be_accessed(self.user) for x in acs]):
+                    access_OK = True
+
             # FIXME sometime in the future this stuff should be converted to use gettext for translation!
-            users_error = ValidationError(
-                'User(s) %(users_str)s cannot be granted access',
-                code="extra_users",
-                params={"users_str": ", ".join([str(x) for x in extra_users])}
-            )
+            if not access_OK:
+                users_error = ValidationError(
+                    'User(s) %(users_str)s cannot be granted access',
+                    code="extra_users",
+                    params={"users_str": ", ".join([str(x) for x in extra_users])}
+                )
         if len(extra_groups) > 0:
             groups_error = ValidationError(
                 'Group(s) %(groups_str)s cannot be granted access',
