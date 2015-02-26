@@ -103,6 +103,7 @@ def run_pipeline(request):
                 rsf.add_error(None, e)
                 rsf_good = False
 
+            curr_pipeline = rsf.cleaned_data["pipeline"]
             if not rsf_good:
                 if "pipeline" in rsf.cleaned_data:
                     # We go back to the choose inputs screen, with this form now annotated with errors.
@@ -117,7 +118,6 @@ def run_pipeline(request):
                 raise RunSubmissionError()
 
             rtp = rsf.save()
-            curr_pipeline = rsf.cleaned_data["pipeline"]
 
             # Now try and put together RunToProcessInputs from the specified inputs.
             for i in range(1, curr_pipeline.inputs.count()+1):
