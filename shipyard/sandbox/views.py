@@ -152,14 +152,14 @@ def run_pipeline(request):
         return HttpResponse(template.render(context))
 
     # Success -- redirect to the active runs view.
-    return HttpResponseRedirect("/active_runs")
+    return HttpResponseRedirect("/runs")
 
 
 @login_required
-def active_runs(request):
+def runs(request):
     """Display all active runs for this user."""
     context = RequestContext(request)
-    template = loader.get_template("sandbox/active_runs.html")
+    template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
 
@@ -191,17 +191,18 @@ def view_results(request, id):
                         "../../dataset_download/{}".format(dataset.id)))
         
     for runstep in run.runsteps_in_order:
-        methodoutput = runstep.log.methodoutput
+        execlog = runstep.execrecord.generator
+        methodoutput = execlog.methodoutput
         outputs.append((runstep.pipelinestep,
                         'Standard out',
                         methodoutput.output_log.size,
-                        runstep.log.end_time,
+                        execlog.end_time,
                         "../../stdout_view/{}".format(methodoutput.id),
                         "../../stdout_download/{}".format(methodoutput.id)))
         outputs.append(('',
                         'Standard error',
                         methodoutput.error_log.size,
-                        runstep.log.end_time,
+                        execlog.end_time,
                         "../../stderr_view/{}".format(methodoutput.id),
                         "../../stderr_download/{}".format(methodoutput.id)))
         for output in runstep.execrecord.execrecordouts_in_order:

@@ -17,6 +17,9 @@ tr.hover a:link:hover {
 a:visited {
     color: #38c;
 }
+.code {
+    font-family: monospace;
+}
 #wrapper {
     width: 100%;
     position: static;

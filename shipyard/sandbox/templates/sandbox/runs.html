@@ -1,0 +1,62 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Runs{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/sandbox/runs.js"></script>
+    <script src="/static/sandbox/jq_color_anim.min.js"></script>
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user portal</a>
+
+<h2>Runs</h2>
+    <div class="filter_ctrl">
+        <form class="short-filter">
+        <input name="name" type="text" data-link="Smart"><input type="button" class="advanced ctrl" value="Advanced"><input type="submit" value="Filter">
+        </form>
+        
+        <form class="advanced-filter">
+        <h4>Advanced search</h4>
+        <label for="name">Name</label>
+        <input name="name" type="text" data-link="Name">
+        <!-- Is active, is owned, start date range, end date range -->
+        <input name="uploads" type="checkbox" data-link="User-Uploaded">
+        <label for="uploads">Show only user uploads</label>
+        <input type="submit" value="Filter">
+        </form>
+    </div>
+
+    <div id="active_filters">
+        <div class="filter" data-key="active">
+            <span class="field">Is-Active</span>
+            <a class="remove">&times;</a>
+        </div>
+    </div>
+
+    <div class="no_results">
+        <strong>No matching runs were found.</strong>
+    </div>
+
+    <div class="results">
+        <table>
+                <caption>showing all matching runs</caption>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Name</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+        </table>
+    </div>
+    
+
+<div id="progress"></div>
+
+{% endblock %}

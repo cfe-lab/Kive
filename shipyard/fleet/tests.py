@@ -23,7 +23,8 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('?-Run', progress)
+        self.assertSequenceEqual('?', progress['status'])
+        self.assertSequenceEqual('Run', progress['name'])
 
     def create_with_empty_pipeline(self):
         pipeline = Pipeline()
@@ -35,7 +36,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('--Run', progress)
+        self.assertSequenceEqual('-', progress['status'])
 
     def create_with_pipeline_step(self):
         pipeline=Pipeline.objects.get(pk=2)
@@ -50,7 +51,8 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('.-.-Fasta2CSV', progress)
+        self.assertSequenceEqual('.-.', progress['status'])
+        self.assertSequenceEqual('Fasta2CSV', progress['name'])
 
     def add_exec_log(self, run_component):
         ExecLog.create(record=run_component,
@@ -80,7 +82,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual(':-.-Fasta2CSV', progress)
+        self.assertSequenceEqual(':-.', progress['status'])
 
     def create_with_started_run_step(self):
         run_tracker = self.create_with_run_step()
@@ -104,14 +106,14 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('+-.-Fasta2CSV', progress)
+        self.assertSequenceEqual('+-.', progress['status'])
 
     def test_run_progress_completed_steps(self):
         run_tracker = self.create_with_completed_run_step()
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-.-Fasta2CSV', progress)
+        self.assertSequenceEqual('*-.', progress['status'])
 
     def test_run_progress_failed_steps(self):
         run_tracker = self.create_with_completed_run_step()
@@ -122,7 +124,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('!-.-Fasta2CSV', progress)
+        self.assertSequenceEqual('!-.', progress['status'])
 
     def test_run_progress_output_ready(self):
         run_tracker = self.create_with_completed_run_step()
@@ -133,7 +135,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-:-Fasta2CSV', progress)
+        self.assertSequenceEqual('*-:', progress['status'])
 
     def test_run_progress_output_running(self):
         run_tracker = self.create_with_completed_run_step()
@@ -146,7 +148,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-+-Fasta2CSV', progress)
+        self.assertSequenceEqual('*-+', progress['status'])
 
     def test_run_progress_complete(self):
         run_tracker = self.create_with_completed_run_step()
@@ -160,7 +162,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('*-*-Fasta2CSV', progress)
+        self.assertSequenceEqual('*-*', progress['status'])
 
     def add_input(self, run_tracker):
         run_tracker.save()
@@ -176,7 +178,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('.-.-Fasta2CSV on TestFASTA', progress)
+        self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_run_progress_display_name_but_no_run(self):
         pipeline=Pipeline.objects.get(pk=2)
@@ -186,7 +188,7 @@ class RunToProcessTest(TestCase):
         
         progress = run_tracker.get_run_progress()
         
-        self.assertSequenceEqual('?-Fasta2CSV on TestFASTA', progress)
+        self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_display_name(self):
         pipeline=Pipeline.objects.get(pk=2)
