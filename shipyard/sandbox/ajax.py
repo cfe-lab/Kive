@@ -2,7 +2,6 @@ from datetime import timedelta
 import itertools
 import json
 import logging
-import time
 
 from django.db.models import Q
 from django.http import HttpResponse
@@ -13,6 +12,8 @@ from archive.models import Dataset, Run
 import fleet.models
 from forms import PipelineSelectionForm
 from pipeline.models import PipelineFamily
+from exceptions import KeyError
+from fleet.models import RunToProcessInput
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -41,7 +42,7 @@ def _filter_datasets(request):
     try:
         cdt_pk = int(request.GET.get("compound_datatype"))
         query = Dataset.objects.filter(symbolicdataset__structure__compounddatatype=cdt_pk)
-    except TypeError:
+    except ValueError:
         query = Dataset.objects.filter(symbolicdataset__structure__isnull=True)
     query = query.order_by("-date_created")
 
@@ -94,23 +95,43 @@ def filter_pipelines(request):
     return AJAXRequestHandler(request, _filter_pipelines).response
 
 
-def _load_status(user):
-    runs = fleet.models.RunToProcess.filter_by_user(user).order_by('time_queued')
-    is_active_required = True
-    if is_active_required:
+def _add_run_filter(runs, key, value):
+    if key == 'active':
         recent_time = timezone.now() - timedelta(minutes=5)
         old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
             'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
-        runs = runs.filter(
+        return runs.filter(
             Q(run_id__isnull=True)|
             Q(run__end_time__isnull=True)|
             Q(run__end_time__gte=recent_time)).distinct().exclude(
             pk__in=old_aborted_runs)
-    return [run.get_run_progress() for run in runs]
-    """ Find all active runs, and return a dict for each with the status.
+    if key == 'name':
+        runs_with_matching_inputs = RunToProcessInput.objects.filter(
+            symbolicdataset__dataset__name__icontains=value).values(
+                'runtoprocess_id')
+        return runs.filter(
+            Q(pipeline__family__name__icontains=value)|
+            Q(id__in=runs_with_matching_inputs))
+    raise KeyError(key)
+
+
+def _load_status(request):
+    """ Find all matching runs, and return a dict for each with the status.
     
     @return [{'id': run_id, 'status': status, 'name': name}]
     """
+    runs = fleet.models.RunToProcess.filter_by_user(request.user).order_by(
+        'time_queued')
+    
+    i = 0
+    while True:
+        key = request.GET.get('filters[{}][key]'.format(i))
+        if key is None:
+            break
+        value = request.GET.get('filters[{}][val]'.format(i))
+        runs = _add_run_filter(runs, key, value)
+        i += 1
+    return [run.get_run_progress() for run in runs]
 
 def _is_status_changed(runs, request):
     for i, run in enumerate(runs):
@@ -128,16 +149,14 @@ def _poll_run_progress(request):
     """
     Helper to produce a JSON description of the current state of a run.
     """
-    result = {'runs': [], 'errors': []}
+    result = {'runs': [], 'errors': [], 'changed': True}
     try:
-        # Arrrgh I hate sleeping. Find a better way.
-        while True:
-            runs = _load_status(request.user)
-            if _is_status_changed(runs, request):
-                break
-            time.sleep(1)
-
-        result['runs'] = runs
+        ajax_logger.debug('Loading status.')
+        runs = _load_status(request)
+        if _is_status_changed(runs, request):
+            result['runs'] = runs
+        else:
+            result['changed'] = False
     except StandardError:
         ajax_logger.error('Status report failed.', exc_info=True)
         result['errors'].append('Status report failed.')

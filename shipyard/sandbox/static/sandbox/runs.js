@@ -11,25 +11,51 @@
  */
 
 /* polling interval. */
-var timeout = 1000;
+var pollingInterval = 1000,
+    timeoutId,
+    ajaxRequest;
 
 /* Ask the server for a progress report of the run. */
 function poll_run_progress(run_data) {
-    setTimeout(function() {
-        $.getJSON(
-                "poll_run_progress",
-                {previous: run_data},
-                function (new_data) {
-                    var errors = new_data['errors'];
-                    if (errors.length != 0) {
-                        show_errors(errors);
+    ajaxRequest = $.getJSON(
+            "poll_run_progress",
+            {
+                filters: get_run_filters(),
+                previous: run_data
+            },
+            function (new_data) {
+                var errors = new_data['errors'];
+                if (errors.length != 0) {
+                    show_errors(errors);
+                }
+                else {
+                    if (new_data['changed']) {
+                        show_run_progress(new_data);
                     }
                     else {
-                        show_run_progress(new_data);
-                        poll_run_progress(new_data);
+                        new_data = run_data;
                     }
-                });
-    }, timeout);
+                    timeoutId = setTimeout(
+                            poll_run_progress,
+                            pollingInterval,
+                            new_data);
+                }
+            });
+}
+
+function reset_polling() {
+    ajaxRequest.abort();
+    window.clearTimeout(timeoutId);
+    $('.results tbody').empty();
+}
+
+function get_run_filters() {
+    var filters = [];
+    $('#active_filters .filter').each(function() {
+        filters.push($(this).data());
+    });
+    
+    return filters;
 }
 
 function show_errors(errors) {
@@ -43,12 +69,14 @@ function show_errors(errors) {
 
 /* Display the progress of a run on the page. */
 function show_run_progress(run_data) {
-    var $progress = $("#progress"),
-        $pre = $("<pre/>"),
-        $name,
-        run_id;
+    var $name,
+        run_id,
+        $tbody = $(".results tbody"),
+        $row;
+    $tbody.empty();
     $.each(run_data['runs'], function() {
-        $pre.append($("<span/>").text("\n" + this["status"] + "-"));
+        $row = $('<tr/>');
+        $row.append($('<td class="code"/>').text(this["status"]));
         run_id = this["id"];
         if (run_id == null) {
             $name = $('<span/>');
@@ -56,10 +84,9 @@ function show_run_progress(run_data) {
         else {
             $name = $('<a/>').attr("href", "view_results/" + run_id);
         }
-        $pre.append($name.text(this["name"]));
+        $row.append($('<td/>').append($name.text(this["name"])));
+        $tbody.append($row);
     });
-    $progress.empty();
-    $progress.append($pre);
 }
 
 $(function(){ // wait for page to finish loading before executing jQuery code
@@ -68,4 +95,27 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     
     run_data = [];
     poll_run_progress(run_data);
+    
+    $('a.remove').click(function() {
+        var $filter = $(this).closest('.filter'),
+            $active_filters = $filter.closest('.active_filters');
+        $filter.detach();
+        reset_polling();
+        poll_run_progress([]);
+    });
+    
+    $('form.short-filter').submit(function(e) {
+        var $filters = $('#active_filters'),
+            $filter = $('<div class="filter" data-key="name"/>'),
+            $search = $('input[type="text"]', this),
+            v = $search.val();
+        e.preventDefault();
+        $filter.attr('data-val', $search.val());
+        $filter.append($('<span class="field">Name:</span>'));
+        $filter.append($('<span class="value"/>').text($search.val()));
+        $filter.append($('<a class="remove">&times;</a>'));
+        $filters.append($filter);
+        reset_polling();
+        poll_run_progress([]);
+    });
 });

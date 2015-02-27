@@ -1,6 +1,6 @@
 /* Display an error on the page. */
 function display_error(message) {
-    $("#errors").html(message);
+    $("#errors").text(message);
 }
 
 /* Display a table, hiding columns not indicated in "data-displaycols". */
@@ -158,6 +158,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             };
             
             $.getJSON(tab.data('ajax-url'), request_data, function (data) {
+                display_error("");
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
                     bg = 'background-color';
