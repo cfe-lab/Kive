@@ -2,9 +2,8 @@
 portal.views
 """
 
-from django.core.context_processors import csrf
 from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, Context
+from django.template import loader, RequestContext
 from django.contrib.auth.decorators import login_required, user_passes_test
 
 from constants import groups
@@ -19,12 +18,12 @@ def home(request):
     """
     Default homepage
     """
-    if not developer_check(request.user):
+    user_is_developer = developer_check(request.user)
+    if not user_is_developer and not request.user.is_staff and not request.user.is_superuser:
         return HttpResponseRedirect("/usr.html")
 
     t = loader.get_template('portal/index.html')
-    c = Context({"user": request.user})
-    c.update(csrf(request))
+    c = RequestContext(request, {"is_developer": user_is_developer})
     return HttpResponse(t.render(c))
 
 
@@ -35,8 +34,7 @@ def dev(request):
     Developer portal
     """
     t = loader.get_template('portal/dev.html')
-    c = Context({"user": request.user})
-    c.update(csrf(request))
+    c = RequestContext(request)
     return HttpResponse(t.render(c))
 
 
@@ -46,6 +44,5 @@ def usr(request):
     User portal
     """
     t = loader.get_template('portal/usr.html')
-    c = Context({"user": request.user})
-    c.update(csrf(request))
+    c = RequestContext(request)
     return HttpResponse(t.render(c))

@@ -5,18 +5,28 @@
 
 {% block content %}
 <nav><ul>
+    {% if is_developer %}
     <li>
         <a href="/dev.html">
         <h4 class="menu-item">Developer portal</h4>
         <p class="menu-description">Add and/or modify database objects, including Datatypes and Methods.</p>
         </a>
     </li>
+    {% endif %}
     <li>
         <a href="/usr.html">
         <h4 class="menu-item">Users portal</h4>
         <p class="menu-description">Upload data sets and process data using pipelines.</p>
         </a>
     </li>
+    {% if user.is_staff %}
+    <li>
+        <a href="/admin/">
+        <h4 class="menu-item">Admin portal</h4>
+        <p class="menu-description">Add, remove, or modify users and groups</p>
+        </a>
+    </li>
+    {% endif %}
 </ul></nav>
 
 {% endblock %}

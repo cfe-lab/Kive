@@ -1,9 +1,10 @@
-from django.conf.urls import patterns, url
-from portal.forms import *
+from django.conf.urls import patterns, url, include
 
 # Uncomment the next two lines to enable the admin:
-#from django.contrib import admin
-#admin.autodiscover()
+from django.contrib import admin
+admin.autodiscover()
+
+from portal.forms import *
 
 urlpatterns = patterns(
     '',
@@ -15,7 +16,7 @@ urlpatterns = patterns(
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     # Uncomment the next line to enable the admin:
-    # url(r'^admin/', include(admin.site.urls)),
+    url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'portal.views.home', name='home'),
     url(r'^login/$', 'django.contrib.auth.views.login',
         {"template_name": "portal/login.html", "current_app": "portal"}, name='login'),

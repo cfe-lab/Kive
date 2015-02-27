@@ -1,110 +1,138 @@
 [
 {
     "fields": {
-        "name": "string",
+        "description": "basic string type",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2013-11-13T19:47:19.853Z",
         "prototype": null,
-        "description": "basic string type",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "string"
     },
     "model": "metadata.datatype",
     "pk": 1
 },
 {
     "fields": {
-        "name": "boolean",
+        "description": "basic boolean type",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             1
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2013-11-13T19:47:19.856Z",
         "prototype": null,
-        "description": "basic boolean type",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "boolean"
     },
     "model": "metadata.datatype",
     "pk": 2
 },
 {
     "fields": {
-        "name": "float",
+        "description": "basic float type",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             1
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2013-11-13T19:47:19.874Z",
         "prototype": null,
-        "description": "basic float type",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "float"
     },
     "model": "metadata.datatype",
     "pk": 3
 },
 {
     "fields": {
-        "name": "integer",
+        "description": "basic integer type",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             3
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2013-11-13T19:47:19.882Z",
         "prototype": null,
-        "description": "basic integer type",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "integer"
     },
     "model": "metadata.datatype",
     "pk": 4
 },
 {
     "fields": {
-        "name": "natural number",
+        "description": "positive integer",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             4
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2013-11-13T19:47:19.890Z",
         "prototype": null,
-        "description": "positive integer",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "natural number"
     },
     "model": "metadata.datatype",
     "pk": 5
 },
 {
     "fields": {
-        "name": "molecular sequence",
+        "description": "String of IUPAC symbols representing either the primary protein sequence (amino acids) or a nucleotide sequence (RNA or DNA).  Only standard placeholders permitted (gap character '-', ambiguous amino acid '?', stop codon '*').",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             1
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2014-06-10T16:36:44.948Z",
         "prototype": null,
-        "description": "String of IUPAC symbols representing either the primary protein sequence (amino acids) or a nucleotide sequence (RNA or DNA).  Only standard placeholders permitted (gap character '-', ambiguous amino acid '?', stop codon '*').",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "molecular sequence"
     },
     "model": "metadata.datatype",
     "pk": 6
 },
 {
     "fields": {
-        "name": "nucleotide sequence",
+        "description": "A string of IUPAC symbols representing DNA or RNA, including ambiguous bases.",
+        "groups_allowed": [
+            1,
+            3,
+            2
+        ],
         "restricts": [
             1
         ],
+        "users_allowed": [],
+        "user": 1,
         "date_created": "2014-06-10T18:32:15.268Z",
         "prototype": null,
-        "description": "A string of IUPAC symbols representing DNA or RNA, including ambiguous bases.",
-        "user": 1,
-        "groups_allowed": [1, 2, 3]
-
+        "name": "nucleotide sequence"
     },
     "model": "metadata.datatype",
     "pk": 7
@@ -204,32 +232,52 @@
 },
 {
     "fields": {
+        "users_allowed": [],
         "user": 1,
-        "groups_allowed": [1, 2, 3]
+        "groups_allowed": [
+            2,
+            3,
+            1
+        ]
     },
     "model": "metadata.compounddatatype",
     "pk": 1
 },
 {
     "fields": {
+        "users_allowed": [],
         "user": 1,
-        "groups_allowed": [1, 2, 3]
+        "groups_allowed": [
+            2,
+            3,
+            1
+        ]
     },
     "model": "metadata.compounddatatype",
     "pk": 2
 },
 {
     "fields": {
+        "users_allowed": [],
         "user": 1,
-        "groups_allowed": [1, 2, 3]
+        "groups_allowed": [
+            2,
+            3,
+            1
+        ]
     },
     "model": "metadata.compounddatatype",
     "pk": 3
 },
 {
     "fields": {
+        "users_allowed": [],
         "user": 1,
-        "groups_allowed": [1, 2, 3]
+        "groups_allowed": [
+            2,
+            3,
+            1
+        ]
     },
     "model": "metadata.compounddatatype",
     "pk": 4

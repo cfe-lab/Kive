@@ -1,17 +1,57 @@
 [
-    {
-        "pk": 1,
-        "model": "auth.group",
-        "fields": {"name": "Everyone", "permissions": []}
+{
+    "fields": {
+        "name": "Everyone",
+        "permissions": []
     },
-    {
-        "pk": 2,
-        "model": "auth.group",
-        "fields": {"name": "Developers", "permissions": []}
+    "model": "auth.group",
+    "pk": 1
+},
+{
+    "fields": {
+        "name": "Developers",
+        "permissions": []
     },
-    {
-        "pk": 3,
-        "model": "auth.group",
-        "fields": {"name": "Administrators", "permissions": []}
-    }
+    "model": "auth.group",
+    "pk": 2
+},
+{
+    "fields": {
+        "name": "Administrators",
+        "permissions": [
+            [
+                "add_group",
+                "auth",
+                "group"
+            ],
+            [
+                "change_group",
+                "auth",
+                "group"
+            ],
+            [
+                "delete_group",
+                "auth",
+                "group"
+            ],
+            [
+                "add_user",
+                "auth",
+                "user"
+            ],
+            [
+                "change_user",
+                "auth",
+                "user"
+            ],
+            [
+                "delete_user",
+                "auth",
+                "user"
+            ]
+        ]
+    },
+    "model": "auth.group",
+    "pk": 3
+}
 ]
