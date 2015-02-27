@@ -1,9 +1,13 @@
 from django.http import HttpResponse, Http404
 from django.core import serializers
+from django.contrib.auth.decorators import login_required, user_passes_test
 
 from method.models import CodeResourceRevision
+from portal.views import developer_check
 
 
+@login_required
+@user_passes_test(developer_check)
 def populate_revision_dropdown(request):
     """
     resource_add.html template can render multiple forms for CodeResourceDependency that

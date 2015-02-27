@@ -5,7 +5,7 @@ method.views
 from django.db import transaction
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User, Group
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, Context, RequestContext
@@ -19,6 +19,7 @@ from method.models import CodeResource, CodeResourceDependency, Method, \
 from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
+from portal.views import developer_check
 
 from constants import groups, users
 
@@ -27,6 +28,7 @@ shipyard_user = User.objects.get(pk=users.SHIPYARD_USER_PK)
 
 
 @login_required
+@user_passes_test(developer_check)
 def resources(request):
     """
     Display a list of all code resources (parents) in database
@@ -39,6 +41,7 @@ def resources(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def resource_revisions(request, id):
     """
     Display a list of all revisions of a specific Code Resource in database.
@@ -184,6 +187,7 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
 
 
 @login_required
+@user_passes_test(developer_check)
 def resource_add(request):
     """
     Add a new code resource with a prototype (no revisions).  The FILENAME of the prototype will
@@ -233,6 +237,7 @@ def resource_add(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def resource_revision_add(request, id):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
@@ -337,6 +342,7 @@ def resource_revision_add(request, id):
 
 
 @login_required
+@user_passes_test(developer_check)
 def resource_revision_view(request, id):
     four_oh_four = False
     try:
@@ -355,6 +361,7 @@ def resource_revision_view(request, id):
 
 
 @login_required
+@user_passes_test(developer_check)
 def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
@@ -366,6 +373,7 @@ def method_families(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def methods(request, id):
     """
     Display a list of all Methods within a given MethodFamily.
@@ -571,6 +579,7 @@ def _method_forms_check_valid(family_form, method_form, input_form_tuples, outpu
 
 
 @login_required
+@user_passes_test(developer_check)
 def method_add(request, id=None):
     """
     Generate forms for adding Methods, and validate and process POST data returned
@@ -655,6 +664,7 @@ def method_add(request, id=None):
 
 
 @login_required
+@user_passes_test(developer_check)
 def method_revise(request, id):
     """
     Add a revision of an existing Method.  revision_parent is defined by the

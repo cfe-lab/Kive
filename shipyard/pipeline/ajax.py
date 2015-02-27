@@ -1,9 +1,15 @@
 from django.http import HttpResponse, Http404
-from method.models import MethodFamily, Method
-from pipeline.models import Pipeline
-from django.core import serializers
+from django.contrib.auth.decorators import login_required, user_passes_test
+
 import json
 
+from method.models import MethodFamily, Method
+from pipeline.models import Pipeline
+from portal.views import developer_check
+
+
+@login_required
+@user_passes_test(developer_check)
 def populate_method_revision_dropdown (request):
     """
     copied from Method ajax.py
@@ -34,6 +40,8 @@ def populate_method_revision_dropdown (request):
         raise Http404
 
 
+@login_required
+@user_passes_test(developer_check)
 def get_method_io (request):
     """
     handles ajax request from pipelines.html
@@ -78,6 +86,7 @@ def get_method_io (request):
     else:
         raise Http404
 
+
 def get_method_xputs(method):
     """Get the inputs and outputs of a Method as a dictionary."""
     result = []
@@ -103,6 +112,9 @@ def get_method_xputs(method):
         result.append(xputs)
     return {'inputs': result[0], 'outputs': result[1]}
 
+
+@login_required
+@user_passes_test(developer_check)
 def get_pipeline(request):
     if request.is_ajax():
         response = HttpResponse()
@@ -124,6 +136,8 @@ def get_pipeline(request):
         raise Http404
 
 
+@login_required
+@user_passes_test(developer_check)
 def activate_pipeline(request):
     """
     Make this pipeline revision the published version.

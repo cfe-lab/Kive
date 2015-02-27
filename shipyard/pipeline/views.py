@@ -4,7 +4,7 @@ pipeline views
 
 from django.http import HttpResponse, Http404
 from django.template import loader, RequestContext
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 
 import json
 import logging
@@ -13,11 +13,13 @@ from method.models import MethodFamily
 from metadata.models import CompoundDatatype
 from pipeline.models import Pipeline, PipelineFamily, PipelineSerializationException
 import metadata.forms
+from portal.views import developer_check
 
 logger = logging.getLogger(__name__)
 
 
 @login_required
+@user_passes_test(developer_check)
 def pipelines(request):
     """
     Display existing pipeline families, represented by the
@@ -43,6 +45,7 @@ def prepare_pipeline_dict(request_body, user):
 
 
 @login_required
+@user_passes_test(developer_check)
 def pipeline_add(request):
     """
     Most of the heavy lifting is done by JavaScript and HTML5.
@@ -68,6 +71,7 @@ def pipeline_add(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def pipeline_revise(request, id):
     """
     Display all revisions in this PipelineFamily.
@@ -115,6 +119,7 @@ def pipeline_revise(request, id):
 
 
 @login_required
+@user_passes_test(developer_check)
 def pipeline_exec(request):
     t = loader.get_template('pipeline/pipeline_exec.html')
     method_families = MethodFamily.filter_by_user(request.user)

@@ -7,7 +7,7 @@ from django.template import loader, RequestContext
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import Group
 
 import re
@@ -15,11 +15,13 @@ import re
 from metadata.models import Datatype, CompoundDatatype, get_builtin_types
 from metadata.forms import *
 from constants import datatypes as dt_pks, groups
+from portal.views import developer_check
 
 everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 @login_required
+@user_passes_test(developer_check)
 def datatypes(request):
     """
     Render table and form on user request for datatypes.html
@@ -33,6 +35,7 @@ def datatypes(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def datatype_add(request):
     """
     Render form for creating a new Datatype
@@ -138,6 +141,7 @@ def datatype_add(request):
 
 
 @login_required
+@user_passes_test(developer_check)
 def datatype_detail(request, id):
     # retrieve the Datatype object from database by PK
     four_oh_four = False
@@ -162,6 +166,7 @@ def datatype_detail(request, id):
 
 
 @login_required
+@user_passes_test(developer_check)
 def compound_datatypes(request):
     """
     Render list of all CompoundDatatypes
@@ -202,6 +207,7 @@ class CDTDefException(Exception):
 
 
 @login_required
+@user_passes_test(developer_check)
 def compound_datatype_add(request):
     """
     Add CompoundDatatype from a dynamic set of CompoundDatatypeMember forms.

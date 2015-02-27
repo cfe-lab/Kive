@@ -4,11 +4,13 @@ Handle Ajax transaction requests from metadata templates.
 
 from django.http import HttpResponse, Http404
 from django.core import serializers
-
-import json
+from django.contrib.auth.decorators import login_required, user_passes_test
 
 from metadata.models import Datatype, get_builtin_types
+from portal.views import developer_check
 
+@login_required
+@user_passes_test(developer_check)
 def get_python_type(request):
     """
     Return the lowest-level Python type (string, boolean, int, or
