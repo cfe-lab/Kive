@@ -793,6 +793,25 @@
 },
 {
     "fields": {
+        "revision_name": "v2",
+        "revision_parent": 25,
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "Uses Biopython to be more robust, and handles mixtures.",
+        "coderesource": 25,
+        "MD5_checksum": "315eaef68ae63c8cb387a361f3d3fbcb",
+        "content_file": "CodeResources/complement_seq_v2.py_20150227101744",
+        "user": 2,
+        "revision_number": 2,
+        "revision_DateTime": "2015-02-27T18:17:44.307Z",
+        "users_allowed": []
+    },
+    "model": "method.coderesourcerevision",
+    "pk": 30
+},
+{
+    "fields": {
         "depPath": ".",
         "requirement": 3,
         "coderesourcerevision": 6,
@@ -1207,6 +1226,40 @@
 },
 {
     "fields": {
+        "revision_parent": null,
+        "family": 18,
+        "users_allowed": [],
+        "groups_allowed": [
+            1
+        ],
+        "driver": 27,
+        "tainted": false,
+        "revision_number": 1,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 27
+},
+{
+    "fields": {
+        "revision_parent": 18,
+        "family": 13,
+        "users_allowed": [],
+        "groups_allowed": [
+            1
+        ],
+        "driver": 30,
+        "tainted": false,
+        "revision_number": 2,
+        "threads": 1,
+        "reusable": 1
+    },
+    "model": "method.method",
+    "pk": 29
+},
+{
+    "fields": {
         "description": "",
         "groups_allowed": [
             1
@@ -1360,5 +1413,18 @@
     },
     "model": "method.methodfamily",
     "pk": 17
+},
+{
+    "fields": {
+        "description": "Translates (header, nuc_seq) to (header, aa_seq).",
+        "groups_allowed": [
+            1
+        ],
+        "users_allowed": [],
+        "user": 2,
+        "name": "Amino Acid Translator"
+    },
+    "model": "method.methodfamily",
+    "pk": 18
 }
 ]

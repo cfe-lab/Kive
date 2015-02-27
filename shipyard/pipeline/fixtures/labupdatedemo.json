@@ -43,6 +43,20 @@
 },
 {
     "fields": {
+        "description": "Takes as input a FASTA file with nucleotide sequences, and manipulates them in a couple ways.",
+        "groups_allowed": [
+            1
+        ],
+        "published_version": 28,
+        "users_allowed": [],
+        "user": 2,
+        "name": "Nucleotide Manipulation"
+    },
+    "model": "pipeline.pipelinefamily",
+    "pk": 6
+},
+{
+    "fields": {
         "revision_number": 1,
         "users_allowed": [],
         "revision_parent": null,
@@ -92,6 +106,32 @@
     },
     "model": "pipeline.pipeline",
     "pk": 26
+},
+{
+    "fields": {
+        "revision_number": 1,
+        "users_allowed": [],
+        "revision_parent": null,
+        "family": 6,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "pipeline.pipeline",
+    "pk": 28
+},
+{
+    "fields": {
+        "revision_number": 2,
+        "users_allowed": [],
+        "revision_parent": 28,
+        "family": 6,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "pipeline.pipeline",
+    "pk": 30
 },
 {
     "fields": {
@@ -274,6 +314,136 @@
     },
     "model": "pipeline.pipelinestep",
     "pk": 22
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "name": "fasta2csv.py",
+        "outputs_to_delete": [],
+        "y": 0.130787977254265,
+        "x": 0.114343707713126,
+        "transformation": 24,
+        "step_num": 1
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 23
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "name": "header_translator.py",
+        "outputs_to_delete": [],
+        "y": 0.199025182778229,
+        "x": 0.185385656292287,
+        "transformation": 15,
+        "step_num": 2
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 24
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "name": "nuc_to_AA.py",
+        "outputs_to_delete": [],
+        "y": 0.190901705930138,
+        "x": 0.266576454668471,
+        "transformation": 27,
+        "step_num": 3
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 25
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "name": "reverse_seq.py",
+        "outputs_to_delete": [],
+        "y": 0.304630381803412,
+        "x": 0.234100135317997,
+        "transformation": 17,
+        "step_num": 4
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 26
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "name": "complement_seq.py",
+        "outputs_to_delete": [],
+        "y": 0.367993501218522,
+        "x": 0.320027063599459,
+        "transformation": 18,
+        "step_num": 5
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 27
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "name": "fasta2csv.py",
+        "outputs_to_delete": [],
+        "y": 0.130787977254265,
+        "x": 0.114343707713126,
+        "transformation": 24,
+        "step_num": 1
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 28
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "name": "header_translator.py",
+        "outputs_to_delete": [],
+        "y": 0.199025182778229,
+        "x": 0.185385656292287,
+        "transformation": 15,
+        "step_num": 2
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 29
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "name": "nuc_to_AA.py",
+        "outputs_to_delete": [],
+        "y": 0.190901705930138,
+        "x": 0.266576454668471,
+        "transformation": 27,
+        "step_num": 3
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 30
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "name": "reverse_seq.py",
+        "outputs_to_delete": [],
+        "y": 0.304630381803412,
+        "x": 0.234100135317997,
+        "transformation": 17,
+        "step_num": 4
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 31
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "name": "complement_seq.py",
+        "outputs_to_delete": [],
+        "y": 0.367993501218522,
+        "x": 0.320027063599459,
+        "transformation": 29,
+        "step_num": 5
+    },
+    "model": "pipeline.pipelinestep",
+    "pk": 32
 },
 {
     "fields": {},
@@ -536,6 +706,76 @@
     "pk": 79
 },
 {
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 80
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 81
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 82
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 83
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 84
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 85
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 86
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 87
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 88
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 89
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 90
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 91
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 92
+},
+{
+    "fields": {},
+    "model": "pipeline.pipelinecable",
+    "pk": 93
+},
+{
     "fields": {
         "pipelinestep": 1,
         "dest": 3,
@@ -765,6 +1005,116 @@
     },
     "model": "pipeline.pipelinestepinputcable",
     "pk": 78
+},
+{
+    "fields": {
+        "pipelinestep": 23,
+        "dest": 125,
+        "keep_output": false,
+        "source": 133,
+        "source_step": 0
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 80
+},
+{
+    "fields": {
+        "pipelinestep": 24,
+        "dest": 93,
+        "keep_output": false,
+        "source": 126,
+        "source_step": 1
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 81
+},
+{
+    "fields": {
+        "pipelinestep": 25,
+        "dest": 131,
+        "keep_output": false,
+        "source": 94,
+        "source_step": 2
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 82
+},
+{
+    "fields": {
+        "pipelinestep": 26,
+        "dest": 97,
+        "keep_output": false,
+        "source": 94,
+        "source_step": 2
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 83
+},
+{
+    "fields": {
+        "pipelinestep": 27,
+        "dest": 99,
+        "keep_output": false,
+        "source": 98,
+        "source_step": 4
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 84
+},
+{
+    "fields": {
+        "pipelinestep": 28,
+        "dest": 125,
+        "keep_output": false,
+        "source": 138,
+        "source_step": 0
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 87
+},
+{
+    "fields": {
+        "pipelinestep": 29,
+        "dest": 93,
+        "keep_output": false,
+        "source": 126,
+        "source_step": 1
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 88
+},
+{
+    "fields": {
+        "pipelinestep": 30,
+        "dest": 131,
+        "keep_output": false,
+        "source": 94,
+        "source_step": 2
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 89
+},
+{
+    "fields": {
+        "pipelinestep": 31,
+        "dest": 97,
+        "keep_output": false,
+        "source": 94,
+        "source_step": 2
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 90
+},
+{
+    "fields": {
+        "pipelinestep": 32,
+        "dest": 136,
+        "keep_output": false,
+        "source": 98,
+        "source_step": 4
+    },
+    "model": "pipeline.pipelinestepinputcable",
+    "pk": 91
 },
 {
     "fields": {
@@ -1137,5 +1487,53 @@
     },
     "model": "pipeline.pipelineoutputcable",
     "pk": 79
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "output_idx": 1,
+        "source": 132,
+        "output_cdt": 25,
+        "output_name": "aa_out",
+        "source_step": 3
+    },
+    "model": "pipeline.pipelineoutputcable",
+    "pk": 85
+},
+{
+    "fields": {
+        "pipeline": 28,
+        "output_idx": 2,
+        "source": 100,
+        "output_cdt": 23,
+        "output_name": "rc_seq_out",
+        "source_step": 5
+    },
+    "model": "pipeline.pipelineoutputcable",
+    "pk": 86
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "output_idx": 1,
+        "source": 132,
+        "output_cdt": 25,
+        "output_name": "aa_out",
+        "source_step": 3
+    },
+    "model": "pipeline.pipelineoutputcable",
+    "pk": 92
+},
+{
+    "fields": {
+        "pipeline": 30,
+        "output_idx": 2,
+        "source": 137,
+        "output_cdt": 23,
+        "output_name": "rc_seq_out",
+        "source_step": 5
+    },
+    "model": "pipeline.pipelineoutputcable",
+    "pk": 93
 }
 ]

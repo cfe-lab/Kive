@@ -253,6 +253,62 @@
 },
 {
     "fields": {
+        "revision_name": "v1",
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "First version.",
+        "users_allowed": [],
+        "user": 2,
+        "revision_DateTime": "2015-02-27T17:51:29.420Z"
+    },
+    "model": "transformation.transformation",
+    "pk": 27
+},
+{
+    "fields": {
+        "revision_name": "v1",
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "First version.",
+        "users_allowed": [],
+        "user": 2,
+        "revision_DateTime": "2015-02-27T17:53:30.449Z"
+    },
+    "model": "transformation.transformation",
+    "pk": 28
+},
+{
+    "fields": {
+        "revision_name": "v2",
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "Second version -- uses Biopython, can now handle mixtures.",
+        "users_allowed": [],
+        "user": 2,
+        "revision_DateTime": "2015-02-27T18:18:12.467Z"
+    },
+    "model": "transformation.transformation",
+    "pk": 29
+},
+{
+    "fields": {
+        "revision_name": "v2",
+        "groups_allowed": [
+            1
+        ],
+        "revision_desc": "Updated complement_seq.py to the newer version.",
+        "users_allowed": [],
+        "user": 2,
+        "revision_DateTime": "2015-02-27T18:19:10.278Z"
+    },
+    "model": "transformation.transformation",
+    "pk": 30
+},
+{
+    "fields": {
         "y": 0.0,
         "x": 0.0
     },
@@ -1061,6 +1117,86 @@
 },
 {
     "fields": {
+        "y": 0.0,
+        "x": 0.0
+    },
+    "model": "transformation.transformationxput",
+    "pk": 131
+},
+{
+    "fields": {
+        "y": 0.0,
+        "x": 0.0
+    },
+    "model": "transformation.transformationxput",
+    "pk": 132
+},
+{
+    "fields": {
+        "y": 0.0812347684809098,
+        "x": 0.064276048714479
+    },
+    "model": "transformation.transformationxput",
+    "pk": 133
+},
+{
+    "fields": {
+        "y": 0.26336311941511,
+        "x": 0.377537212449256
+    },
+    "model": "transformation.transformationxput",
+    "pk": 134
+},
+{
+    "fields": {
+        "y": 0.455889520714866,
+        "x": 0.428958051420839
+    },
+    "model": "transformation.transformationxput",
+    "pk": 135
+},
+{
+    "fields": {
+        "y": 0.0,
+        "x": 0.0
+    },
+    "model": "transformation.transformationxput",
+    "pk": 136
+},
+{
+    "fields": {
+        "y": 0.0,
+        "x": 0.0
+    },
+    "model": "transformation.transformationxput",
+    "pk": 137
+},
+{
+    "fields": {
+        "y": 0.0812347684809098,
+        "x": 0.064276048714479
+    },
+    "model": "transformation.transformationxput",
+    "pk": 138
+},
+{
+    "fields": {
+        "y": 0.26336311941511,
+        "x": 0.377537212449256
+    },
+    "model": "transformation.transformationxput",
+    "pk": 139
+},
+{
+    "fields": {
+        "y": 0.455889520714866,
+        "x": 0.428958051420839
+    },
+    "model": "transformation.transformationxput",
+    "pk": 140
+},
+{
+    "fields": {
         "min_row": null,
         "transf_xput": 3,
         "max_row": null,
@@ -1651,6 +1787,86 @@
 },
 {
     "fields": {
+        "min_row": 0,
+        "transf_xput": 131,
+        "max_row": null,
+        "compounddatatype": 23
+    },
+    "model": "transformation.xputstructure",
+    "pk": 78
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 132,
+        "max_row": null,
+        "compounddatatype": 25
+    },
+    "model": "transformation.xputstructure",
+    "pk": 79
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 134,
+        "max_row": null,
+        "compounddatatype": 25
+    },
+    "model": "transformation.xputstructure",
+    "pk": 80
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 135,
+        "max_row": null,
+        "compounddatatype": 23
+    },
+    "model": "transformation.xputstructure",
+    "pk": 81
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 136,
+        "max_row": null,
+        "compounddatatype": 23
+    },
+    "model": "transformation.xputstructure",
+    "pk": 82
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 137,
+        "max_row": null,
+        "compounddatatype": 23
+    },
+    "model": "transformation.xputstructure",
+    "pk": 83
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 139,
+        "max_row": null,
+        "compounddatatype": 25
+    },
+    "model": "transformation.xputstructure",
+    "pk": 84
+},
+{
+    "fields": {
+        "min_row": 0,
+        "transf_xput": 140,
+        "max_row": null,
+        "compounddatatype": 23
+    },
+    "model": "transformation.xputstructure",
+    "pk": 85
+},
+{
+    "fields": {
         "dataset_idx": 1,
         "transformation": 2,
         "dataset_name": "pairs"
@@ -1882,6 +2098,42 @@
     },
     "model": "transformation.transformationinput",
     "pk": 129
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 27,
+        "dataset_name": "nuc_in"
+    },
+    "model": "transformation.transformationinput",
+    "pk": 131
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 28,
+        "dataset_name": "fasta_in"
+    },
+    "model": "transformation.transformationinput",
+    "pk": 133
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 29,
+        "dataset_name": "seq_in"
+    },
+    "model": "transformation.transformationinput",
+    "pk": 136
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 30,
+        "dataset_name": "fasta_in"
+    },
+    "model": "transformation.transformationinput",
+    "pk": 138
 },
 {
     "fields": {
@@ -2539,5 +2791,59 @@
     },
     "model": "transformation.transformationoutput",
     "pk": 130
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 27,
+        "dataset_name": "aa_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 132
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 28,
+        "dataset_name": "aa_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 134
+},
+{
+    "fields": {
+        "dataset_idx": 2,
+        "transformation": 28,
+        "dataset_name": "rc_seq_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 135
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 29,
+        "dataset_name": "comp_seq_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 137
+},
+{
+    "fields": {
+        "dataset_idx": 1,
+        "transformation": 30,
+        "dataset_name": "aa_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 139
+},
+{
+    "fields": {
+        "dataset_idx": 2,
+        "transformation": 30,
+        "dataset_name": "rc_seq_out"
+    },
+    "model": "transformation.transformationoutput",
+    "pk": 140
 }
 ]

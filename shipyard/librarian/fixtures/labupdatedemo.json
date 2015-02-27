@@ -1,35 +1,101 @@
 [
 {
-    "pk": 1, 
-    "model": "librarian.symbolicdataset", 
     "fields": {
+        "users_allowed": [],
+        "user": 1,
         "MD5_checksum": "d7fb24458b3b25e0962e55e874117710",
-        "user": 1
-    }
+        "groups_allowed": []
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 1
 },
 {
-    "pk": 1, 
-    "model": "librarian.datasetstructure", 
     "fields": {
-        "num_rows": 5, 
-        "symbolicdataset": 1, 
-        "compounddatatype": 5
-    }
-},
-{
-    "pk": 2, 
-    "model": "librarian.symbolicdataset", 
-    "fields": {
+        "users_allowed": [],
+        "user": 1,
         "MD5_checksum": "8f5e421b1d9761927e0bd2128a786840",
-        "user": 1
-    }
+        "groups_allowed": []
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 2
 },
 {
-    "pk": 3, 
-    "model": "librarian.symbolicdataset", 
     "fields": {
+        "users_allowed": [],
+        "user": 1,
         "MD5_checksum": "814bcabb72e2624858827bcc74b36b82",
-        "user": 1
-    }
+        "groups_allowed": []
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 3
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "MD5_checksum": "3bcac832f5c0f5d4a32df3d649c6dd83",
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 4
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 4,
+        "MD5_checksum": "32da8eb1068269827a1c5b725011e870",
+        "groups_allowed": [
+            4
+        ]
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 5
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "MD5_checksum": "d35ce77db2ed9b908a21dc6899fd1cf7",
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 6
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "MD5_checksum": "91fef4d2e42610ad09f311dbea8a301e",
+        "groups_allowed": [
+            4
+        ]
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 7
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 4,
+        "MD5_checksum": "1a57b70af1f342c08370c55a947e0108",
+        "groups_allowed": [
+            4
+        ]
+    },
+    "model": "librarian.symbolicdataset",
+    "pk": 8
+},
+{
+    "fields": {
+        "num_rows": 5,
+        "symbolicdataset": 1,
+        "compounddatatype": 5
+    },
+    "model": "librarian.datasetstructure",
+    "pk": 1
 }
 ]

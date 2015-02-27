@@ -17,17 +17,19 @@ Dependencies:
 """
 
 import argparse
-import HyPhy
 from itertools import groupby
 import logging
 import os
 import re
+from collections import Counter
+
+import HyPhy
 
 from hyphyAlign import change_settings, pair_align
 import miseq_logging
-import settings
 import project_config
-from collections import Counter
+from shipyard.FixtureFiles.labupdatedemo.CodeResources import settings
+
 
 def parseArgs():
     parser = argparse.ArgumentParser(

@@ -1,7 +1,7 @@
 import json
 import os
 
-import settings
+from shipyard.FixtureFiles.labupdatedemo.CodeResources import settings
 
 
 class ProjectConfig(object):

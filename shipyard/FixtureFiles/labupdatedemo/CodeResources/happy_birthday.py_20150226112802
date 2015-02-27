@@ -17,10 +17,10 @@ def main():
     with open(args.seqs, "rb") as f, open(args.happy_birthday, "wb") as g:
         seq_reader = csv.DictReader(f)
         hb_writer = csv.writer(g)
-        hb_writer.writerow(("happy birthday"))
+        hb_writer.writerow(("happy birthday",))
         # The input has header (FASTA header, FASTA sequence)
         for _ in seq_reader:
-            hb_writer.writerow(("Phil"))
+            hb_writer.writerow(("Phil",))
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@
     "pk": 4
 },
 {
+    "comment": "password: guest",
     "fields": {
         "username": "rliang",
         "first_name": "",
@@ -30,6 +31,7 @@
     "pk": 2
 },
 {
+    "comment": "password: 934TXS",
     "fields": {
         "username": "duchess",
         "first_name": "",
@@ -50,6 +52,7 @@
     "pk": 3
 },
 {
+    "comment": "password: phil",
     "fields": {
         "username": "birthday_boy_phil",
         "first_name": "",
