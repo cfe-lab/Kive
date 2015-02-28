@@ -17,25 +17,27 @@
 <h2>Runs</h2>
     <div class="filter_ctrl">
         <form class="short-filter">
-        <input name="name" type="text" data-link="Smart"><input type="button" class="advanced ctrl" value="Advanced"><input type="submit" value="Filter">
+        <input name="name" type="text"
+            ><input type="button" class="advanced ctrl" value="Advanced"
+            ><input type="submit" value="Filter">
         </form>
         
         <form class="advanced-filter">
         <h4>Advanced search</h4>
-        <label for="name">Name</label>
-        <input name="name" type="text" data-link="Name">
+        <label>Name
+        <input name="name" type="text"/></label>
         <!-- Is active, is owned, start date range, end date range -->
-        <input name="uploads" type="checkbox" data-link="User-Uploaded">
-        <label for="uploads">Show only user uploads</label>
-        <input type="submit" value="Filter">
+        <label>
+        <input name="active" type="checkbox"/>
+        Is active</label>
+        <br/>
+        <label>Start date
+        <input name="startafter" type="text" class="datetime"/></label>
+        <input type="submit" value="Filter"/>
         </form>
     </div>
 
     <div id="active_filters">
-        <div class="filter" data-key="active">
-            <span class="field">Is-Active</span>
-            <a class="remove">&times;</a>
-        </div>
     </div>
 
     <div class="no_results">
@@ -49,6 +51,8 @@
             <tr>
                 <th>Status</th>
                 <th>Name</th>
+                <th>Start</th>
+                <th>End</th>
             </tr>
         </thead>
         <tbody>

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 import itertools
 import json
 import logging
@@ -112,16 +112,20 @@ def _add_run_filter(runs, key, value):
         return runs.filter(
             Q(pipeline__family__name__icontains=value)|
             Q(id__in=runs_with_matching_inputs))
+    if key == 'startafter':
+        t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
+                                timezone.get_current_timezone())
+        return runs.filter(run__start_time__gte=t)
     raise KeyError(key)
 
 
 def _load_status(request):
     """ Find all matching runs, and return a dict for each with the status.
     
-    @return [{'id': run_id, 'status': status, 'name': name}]
+    @return [{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}]
     """
     runs = fleet.models.RunToProcess.filter_by_user(request.user).order_by(
-        'time_queued')
+        '-time_queued')
     
     i = 0
     while True:
@@ -139,7 +143,7 @@ def _is_status_changed(runs, request):
         previous_run_id = request.GET.get(prefix + '[id]')
         previous_run_id = previous_run_id and int(previous_run_id)
         if (run.get('id') != previous_run_id or
-            run['name'] != request.GET.get(prefix + '[name]') or 
+            run.get('end') != request.GET.get(prefix + '[end]') or 
             run['status'] != request.GET.get(prefix + '[status]')):
             return True
     
@@ -149,20 +153,21 @@ def _poll_run_progress(request):
     """
     Helper to produce a JSON description of the current state of a run.
     """
-    result = {'runs': [], 'errors': [], 'changed': True}
+    is_changed = True
     try:
         ajax_logger.debug('Loading status.')
         runs = _load_status(request)
-        if _is_status_changed(runs, request):
-            result['runs'] = runs
-        else:
-            result['changed'] = False
+        is_changed = _is_status_changed(runs, request)
+        if not is_changed:
+            runs = []
+        
+        ajax_logger.debug("Returning run status: %r", runs)
+        return json.dumps(dict(runs=runs, errors=[], changed=is_changed))
     except StandardError:
         ajax_logger.error('Status report failed.', exc_info=True)
-        result['errors'].append('Status report failed.')
-
-    ajax_logger.debug("Returning: %r", result)
-    return json.dumps(result)
+        return json.dumps(dict(runs=[],
+                               errors=['Status report failed.'],
+                               changed=True))
 
 @login_required
 def poll_run_progress(request):

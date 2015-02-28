@@ -4,6 +4,7 @@ import threading
 from django.db import models, transaction
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from archive.models import ExecLog, Run
 from librarian.models import SymbolicDataset
@@ -98,7 +99,7 @@ class RunToProcess(metadata.models.AccessControl):
         """
         Return a dictionary describing the Run's current state.
     
-        @return {'id': run_id, 'status': status, 'name': name}
+        @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}
         """
         result = {'name': self.display_name}
         if hasattr(self, "not_enough_CPUs"):
@@ -153,8 +154,13 @@ class RunToProcess(metadata.models.AccessControl):
         
         result['status'] = status
         result['id'] = run.id
+        result['start'] = self._format_time(run.start_time)
+        result['end'] = self._format_time(run.end_time)
 
         return result
+    
+    def _format_time(self, t):
+        return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 
 
 class RunToProcessInput(models.Model):
