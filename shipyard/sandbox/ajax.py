@@ -129,7 +129,9 @@ def _add_run_filter(runs, key, value):
 def _load_status(request):
     """ Find all matching runs, and return a dict for each with the status.
     
-    @return [{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}]
+    @return ([{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}],
+        has_more) where has_more is true if more runs matched the search
+        criteria than were returned
     """
     runs = fleet.models.RunToProcess.filter_by_user(request.user).order_by(
         '-time_queued')
@@ -142,7 +144,16 @@ def _load_status(request):
         value = request.GET.get('filters[{}][val]'.format(i))
         runs = _add_run_filter(runs, key, value)
         i += 1
-    return [run.get_run_progress() for run in runs]
+    
+    LIMIT = 30
+    has_more = False
+    report = []
+    for i, run in enumerate(runs[:LIMIT + 1]):
+        if i == LIMIT:
+            has_more = True
+            break
+        report.append(run.get_run_progress())
+    return (report, has_more)
 
 def _is_status_changed(runs, request):
     for i, run in enumerate(runs):
@@ -158,23 +169,27 @@ def _is_status_changed(runs, request):
 
 def _poll_run_progress(request):
     """
-    Helper to produce a JSON description of the current state of a run.
+    Helper to produce a JSON description of the current state of some runs.
     """
     is_changed = True
     try:
         ajax_logger.debug('Loading status.')
-        runs = _load_status(request)
+        runs, has_more = _load_status(request)
         is_changed = _is_status_changed(runs, request)
         if not is_changed:
             runs = []
         
         ajax_logger.debug("Returning run status: %r", runs)
-        return json.dumps(dict(runs=runs, errors=[], changed=is_changed))
+        return json.dumps(dict(runs=runs,
+                               errors=[],
+                               changed=is_changed,
+                               has_more=has_more))
     except StandardError:
         ajax_logger.error('Status report failed.', exc_info=True)
         return json.dumps(dict(runs=[],
                                errors=['Status report failed.'],
-                               changed=True))
+                               changed=True,
+                               has_more=False))
 
 @login_required
 def poll_run_progress(request):

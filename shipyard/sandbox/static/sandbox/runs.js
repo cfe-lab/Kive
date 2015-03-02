@@ -99,6 +99,10 @@ function show_run_progress(run_data) {
         $row.append($('<td/>').text(this["end"] || '-'));
         $tbody.append($row);
     });
+    $('.results table caption').text(
+            run_data['has_more']
+            ? 'Showing ' + run_data['runs'].length + ' most recent matching runs.'
+            : 'Showing all matching runs.')
 }
 
 function remove_handler() {
