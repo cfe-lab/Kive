@@ -13,6 +13,10 @@ Prerequisites
 6. PostgreSQL
 7. psycopg (Python library for interfacing with PostgreSQL)
 
+Optionally, if you would like to create UML diagrams of the backend models:
+8. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
+9. pygraphviz
+
 It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
 
 Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
@@ -20,18 +24,27 @@ Source code or binaries for Python can be obtained from the official website, [p
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
 If you are already running Django 1.6, installing should be as painless as running
 
-    pip install Django==1.7.4
+    pip install Django==1.7.5
 
-You will likely need to run this using `sudo` unless you only installed Django locally and not
+(substitute the appropriate version number if you wish to use a different version -- a newer one, for example).  You will likely need to run this using `sudo` unless you only installed Django locally and not
 system-wide.  Also, many systems have multiple Python installations, so make sure that 
 `pip` is using the correct one.
+
+Instructions for downloading and installing `django-extensions` may be found [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
 
 Installing PostgreSQL
 ---------------------
 Instructions for downloading and installing PostgreSQL may be found at [postgresql.org](http://www.postgresql.org/).
 PostgreSQL is available as pre-compiled binary executables.  On Linux systems, the easiest way to obtain the binaries is to use a package manager such as `yum` or `apt-get`, depending on your distribution.  On Mac OS-X, there are number of methods including third-party installers and package managers such as `MacPorts` or `homebrew`.  The only option listed on the PostgreSQL website for installing PostgreSQL for Windows is a third-party installer distributed by [EnterpriseDB](http://www.enterprisedb.com/).
 
-#### Installation on OS-X with MacPorts
+#### Installing on OS X
+
+##### Using the Graphical Installer provided by EnterpriseDB
+To install PostgreSQL under OS X using the graphical installer (download [here](http://www.enterprisedb.com/products-services-training/pgdownload#osx)), the instructions for Windows and PostgreSQL 9.3 are [here](http://www.enterprisedb.com/docs/en/9.3/pginstguide/PostgreSQL_Installation_Guide-07.htm#TopOfPage)); the procedures for OS X, and for different versions of the database, are similar.  Take note of the install directory for Postgres and the data directory, as well as the port on which the server listens.  On a default installation, Postgres is installed in `/Library/PostgreSQL/9.3`, and the data directory is `/Library/PostgreSQL/9.3/data`.  (All paths are given assuming version 9.3; substitute the appropriate version number for your system.)  We will need some of the utilities installed in `/Library/PostgreSQL/9.3/bin` later.  It will also ask you to specify a password for the default system `postgres` user.  You will have to be logged in as this user to perform several necessary administrative tasks, so be sure to remember this password!  At the end of the installation, it will ask if you wish to start Stack Builder.  Everything we need should already be installed, so you can pass on this.
+
+After installation, Postgres will have been automatically launched in the background, and configured to automatically start on reboot using a LaunchDaemon script at (in a default installation) `com.edb.launchd.postgresql-9.3.plist`.  A `postgres` user will also have been installed on your computer, whose home directory is `/Library/PostgreSQL/[version number]`.
+
+##### Using MacPorts
 [MacPorts](https://www.macports.org/) is a package manager for OS-X that installs packages into a separate directory at `/opt` so that any files installed by MacPorts can be removed without compromising the original filesystem.
 Instructions for installing MacPorts can be found [here](https://www.macports.org/install.php).
 
@@ -54,8 +67,6 @@ In the `vi` editor, type `O` to open the file for editing and write this line:
 
     export PATH=/opt/local/lib/postgresql93/bin:$PATH
 
-
-
 To create a database install, MacPorts also provides the following instructions:
 
     sudo mkdir -p /opt/local/var/db/postgresql93/defaultdb
@@ -68,43 +79,48 @@ Now that we've created a database, we need to start a server to handle database 
 
     sudo chown postgres:postgres /opt/local/var/db/postgresql93
 
-
-login as the `postgres` user
+Log in as the `postgres` user:
 
     sudo su - postgres
 
-and start the server as a background process by this command
+and start the server as a background process using this command:
 
     postgres -D /opt/local/var/db/postgresql93/defaultdb >logfile 2>&1 &
 
-which redirects standard output and error messages to a file `logfile`.
+This redirects standard output and error messages to a file `logfile`.
 A slightly less obtuse way to issue this command is to call the `pg_ctl` utility from the `postgres` user home directory:
 
     pg_ctl -D defaultdb -l logfile start
 
-
 The PostgreSQL server will be automatically started when you reboot your system through a LaunchDaemon script that was installed by MacPorts at `/Library/LaunchDaemons/org.macports.postgresql93-server.plist`.  To inspect what this script is actually doing, you can look at the contents of the wrapper `/opt/local/etc/LaunchDaemons/org.macports.postgresql93-server/postgresql93-server.wrapper`.
 Note that if you used a database location or name other than the MacPorts default, then you may need to modify this wrapper accordingly.
 
-
-
-Installing psycopg
+Installing psycopg2
 ------------------
-Psycopg is a PostgreSQL adaptor for Python.  It is mandatory in order for Django to use a PostgreSQL database.  Instructions for downloading and installing psycopg2 may be found at [initd.org](http://initd.org/psycopg/).
+Psycopg is a PostgreSQL adaptor for Python.  It is mandatory in order for Django to use a PostgreSQL database.  Instructions for downloading and installing it may be found at [initd.org](http://initd.org/psycopg/).
 
 #### Installing psycopg2 in OS-X
 
 First, note that OS-X ships with its own version of Python (often referred to as System Python).  However, this version may be older and lack features required by open source software.  System Python also has some irregularities about the installation of modules that can complicate the installation and upgrading process of third-party modules.  For such reasons, users often like to install another version of Python.  
 
+##### Using MacPorts
 If you are using a MacPorts binary of Python, you can easily install the psycopg2 port, by running
 
     sudo port install py27-psycopg2
 
 This may also install a number of dependencies if they are not already present on your system, such as `libxslt`.
 
-If you compiled your own version of Python from source, then you can obtain the source code for psycopg2 [here](http://initd.org/psycopg/download/).
-Compiling pscyopg2 requires the `pg_config` executable that might not be in your `$PATH` -- for example, if you used MacPorts to install the PostgreSQL server, it is located at `/opt/local/lib/postgresql93/bin/pg_config`.  
-You can direct the `setup.py` script to this executable by modifying the file `setup.cfg` and editing the last line in the block:
+##### Using pip
+The developers recommend using a binary package where possible, using fink or ports.
+However, if you don't want to do this or if it isn't feasible -- for example, if you're using either
+the system Python on a Mac or an official version obtained from [python.org][www.python.org] -- it's relatively
+easy to install using `pip`: instructions may be found [here](http://initd.org/psycopg/docs/install.html#install-from-source).
+
+Some key hangups you may encounter when installing using this method are making sure that you have the `pg_config` utility 
+on your PATH; this is one of the utilities installed by PostgreSQL.  If you installed PostgreSQL using the graphical installer, this is typically at `/Library/PostgreSQL/9.3/bin`; in a typical MacPorts install it is located at `/opt/local/lib/postgresql93/bin/pg_config`.  You may also need to update your LD_LIBRARY_PATH and your DYLD_FALLBACK_LIBRARY_PATH to point at the directory where PostgreSQL installed its libraries.  Depending on your system, you may also encounter problems because your system's libraries are not the right versions required by Psycopg.  In these cases, a package manager such as MacPorts may be of use.
+
+##### Directly from source
+You may also wish to directly compile psycopg2 from the source (available [here](http://initd.org/psycopg/download/)).  The same gotchas as above apply.  An alternative to putting `pg_config` on your PATH is to direct the `setup.py` script to this executable by modifying the file `setup.cfg` and editing the last line in the block:
 
     # "pg_config" is required to locate PostgreSQL headers and libraries needed to
     # build psycopg2. If pg_config is not in the path or is installed under a
@@ -117,8 +133,8 @@ so that it reads
     pg_config=/opt/local/lib/postgresql93/bin/pg_config
 
 Then you can compile and install this module by running `sudo python setup.py install`.
-To confirm that the module is installed, start an interaction session by calling `python` on the command line and then enter `import psycopg2`.  If this raises an `ImportError` then something has gone wrong - for example, the version of Python used to install the module is different from the version running the interactive session.
 
+To confirm that the module is installed, start an interaction session by calling `python` on the command line and then enter `import psycopg2`.  If this raises an `ImportError` then something has gone wrong - for example, the version of Python used to install the module is different from the version running the interactive session.
 
 Project structure
 -----------------
@@ -144,7 +160,10 @@ this user account:
 
     sudo su - postgres
 
-Create a database for **shipyard**.
+Create a database for **shipyard**.  If the Postgres utilities have not been
+automatically added to your PATH (they won't have been if you followed the above instructions
+installing the database using the graphical installer), make sure you specify the path
+of the commands in the following:
 
     createdb shipyard
 
@@ -303,6 +322,20 @@ To launch a fleet manager and workers, you need to run the following command
 and replace X with the number of workers you want:
 
     python manage.py runfleet --workers X
+    
+Creating a UML diagram of the backend
+-------------------------------------
+The optional `django-extensions` module adds a command to `./manage.py` that creates a UML representation of the database design using either `pydot` or `pygraphviz`.  For example, to build a UML diagram of the `method` app, you may use
+
+    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings method -g > method.dot
+    
+This creates a `.dot` file that can be opened using GraphViz.  Note that this command specifies an alternate settings file that is provided in the code base: this was done to ensure that you don't need to install `django-extensions` to run the system normally.  If you prefer to directly create a PDF file, you can use the `-o` option:
+
+    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings method -g -o method.pdf
+    
+To create a diagram of the entire database:
+
+    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings -a -g -o kive.pdf
 
 Running a pipeline
 ------------------
