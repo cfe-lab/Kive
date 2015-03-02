@@ -29,7 +29,7 @@ function poll_run_progress(run_data) {
                     show_errors(errors);
                 }
                 else {
-                    if (new_data['changed']) {
+                    if (new_data['changed'] || run_data == null) {
                         show_run_progress(new_data);
                     }
                     else {
@@ -47,6 +47,7 @@ function reset_polling() {
     ajaxRequest.abort();
     window.clearTimeout(timeoutId);
     $('.results tbody').empty();
+    $('.no_results').empty();
 }
 
 function get_run_filters() {
@@ -59,12 +60,14 @@ function get_run_filters() {
 }
 
 function show_errors(errors) {
-    var $progress = $("#progress");
-    $progress.empty();
-    $progress.append($('<h2>Errors:</h2>'));
+    var $no_results = $('.no_results');
+    $no_results.empty();
+    $no_results.append($('<h2>Errors:</h2>'));
     $.each(errors, function() {
-        $progress.append($('<p/>').text(this));
+        $no_results.append($('<p/>').text(this));
     });
+    $('.results').hide();
+    $no_results.show();
 }
 
 /* Display the progress of a run on the page. */
@@ -73,6 +76,13 @@ function show_run_progress(run_data) {
         run_id,
         $tbody = $(".results tbody"),
         $row;
+    if (run_data == null || run_data['runs'].length == 0) {
+        $('.no_results').html('<p>No results match your query.</p>').show();
+        $('.results').hide();
+        return;
+    }
+    $('.no_results').hide();
+    $('.results').show();
     $tbody.empty();
     $.each(run_data['runs'], function() {
         $row = $('<tr/>');
@@ -96,7 +106,7 @@ function remove_handler() {
         $active_filters = $filter.closest('.active_filters');
     $filter.detach();
     reset_polling();
-    poll_run_progress([]);
+    poll_run_progress();
 }
 
 function add_filter(key, value) {
@@ -170,11 +180,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                     $field.is(':checked') ? null : value);
         });
         reset_polling();
-        poll_run_progress([]);
+        poll_run_progress();
     });
     
     add_filter('active');
     
-    run_data = [];
-    poll_run_progress(run_data);
+    poll_run_progress();
 });
