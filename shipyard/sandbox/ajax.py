@@ -112,10 +112,17 @@ def _add_run_filter(runs, key, value):
         return runs.filter(
             Q(pipeline__family__name__icontains=value)|
             Q(id__in=runs_with_matching_inputs))
-    if key == 'startafter':
+    if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
         t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
                                 timezone.get_current_timezone())
-        return runs.filter(run__start_time__gte=t)
+        if key == 'startafter':
+            return runs.filter(run__start_time__gte=t)
+        if key == 'startbefore':
+            return runs.filter(run__start_time__lte=t)
+        if key == 'endafter':
+            return runs.filter(run__end_time__gte=t)
+        if key == 'endbefore':
+            return runs.filter(run__end_time__lte=t)
     raise KeyError(key)
 
 

@@ -24,15 +24,34 @@
         
         <form class="advanced-filter">
         <h4>Advanced search</h4>
-        <label>Name
-        <input name="name" type="text"/></label>
-        <!-- Is active, is owned, start date range, end date range -->
-        <label>
-        <input name="active" type="checkbox"/>
-        Is active</label>
-        <br/>
-        <label>Start date
-        <input name="startafter" type="text" class="datetime"/></label>
+        <table>
+        <tr>
+            <td><label>Name<input name="name" type="text"/></label></td>
+            <td><label><input
+                name="active"
+                type="checkbox"/>Is active</label></td>
+        </tr>
+        <tr>
+            <td><label>Started after<input
+                name="startafter"
+                type="text"
+                class="datetime"/></label>
+            <td><label>Started before<input
+                name="startbefore"
+                type="text"
+                class="datetime"/></label>
+        </tr>
+        <tr>
+            <td><label>Ended after<input
+                name="endafter"
+                type="text"
+                class="datetime"/></label>
+            <td><label>Ended before<input
+                name="endbefore"
+                type="text"
+                class="datetime"/></label>
+        </tr>
+        </table>
         <input type="submit" value="Filter"/>
         </form>
     </div>

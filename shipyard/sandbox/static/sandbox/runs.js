@@ -178,6 +178,12 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             add_filter(
                     $field.attr('name'),
                     $field.is(':checked') ? null : value);
+            if ($field.is(':checked')) {
+                $field.attr('checked', false);
+            }
+            else {
+                $field.val('');
+            }
         });
         reset_polling();
         poll_run_progress();
