@@ -139,12 +139,12 @@ a[rel="prev"]:before {
     color: #fff;
     margin-top: -4.5em;
     margin-right: -3em;
-    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAn0lEQVQ4y7XTYQ2AIBAGUCIQhQhEMQIRaGAEIxCBCBeBCEQ42TwcOvQOh992f9h44w5Q6o8goi0VSmU8AqV8KT2CLPgcEGF0kppEG++JEihUpFnbOpjhoHMmzZrrQJ6D2qyE5C8QoCyOg7wQYmekhafinwFhcQpGoKFWPQ3ddE4LQ6+dmeE49nIZMPoPbdNumtVm70JgFoRfIEOtXv7iDoQpR1rA+zY9AAAAAElFTkSuQmCC");
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAALCAYAAAB/Ca1DAAAAqElEQVQoz2NggIL///8LAHEDEO8H4vtQuh+IFRhIBUBNBkD8Hor7oQY3QA0GiRmQYpgAVON5EBuL3HyooQrEGlgA1SCARw0sCBrwYAGYYnBYEbA0AaoOF34P9yHMZgYKAFIcnCfVhethXoOGbQKagfNJDUOY10CGwUAD3DCkmHyPLZaRXAKOZSSX/Ie6ugHKnk8oHQagpUMHNLUByMGBLz3Ccsp/cnMKABOmj6DAXZwZAAAAAElFTkSuQmCC");
     background-repeat: no-repeat;
-    background-position: .5em center;
+    background-position: .8em center;
 }
 #auth_info p {
-    margin: .5em .5em .5em 2.3em;
+    margin: .5em .5em .5em 3.2em;
     font-style: italic;
     font-size: 0.8em;
     float: left;

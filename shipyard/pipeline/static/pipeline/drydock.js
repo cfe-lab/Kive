@@ -779,10 +779,10 @@ CanvasState.prototype.draw = function() {
         var labels = [];
         this.clear();
         
-        var draggingFromMethodOut = this.dragging && this.selection 
-            && this.selection.constructor == Connector
-            && this.selection.source.parent.constructor == MethodNode;
-
+        var draggingFromMethodOut = this.dragging && this.selection.length == 1 
+            && this.selection[0].constructor == Connector
+            && this.selection[0].source.parent.constructor == MethodNode;
+        
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut) {
             this.outputZone.draw(this.ctx);

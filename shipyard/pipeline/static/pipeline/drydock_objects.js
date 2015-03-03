@@ -1014,8 +1014,8 @@ function NodeLabel (label, x, y) {
 }
 
 function OutputZone (cw, ch, inset) {
-    this.x = cw * .8;
-    this.w = cw * .15;
+    this.x = cw * .82;
+    this.w = cw * .175;
     this.h = this.w;
     this.y = 1;
     

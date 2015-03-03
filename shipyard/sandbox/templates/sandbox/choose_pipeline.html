@@ -38,11 +38,11 @@ var mNodeWidth = 40,
 $(function() {
     // initialize animated canvas
     canvas = document.getElementById('pipeline_preview_canvas');
-    var canvasWidth  = canvas.width  = 160,
-        canvasHeight = canvas.height = 120;
+    var canvasWidth  = canvas.width  = 120,
+        canvasHeight = canvas.height = 90;
 
     canvasState = new CanvasState(canvas);
-    canvasState.setScale(0.20);
+    canvasState.setScale(0.12);
     canvasState.enable_labels = false;
     
     // change pipeline revision drop-down triggers ajax to redraw canvas
