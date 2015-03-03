@@ -12,13 +12,14 @@
 <body>
 
 <div data-role="wrapper" id="wrapper">
-<h1>Shipyard</h1>
-
-{% if user.is_authenticated %}
-<p>Logged in as {{ user }} <a href="/logout_then_login/">logout</a></p>
-{% endif %}
+<h1>Kive</h1>
 
 <div id="inner_wrap">
+
+{% if user.is_authenticated %}
+<div id="auth_info"><p>{{ user }}</p> <a href="/logout_then_login/">Log out</a></div>
+{% endif %}
+
 {% block content %}
 {% endblock %}
 </div>

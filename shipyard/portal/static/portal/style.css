@@ -133,6 +133,49 @@ a[rel="prev"]:before {
     font-style: normal;
 }
 
+#auth_info {
+    float: right;
+    background-color: #bbb;
+    color: #fff;
+    margin-top: -4.5em;
+    margin-right: -3em;
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAn0lEQVQ4y7XTYQ2AIBAGUCIQhQhEMQIRaGAEIxCBCBeBCEQ42TwcOvQOh992f9h44w5Q6o8goi0VSmU8AqV8KT2CLPgcEGF0kppEG++JEihUpFnbOpjhoHMmzZrrQJ6D2qyE5C8QoCyOg7wQYmekhafinwFhcQpGoKFWPQ3ddE4LQ6+dmeE49nIZMPoPbdNumtVm70JgFoRfIEOtXv7iDoQpR1rA+zY9AAAAAElFTkSuQmCC");
+    background-repeat: no-repeat;
+    background-position: .5em center;
+}
+#auth_info p {
+    margin: .5em .5em .5em 2.3em;
+    font-style: italic;
+    font-size: 0.8em;
+    float: left;
+}
+#auth_info a {
+    padding: .5em;
+    font-size: 0.8em;
+    color: #fff;
+    width: 1em;
+    color: transparent;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    font-weight: bold;
+    float: right;
+}
+#auth_info a:hover {
+    padding: .5em 1em;
+    background-color: #c7e5fa;
+    outline: none;
+    width: auto;
+    color: #fff;
+}
+#auth_info a:before {
+    content: '\00D7';
+    margin-right: 1em;
+    margin-left: 0em;
+    color: #fff;
+    font-style: normal;
+}
+
 
 /* Navigation menu styles */
 nav { width: 25em; }
@@ -224,6 +267,7 @@ table.formtable {
 }
 input[type="text"],
 input[type="number"],
+input[type="password"],
 select {
     padding: .25em;
 }
