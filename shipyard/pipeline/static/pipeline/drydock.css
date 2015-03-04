@@ -11,6 +11,7 @@
     top: 46px; left: 0;
     width: 100%;
     height: 1.5em;
+    z-index: 1;
 }
 #pipeline_ctrl input,
 #pipeline_ctrl textarea,
@@ -57,7 +58,7 @@ ul#id_ctrl_nav li:hover {
     width: 250px;
 }
 
-#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 1em; }
+#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 9em; }
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
 #pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
 #pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
