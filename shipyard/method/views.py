@@ -6,7 +6,6 @@ from django.db import transaction
 from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.models import User, Group
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, Context, RequestContext
 
@@ -20,11 +19,6 @@ from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
 from portal.views import developer_check
-
-from constants import groups, users
-
-everyone = Group.objects.get(pk=groups.EVERYONE_PK)
-shipyard_user = User.objects.get(pk=users.SHIPYARD_USER_PK)
 
 
 @login_required

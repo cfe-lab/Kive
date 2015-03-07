@@ -14,10 +14,8 @@ import re
 
 from metadata.models import Datatype, CompoundDatatype, get_builtin_types
 from metadata.forms import *
-from constants import datatypes as dt_pks, groups
+from constants import datatypes as dt_pks
 from portal.views import developer_check
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 @login_required

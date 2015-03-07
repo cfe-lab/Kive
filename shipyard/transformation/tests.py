@@ -1,12 +1,8 @@
 from django.test import TestCase
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 
 from transformation.models import *
 from metadata.models import *
-
-from constants import groups
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 class TransformationTestCase(TestCase):
@@ -15,7 +11,7 @@ class TransformationTestCase(TestCase):
     def setUp(self):
         self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')
         self.transf_user.save()
-        self.transf_user.groups.add(everyone_group)
+        self.transf_user.groups.add(everyone_group())
         self.transf_user.save()
 
         # Create some objects.

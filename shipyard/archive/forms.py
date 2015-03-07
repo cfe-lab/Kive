@@ -1,6 +1,5 @@
 from django import forms
-from django.forms.widgets import ClearableFileInput
-from django.contrib.auth.models import User
+from django.forms.widgets import ClearableFileInput\
 from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 
 import logging

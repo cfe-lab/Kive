@@ -2,7 +2,6 @@
 Shipyard archive application unit tests.
 """
 
-from datetime import datetime
 import os
 import re
 import tempfile
@@ -11,7 +10,6 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import Group
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -23,9 +21,9 @@ import metadata.tests
 import sandbox.execute
 import sandbox.testing_utils as tools
 
-from constants import groups
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+# Rather than define everyone_group here, we import this function to prevent compile-time
+# database access.
+from metadata.models import everyone_group
 
 
 def create_archive_test_environment(case):
@@ -401,11 +399,11 @@ class ArchiveTestCaseHelpers:
         tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_one.execute_pipeline()
 
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_two.execute_pipeline()
 
     def _setup_deep_nested_run(self, user):
@@ -437,13 +435,13 @@ class ArchiveTestCaseHelpers:
         tools.make_words_symDS(self)
 
         run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words],
-                                              groups_allowed=[everyone_group])
+                                              groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
         self.deep_nested_run = run_sandbox.run
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_archive_test_environment(self)
@@ -453,7 +451,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
 
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_archive_test_environment(self)
@@ -462,7 +460,7 @@ class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
         metadata.tests.clean_up_all_files()
 
 
-class RunComponentTests(ArchiveTransactionTestCase):
+class RunComponentTests(ArchiveTestCase):
     """Tests of functionality shared by all RunComponents."""
 
     def test_clean_execlogs_invoked_logs_cleaned(self):
@@ -1182,11 +1180,11 @@ class RunStepTests(ArchiveTestCase):
         self.assertFalse(self.step_E3_RS.keeps_output(self.C3_rawout))
 
 
-class RunComponentTooManyChecks(TransactionTestCase):
+class RunComponentTooManyChecks(TestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_word_reversal_environment(self)
@@ -1202,7 +1200,7 @@ class RunComponentTooManyChecks(TransactionTestCase):
         first_step.save()
 
         self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
-                                                     groups_allowed=[everyone_group])
+                                                     groups_allowed=[everyone_group()])
         self.two_step_sdbx.execute_pipeline()
 
         # The second one's second step will have to recover its first step.  (Its input cable is trivial
@@ -1219,7 +1217,7 @@ class RunComponentTooManyChecks(TransactionTestCase):
         first_step.save()
 
         self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
-                                                      groups_allowed=[everyone_group])
+                                                      groups_allowed=[everyone_group()])
         self.following_sdbx.execute_pipeline()
         second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
         assert(second_step.invoked_logs.count() == 2)
@@ -2671,7 +2669,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
 
 class DatasetTests(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         librarian.tests.create_librarian_test_environment(self)
@@ -2900,7 +2898,7 @@ class ExecLogTests(ArchiveTestCase):
         self.assertFalse(execlog.is_successful())
 
 
-class GetCoordinatesTests(ArchiveTransactionTestCase):
+class GetCoordinatesTests(ArchiveTestCase):
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
 
     def test_get_coordinates_top_level_run(self):
@@ -3069,7 +3067,7 @@ class GetCoordinatesTests(ArchiveTransactionTestCase):
                     self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
 
-class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
+class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
     """
     Tests the is_complete/successful_execution functions of Run, RunComponent, RunStep, ExecLog.
 
@@ -3274,7 +3272,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_one.execute_pipeline()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
@@ -3293,7 +3291,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTransactionTestCase):
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_two.execute_pipeline()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
@@ -3344,7 +3342,7 @@ for i in range(%d):
         tools.make_words_symDS(self)
 
         active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.symds_words],
-                                                 groups_allowed=[everyone_group])
+                                                 groups_allowed=[everyone_group()])
         active_sandbox.execute_pipeline()
 
         run_step = active_sandbox.run.runsteps.get(pipelinestep__step_num=1)
@@ -3375,7 +3373,7 @@ for i in range(%d):
         tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_one.execute_pipeline()
 
         tampered_script = """#!/bin/bash
@@ -3402,7 +3400,7 @@ echo "This is not what's supposed to be output here" > $2
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_two.execute_pipeline()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
@@ -3434,7 +3432,7 @@ echo "This is not what's supposed to be output here" > $2
         tools.make_words_symDS(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
         self.sandbox_one.execute_pipeline()
 
         # Between runs, self.method_noop gets screwed with so that no data comes out, but still returns code 0.
@@ -3669,7 +3667,7 @@ echo
         self.assertTrue(self.pE_run.successful_execution())
 
 
-class TopLevelRunTests(ArchiveTransactionTestCase):
+class TopLevelRunTests(ArchiveTestCase):
     def test_usual_run(self):
         """Test on all elements of a simulated run."""
         self.step_through_run_creation("outcables_done")
@@ -3714,8 +3712,8 @@ class TopLevelRunTests(ArchiveTransactionTestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
-class RunStepReuseFailedExecRecordTests(TransactionTestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+class RunStepReuseFailedExecRecordTests(TestCase):
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
@@ -3754,9 +3752,9 @@ class RunStepReuseFailedExecRecordTests(TransactionTestCase):
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
         run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.symds_words],
-                                        groups_allowed=[everyone_group]).execute_pipeline()
+                                        groups_allowed=[everyone_group()]).execute_pipeline()
         run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.symds_words],
-                                        groups_allowed=[everyone_group]).execute_pipeline()
+                                        groups_allowed=[everyone_group()]).execute_pipeline()
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)

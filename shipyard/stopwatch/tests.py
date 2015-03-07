@@ -1,7 +1,6 @@
 """
 Tests on the Stopwatch functionality used in Run, RunAtomic, etc.
 """
-from datetime import datetime
 import re
 
 from django.test import TestCase

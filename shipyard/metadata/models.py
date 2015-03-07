@@ -23,11 +23,19 @@ import shutil
 from datetime import datetime
 
 from file_access_utils import set_up_directory
-from constants import datatypes, CDTs, maxlengths, groups
+from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
+
+
+def shipyard_user():
+    return User.objects.get(pk=users.SHIPYARD_USER_PK)
+
+
+def everyone_group():
+    return Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def get_builtin_types(datatypes):
@@ -312,8 +320,7 @@ class AccessControl(models.Model):
                 ac_groups_allowed.intersection_update(ac.groups_allowed.all())
 
         # Special case: everyone is allowed access to all of the elements of acs.
-        everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
-        if everyone_group in ac_groups_allowed:
+        if everyone_group() in ac_groups_allowed:
             return set(), set()
 
         users_difference = self_users_allowed.difference(ac_users_allowed)

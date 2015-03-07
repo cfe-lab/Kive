@@ -4,24 +4,22 @@ import sys
 import tempfile
 
 from django.core.files import File
-from django.contrib.auth.models import User, Group
-from django.test import TransactionTestCase
+from django.contrib.auth.models import User
+from django.test import TransactionTestCase, TestCase
 
 from archive.models import MethodOutput, Dataset
 from librarian.models import SymbolicDataset, DatasetStructure
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 
 from method.tests import samplecode_path
-from constants import datatypes, groups
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
+from constants import datatypes
 
 
-class ExecuteTests(TransactionTestCase):
+class ExecuteTests(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
@@ -29,7 +27,7 @@ class ExecuteTests(TransactionTestCase):
 		# Users + method/pipeline families
         self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
         self.myUser.save()
-        self.myUser.groups.add(everyone_group)
+        self.myUser.groups.add(everyone_group())
         self.myUser.save()
 
         self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser); self.mf.save()

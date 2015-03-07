@@ -6,20 +6,18 @@ import subprocess
 import tempfile
 import time
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.core.files import File
 from django.db import transaction
 
-from constants import datatypes, groups
+from constants import datatypes
 import file_access_utils
 from librarian.models import SymbolicDataset
-from metadata.models import CompoundDatatype, Datatype
+from metadata.models import CompoundDatatype, Datatype, everyone_group
 from metadata.tests import clean_up_all_files
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 import sandbox.execute
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def create_sandbox_testing_tools_environment(case):
@@ -28,7 +26,7 @@ def create_sandbox_testing_tools_environment(case):
     # An ordinary user.
     case.user_bob = User.objects.create_user('bob', 'bob@talabs.com', 'verysecure')
     case.user_bob.save()
-    case.user_bob.groups.add(everyone_group)
+    case.user_bob.groups.add(everyone_group())
     case.user_bob.save()
 
     # Predefined datatypes.
@@ -87,7 +85,7 @@ def create_sequence_manipulation_environment(case):
     # Alice is a Shipyard user.
     case.user_alice = User.objects.create_user('alice', 'alice@talabs.com', 'secure')
     case.user_alice.save()
-    case.user_alice.groups.add(everyone_group)
+    case.user_alice.groups.add(everyone_group())
     case.user_alice.save()
 
     # Alice's lab has two tasks - complement DNA, and reverse and complement DNA.
@@ -304,7 +302,7 @@ def create_word_reversal_environment(case):
         string_datafile.name,
         name="blahblah", cdt=case.cdt_string, user=case.user_bob,
         description="blahblahblah", make_dataset=True,
-        groups_allowed=[everyone_group])
+        groups_allowed=[everyone_group()])
 
     os.remove(string_datafile.name)
 
@@ -338,13 +336,13 @@ def create_word_reversal_environment(case):
         case.wordbacks_datafile.name, user=case.user_bob,
         name="wordbacks", cdt=case.cdt_wordbacks,
         description="random reversed words", make_dataset=True,
-        groups_allowed=[everyone_group])
+        groups_allowed=[everyone_group()])
 
     case.symds_backwords = SymbolicDataset.create_SD(
         case.backwords_datafile.name, user=case.user_bob,
         name="backwords", cdt=case.cdt_backwords,
         description="random reversed words", make_dataset=True,
-        groups_allowed=[everyone_group])
+        groups_allowed=[everyone_group()])
 
 
 def destroy_word_reversal_environment(case):
@@ -545,7 +543,7 @@ def create_grandpa_sandbox_environment(case):
     # May 20, 2014: he's doing his best, man -- RL
     case.user_grandpa = User.objects.create_user('grandpa', 'gr@nd.pa', '123456')
     case.user_grandpa.save()
-    case.user_grandpa.groups.add(everyone_group)
+    case.user_grandpa.groups.add(everyone_group())
     case.user_grandpa.save()
 
     # A code resource, method, and pipeline which are empty.

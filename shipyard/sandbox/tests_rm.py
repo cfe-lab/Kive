@@ -33,7 +33,7 @@ class SandboxRMTransactionTestCase(TransactionTestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
-class ExecuteTestsRM(TransactionTestCase):
+class ExecuteTestsRM(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
@@ -332,7 +332,7 @@ class ExecuteTestsRM(TransactionTestCase):
         sandbox2.execute_pipeline()
 
 
-class BadRunTests(TransactionTestCase):
+class BadRunTests(TestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
@@ -379,7 +379,7 @@ class BadRunTests(TransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
 
 
-class FindSDTests(TransactionTestCase):
+class FindSDTests(TestCase):
     """
     Tests for first_generator_of_SD.
     """
@@ -561,7 +561,7 @@ class FindSDTests(TransactionTestCase):
         self.assertEqual(gen, cable.PSIC)
 
 
-class RawTests(SandboxRMTransactionTestCase):
+class RawTests(SandboxRMTestCase):
 
     def setUp(self):
         super(RawTests, self).setUp()

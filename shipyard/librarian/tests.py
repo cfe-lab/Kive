@@ -11,13 +11,13 @@ import time
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes, groups
+from constants import datatypes
 from librarian.models import SymbolicDataset, ExecRecord
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, everyone_group
 import metadata.tests
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
@@ -26,8 +26,6 @@ from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 import file_access_utils
 import logging
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 def create_librarian_test_environment(case):
@@ -159,7 +157,7 @@ def create_librarian_test_environment(case):
                                                    case.myUser,
                                                    cdt=case.triplet_cdt, make_dataset=True,
                                                    name="triplet", description="lol",
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
     case.triplet_symDS_structure = case.triplet_symDS.structure
     case.triplet_DS = case.triplet_symDS.dataset
 
@@ -167,7 +165,7 @@ def create_librarian_test_environment(case):
                                                    case.myUser,
                                                    cdt=case.doublet_cdt, name="doublet",
                                                    description="lol",
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
     case.doublet_symDS_structure = case.doublet_symDS.structure
     case.doublet_DS = case.doublet_symDS.dataset
 
@@ -175,7 +173,7 @@ def create_librarian_test_environment(case):
                                                    case.myUser,
                                                    cdt=case.singlet_cdt, name="singlet",
                                                    description="lol",
-                                                   groups_allowed=[everyone_group])
+                                                   groups_allowed=[everyone_group()])
     case.singlet_symDS_structure = case.singlet_symDS.structure
     case.singlet_DS = case.singlet_symDS.dataset
 
@@ -184,13 +182,13 @@ def create_librarian_test_environment(case):
                                                          case.myUser,
                                                          cdt=case.singlet_cdt, name="singlet",
                                                          description="lol",
-                                                         groups_allowed=[everyone_group])
+                                                         groups_allowed=[everyone_group()])
     case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
     case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
 
     case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
                                                user=case.myUser, cdt=None, name="raw", description="lol",
-                                               groups_allowed=[everyone_group])
+                                               groups_allowed=[everyone_group()])
     case.raw_DS = case.raw_symDS.dataset
 
     # Added September 30, 2013: symbolic dataset that results from E01_21.
@@ -200,14 +198,14 @@ def create_librarian_test_environment(case):
                                                  user=case.myUser,
                                                  cdt=case.doublet_cdt,
                                                  make_dataset=False,
-                                                 groups_allowed=[everyone_group])
+                                                 groups_allowed=[everyone_group()])
     case.D1_in_symDS_structure = case.D1_in_symDS.structure
 
     case.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"),
                                                  case.myUser,
                                                  cdt=case.triplet_cdt, name="C1_in_triplet",
                                                  description="triplet 3 rows",
-                                                 groups_allowed=[everyone_group])
+                                                 groups_allowed=[everyone_group()])
     case.C1_in_symDS_structure = case.C1_in_symDS.structure
     case.C1_in_DS = case.C1_in_symDS.dataset
 
@@ -216,7 +214,7 @@ def create_librarian_test_environment(case):
     case.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
                                                  case.myUser,
                                                  cdt=case.doublet_cdt, make_dataset=False,
-                                                 groups_allowed=[everyone_group])
+                                                 groups_allowed=[everyone_group()])
     case.C2_in_symDS_structure = case.C2_in_symDS.structure
 
     # October 16: an alternative to C2_in_symDS, which has existent data.
@@ -225,30 +223,30 @@ def create_librarian_test_environment(case):
                                                          cdt=case.doublet_cdt,
                                                          name="E11_32 output doublet",
                                                          description="result of E11_32 fed by doublet_cdt.csv",
-                                                         groups_allowed=[everyone_group])
+                                                         groups_allowed=[everyone_group()])
     case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
     case.E11_32_output_DS = case.E11_32_output_symDS.dataset
 
     case.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
                                                   case.myUser,
                                                   cdt=case.singlet_cdt, name="raw", description="lol",
-                                                  groups_allowed=[everyone_group])
+                                                  groups_allowed=[everyone_group()])
     case.C1_out_symDS_structure = case.C1_out_symDS.structure
     case.C1_out_DS = case.C1_out_symDS.dataset
 
     case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
                                                   case.myUser, cdt=None, name="raw", description="lol",
-                                                  groups_allowed=[everyone_group])
+                                                  groups_allowed=[everyone_group()])
     case.C2_out_DS = case.C2_out_symDS.dataset
 
     case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
                                                   case.myUser, cdt=None, name="raw", description="lol",
-                                                  groups_allowed=[everyone_group])
+                                                  groups_allowed=[everyone_group()])
     case.C3_out_DS = case.C3_out_symDS.dataset
 
     case.triplet_3_rows_symDS = SymbolicDataset.create_SD(
         os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), case.myUser, cdt=case.triplet_cdt,
-        name="triplet", description="lol", groups_allowed=[everyone_group])
+        name="triplet", description="lol", groups_allowed=[everyone_group()])
     case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
     case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
 
@@ -256,7 +254,7 @@ def create_librarian_test_environment(case):
     case.E1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
                                                   case.myUser, cdt=case.doublet_cdt, name="E1_out",
                                                   description="doublet remuxed from triplet",
-                                                  groups_allowed=[everyone_group])
+                                                  groups_allowed=[everyone_group()])
     case.E1_out_symDS_structure = case.E1_out_symDS.structure
     case.E1_out_DS = case.E1_out_symDS.dataset
 
@@ -265,7 +263,7 @@ def create_librarian_test_environment(case):
     case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
                                                        case.myUser, cdt=case.DNA_triplet_cdt, name="DNA_triplet",
                                                        description="DNA triplet data",
-                                                       groups_allowed=[everyone_group])
+                                                       groups_allowed=[everyone_group()])
     case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
     case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
 
@@ -273,7 +271,7 @@ def create_librarian_test_environment(case):
         os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
         name="E01_21_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
-        groups_allowed=[everyone_group])
+        groups_allowed=[everyone_group()])
     case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
     case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
 
@@ -281,7 +279,7 @@ def create_librarian_test_environment(case):
         os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
         name="E21_41_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
-        groups_allowed=[everyone_group])
+        groups_allowed=[everyone_group()])
     case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
     case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
 

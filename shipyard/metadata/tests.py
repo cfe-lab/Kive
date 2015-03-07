@@ -8,12 +8,12 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
 
-from metadata.models import BasicConstraint, CompoundDatatype, Datatype
+from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group
 from method.models import CodeResourceRevision
 from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
-from constants import datatypes, CDTs, groups
+from constants import datatypes, CDTs
 
 
 samplecode_path = "../samplecode"
@@ -21,13 +21,11 @@ samplecode_path = "../samplecode"
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
-    everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
-    
     # Define a user.  This was previously in librarian/tests.py,
     # but we put it here now so all tests can use it.
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     case.myUser.save()
-    case.myUser.groups.add(everyone_group)
+    case.myUser.groups.add(everyone_group())
     case.myUser.save()
 
     # Load up the builtin Datatypes.
@@ -248,7 +246,7 @@ class MetadataTestCase(TestCase):
     
     Other test classes that require this state can extend this one.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_metadata_test_environment(self)
@@ -263,7 +261,7 @@ class MetadataTransactionTestCase(TransactionTestCase):
 
     Other test classes that require this state can extend this one.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_metadata_test_environment(self)

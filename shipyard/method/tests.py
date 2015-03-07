@@ -9,16 +9,19 @@ import os.path
 import re
 import shutil
 import tempfile
-import itertools
 import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.contrib.auth.management import create_permissions
+from django.contrib.contenttypes.management import update_all_contenttypes
+from django.apps import apps as django_apps
 
-from constants import datatypes, groups
-from metadata.models import CompoundDatatype, Datatype
+from constants import datatypes
+from metadata.models import CompoundDatatype, Datatype, everyone_group
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
@@ -32,10 +35,10 @@ samplecode_path = metadata.tests.samplecode_path
 # For tracking whether we're leaking file descriptors.
 fd_count_logger = logging.getLogger("method.tests")
 
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 def fd_count(msg):
     fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
+
 
 # This is copied from
 # http://stackoverflow.com/questions/2023608/check-what-files-are-open-in-python
@@ -57,6 +60,7 @@ def get_open_fds():
             procs.split( '\n' ) )
         )
     return nprocs
+
 
 def create_method_test_environment(case):
     """Set up default database state that includes some CRs, CRRs, Methods, etc."""
@@ -546,15 +550,25 @@ def destroy_method_test_environment(case):
 
 
 class FileAccessTests(TransactionTestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_groups", "initial_user", "initial_data"]
 
     def setUp(self):
         fd_count("FDs (start)")
 
+        # Since these fixtures touch ContentType and Permission, loading them in the
+        # 'fixtures' attribute doesn't work.
+        # update_all_contenttypes(verbosity=0)
+        # call_command("flush", interactive=False)
+        # auth_app_config = django_apps.get_app_config("auth")
+        # create_permissions(auth_app_config, verbosity=0)
+        call_command("loaddata", "initial_groups", verbosity=0)
+        call_command("loaddata", "initial_user", verbosity=0)
+        call_command("loaddata", "initial_data", verbosity=0)
+
         # A typical user.
         self.user_randy = User.objects.create_user("Randy", "theotherrford@deco.ca", "hat")
         self.user_randy.save()
-        self.user_randy.groups.add(everyone_group)
+        self.user_randy.groups.add(everyone_group())
         self.user_randy.save()
 
         # Define comp_cr
@@ -571,6 +585,7 @@ class FileAccessTests(TransactionTestCase):
     def tearDown(self):
         metadata.tests.clean_up_all_files()
         fd_count("FDs (end)")
+        update_all_contenttypes(verbosity=0)
 
     def test_close_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -2690,13 +2705,19 @@ class MethodFamilyTests(MethodTestCase):
 
 
 class NonReusableMethodTests(TransactionTestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
+        # Loading the fixtures using the 'fixtures' attribute doesn't work due to
+        # subtleties in how Django's tests run.
+        call_command("loaddata", "initial_groups", verbosity=0)
+        call_command("loaddata", "initial_user", verbosity=0)
+        call_command("loaddata", "initial_data", verbosity=0)
+
         # An unpredictable, non-reusable user.
         self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
         self.user_rob.save()
-        self.user_rob.groups.add(everyone_group)
+        self.user_rob.groups.add(everyone_group())
         self.user_rob.save()
 
         # A piece of code that is non-reusable.
@@ -2850,7 +2871,11 @@ with open(outfile, "wb") as f:
         self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(
             datafile.name, name="numbers", cdt=self.increment_in_1_cdt,
             user=self.user_rob, description="1-2-3-4",
-            make_dataset=True, groups_allowed=[everyone_group])
+            make_dataset=True, groups_allowed=[everyone_group()])
+
+    def tearDown(self):
+        # Our tests fail post-teardown without this.
+        update_all_contenttypes(verbosity=0)
 
     def test_find_compatible_ER_non_reusable_method(self):
         """

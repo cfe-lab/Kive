@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
-from django.contrib.auth.models import User, Group
 
 import metadata.models
 

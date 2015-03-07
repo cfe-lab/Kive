@@ -6,18 +6,16 @@ Replace this with more appropriate tests for your application.
 """
 
 from django.test import TestCase
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 
 import shutil
 import tempfile
 
-from constants import datatypes, groups
+from constants import datatypes
 import metadata.models
 from datachecking.models import *
 from librarian.models import *
 import sandbox.testing_utils as tools
-
-everyone_group = Group.objects.get(pk=groups.EVERYONE_PK)
 
 
 class BlankableTestCase(TestCase):
@@ -26,7 +24,7 @@ class BlankableTestCase(TestCase):
     def setUp(self):
         self.user_doug = User.objects.create_user('doug', 'dford@deco.com', 'durrrrr')
         self.user_doug.save()
-        self.user_doug.groups.add(everyone_group)
+        self.user_doug.groups.add(metadata.models.everyone_group())
         self.user_doug.save()
 
         self.INT = metadata.models.Datatype.objects.get(pk=datatypes.INT_PK)
