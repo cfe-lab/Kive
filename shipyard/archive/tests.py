@@ -172,8 +172,8 @@ class ArchiveTestCaseHelpers:
 
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
         icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
         if bp == "first_cable": return
 
@@ -204,8 +204,8 @@ class ArchiveTestCaseHelpers:
         D1_in_ccl.save()
 
         icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         self.pD_run.parent_runstep = self.step_E2_RS
@@ -220,12 +220,12 @@ class ArchiveTestCaseHelpers:
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
         icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
         icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
@@ -238,8 +238,8 @@ class ArchiveTestCaseHelpers:
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
         if bp == "sub_pipeline_complete": return
 
@@ -254,8 +254,8 @@ class ArchiveTestCaseHelpers:
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
         icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         # C2_in_symDS was created here so we associate its CCL with cable
@@ -296,12 +296,12 @@ class ArchiveTestCaseHelpers:
         # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
         # and C3_out_symDS.
         icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
         icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         if bp == "outcables_done": return
@@ -351,13 +351,14 @@ class ArchiveTestCaseHelpers:
         if bp == "custom_roc_completed": return
 
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        self.step_E2_RS.start()
+        self.step_E2_RS.start(save=True)
+        self.step_E2_RS.save()
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.grant_everyone_access()
         self.pD_run.save()
         self.D11_21_ROC = self.D11_21.poc_instances.create(run=self.pD_run)
-        self.D11_21_ROC.start()
+        self.D11_21_ROC.start(save=False)
         # Define some custom wiring for D11_21: swap the first two columns.
         pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
         self.D11_21.custom_wires.create(source_pin=pin1, dest_pin=pin2)
@@ -369,7 +370,7 @@ class ArchiveTestCaseHelpers:
         self.C1_in_DS.save()
         self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
                                                end_time=timezone.now(), user=self.myUser)
-        self.D11_21_ROC.stop()
+        self.D11_21_ROC.stop(save=True)
         if bp == "subrun_complete": return
 
     def run_pipelines_recovering_reused_step(self):
@@ -3180,8 +3181,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
         other_cable = other_step1.RSICs.first()
         icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
@@ -3205,8 +3206,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
 
         icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
@@ -3537,12 +3538,12 @@ echo
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
         icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
         icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
-        icl.start()
-        icl.stop()
+        icl.start(save=False)
+        icl.stop(save=False)
         icl.save()
 
         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])

@@ -51,15 +51,19 @@ class Stopwatch(models.Model):
         return (self.end_time is not None)
 
     @transaction.atomic
-    def start(self):
+    def start(self, save=True, clean=False):
         """Start the stopwatch."""
         self.start_time = timezone.now()
-        self.clean()
-        self.save()
+        if clean:
+            self.clean()
+        if save:
+            self.save()
 
     @transaction.atomic
-    def stop(self):
+    def stop(self, save=True, clean=False):
         """Stop the stopwatch."""
         self.end_time = timezone.now()
-        self.clean()
-        self.save()
+        if clean:
+            self.clean()
+        if save:
+            self.save()

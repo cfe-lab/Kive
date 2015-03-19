@@ -257,6 +257,7 @@ class Sandbox:
         recover = recovering_record is not None
 
         # TODO: assertion for precondition 1?
+        # FIXME: do we need this clean?
         assert input_SD is None or input_SD.clean() is None
         assert recover or (input_SD and output_path)
 
@@ -274,8 +275,7 @@ class Sandbox:
             if not input_SD.is_OK():
                 self.logger.debug("Input %s has corrupted.  Cancelling.", input_SD)
                 curr_record.is_cancelled = True
-                curr_record.stop()
-                curr_record.save()
+                curr_record.stop(save=True, clean=False)
                 curr_record.complete_clean()
 
             # Attempt to reuse this PipelineCable.
@@ -297,7 +297,7 @@ class Sandbox:
                                 )
                                 curr_record.reused = True
                                 curr_record.execrecord = curr_ER
-                                curr_record.stop()
+                                curr_record.stop(save=False, clean=False)
                                 curr_record.complete_clean()
                                 curr_record.save()
                                 self.update_cable_maps(curr_record, output_SD, output_path)
@@ -350,7 +350,7 @@ class Sandbox:
                 # End. Return incomplete curr_record.
                 self.logger.warn("Recovery failed - returning RSIC/ROC without ExecLog")
                 if not recover:
-                    curr_record.stop()
+                    curr_record.stop(save=True, clean=False)
                 curr_record.clean()
                 return curr_record
 
@@ -425,7 +425,7 @@ class Sandbox:
                         self.logger.error("PipelineStepInputCable {} failed on reuse.".format(curr_RSIC))
                     else:
                         self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
-                    curr_RS.stop()
+                    curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
                 # Cable succeeded.
@@ -458,7 +458,7 @@ class Sandbox:
                                     )
                                     curr_RS.reused = True
                                     curr_RS.execrecord = curr_ER
-                                    curr_RS.stop()
+                                    curr_RS.stop(save=False, clean=False)
                                     curr_RS.complete_clean()
                                     curr_RS.save()
                                     self.update_step_maps(curr_RS, step_run_dir, output_paths)
@@ -493,7 +493,7 @@ class Sandbox:
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
                     self.logger.warn("Recovery of SymbolicDataset {} failed".format(curr_in_SD))
-                    curr_RS.stop()
+                    curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
         # Run code.
@@ -501,7 +501,7 @@ class Sandbox:
         if pipelinestep.is_subpipeline:
             self.execute_pipeline(pipeline=pipelinestep.transformation.pipeline, input_SDs=inputs_after_cable,
                                   sandbox_path=step_run_dir, parent_runstep=curr_RS)
-            curr_RS.stop()
+            curr_RS.stop(save=True, clean=True)
             return curr_RS
 
         input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
@@ -539,7 +539,7 @@ class Sandbox:
         else:
             pipeline = self.pipeline
 
-        curr_run.start()
+        curr_run.start(save=True, clean=False)
         sandbox_path = sandbox_path or self.sandbox_path
     
         for step in pipeline.steps.order_by("step_num"):
@@ -601,7 +601,7 @@ class Sandbox:
                     stop_now = True
 
             if stop_now:
-                curr_run.stop()
+                curr_run.stop(save=True, clean=True)
                 return curr_run
 
         self.logger.debug("Finished executing steps, executing POCs")
@@ -638,13 +638,11 @@ class Sandbox:
                     self.logger.debug("Reuse of cable %s failed", curr_ROC)
                 else:
                     self.logger.debug("Execution of cable %s failed", curr_ROC)
-                curr_run.clean()
-                curr_run.stop()
+                curr_run.stop(save=True, clean=True)
                 return curr_run
 
         self.logger.debug("Finished executing output cables")
-        curr_run.stop()
-        curr_run.save()
+        curr_run.stop(save=True, clean=False)
         curr_run.complete_clean()
         self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
 
@@ -827,7 +825,7 @@ class Sandbox:
             run_to_resume = task_completed.parent_run
 
         if task_completed is None:
-            run_to_resume.start()
+            run_to_resume.start(save=True)
 
         pipeline_to_resume = run_to_resume.pipeline
 
@@ -1013,8 +1011,7 @@ class Sandbox:
         if not input_SD.is_OK():
             self.logger.debug("Input %s has corrupted.  Cancelling.", input_SD)
             curr_record.is_cancelled = True
-            curr_record.stop()
-            curr_record.save()
+            curr_record.stop(save=True, clean=False)
             curr_record.complete_clean()
 
             # Return a RunCableExecuteInfo that is marked as cancelled.
@@ -1043,7 +1040,7 @@ class Sandbox:
                             )
                             curr_record.reused = True
                             curr_record.execrecord = curr_ER
-                            curr_record.stop()
+                            curr_record.stop(save=False, clean=False)
                             curr_record.complete_clean()
                             curr_record.save()
                             self.update_cable_maps(curr_record, output_SD, output_path)
@@ -1153,8 +1150,7 @@ class Sandbox:
             if cable_exec_info.cancelled:
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
-                curr_RS.stop()
-                curr_RS.save()
+                curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
             # If the cable is not complete and not ready to go, we need to recover its input.
             elif not cable_exec_info.cable_record.is_complete():
@@ -1224,8 +1220,7 @@ class Sandbox:
                                 )
                                 curr_RS.reused = True
                                 curr_RS.execrecord = curr_ER
-                                curr_RS.stop()
-                                curr_RS.save()
+                                curr_RS.stop(save=True, clean=False)
                                 curr_RS.complete_clean()
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
                                 return curr_RS
@@ -1453,8 +1448,7 @@ def finish_cable(cable_execute_dict, worker_rank):
                                      worker_rank, curr_ER, can_reuse["successful"])
                         curr_record.reused = True
                         curr_record.execrecord = curr_ER
-                        curr_record.stop()
-                        curr_record.save()
+                        curr_record.stop(save=True, clean=False)
                         curr_record.complete_clean()
                         return curr_record
             succeeded_yet = True
@@ -1487,7 +1481,7 @@ def finish_cable(cable_execute_dict, worker_rank):
         except IOError:
             logger.error("[%d] could not copy file %s to file %s.",
                          worker_rank, saved_data.dataset_file.path, input_SD_path)
-            curr_record.stop()
+            curr_record.stop(save=True, clean=True)
             return curr_record
 
     output_CDT = None
@@ -1620,7 +1614,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
     # End. Return curr_record.  Stop the clock if this was not a recovery.
     if not recover:
-        curr_record.stop()
+        curr_record.stop(save=True, clean=False)
     curr_record.complete_clean()
     return curr_record
 
@@ -1669,8 +1663,7 @@ def finish_step(step_execute_dict, worker_rank):
         # Cable failed, return incomplete RunStep.
         if not curr_RSIC.is_successful():
             logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
-            curr_RS.stop()
-            curr_RS.save()
+            curr_RS.stop(save=True, clean=False)
             curr_RS.complete_clean()
             return curr_RS
 
@@ -1696,8 +1689,7 @@ def finish_step(step_execute_dict, worker_rank):
                                          worker_rank, curr_ER, can_reuse["successful"])
                             curr_RS.reused = True
                             curr_RS.execrecord = curr_ER
-                            curr_RS.stop()
-                            curr_RS.save()
+                            curr_RS.stop(save=True, clean=False)
                             curr_RS.complete_clean()
                             return curr_RS
 
@@ -1889,7 +1881,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
             # Since reused=False, step_run_dir represents where the step *actually is*.
             sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
 
-        runstep.stop()
+        runstep.stop(save=True, clean=False)
     runstep.complete_clean()
     return runstep
 
