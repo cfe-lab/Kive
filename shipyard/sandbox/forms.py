@@ -18,6 +18,7 @@ class PipelineSelectionForm(forms.Form):
 
         family = PipelineFamily.objects.get(pk=pipeline_family_pk)
         self.family_name = family.name
+        self.family_pk = pipeline_family_pk
         choices = []
         for pipeline in family.complete_members:
             choices.append((pipeline.pk, str(pipeline)))

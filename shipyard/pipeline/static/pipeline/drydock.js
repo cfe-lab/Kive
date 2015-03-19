@@ -364,8 +364,8 @@ CanvasState.prototype.centreCanvas = function() {
 CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices(),
-        scale_width = canvas.width / this.scale,
-        scale_height = canvas.height / this.scale;
+        scale_width = this.canvas.width / this.scale,
+        scale_height = this.canvas.height / this.scale;
         
     // Bias defines how much to move myShape vs how much to move the shape it collided with.
     // 1 would be 100% myShape movement, 0 would be 100% other shape movement, and everything

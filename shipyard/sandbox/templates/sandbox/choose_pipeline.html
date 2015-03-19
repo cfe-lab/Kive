@@ -37,51 +37,48 @@ var mNodeWidth = 40,
 
 $(function() {
     // initialize animated canvas
-    canvas = document.getElementById('pipeline_preview_canvas');
-    var canvasWidth  = canvas.width  = 120,
-        canvasHeight = canvas.height = 90;
-
-    canvasState = new CanvasState(canvas);
-    canvasState.setScale(0.12);
-    canvasState.enable_labels = false;
     
-    // change pipeline revision drop-down triggers ajax to redraw canvas
-    $('.tbselect-value').on('change', function () {
-        if ($('.tbselect-value').val() !== '') {
-            $.ajax({
-                type: "POST",
-                url: "/get_pipeline/",
-                data: { pipeline_id: $('.tbselect-value').val() },
-                datatype: "json",
-                success: function(result) {
-                    $("#pipeline_preview_container").show();
-                    
-                    // prepare to redraw canvas
-                    // remove all objects from canvas
-                    canvasState.clear();
-                    // reset containers to reflect canvas
-                    canvasState.shapes = [];
-                    canvasState.connectors = [];
-                    canvasState.exec_order = [];
-                    canvasState.selection = [];
-        
-                    submit_to_url = result['family_pk'];
-                    var i, j, k; // counters
-                    var node, cables, cable, connector, shape, source, magnet;
-        
-                    draw_inputs(result);
-                    canvasState.testExecutionOrder();
-                    
-                    for (var i = 0; i < canvasState.shapes.length; i++) {
-                        canvasState.detectCollisions(canvasState.shapes[i], 0.5);
-                    }
+    $previews = $('canvas.preview').each(function() {
+        var $this = $(this),
+            this_ = this,
+            pkey = $this.closest('.results').data('pkey');
+        $.ajax({
+            type: "POST",
+            url: "/get_pipeline/",
+            data: { pipeline_id: $this.closest('tr').get_pkey(pkey) },
+            datatype: "json",
+            success: function(result) {
+                $this.show();
+                
+                this_.width  = 120,
+                this_.height = 90;
+
+                var cs = new CanvasState(this_);
+                cs.setScale(0.12);
+                cs.enable_labels = false;
+                
+                // prepare to redraw canvas
+                // remove all objects from canvas
+                cs.clear();
+                // reset containers to reflect canvas
+                cs.shapes = [];
+                cs.connectors = [];
+                cs.exec_order = [];
+                cs.selection = [];
+    
+                submit_to_url = result['family_pk'];
+                var i, j, k; // counters
+                var node, cables, cable, connector, shape, source, magnet;
+    
+                draw_inputs(cs, result);
+                cs.testExecutionOrder();
+                
+                for (var i = 0; i < cs.shapes.length; i++) {
+                    cs.detectCollisions(cs.shapes[i], 0.5);
                 }
-            });
-        }
-        else {
-            $("#pipeline_preview_container").hide();
-        }
-    }).change();
+            }
+        });
+    });
 });
 
     </script>
@@ -99,11 +96,6 @@ Select a pipeline
 </p>
 
 {% if pipeline_forms|length > 0 %}
-    <div id="pipeline_preview_container">
-        <h3>Currently selected: (thumbnail)</h3>
-        <canvas id="pipeline_preview_canvas">Warning: Kive does not support your web browser.</canvas>
-    </div>
-    
 	<div class="filter_ctrl">
 		<form class="short-filter">
 		<input name="name" type="text" data-link="Smart"><!--
@@ -134,6 +126,7 @@ Select a pipeline
         <thead>
             <tr>
                 <th>Pipeline Family</th>
+                <th>Thumbnail</th>
                 <th>Revision</th>
             </tr>
         </thead>
@@ -141,6 +134,7 @@ Select a pipeline
             {% for form in pipeline_forms %}
             <tr>
                 <td>{{ form.family_name }}</td>
+                <td class="preview-canvas"><canvas class="preview">Warning: Kive does not support your web browser.</canvas></td>
                 <td>{{ form.pipeline }}</td>
             </tr>
             {% endfor %}

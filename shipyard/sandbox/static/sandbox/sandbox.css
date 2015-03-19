@@ -39,12 +39,15 @@
 .results th:last-child {
     border-right-width: 0;
 }
+.results td:first-child {
+    padding-left: .5em;
+}
 .results td {
     border: 1px solid #eee;
     background-color: #fff;
     border-width: 1px 0;
     padding: .25em .5em;
-    vertical-align: top;
+    vertical-align: middle;
     font-size: .9em;
     white-space: nowrap;
 }
@@ -72,6 +75,14 @@
 .results caption {
     padding: .25em .5em;
     color: #bbb;
+}
+
+canvas.preview {
+    width: 120px;
+    height: 90px;
+}
+td.preview-canvas {
+    width: 120px;
 }
 
 .greyedout {
