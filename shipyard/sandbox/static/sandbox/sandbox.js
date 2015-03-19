@@ -166,22 +166,20 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 for (var i = 0; i < data.length; i++) {
                     var cols = tab.data('cols'),
                         new_row = [];
-                    
                     for (var j = 0; j < cols.length; j++) {
                         new_row[j] = data[i][cols[j]];
                     }
-                    
+                    new_row[cols.indexOf('Thumbnail')] = "<canvas class=\"preview\">Warning: Kive does not support your web browser.</canvas>"; 
                     new_tbody.push(new_row);
                 }
                 
                 for (i = 0; i < new_tbody.length; i++) {
                     new_tbody[i] = '<tr><td>' + new_tbody[i].join('</td><td>') + '</td></tr>';
                 }
-                
                 numResults = new_tbody.length;
-                
                 if (numResults > 0) {
                     var new_cells = tbody.html( new_tbody.join("\n") ).find('th,td');
+                    $('canvas.preview', tbody).each(load_preview_canvas).closest('td').addClass('preview-canvas');
                     columnPresentation(tab);
                 
                     // Was a row already selected, and is it still in the returned set?
@@ -189,9 +187,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                         // Check index row. nth-child(), as a CSS function, is 1-indexed
                         // rather than 0-indexed like everything else. We use jQuery.filter()
                         // to search the rows. Any matches have their click event triggered.
-                        var selectedRow = $('tbody td:nth-child(' + (tab.data('pkey') + 1) + ')', tab)
+                        console.log('tbody td:nth-child(' + (parseInt(tab.data('pkey')) + 1) + ')');
+                        var selectedRow = $('tbody td:nth-child(' + (parseInt(tab.data('pkey')) + 1) + ')', tab)
                                 .filter(function() {
-                                    return parseInt(this.innerHTML) == selectedValue;
+                                    return $('select', this).val() == selectedValue;
                                 }).closest('tr').click();
                     
                         // If no rows were matched, the selection is cleared to be empty.

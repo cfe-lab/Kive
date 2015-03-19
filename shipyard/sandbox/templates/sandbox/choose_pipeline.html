@@ -13,8 +13,6 @@
     <script type="text/javascript">
 
 // place in global namespace to access from other files
-var canvas;
-var canvasState;
 var submit_to_url = '/pipeline_add';
 
 var rawNodeWidth = 20,
@@ -35,50 +33,40 @@ var mNodeWidth = 40,
     mNodeColour = '#999',
     mNodeOffset = 5;
 
-$(function() {
-    // initialize animated canvas
-    
-    $previews = $('canvas.preview').each(function() {
-        var $this = $(this),
-            this_ = this,
-            pkey = $this.closest('.results').data('pkey');
-        $.ajax({
-            type: "POST",
-            url: "/get_pipeline/",
-            data: { pipeline_id: $this.closest('tr').get_pkey(pkey) },
-            datatype: "json",
-            success: function(result) {
-                $this.show();
-                
-                this_.width  = 120,
-                this_.height = 90;
-
-                var cs = new CanvasState(this_);
-                cs.setScale(0.12);
-                cs.enable_labels = false;
-                
-                // prepare to redraw canvas
-                // remove all objects from canvas
-                cs.clear();
-                // reset containers to reflect canvas
-                cs.shapes = [];
-                cs.connectors = [];
-                cs.exec_order = [];
-                cs.selection = [];
-    
-                submit_to_url = result['family_pk'];
-                var i, j, k; // counters
-                var node, cables, cable, connector, shape, source, magnet;
-    
-                draw_inputs(cs, result);
-                cs.testExecutionOrder();
-                
-                for (var i = 0; i < cs.shapes.length; i++) {
-                    cs.detectCollisions(cs.shapes[i], 0.5);
-                }
+var load_preview_canvas = function() {
+    var $this = $(this),
+        this_ = this,
+        pkey = $this.closest('.results').data('pkey');
+    $.ajax({
+        type: "POST",
+        url: "/get_pipeline/",
+        data: { pipeline_id: $this.closest('tr').get_pkey(pkey) },
+        datatype: "json",
+        success: function(result) {
+            this_.width  = 120,
+            this_.height = 90;
+            var cs = new CanvasState(this_);
+            cs.setScale(0.12);
+            cs.enable_labels = false;
+            // reset containers to reflect canvas
+            cs.shapes = [];
+            cs.connectors = [];
+            cs.exec_order = [];
+            cs.selection = [];
+            submit_to_url = result['family_pk'];
+//            var i, j, k; // counters
+//            var node, cables, cable, connector, shape, source, magnet;
+            draw_inputs(cs, result);
+            cs.testExecutionOrder();
+            for (var i = 0; i < cs.shapes.length; i++) {
+                cs.detectCollisions(cs.shapes[i], 0.5);
             }
-        });
+        }
     });
+};
+
+$(function() {
+    $('canvas.preview').each(load_preview_canvas);
 });
 
     </script>
