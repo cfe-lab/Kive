@@ -34,9 +34,10 @@ class Command(BaseCommand):
                 
         subprocess.check_call([python, manage_script, "flush", "--noinput"])
         call_command("migrate")
-        # call_command("loaddata", "initial_groups")
-        # call_command("loaddata", "initial_user")
-        # call_command("loaddata", "initial_data")
+        # flush truncates all tables, so we need to re-load this stuff.
+        call_command("loaddata", "initial_groups")
+        call_command("loaddata", "initial_user")
+        call_command("loaddata", "initial_data")
         os.mkdir(os.path.join(shipyard.settings.MEDIA_ROOT, "Sandboxes"))
         if fixture:
             call_command("loaddata", fixture)

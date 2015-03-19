@@ -32,7 +32,7 @@ class StopwatchTests(TestCase):
         """
         start_time set, end_time not set.  This is fine.
         """
-        self.pE_run.start()
+        self.pE_run.start(clean=False)
         self.assertIsNone(self.pE_run.clean())
 
     def test_clean_neither_set(self):
@@ -45,15 +45,15 @@ class StopwatchTests(TestCase):
         """
         start_time set, end_time not set.  This is fine.
         """
-        self.pE_run.start()
+        self.pE_run.start(clean=False)
         self.assertIsNone(self.pE_run.clean())
 
     def test_clean_start_set_end_set(self):
         """
         start_time set, end_time set afterwards.  This is fine.
         """
-        self.pE_run.start()
-        self.pE_run.stop()
+        self.pE_run.start(clean=False)
+        self.pE_run.stop(clean=False)
         self.assertIsNone(self.pE_run.clean())
 
     def test_clean_start_unset_end_set(self):
@@ -104,7 +104,7 @@ class StopwatchTests(TestCase):
         start() sets start_time.
         """
         self.assertFalse(self.pE_run.has_started())
-        self.pE_run.start()
+        self.pE_run.start(clean=False)
         self.assertTrue(self.pE_run.has_started())
 
     def test_stop(self):
@@ -112,7 +112,7 @@ class StopwatchTests(TestCase):
         stop() sets end_time.
         """
         self.assertFalse(self.pE_run.has_ended())
-        self.pE_run.start()
+        self.pE_run.start(clean=False)
         self.assertFalse(self.pE_run.has_ended())
-        self.pE_run.stop()
+        self.pE_run.stop(clean=False)
         self.assertTrue(self.pE_run.has_ended())

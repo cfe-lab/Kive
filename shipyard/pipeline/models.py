@@ -1055,13 +1055,12 @@ class PipelineCable(models.Model):
         # Set the ExecLog's start time.
         self.logger.debug("Filling in ExecLog of record {} and running cable (source='{}', output_path='{}')"
                           .format(cable_record, source, output_path))
-        curr_log.start()
-        curr_log.save()
+        curr_log.start(save=False)
 
         if self.is_trivial():
             self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
             link_result = os.link(source, output_path)
-            curr_log.stop()
+            curr_log.stop(save=True, clean=True)
             return link_result
 
         # Make a dict encapsulating the mapping required: keyed by the output column name, with value
@@ -1098,7 +1097,7 @@ class PipelineCable(models.Model):
                     output_csv.writerow(dest_row)
 
         # Now give it the correct end_time
-        curr_log.stop()
+        curr_log.stop(save=False, clean=False)
         curr_log.complete_clean()
         curr_log.save()
 

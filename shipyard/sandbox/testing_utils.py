@@ -372,7 +372,7 @@ def new_datatype(dtname, dtdesc, shipyardtype, user):
     datatype.save()
     datatype.restricts.add(Datatype.objects.get(pk=shipyardtype.pk))
     datatype.grant_everyone_access()
-    datatype.complete_clean()
+    # datatype.complete_clean()
     return datatype
 
 
@@ -381,7 +381,7 @@ def make_first_revision(resname, resdesc, resfn, contents, user):
     Helper function to make a CodeResource and the first version.
     """
     resource = CodeResource(name=resname, description=resdesc, filename=resfn, user=user)
-    resource.clean()
+    # resource.clean()
     resource.save()
     resource.grant_everyone_access()
     with tempfile.TemporaryFile() as f:
@@ -405,7 +405,6 @@ def make_first_method(famname, famdesc, driver, user):
     Helper function to make a new MethodFamily for a new Method.
     """
     family = MethodFamily(name=famname, description=famdesc, user=user)
-    family.clean()
     family.save()
     family.grant_everyone_access()
     with transaction.atomic():
@@ -446,7 +445,6 @@ def make_first_pipeline(pname, pdesc, user):
     member.
     """
     family = PipelineFamily(name=pname, description=pdesc, user=user)
-    family.clean()
     family.save()
     family.grant_everyone_access()
     pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=user)

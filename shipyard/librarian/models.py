@@ -472,10 +472,11 @@ class SymbolicDataset(metadata.models.AccessControl):
         self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
                           .format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog, user=checking_user)
-        ccl.start()
+        ccl.start(save=False)
 
         if self.is_raw():
-            ccl.stop()
+            ccl.stop(save=True, clean=False)
+            ccl.clean()
             return ccl
 
         my_CDT = self.get_cdt()
@@ -487,7 +488,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
             self.logger.warn("malformed header")
             ccl.add_bad_header()
-            ccl.stop()
+            ccl.stop(save=True, clean=True)
             return ccl
 
         if csv_summary["num_rows"] == 0:
@@ -534,7 +535,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         else:
             self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
                     format(file_path_to_check, self))
-        ccl.stop()
+        ccl.stop(save=True, clean=True)
         return ccl
 
     def check_integrity(self, new_file_path, checking_user, execlog, newly_computed_MD5=None):
@@ -551,7 +552,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
         icl = self.integrity_checks.create(execlog=execlog, user=checking_user)
-        icl.start()
+        icl.start(save=False)
 
         if newly_computed_MD5 == None:
             with open(new_file_path, "rb") as f:
@@ -569,9 +570,7 @@ class SymbolicDataset(metadata.models.AccessControl):
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()
 
-        icl.end_time = timezone.now()
-        icl.clean()
-        icl.save()
+        icl.stop(save=True, clean=True)
         return icl
     
     def is_OK(self):
@@ -691,13 +690,12 @@ class ExecRecord(models.Model):
                         during execution, in order of their index
         """
         execrecord = cls(generator=generator)
-        execrecord.clean()
+        # execrecord.clean()
         execrecord.save()
         for i, component_input in enumerate(component.inputs):
             execrecord.execrecordins.create(generic_input=component_input, symbolicdataset=input_SDs[i])
         for i, component_output in enumerate(component.outputs):
             execrecord.execrecordouts.create(generic_output=component_output, symbolicdataset=output_SDs[i])
-        execrecord.save()
         execrecord.complete_clean()
         return execrecord
 

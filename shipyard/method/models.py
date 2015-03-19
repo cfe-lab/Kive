@@ -632,7 +632,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         are handles to regular files, open for reading and writing.
         """
         if log:
-            log.start()
+            log.start(save=False)
 
         returncode = None
         try:
@@ -663,7 +663,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         with transaction.atomic():
             if log:
-                log.stop()
+                log.stop(save=True, clean=True)
 
             # TODO: I'm not sure how this is going to handle huge output, 
             # it would be better to update the logs as we go.

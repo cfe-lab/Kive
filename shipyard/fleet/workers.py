@@ -100,8 +100,7 @@ class Manager:
         if new_sdbx.run.is_complete():
             mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
                             new_sdbx.run, pipeline_to_run, user)
-            new_sdbx.run.stop()
-            new_sdbx.run.save()
+            new_sdbx.run.stop(save=True)
             new_sdbx.run.complete_clean()
         else:
             self.active_sandboxes[new_sdbx.run] = new_sdbx
@@ -248,8 +247,7 @@ class Manager:
                                 curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
 
             self.active_sandboxes.pop(curr_sdbx.run)
-            curr_sdbx.run.stop()
-            curr_sdbx.run.save()
+            curr_sdbx.run.stop(save=True)
             curr_sdbx.run.complete_clean()
 
             if curr_sdbx.run.successful_execution():
