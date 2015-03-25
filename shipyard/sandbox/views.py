@@ -9,16 +9,16 @@ import archive.models
 import pipeline.models
 from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmissionForm
 import fleet.models
+from django.db.models import Count
+from metadata.models import KiveUser
 
 
 def _prepare_pipeline_selection_forms(user):
-    families = pipeline.models.PipelineFamily.filter_by_user(user)
-    forms = []
-    for family in families:
-        if len(family.complete_members) > 0:
-            forms.append(PipelineSelectionForm(pipeline_family_pk=family.pk))
-    return forms
-
+    user = KiveUser.kiveify(user)
+    families = pipeline.models.PipelineFamily.objects\
+        .annotate(member_count=Count('members'))\
+        .filter(user.access_query(), member_count__gt=0)
+    return [PipelineSelectionForm(pipeline_family_pk=f.pk) for f in families]
 
 @login_required
 def choose_pipeline(request):
