@@ -1382,8 +1382,21 @@ class CompoundDatatype(AccessControl):
     def __str__(self):
         """ Represent CompoundDatatype with a list of it's members """
 
+        # Okay, this is kind of ugly, and try never to do this,
+        # but if we use 'self.members.order_by("column_idx")' here
+        # it invalidates results that may have been prefetched (if this
+        # is used in a queryset that has prefetched results). So we just
+        members = self.members.all()
+
+        # then sort those results in python
+        members = sorted(members, key=lambda x: x.column_idx)
+
+        # typically it's better to let the database sort data
+        # but the list of members is also typically very small
+        # so we can get away with no performance hit here
+
         string_rep = "("
-        string_rep += ", ".join(str(m) for m in self.members.order_by("column_idx"))
+        string_rep += ", ".join(str(m) for m in members)
         string_rep += ")"
         if string_rep == "()":
             string_rep = "[empty CompoundDatatype]"

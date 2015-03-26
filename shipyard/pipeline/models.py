@@ -286,7 +286,7 @@ class Pipeline(transformation.models.Transformation):
         # Create a map of the outputs for this pipeline by dataset name
         outputmap = {o.dataset_name: o for o in self.outputs.all()}
 
-        # Prefetch + software join for related fields
+        # Prefetch + software join related fields
         steps = list(self.steps.order_by('step_num').\
             prefetch_related('transformation__method__family',
                              'transformation__pipeline__family',

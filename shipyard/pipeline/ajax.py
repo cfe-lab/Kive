@@ -122,9 +122,15 @@ def get_pipeline(request):
         if pipeline_revision_id != '':
             pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
             pipeline_dict = pipeline_revision.represent_as_dict()
+            steps = pipeline_revision.steps\
+                .select_related('transformation__pipeline',
+                                'transformation__method')\
+                .prefetch_related('transformation__method__inputs__structure__compounddatatype__members__datatype',
+                                  'transformation__method__outputs__structure__compounddatatype__members__datatype',
+                                  'transformation__method__family')
 
             # Hack to reduce number of ajax calls in interface.
-            for step in pipeline_revision.steps.all():
+            for step in steps:
                 if not step.is_subpipeline:
                     method = step.transformation.definite
                     pipeline_dict["pipeline_steps"][step.step_num-1].update(get_method_xputs(method))
