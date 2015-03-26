@@ -283,18 +283,33 @@ class Pipeline(transformation.models.Transformation):
             "is_published_version": self.is_published_version
         }
 
-        # Populate dict_repr["pipeline_inputs"].
-        for curr_input in self.inputs.all():
-            dict_repr["pipeline_inputs"].append(curr_input.represent_as_dict())
+        # Create a map of the outputs for this pipeline by dataset name
+        outputmap = {o.dataset_name: o for o in self.outputs.all()}
 
-        # Now populate dict_repr["pipeline_steps"].
-        for curr_step in self.steps.all().order_by("step_num"):
-            dict_repr["pipeline_steps"].append(curr_step.represent_as_dict())
+        # Prefetch + software join for related fields
+        steps = list(self.steps.order_by('step_num').\
+            prefetch_related('transformation__method__family',
+                             'transformation__pipeline__family',
+                             'cables_in__custom_wires',
+                             'cables_in__dest__transformationinput',
+                             'cables_in__dest__transformationoutput',
+                             'cables_in__source__transformationinput',
+                             'cables_in__source__transformationoutput',
+                             'outputs_to_delete'))
+        inputs = self.inputs.prefetch_related('structure')
+        outcables = self.outcables.select_related('pipeline',
+                                                  'output_cdt',
+                                                  'source')\
+            .prefetch_related('source__structure',
+                              'source__transformationinput',
+                              'source__transformationoutput',
+                              'custom_wires__source_pin',
+                              'custom_wires__dest_pin')
 
-        # Finally, populate dict_repr["pipeline_outputs"].
-        for curr_poc in self.outcables.all():
-            dict_repr["pipeline_outputs"].append(curr_poc.represent_as_dict())
-
+        # Populate dictionary
+        dict_repr["pipeline_steps"] = [s.represent_as_dict() for s in steps]
+        dict_repr["pipeline_inputs"] = [i.represent_as_dict() for i in inputs]
+        dict_repr["pipeline_outputs"] = [o.represent_as_dict(outputmap) for o in outcables]
         return dict_repr
 
     @transaction.atomic
@@ -1817,7 +1832,7 @@ class PipelineOutputCable(PipelineCable):
             new_structure.save()
 
     @transaction.atomic
-    def represent_as_dict(self):
+    def represent_as_dict(self, outputmap=None):
         """
         Make a dict serialization of this POC.
 
@@ -1831,7 +1846,11 @@ class PipelineOutputCable(PipelineCable):
          - y: y-coordinate of the same
          - wires: list of dicts as produced by a CustomCableWire's represent_as_dict() method.
         """
-        corresp_output = self.pipeline.outputs.get(dataset_name=self.output_name)
+        # This is a bit of a hacky fix
+        if outputmap is None:
+            corresp_output = self.pipeline.outputs.get(dataset_name=self.output_name)
+        else:
+            corresp_output = outputmap[self.output_name]
         my_dict = {
             "output_idx": self.output_idx,
             "output_name": self.output_name,

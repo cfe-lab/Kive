@@ -206,7 +206,7 @@ class Transformation(metadata.models.AccessControl):
     @transaction.atomic
     def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
                     input=True, clean=True):
-        """Create a TranformationXput for this Transformation.
+        """Create a TransformationXput for this Transformation.
 
         Decides whether the created TransformationXput should have a
         structure or not based on the parameters given. If
