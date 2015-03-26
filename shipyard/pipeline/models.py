@@ -296,7 +296,7 @@ class Pipeline(transformation.models.Transformation):
                              'cables_in__source__transformationinput',
                              'cables_in__source__transformationoutput',
                              'outputs_to_delete'))
-        inputs = self.inputs.prefetch_related('structure')
+        inputs = self.inputs.prefetch_related('structure').select_related('transformation')
         outcables = self.outcables.select_related('pipeline',
                                                   'output_cdt',
                                                   'source')\
@@ -824,7 +824,10 @@ class PipelineStep(models.Model):
 
         return outputs_needed
 
-    @transaction.atomic
+    # Why did we need transaction.atomic here?
+    # Commenting it out to avoid creating a transaction
+    # for a read
+    #@transaction.atomic
     def represent_as_dict(self):
         """
         Make a dictionary representation of this PipelineStep.
