@@ -33,7 +33,7 @@
 {% for dataset in datasets %}
 <tr>
     <td>{{ dataset.user }}</td>
-	<td><a href="{{ dataset.get_absolute_url }}">{{ dataset.name }}</a></td>
+	<td><a href="{{ dataset.get_absolute_url|get_view_link }}">{{ dataset.name }}</a></td>
 	<td>{{ dataset.description|escape|linebreaksbr }}</td>
     <td>{{ dataset.date_created }}</td>
     <td>{{ dataset.get_filesize }}</td>
@@ -59,7 +59,7 @@
             None
         {% endif %}
     </td>
-    <td><a href="{{ dataset.get_absolute_url|get_view_link }}">View</a> | <a href="{{ dataset.get_absolute_url }}">Download</a></td>
+    <td><a href="{{ dataset.get_absolute_url }}">Download</a></td>
 </tr>
 {% endfor %}
 </table>

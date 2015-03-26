@@ -67,14 +67,14 @@ def dataset_view(request, dataset_id):
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
     if dataset.symbolicdataset.is_raw():
-        return _build_raw_viewer(request, dataset.dataset_file, dataset.name)
+        return _build_raw_viewer(request, dataset.dataset_file, dataset.name, dataset.get_absolute_url())
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {"dataset": dataset})
     return HttpResponse(t.render(c))
 
-def _build_raw_viewer(request, file, name):
+def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")
-    c = RequestContext(request, {"file": file, "name": name})
+    c = RequestContext(request, {"file": file, "name": name, 'download': download})
     return HttpResponse(t.render(c))
     
 
