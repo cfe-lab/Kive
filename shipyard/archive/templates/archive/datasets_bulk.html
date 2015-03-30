@@ -5,13 +5,10 @@
 
 {% block title %}Bulk Added Dataset{% endblock %}
 
+{% block javascript %}
 <style>
 {#    TODO:  put this in CSS#}
-    .bulk_dataset_table {
-        overflow:scroll;
-        height:50em;
-        clear: both;
-    }
+
 
     .status_cell {
 
@@ -26,12 +23,15 @@
         outline: none;
     }
 
+    .display_only_input  input[type="text"] {
+        background-color: #F5F5F5;
+    }
+
     textarea:focus, input:focus{
         outline: none;
     }
 </style>
 
-{% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script>
     $(document).ready(function() {
@@ -87,10 +87,10 @@
                         <td style="display:none">{{ dataset_form.id }}
                             <div class="errortext">{{ dataset_form.id.errors }}</div>
                         </td>
-                        <td>{{ dataset_form.orig_filename }}
+                        <td class="display_only_input">{{ dataset_form.orig_filename }}
                             <div class="errortext">{{ dataset_form.orig_filename.errors }}</div>
                         </td>
-                        <td>{{ dataset_form.filesize }}
+                        <td class="display_only_input">{{ dataset_form.filesize }}
                             <div class="errortext">{{ dataset_form.filesize.errors }}</div>
                         </td>
                         <td>{{ dataset_form.name }}
