@@ -293,6 +293,18 @@ class RunComponent(stopwatch.models.Stopwatch):
         super(RunComponent, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    def save(self, *args, **kwargs):
+        """
+        Saves the object to the database.
+        """
+
+        # Compute and mark these here so as to
+        # save time avoiding database lookups
+        # when we calculate these in other parts of code
+        self._complete = self.is_complete()
+        self._successful = self.is_successful()
+        super(RunComponent, self).save(*args, **kwargs)
+
     def has_data(self):
         """
         Returns whether or not this instance has an associated Dataset.
@@ -523,6 +535,13 @@ class RunComponent(stopwatch.models.Stopwatch):
                     self.__class__.__name__, self)
             )
 
+    def is_marked_complete(self):
+        """
+        Returns whether or not this run component has been marked
+        as complete when it was last saved.
+        """
+        return self._complete
+
     def is_complete(self):
         """
         True if this RunComponent is complete; false otherwise.
@@ -611,6 +630,13 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.clean()
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
+
+    def is_marked_successful(self):
+        """
+        Returns whether or not this run component has been marked
+        as successful when it was last saved.
+        """
+        return self._successful
 
     def is_successful(self):
         if self.is_cancelled:

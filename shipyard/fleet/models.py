@@ -120,34 +120,34 @@ class RunToProcess(metadata.models.AccessControl):
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
-        runsteps = list(run.runsteps.order_by("pipelinestep__step_num"))
+        runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
         for step in runsteps:
-            if not step.is_complete():
+            if not step.is_marked_complete():
                 try:
-                    step.log
+                    step.log.id
                     status += "+"
                 except ExecLog.DoesNotExist:
                     status += ":"
-            elif not step.is_successful():
+            elif not step.is_marked_successful():
                 status += "!"
             else:
                 status += "*"
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
-        
         status += "-"
         
         # Which outcables are in progress?
-        for pipeline_cable in run.pipeline.outcables.order_by("output_idx"):
-            run_cable = pipeline_cable.poc_instances.filter(run=run).first()
-            if run_cable is None:
+        cables = sorted(run.pipeline.outcables.all(), key=lambda x: x.output_idx)
+        for pipeline_cable in cables:
+            run_cables = filter(lambda x: x.run == run, pipeline_cable.poc_instances.all())
+            if len(run_cables) <= 0:
                 status += "."
-            elif run_cable.is_complete():
+            elif run_cables[0].is_marked_complete():
                 status += "*"
             else:
                 try:
-                    run_cable.log
+                    run_cables[0].log.id
                     status += "+"
                 except ExecLog.DoesNotExist:
                     status += ":"

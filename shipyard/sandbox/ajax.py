@@ -144,7 +144,15 @@ def _load_status(request):
         value = request.GET.get('filters[{}][val]'.format(i))
         runs = _add_run_filter(runs, key, value)
         i += 1
-    
+
+    runs = runs.prefetch_related('pipeline__steps',
+                                 'run__runsteps__log',
+                                 'run__runsteps__pipelinestep__cables_in',
+                                 'run__runsteps__pipelinestep__transformation__method',
+                                 'run__runsteps__pipelinestep__transformation__pipeline',
+                                 'run__pipeline__outcables__poc_instances__run',
+                                 'run__pipeline__outcables__poc_instances__log',
+                                 'run__pipeline__steps')
     LIMIT = 30
     has_more = False
     report = []
@@ -153,7 +161,7 @@ def _load_status(request):
             has_more = True
             break
         report.append(run.get_run_progress())
-    return (report, has_more)
+    return report, has_more
 
 def _is_status_changed(runs, request):
     for i, run in enumerate(runs):
