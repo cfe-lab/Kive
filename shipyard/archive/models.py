@@ -276,6 +276,11 @@ class RunComponent(stopwatch.models.Stopwatch):
     is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
                                     default=False)
 
+    _complete = models.BooleanField(help_text="Denotes whether this run component has been completed. Private use only",
+                                    default=False)
+    _successful = models.BooleanField(help_text="Denotes whether this has been successful. Private use only!",
+                                      default=False)
+
     # Implicit:
     # - log: via OneToOneField from ExecLog
     # - invoked_logs: via FK from ExecLog
