@@ -35,8 +35,6 @@ def update_complete_mark(func):
         # Hopefully you've decorated the right object
         # and this exists
         if hasattr(self, '_complete'):
-            if 'dontsave' in kwargs:
-                return result
             self._complete = result
             # If there is an entry in the database
             if self.pk is not None:
@@ -53,8 +51,6 @@ def update_success_mark(func):
         # Hopefully you've decorated the right object
         # and this exists
         if hasattr(self, '_successful'):
-            if 'dontsave' in kwargs:
-                return result
             self._successful = result
             # If there is an entry in the database
             if self.pk is not None:
