@@ -122,7 +122,7 @@ class RunToProcess(metadata.models.AccessControl):
         total_steps = run.pipeline.steps.count()
         runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
         for step in runsteps:
-            if not step.is_marked_complete():
+            if not step.is_complete():
                 try:
                     step.log.id
                     status += "+"

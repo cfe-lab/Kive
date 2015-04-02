@@ -121,8 +121,6 @@ class RunToProcessTest(TestCase):
         exec_log = run_step.invoked_logs.first()
         exec_log.methodoutput.return_code = 5
         exec_log.methodoutput.save()
-        # The step must be saved, so as to recompute
-        # all the _complete flags
         run_step.save()
         
         progress = run_tracker.get_run_progress()

@@ -26,6 +26,42 @@ import metadata.models
 from constants import maxlengths
 import archive.signals
 
+
+def update_complete_mark(func):
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        result = func(*args, **kwargs)
+
+        # Hopefully you've decorated the right object
+        # and this exists
+        if hasattr(self, '_complete'):
+            if 'dontsave' in kwargs:
+                return result
+            self._complete = result
+            # If there is an entry in the database
+            if self.pk is not None:
+                self.save(update_fields=["_complete"])
+        return result
+    return wrapper
+
+
+def update_success_mark(func):
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        result = func(*args, **kwargs)
+
+        # Hopefully you've decorated the right object
+        # and this exists
+        if hasattr(self, '_successful'):
+            if 'dontsave' in kwargs:
+                return result
+            self._successful = result
+            # If there is an entry in the database
+            if self.pk is not None:
+                self.save(update_fields=["_successful"])
+        return result
+    return wrapper
+
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
@@ -294,16 +330,11 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def save(self, *args, **kwargs):
-        """
-        Saves the object to the database.
-        """
-
-        # Compute and mark these here so as to
-        # save time avoiding database lookups
-        # when we calculate these in other parts of code
-        self._complete = self.is_complete()
-        self._successful = self.is_successful()
+        if 'update_fields' not in kwargs:
+            self._complete = self.is_complete()
+            self._successful = self.is_successful()
         super(RunComponent, self).save(*args, **kwargs)
+
 
     def has_data(self):
         """
@@ -542,7 +573,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         return self._complete
 
-    def is_complete(self):
+    def is_complete(self, **kwargs):
         """
         True if this RunComponent is complete; false otherwise.
 
@@ -638,7 +669,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         return self._successful
 
-    def is_successful(self):
+    def is_successful(self, **kwargs):
         if self.is_cancelled:
             return False
         if self.reused:
@@ -1090,7 +1121,8 @@ class RunStep(RunComponent):
         if not self.reused or usable_dict["successful"]:
             self._clean_outputs()
 
-    def is_complete(self):
+    @update_complete_mark
+    def is_complete(self, **kwargs):
         """
         True if RunStep is complete; False otherwise.
 
@@ -1136,6 +1168,10 @@ class RunStep(RunComponent):
         # At this point we know that all RSICs exist, and are complete
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self)
+
+    @update_success_mark
+    def is_successful(self, **kwargs):
+        return super(RunStep, self).is_successful()
 
     def successful_execution(self):
         """
@@ -1318,6 +1354,14 @@ class RunCable(RunComponent):
 
     def is_trivial(self):
         return self.component.is_trivial()
+
+    @update_complete_mark
+    def is_complete(self, **kwargs):
+        return super(RunCable, self).is_complete()
+
+    @update_success_mark
+    def is_successful(self, **kwargs):
+        return super(RunCable, self).is_successful()
 
     def _clean_not_reused(self):
         """
