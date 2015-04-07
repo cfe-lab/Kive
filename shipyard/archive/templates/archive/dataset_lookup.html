@@ -23,19 +23,19 @@
     {% if datasets.count == 0 %}
         <h3>No matching runs!</h3>
     {% else %}
+        <ul>
         {% for d in datasets %}
-            yo: {{ d.MD5_checksum }}
+            <li>
+                {{ d.dataset.created_by.parent_run.name }}:
 
-            {% if d.dataset.created_by == None %}
-                This was an upload
-            {% else %}
-               created by:  {{ d.dataset.created_by.parent_run }}
-                            {{ d.dataset.created_by.parent_run.pipeline }}
-                <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
-            {% endif %}
+                {% if d.dataset.created_by == None %}
+                    This was an upload
+                {% else %}
+                    instance of pipeline: {{ d.dataset.created_by.parent_run.pipeline.family }}
+                    <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
+                {% endif %}
+            </li>
         {% endfor %}
+        </ul>
     {% endif %}
-
-
-
 {% endblock %}

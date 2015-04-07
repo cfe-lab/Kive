@@ -58,6 +58,12 @@ $(function() {
 {% endblock %}
 
 {% block content %}
+    {% if md5 != None %}
+        <a href="/datasets_lookup/{{md5}}" rel="prev">Back to matching list</a>
+    {% else %}
+        <a href="/runs" rel="prev"> Back to runs </a>
+    {% endif %}
+
     <div>
         <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
         <div id="method_context_menu" class="context_menu">
