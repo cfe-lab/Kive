@@ -55,15 +55,16 @@ function CanvasState (canvas) {
     this.collisions = 0;
 
     // events
-    
     var myState = this; // save reference to this particular CanvasState
-    
     this.outputZone = new OutputZone(this.width, this.height);
 
     // options
     this.selectionColor = '#7bf';
     this.selectionWidth = 2;
     setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
+
+    // Parameters on data-x
+    this.can_edit = !($(canvas).data('editable') === false);
 }
 
 CanvasState.prototype.setScale = function(factor) {
@@ -163,8 +164,10 @@ CanvasState.prototype.doDown = function(e) {
             $('#id_method_button')[0].value = 'Revise Method';
         }
     }
+
     else if (mySel.constructor == Magnet && mySel.isOutput) {
-        if (!shift || this.selection.length == 0) {
+
+        if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
             conn = new Connector(null, null, mySel);
             this.connectors.push(conn);
@@ -176,7 +179,12 @@ CanvasState.prototype.doDown = function(e) {
     else if (mySel.constructor == Connector) {
         if (!shift || this.selection.length == 0) {
             this.selection = [ mySel ];
-            this.dragoffx = this.dragoffy = 0;
+            if(this.can_edit){
+                this.dragoffx = this.dragoffy = 0;
+            } else {
+                this.dragging = false;
+                return;
+            }
         }
     }
     
@@ -210,7 +218,7 @@ CanvasState.prototype.doMove = function(e) {
                 this.valid = false; // redraw
 
                 // are we carrying a connector?
-                if (sel.constructor == Connector) {
+                if (sel.constructor == Connector && this.can_edit) {
                     // reset to allow mouse to disengage Connector from a magnet
                     
                     sel.x = mouse.x;
@@ -596,7 +604,7 @@ CanvasState.prototype.doUp = function(e) {
 
 CanvasState.prototype.contextMenu = function(e) {
     var pos = this.getPos(e);
-    if (this.selection.length == 1 && this.selection[0].constructor != Connector) {
+    if (this.selection.length == 1 && this.selection[0].constructor != Connector && this.can_edit) {
         $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
         $('#method_context_menu li').show();
         
@@ -784,7 +792,7 @@ CanvasState.prototype.draw = function() {
             && this.selection[0].source.parent.constructor == MethodNode;
         
         // draw output end-zone -when- dragging a connector from a MethodNode
-        if (draggingFromMethodOut) {
+        if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
         }
         
