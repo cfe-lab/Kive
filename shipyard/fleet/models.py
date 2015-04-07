@@ -95,10 +95,13 @@ class RunToProcess(metadata.models.AccessControl):
         return '{} on {}'.format(pipeline_name, first_input_name) 
 
     @transaction.atomic
-    def get_run_progress(self):
+    def get_run_progress(self, detailed=False):
         """
         Return a dictionary describing the Run's current state.
-    
+
+        If detailed is True, then the returned dictionary contains
+         dictionaries for the run components and cables denoting
+         their completion/success status (indexed by id)
         @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}
         """
         result = {'name': self.display_name}
@@ -115,23 +118,28 @@ class RunToProcess(metadata.models.AccessControl):
             return result
 
         run = self.run
-
         status = ""
+        step_progress = {}
+        cable_progress = {}
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
         runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
         for step in runsteps:
-            if not step.is_complete():
+            if not step.is_marked_complete():
                 try:
                     step.log.id
                     status += "+"
+                    step_progress[step.id] = '+'
                 except ExecLog.DoesNotExist:
                     status += ":"
+                    step_progress[step.id] = ':'
             elif not step.is_marked_successful():
                 status += "!"
+                step_progress[step.id] = '!'
             else:
                 status += "*"
+                step_progress[step.id] = '*'
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
@@ -151,14 +159,17 @@ class RunToProcess(metadata.models.AccessControl):
                     status += "+"
                 except ExecLog.DoesNotExist:
                     status += ":"
-        
+
+        if detailed:
+            result['step_progress'] = step_progress
+            result['cable_progress'] = cable_progress
         result['status'] = status
         result['id'] = run.id
         result['start'] = self._format_time(run.start_time)
         result['end'] = self._format_time(run.end_time)
 
         return result
-    
+
     def _format_time(self, t):
         return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 
