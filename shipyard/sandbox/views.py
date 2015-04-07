@@ -218,6 +218,7 @@ def view_results(request, id):
 
 
 def view_run(request, id, md5=None):
+    run = archive.models.Run.objects.get(id=id)
     template = loader.get_template("sandbox/view_run.html")
-    context = RequestContext(request, {'id': id, 'md5': md5})
+    context = RequestContext(request, {'id': id, 'md5': md5, 'run': run})
     return HttpResponse(template.render(context))

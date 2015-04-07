@@ -8,9 +8,66 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
+
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
+
+    <script src="/static/pipeline/pipeline_add.js"></script>
+    <script src="/static/pipeline/pipeline_load.js"></script>
+    <script type="text/javascript">
+
+$(function() {
+    // change pipeline revision drop-down triggers ajax to redraw canvas
+    $('#id_pipeline_select').on('change', function () {
+        $.ajax({
+            type: "POST",
+            url: "/get_pipeline/",
+            data: { pipeline_id: $('#id_pipeline_select').val() },
+            datatype: "json",
+            success: function(result) {
+                // prepare to redraw canvas
+                $('#id_reset_button').click();
+                submit_to_url = result['family_pk'];
+
+                draw_inputs(canvasState, result);
+
+                canvasState.testExecutionOrder();
+
+                for (var i = 0; i < canvasState.shapes.length; i++) {
+                    canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+                }
+
+                $('#id_publish').val(
+                    result['is_published_version']?
+                    'Cancel publication' :
+                    'Make published version'
+                );
+            }
+        });
+    }).change();
+
+});
+
+</script>
+
+    <link rel="stylesheet" href="/static/pipeline/drydock.css">
+    <style>
+        #canvas{}
+    </style>
 {% endblock %}
 
 {% block content %}
+    <div>
+        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
+        <div id="method_context_menu" class="context_menu">
+            <ul>
+                <li data-action="edit" class="edit">Edit</li>
+                <li data-action="delete" class="delete">Delete</li>
+            </ul>
+        </div>
 
-
+        <select id="id_pipeline_select" style="display:none">
+            <option value="{{run.pipeline.id}}">{{run.pipeline.id}}</option>
+        </select>
+    </div>
 {% endblock %}
