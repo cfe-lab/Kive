@@ -1,0 +1,29 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% load filters %}
+
+{% block title %}Pipeline Lookup{% endblock %}
+
+{% block javascript %}
+    <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script type="text/javascript" src="/static/archive/md5.js"></script>
+    <script type="text/javascript" src="/static/archive/lookup.js"></script>
+    <style>
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <a href="usr.html" rel="prev">Back to data lookup</a>
+    <h2>Find pipeline</h2>
+
+
+    <div id="dropzone" style="background-color: grey; display: block; height: 90%" id="dropzone">
+        hey
+    </div>
+
+    <input id='continuebtn' type="button"  value="Ok" disabled/>
+{% endblock %}

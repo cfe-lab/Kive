@@ -302,6 +302,7 @@ def datasets_bulk(request):
     return HttpResponse(t.render(c))
 
 
+@login_required
 def dataset_lookup(request, md5_checksum=None):
     if md5_checksum is None:
         # Check POST
@@ -309,14 +310,18 @@ def dataset_lookup(request, md5_checksum=None):
         # calculate md5 sum
         pass
 
-    # Lookup data by Md5
-    # if not found 404
+    datasets = librarian.models.SymbolicDataset.objects.filter(MD5_checksum=md5_checksum)
+    t = loader.get_template('archive/dataset_lookup.html')
+    c = RequestContext(request, {'datasets': datasets, 'md5': md5_checksum})
 
-    return HttpResponse()
+    return HttpResponse(t.render(c))
 
 
+@login_required
 def lookup(request):
-    return HttpResponse()
+    t = loader.get_template("archive/lookup.html")
+    c = RequestContext(request, {})
+    return HttpResponse(t.render(c))
 
 
 # def datasets_update_bulk(request):
