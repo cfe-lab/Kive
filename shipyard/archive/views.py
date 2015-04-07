@@ -302,6 +302,23 @@ def datasets_bulk(request):
     return HttpResponse(t.render(c))
 
 
+def dataset_lookup(request, md5_checksum=None):
+    if md5_checksum is None:
+        # Check POST
+        # Check valid form
+        # calculate md5 sum
+        pass
+
+    # Lookup data by Md5
+    # if not found 404
+
+    return HttpResponse()
+
+
+def lookup(request):
+    return HttpResponse()
+
+
 # def datasets_update_bulk(request):
 #     """
 #     Edit recently added bulk datasets in /datasets_udate_bulk.html

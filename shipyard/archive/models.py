@@ -331,7 +331,6 @@ class RunComponent(stopwatch.models.Stopwatch):
             self._successful = self.is_successful()
         super(RunComponent, self).save(*args, **kwargs)
 
-
     def has_data(self):
         """
         Returns whether or not this instance has an associated Dataset.
