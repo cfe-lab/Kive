@@ -16,16 +16,13 @@
 {% endblock %}
 
 {% block content %}
-
     <a href="/lookup" rel="prev">Back to data lookup</a>
     <h2>Matching runs</h2>
 
-    {{ datasets }}
 
     {% if datasets.count == 0 %}
-        No matching runs!
+        <h3>No matching runs!</h3>
     {% else %}
-        Matching runs!
         {% for d in datasets %}
             yo: {{ d.MD5_checksum }}
 
@@ -34,7 +31,11 @@
             {% else %}
                created by:  {{ d.dataset.created_by.parent_run }}
                             {{ d.dataset.created_by.parent_run.pipeline }}
+                <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
             {% endif %}
         {% endfor %}
     {% endif %}
+
+
+
 {% endblock %}

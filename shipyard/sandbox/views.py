@@ -215,3 +215,9 @@ def view_results(request, id):
                             "../../dataset_download/{}".format(dataset.id)))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
+
+
+def view_run(request, id, md5=None):
+    template = loader.get_template("sandbox/view_run.html")
+    context = RequestContext(request, {'id': id, 'md5': md5})
+    return HttpResponse(template.render(context))
