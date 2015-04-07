@@ -10,6 +10,12 @@ $(document).ready(function(){
         var reader = new FileReader();
         reader.onloadend = function(e) {
             self.md5_sum = md5(e.target.result);
+
+            $('#no_file').hide();
+            $('#file_loaded').show();
+
+            $('#id_filename').text(files[0].name);
+            $('#id_md5sum').text(self.md5_sum);
             $('#continuebtn').removeAttr('disabled');
         };
         reader.readAsBinaryString(files[0]);
@@ -21,7 +27,7 @@ $(document).ready(function(){
     {
         e.stopPropagation();
         e.preventDefault();
-        self.dzone.css('border', '2px solid #0B85A1');
+        self.dzone.addClass('dz_shadow');
     });
     self.dzone.on('dragover', function (e)
     {
@@ -30,7 +36,7 @@ $(document).ready(function(){
     });
     self.dzone.on('drop', function (e)
     {
-         self.dzone.css('border', '2px dotted #0B85A1');
+         self.dzone.removeClass('dz_shadow');
          e.preventDefault();
          var files = e.originalEvent.dataTransfer.files;
 
@@ -49,7 +55,6 @@ $(document).ready(function(){
     {
       e.stopPropagation();
       e.preventDefault();
-      self.dzone.css('border', '2px dotted #0B85A1');
     });
     doc.on('drop', function (e)
     {

@@ -8,6 +8,7 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
+    <script src="/static/pipeline/jsBezier-0.6.js"></script>
 
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
@@ -58,7 +59,7 @@ $(function() {
 
 {% block content %}
     <div>
-        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
+        <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
         <div id="method_context_menu" class="context_menu">
             <ul>
                 <li data-action="edit" class="edit">Edit</li>
@@ -69,5 +70,16 @@ $(function() {
         <select id="id_pipeline_select" style="display:none">
             <option value="{{run.pipeline.id}}">{{run.pipeline.id}}</option>
         </select>
+
+        <input type="submit" id="id_method_button" value="Add Method" style="display:none">
     </div>
+    <div id="dialog_form">
+        <form id="id_output_name_form">
+            <label for="output_name">Output name</label>
+            <input type="text" name="output_name" id="output_name" class="text">
+            <input type="submit" id="output_submit" value="OK">
+            <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
+        </form>
+    </div>
+
 {% endblock %}
