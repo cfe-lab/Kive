@@ -55,15 +55,16 @@ function CanvasState (canvas) {
     this.collisions = 0;
 
     // events
-    
     var myState = this; // save reference to this particular CanvasState
-    
     this.outputZone = new OutputZone(this.width, this.height);
 
     // options
     this.selectionColor = '#7bf';
     this.selectionWidth = 2;
     setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
+
+    // Parameters on data-x
+    this.can_edit = !($(canvas).data('editable') === false);
 }
 
 CanvasState.prototype.setScale = function(factor) {
@@ -163,8 +164,10 @@ CanvasState.prototype.doDown = function(e) {
             $('#id_method_button')[0].value = 'Revise Method';
         }
     }
+
     else if (mySel.constructor == Magnet && mySel.isOutput) {
-        if (!shift || this.selection.length == 0) {
+
+        if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
             conn = new Connector(null, null, mySel);
             this.connectors.push(conn);
@@ -176,7 +179,12 @@ CanvasState.prototype.doDown = function(e) {
     else if (mySel.constructor == Connector) {
         if (!shift || this.selection.length == 0) {
             this.selection = [ mySel ];
-            this.dragoffx = this.dragoffy = 0;
+            if(this.can_edit){
+                this.dragoffx = this.dragoffy = 0;
+            } else {
+                this.dragging = false;
+                return;
+            }
         }
     }
     
@@ -219,7 +227,7 @@ CanvasState.prototype.doMove = function(e) {
                 this.valid = false; // redraw
 
                 // are we carrying a connector?
-                if (sel.constructor == Connector) {
+                if (sel.constructor == Connector && this.can_edit) {
                     // reset to allow mouse to disengage Connector from a magnet
                     
                     sel.x = mouse.x;
@@ -605,16 +613,43 @@ CanvasState.prototype.doUp = function(e) {
 
 CanvasState.prototype.contextMenu = function(e) {
     var pos = this.getPos(e);
-    if (this.selection.length == 1 && this.selection[0].constructor != Connector) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu li').show();
-        
-        if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+
+    // Edit mode can popup the context menu to delete and edit nodes
+    if(this.can_edit){
+        if (this.selection.length == 1 && this.selection[0].constructor != Connector ) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+            $('#method_context_menu li').show();
+
+            if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+                $('#method_context_menu .edit').hide();
+            }
+        } else if (this.selection.length > 1) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
             $('#method_context_menu .edit').hide();
         }
-    } else if (this.selection.length > 1) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu .edit').hide();
+    } else {
+        // Otherwise, we're read only, so only popup the context menu
+        // for outputs with datasets
+        if(this.selection.length == 1 &&
+           this.selection[0].constructor == OutputNode &&
+           this.selection[0].dataset_id !== null) {
+
+           // Context menu for pipeline outputs
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').show();
+           $('#method_context_menu .step_node').hide();
+
+        } else if(  this.selection.length == 1 &&
+                    this.selection[0].constructor == MethodNode &&
+                    this.selection[0].log_id !== null) {
+
+           // Context menu for pipeline steps
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').hide();
+           $('#method_context_menu .step_node').show();
+        }
     }
     this.doUp(e);
     e.preventDefault();
@@ -800,7 +835,7 @@ CanvasState.prototype.draw = function() {
             && this.selection[0].source.parent.constructor == MethodNode;
         
         // draw output end-zone -when- dragging a connector from a MethodNode
-        if (draggingFromMethodOut) {
+        if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
         }
         
@@ -995,3 +1030,19 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
         }
     }
 };
+
+CanvasState.prototype.findMethodNode = function(method_pk) {
+    var shapes = this.shapes;
+    for(var i=0; i < shapes.length; i++)
+        if (shapes[i].constructor === MethodNode && shapes[i].pk == method_pk)
+            return shapes[i];
+    return null;
+}
+
+CanvasState.prototype.findOutputNode = function(method_pk) {
+    var shapes = this.shapes;
+    for(var i=0; i < shapes.length; i++)
+        if (shapes[i].constructor === OutputNode && shapes[i].pk == method_pk)
+            return shapes[i];
+    return null;
+}

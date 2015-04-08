@@ -1,0 +1,88 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% load filters %}
+
+{% block title %}Pipeline Lookup{% endblock %}
+
+{% block javascript %}
+    <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script type="text/javascript" src="/static/archive/md5.js"></script>
+    <script type="text/javascript" src="/static/archive/lookup.js"></script>
+    <style>
+        #dropzone {
+            background-color: rgb(242, 242, 242);
+            left: 70px;
+            right: 70px;
+
+            border: 4px dashed rgb(202, 202, 202);
+            vertical-align: middle;
+            text-align: center;
+
+            -moz-border-radius: 50px;
+            -webkit-border-radius: 50px;
+            border-radius: 50px;
+        }
+
+        .margin-fix {
+            margin-top: 100px;
+            margin-bottom: 100px;
+        }
+
+        .color-fix {
+            color: rgb(105, 105, 105);
+        }
+
+        #dropzone h2 {
+            color: rgb(194, 194, 194);
+            font-size: 2.5em;
+        }
+
+        #dropzone h3{
+            color: rgb(194, 194, 194);
+        }
+
+
+        .dz_shadow {
+            -moz-box-shadow: 0px 0px 15px 5px rgba(165, 217, 249, 0.75);
+            -webkit-box-shadow: 0px 0px 15px 5px rgba(165, 217, 249, 0.75);
+            box-shadow: 0px 0px 15px 5px rgba(165, 217, 249, 0.75);
+        }
+
+        #file_loaded {
+            display: none;
+        }
+
+        input[type='button'] {
+            margin-top: 50px;
+            width: 100px;
+        }
+
+        #continuebtn:disabled {
+            color: #C5C5C5;
+            background-color: #ECECEC;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <a href="usr.html" rel="prev">Back to user's portal</a>
+    <h2>Find pipeline</h2>
+
+    <div id="dropzone" id="dropzone">
+        <div id="no_file">
+            <h2 class="margin-fix"> Drop a file here to search the database.</h2>
+        </div>
+        <div id="file_loaded">
+            <h2>
+                <span class="color-fix">Loaded file: <span id="id_filename"></span></span>
+            </h2>
+            <h3> MD5: <span id="id_md5sum"></span> </h3>
+            <p class="color-fix">Click &quot;Search&quot; to proceed</p>
+        </div>
+    </div>
+
+    <input id='continuebtn' type="button"  value="Search" disabled/>
+{% endblock %}

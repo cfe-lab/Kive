@@ -215,3 +215,11 @@ def view_results(request, id):
                             "../../dataset_download/{}".format(dataset.id)))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
+
+
+@login_required
+def view_run(request, run_id, md5=None):
+    run = archive.models.Run.objects.get(id=run_id)
+    template = loader.get_template("sandbox/view_run.html")
+    context = RequestContext(request, {'run_id': run_id, 'md5': md5, 'run': run})
+    return HttpResponse(template.render(context))
