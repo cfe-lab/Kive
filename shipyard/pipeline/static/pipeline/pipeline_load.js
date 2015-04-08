@@ -144,3 +144,16 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
         }
     }
 }
+
+function update_status(canvasState, status) {
+    var pipeline_steps = status.runs.step_progress;
+
+    // Update all runsteps
+    for(method_pk in pipeline_steps) {
+        var shape = canvasState.findMethodNode(method_pk);
+        if(shape != null)
+            shape.status = pipeline_steps[method_pk];
+    }
+
+    canvasState.valid = false;
+}

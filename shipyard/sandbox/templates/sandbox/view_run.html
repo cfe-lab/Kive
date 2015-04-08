@@ -18,35 +18,49 @@
     <script type="text/javascript">
 
 $(function() {
-    // change pipeline revision drop-down triggers ajax to redraw canvas
-    $('#id_pipeline_select').on('change', function () {
-        $.ajax({
-            type: "POST",
-            url: "/get_pipeline/",
-            data: { pipeline_id: $('#id_pipeline_select').val() },
-            datatype: "json",
-            success: function(result) {
-                // prepare to redraw canvas
-                $('#id_reset_button').click();
-                submit_to_url = result['family_pk'];
+    var self = this;
 
-                draw_inputs(canvasState, result);
+    self.timer = null;
 
-                canvasState.testExecutionOrder();
+    function grabStatus() {
+        if(self.timer === null)
+            self.timer = setInterval(grabStatus, 1000);
 
-                for (var i = 0; i < canvasState.shapes.length; i++) {
-                    canvasState.detectCollisions(canvasState.shapes[i], 0.5);
-                }
-
-                $('#id_publish').val(
-                    result['is_published_version']?
-                    'Cancel publication' :
-                    'Make published version'
-                );
+        $.getJSON(
+            "/poll_run_progress/{{run_id}}",{},
+            function(result){
+                if(result.runs.status != '?')
+                    update_status(canvasState, result);
             }
-        });
-    }).change();
+        );
+    }
 
+    $.ajax({
+        type: "POST",
+        url: "/get_pipeline/",
+        data: { pipeline_id: {{run.pipeline.id}} },
+        datatype: "json",
+        success: function(result) {
+            // prepare to redraw canvas
+            $('#id_reset_button').click();
+            submit_to_url = result['family_pk'];
+
+            draw_inputs(canvasState, result);
+            grabStatus();
+
+            canvasState.testExecutionOrder();
+
+            for (var i = 0; i < canvasState.shapes.length; i++) {
+                canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+            }
+
+            $('#id_publish').val(
+                result['is_published_version']?
+                'Cancel publication' :
+                'Make published version'
+            );
+        }
+    });
 });
 
 </script>

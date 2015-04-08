@@ -299,7 +299,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
+function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -332,6 +332,8 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     
     this.stack = 20;
     this.scoop = 45;
+
+    this.status = status || null;
 
     this.in_magnets = [];
     var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
@@ -460,6 +462,37 @@ MethodNode.prototype.draw = function(ctx) {
         magnet.x = x_outputs + pos * cos30 * c2c;
         magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
+    }
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        status_color_map = {
+            '*': 'green',
+            '!': 'red',
+            '+': 'orange',
+            ':': 'orange',
+            '.': 'yellow',
+        }
+        ctx.save();
+
+        ctx.strokeStyle = status_color_map[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // body
+        ctx.beginPath();
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[5].x, vertices[5].y );
+        ctx.lineTo( vertices[6].x, vertices[6].y );
+        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+        ctx.lineTo( vertices[2].x, vertices[2].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        ctx.closePath();
+
+        ctx.stroke();
+        ctx.restore();
     }
 };
 

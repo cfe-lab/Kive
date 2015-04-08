@@ -126,20 +126,21 @@ class RunToProcess(metadata.models.AccessControl):
         total_steps = run.pipeline.steps.count()
         runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
         for step in runsteps:
+            log_char = ""
             if not step.is_marked_complete():
                 try:
                     step.log.id
-                    status += "+"
-                    step_progress[step.id] = '+'
+                    log_char = "+"
                 except ExecLog.DoesNotExist:
-                    status += ":"
-                    step_progress[step.id] = ':'
+                    log_char = ":"
             elif not step.is_marked_successful():
-                status += "!"
-                step_progress[step.id] = '!'
+                log_char = "!"
             else:
-                status += "*"
-                step_progress[step.id] = '*'
+                log_char = "*"
+
+            status += log_char
+            if detailed:
+                step_progress[step.pipelinestep.transformation.pk] = log_char
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
@@ -149,16 +150,20 @@ class RunToProcess(metadata.models.AccessControl):
         cables = sorted(run.pipeline.outcables.all(), key=lambda x: x.output_idx)
         for pipeline_cable in cables:
             run_cables = filter(lambda x: x.run == run, pipeline_cable.poc_instances.all())
+            log_char = ""
             if len(run_cables) <= 0:
-                status += "."
+                log_char = "."
             elif run_cables[0].is_marked_complete():
-                status += "*"
+                log_char = "*"
             else:
                 try:
                     run_cables[0].log.id
-                    status += "+"
+                    log_char = "+"
                 except ExecLog.DoesNotExist:
-                    status += ":"
+                    log_char = ":"
+            status += log_char
+            if detailed:
+                cable_progress[pipeline_cable.id] = log_char
 
         if detailed:
             result['step_progress'] = step_progress

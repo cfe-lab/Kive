@@ -30,7 +30,7 @@ class AJAXRequestHandler:
         *args           additional arguments to response_fun
         **kwargs        keyword arguments to response_fun
         """
-        if request.is_ajax() or True:
+        if request.is_ajax():
             self.response = HttpResponse()
             self.response.write(response_fun(request, *args, **kwargs))
         else:

@@ -987,3 +987,11 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
         }
     }
 };
+
+CanvasState.prototype.findMethodNode = function(method_pk) {
+    var shapes = this.shapes;
+    for(var i=0; i < shapes.length; i++)
+        if (shapes[i].constructor === MethodNode && shapes[i].pk == method_pk)
+            return shapes[i];
+    return null;
+}
