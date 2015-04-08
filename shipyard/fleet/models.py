@@ -95,10 +95,13 @@ class RunToProcess(metadata.models.AccessControl):
         return '{} on {}'.format(pipeline_name, first_input_name) 
 
     @transaction.atomic
-    def get_run_progress(self):
+    def get_run_progress(self, detailed=False):
         """
         Return a dictionary describing the Run's current state.
-    
+
+        If detailed is True, then the returned dictionary contains
+         dictionaries for the run components and cables denoting
+         their completion/success status (indexed by id)
         @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}
         """
         result = {'name': self.display_name}
@@ -115,50 +118,79 @@ class RunToProcess(metadata.models.AccessControl):
             return result
 
         run = self.run
-
         status = ""
+        completed = True
+        failed = False
+        step_progress = {}
+        cable_progress = {}
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
         runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
         for step in runsteps:
-            if not step.is_complete():
+            log_char = ""
+            if not step.is_marked_complete():
                 try:
                     step.log.id
-                    status += "+"
+                    log_char = "+"
                 except ExecLog.DoesNotExist:
-                    status += ":"
+                    log_char = ":"
             elif not step.is_marked_successful():
-                status += "!"
+                log_char = "!"
             else:
-                status += "*"
+                log_char = "*"
+
+            status += log_char
+            if detailed:
+                step_progress[step.pipelinestep.transformation.pk] = {'status': log_char, 'log_id': None}
+                try:
+                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                        methodoutput.id
+                except:
+                    pass
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
         status += "-"
-        
+
         # Which outcables are in progress?
         cables = sorted(run.pipeline.outcables.all(), key=lambda x: x.output_idx)
         for pipeline_cable in cables:
             run_cables = filter(lambda x: x.run == run, pipeline_cable.poc_instances.all())
+            log_char = ""
             if len(run_cables) <= 0:
-                status += "."
+                log_char = "."
             elif run_cables[0].is_marked_complete():
-                status += "*"
+                log_char = "*"
             else:
                 try:
                     run_cables[0].log.id
-                    status += "+"
+                    log_char = "+"
                 except ExecLog.DoesNotExist:
-                    status += ":"
-        
+                    log_char = ":"
+
+            # Log the statu
+            status += log_char
+            if detailed:
+                cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id': None, 'md5': None}
+                try:
+                    symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
+                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.pk
+                    cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
+                except:
+                    pass
+
+        if detailed:
+            result['step_progress'] = step_progress
+            result['output_progress'] = cable_progress
+
         result['status'] = status
         result['id'] = run.id
         result['start'] = self._format_time(run.start_time)
         result['end'] = self._format_time(run.end_time)
 
         return result
-    
+
     def _format_time(self, t):
         return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 

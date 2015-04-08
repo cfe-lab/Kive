@@ -127,7 +127,14 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
             magnet = source.out_magnets[k];
             if (magnet.label === this_output.source_dataset_name) {
                 connector = new Connector(null, null, magnet);
-                output_node = new OutputNode(this_output.x * canvasState.canvas.width / canvasState.scale, this_output.y * canvasState.canvas.height / canvasState.scale, null, null, null, null, null, this_output.output_name);
+                output_node = new OutputNode(
+                    this_output.x * canvasState.canvas.width / canvasState.scale,
+                    this_output.y * canvasState.canvas.height / canvasState.scale,
+                    null, null, null, null, null,
+                    this_output.output_name,
+                    this_output.id
+                 );
+
                 canvasState.addShape(output_node);
                 
                 connector.x = this_output.x * canvasState.canvas.width / canvasState.scale;
@@ -143,4 +150,41 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
             }
         }
     }
+}
+
+function update_status(canvasState, status, look_for_md5) {
+    var pipeline_steps = status.runs.step_progress;
+    var outputs = status.runs.output_progress;
+
+    // Set all the inputs as complete
+    for(var i = 0; i < canvasState.shapes.length; i++){
+        if( canvasState.shapes[i].constructor == RawNode ||
+            canvasState.shapes[i].constructor == CDtNode)
+            canvasState.shapes[i].status = '*';
+    }
+
+    // Update all runsteps
+    for(method_pk in pipeline_steps) {
+        var shape = canvasState.findMethodNode(method_pk);
+        if(shape != null) {
+            shape.status = pipeline_steps[method_pk].status;
+            shape.log_id = pipeline_steps[method_pk].log_id;
+        }
+    }
+
+    // Update all outputs
+    for(output_pk in outputs) {
+        var shape = canvasState.findOutputNode(output_pk);
+        if(shape != null) {
+            shape.status = outputs[output_pk].status;
+            shape.md5 = outputs[output_pk].md5;
+            shape.dataset_id = outputs[output_pk].dataset_id;
+
+            if(shape.md5 == look_for_md5)
+                shape.found_md5 = true;
+        }
+    }
+
+    // Invalidate to force a redraw
+    canvasState.valid = false;
 }

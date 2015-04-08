@@ -1,0 +1,135 @@
+<!-- Django template -->
+<!-- Displays a Run-->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Runs{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/pipeline/jsBezier-0.6.js"></script>
+
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
+
+    <script src="/static/pipeline/pipeline_add.js"></script>
+    <script src="/static/pipeline/pipeline_load.js"></script>
+    <script type="text/javascript">
+
+$(function() {
+    var self = this;
+
+    self.timer = null;
+
+    function grabStatus() {
+        if(self.timer === null)
+            self.timer = setInterval(grabStatus, 1000);
+
+        $.getJSON(
+            "/poll_run_progress/{{run_id}}",{},
+            function(result){
+                if(result.runs.status != '?') {
+                    var stat = result.runs.status;
+                    var msg = 'Complete';
+                    if(stat.indexOf('.') > -1)
+                        msg = 'In progress...';
+                    if(stat.indexOf('!') > -1)
+                        msg = 'Failed!';
+
+                    $('#run_status').text(msg);
+                    update_status(canvasState, result, "{{md5}}");
+                }
+            }
+        );
+    }
+
+    $.ajax({
+        type: "POST",
+        url: "/get_pipeline/",
+        data: { pipeline_id: {{run.pipeline.id}} },
+        datatype: "json",
+        success: function(result) {
+            // prepare to redraw canvas
+            $('#id_reset_button').click();
+            submit_to_url = result['family_pk'];
+
+            draw_inputs(canvasState, result);
+            grabStatus();
+
+            canvasState.testExecutionOrder();
+
+            for (var i = 0; i < canvasState.shapes.length; i++) {
+                canvasState.detectCollisions(canvasState.shapes[i], 0.5);
+            }
+
+            $('#id_publish').val(
+                result['is_published_version']?
+                'Cancel publication' :
+                'Make published version'
+            );
+        }
+    });
+});
+
+</script>
+
+    <link rel="stylesheet" href="/static/pipeline/drydock.css">
+    <style>
+        #canvas{}
+    </style>
+{% endblock %}
+
+{% block content %}
+    {% if md5 != None %}
+        <a href="/datasets_lookup/{{md5}}" rel="prev">Back to matching list</a>
+    {% else %}
+        <a href="/runs" rel="prev"> Back to runs </a>
+    {% endif %}
+
+    <div class="pipeline_rdonly_ctrl">
+        <ul class="desc_topleft">
+            {% if  run.pipeline.revision_name|length <= 0 %}
+                <li> Pipeline family: {{ run.pipeline.family }} </li>
+            {% else %}
+                <li> Pipeline: {{ run.pipeline.revision_name }} ({{ run.pipeline.family }})</li>
+            {% endif %}
+            <li class="new_ctrl">Revision #: {{ run.pipeline.revision_number }}</li>
+
+            {% if run.pipeline.revision_desc|length <= 0 %}
+                {% if run.pipeline.family.description|length > 0 %}
+                    <li class="new_ctrl">{{ run.pipeline.family.description }}</li>
+                {% endif %}
+            {% else %}
+                    <li class="new_ctrl">{{ run.pipeline.revision_desc }}</li>
+            {% endif %}
+                <li> Run status: <span id="run_status">Checking...</span> </li>
+        </ul>
+    </div>
+
+    <div>
+        <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
+        <div id="method_context_menu" class="context_menu">
+            <ul>
+                <li data-action="display" class="output_node">View Dataset</li>
+                <li data-action="download" class="output_node">Download Dataset</li>
+                <li data-action="viewlog" class="step_node">View Log</li>
+                <li data-action="viewerrorlog" class="step_node">View Error Log</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- These are here because drydock expects them, todo, remove these and refactor the code so as not to need them -->
+    <select id="id_pipeline_select" style="display:none"></select>
+    <input type="submit" id="id_method_button" value="Add Method" style="display:none">
+    <div id="dialog_form">
+        <form id="id_output_name_form">
+            <label for="output_name">Output name</label>
+            <input type="text" name="output_name" id="output_name" class="text">
+            <input type="submit" id="output_submit" value="OK">
+            <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
+        </form>
+    </div>
+
+{% endblock %}

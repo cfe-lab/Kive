@@ -86,7 +86,13 @@ function show_run_progress(run_data) {
     $tbody.empty();
     $.each(run_data['runs'], function() {
         $row = $('<tr/>');
-        $row.append($('<td class="code"/>').text(this["status"]));
+        if(this.status == '?' || this.status.indexOf('Too') > -1) {
+            $run_status =  $('<span>').text(this.status);
+        } else {
+            $run_status = $('<a>').attr("href", "/view_run/" + this.id).text(this.status);
+        }
+        $row.append($('<td class="code"/>').append($run_status));
+        console.log(run_data)
         run_id = this["id"];
         if (run_id == null) {
             $name = $('<span/>');

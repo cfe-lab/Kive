@@ -1,0 +1,41 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% load filters %}
+
+{% block title %}Pipeline Lookup{% endblock %}
+
+{% block javascript %}
+    <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script type="text/javascript" src="/static/archive/dataset_lookup.js"></script>
+    <style>
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <a href="/lookup" rel="prev">Back to data lookup</a>
+    <h2>Matching runs</h2>
+
+
+    {% if datasets.count == 0 %}
+        <h3>No matching runs!</h3>
+    {% else %}
+        <ul>
+        {% for d in datasets %}
+            <li>
+                {{ d.dataset.created_by.parent_run.name }}:
+
+                {% if d.dataset.created_by == None %}
+                    This was an upload
+                {% else %}
+                    instance of pipeline: {{ d.dataset.created_by.parent_run.pipeline.family }}
+                    <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}

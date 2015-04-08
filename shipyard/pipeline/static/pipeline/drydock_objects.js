@@ -3,6 +3,13 @@
  *   JS prototypes that are used to populate canvasState
  *   (see drydock.js)
  */
+var _statusColorMap = {
+    '*': 'green',
+    '!': 'red',
+    '+': 'orange',
+    ':': 'orange',
+    '.': 'yellow',
+};
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
@@ -352,7 +359,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
+function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status, log_id) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -385,6 +392,10 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     
     this.stack = 20;
     this.scoop = 45;
+
+    // Members for instances of methods in runs
+    this.status = status || null;
+    this.log_id = log_id || null;
 
     this.in_magnets = [];
     var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
@@ -513,6 +524,30 @@ MethodNode.prototype.draw = function(ctx) {
         magnet.x = x_outputs + pos * cos30 * c2c;
         magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
+    }
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        ctx.save();
+
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // body
+        ctx.beginPath();
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[5].x, vertices[5].y );
+        ctx.lineTo( vertices[6].x, vertices[6].y );
+        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+        ctx.lineTo( vertices[2].x, vertices[2].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        ctx.closePath();
+
+        ctx.stroke();
+        ctx.restore();
     }
 };
 
@@ -859,7 +894,41 @@ Connector.prototype.draw = function(ctx) {
         x: this.x - this.dx / 10,
         y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
     };
-    
+
+    // Recolour this path if the statuses of the source and dest are meaningful
+    if(this.source.parent != null && this.dest.parent != null) {
+        var src = this.source.parent, dst = this.dest.parent, cable_stat = null;
+
+        if(src.status != null && dst.status != null) {
+
+            // Source has started, but not finished
+            if(!(['.', '*', '!'].indexOf(src.status) > -1)) {
+                // So nothing else matters, this cable is in progress
+                cable_stat = "+";
+            }
+
+            // Source is done, but cable isn't
+            else if(src.status == '*' && dst.status != '*') {
+                // So it's in progress, but moreso?
+                cable_stat = ":";
+            }
+
+            // Upper cable is done!
+            else if(src.status == '*') {
+                // Whatever, everything else is fine!
+                cable_stat = "*";
+            }
+
+            // Source is borked
+            else if(src.status == '!') {
+                // so is any cable that pokes out of it...
+                cable_stat == "!";
+            }
+            if(_statusColorMap[cable_stat] !== null)
+                ctx.strokeStyle = _statusColorMap[cable_stat];
+        }
+    }
+
     this.midX = this.fromX + this.dx / 2;
     
     ctx.beginPath();
@@ -1110,7 +1179,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, inset, offset, label) {
+function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status, md5, dataset_id) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -1124,10 +1193,20 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
     this.w = this.r; // for compatibility
     this.h = h || 25; // height of cylinder
     this.fill = fill || "#d40";
+    this.diffFill = "blue"
     this.inset = inset || 12; // distance of magnet from center
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';
     this.out_magnets = []; // for compatibility
+    this.pk = pk || null;
+    this.status = status || null;
+    this.md5 = md5 || null;
+    this.dataset_id = dataset_id || null;
+
+    // Marks whether or not this node
+    // was being searched for and was found
+    // (when doing an md5 lookup)
+    this.found_md5 = false;
 
     // CDT node always has one magnet
     this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
@@ -1138,7 +1217,7 @@ OutputNode.prototype.draw = function(ctx) {
         cy = this.y + this.dy;
     
     // draw bottom ellipse
-    ctx.fillStyle = this.fill;
+    ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.fill();
     
@@ -1161,6 +1240,35 @@ OutputNode.prototype.draw = function(ctx) {
     in_magnet.x = cx - this.inset;
     in_magnet.y = cy - this.h/2;
     in_magnet.draw(ctx);
+
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+
+        ctx.save();
+
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        // This line means that we are drawing "behind" the canvas now.
+        // We must set it back after we're done otherwise it'll be utter chaos.
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // draw bottom ellipse
+        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
+        ctx.stroke();
+
+        // draw stack
+        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+
+        // draw top ellipse
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
 };
 
 OutputNode.prototype.contains = function(mx, my) {
@@ -1206,7 +1314,7 @@ OutputNode.prototype.highlight = function(ctx) {
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.stroke();
     
-    // draw stack 
+    // draw stack
     ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
