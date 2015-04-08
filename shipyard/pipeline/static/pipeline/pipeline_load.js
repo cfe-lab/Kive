@@ -156,6 +156,13 @@ function update_status(canvasState, status, look_for_md5) {
     var pipeline_steps = status.runs.step_progress;
     var outputs = status.runs.output_progress;
 
+    // Set all the inputs as complete
+    for(var i = 0; i < canvasState.shapes.length; i++){
+        if( canvasState.shapes[i].constructor == RawNode ||
+            canvasState.shapes[i].constructor == CDtNode)
+            canvasState.shapes[i].status = '*';
+    }
+
     // Update all runsteps
     for(method_pk in pipeline_steps) {
         var shape = canvasState.findMethodNode(method_pk);

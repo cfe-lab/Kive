@@ -3,6 +3,13 @@
  *   JS prototypes that are used to populate canvasState
  *   (see drydock.js)
  */
+var _statusColorMap = {
+    '*': 'green',
+    '!': 'red',
+    '+': 'orange',
+    ':': 'orange',
+    '.': 'yellow',
+};
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
@@ -468,16 +475,9 @@ MethodNode.prototype.draw = function(ctx) {
 
     // Highlight the method based on status.
     if(this.status !== null) {
-        status_color_map = {
-            '*': 'green',
-            '!': 'red',
-            '+': 'orange',
-            ':': 'orange',
-            '.': 'yellow',
-        }
         ctx.save();
 
-        ctx.strokeStyle = status_color_map[this.status] || 'black';
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
         ctx.lineWidth = 5;
 
         ctx.globalCompositeOperation = 'destination-over';
@@ -841,7 +841,41 @@ Connector.prototype.draw = function(ctx) {
         x: this.x - this.dx / 10,
         y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
     };
-    
+
+    // Recolour this path if the statuses of the source and dest are meaningful
+    if(this.source.parent != null && this.dest.parent != null) {
+        var src = this.source.parent, dst = this.dest.parent, cable_stat = null;
+
+        if(src.status != null && dst.status != null) {
+
+            // Source has started, but not finished
+            if(!(['.', '*', '!'].indexOf(src.status) > -1)) {
+                // So nothing else matters, this cable is in progress
+                cable_stat = "+";
+            }
+
+            // Source is done, but cable isn't
+            else if(src.status == '*' && dst.status != '*') {
+                // So it's in progress, but moreso?
+                cable_stat = ":";
+            }
+
+            // Upper cable is done!
+            else if(src.status == '*') {
+                // Whatever, everything else is fine!
+                cable_stat = "*";
+            }
+
+            // Source is borked
+            else if(src.status == '!') {
+                // so is any cable that pokes out of it...
+                cable_stat == "!";
+            }
+            if(_statusColorMap[cable_stat] !== null)
+                ctx.strokeStyle = _statusColorMap[cable_stat];
+        }
+    }
+
     this.midX = this.fromX + this.dx / 2;
     
     ctx.beginPath();
@@ -1157,20 +1191,12 @@ OutputNode.prototype.draw = function(ctx) {
 
     // Highlight the method based on status.
     if(this.status !== null) {
-        var status_color_map = {
-            '*': 'green',
-            '!': 'red',
-            '+': 'orange',
-            ':': 'orange',
-            '.': 'yellow',
-        };
-
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
 
         ctx.save();
 
-        ctx.strokeStyle = status_color_map[this.status] || 'black';
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
         ctx.lineWidth = 5;
 
         // This line means that we are drawing "behind" the canvas now.
@@ -1235,7 +1261,7 @@ OutputNode.prototype.highlight = function(ctx) {
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.stroke();
     
-    // draw stack 
+    // draw stack
     ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse
