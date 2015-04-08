@@ -29,8 +29,17 @@ $(function() {
         $.getJSON(
             "/poll_run_progress/{{run_id}}",{},
             function(result){
-                if(result.runs.status != '?')
+                if(result.runs.status != '?') {
+                    var stat = result.runs.status;
+                    var msg = 'Complete';
+                    if(stat.indexOf('.') > -1)
+                        msg = 'In progress...';
+                    if(stat.indexOf('!') > -1)
+                        msg = 'Failed!';
+
+                    $('#run_status').text(msg);
                     update_status(canvasState, result, "{{md5}}");
+                }
             }
         );
     }
@@ -78,6 +87,26 @@ $(function() {
         <a href="/runs" rel="prev"> Back to runs </a>
     {% endif %}
 
+    <div class="pipeline_rdonly_ctrl">
+        <ul class="desc_topleft">
+            {% if  run.pipeline.revision_name|length <= 0 %}
+                <li> Pipeline family: {{ run.pipeline.family }} </li>
+            {% else %}
+                <li> Pipeline: {{ run.pipeline.revision_name }} ({{ run.pipeline.family }})</li>
+            {% endif %}
+            <li class="new_ctrl">Revision #: {{ run.pipeline.revision_number }}</li>
+
+            {% if run.pipeline.revision_desc|length <= 0 %}
+                {% if run.pipeline.family.description|length > 0 %}
+                    <li class="new_ctrl">{{ run.pipeline.family.description }}</li>
+                {% endif %}
+            {% else %}
+                    <li class="new_ctrl">{{ run.pipeline.revision_desc }}</li>
+            {% endif %}
+                <li> Run status: <span id="run_status">Checking...</span> </li>
+        </ul>
+    </div>
+
     <div>
         <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
         <div id="method_context_menu" class="context_menu">
@@ -89,12 +118,11 @@ $(function() {
             </ul>
         </div>
 
-        <select id="id_pipeline_select" style="display:none">
-            <option value="{{run.pipeline.id}}">{{run.pipeline.id}}</option>
-        </select>
-
-        <input type="submit" id="id_method_button" value="Add Method" style="display:none">
     </div>
+
+    <!-- These are here because drydock expects them, todo, remove these and refactor the code so as not to need them -->
+    <select id="id_pipeline_select" style="display:none"></select>
+    <input type="submit" id="id_method_button" value="Add Method" style="display:none">
     <div id="dialog_form">
         <form id="id_output_name_form">
             <label for="output_name">Output name</label>

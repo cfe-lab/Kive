@@ -119,6 +119,8 @@ class RunToProcess(metadata.models.AccessControl):
 
         run = self.run
         status = ""
+        completed = True
+        failed = False
         step_progress = {}
         cable_progress = {}
 
@@ -150,7 +152,7 @@ class RunToProcess(metadata.models.AccessControl):
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
         status += "-"
-        
+
         # Which outcables are in progress?
         cables = sorted(run.pipeline.outcables.all(), key=lambda x: x.output_idx)
         for pipeline_cable in cables:
@@ -166,6 +168,8 @@ class RunToProcess(metadata.models.AccessControl):
                     log_char = "+"
                 except ExecLog.DoesNotExist:
                     log_char = ":"
+
+            # Log the statu
             status += log_char
             if detailed:
                 cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id': None, 'md5': None}
@@ -175,7 +179,6 @@ class RunToProcess(metadata.models.AccessControl):
                     cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
                 except:
                     pass
-
 
         if detailed:
             result['step_progress'] = step_progress
