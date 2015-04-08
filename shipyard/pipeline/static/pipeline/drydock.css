@@ -64,6 +64,15 @@ ul#id_ctrl_nav li:hover {
 #pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
 #pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
 
+#pipeline_ctrl .form-inline-opts {
+    font-size: 0.9em;
+    font-style:italic;
+}
+#pipeline_ctrl .form-inline-opts input {
+    display: inline;
+}
+
+
 #id_submit_error {
     display: none;
     position: absolute;

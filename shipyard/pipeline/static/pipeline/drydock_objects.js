@@ -51,6 +51,61 @@ var Geometry = {
         }
     
         return intersections % 2;
+    },
+    isometricXCoord: function(x,y) {
+        // isometric x-coordinate is explained in issue #277.
+        // using a -30° line that intersects (0,0) and a 30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y).
+        return x * Math.tan(Math.PI/6) - y;
+    },
+    isometricYCoord: function(x,y) {
+        // isometric y-coordinate is explained in issue #277.
+        // using a 30° line that intersects (0,0) and a -30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y).
+        return x * Math.tan(Math.PI/6) + y;
+        
+        /*
+         * unabridged version:
+         
+        var tan30 = Math.tan(Math.PI/6),
+            // (x0, y0) is the coordinate of the intersection
+            x0 = (x * tan30 - y) / (2 * tan30),
+            y0 = - x0 * tan30,
+            dx = x - x0,
+            dy = y - y0,
+            // dh is the distance from (x0,y0) to (x,y). it is a 30° line.
+            dh = Math.sqrt(dx*dx + dy*dy);
+        return dh;
+        
+         */
+    },
+    isometricSort: function(x1,y1,x2,y2) {
+        // returns 1 if the first set of coordinates is after the second,
+        // -1 if the reverse is true, 0 if it's a tie. order goes left-to-right,
+        // top-to-bottom if you sort of rotate your screen 30° clockwise and get
+        // in the isometric plane.
+        // includes ±7 pixels of fuzziness in the top-to-bottom decision. 
+        
+        if (x1 instanceof Object && y1 instanceof Object && [ x1.x, x1.y, y1.x, y1.y ].indexOf(undefined) === -1) {
+            // transform alternative syntax
+            return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
+        }
+        
+        var y_diff = (x1 - x2) * Math.tan(Math.PI/6) + y1 - y2;
+        if (y_diff > 7) {
+            return 1;
+        } else if (y_diff < -7) {
+            return -1;
+        } else {
+            var x_diff = y_diff + (y2 - y1) * 2;
+            if (x_diff > 0) {
+                return 1;
+            } else if (x_diff < 0) {
+                return -1;
+            } else {
+                return 0;
+            }
+        }
     }
 };
 
@@ -58,11 +113,9 @@ var Geometry = {
 CanvasRenderingContext2D.prototype.ellipse = function (cx, cy, rx, ry) {
     this.save(); // save state
     this.beginPath();
-
     this.translate(cx - rx, cy - ry);
     this.scale(rx, ry);
     this.arc(1, 1, 1, 0, 2 * Math.PI, false);
-
     this.restore(); // restore to original state
 };
 

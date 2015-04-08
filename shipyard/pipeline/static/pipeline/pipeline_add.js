@@ -30,22 +30,26 @@ jQuery.fn.extend({
         // wrapper function for changing <input> values with added checks. replaces .val().
         this.val(str);
         
-        if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length) {
-            var data_lbl = this.data('label');
+        if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length > 0) {
+            var data_lbl = this.data('label'),
+                lbl;
             
             if (typeof data_lbl !== 'undefined') {
-                var lbl = data_lbl;
+                lbl = data_lbl;
             } else {
-                var lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
-                if (lbl.length == 0)
+                lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
+                if (lbl.length == 0) {
                     return this;
-                else lbl = lbl.html();
+                } else {
+                    lbl = lbl.html();
+                }
                 this.data('label', lbl);
             }
-            
-            if (str == lbl)
+            if (str === lbl) {
                 this.addClass('input-label');
-            else this.removeClass('input-label');
+            } else {
+                this.removeClass('input-label');
+            }
         }
         return this;
     },
@@ -58,10 +62,11 @@ jQuery.fn.extend({
         });
         
         $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            var $drag;
             if (opt.handle === '') {
-                var $drag = $(this).addClass('draggable');
+                $drag = $(this).addClass('draggable');
             } else {
-                var $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
             }  
             
             $drag.data('z', $drag.data('z') || $drag.css('z-index'));
@@ -94,29 +99,30 @@ jQuery.fn.extend({
 });
 
 $(function() { // wait for page to finish loading before executing jQuery code
+    $('body').css('background-image', 'url("/static/pipeline/isogrid.png")');
     // initialize animated canvas
     canvas = $('#pipeline_canvas')[0];
     var canvasWidth  = canvas.width  = window.innerWidth,
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-
+    
     canvasState = new CanvasState(canvas);
     
     // de-activate double-click selection of text on page
-    canvasState.canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+    canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
 
-    canvasState.canvas.addEventListener('mousedown', function(e) {
+    canvas.addEventListener('mousedown', function(e) {
         canvasState.doDown(e); // listener registered on mousedown event
     }, true);
 
-    canvasState.canvas.addEventListener('mousemove', function(e) {
+    canvas.addEventListener('mousemove', function(e) {
         canvasState.doMove(e);
     }, true);
 
-    canvasState.canvas.addEventListener('mouseup', function(e) {
+    canvas.addEventListener('mouseup', function(e) {
         canvasState.doUp(e);
     }, true);
     
-    canvasState.canvas.addEventListener('contextmenu', function(e) {
+    canvas.addEventListener('contextmenu', function(e) {
         canvasState.contextMenu(e);
     }, true);
     
@@ -169,32 +175,30 @@ $(function() { // wait for page to finish loading before executing jQuery code
     });
 
     // update method drop-down
-    $("#id_select_method_family").on('change',
-        function() {
-            mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
-            if (mf_id != '') {
-                $.ajax({
-                    type: "POST",
-                    url: "/get_method_revisions/",
-                    data: {mf_id: mf_id}, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        var options = [];
-                        var arr = JSON.parse(result)
-                        $.each(arr, function(index,value) {
-                            options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
-                        });
-                        $("#id_select_method").show().html(options.join('')).change();
-                    }
-                });
-                
-                $('#id_method_revision_field').show().focus();
-            }
-            else {
-                $("#id_method_revision_field").hide();
-            }
+    $("#id_select_method_family").on('change', function() {
+        mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
+        if (mf_id != '') {
+            $.ajax({
+                type: "POST",
+                url: "/get_method_revisions/",
+                data: {mf_id: mf_id}, // specify data as an object
+                datatype: "json", // type of data expected back from server
+                success: function(result) {
+                    var options = [];
+                    var arr = JSON.parse(result)
+                    $.each(arr, function(index,value) {
+                        options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
+                    });
+                    $("#id_select_method").show().html(options.join('')).change();
+                }
+            });
+            
+            $('#id_method_revision_field').show().focus();
         }
-    ).change(); // trigger on load
+        else {
+            $("#id_method_revision_field").hide();
+        }
+    }).change(); // trigger on load
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
@@ -203,22 +207,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(function() {
-    
         var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
         
         if (lbl.length) {
             $(this).on('focus', function() {
-            
                 if (this.value == lbl.html()) {
                     $(this).removeClass('input-label').val('');
                 }
-                
             }).on('blur', function() {
-            
                 if (this.value === '') {
                     $(this).addClass('input-label').val(lbl.html());
                 }
-                
             }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
             lbl.remove();
         }
@@ -229,36 +228,33 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     $('li', 'ul#id_ctrl_nav').on('click', function(e) {
         var $this = $(this),
-            menu = $($this.data('rel'));
-
+            menu = $($this.data('rel')),
+            inputs,
+            input;
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
-        
         if (menu.is('#id_method_ctrl')) {
             $('#id_method_button', menu).val('Add Method');
         }
-        
         if ($this.hasClass('new_ctrl')) {
             menu.css({ left: 100, top: 350 }).addClass('modal_dialog');
             var preview_canvas = $('canvas', menu)[0];
             preview_canvas.width = menu.innerWidth();
             preview_canvas.height = 60;
-            
             $('#id_select_cdt').change();
         }
-        
         $('form', menu).trigger('reset');
-        
-        for (var i=0, inputs = menu.find('input'); i < inputs.length; i++) {
-            if (!inputs[i].value || inputs[i].value == $('label[for="' + inputs[i].id +'"]', '#pipeline_ctrl').html())
-            {
-                $(inputs[i]).val_('').focus();
+        inputs = menu.find('input');
+        for (var i = 0; i < inputs.length; i++) {
+            input = inputs[i];
+            var default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
+            if (input.value === '' || input.value === default_input_value) {
+                $(input).val_('').focus();
                 break;
             }
         }
-        
         e.stopPropagation();
     });
 
@@ -266,11 +262,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('form', '#dialog_form').on('submit', function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
-        var dialog = $(this).closest('#dialog_form');
-        var out_node = dialog.data('node');
-        var label = $('#output_name').val();
-        var shape;
-        
+        var dialog = $(this).closest('#dialog_form'),
+            out_node = dialog.data('node'),
+            label = $('#output_name').val(),
+            shape;
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             if (shape == out_node) continue;
@@ -280,7 +275,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         }
         $('#output_name_error').hide();
-        
         out_node.label = label;
         canvasState.selection = [ out_node ];
         canvasState.valid = false;
@@ -345,7 +339,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         var node_label = $('#id_datatype_name', this).val(),
             pos,
             dlg = $(this).closest('.modal_dialog'),
-            preview_canvas = dlg.find('canvas');
+            preview_canvas = dlg.find('canvas'),
+            dt_error = $('#id_dt_error', this)[0];
         
         if (dlg.length) {
             pos = preview_canvas.offset();
@@ -358,18 +353,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // check for duplicate names
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
-            if ((shape.constructor == RawNode || shape.constructor == CDtNode) && shape.label == node_label) {
-                $('#id_dt_error', this)[0].innerHTML = 'That name has already been used.';
+            if ((shape.constructor === RawNode || shape.constructor === CDtNode) && shape.label == node_label) {
+                dt_error.innerHTML = 'That name has already been used.';
                 return false;
             }
         }
         
         if (node_label === '' || node_label === "Label") {
             // required field
-            $('#id_dt_error', this)[0].innerHTML = "Label is required";
-        }
-        else {
-            $('#id_dt_error', this)[0].innerHTML = "";
+            dt_error.innerHTML = "Label is required";
+        } else {
+            dt_error.innerHTML = "";
             var this_pk = $('#id_select_cdt', this).val(), // primary key
                 shape;
             
@@ -379,10 +373,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label);
             }
             canvasState.addShape(shape);
-            
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
             $('#id_datatype_name').val('');  // reset text field
-            
             dlg.removeClass('modal_dialog').hide();
         }
     });
@@ -474,7 +466,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 }
                             }
 
-                            for (idx in old_node.outputs) {
+                            for (idx in old_node.outputs) if (old_node.outputs.propertyIsEnumerable(idx)) {
                                 old_xput = old_node.outputs[idx];
                                 if (outputs.hasOwnProperty(idx)) {
                                     new_xput = outputs[idx];
@@ -525,21 +517,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             new CDtNode(1, 100, 150, null, null, null, null, null, 'Strings')
         );
     });
-
-    $('#id_reset_button').on('click', function() {
-        // remove all objects from canvas
-        canvasState.clear();
-        // reset containers to reflect canvas
-        canvasState.shapes = [];
-        canvasState.connectors = [];
-        canvasState.exec_order = [];
-        canvasState.selection = [];
-    });
-
-    $('#id_delete_button').on('click', function() {
-        // remove selected object from canvas
-        canvasState.deleteObject();
-    });
     
     $('#id_revision_desc').on('keydown', function() {
         var getHappierEachXChars = 12,
@@ -568,6 +545,23 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }).blur()
     ;
     
+    $('.form-inline-opts').on('click', 'input', function() {
+        var $this = $(this),
+            val = $this.val();
+        if ($this.is(':checked')) {
+            if (val == 'always') {
+                canvasState.force_show_exec_order = true;
+            } else if (val == 'never') {
+                canvasState.force_show_exec_order = false;
+            } else if (val == 'ambiguous') {
+                canvasState.force_show_exec_order = undefined;
+            } else {
+                return false;
+            }
+            canvasState.valid = false;
+        }
+    });
+    
     $(document).on('keydown', function(e) {
         // backspace or delete key also removes selected object
         if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
@@ -590,10 +584,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             canvasState.selection = [];
             canvasState.valid = false;
         }
-    })
-
-    
-    $(document).on('mousedown', function(e) {
+    }).on('mousedown', function(e) {
         var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
             menus.trigger('cancel');
@@ -621,19 +612,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     */
                     var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
                         preview_canvas = $('canvas', menu)[0];
-                    
                     preview_canvas.width = menu.innerWidth();
-                    
                     menu.css({
                         top:  sel.y + sel.dy - sel.n_inputs * 4 + canvas.offsetTop - 36,
                         left: sel.x + sel.dx - (
                             preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( sel.n_inputs * 8 + 14 ), 42 - sel.n_outputs * 8) + Math.max( sel.n_inputs  * 8 + 14, sel.n_outputs * 8 + 48 ) ) /4
                         ) + canvas.offsetLeft - 9
                     });
-                    
                     $('#id_select_colour').val(sel.fill);
                     $('#colour_picker_pick').css('background-color', sel.fill);
-                    
                     $('#id_select_method_family').val(sel.family).change();  // trigger ajax
                     
                     // #id_method_revision_field is always populated via ajax.
@@ -812,13 +799,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
         form_data["canvas_width"] = canvas.width;
         form_data["canvas_height"] = canvas.height;
 
-        // sort pipeline inputs by their Y-position on canvas (top to bottom)
-        function sortByYpos (a, b) {
+        // OLD: sort pipeline inputs by their Y-position on canvas (top to bottom)
+        // NEW: sort pipelines by their isometric position, left-to-right, top-to-bottom
+        // (sort of like reading order if you tilt your screen 30° clockwise)
+        /*function sortByYpos (a, b) {
             var ay = a.y;
             var by = b.y;
             return +(ay < by ? -1 : ay > by);
-        }
-        pipeline_inputs.sort(sortByYpos);
+        }*/
+        pipeline_inputs.sort(Geometry.isometricSort);
 
         // update form data with inputs
         var this_input;
@@ -828,7 +817,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             form_data['pipeline_inputs'][i] = {
                 'CDT_pk': (this_input.constructor === CDtNode) ? this_input.pk : null,
                 'dataset_name': this_input.label,
-                'dataset_idx': i+1,
+                'dataset_idx': i + 1,
                 'x': this_input.x / canvas.width,
                 'y': this_input.y / canvas.height,
                 "min_row": null, // in the future these can be more detailed
@@ -904,7 +893,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
 
         // sort output cables by y-position (top to bottom)
-        pipeline_outputs.sort(sortByYpos);
+        pipeline_outputs.sort(Geometry.isometricSort);
 
         var this_output;
         form_data['pipeline_outputs'] = [];
