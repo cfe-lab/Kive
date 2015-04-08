@@ -30,7 +30,7 @@ $(function() {
             "/poll_run_progress/{{run_id}}",{},
             function(result){
                 if(result.runs.status != '?')
-                    update_status(canvasState, result);
+                    update_status(canvasState, result, "{{md5}}");
             }
         );
     }
@@ -82,8 +82,8 @@ $(function() {
         <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
         <div id="method_context_menu" class="context_menu">
             <ul>
-                <li data-action="edit" class="edit">Edit</li>
-                <li data-action="delete" class="delete">Delete</li>
+                <li data-action="display" class="edit">View Dataset</li>
+                <li data-action="download" class="delete">Download Dataset</li>
             </ul>
         </div>
 

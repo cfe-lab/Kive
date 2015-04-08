@@ -163,7 +163,14 @@ class RunToProcess(metadata.models.AccessControl):
                     log_char = ":"
             status += log_char
             if detailed:
-                cable_progress[pipeline_cable.id] = log_char
+                cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id':None, 'md5': None}
+                try:
+                    symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
+                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.id
+                    cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
+                except:
+                    pass
+
 
         if detailed:
             result['step_progress'] = step_progress

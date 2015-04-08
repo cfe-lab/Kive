@@ -1090,7 +1090,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status) {
+function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status, md5, dataset_id) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -1104,12 +1104,20 @@ function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status) {
     this.w = this.r; // for compatibility
     this.h = h || 25; // height of cylinder
     this.fill = fill || "#d40";
+    this.diffFill = "blue"
     this.inset = inset || 12; // distance of magnet from center
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';
     this.out_magnets = []; // for compatibility
     this.pk = pk || null;
     this.status = status || null;
+    this.md5 = md5 || null;
+    this.dataset_id = dataset_id || null;
+
+    // Marks whether or not this node
+    // was being searched for and was found
+    // (when doing an md5 lookup)
+    this.found_md5 = false;
 
     // CDT node always has one magnet
     this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
@@ -1120,7 +1128,7 @@ OutputNode.prototype.draw = function(ctx) {
         cy = this.y + this.dy;
     
     // draw bottom ellipse
-    ctx.fillStyle = this.fill;
+    ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.fill();
     
@@ -1177,7 +1185,7 @@ OutputNode.prototype.draw = function(ctx) {
         // draw top ellipse
         ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
         ctx.stroke();
-        
+
         ctx.restore();
     }
 };

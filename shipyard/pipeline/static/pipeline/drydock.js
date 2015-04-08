@@ -604,16 +604,30 @@ CanvasState.prototype.doUp = function(e) {
 
 CanvasState.prototype.contextMenu = function(e) {
     var pos = this.getPos(e);
-    if (this.selection.length == 1 && this.selection[0].constructor != Connector && this.can_edit) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu li').show();
-        
-        if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+
+    // Edit mode can popup the context menu to delete and edit nodes
+    if(this.can_edit){
+        if (this.selection.length == 1 && this.selection[0].constructor != Connector ) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+            $('#method_context_menu li').show();
+
+            if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+                $('#method_context_menu .edit').hide();
+            }
+        } else if (this.selection.length > 1) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
             $('#method_context_menu .edit').hide();
         }
-    } else if (this.selection.length > 1) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu .edit').hide();
+    } else {
+        // Otherwise, we're read only, so only popup the context menu
+        // for outputs with datasets
+        if(this.selection.length == 1 &&
+           this.selection[0].constructor == OutputNode &&
+           this.selection[0].dataset_id !== null) {
+
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+        }
     }
     this.doUp(e);
     e.preventDefault();

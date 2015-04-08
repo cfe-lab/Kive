@@ -152,9 +152,10 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
     }
 }
 
-function update_status(canvasState, status) {
+function update_status(canvasState, status, look_for_md5) {
     var pipeline_steps = status.runs.step_progress;
     var outputs = status.runs.output_progress;
+
     // Update all runsteps
     for(method_pk in pipeline_steps) {
         var shape = canvasState.findMethodNode(method_pk);
@@ -162,11 +163,19 @@ function update_status(canvasState, status) {
             shape.status = pipeline_steps[method_pk];
     }
 
+    // Update all outputs
     for(output_pk in outputs) {
         var shape = canvasState.findOutputNode(output_pk);
-        if(shape != null)
-            shape.status = outputs[output_pk];
+        if(shape != null) {
+            shape.status = outputs[output_pk].status;
+            shape.md5 = outputs[output_pk].md5
+            shape.dataset_id = outputs[output_pk].dataset_id;
+
+            if(shape.md5 == look_for_md5)
+                shape.found_md5 = true;
+        }
     }
 
+    // Invalidate to force a redraw
     canvasState.valid = false;
 }

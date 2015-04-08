@@ -663,6 +663,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (action == 'delete') {
                 canvasState.deleteObject();
             }
+            if (action == 'display') {
+                sel = sel[0];
+                if(sel.constructor == OutputNode)
+                    window.location = '/dataset_view/' + sel.dataset_id;
+
+            }
+            if (action == 'download') {
+                sel = sel[0];
+                if(sel.constructor == OutputNode)
+                    window.location = '/dataset_download/' + sel.dataset_id;
+            }
         }
         $('.context_menu').hide();
         e.stopPropagation();
