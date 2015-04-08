@@ -167,7 +167,8 @@ class RunToProcess(metadata.models.AccessControl):
 
         if detailed:
             result['step_progress'] = step_progress
-            result['cable_progress'] = cable_progress
+            result['output_progress'] = cable_progress
+
         result['status'] = status
         result['id'] = run.id
         result['start'] = self._format_time(run.start_time)

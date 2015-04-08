@@ -127,7 +127,14 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
             magnet = source.out_magnets[k];
             if (magnet.label === this_output.source_dataset_name) {
                 connector = new Connector(null, null, magnet);
-                output_node = new OutputNode(this_output.x * canvasState.canvas.width / canvasState.scale, this_output.y * canvasState.canvas.height / canvasState.scale, null, null, null, null, null, this_output.output_name);
+                output_node = new OutputNode(
+                    this_output.x * canvasState.canvas.width / canvasState.scale,
+                    this_output.y * canvasState.canvas.height / canvasState.scale,
+                    null, null, null, null, null,
+                    this_output.output_name,
+                    this_output.id
+                 );
+
                 canvasState.addShape(output_node);
                 
                 connector.x = this_output.x * canvasState.canvas.width / canvasState.scale;
@@ -147,12 +154,18 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
 
 function update_status(canvasState, status) {
     var pipeline_steps = status.runs.step_progress;
-
+    var outputs = status.runs.output_progress;
     // Update all runsteps
     for(method_pk in pipeline_steps) {
         var shape = canvasState.findMethodNode(method_pk);
         if(shape != null)
             shape.status = pipeline_steps[method_pk];
+    }
+
+    for(output_pk in outputs) {
+        var shape = canvasState.findOutputNode(output_pk);
+        if(shape != null)
+            shape.status = outputs[output_pk];
     }
 
     canvasState.valid = false;

@@ -1090,7 +1090,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, inset, offset, label) {
+function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -1108,6 +1108,8 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';
     this.out_magnets = []; // for compatibility
+    this.pk = pk || null;
+    this.status = status || null;
 
     // CDT node always has one magnet
     this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
@@ -1141,6 +1143,43 @@ OutputNode.prototype.draw = function(ctx) {
     in_magnet.x = cx - this.inset;
     in_magnet.y = cy - this.h/2;
     in_magnet.draw(ctx);
+
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        var status_color_map = {
+            '*': 'green',
+            '!': 'red',
+            '+': 'orange',
+            ':': 'orange',
+            '.': 'yellow',
+        };
+
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+
+        ctx.save();
+
+        ctx.strokeStyle = status_color_map[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        // This line means that we are drawing "behind" the canvas now.
+        // We must set it back after we're done otherwise it'll be utter chaos.
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // draw bottom ellipse
+        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
+        ctx.stroke();
+
+        // draw stack
+        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+
+        // draw top ellipse
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
 };
 
 OutputNode.prototype.contains = function(mx, my) {
