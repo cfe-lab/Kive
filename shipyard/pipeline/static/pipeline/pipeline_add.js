@@ -674,6 +674,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 if(sel.constructor == OutputNode)
                     window.location = '/dataset_download/' + sel.dataset_id;
             }
+            if (action == 'viewlog') {
+                sel = sel[0];
+                if(sel.constructor == MethodNode)
+                    window.location = '/stdout_view/' + sel.log_id;
+
+            }
+            if (action == 'viewerrorlog') {
+                sel = sel[0];
+                if(sel.constructor == MethodNode)
+                    window.location = '/stderr_view/' + sel.log_id;
+            }
         }
         $('.context_menu').hide();
         e.stopPropagation();

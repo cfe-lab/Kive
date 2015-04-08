@@ -159,8 +159,10 @@ function update_status(canvasState, status, look_for_md5) {
     // Update all runsteps
     for(method_pk in pipeline_steps) {
         var shape = canvasState.findMethodNode(method_pk);
-        if(shape != null)
-            shape.status = pipeline_steps[method_pk];
+        if(shape != null) {
+            shape.status = pipeline_steps[method_pk].status;
+            shape.log_id = pipeline_steps[method_pk].log_id;
+        }
     }
 
     // Update all outputs
@@ -168,7 +170,7 @@ function update_status(canvasState, status, look_for_md5) {
         var shape = canvasState.findOutputNode(output_pk);
         if(shape != null) {
             shape.status = outputs[output_pk].status;
-            shape.md5 = outputs[output_pk].md5
+            shape.md5 = outputs[output_pk].md5;
             shape.dataset_id = outputs[output_pk].dataset_id;
 
             if(shape.md5 == look_for_md5)

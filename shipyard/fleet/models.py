@@ -140,7 +140,12 @@ class RunToProcess(metadata.models.AccessControl):
 
             status += log_char
             if detailed:
-                step_progress[step.pipelinestep.transformation.pk] = log_char
+                step_progress[step.pipelinestep.transformation.pk] = {'status': log_char, 'log_id': None}
+                try:
+                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                        methodoutput.id
+                except:
+                    pass
 
         # Just finished a step, but didn't start the next one?
         status += "." * (total_steps - len(runsteps))
@@ -163,10 +168,10 @@ class RunToProcess(metadata.models.AccessControl):
                     log_char = ":"
             status += log_char
             if detailed:
-                cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id':None, 'md5': None}
+                cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id': None, 'md5': None}
                 try:
                     symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
-                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.id
+                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.pk
                     cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
                 except:
                     pass

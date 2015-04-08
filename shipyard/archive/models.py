@@ -2312,7 +2312,19 @@ class MethodOutput(models.Model):
                                   help_text="Terminal output of the RunStep Method, i.e. stdout.")
     error_log = models.FileField("error log", upload_to="Logs",
                                  help_text="Terminal error output of the RunStep Method, i.e. stderr.")
-    
+
+    def get_absolute_log_url(self):
+        """
+        :return str: URL to access the output log
+        """
+        return reverse('stdout_download', kwargs={"methodoutput_id": self.id})
+
+    def get_absolute_error_url(self):
+        """
+        :return str: URL to access the output log
+        """
+        return reverse('stderr_download', kwargs={"methodoutput_id": self.id})
+
     @classmethod
     def create(cls, execlog):
         methodoutput = cls(execlog=execlog)

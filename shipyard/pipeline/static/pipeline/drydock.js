@@ -625,8 +625,21 @@ CanvasState.prototype.contextMenu = function(e) {
            this.selection[0].constructor == OutputNode &&
            this.selection[0].dataset_id !== null) {
 
+           // Context menu for pipeline outputs
            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
            $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').show();
+           $('#method_context_menu .step_node').hide();
+
+        } else if(  this.selection.length == 1 &&
+                    this.selection[0].constructor == MethodNode &&
+                    this.selection[0].log_id !== null) {
+
+           // Context menu for pipeline steps
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').hide();
+           $('#method_context_menu .step_node').show();
         }
     }
     this.doUp(e);

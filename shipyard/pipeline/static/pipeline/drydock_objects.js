@@ -299,7 +299,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status) {
+function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status, log_id) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -333,7 +333,9 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     this.stack = 20;
     this.scoop = 45;
 
+    // Members for instances of methods in runs
     this.status = status || null;
+    this.log_id = log_id || null;
 
     this.in_magnets = [];
     var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
