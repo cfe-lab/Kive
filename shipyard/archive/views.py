@@ -306,11 +306,8 @@ def datasets_bulk(request):
 
 @login_required
 def dataset_lookup(request, md5_checksum=None):
-
     if md5_checksum is None and request.method == 'POST':
         checksum = hashlib.md5()
-        print request.FILES
-        print request.POST
         if 'file' in request.FILES:
             for chunk in request.FILES['file'].chunks():
                 checksum.update(chunk)

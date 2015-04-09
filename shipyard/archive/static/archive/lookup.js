@@ -6,7 +6,7 @@ $(document).ready(function(){
     self.dels = $("#dropzone, .dragfix");
     self.in_counter = 0;
 
-    self.file_io = false; //(window.File && window.FileReader && window.FileList && window.Blob);
+    self.file_io = (window.File && window.FileReader && window.FileList && window.Blob);
     self.md5_sum = null;
 
     function handleFiles(files) {

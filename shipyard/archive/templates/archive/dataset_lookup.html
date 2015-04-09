@@ -22,25 +22,27 @@
         <table>
             <thead>
                 <th>Run ID</th>
+                <th>Output dataset name</th>
                 <th>Family</th>
-                <th>Pipeline Name</th>
-                <th>Pipeline Revision</th>
+                <th>Pipeline name</th>
+                <th>Pipeline revision</th>
                 <th></th>
             </thead>
         {% for d in datasets %}
             <tr>
 
                 <td>{{ d.dataset.created_by.parent_run.id }}</td>
+                <td> <a href="/dataset_view/{{d.dataset.id}}"> {{ d.dataset.name }} </a> </td>
                 <td>{{ d.dataset.created_by.parent_run.pipeline.family }} </td>
                 <td>
                     {% if  d.dataset.created_by.parent_run.pipeline.revision_name|length <= 0 %}
-                        {{ d.dataset.created_by.parent_run.pipeline.family }} </li>
+                        {{ d.dataset.created_by.parent_run.pipeline.family }}
                     {% else %}
                         {{ d.dataset.created_by.parent_run.pipeline.revision_name }}
                     {% endif %}
                 </td>
                 <td>
-                    #{{ d.dataset.created_by.parent_run.pipeline.revision_number }}
+                    {{ d.dataset.created_by.parent_run.pipeline.revision_number }}
                 </td>
                 <td>
                     {% if d.dataset.created_by == None %}
