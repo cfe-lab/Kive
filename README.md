@@ -21,6 +21,20 @@ What does Kive do?
 
 2. Kive also keeps track of all the outputs at various stages of processing data through a pipeline.  We think of each step in a pipeline as a *transformation* of a data set from its raw state, through intermediate states, and ultimately to end results.  *Kive* records the MD5 checksum of each state as a permanent imprint of the data set contents.
 
+
+Client requirements
+-----------------------
+
+The following browsers are supported
+
+Browser            | Basic Support | Bulk Upload Feature
+-------------------|---------------|--------------------
+Google Chrome      | version 4     | version 5
+Firefox            | version 3.6   | version 3.6
+Safari             | version 3.1   | version 7
+Internet Explorer  | version 9     | version 10
+
+
 What are we working on?
 -----------------------
 
