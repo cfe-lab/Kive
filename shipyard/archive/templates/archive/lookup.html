@@ -55,7 +55,7 @@
             display: none;
         }
 
-        input[type='button'] {
+        input[type='submit'] {
             margin-top: 50px;
             width: 100px;
         }
@@ -71,18 +71,24 @@
     <a href="usr.html" rel="prev">Back to user's portal</a>
     <h2>Find pipeline</h2>
 
-    <div id="dropzone" id="dropzone">
-        <div id="no_file">
-            <h2 class="margin-fix"> Drop a file here to search the database.</h2>
+    <div id="file_io_compat">
+        <div id="dropzone">
+            <div id="no_file">
+                <h2 class="margin-fix dragfix" id="dz_text"> Drop a file here to search the database.</h2>
+            </div>
+            <div id="file_loaded">
+                <h2 class="dragfix">
+                    <span class="color-fix">Loaded file: <span id="id_filename"></span></span>
+                </h2>
+                <h3 class="dragfix"> MD5: <span id="id_md5sum"></span> </h3>
+                <p class="color-fix dragfix">Click &quot;Search&quot; to proceed</p>
+            </div>
         </div>
-        <div id="file_loaded">
-            <h2>
-                <span class="color-fix">Loaded file: <span id="id_filename"></span></span>
-            </h2>
-            <h3> MD5: <span id="id_md5sum"></span> </h3>
-            <p class="color-fix">Click &quot;Search&quot; to proceed</p>
-        </div>
+    <span>Or click <a id="filesel" href="#">here</a> to select a file.</span>
     </div>
-
-    <input id='continuebtn' type="button"  value="Search" disabled/>
+    <form action="/datasets_lookup/" method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="file" id="upload_file" style="display:none">
+        <input id='continuebtn' type="submit"  value="Search" disabled/>
+    </form>
 {% endblock %}

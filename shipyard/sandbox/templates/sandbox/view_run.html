@@ -103,7 +103,7 @@ $(function() {
             {% else %}
                     <li class="new_ctrl">{{ run.pipeline.revision_desc }}</li>
             {% endif %}
-                <li> Run status: <span id="run_status">Checking...</span> </li>
+            <li> Run status: <span id="run_status">Checking...</span> </li>
         </ul>
     </div>
 
@@ -131,5 +131,4 @@ $(function() {
             <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
         </form>
     </div>
-
 {% endblock %}

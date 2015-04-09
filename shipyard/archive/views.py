@@ -16,6 +16,7 @@ import logging
 from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
 import librarian.models
+import hashlib
 
 
 LOGGER = logging.getLogger(__name__)
@@ -305,11 +306,15 @@ def datasets_bulk(request):
 
 @login_required
 def dataset_lookup(request, md5_checksum=None):
-    if md5_checksum is None:
-        # Check POST
-        # Check valid form
-        # calculate md5 sum
-        pass
+
+    if md5_checksum is None and request.method == 'POST':
+        checksum = hashlib.md5()
+        print request.FILES
+        print request.POST
+        if 'file' in request.FILES:
+            for chunk in request.FILES['file'].chunks():
+                checksum.update(chunk)
+            md5_checksum = checksum.hexdigest()
 
     datasets = librarian.models.SymbolicDataset.objects.filter(MD5_checksum=md5_checksum)
     t = loader.get_template('archive/dataset_lookup.html')

@@ -899,22 +899,12 @@ Connector.prototype.draw = function(ctx) {
     if(this.source.parent != null && this.dest.parent != null) {
         var src = this.source.parent, dst = this.dest.parent, cable_stat = null;
 
-        if(src.status != null && dst.status != null) {
+        if(src.status != null) {
+            cable_stat = "+";
 
-            // Source has started, but not finished
-            if(!(['.', '*', '!'].indexOf(src.status) > -1)) {
-                // So nothing else matters, this cable is in progress
-                cable_stat = "+";
-            }
-
-            // Source is done, but cable isn't
-            else if(src.status == '*' && dst.status != '*') {
-                // So it's in progress, but moreso?
-                cable_stat = ":";
-            }
 
             // Upper cable is done!
-            else if(src.status == '*') {
+           if(src.status == '*'  && dst.status != null ) {
                 // Whatever, everything else is fine!
                 cable_stat = "*";
             }
@@ -922,11 +912,12 @@ Connector.prototype.draw = function(ctx) {
             // Source is borked
             else if(src.status == '!') {
                 // so is any cable that pokes out of it...
-                cable_stat == "!";
+                cable_stat = "!";
             }
-            if(_statusColorMap[cable_stat] !== null)
-                ctx.strokeStyle = _statusColorMap[cable_stat];
         }
+
+        if(_statusColorMap[cable_stat] !== null)
+             ctx.strokeStyle = _statusColorMap[cable_stat];
     }
 
     this.midX = this.fromX + this.dx / 2;

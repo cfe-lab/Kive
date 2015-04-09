@@ -3,7 +3,10 @@ $(document).ready(function(){
     var doc = $(document);
 
     self.dzone = $("#dropzone");
-    self.file_io = (window.File && window.FileReader && window.FileList && window.Blob);
+    self.dels = $("#dropzone, .dragfix");
+    self.in_counter = 0;
+
+    self.file_io = false; //(window.File && window.FileReader && window.FileList && window.Blob);
     self.md5_sum = null;
 
     function handleFiles(files) {
@@ -19,29 +22,37 @@ $(document).ready(function(){
             $('#continuebtn').removeAttr('disabled');
         };
         reader.readAsBinaryString(files[0]);
-        console.log(files[0]);
     }
 
     // Continue setup
-    self.dzone.on('dragenter', function (e)
+    self.dels.on('dragenter', function (e)
     {
         e.stopPropagation();
         e.preventDefault();
+        self.in_counter++;
         self.dzone.addClass('dz_shadow');
     });
-    self.dzone.on('dragover', function (e)
+    self.dels.on('dragover', function (e)
     {
          e.stopPropagation();
          e.preventDefault();
     });
-    self.dzone.on('drop', function (e)
-    {
-         self.dzone.removeClass('dz_shadow');
+    self.dels.on('dragleave dragexit', function(e){
+         e.stopPropagation();
          e.preventDefault();
-         var files = e.originalEvent.dataTransfer.files;
+         self.in_counter--;
 
-         //We need to send dropped files to Server
-         handleFiles(files);
+         if(!self.in_counter)
+            self.dzone.removeClass('dz_shadow');
+    });
+    self.dels.on('drop', function (e)
+    {
+        self.in_counter = 0;
+        self.dzone.removeClass('dz_shadow');
+        e.preventDefault();
+        var files = e.originalEvent.dataTransfer.files;
+
+        handleFiles(files);
     });
 
     // Override the drag handler for
@@ -61,8 +72,34 @@ $(document).ready(function(){
         e.stopPropagation();
         e.preventDefault();
     });
-    $('#continuebtn').on('click', function(e){
-        window.location.href = "/datasets_lookup/" + self.md5_sum;
+
+    $('#filesel').on('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+
+        $('#upload_file').click();
     });
 
+    $("#upload_file").on('change', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if(self.file_io)
+            handleFiles(e.target.files);
+        $('#continuebtn').removeAttr('disabled');
+
+    });
+
+    //
+    if(self.file_io){
+
+        $('#continuebtn').on('click', function(e){
+            e.stopPropagation();
+            e.preventDefault();
+
+            window.location.href = "/datasets_lookup/" + self.md5_sum;
+        });
+    } else {
+        $('#upload_file').show();
+        $('#file_io_compat').hide();
+    }
 });
