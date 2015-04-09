@@ -313,7 +313,7 @@ def dataset_lookup(request, md5_checksum=None):
                 checksum.update(chunk)
             md5_checksum = checksum.hexdigest()
 
-    datasets = librarian.models.SymbolicDataset.objects.filter(MD5_checksum=md5_checksum)
+    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum)
     t = loader.get_template('archive/dataset_lookup.html')
     c = RequestContext(request, {'datasets': datasets, 'md5': md5_checksum})
 
