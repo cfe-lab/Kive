@@ -152,7 +152,7 @@ def run_pipeline(request):
         return HttpResponse(template.render(context))
 
     # Success -- redirect to the active runs view.
-    return HttpResponseRedirect("/runs")
+    return HttpResponseRedirect("/view_run/%d" % rtp.id)
 
 
 @login_required
@@ -218,8 +218,9 @@ def view_results(request, id):
 
 
 @login_required
-def view_run(request, run_id, md5=None):
-    run = archive.models.Run.objects.get(id=run_id)
+def view_run(request, rtp_id, md5=None):
+    rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
+
     template = loader.get_template("sandbox/view_run.html")
-    context = RequestContext(request, {'run_id': run_id, 'md5': md5, 'run': run})
+    context = RequestContext(request, {'rtp_id': rtp_id, 'md5': md5, 'pipeline': rtp.pipeline})
     return HttpResponse(template.render(context))

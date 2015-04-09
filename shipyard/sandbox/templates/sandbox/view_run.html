@@ -27,19 +27,22 @@ $(function() {
             self.timer = setInterval(grabStatus, 1000);
 
         $.getJSON(
-            "/poll_run_progress/{{run_id}}",{},
+            "/poll_run_progress/{{rtp_id}}",{},
             function(result){
-                if(result.runs.status != '?') {
-                    var stat = result.runs.status;
-                    var msg = 'Complete';
+                var stat = result.runs.status;
+                var msg = 'Complete';
+                if(stat.indexOf('?') > -1 || stat.indexOf('Too') > -1) {
+                    msg = 'Waiting for run to start <img src="/static/sandbox/preload.gif"/>';
+                } else {
                     if(stat.indexOf('.') > -1)
-                        msg = 'In progress...';
-                    if(stat.indexOf('!') > -1)
+                        msg = 'In progress <img src="/static/sandbox/preload.gif"/>';
+                    else if(stat.indexOf('!') > -1)
                         msg = 'Failed!';
-
-                    $('#run_status').text(msg);
+                    else
+                        clearInterval(self.timer);
                     update_status(canvasState, result, "{{md5}}");
                 }
+                $('#run_status').html('<span class="status-message">'+msg+'</span>');
             }
         );
     }
@@ -47,7 +50,7 @@ $(function() {
     $.ajax({
         type: "POST",
         url: "/get_pipeline/",
-        data: { pipeline_id: {{run.pipeline.id}} },
+        data: { pipeline_id: {{pipeline.id}} },
         datatype: "json",
         success: function(result) {
             // prepare to redraw canvas
@@ -77,6 +80,9 @@ $(function() {
     <link rel="stylesheet" href="/static/pipeline/drydock.css">
     <style>
         #canvas{}
+        .status-message img{
+              vertical-align: middle;
+        }
     </style>
 {% endblock %}
 
@@ -89,19 +95,19 @@ $(function() {
 
     <div class="pipeline_rdonly_ctrl">
         <ul class="desc_topleft">
-            {% if  run.pipeline.revision_name|length <= 0 %}
-                <li> Pipeline family: {{ run.pipeline.family }} </li>
+            {% if  pipeline.revision_name|length <= 0 %}
+                <li> Pipeline family: {{ pipeline.family }} </li>
             {% else %}
-                <li> Pipeline: {{ run.pipeline.revision_name }} ({{ run.pipeline.family }})</li>
+                <li> Pipeline: {{ pipeline.revision_name }} ({{ pipeline.family }})</li>
             {% endif %}
-            <li class="new_ctrl">Revision #: {{ run.pipeline.revision_number }}</li>
+            <li class="new_ctrl">Revision #: {{ pipeline.revision_number }}</li>
 
-            {% if run.pipeline.revision_desc|length <= 0 %}
-                {% if run.pipeline.family.description|length > 0 %}
-                    <li class="new_ctrl">{{ run.pipeline.family.description }}</li>
+            {% if pipeline.revision_desc|length <= 0 %}
+                {% if pipeline.family.description|length > 0 %}
+                    <li class="new_ctrl">{{ pipeline.family.description }}</li>
                 {% endif %}
             {% else %}
-                    <li class="new_ctrl">{{ run.pipeline.revision_desc }}</li>
+                    <li class="new_ctrl">{{ pipeline.revision_desc }}</li>
             {% endif %}
             <li> Run status: <span id="run_status">Checking...</span> </li>
         </ul>

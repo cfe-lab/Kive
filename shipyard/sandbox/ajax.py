@@ -126,7 +126,7 @@ def _add_run_filter(runs, key, value):
     raise KeyError(key)
 
 
-def _load_status(request, run_id=None):
+def _load_status(request, rtp_id=None):
     """ Find all matching runs, and return a dict for each with the status.
     
     @return ([{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}],
@@ -145,8 +145,8 @@ def _load_status(request, run_id=None):
         runs = _add_run_filter(runs, key, value)
         i += 1
 
-    if run_id is not None:
-        runs = runs.filter(id=run_id)
+    if rtp_id is not None:
+        runs = runs.filter(id=rtp_id)
 
     runs = runs.prefetch_related('pipeline__steps',
                                  'run__runsteps__log',
@@ -157,7 +157,7 @@ def _load_status(request, run_id=None):
                                  'run__pipeline__outcables__poc_instances__log',
                                  'run__pipeline__steps')
 
-    if run_id is not None:
+    if rtp_id is not None:
         if runs.exists():
             return runs.first().get_run_progress(True), False
         return None, False
@@ -186,12 +186,12 @@ def _is_status_changed(runs, request):
     return False
 
 
-def _poll_run_progress(request, run_id):
+def _poll_run_progress(request, rtp_id):
     """
     Helper to produce a JSON description of the current state of some runs.
     """
-    if run_id is not None:
-        run, O_v = _load_status(request, run_id)
+    if rtp_id is not None:
+        run, O_v = _load_status(request, rtp_id)
         return json.dumps(dict(runs=run,
                                errors=[]))
 
@@ -216,8 +216,8 @@ def _poll_run_progress(request, run_id):
 
 
 @login_required
-def poll_run_progress(request, run_id=None):
-    return AJAXRequestHandler(request, _poll_run_progress, run_id).response
+def poll_run_progress(request, rtp_id=None):
+    return AJAXRequestHandler(request, _poll_run_progress, rtp_id).response
 
 
 def tail(handle, nbytes):

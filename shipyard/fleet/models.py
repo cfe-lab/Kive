@@ -104,7 +104,7 @@ class RunToProcess(metadata.models.AccessControl):
          their completion/success status (indexed by id)
         @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}
         """
-        result = {'name': self.display_name}
+        result = {'name': self.display_name, 'rtp_id': self.id}
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
             result['status'] = "Too many threads ({} from {})".format(
