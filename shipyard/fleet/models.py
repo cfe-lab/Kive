@@ -119,8 +119,6 @@ class RunToProcess(metadata.models.AccessControl):
 
         run = self.run
         status = ""
-        completed = True
-        failed = False
         step_progress = {}
         cable_progress = {}
 

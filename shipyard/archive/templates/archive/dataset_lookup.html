@@ -23,19 +23,38 @@
     {% if datasets.count == 0 %}
         <h3>No matching runs!</h3>
     {% else %}
-        <ul>
+        <table>
+            <thead>
+                <th>Run ID</th>
+                <th>Family</th>
+                <th>Pipeline Name</th>
+                <th>Pipeline Revision</th>
+                <th></th>
+            </thead>
         {% for d in datasets %}
-            <li>
-                {{ d.dataset.created_by.parent_run.name }}:
+            <tr>
 
-                {% if d.dataset.created_by == None %}
-                    This was an upload
-                {% else %}
-                    instance of pipeline: {{ d.dataset.created_by.parent_run.pipeline.family }}
-                    <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
-                {% endif %}
-            </li>
+                <td>{{ d.dataset.created_by.parent_run.id }}</td>
+                <td>{{ d.dataset.created_by.parent_run.pipeline.family }} </td>
+                <td>
+                    {% if  d.dataset.created_by.parent_run.pipeline.revision_name|length <= 0 %}
+                        {{ d.dataset.created_by.parent_run.pipeline.family }} </li>
+                    {% else %}
+                        {{ d.dataset.created_by.parent_run.pipeline.revision_name }}
+                    {% endif %}
+                </td>
+                <td>
+                    #{{ d.dataset.created_by.parent_run.pipeline.revision_number }}
+                </td>
+                <td>
+                    {% if d.dataset.created_by == None %}
+                        This was an upload
+                    {% else %}
+                        <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
+                    {% endif %}
+                </td>
+            </tr>
         {% endfor %}
-        </ul>
+        </table>
     {% endif %}
 {% endblock %}
