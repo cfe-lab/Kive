@@ -72,6 +72,7 @@ def dataset_view(request, dataset_id):
 
     # If we have a mismatched output, we do an alignment
     # over the columns
+    col_matching, processed_rows = None, None
     if not dataset.content_matches_header:
         col_matching = dataset.column_alignment()
 
