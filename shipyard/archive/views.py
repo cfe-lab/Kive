@@ -69,8 +69,22 @@ def dataset_view(request, dataset_id):
 
     if dataset.symbolicdataset.is_raw():
         return _build_raw_viewer(request, dataset.dataset_file, dataset.name, dataset.get_absolute_url())
+
+    # If we have a mismatched output, we do an alignment
+    # over the columns
+    if not dataset.content_matches_header:
+        col_matching = dataset.column_alignment()
+
+        # Find all the expected places for a field,
+        # that didn't have one
+        insert = [len(x) > 0 and len(o) == 0 for x, o, _ in col_matching]
+        # Get the indices of those
+        insert = [a[0] for a in filter(lambda (i, tv): tv, enumerate(insert))]
+        print insert
+        processed_rows = dataset.rows(insert)
+
     t = loader.get_template("archive/dataset_view.html")
-    c = RequestContext(request, {"dataset": dataset})
+    c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
 
 

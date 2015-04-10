@@ -1976,17 +1976,86 @@ class Dataset(models.Model):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self):
-        rows = self.all_rows()
+    def rows(self, insert_at=None):
+        rows = self.all_rows(insert_at)
         next(rows) # skip header
         for row in rows:
             yield row
 
-    def all_rows(self):
+    def expected_header(self):
+        header = []
+        if not self.symbolicdataset.is_raw():
+            header = [c.column_name for c in self.symbolicdataset.compounddatatype.members.order_by("column_idx")]
+        return header
+
+    @property
+    def content_matches_header(self):
+        observed = self.header()
+        expected = self.expected_header()
+        if len(observed) != len(expected):
+            return False
+        return not any([o != x for (o, x) in zip(observed, expected)])
+
+    def column_alignment(self):
+        """
+        This function looks at the expected and observed headers for
+        a dataset, and trys to align them if they don't match
+
+
+        :return: a tuple whose first element is a list of triples
+        i.e (expected header name, observed header name, original column #), and
+        whose second element is the necessary swaps on the elements to bring
+        one unaligned row to an aligned row.
+        """
+        expt = self.expected_header()
+        obs = self.header()
+
+        if self.symbolicdataset.is_raw() and not self.content_matches_header:
+            return None, None
+
+        # A distance between two strings
+        def dist(t, s):
+            if len(t) == 0:
+                return len(s)
+            if len(s) == 0:
+                return len(t)
+            c = 0 if t[-1] == s[-1] else 1
+            return min(dist(t[:-1], s) + 1, dist(s, t[:-1]) + 1, dist(s[:-1], t[:-1]) + c)
+
+        col_idx = range(1, len(expt) + 1)
+
+        # Pad the lists so that they're the same size
+        diff = abs(len(expt) - len(obs))
+        if len(expt) > len(obs):
+            obs += [""] * diff
+        else:
+            expt += [""] * diff
+            col_idx += [None] * diff
+
+        # Do a very simple greedy "alignment" over the columns
+        for i, a in enumerate(obs):
+            if dist(a, expt[i]) != 0:
+                cost = [(dist(a, b), j) for j, b in enumerate(expt)]
+                cost = filter(lambda x: dist(expt[x[1]], obs[x[1]]) != 0, cost)
+                b, j = min(cost, key=lambda x: x[0])
+                if i == j:
+                    continue
+                (expt[i], expt[j]) = (expt[j], expt[i])
+                (col_idx[i], col_idx[j]) = (col_idx[j], col_idx[i])
+        return zip(expt, obs, col_idx)
+
+    def all_rows(self, insert_at=None):
         self.dataset_file.open('rU')
+        pad_length = None
+
+        if insert_at is not None:
+            insert_at = sorted(insert_at, reverse=True)
+
         with self.dataset_file:
             reader = csv.reader(self.dataset_file)
             for row in reader:
+                if insert_at is not None:
+                    [row.insert(pos, "") for pos in insert_at]
                 yield row
 
     def validate_unique(self, *args, **kwargs):

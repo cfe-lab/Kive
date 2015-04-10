@@ -30,14 +30,17 @@ $(function() {
             "/poll_run_progress/{{rtp_id}}",{},
             function(result){
                 var stat = result.runs.status;
-                var msg = 'Complete';
+                var run_id = result.runs.id;
+                console.log(run_id);
+                var msg = '<a href="/view_results/'+run_id+'">Complete</a>';
                 if(stat.indexOf('?') > -1 || stat.indexOf('Too') > -1) {
                     msg = 'Waiting for run to start <img src="/static/sandbox/preload.gif"/>';
                 } else {
-                    if(stat.indexOf('.') > -1)
-                        msg = 'In progress <img src="/static/sandbox/preload.gif"/>';
-                    else if(stat.indexOf('!') > -1)
-                        msg = 'Failed!';
+                    if(stat.indexOf('!') > -1) {
+                       msg = '<a href="/view_results/'+run_id+'">Failed!</a>';
+                       clearInterval(self.timer);
+                    } else if(stat.indexOf('.') > -1 || stat.indexOf('+') > -1 || stat.indexOf(':') > -1 )
+                       msg = 'In progress <img src="/static/sandbox/preload.gif"/>';
                     else
                         clearInterval(self.timer);
                     update_status(canvasState, result, "{{md5}}");

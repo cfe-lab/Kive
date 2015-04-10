@@ -8,6 +8,18 @@
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
+    <style>
+        .col_warn {
+            background-color: rgba(255, 203, 0, 0.59);
+        }
+        .col_error {
+            background-color: rgba(255, 29, 0, 0.4);
+        }
+        th sub {
+            font-weight: 100;
+            font-size: 0.6em;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -20,19 +32,54 @@
 <table>
 <thead>
     <tr>
-    {% for column in dataset.header %}
-        <th>{{ column }}</th>
-    {% endfor %}
+    {% if dataset.content_matches_header %}
+       {% for column in dataset.header %}
+            <th>{{ column }}</th>
+        {% endfor %}
+    {% else %}
+            <th> Expected: </th>
+           {% for column in column_matching %}
+                <th>
+                    {{ column.0 }}
+                    {% if column.2 %}
+                        <sub> {{ column.2}} </sub>
+                    {% endif %}
+                </th>
+            {% endfor %}
+    {% endif %}
     </tr>
+
+    {% if not dataset.content_matches_header %}
+    <tr>
+        <th> Observed: </th>
+        {% for column in column_matching %}
+            <th class="{%if column.0 != column.1 and column.0|length == 0%}col_error{% elif column.0 != column.1 %}col_warn{%endif%}">
+                {{ column.1 }}
+                <sub>{{ forloop.counter }}</sub>
+            </th>
+        {% endfor %}
+    </tr>
+    {% endif %}
 </thead>
 </tbody>
-    {% for row in dataset.rows %}
-        <tr>
-        {% for value in row %}
-            <td>{{ value|truncatechars:10 }}</td>
+    {% if dataset.content_matches_header %}
+        {% for row in dataset.rows %}
+            <tr>
+            {% for value in row %}
+                <td>{{ value|truncatechars:10 }}</td>
+            {% endfor %}
+            </tr>
         {% endfor %}
-        </tr>
-    {% endfor %}
+    {% else %}
+        {% for row in processed_rows %}
+            <tr>
+                <td></td>
+            {% for value in row %}
+                <td>{{ value|truncatechars:10 }}</td>
+            {% endfor %}
+            </tr>
+        {% endfor %}
+    {% endif %}
 </tbody>
 </table>
 {% endblock %}
