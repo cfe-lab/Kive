@@ -53,9 +53,14 @@
     <tr>
         <th> Observed: </th>
         {% for column in column_matching %}
-            <th class="{%if column.0 != column.1 and column.0|length == 0%}col_error{% elif column.0 != column.1 %}col_warn{%endif%}">
+            <th class="{%
+                         if column.0 != column.1 and column.0|length == 0
+                             %}col_error{%
+                         elif column.0 != column.1 and column.1|length > 0
+                             %}col_warn{%
+                        endif%}">
                 {{ column.1 }}
-                <sub>{{ forloop.counter }}</sub>
+                {% if column.1|length > 0 %}<sub>{{ forloop.counter }}</sub> {%endif%}
             </th>
         {% endfor %}
     </tr>
