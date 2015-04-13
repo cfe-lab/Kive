@@ -72,10 +72,10 @@ def dataset_view(request, dataset_id):
 
     # If we have a mismatched output, we do an alignment
     # over the columns
-    col_matching, processed_rows = None, None
+    col_matching, processed_rows = None, dataset.rows(True)
     if not dataset.content_matches_header:
         col_matching, insert = dataset.column_alignment()
-        processed_rows = dataset.rows(insert)
+        processed_rows = dataset.rows(data_check=True, insert_at=insert)
 
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})

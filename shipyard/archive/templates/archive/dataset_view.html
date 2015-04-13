@@ -19,7 +19,44 @@
             font-weight: 100;
             font-size: 0.6em;
         }
+        .data-error {
+            background-color: rgb(255, 191, 191);
+            cursor: pointer;
+            position: relative;
+        }
+        .value-error-tip{
+            display: block;
+            position: absolute;
+            background: rgb(255, 253, 253);
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 1);
+            border-radius: 5px;
+            width: 300px;
+            top: 0;
+            right: -320px;
+            padding: 10px;
+            display: none;
+            z-index: 100;
+        }
+        .value-error-tip ul{
+            margin: 0;
+            padding: 4px 0 0 25px;
+        }
+        .value-error-tip li{
+            text-size: 0.7em;
+        }
     </style>
+    <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+<script>
+$(document).ready(function(){
+    $('.data-error').hover( function(){
+        $(this).find('.value-error-tip').show();
+    },
+    function(){
+        $(this).find('.value-error-tip').hide();
+    });
+});
+
+</script>
 {% endblock %}
 
 {% block content %}
@@ -59,10 +96,22 @@
 </thead>
 </tbody>
     {% if dataset.content_matches_header %}
-        {% for row in dataset.rows %}
+        {% for row in processed_rows %}
             <tr>
-            {% for value in row %}
-                <td>{{ value|truncatechars:10 }}</td>
+            {% for value,errors in row %}
+                <td {% if errors|length > 0 %} class="data-error" {% endif %}>
+                    {{ value|truncatechars:10 }}
+                    {% if errors|length > 0 %}
+                        <div class="value-error-tip">
+                            The following data checks failed:
+                            <ul>
+                            {% for error in errors %}
+                                <li>{{ error }} </li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </td>
             {% endfor %}
             </tr>
         {% endfor %}
@@ -70,8 +119,20 @@
         {% for row in processed_rows %}
             <tr>
                 <td></td>
-            {% for value in row %}
-                <td>{{ value|truncatechars:10 }}</td>
+            {% for value,errors in row %}
+                <td {% if errors|length > 0 %} class="data-error" {% endif %}>
+                    {{ value|truncatechars:10 }}
+                    {% if errors|length > 0 %}
+                        <div class="value-error-tip">
+                             The following data checks failed:
+                            <ul>
+                            {% for error in errors %}
+                                <li>{{ error }} </li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </td>
             {% endfor %}
             </tr>
         {% endfor %}

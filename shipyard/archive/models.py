@@ -1976,9 +1976,9 @@ class Dataset(models.Model):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self, insert_at=None):
-        rows = self.all_rows(insert_at)
-        next(rows) # skip header
+    def rows(self, data_check=False, insert_at=None):
+        rows = self.all_rows(data_check, insert_at)
+        next(rows)  # skip header
         for row in rows:
             yield row
 
@@ -2032,11 +2032,13 @@ class Dataset(models.Model):
                 [expt.insert(i, "") for _ in xrange(u_score)]
             elif l_score <= u_score and l_score != float('inf'):
                 [obs.insert(i, "") for _ in xrange(l_score)]
-                insert += [i] * l_score
+                insert += [i] * l_score # keep track of where to insert columns in the resulting view
             i += 1
 
         # it would be nice to do a similar soft matching to try to
-        # match columns that
+        # match columns that are close to being the same string
+
+        # Pad out the arrays
         diff = abs(len(expt)-len(obs))
         if len(expt) > len(obs):
             obs += [""] * diff
@@ -2045,14 +2047,23 @@ class Dataset(models.Model):
 
         return zip(expt, obs), insert
 
-    def all_rows(self, insert_at=None):
+    def all_rows(self, data_check=False, insert_at=None):
+        """
+        Returns an iterator over all rows of this dataset
+
+        If insert_at is specified, a blank field is inserted
+        at each element of insert_at.
+        """
         self.dataset_file.open('rU')
+        cdt = self.symbolicdataset.compounddatatype
 
         with self.dataset_file:
             reader = csv.reader(self.dataset_file)
             for row in reader:
                 if insert_at is not None:
                     [row.insert(pos, "") for pos in insert_at]
+                if data_check:
+                    row = map(None, row, cdt.check_constraints(row))
                 yield row
 
     def validate_unique(self, *args, **kwargs):
