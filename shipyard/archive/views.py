@@ -74,14 +74,7 @@ def dataset_view(request, dataset_id):
     # over the columns
     col_matching, processed_rows = None, None
     if not dataset.content_matches_header:
-        col_matching = dataset.column_alignment()
-
-        # Find all the expected places for a field,
-        # that didn't have one
-        insert = [len(x) > 0 and len(o) == 0 for x, o, _ in col_matching]
-        # Get the indices of those
-        insert = [a[0] for a in filter(lambda (i, tv): tv, enumerate(insert))]
-        print insert
+        col_matching, insert = dataset.column_alignment()
         processed_rows = dataset.rows(insert)
 
     t = loader.get_template("archive/dataset_view.html")

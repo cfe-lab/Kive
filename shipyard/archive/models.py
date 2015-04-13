@@ -2002,54 +2002,51 @@ class Dataset(models.Model):
         a dataset, and trys to align them if they don't match
 
 
-        :return: a tuple whose first element is a list of triples
-        i.e (expected header name, observed header name, original column #), and
-        whose second element is the necessary swaps on the elements to bring
-        one unaligned row to an aligned row.
+        :return: a tuple whose first element is a list of tuples
+        i.e (expected header name, observed header name), and
+        whose second element is a list of gaps indicating where
+        to insert blank fields in a row
         """
         expt = self.expected_header()
         obs = self.header()
+        i, insert = 0, []
 
         if self.symbolicdataset.is_raw() and not self.content_matches_header:
             return None, None
 
-        # A distance between two strings
-        def dist(t, s):
-            if len(t) == 0:
-                return len(s)
-            if len(s) == 0:
-                return len(t)
-            c = 0 if t[-1] == s[-1] else 1
-            return min(dist(t[:-1], s) + 1, dist(s, t[:-1]) + 1, dist(s[:-1], t[:-1]) + c)
+        # Do a greedy 'hard matching' over the columns
+        while i < max(len(expt), len(obs)) - 1:
+            ex, ob = zip(*(map(None, expt, obs)[i:]))
+            u_score = float('inf')
+            l_score = float('inf')
 
-        col_idx = range(1, len(expt) + 1)
+            for j, val in enumerate(ob):
+                if val == ex[0]:
+                    u_score = j
+            for j, val in enumerate(ex):
+                if val == ob[0]:
+                    l_score = j
+            if l_score == u_score == float('inf'):
+                pass
+            elif u_score < l_score and u_score != float('inf'):
+                [expt.insert(i, "") for _ in xrange(u_score)]
+            elif l_score <= u_score and l_score != float('inf'):
+                [obs.insert(i, "") for _ in xrange(l_score)]
+                insert += [i] * l_score
+            i += 1
 
-        # Pad the lists so that they're the same size
-        diff = abs(len(expt) - len(obs))
+        # it would be nice to do a similar soft matching to try to
+        # match columns that
+        diff = abs(len(expt)-len(obs))
         if len(expt) > len(obs):
             obs += [""] * diff
         else:
             expt += [""] * diff
-            col_idx += [None] * diff
 
-        # Do a very simple greedy "alignment" over the columns
-        for i, a in enumerate(obs):
-            if dist(a, expt[i]) != 0:
-                cost = [(dist(a, b), j) for j, b in enumerate(expt)]
-                cost = filter(lambda x: dist(expt[x[1]], obs[x[1]]) != 0, cost)
-                b, j = min(cost, key=lambda x: x[0])
-                if i == j:
-                    continue
-                (expt[i], expt[j]) = (expt[j], expt[i])
-                (col_idx[i], col_idx[j]) = (col_idx[j], col_idx[i])
-        return zip(expt, obs, col_idx)
+        return zip(expt, obs), insert
 
     def all_rows(self, insert_at=None):
         self.dataset_file.open('rU')
-        pad_length = None
-
-        if insert_at is not None:
-            insert_at = sorted(insert_at, reverse=True)
 
         with self.dataset_file:
             reader = csv.reader(self.dataset_file)
