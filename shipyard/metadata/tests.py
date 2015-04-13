@@ -65,13 +65,41 @@ def create_metadata_test_environment(case):
         rule="^[ACGUacgu]*$")
     case.RNA_dt.save()
 
+    # Define a new CDT with a bunch of different member
+    case.basic_cdt = CompoundDatatype(user=case.myUser)
+    case.basic_cdt.save()
+    case.basic_cdt.grant_everyone_access()
+    case.basic_cdt.save()
+
+    case.basic_cdt.members.create(
+        datatype=case.string_dt,
+        column_name='label',
+        column_idx=1)
+    case.basic_cdt.members.create(
+        datatype=case.INT,
+        column_name='integer',
+        column_idx=2)
+    case.basic_cdt.members.create(
+        datatype=case.FLOAT,
+        column_name='float',
+        column_idx=3)
+    case.basic_cdt.members.create(
+        datatype=case.BOOL,
+        column_name='bool',
+        column_idx=4)
+    case.basic_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="rna",
+        column_idx=5)
+    case.basic_cdt.full_clean()
+    case.basic_cdt.save()
+
     # Define test_cdt as containing 3 members:
     # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
     case.test_cdt = CompoundDatatype(user=case.myUser)
     case.test_cdt.save()
     case.test_cdt.grant_everyone_access()
     case.test_cdt.save()
-
     case.test_cdt.members.create(
         datatype=case.string_dt,
         column_name="label",
@@ -2537,3 +2565,24 @@ class CompoundDatatypeTests(MetadataTestCase):
                           .format(path, self.triplet_cdt)),
                 lambda: SymbolicDataset.create_SD(path, user=self.myUser,
                                                   cdt=self.triplet_cdt, name="DS1", description="DS1 desc"))
+
+    def test_type_contraints_row(self):
+
+        # The cdt schema is (string, int, float, bool, rna)
+        t1 = self.basic_cdt.check_constraints(['Once', 'upon', 'a', 'time', 'there'])
+        t2 = self.basic_cdt.check_constraints(['was', '1', 'young', 'lazy', 'dev'])
+        t3 = self.basic_cdt.check_constraints(['that', 'needed', '2', 'test', 'his'])
+        t4 = self.basic_cdt.check_constraints(['datatype', 'as', 'a', 'True', 'which'])
+        t5 = self.basic_cdt.check_constraints(['often', 'made', 'him', 'scream', 'UGGGG'])
+
+        int_fail = u'Was not integer'
+        float_fail = u'Was not float'
+        bool_fail = u'Was not Boolean'
+        rna_fail = u"Failed check 'regexp=^[ACGUacgu]*$'"
+
+        self.assertEqual(t1, [[], [int_fail], [float_fail], [bool_fail], [rna_fail]])
+        self.assertEqual(t2, [[], [], [float_fail], [bool_fail], [rna_fail]])
+        self.assertEqual(t3, [[], [int_fail], [], [bool_fail], [rna_fail]])
+        self.assertEqual(t4, [[], [int_fail], [float_fail], [], [rna_fail]])
+        self.assertEqual(t5, [[], [int_fail], [float_fail], [bool_fail], []])
+

@@ -453,8 +453,8 @@ class Datatype(AccessControl):
         """
         Parse a string as a boolean, returning None if it could not be parsed.
         """
-        true_ptn = re.compile("^(True)|(true)|(TRUE)|T|t|1$")
-        false_ptn = re.compile("^(False)|(false)|(FALSE)|F|f|0$")
+        true_ptn = re.compile(r"(^True$)|(^true$)|(^TRUE$)|^T$|^t$|^1$")
+        false_ptn = re.compile(r"(^False$)|(^false$)|(^FALSE$)|^F$|^f$|^0$")
         if true_ptn.match(string):
             return True
         elif false_ptn.match(string):
@@ -858,7 +858,7 @@ class Datatype(AccessControl):
         summary_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
         with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
-            next(reader) # skip header - we already know it's good from cleaning the prototype
+            next(reader)  # skip header - we already know it's good from cleaning the prototype
             summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader, summary_path)
 
         try:
@@ -871,7 +871,7 @@ class Datatype(AccessControl):
             next(reader) # skip header again
             for rownum, row in enumerate(reader, start=1):
                 # This has to be not None, since the prototype was
-                # succesfully uploaded.
+                # successfully uploaded.
                 valid = Datatype.parse_boolean(row[1])
 
                 if valid and (rownum, 1) in failing_cells:
@@ -1415,7 +1415,6 @@ class CompoundDatatype(AccessControl):
                                        .format(self)))
             member_dts.append(member.datatype)
 
-
     def is_restriction(self, other_CDT):
         """
         True if this CDT is a column-wise restriction of its parameter.
@@ -1562,6 +1561,26 @@ class CompoundDatatype(AccessControl):
         summary.update(summarize_CSV(self.members.all().order_by("column_idx"), data_csv,
                                      summary_path, content_check_log))
         return summary
+
+    def check_constraints(self, row):
+        """
+        SYNOPSIS
+        Checks a row of data against the constraints for each column
+
+        INPUTS
+        :param row      A row of data to check for conformance
+
+        OUTPUTS
+        :returns        A list whose elements are lists of the
+                        failed constraints
+
+        """
+
+        def _check_constr(check, value):
+            err = check.check_basic_constraints(value)
+            return ['Failed check \'%s\'' % e if not isinstance(e, (str, unicode)) else e for e in err]
+
+        return [_check_constr(chk, val) for chk, val in zip(self.members.all(), row)]
 
     @property
     def num_conforming_datasets (self):
