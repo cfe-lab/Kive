@@ -348,7 +348,8 @@ class MD5Conflict(models.Model):
     Denotes an MD5 conflict found during an integrity check.
     """
     integritychecklog = models.OneToOneField(IntegrityCheckLog, related_name="usurper")
-    conflicting_SD = models.OneToOneField("librarian.SymbolicDataset", related_name="usurps")
+    conflicting_SD = models.OneToOneField("librarian.SymbolicDataset", related_name="usurps",
+                                          null=True, on_delete=models.SET_NULL)
 
 
 class BlankCell(models.Model):

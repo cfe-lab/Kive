@@ -58,6 +58,7 @@ def update_success_mark(func):
         return result
     return wrapper
 
+
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
@@ -295,6 +296,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Shouldn't reach here.
         return ("Unknown error", "Unknown reason")
 
+    def remove(self):
+        """Remove this Run cleanly."""
+        # Call remove (don't leave it to a cascade) on all the components.
+        for rs in self.runsteps.all():
+            rs.remove()
+        for roc in self.runoutputcables.all():
+            roc.remove()
+        self.delete()
+
 
 class RunComponent(stopwatch.models.Stopwatch):
     """
@@ -330,7 +340,6 @@ class RunComponent(stopwatch.models.Stopwatch):
             self._complete = self.is_complete()
             self._successful = self.is_successful()
         super(RunComponent, self).save(*args, **kwargs)
-
 
     def has_data(self):
         """
@@ -706,6 +715,20 @@ class RunComponent(stopwatch.models.Stopwatch):
             if ccls.exists() and any([x.is_fail() for x in ccls]):
                 return False
         return True
+
+    def remove(self):
+        """
+        Remove this RunComponent cleanly.
+
+        This *does not* attempt to remove the parent Run.  If that's the goal then
+        one should directly remove that Run.
+        """
+        # If this RunComponent is the creator of an ExecRecord, then that ExecRecord will
+        # be deleted in the cascade (via the ExecLog).  If not but Datasets are generated here,
+        # we have to handle removal of the Dataset somehow.
+        for ds in self.outputs.all():
+            ds.symbolicdataset.redact()
+        self.delete()
 
 
 @python_2_unicode_compatible
@@ -2061,6 +2084,26 @@ class Dataset(models.Model):
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
 
+    # def remove(self):
+    #     """
+    #     Cleanly remove this Dataset from the database.
+    #
+    #     If this Dataset was required by any other RunComponents that needed it, we
+    #     remove those as well.  This *does not* delete the creating RunComponent (to
+    #     avoid infinite loops).
+    #     """
+    #     if self.created_by is not None:
+    #         execrecord = self.created_by.execrecord
+    #         producing_output = execrecord.execrecordouts.get(
+    #             symbolicdataset=self.symbolicdataset).generic_output
+    #         for rc in execrecord.used_by_components.exclude(pk=self.created_by.pk):
+    #             should_remove = (rc.keeps_output(producing_output) if isinstance(rc, RunStep)
+    #                              else rc.keeps_output())
+    #             if should_remove and rc.top_level_run != self.created_by.top_level_run:
+    #                 rc.top_level_run.remove()
+    #
+    #     self.delete()
+
 
 class ExecLog(stopwatch.models.Stopwatch):
     """
@@ -2291,6 +2334,13 @@ class ExecLog(stopwatch.models.Stopwatch):
 
         return True
 
+    def is_redacted(self):
+        try:
+            return self.methodoutput.is_redacted()
+        except ObjectDoesNotExist:
+            pass
+        return False
+
 
 class MethodOutput(models.Model):
     """
@@ -2310,9 +2360,15 @@ class MethodOutput(models.Model):
     execlog = models.OneToOneField(ExecLog, related_name="methodoutput")
     return_code = models.IntegerField("return code", null=True)
     output_log = models.FileField("output log", upload_to="Logs",
-                                  help_text="Terminal output of the RunStep Method, i.e. stdout.")
+                                  help_text="Terminal output of the RunStep Method, i.e. stdout.",
+                                  null=True, blank=True)
     error_log = models.FileField("error log", upload_to="Logs",
-                                 help_text="Terminal error output of the RunStep Method, i.e. stderr.")
+                                 help_text="Terminal error output of the RunStep Method, i.e. stderr.",
+                                 null=True, blank=True)
+
+    _output_redacted = models.BooleanField(default=False)
+    _error_redacted = models.BooleanField(default=False)
+    _code_redacted = models.BooleanField(default=False)
     
     @classmethod
     def create(cls, execlog):
@@ -2320,6 +2376,21 @@ class MethodOutput(models.Model):
         methodoutput.clean()
         methodoutput.save()
         return methodoutput
+
+    def is_redacted(self):
+        return self._output_redacted or self._error_redacted or self._code_redacted
+
+    def redact_output_log(self):
+        self.output_log.delete()
+        self.save()
+
+    def redact_error_log(self):
+        self.error_log.delete()
+        self.save()
+
+    def redact_return_code(self):
+        self.return_code = None
+        self.save()
 
 
 # Register signals.

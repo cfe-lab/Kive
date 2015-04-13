@@ -60,6 +60,8 @@ class SymbolicDataset(metadata.models.AccessControl):
             message="MD5 checksum is not either 32 hex characters or blank")],
         blank=True, default="", help_text="Validates file integrity")
 
+    _redacted = models.BooleanField(default=False)
+
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -615,6 +617,34 @@ class SymbolicDataset(metadata.models.AccessControl):
 
         return False
 
+    # FIXME this means we will need to change the clean() of RunComponent to check that outputs are either
+    # present or redacted
+    def redact(self, remove=False):
+        """
+        Wipe out the contents of this SymbolicDataset.
+        """
+        if self.has_data():
+            self.dataset.remove()
+        if self.has_structure():
+            self.structure.delete()
+
+        # Redact anything that was produced from this SymbolicDataset.
+        for used_as_input in self.execrecordins.all():
+            used_as_input.execrecord.redact(remove=remove)
+        if remove:
+            # Also get rid of the producing ExecRecord.
+            for produced_as_output in self.execrecordouts.all():
+                produced_as_output.execrecord.redact(remove=True)
+
+        if remove:
+            self.remove()
+        else:
+            self._redacted = True
+            self.MD5_checksum = ""
+
+    def is_redacted(self):
+        return self._redacted
+
 
 class DatasetStructure(models.Model):
     """
@@ -644,7 +674,12 @@ class ExecRecord(models.Model):
     """
     Record of a previous execution of a Pipeline component.
     """
-    generator = models.ForeignKey("archive.ExecLog", related_name="execrecords")
+    generator = models.OneToOneField("archive.ExecLog", related_name="execrecord",
+                                     null=True, blank=True)
+    adopter = models.OneToOneField("archive.RunComponent", related_name="adopted_execrecord",
+                                   null=True, blank=True)
+
+    # FIXME exactly one of these must be non-null
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -868,6 +903,32 @@ class ExecRecord(models.Model):
                 runsteps_using_this.append(component_using_this.runstep)
         return any(not runstep.successful_execution() for runstep in runsteps_using_this if not runstep.reused)
 
+    def is_redacted(self):
+        for eri in self.execrecordins.all().select_related("symbolicdataset"):
+            if eri.symbolicdataset.is_redacted():
+                return True
+        for ero in self.execrecordins.all().select_related("symbolicdataset"):
+            if ero.symbolicdataset.is_redacted():
+                return True
+
+        if self.generator.is_redacted():
+            return True
+
+    def redact(self, remove=False):
+        """
+        "Hollow out" this ExecRecord.
+
+        This may be triggered by an input SymbolicDataset or by the ExecLog.
+        """
+        for ero in self.execrecordins.all().select_related("symbolicdataset"):
+            ero.symbolicdataset.redact(remove=remove)
+
+        if remove:
+            # Remove any RunComponents using this ExecRecord.  This will cascade onto the
+            # ExecLogs and thus also this ExecRecord.
+            for rc in self.used_by_components.exclude(pk=self.generator.record.pk):
+                rc.top_level_run.remove()
+
 
 @python_2_unicode_compatible
 class ExecRecordIn(models.Model):
@@ -878,7 +939,8 @@ class ExecRecordIn(models.Model):
     of a previous step in a pipeline.
     """
     execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord", related_name="execrecordins")
-    symbolicdataset = models.ForeignKey(SymbolicDataset, help_text="Symbol for the dataset fed to this input")
+    symbolicdataset = models.ForeignKey(SymbolicDataset, help_text="Symbol for the dataset fed to this input",
+                                        related_name="execrecordins")
 
     # For a Method/Pipeline, this denotes the input that this ERI refers to;
     # for a cable, this denotes the thing that "feeds" it.

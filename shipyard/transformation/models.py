@@ -399,7 +399,7 @@ class XputStructure(models.Model):
     transf_xput = models.OneToOneField(TransformationXput, related_name="structure")
 
     # The expected compounddatatype of the input/output
-    compounddatatype = models.ForeignKey("metadata.CompoundDatatype")
+    compounddatatype = models.ForeignKey("metadata.CompoundDatatype", related_name="xput_structures")
     
     # Nullable fields indicating that this dataset has
     # restrictions on how many rows it can have

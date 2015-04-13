@@ -1110,6 +1110,24 @@ class Datatype(AccessControl):
 
         return failing_cells
 
+    def remove(self, rm_verif_method=True):
+        """
+        Remove this Datatype and anything tied to it from the system.
+        """
+        self.prototype.remove()
+        for descendant_dt in self.restricted_by.all():
+            descendant_dt.remove()
+
+        for cdtm in self.CDTMs.all():
+            cdtm.remove(remove_empty_cdt=True)
+
+        if (rm_verif_method and self.has_custom_constraint() and
+                self.custom_constraint.verification_method.user == self.user):
+            self.custom_constraint.verification_method.remove(
+                remove_empty_family=True, remove_crr=True, remove_empty_cr=True)
+
+        self.delete()
+
 
 @python_2_unicode_compatible
 class BasicConstraint(models.Model):
@@ -1292,10 +1310,12 @@ class CompoundDatatypeMember(models.Model):
     Related to :model:`archive.models.Dataset`
     Related to :model:`metadata.models.CompoundDatatype`
     """
-    compounddatatype = models.ForeignKey("CompoundDatatype", related_name="members",
+    compounddatatype = models.ForeignKey(
+        "CompoundDatatype", related_name="members",
         help_text="Links this DataType member to a particular CompoundDataType")
 
-    datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is")
+    datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is",
+                                 related_name="CDTMs")
 
     column_name = models.CharField("Column name", blank=False, max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Gives datatype a 'column name' as an alternative to column index")
@@ -1356,6 +1376,10 @@ class CompoundDatatypeMember(models.Model):
                 return [CompoundDatatypeMember.BLANK_ENTRY]
         return self.datatype.check_basic_constraints(value)
 
+    def remove(self, remove_cdt=True):
+        if remove_cdt:
+            self.compounddatatype.remove()
+
 
 @python_2_unicode_compatible
 class CompoundDatatype(AccessControl):
@@ -1373,7 +1397,7 @@ class CompoundDatatype(AccessControl):
 
     # Implicitly defined:
     #   members (CompoundDatatypeMember/ForeignKey)
-    #   Conforming_datasets (Dataset/ForeignKey)
+    #   conforming_datasets (DatasetStructure/ForeignKey)
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -1414,7 +1438,6 @@ class CompoundDatatype(AccessControl):
                 raise ValidationError(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'
                                        .format(self)))
             member_dts.append(member.datatype)
-
 
     def is_restriction(self, other_CDT):
         """
@@ -1570,3 +1593,16 @@ class CompoundDatatype(AccessControl):
         Is this even possible?
         """
         return 0
+
+    def remove(self):
+        """
+        Handle removal of this CDT from the database, including all records that tied to it.
+        """
+        # Remove any SymbolicDatasets that had this CDT.
+        for ds in self.conforming_datasets.all().select_related("symbolicdataset"):
+            ds.symbolicdataset.remove()
+
+        # Remove any Transformations that had this CDT.
+        for xput_structure in self.xput_structures.all():
+            xput_structure.transf_xput.definite.transformation.remove()
+
