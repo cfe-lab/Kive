@@ -24,18 +24,44 @@
             cursor: pointer;
             position: relative;
         }
+        .data-error:hover {
+            background-color: rgb(255, 62, 62);
+        }
         .value-error-tip{
             display: block;
             position: absolute;
-            background: rgb(255, 253, 253);
-            box-shadow: 3px 3px 10px rgba(0, 0, 0, 1);
+            background: #FFF0F0;
             border-radius: 5px;
             width: 300px;
             top: 0;
-            right: -320px;
+            right: -335px;
             padding: 10px;
             display: none;
             z-index: 100;
+	        border: 2px solid #FFD5D5;
+        }
+        .value-error-tip:after, .value-error-tip:before {
+	        right: 100%;
+	        top: 15px;
+	        border: solid transparent;
+	        content: " ";
+	        height: 0;
+	        width: 0;
+	        position: absolute;
+	        pointer-events: none;
+        }
+
+        .value-error-tip:after {
+            border-color: rgba(214, 133, 133, 0);
+            border-right-color: #FFF0F0;
+            border-width: 10px;
+            margin-top: -10px;
+        }
+        .value-error-tip:before {
+            border-color: rgba(204, 204, 204, 0);
+            border-right-color: #FFD5D5;
+            border-width: 12px;
+            margin-top: -12px;
         }
         .value-error-tip ul{
             margin: 0;
@@ -95,30 +121,11 @@ $(document).ready(function(){
     {% endif %}
 </thead>
 </tbody>
-    {% if dataset.content_matches_header %}
         {% for row in processed_rows %}
             <tr>
-            {% for value,errors in row %}
-                <td {% if errors|length > 0 %} class="data-error" {% endif %}>
-                    {{ value|truncatechars:10 }}
-                    {% if errors|length > 0 %}
-                        <div class="value-error-tip">
-                            The following data checks failed:
-                            <ul>
-                            {% for error in errors %}
-                                <li>{{ error }} </li>
-                            {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                </td>
-            {% endfor %}
-            </tr>
-        {% endfor %}
-    {% else %}
-        {% for row in processed_rows %}
-            <tr>
+            {% if not dataset.content_matches_header %}
                 <td></td>
+            {% endif %}
             {% for value,errors in row %}
                 <td {% if errors|length > 0 %} class="data-error" {% endif %}>
                     {{ value|truncatechars:10 }}
@@ -136,7 +143,6 @@ $(document).ready(function(){
             {% endfor %}
             </tr>
         {% endfor %}
-    {% endif %}
 </tbody>
 </table>
 {% endblock %}

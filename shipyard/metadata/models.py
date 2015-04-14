@@ -1577,10 +1577,12 @@ class CompoundDatatype(AccessControl):
         """
 
         def _check_constr(check, value):
+            if check is None:
+                return []
             err = check.check_basic_constraints(value)
             return ['Failed check \'%s\'' % e if not isinstance(e, (str, unicode)) else e for e in err]
 
-        return [_check_constr(chk, val) for chk, val in zip(self.members.all(), row)]
+        return [_check_constr(chk, val) for chk, val in map(None, self.members.all(), row)]
 
     @property
     def num_conforming_datasets (self):
