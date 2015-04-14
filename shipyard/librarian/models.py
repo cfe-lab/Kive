@@ -534,6 +534,12 @@ class SymbolicDataset(metadata.models.AccessControl):
                     new_cell_error.clean()
                     new_cell_error.save()
 
+        if csv_baddata:
+            self.logger.debug("Content check failed - file {} does not conform to SymbolicDataset {}".
+                    format(file_path_to_check, self))
+            self._notify_runcomponents_of_failure()
+
+
         else:
             self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
                     format(file_path_to_check, self))
@@ -572,14 +578,29 @@ class SymbolicDataset(metadata.models.AccessControl):
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()
 
+            self._notify_runcomponents_of_failure()
+
         icl.stop(save=True, clean=True)
         return icl
-    
+
+    def _notify_runcomponents_of_failure(self):
+        """
+        Mark RunComponents that use this as an output as failed.
+        """
+        creating_ER = self.dataset.created_by.execrecord
+        for rc in creating_ER.used_by_components():
+            rc.mark_unsuccessful()
+
     def is_OK(self):
         """
         Check that this SD has passed a check for contents if not raw,
         and it has never failed any check for integrity or contents.
+
+        Redacted SDs are not considered OK.
         """
+        if self.is_redacted():
+            return False
+
         # Check for any failures.
         if self.any_failed_checks():
             return False
@@ -781,6 +802,10 @@ class ExecRecord(models.Model):
                         raise ValidationError(('ExecRecord "{}" represents a trivial cable but its input and output '
                                                'do not match').format(self))
 
+                # From this point on we can't proceed if the ExecRecord is redacted.
+                if self.is_redacted():
+                    return
+
                 # If the cable is not trivial and both sides have
                 # data, then the column *Datatypes* on the destination
                 # side are the same as the corresponding column on the
@@ -928,6 +953,9 @@ class ExecRecord(models.Model):
             # ExecLogs and thus also this ExecRecord.
             for rc in self.used_by_components.exclude(pk=self.generator.record.pk):
                 rc.top_level_run.remove()
+        else:
+            for rc in self.used_by_components.all():
+                rc.redact()
 
 
 @python_2_unicode_compatible
@@ -1024,6 +1052,10 @@ class ExecRecordIn(models.Model):
                 raise ValidationError(
                     'Input "{}" does not belong to Method of ExecRecord "{}"'.
                     format(self.generic_input, self.execrecord))
+
+        # If the SD is redacted, we return -- the rest is not applicable.
+        if self.symbolicdataset.is_redacted():
+            return
 
         # The ERI's SymbolicDataset raw/unraw state must match the
         # raw/unraw state of the generic_input that feeds it (if ER is a cable)
@@ -1171,6 +1203,10 @@ class ExecRecordOut(models.Model):
                 raise ValidationError(
                     "Output \"{}\" does not belong to Method/Pipeline of ExecRecord \"{}\"".
                     format(self.generic_output, self.execrecord))
+
+        if self.symbolicdataset.is_redacted():
+            # A redacted SD is fine -- the rest of the checks are inapplicable.
+            return
 
         # Check that the SD is compatible with generic_output.
 

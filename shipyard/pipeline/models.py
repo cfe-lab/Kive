@@ -635,6 +635,14 @@ class Pipeline(transformation.models.Transformation):
     def threads_needed(self):
         return max(x.threads_needed() for x in self.steps.all())
 
+    def remove(self):
+        # A cascade to Run won't do it because Run needs to be *removed*.
+        for run in self.pipeline_instances.all():
+            run.remove()
+
+        # Cascade will handle steps, cables, RunToProcess objects, etc.
+        self.delete()
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
@@ -1205,6 +1213,9 @@ class PipelineCable(models.Model):
         candidates = []
         for candidate_ERI in candidate_ERIs:
             candidate_execrecord = candidate_ERI.execrecord
+            if candidate_execrecord.is_redacted():
+                continue
+
             candidate_component = candidate_execrecord.general_transf()
 
             if not candidate_component.is_cable:

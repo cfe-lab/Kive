@@ -568,6 +568,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     reused=False,
                     execrecord_id__isnull=False):
                 candidate_ER = possible_RS.execrecord
+                if candidate_ER.is_redacted():
+                    continue
 
                 # Check that this ER is accessible by runstep.
                 extra_users, extra_groups = runstep.top_level_run.extra_users_groups(
@@ -748,6 +750,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     def is_identical(self, other):
         """Is this Method identical to another one?"""
         return self.driver == other.driver and super(Method, self).is_identical(super(Method, other))
+
+    def remove(self):
+        """
+        Cleanly remove this Method from the database.
+        """
+        # Remove all Pipelines that use this Method.  This will eventually make its way over to
+        # remove the ExecLogs and ExecRecords too.
+        for ps in self.pipelinesteps.all():
+            ps.pipeline.remove()
+
+        # This delete will cascade to the inputs/outputs.
+        self.delete()
 
 
 @python_2_unicode_compatible

@@ -1600,7 +1600,7 @@ class CompoundDatatype(AccessControl):
         """
         # Remove any SymbolicDatasets that had this CDT.
         for ds in self.conforming_datasets.all().select_related("symbolicdataset"):
-            ds.symbolicdataset.remove()
+            ds.symbolicdataset.redact(remove=True)
 
         # Remove any Transformations that had this CDT.
         for xput_structure in self.xput_structures.all():

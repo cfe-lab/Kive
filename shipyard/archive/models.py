@@ -27,36 +27,38 @@ from constants import maxlengths
 import archive.signals
 
 
-def update_complete_mark(func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        result = func(*args, **kwargs)
+def update_flag_factory(flag_name):
+    assert(flag_name in ("_complete", "_successful", "_redacted"))
 
-        # Hopefully you've decorated the right object
-        # and this exists
-        if hasattr(self, '_complete'):
-            self._complete = result
-            # If there is an entry in the database
-            if self.pk is not None:
-                self.save(update_fields=["_complete"])
-        return result
-    return wrapper
+    def update_flag(func):
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            result = func(*args, **kwargs)
 
+            # Hopefully you've decorated the right object
+            # and the flag exists.
+            if "save" in kwargs and kwargs["save"]:
+                if hasattr(self, flag_name):
+                    if flag_name == "_complete":
+                        orig_val = self._complete
+                        self._complete = result
+                    elif flag_name == "_successful":
+                        orig_val = self._successful
+                        self._successful = result
+                    elif flag_name == "_redacted":
+                        orig_val = self._redacted
+                        self._redacted = result
+                    # If there is an entry in the database....
+                    if self.pk is not None and orig_val != result:
+                        self.save(update_fields=[flag_name])
+            return result
+        return wrapper
 
-def update_success_mark(func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        result = func(*args, **kwargs)
+    return update_flag
 
-        # Hopefully you've decorated the right object
-        # and this exists
-        if hasattr(self, '_successful'):
-            self._successful = result
-            # If there is an entry in the database
-            if self.pk is not None:
-                self.save(update_fields=["_successful"])
-        return result
-    return wrapper
+update_complete_mark = update_flag_factory("_complete")
+update_successful_mark = update_flag_factory("_successful")
+update_redacted_mark = update_flag_factory("_redacted")
 
 
 @python_2_unicode_compatible
@@ -318,10 +320,15 @@ class RunComponent(stopwatch.models.Stopwatch):
     is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
                                     default=False)
 
-    _complete = models.BooleanField(help_text="Denotes whether this run component has been completed. Private use only",
-                                    default=False)
-    _successful = models.BooleanField(help_text="Denotes whether this has been successful. Private use only!",
-                                      default=False)
+    _complete = models.BooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only",
+        default=False)
+    _successful = models.BooleanField(
+        help_text="Denotes whether this has been successful. Private use only!",
+        default=False)
+    _redacted = models.BooleanField(
+        help_text="Denotes whether this has been redacted. Private use only!",
+        default=False)
 
     # Implicit:
     # - log: via OneToOneField from ExecLog
@@ -339,6 +346,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if 'update_fields' not in kwargs:
             self._complete = self.is_complete()
             self._successful = self.is_successful()
+            self._redacted = self.is_redacted()
         super(RunComponent, self).save(*args, **kwargs)
 
     def has_data(self):
@@ -396,7 +404,11 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     @property
     def has_log(self):
-        return hasattr(self, "log")
+        try:
+            self.logger
+        except ExecLog.DoesNotExist:
+            return False
+        return True
 
     @property
     def definite(self):
@@ -649,6 +661,17 @@ class RunComponent(stopwatch.models.Stopwatch):
         # At this point, we know that it is unsuccessful and incomplete.
         return False
 
+    @update_redacted_mark
+    def is_redacted(self, *kwargs):
+        if self.has_log and self.log.is_redacted():
+            return True
+        if self.execrecord is not None and self.execrecord.is_redacted():
+            return True
+        return False
+
+    def is_marked_redacted(self):
+        return self._redacted
+
     def clean(self):
         """Confirm that this is one of RunStep or RunCable."""
         # If the ExecRecord is set, check that access on the top level Run does not exceed
@@ -666,6 +689,10 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.clean()
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
+
+    def mark_unsuccessful(self):
+        self._successful = False
+        self.save(update_fields=["_successful"])
 
     def is_marked_successful(self):
         """
@@ -729,6 +756,11 @@ class RunComponent(stopwatch.models.Stopwatch):
         for ds in self.outputs.all():
             ds.symbolicdataset.redact()
         self.delete()
+
+    @transaction.atomic
+    def redact(self):
+        self._redacted = True
+        self.save(update_fields=["_redacted"])
 
 
 @python_2_unicode_compatible
@@ -1188,7 +1220,7 @@ class RunStep(RunComponent):
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self)
 
-    @update_success_mark
+    @update_successful_mark
     def is_successful(self, **kwargs):
         return super(RunStep, self).is_successful()
 
@@ -1378,7 +1410,7 @@ class RunCable(RunComponent):
     def is_complete(self, **kwargs):
         return super(RunCable, self).is_complete()
 
-    @update_success_mark
+    @update_successful_mark
     def is_successful(self, **kwargs):
         return super(RunCable, self).is_successful()
 
@@ -2383,14 +2415,17 @@ class MethodOutput(models.Model):
     def redact_output_log(self):
         self.output_log.delete()
         self.save()
+        self.execlog.record.redact()
 
     def redact_error_log(self):
         self.error_log.delete()
         self.save()
+        self.execlog.record.redact()
 
     def redact_return_code(self):
         self.return_code = None
         self.save()
+        self.execlog.record.redact()
 
 
 # Register signals.
