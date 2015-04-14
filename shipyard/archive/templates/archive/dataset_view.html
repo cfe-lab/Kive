@@ -95,6 +95,7 @@ $(document).ready(function(){
 <table>
 <thead>
     <tr>
+
     {% if dataset.content_matches_header %}
        {% for column in dataset.header %}
             <th>{{ column }}</th>
@@ -102,9 +103,7 @@ $(document).ready(function(){
     {% else %}
             <th> Expected: </th>
            {% for column in column_matching %}
-                <th>
-                    {{ column.0 }}
-                </th>
+                <th> {{ column.0 }} </th>
             {% endfor %}
     {% endif %}
     </tr>
@@ -113,36 +112,37 @@ $(document).ready(function(){
     <tr>
         <th> Observed: </th>
         {% for column in column_matching %}
-            <th class="{% if column.0 != column.1 and column.0|length == 0  %}col_error{%  elif column.0 != column.1 and column.1|length > 0 %}col_warn{% endif%}">
+            <th>
                 {{ column.1 }}
             </th>
         {% endfor %}
     </tr>
     {% endif %}
 </thead>
-</tbody>
-        {% for row in processed_rows %}
-            <tr>
-            {% if not dataset.content_matches_header %}
-                <td></td>
-            {% endif %}
-            {% for value,errors in row %}
-                <td {% if errors|length > 0 %} class="data-error" {% endif %}>
-                    {{ value|truncatechars:10 }}
-                    {% if errors|length > 0 %}
-                        <div class="value-error-tip">
-                             The following data checks failed:
-                            <ul>
-                            {% for error in errors %}
-                                <li>{{ error }} </li>
-                            {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                </td>
-            {% endfor %}
-            </tr>
+<tbody>
+    {% for row in processed_rows %}
+    <tr>
+        {% if not dataset.content_matches_header %}
+            <td></td>
+        {% endif %}
+
+        {% for value,errors in row %}
+            <td {% if errors|length > 0 %} class="data-error" {% endif %}>
+                {{ value|truncatechars:10 }}
+                {% if errors|length > 0 %}
+                    <div class="value-error-tip">
+                        The following data checks failed:
+                        <ul>
+                        {% for error in errors %}
+                            <li>{{ error }} </li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </td>
         {% endfor %}
+        </tr>
+    {% endfor %}
 </tbody>
 </table>
 {% endblock %}
