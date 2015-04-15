@@ -1,7 +1,7 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
   // Created: 2015-02-27 17:10
-  // Cli Options: --pygraphviz --settings=shipyard.UML_settings -a -g
+  // Cli Options: --pygraphviz --settings=kive.UML_settings -a -g
 
   fontname = "Helvetica"
   fontsize = 8

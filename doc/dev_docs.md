@@ -1,7 +1,7 @@
-Getting Your Code into Shipyard: CodeResources and CodeResourceRevisions
+Getting Your Code into Kive: CodeResources and CodeResourceRevisions
 ========================================================================
 
-If you're considering using Shipyard, chances are you have a lot of
+If you're considering using Kive, chances are you have a lot of
 scripts hanging around on your computer to perform different analyses
 and processing steps on biological datasets. Some of these may be
 entirely your own code, or they may call external programs you have
@@ -15,18 +15,18 @@ behaviour, output from the old version may become unreproducible. Making
 matters worse, you might not know which version of a given script was
 used to generate a particular dataset.
 
-Shipyard aims to streamline your data processing by handling the
+Kive aims to streamline your data processing by handling the
 versioning and running of your code, and recording every detail of every
 run. This way, you can focus on developing new and better ways to
 process and analyse your data, with the knowledge that everything you do
 will be recorded and reproducible. Your first step will be to upload
-some code to Shipyard.
+some code to Kive.
 
-### Readying your Code for Shipyard
+### Readying your Code for Kive
 
-Because Shipyard handles running of your code automatically, scripts you
+Because Kive handles running of your code automatically, scripts you
 provide must have a specific command line interface. If you are writing
-new scripts for Shipyard, you can implement this interface from the
+new scripts for Kive, you can implement this interface from the
 get-go; otherwise, you will need to modify your code. There are two
 important changes you'll need to make: your program's command line
 interface, and the format of the data your program will read and write.
@@ -41,7 +41,7 @@ This script expects n input files and produces k output files, whose
 filenames are passed in that order on the command line. Your script may
 additionally print messages to standard output and standard error, and
 set its return code to a descriptive value, if you like, and all this
-information will be recorded in Shipyard. However, your actual data must
+information will be recorded in Kive. However, your actual data must
 be read in from, and output to, the files named on the command line. 
 
 For example, suppose you have written a script which takes two inputs and
@@ -69,7 +69,7 @@ documentation for more details). Of course, you do not have to provide a
 return code, nor do you need to output anything to either of the
 standard streams.
 
-Shipyard puts no restrictions on what characters can appear in your
+Kive puts no restrictions on what characters can appear in your
 dataset names, except those imposed by your file system. You must take
 care that your programs can handle all possible characters in file
 names. For example, on Unix, spaces are allowed. When using scripting
@@ -95,7 +95,7 @@ my\_script as a /dependency/ of this wrapper - see the below section on
 CodeResources for more information.
 
 The second modification you'll need to make is the format of the data
-fed into, and output by, your code. Shipyard passes data around mostly
+fed into, and output by, your code. Kive passes data around mostly
 in RFC 4018-compliant comma-separated value (CSV) format. That means,
 for example, if your script outputs data in the form of DNA sequences
 with accompanying headers, you will need to output a file which looks
@@ -110,32 +110,32 @@ Of course, not every file you might want to handle can be reasonably
 coerced into CSV format, such as a configuration or settings file.
 External programs will probably output results in formats other than
 CSV - bioinformatics programs often produce files in NEXUS or FASTA
-format. For these use cases, Shipyard also allows you to declare data as
+format. For these use cases, Kive also allows you to declare data as
 being "raw". Raw data will simply be passed around as-is from one step
 in a pipeline to another. However, whenever possible, we /strongly
 encourage/ you to write code which inputs and outputs CSV. One of
-Shipyard's strengths is its ability to check the integrity of your data
+Kive's strengths is its ability to check the integrity of your data
 against any constraints you define, which can help catch bugs and
 unexpected behaviour in your code (see the section on Datatypes, below).
 With raw data, this functionality is lost. In general, raw data should
 be reserved for output directly from external programs. If you are
 writing the program yourself, output to CSV.
 
-<!--- end of Readying your Code for Shipyard -->
+<!--- end of Readying your Code for Kive -->
 <!--- here will go sections on CodeResource and CodeResourceRevision -->
 
-How Shipyard Structures Data: Datatypes and CompoundDatatypes
+How Kive Structures Data: Datatypes and CompoundDatatypes
 =============================================================
 
 Just as important as uploading the code, you need to describe to
-Shipyard what kinds of data you will be working with. Shipyard is a tool
+Kive what kinds of data you will be working with. Kive is a tool
 for manipulating structured data. In fact, from the point of view of the
 system, the structure of the data is just as important as the contents,
-if not more so. Shipyard wants as much information as possible about
+if not more so. Kive wants as much information as possible about
 what your data is supposed to look like, so that it can catch more
 errors at all steps of Pipeline execution. 
 
-Shipyard passes most data around as CSV files with headers. In Shipyard
+Kive passes most data around as CSV files with headers. In Kive
 terms, each column of a CSV file has a Datatype, indicated by its
 header, and the entire CSV file has a CompoundDatatype, which is simply
 composed of the sequence of Datatypes of the individual columns. These
@@ -149,7 +149,7 @@ language. C, for example, has only a few datatypes - integer, character,
 double, and variations on these. Languages like Python have many
 datatypes, including lists, dictionaries, and files.
 
-The datatype system of Shipyard more closely resembles that of Ada or
+The datatype system of Kive more closely resembles that of Ada or
 Haskell (but don't let that scare you off :) ). Datatypes can be
 extremely restrictive, and we encourage you to define types as narrowly
 as possible for the range of data you expect to work with. For example,
@@ -174,8 +174,8 @@ You can also have multiple Datatypes restricting a single one (A and B
 both restrict C), or one Datatype which restricts several others (A
 restricts both B and C). 
 
-Because Shipyard operates primarily on CSV files, all datatypes in
-Shipyard restrict strings. When you create a new Datatype, you must
+Because Kive operates primarily on CSV files, all datatypes in
+Kive restrict strings. When you create a new Datatype, you must
 select one or more Datatypes for it to restrict (in addition to any
 other restrictions you want to define). If you do not want to impose any
 restrictions on your Datatype, declare it to restrict "string" only. For
@@ -194,8 +194,8 @@ Constraints hold specific rules that data of a particular Datatype must
 adhere to. These can be very basic, such as having a particular length,
 or arbitrarily complex, defined by code that you write.
 
-There are two types of constraints on Datatypes in Shipyard. /Basic
-constraints/ are simple checks built in to Shipyard, which should cover
+There are two types of constraints on Datatypes in Kive. /Basic
+constraints/ are simple checks built in to Kive, which should cover
 a good number of data checking cases. These include minimum and maximum
 length (for strings), minimum and maximum values (for integers and
 floats), matching a regular expression (for strings), and being
@@ -224,7 +224,7 @@ called "to\_test", and return a column of positive integers called
 "failed\_row". For each string in "to\_test", the Method should process
 the string and check if it matches the constraint. If it does not match,
 the row of the non-matching string should be appended to the output.
-Note that rows in Shipyard are indexed from 1, so if the first input
+Note that rows in Kive are indexed from 1, so if the first input
 string fails the check, the Method should append a "1" to the output.
 
 Here is an example. Suppose you are processing phylogenetic trees in
@@ -259,7 +259,7 @@ understand what's going on).
 
         # Loop through each input string.
         for i, row in enumerate(reader):
-            row_num = i+1 # Shipyard uses 1-indexing for rows
+            row_num = i+1 # Kive uses 1-indexing for rows
             # Try to parse the tree.
             io = StringIO(row["to_test"]) 
             try:
@@ -293,13 +293,13 @@ restrictions of strings).
         041,true
         01a,false
 
-When you provide a prototype, Shipyard will test your data checking
+When you provide a prototype, Kive will test your data checking
 method by running it against the values in "example", and ensuring that
 only the rows in "valid" which are false are output. If the Method does
 not work as expected, nothing will be run on your data until the problem
 is fixed. Although prototypes are not required, we highly recommend you
 supply them. Checking the integrity of data at all steps of execution is
-one of Shipyard's core functions, and bugs in data checking methods can
+one of Kive's core functions, and bugs in data checking methods can
 be difficult to chase down. Moreover, prototypes provide a helpful
 reminder for yourself, and an aid for fellow users, of what your
 Datatype should look like.

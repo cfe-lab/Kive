@@ -14,13 +14,13 @@ import method.models
 import sandbox.testing_utils as tools
 
 # This comes from the initial_data fixture.
-shipyard_user = User.objects.get(pk=1)
+kive_user = User.objects.get(pk=1)
 
 test_fasta = SymbolicDataset.create_SD(
     "../samplecode/step_0_raw.fasta",
     cdt=None,
     make_dataset=True,
-    user=shipyard_user,
+    user=kive_user,
     name="TestFASTA",
     description="Toy FASTA file for testing pipelines"
     )

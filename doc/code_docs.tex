@@ -47,17 +47,17 @@ contents will be modified, but metadata about the file (like its name and
 description) will stay the same. Just like in source control, CodeResources
 cannot exist without having at least one revision.
 
-Let's consider some examples. To learn how to use Shipyard, a user Jan has
+Let's consider some examples. To learn how to use Kive, a user Jan has
 written a toy program in C which simply reads a list of strings and outputs the
 lexicographically first one. Jan compiles his C code, with whatever compiler he
 has on his system, and then creates a new CodeResource with the compiled binary
 as its first revision. It's important that Jan doesn't upload the C code itself
-in this case, since Shipyard knows only how to execute files, not how to
+in this case, since Kive knows only how to execute files, not how to
 compile them. If Jan's code made use of another header file he had written, he
 would not need to make a CodeResource for that file, because it are only used
 to compile his program and is not needed at runtime. 
 
-Another Shipyard user, Catherine, has written a program in perl called
+Another Kive user, Catherine, has written a program in perl called
 \code{count\_reads.pl} to process reads from a sequencing platform. It produces
 two output files: (1) a list of the unique, good quality reads and how many
 times they appeared, and (2) the number of bad quality reads which were
@@ -71,7 +71,7 @@ revision of \code{read\_checking.pm} as a dependency.
 In a final case, user Dan wants to make use of the popular sequence alignment
 program Clustal Omega. He has installed the software on his system. However, as
 we'll see later under Method, CodeResources which are intended for execution by
-Shipyard must have a particular command line interface, namely
+Kive must have a particular command line interface, namely
 \begin{verbatim}
     program\_name input1 input2 ... inputN output1 ... outputM
 \end{verbatim}
@@ -83,7 +83,7 @@ follows (from clustalo's help).
     clustalo -i my-in-seqs.fa -o my-out-seqs.fa -v
 \end{verbatim}
 To use Clustal Omega, Dan writes a wrapper script in bash which takes arguments
-in the form expected by Shipyard and passes them to clustalo. Note that in bash,
+in the form expected by Kive and passes them to clustalo. Note that in bash,
 ``\$1'' means the first command line argument, and so on.
 \begin{verbatim}
     #!/bin/bash
@@ -91,11 +91,11 @@ in the form expected by Shipyard and passes them to clustalo. Note that in bash,
 \end{verbatim}
 Dan creates a new CodeResource for this wrapper script. While Dan's script
 obviously depends on the program clustalo, he does not create a new
-CodeResource for clustalo. Shipyard is not intended to manage third-party
+CodeResource for clustalo. Kive is not intended to manage third-party
 applications that may be installed on the user's system. Rather, it is up to
 the user to keep track of what is installed and available on their own machine. 
 Importantly, this means that if the local installation of Clustal Omega is
-upgraded to a new version, Shipyard won't be aware of the change, which could
+upgraded to a new version, Kive won't be aware of the change, which could
 cause inconsistencies or integrity errors. It is up to Dan to ensure this does
 not happen, perhaps by adding a check for a specific version number to the top
 of his wrapper script.
@@ -233,7 +233,7 @@ not saved.
   \caption{Jim's Pipeline, after it was executed for the first time.}
 \end{figure}
 
-Since this execution was totally new to Shipyard, new ExecRecords were created
+Since this execution was totally new to Kive, new ExecRecords were created
 for each Pipeline component that was run. There were eight of these components
 in total: three PipelineSteps, three PipelineStepInputCables, and two
 PipelineOutputCables.
@@ -317,7 +317,7 @@ PipelineOutputCables.
 
 \subsection*{Reuse}
 
-Shipyard provides the option to not store Datasets produced by steps of a
+Kive provides the option to not store Datasets produced by steps of a
 Pipeline. This means that ExecRecords in the Database will sometimes
 contain only a record of the data that was produced, rather than the actual
 data itself. That is, their ExecRecordIns and ExecRecordOuts may point to
@@ -381,7 +381,7 @@ processing to the first output (Figure~\ref{fig:newpipeline}).
 \end{figure}
 
 When Jim goes to execute this version of the Pipeline on the same input,
-Shipyard will realize that most of the execution has already been done before.
+Kive will realize that most of the execution has already been done before.
 Instead of running steps $A$, $B$, and $C$ again, ExecRecords matching those
 steps will simply be found and reused. After reusing these ExecRecords, the
 only components left to actually run will be step $D$ and its associated
@@ -437,14 +437,14 @@ cables (Figure~\ref{fig:newmidexec}).
   \label{fig:newmidexec}
 \end{figure}
 
-Shipyard was able to reuse the ExecRecord for running step $B$ on input $A_1$
+Kive was able to reuse the ExecRecord for running step $B$ on input $A_1$
 to produce output $R_1$, even though $A_1$ does not have real data. Moreover,
-because $R_1$ \emph{does} have data, Shipyard is able to use that data to
+because $R_1$ \emph{does} have data, Kive is able to use that data to
 execute step $D$.
 
 \subsection*{Recovery}
 
-Of course, not every ExecRecord Shipyard might reuse has real data in its
+Of course, not every ExecRecord Kive might reuse has real data in its
 ExecRecordOuts. After reusing such an ExecRecord, a step further on in
 the Pipeline execution may actually need the data from its outputs. Recovery is
 the procedure used to retrieve that needed data.
@@ -625,7 +625,7 @@ run with the same inputs, the same ExecRecord is used.
 
 To illustrate this, suppose Jim decides he wants the output of step $A$ after
 all. He marks the outputs of step $A$ as retained, instead of missing, and
-tries to run the Pipeline again. Shipyard will find a compatible ExecRecord for
+tries to run the Pipeline again. Kive will find a compatible ExecRecord for
 step $A$, as shown below. Unfortunately, this ExecRecord does not provide all
 the outputs which are now required, namely $A_1$ and $A_2$. The code for step
 $A$ must be executed to \emph{fill in} these missing outputs.
@@ -743,7 +743,7 @@ An ExecLog is a record of code having been run during the execution of
 one of the component parts of a Pipeline (ie. a PipelineStep,
 PipelineStepInputCable, or PipelineOutputCable).
 
-A single execution of a Pipeline in Shipyard is called a Run. When a Run
+A single execution of a Pipeline in Kive is called a Run. When a Run
 is created (that is, a Pipeline is executed), each of its steps and
 cables are executed sequentially, creating the component RunSteps,
 RunOutputCables, and RunStepInputCables of the Run (see the Archive and
@@ -969,7 +969,7 @@ parameter is ignored.
 \paragraph*{step\_run\_dir}
 
 A step is run in its own individual directory in the Sandbox. This directory
-must exist and be empty, and Shipyard must have both read and write access to
+must exist and be empty, and Kive must have both read and write access to
 it. In the recovery case, we look up the directory where the step was executed
 the first time, and this parameter is ignored.
 
