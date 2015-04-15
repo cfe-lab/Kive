@@ -34,7 +34,7 @@ class AJAXRequestHandler:
             self.response = HttpResponse()
             self.response.write(response_fun(request, *args, **kwargs))
         else:
-            self.response = HttpResponse(status=405) # Method not allowed
+            self.response = HttpResponse(status=405)  # Method not allowed
 
 
 def _filter_datasets(request):
@@ -126,7 +126,7 @@ def _add_run_filter(runs, key, value):
     raise KeyError(key)
 
 
-def _load_status(request):
+def _load_status(request, rtp_id=None):
     """ Find all matching runs, and return a dict for each with the status.
     
     @return ([{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}],
@@ -145,6 +145,9 @@ def _load_status(request):
         runs = _add_run_filter(runs, key, value)
         i += 1
 
+    if rtp_id is not None:
+        runs = runs.filter(id=rtp_id)
+
     runs = runs.prefetch_related('pipeline__steps',
                                  'run__runsteps__log',
                                  'run__runsteps__pipelinestep__cables_in',
@@ -153,6 +156,12 @@ def _load_status(request):
                                  'run__pipeline__outcables__poc_instances__run',
                                  'run__pipeline__outcables__poc_instances__log',
                                  'run__pipeline__steps')
+
+    if rtp_id is not None:
+        if runs.exists():
+            return runs.first().get_run_progress(True), False
+        return None, False
+
     LIMIT = 30
     has_more = False
     report = []
@@ -162,6 +171,7 @@ def _load_status(request):
             break
         report.append(run.get_run_progress())
     return report, has_more
+
 
 def _is_status_changed(runs, request):
     for i, run in enumerate(runs):
@@ -175,11 +185,16 @@ def _is_status_changed(runs, request):
     
     return False
 
-def _poll_run_progress(request):
+
+def _poll_run_progress(request, rtp_id):
     """
     Helper to produce a JSON description of the current state of some runs.
     """
-    is_changed = True
+    if rtp_id is not None:
+        run, O_v = _load_status(request, rtp_id)
+        return json.dumps(dict(runs=run,
+                               errors=[]))
+
     try:
         ajax_logger.debug('Loading status.')
         runs, has_more = _load_status(request)
@@ -199,9 +214,10 @@ def _poll_run_progress(request):
                                changed=True,
                                has_more=False))
 
+
 @login_required
-def poll_run_progress(request):
-    return AJAXRequestHandler(request, _poll_run_progress).response
+def poll_run_progress(request, rtp_id=None):
+    return AJAXRequestHandler(request, _poll_run_progress, rtp_id).response
 
 
 def tail(handle, nbytes):

@@ -10,6 +10,7 @@ shipyard/CodeResources
 shipyard/VerificationScripts
 shipyard/Datasets
 shipyard/Logs
+shipyard/Sandboxes
 shipyard/shipyard.log*
 shipyard/testreport.xml
 
@@ -20,3 +21,5 @@ doc/*.dvi
 doc/*.pdf
 *.log
 /.idea/
+.DS_Store
+

@@ -16,6 +16,7 @@ import logging
 from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
 import librarian.models
+import hashlib
 
 
 LOGGER = logging.getLogger(__name__)
@@ -68,9 +69,18 @@ def dataset_view(request, dataset_id):
 
     if dataset.symbolicdataset.is_raw():
         return _build_raw_viewer(request, dataset.dataset_file, dataset.name, dataset.get_absolute_url())
+
+    # If we have a mismatched output, we do an alignment
+    # over the columns
+    col_matching, processed_rows = None, dataset.rows(True)
+    if not dataset.content_matches_header:
+        col_matching, insert = dataset.column_alignment()
+        processed_rows = dataset.rows(data_check=True, insert_at=insert)
+
     t = loader.get_template("archive/dataset_view.html")
-    c = RequestContext(request, {"dataset": dataset})
+    c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
+
 
 def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")
@@ -100,7 +110,7 @@ def stdout_view(request, methodoutput_id):
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_raw_viewer(request, methodoutput.output_log, 'Standard out')
+    return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url())
 
 @login_required
 def stderr_download(request, methodoutput_id):
@@ -124,7 +134,7 @@ def stderr_view(request, methodoutput_id):
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_raw_viewer(request, methodoutput.error_log, 'Standard error')
+    return _build_raw_viewer(request, methodoutput.error_log, 'Standard error', methodoutput.get_absolute_error_url())
 
 
 @login_required
@@ -299,6 +309,29 @@ def datasets_bulk(request):
         bulk_dataset_form = BulkAddDatasetForm(user=request.user)
         c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
+    return HttpResponse(t.render(c))
+
+
+@login_required
+def dataset_lookup(request, md5_checksum=None):
+    if md5_checksum is None and request.method == 'POST':
+        checksum = hashlib.md5()
+        if 'file' in request.FILES:
+            for chunk in request.FILES['file'].chunks():
+                checksum.update(chunk)
+            md5_checksum = checksum.hexdigest()
+
+    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum)
+    t = loader.get_template('archive/dataset_lookup.html')
+    c = RequestContext(request, {'datasets': datasets, 'md5': md5_checksum})
+
+    return HttpResponse(t.render(c))
+
+
+@login_required
+def lookup(request):
+    t = loader.get_template("archive/lookup.html")
+    c = RequestContext(request, {})
     return HttpResponse(t.render(c))
 
 

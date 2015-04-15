@@ -1866,6 +1866,7 @@ class PipelineOutputCable(PipelineCable):
         else:
             corresp_output = outputmap[self.output_name]
         my_dict = {
+            "id": self.id,
             "output_idx": self.output_idx,
             "output_name": self.output_name,
             "output_CDT_pk": None if self.is_raw() else self.output_cdt.pk,

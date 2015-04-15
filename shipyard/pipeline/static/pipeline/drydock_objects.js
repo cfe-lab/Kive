@@ -3,6 +3,13 @@
  *   JS prototypes that are used to populate canvasState
  *   (see drydock.js)
  */
+var _statusColorMap = {
+    '*': 'green',
+    '!': 'red',
+    '+': 'orange',
+    ':': 'orange',
+    '.': 'yellow',
+};
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
@@ -51,6 +58,61 @@ var Geometry = {
         }
     
         return intersections % 2;
+    },
+    isometricXCoord: function(x,y) {
+        // isometric x-coordinate is explained in issue #277.
+        // using a -30° line that intersects (0,0) and a 30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y).
+        return x * Math.tan(Math.PI/6) - y;
+    },
+    isometricYCoord: function(x,y) {
+        // isometric y-coordinate is explained in issue #277.
+        // using a 30° line that intersects (0,0) and a -30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y).
+        return x * Math.tan(Math.PI/6) + y;
+        
+        /*
+         * unabridged version:
+         
+        var tan30 = Math.tan(Math.PI/6),
+            // (x0, y0) is the coordinate of the intersection
+            x0 = (x * tan30 - y) / (2 * tan30),
+            y0 = - x0 * tan30,
+            dx = x - x0,
+            dy = y - y0,
+            // dh is the distance from (x0,y0) to (x,y). it is a 30° line.
+            dh = Math.sqrt(dx*dx + dy*dy);
+        return dh;
+        
+         */
+    },
+    isometricSort: function(x1,y1,x2,y2) {
+        // returns 1 if the first set of coordinates is after the second,
+        // -1 if the reverse is true, 0 if it's a tie. order goes left-to-right,
+        // top-to-bottom if you sort of rotate your screen 30° clockwise and get
+        // in the isometric plane.
+        // includes ±7 pixels of fuzziness in the top-to-bottom decision. 
+        
+        if (x1 instanceof Object && y1 instanceof Object && [ x1.x, x1.y, y1.x, y1.y ].indexOf(undefined) === -1) {
+            // transform alternative syntax
+            return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
+        }
+        
+        var y_diff = (x1 - x2) * Math.tan(Math.PI/6) + y1 - y2;
+        if (y_diff > 7) {
+            return 1;
+        } else if (y_diff < -7) {
+            return -1;
+        } else {
+            var x_diff = y_diff + (y2 - y1) * 2;
+            if (x_diff > 0) {
+                return 1;
+            } else if (x_diff < 0) {
+                return -1;
+            } else {
+                return 0;
+            }
+        }
     }
 };
 
@@ -58,11 +120,9 @@ var Geometry = {
 CanvasRenderingContext2D.prototype.ellipse = function (cx, cy, rx, ry) {
     this.save(); // save state
     this.beginPath();
-
     this.translate(cx - rx, cy - ry);
     this.scale(rx, ry);
     this.arc(1, 1, 1, 0, 2 * Math.PI, false);
-
     this.restore(); // restore to original state
 };
 
@@ -299,7 +359,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs) {
+function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status, log_id) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -332,6 +392,10 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     
     this.stack = 20;
     this.scoop = 45;
+
+    // Members for instances of methods in runs
+    this.status = status || null;
+    this.log_id = log_id || null;
 
     this.in_magnets = [];
     var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
@@ -460,6 +524,30 @@ MethodNode.prototype.draw = function(ctx) {
         magnet.x = x_outputs + pos * cos30 * c2c;
         magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
+    }
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        ctx.save();
+
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // body
+        ctx.beginPath();
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[5].x, vertices[5].y );
+        ctx.lineTo( vertices[6].x, vertices[6].y );
+        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+        ctx.lineTo( vertices[2].x, vertices[2].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        ctx.closePath();
+
+        ctx.stroke();
+        ctx.restore();
     }
 };
 
@@ -806,7 +894,32 @@ Connector.prototype.draw = function(ctx) {
         x: this.x - this.dx / 10,
         y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
     };
-    
+
+    // Recolour this path if the statuses of the source and dest are meaningful
+    if(this.source.parent != null && this.dest.parent != null) {
+        var src = this.source.parent, dst = this.dest.parent, cable_stat = null;
+
+        if(src.status != null) {
+            cable_stat = "+";
+
+
+            // Upper cable is done!
+           if(src.status == '*'  && dst.status != null ) {
+                // Whatever, everything else is fine!
+                cable_stat = "*";
+            }
+
+            // Source is borked
+            else if(src.status == '!') {
+                // so is any cable that pokes out of it...
+                cable_stat = "!";
+            }
+        }
+
+        if(_statusColorMap[cable_stat] !== null)
+             ctx.strokeStyle = _statusColorMap[cable_stat];
+    }
+
     this.midX = this.fromX + this.dx / 2;
     
     ctx.beginPath();
@@ -1057,7 +1170,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, inset, offset, label) {
+function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status, md5, dataset_id) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -1071,10 +1184,20 @@ function OutputNode (x, y, r, h, fill, inset, offset, label) {
     this.w = this.r; // for compatibility
     this.h = h || 25; // height of cylinder
     this.fill = fill || "#d40";
+    this.diffFill = "blue"
     this.inset = inset || 12; // distance of magnet from center
     this.offset = offset || 18; // distance of label from center
     this.label = label || '';
     this.out_magnets = []; // for compatibility
+    this.pk = pk || null;
+    this.status = status || null;
+    this.md5 = md5 || null;
+    this.dataset_id = dataset_id || null;
+
+    // Marks whether or not this node
+    // was being searched for and was found
+    // (when doing an md5 lookup)
+    this.found_md5 = false;
 
     // CDT node always has one magnet
     this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
@@ -1085,7 +1208,7 @@ OutputNode.prototype.draw = function(ctx) {
         cy = this.y + this.dy;
     
     // draw bottom ellipse
-    ctx.fillStyle = this.fill;
+    ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.fill();
     
@@ -1108,6 +1231,35 @@ OutputNode.prototype.draw = function(ctx) {
     in_magnet.x = cx - this.inset;
     in_magnet.y = cy - this.h/2;
     in_magnet.draw(ctx);
+
+
+    // Highlight the method based on status.
+    if(this.status !== null) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+
+        ctx.save();
+
+        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+        ctx.lineWidth = 5;
+
+        // This line means that we are drawing "behind" the canvas now.
+        // We must set it back after we're done otherwise it'll be utter chaos.
+        ctx.globalCompositeOperation = 'destination-over';
+
+        // draw bottom ellipse
+        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
+        ctx.stroke();
+
+        // draw stack
+        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+
+        // draw top ellipse
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
 };
 
 OutputNode.prototype.contains = function(mx, my) {
@@ -1153,7 +1305,7 @@ OutputNode.prototype.highlight = function(ctx) {
     ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
     ctx.stroke();
     
-    // draw stack 
+    // draw stack
     ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
     // draw top ellipse

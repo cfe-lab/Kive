@@ -55,15 +55,16 @@ function CanvasState (canvas) {
     this.collisions = 0;
 
     // events
-    
     var myState = this; // save reference to this particular CanvasState
-    
     this.outputZone = new OutputZone(this.width, this.height);
 
     // options
     this.selectionColor = '#7bf';
     this.selectionWidth = 2;
     setInterval(function() { myState.draw(); }, 50); // 50 ms between redraws
+
+    // Parameters on data-x
+    this.can_edit = !($(canvas).data('editable') === false);
 }
 
 CanvasState.prototype.setScale = function(factor) {
@@ -163,8 +164,10 @@ CanvasState.prototype.doDown = function(e) {
             $('#id_method_button')[0].value = 'Revise Method';
         }
     }
+
     else if (mySel.constructor == Magnet && mySel.isOutput) {
-        if (!shift || this.selection.length == 0) {
+
+        if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
             conn = new Connector(null, null, mySel);
             this.connectors.push(conn);
@@ -176,7 +179,12 @@ CanvasState.prototype.doDown = function(e) {
     else if (mySel.constructor == Connector) {
         if (!shift || this.selection.length == 0) {
             this.selection = [ mySel ];
-            this.dragoffx = this.dragoffy = 0;
+            if(this.can_edit){
+                this.dragoffx = this.dragoffy = 0;
+            } else {
+                this.dragging = false;
+                return;
+            }
         }
     }
     
@@ -193,24 +201,33 @@ CanvasState.prototype.doMove = function(e) {
     var mouse = this.getPos(e);
     var shapes = this.shapes;
     var i, j, shape, sel;
-    
     var dx = mouse.x - this.dragstart.x;
     var dy = mouse.y - this.dragstart.y;
     
     if (this.dragging) {
         // are we carrying a shape or Connector?
         if (this.selection.length > 0) {
-            for (j=0; j < this.selection.length; j++) {
+            for (j = 0; j < this.selection.length; j++) {
                 sel = this.selection[j];
                 
                 // update coordinates of this shape/connector
                 sel.x += dx;
                 sel.y += dy;
                 
+                // any changes made by the collision detection algorithm on this shape are now made "official"
+                if (sel.dx != 0) {
+                    sel.x += sel.dx;
+                    sel.dx = 0;
+                }
+                if (sel.dy != 0) {
+                    sel.y += sel.dy;
+                    sel.dy = 0;
+                }
+                
                 this.valid = false; // redraw
 
                 // are we carrying a connector?
-                if (sel.constructor == Connector) {
+                if (sel.constructor == Connector && this.can_edit) {
                     // reset to allow mouse to disengage Connector from a magnet
                     
                     sel.x = mouse.x;
@@ -300,29 +317,31 @@ CanvasState.prototype.doMove = function(e) {
 
 CanvasState.prototype.scaleToCanvas = function() {
     // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
-    var x_ar = [], y_ar = [];
-    for (var i in this.shapes) {
+    var x_ar = [],
+        y_ar = [],
+        margin = {
+            x: Math.min(this.width  * .15, 100),
+            y: Math.min(this.height * .15, 100)
+        },
+        shape;
+    
+    for (var i = 0; i < this.shapes.length; i++) {
         x_ar.push(this.shapes[i].x);
         y_ar.push(this.shapes[i].y);
     }
     
-    with (Math) var
-        xmin = min.apply(null, x_ar),
-        ymin = min.apply(null, y_ar),
-        width = max.apply(null, x_ar) - xmin,
-        height = max.apply(null, y_ar) - ymin,
-        margin = {
-            x: min(this.width  * .15, 100),
-            y: min(this.height * .15, 100)
-        },
+    var xmin = Math.min.apply(null, x_ar),
+        ymin = Math.min.apply(null, y_ar),
+        pipeline_width = Math.max.apply(null, x_ar) - xmin,
+        pipeline_height = Math.max.apply(null, y_ar) - ymin,
         offset = {
             x: xmin - margin.x,
             y: ymin - margin.y
         },
         scale = {
-            x: (this.width  - margin.x * 2) / width,
-            y: (this.height - margin.y * 2) / height
-        }, shape;
+            x: (this.width  - margin.x * 2) / pipeline_width,
+            y: (this.height - margin.y * 2) / pipeline_height
+        };
     
     /*
     for both x and y dimensions, 4 numbers are now available:
@@ -341,21 +360,22 @@ CanvasState.prototype.scaleToCanvas = function() {
 };
 
 CanvasState.prototype.centreCanvas = function() {
-    var x_ar = [], y_ar = [], sh = this.shapes, i;
-    for (i in sh) {
-        x_ar.push(sh[i].x);
-        y_ar.push(sh[i].y);
+    var x_ar = [],
+        y_ar = [],
+        shapes = this.shapes,
+        xmove, ymove;
+    
+    for (var i = 0; i < shapes.length; i++) {
+        x_ar.push(shapes[i].x);
+        y_ar.push(shapes[i].y);
     }
     
-    with (Math) var
-        xmin = min.apply(null, x_ar),
-        ymin = min.apply(null, y_ar),
-        xmove = this.width  / 2 - (max.apply(null, x_ar) - xmin) / 2 - xmin,
-        ymove = this.height / 2 - (max.apply(null, y_ar) - ymin) / 2 - ymin;
+    xmove = ( this.width  - Math.max.apply(null, x_ar) - Math.min.apply(null, x_ar) ) / 2;
+    ymove = ( this.height - Math.max.apply(null, y_ar) - Math.min.apply(null, y_ar) ) / 2;
     
-    for (i in sh) {
-        sh[i].x += xmove;
-        sh[i].y += ymove;
+    for (i = 0; i < shapes.length; i++) {
+        shapes[i].x += xmove;
+        shapes[i].y += ymove;
     }
     
     this.valid = false;
@@ -398,14 +418,11 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
                     sh_y = shape.y + shape.dy,
                     dx = my_x - sh_x,
                     dy = my_y - sh_y,
-                    step = 5;
-            
-                // Shortcut so that I don't have to type Math.everything
-                with (Math) var 
-                    dh = (dx < 0 ? -1 : 1) * (sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
-                    angle = dx ? atan(dy / dx) : PI/2,
-                    Dx = cos(angle) * dh - dx,
-                    Dy = sin(angle) * dh - dy;
+                    step = 5,
+                    dh = (dx < 0 ? -1 : 1) * (Math.sqrt(dx*dx + dy*dy) + step),// add however many additional pixels you want to move
+                    angle = dx ? Math.atan(dy / dx) : Math.PI/2,
+                    Dx = Math.cos(angle) * dh - dx,
+                    Dy = Math.sin(angle) * dh - dy;
                 
                 myShape.dx += Dx * bias;
                 shape.dx   -= Dx * (1 - bias);
@@ -596,16 +613,43 @@ CanvasState.prototype.doUp = function(e) {
 
 CanvasState.prototype.contextMenu = function(e) {
     var pos = this.getPos(e);
-    if (this.selection.length == 1 && this.selection[0].constructor != Connector) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu li').show();
-        
-        if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+
+    // Edit mode can popup the context menu to delete and edit nodes
+    if(this.can_edit){
+        if (this.selection.length == 1 && this.selection[0].constructor != Connector ) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+            $('#method_context_menu li').show();
+
+            if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
+                $('#method_context_menu .edit').hide();
+            }
+        } else if (this.selection.length > 1) {
+            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
             $('#method_context_menu .edit').hide();
         }
-    } else if (this.selection.length > 1) {
-        $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-        $('#method_context_menu .edit').hide();
+    } else {
+        // Otherwise, we're read only, so only popup the context menu
+        // for outputs with datasets
+        if(this.selection.length == 1 &&
+           this.selection[0].constructor == OutputNode &&
+           this.selection[0].dataset_id !== null) {
+
+           // Context menu for pipeline outputs
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').show();
+           $('#method_context_menu .step_node').hide();
+
+        } else if(  this.selection.length == 1 &&
+                    this.selection[0].constructor == MethodNode &&
+                    this.selection[0].log_id !== null) {
+
+           // Context menu for pipeline steps
+           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
+           $('#method_context_menu li').show();
+           $('#method_context_menu .output_node').hide();
+           $('#method_context_menu .step_node').show();
+        }
     }
     this.doUp(e);
     e.preventDefault();
@@ -751,21 +795,28 @@ CanvasState.prototype.testExecutionOrder = function() {
 
 CanvasState.prototype.disambiguateExecutionOrder = function() {
     for ( k=0; k < this.exec_order.length; k++ ) {
-        this.exec_order[k].sort(function(a,b) {
-            if (a.y > b.y) return 1;
-            if (a.y < b.y) return -1;
-            return 0;
-        });
+        // @note: nodes also have dx and dy properties which are !== 0 when collisions were detected.
+        // I have not accounted for these properties in this method because they could shift around
+        // on window resize, and it makes no sense for the pipeline to change on window resize.
+        this.exec_order[k].sort(Geometry.isometricSort);
     }
 }
 
 CanvasState.prototype.clear = function() {
     // wipe canvas content clean before redrawing
     this.ctx.clearRect(0, 0, this.width / this.scale, this.height / this.scale);
-
     this.ctx.textAlign = 'center';
     this.ctx.font = '12pt Lato, sans-serif';
+};
 
+CanvasState.prototype.reset = function() {
+    // remove all objects from canvas
+    this.clear();
+    // reset containers to reflect canvas
+    this.shapes = [];
+    this.connectors = [];
+    this.exec_order = [];
+    this.selection = [];
 };
 
 CanvasState.prototype.draw = function() {
@@ -784,7 +835,7 @@ CanvasState.prototype.draw = function() {
             && this.selection[0].source.parent.constructor == MethodNode;
         
         // draw output end-zone -when- dragging a connector from a MethodNode
-        if (draggingFromMethodOut) {
+        if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
         }
         
@@ -800,7 +851,7 @@ CanvasState.prototype.draw = function() {
             shapes[i].draw(ctx);
             
             // queue label to be drawn after
-            if (shapes[i].constructor !== MethodNode || !this.exec_order_is_ambiguous) {
+            if (this.force_show_exec_order === false || shapes[i].constructor !== MethodNode || this.force_show_exec_order === undefined && !this.exec_order_is_ambiguous) {
                 labels.push(shapes[i].getLabel());
             } else {
                 // add information about execution order
@@ -979,3 +1030,19 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
         }
     }
 };
+
+CanvasState.prototype.findMethodNode = function(method_pk) {
+    var shapes = this.shapes;
+    for(var i=0; i < shapes.length; i++)
+        if (shapes[i].constructor === MethodNode && shapes[i].pk == method_pk)
+            return shapes[i];
+    return null;
+}
+
+CanvasState.prototype.findOutputNode = function(method_pk) {
+    var shapes = this.shapes;
+    for(var i=0; i < shapes.length; i++)
+        if (shapes[i].constructor === OutputNode && shapes[i].pk == method_pk)
+            return shapes[i];
+    return null;
+}

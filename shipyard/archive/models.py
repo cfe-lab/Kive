@@ -27,38 +27,30 @@ from constants import maxlengths
 import archive.signals
 
 
-def update_flag_factory(flag_name):
-    assert(flag_name in ("_complete", "_successful", "_redacted"))
+class update_field(object):
 
-    def update_flag(func):
+    def __init__(self, field):
+        self.field = field
+
+    def __call__(self, func):
         def wrapper(*args, **kwargs):
-            self = args[0]
+            this = args[0]
             result = func(*args, **kwargs)
+            original_flag = getattr(this, self.field)
 
-            # Hopefully you've decorated the right object
-            # and the flag exists.
-            if "save" in kwargs and kwargs["save"]:
-                if hasattr(self, flag_name):
-                    if flag_name == "_complete":
-                        orig_val = self._complete
-                        self._complete = result
-                    elif flag_name == "_successful":
-                        orig_val = self._successful
-                        self._successful = result
-                    elif flag_name == "_redacted":
-                        orig_val = self._redacted
-                        self._redacted = result
-                    # If there is an entry in the database....
-                    if self.pk is not None and orig_val != result:
-                        self.save(update_fields=[flag_name])
+            if hasattr(this, self.field) and original_flag != result:
+                if 'dont_save' in kwargs and kwargs['dont_save']:
+                    return result
+
+                setattr(this, self.field, result)
+
+                if this.pk is not None:
+                    try:
+                        this.save(update_fields=[self.field])
+                    except:
+                        pass
             return result
         return wrapper
-
-    return update_flag
-
-update_complete_mark = update_flag_factory("_complete")
-update_successful_mark = update_flag_factory("_successful")
-update_redacted_mark = update_flag_factory("_redacted")
 
 
 @python_2_unicode_compatible
@@ -1172,7 +1164,7 @@ class RunStep(RunComponent):
         if not self.reused or usable_dict["successful"]:
             self._clean_outputs()
 
-    @update_complete_mark
+    @update_field("_complete")
     def is_complete(self, **kwargs):
         """
         True if RunStep is complete; False otherwise.
@@ -1220,7 +1212,7 @@ class RunStep(RunComponent):
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self)
 
-    @update_successful_mark
+    @update_field("_successful")
     def is_successful(self, **kwargs):
         return super(RunStep, self).is_successful()
 
@@ -1406,11 +1398,11 @@ class RunCable(RunComponent):
     def is_trivial(self):
         return self.component.is_trivial()
 
-    @update_complete_mark
+    @update_field("_complete")
     def is_complete(self, **kwargs):
         return super(RunCable, self).is_complete()
 
-    @update_successful_mark
+    @update_field("_successful")
     def is_successful(self, **kwargs):
         return super(RunCable, self).is_successful()
 
@@ -2032,17 +2024,94 @@ class Dataset(models.Model):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self):
-        rows = self.all_rows()
-        next(rows) # skip header
+    def rows(self, data_check=False, insert_at=None):
+        rows = self.all_rows(data_check, insert_at)
+        next(rows)  # skip header
         for row in rows:
             yield row
 
-    def all_rows(self):
+    def expected_header(self):
+        header = []
+        if not self.symbolicdataset.is_raw():
+            header = [c.column_name for c in self.symbolicdataset.compounddatatype.members.order_by("column_idx")]
+        return header
+
+    @property
+    def content_matches_header(self):
+        observed = self.header()
+        expected = self.expected_header()
+        if len(observed) != len(expected):
+            return False
+        return not any([o != x for (o, x) in zip(observed, expected)])
+
+    def column_alignment(self):
+        """
+        This function looks at the expected and observed headers for
+        a dataset, and trys to align them if they don't match
+
+
+        :return: a tuple whose first element is a list of tuples
+        i.e (expected header name, observed header name), and
+        whose second element is a list of gaps indicating where
+        to insert blank fields in a row
+        """
+        expt = self.expected_header()
+        obs = self.header()
+        i, insert = 0, []
+
+        if self.symbolicdataset.is_raw() and not self.content_matches_header:
+            return None, None
+
+        # Do a greedy 'hard matching' over the columns
+        while i < max(len(expt), len(obs)) - 1:
+            ex, ob = zip(*(map(None, expt, obs)[i:]))
+            u_score = float('inf')
+            l_score = float('inf')
+
+            for j, val in enumerate(ob):
+                if val == ex[0]:
+                    u_score = j
+            for j, val in enumerate(ex):
+                if val == ob[0]:
+                    l_score = j
+            if l_score == u_score == float('inf'):
+                pass
+            elif u_score < l_score and u_score != float('inf'):
+                [expt.insert(i, "") for _ in xrange(u_score)]
+            elif l_score <= u_score and l_score != float('inf'):
+                [obs.insert(i, "") for _ in xrange(l_score)]
+                insert += [i] * l_score # keep track of where to insert columns in the resulting view
+            i += 1
+
+        # it would be nice to do a similar soft matching to try to
+        # match columns that are close to being the same string
+
+        # Pad out the arrays
+        diff = abs(len(expt)-len(obs))
+        if len(expt) > len(obs):
+            obs += [""] * diff
+        else:
+            expt += [""] * diff
+
+        return zip(expt, obs), insert
+
+    def all_rows(self, data_check=False, insert_at=None):
+        """
+        Returns an iterator over all rows of this dataset
+
+        If insert_at is specified, a blank field is inserted
+        at each element of insert_at.
+        """
         self.dataset_file.open('rU')
+        cdt = self.symbolicdataset.compounddatatype
+
         with self.dataset_file:
             reader = csv.reader(self.dataset_file)
             for row in reader:
+                if insert_at is not None:
+                    [row.insert(pos, "") for pos in insert_at]
+                if data_check:
+                    row = map(None, row, cdt.check_constraints(row))
                 yield row
 
     def validate_unique(self, *args, **kwargs):
@@ -2401,7 +2470,19 @@ class MethodOutput(models.Model):
     _output_redacted = models.BooleanField(default=False)
     _error_redacted = models.BooleanField(default=False)
     _code_redacted = models.BooleanField(default=False)
-    
+
+    def get_absolute_log_url(self):
+        """
+        :return str: URL to access the output log
+        """
+        return reverse('stdout_download', kwargs={"methodoutput_id": self.id})
+
+    def get_absolute_error_url(self):
+        """
+        :return str: URL to access the output log
+        """
+        return reverse('stderr_download', kwargs={"methodoutput_id": self.id})
+
     @classmethod
     def create(cls, execlog):
         methodoutput = cls(execlog=execlog)

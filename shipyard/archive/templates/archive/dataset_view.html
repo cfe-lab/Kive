@@ -8,6 +8,81 @@
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
+    <style>
+        .col_warn {
+            background-color: rgba(255, 203, 0, 0.59);
+        }
+        .col_error {
+            background-color: rgba(255, 29, 0, 0.4);
+        }
+        th sub {
+            font-weight: 100;
+            font-size: 0.6em;
+        }
+        .data-error {
+            background-color: rgb(255, 191, 191);
+            cursor: pointer;
+            position: relative;
+        }
+        .data-error:hover {
+            background-color: rgb(255, 62, 62);
+        }
+        .value-error-tip{
+            display: block;
+            position: absolute;
+            background: #FFF0F0;
+            border-radius: 5px;
+            width: 300px;
+            top: 0;
+            right: -335px;
+            padding: 10px;
+            display: none;
+            z-index: 100;
+	        border: 2px solid #FFD5D5;
+        }
+        .value-error-tip:after, .value-error-tip:before {
+	        right: 100%;
+	        top: 15px;
+	        border: solid transparent;
+	        content: " ";
+	        height: 0;
+	        width: 0;
+	        position: absolute;
+	        pointer-events: none;
+        }
+
+        .value-error-tip:after {
+            border-color: rgba(214, 133, 133, 0);
+            border-right-color: #FFF0F0;
+            border-width: 10px;
+            margin-top: -10px;
+        }
+        .value-error-tip:before {
+            border-color: rgba(204, 204, 204, 0);
+            border-right-color: #FFD5D5;
+            border-width: 12px;
+            margin-top: -12px;
+        }
+        .value-error-tip ul{
+            margin: 0;
+            padding: 4px 0 0 25px;
+        }
+        .value-error-tip li{
+            text-size: 0.7em;
+        }
+    </style>
+    <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+<script>
+$(document).ready(function(){
+    $('.data-error').hover( function(){
+        $(this).find('.value-error-tip').show();
+    },
+    function(){
+        $(this).find('.value-error-tip').hide();
+    });
+});
+
+</script>
 {% endblock %}
 
 {% block content %}
@@ -20,16 +95,51 @@
 <table>
 <thead>
     <tr>
-    {% for column in dataset.header %}
-        <th>{{ column }}</th>
-    {% endfor %}
+
+    {% if dataset.content_matches_header %}
+       {% for column in dataset.header %}
+            <th>{{ column }}</th>
+        {% endfor %}
+    {% else %}
+            <th> Expected: </th>
+           {% for column in column_matching %}
+                <th> {{ column.0 }} </th>
+            {% endfor %}
+    {% endif %}
     </tr>
+
+    {% if not dataset.content_matches_header %}
+    <tr>
+        <th> Observed: </th>
+        {% for column in column_matching %}
+            <th>
+                {{ column.1 }}
+            </th>
+        {% endfor %}
+    </tr>
+    {% endif %}
 </thead>
-</tbody>
-    {% for row in dataset.rows %}
-        <tr>
-        {% for value in row %}
-            <td>{{ value|truncatechars:10 }}</td>
+<tbody>
+    {% for row in processed_rows %}
+    <tr>
+        {% if not dataset.content_matches_header %}
+            <td></td>
+        {% endif %}
+
+        {% for value,errors in row %}
+            <td {% if errors|length > 0 %} class="data-error" {% endif %}>
+                {{ value|truncatechars:10 }}
+                {% if errors|length > 0 %}
+                    <div class="value-error-tip">
+                        The following data checks failed:
+                        <ul>
+                        {% for error in errors %}
+                            <li>{{ error }} </li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </td>
         {% endfor %}
         </tr>
     {% endfor %}

@@ -4112,10 +4112,9 @@ class PipelineSerializationTests(TestCase):
         # Check for extraneous keys.
         self.assertSetEqual(
             set(step_dict.keys()),
-            set([
-                "transf_pk", "transf_type", "step_num", "x", "y", "name",
-                 "cables_in", "outputs_to_delete", "family_pk"
-            ]))
+            {"transf_pk", "transf_type", "step_num", "x", "y", "name",
+             "cables_in", "outputs_to_delete", "family_pk"}
+        )
 
         self.assertEquals(step_dict["transf_pk"], step.transformation.definite.pk)
         transf_type_str = "Method" if type(step.transformation.definite) == Method else "Pipeline"
@@ -4202,11 +4201,12 @@ class PipelineSerializationTests(TestCase):
         """
         Checks correctness of a dictionary representation of a POC.
         """
+
         # Check for extraneous keys.
         self.assertSetEqual(
-            set(outcable_dict.keys()),
-            set(["output_idx", "output_name", "output_CDT_pk", "source_step", "source_dataset_name",
-                 "x", "y", "wires"])
+            set(outcable_dict.keys()).difference({"id"}),  # This may or may not have an id based on its source, so nix it
+            {"output_idx", "output_name", "output_CDT_pk", "source_step", "source_dataset_name",
+             "x", "y", "wires"}
         )
         self.assertEquals(outcable_dict["output_idx"], outcable.output_idx)
         self.assertEquals(outcable_dict["output_name"], outcable.output_name)
@@ -4977,6 +4977,7 @@ cat "$3" >> "$5"
         my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
                                      "input_to_not_touch", "untouched_output")
+        my_pipeline.save()
 
         for outcable in my_pipeline.outcables.all():
             self._check_outcable(outcable.represent_as_dict(), outcable)
