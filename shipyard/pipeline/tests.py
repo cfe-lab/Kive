@@ -4081,7 +4081,7 @@ class PipelineSerializationTests(TestCase):
         dict_rev_parent_pk = None if pipeline.revision_parent is None else pipeline.revision_parent.pk
         self.assertEquals(dict_repr["revision_parent_pk"], dict_rev_parent_pk)
 
-    def _check_pipeline(self, dict_repr, pipeline):
+    def _check_pipeline(self, dict_repr, pipeline, test_for_id=True):
         """
         Checks correctness of a dictionary representation of a Pipeline including all children.
         """
@@ -4103,7 +4103,7 @@ class PipelineSerializationTests(TestCase):
         self.assertEquals(len(dict_repr["pipeline_outputs"]), pipeline.outcables.count())
         for outcable_dict in dict_repr["pipeline_outputs"]:
             corresp_outcable = pipeline.outcables.get(output_idx=outcable_dict["output_idx"])
-            self._check_outcable(outcable_dict, corresp_outcable)
+            self._check_outcable(outcable_dict, corresp_outcable, test_for_id)
 
     def _check_step_own_members(self, step_dict, step):
         """
@@ -4186,7 +4186,7 @@ class PipelineSerializationTests(TestCase):
             corresp_wire = input_cable.custom_wires.get(dest_pin__column_idx=wire_dict["dest_idx"])
             self._check_wire(wire_dict, corresp_wire)
 
-    def _check_wire(self, wire_dict, wire):
+    def _check_wire(self, wire_dict, wire, test_for_id=True):
         """
         Check correctness of a dictionary representation of a CCW.
         """
@@ -4198,15 +4198,20 @@ class PipelineSerializationTests(TestCase):
         self.assertEquals(wire_dict["source_idx"], wire.source_pin.column_idx)
         self.assertEquals(wire_dict["dest_idx"], wire.dest_pin.column_idx)
 
-    def _check_outcable_own_members(self, outcable_dict, outcable):
+    def _check_outcable_own_members(self, outcable_dict, outcable, test_for_id=True):
         """
         Checks correctness of a dictionary representation of a POC.
         """
+
+        expected_keys = {"output_idx", "output_name", "output_CDT_pk", "source_step", "source_dataset_name",
+                         "x", "y", "wires"}
+        if test_for_id:
+            expected_keys.union({"id"})
+
         # Check for extraneous keys.
         self.assertSetEqual(
             set(outcable_dict.keys()),
-            set(["output_idx", "output_name", "output_CDT_pk", "source_step", "source_dataset_name",
-                 "x", "y", "wires"])
+            expected_keys
         )
         self.assertEquals(outcable_dict["output_idx"], outcable.output_idx)
         self.assertEquals(outcable_dict["output_name"], outcable.output_name)
@@ -4215,16 +4220,16 @@ class PipelineSerializationTests(TestCase):
         self.assertEquals(outcable_dict["source_step"], outcable.source_step)
         self.assertEquals(outcable_dict["source_dataset_name"], outcable.source.definite.dataset_name)
 
-    def _check_outcable(self, outcable_dict, outcable):
+    def _check_outcable(self, outcable_dict, outcable, test_for_id=True):
         """
         Checks correctness of a dictionary representation of a POC including wiring.
         """
-        self._check_outcable_own_members(outcable_dict, outcable)
+        self._check_outcable_own_members(outcable_dict, outcable, test_for_id)
 
         self.assertEquals(len(outcable_dict["wires"]), outcable.custom_wires.count())
         for wire_dict in outcable_dict["wires"]:
             corresp_wire = outcable.custom_wires.get(dest_pin__column_idx=wire_dict["dest_idx"])
-            self._check_wire(wire_dict, corresp_wire)
+            self._check_wire(wire_dict, corresp_wire, test_for_id)
 
     def test_serialize_input(self):
         """Serializing a Pipeline input."""
@@ -4945,7 +4950,7 @@ cat "$3" >> "$5"
                                      "input_to_not_touch", "untouched_output")
 
         for outcable in my_pipeline.outcables.all():
-            self._check_outcable(outcable.represent_as_dict(), outcable)
+            self._check_outcable(outcable.represent_as_dict(), outcable, False)
 
     def test_deserialize_outcable_no_wires(self):
         """Serializing a POC with no custom wiring."""
@@ -4970,13 +4975,14 @@ cat "$3" >> "$5"
             "wires": []
         }
         outcable = my_pipeline.create_outcable_from_dict(outcable_dict)
-        self._check_outcable(outcable_dict, outcable)
+        self._check_outcable(outcable_dict, outcable, False)
 
     def test_serialize_raw_outcable(self):
         """Serializing a raw POC."""
         my_pipeline = tools.make_first_pipeline("two-step raw noop", "Double raw no-op", self.user_bob)
         tools.create_linear_pipeline(my_pipeline, [self.method_noop_raw, self.method_noop_raw],
                                      "input_to_not_touch", "untouched_output")
+        my_pipeline.save()
 
         for outcable in my_pipeline.outcables.all():
             self._check_outcable(outcable.represent_as_dict(), outcable)
@@ -5004,7 +5010,7 @@ cat "$3" >> "$5"
             "wires": []
         }
         raw_outcable = my_pipeline.create_outcable_from_dict(raw_outcable_dict)
-        self._check_outcable(raw_outcable_dict, raw_outcable)
+        self._check_outcable(raw_outcable_dict, raw_outcable, False)
 
     def test_serialize_outcable_custom_wires(self):
         """Serializing a POC with custom wiring."""
@@ -5033,7 +5039,7 @@ cat "$3" >> "$5"
                                      dest_pin=self.string_doublet.members.get(column_idx=2))
         my_pipeline.create_outputs()
 
-        self._check_outcable(outcable.represent_as_dict(), outcable)
+        self._check_outcable(outcable.represent_as_dict(), outcable, False)
 
     def test_deserialize_outcable_custom_wires(self):
         """Defining a POC with custom wiring using a dictionary."""
@@ -5237,7 +5243,7 @@ cat "$3" >> "$5"
         tools.create_linear_pipeline(my_pipeline, [self.method_noop, self.method_noop, self.method_noop],
                                      "input_to_not_touch", "untouched_output")
 
-        self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline)
+        self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline, False)
 
     def test_deserialize_pipeline(self):
         """Defining a complete Pipeline from a dictionary."""
@@ -5247,7 +5253,7 @@ cat "$3" >> "$5"
         # Get the PipelineFamily PK:
         complete_pipeline_dict["family_pk"] = complete_pipeline.family.pk
 
-        self._check_pipeline(complete_pipeline_dict, complete_pipeline)
+        self._check_pipeline(complete_pipeline_dict, complete_pipeline, False)
 
     def test_serialize_pipeline_multiple_steps_multiple_outputs(self):
         """Serializing a more complicated Pipeline."""
@@ -5312,7 +5318,7 @@ tail -n +2 "$2" >> "$3"
 
         my_pipeline.create_outputs()
 
-        self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline)
+        self._check_pipeline(my_pipeline.represent_as_dict(), my_pipeline, False)
 
     def test_deserialize_pipeline_multiple_steps_multiple_outputs(self):
         """Defining a more complicated Pipeline from a dictionary."""
@@ -5479,7 +5485,7 @@ tail -n +2 "$2" >> "$3"
         # Get the PipelineFamily PK.
         complex_pipeline_dict["family_pk"] = complex_pipeline.family.pk
 
-        self._check_pipeline(complex_pipeline_dict, complex_pipeline)
+        self._check_pipeline(complex_pipeline_dict, complex_pipeline, False)
 
     def test_update_from_dict(self):
         """Testing making an update of an existing Pipeline from a dictionary."""
@@ -5493,7 +5499,7 @@ tail -n +2 "$2" >> "$3"
         my_pipeline.update_from_dict(incomplete_pipeline_dict)
         # The updated Pipeline should still have the same family.
         incomplete_pipeline_dict["family_pk"] = pipeline_family_just_created.pk
-        self._check_pipeline(incomplete_pipeline_dict, my_pipeline)
+        self._check_pipeline(incomplete_pipeline_dict, my_pipeline, False)
 
         # Update it to a complete state.
         complete_pipeline_dict = self._setup_pipeline_dict("complete")
@@ -5540,7 +5546,7 @@ tail -n +2 "$2" >> "$3"
         updated_pipeline_dict["revision_parent_pk"] = my_pipeline.pk
 
         new_and_improved = my_pipeline.revise_from_dict(updated_pipeline_dict)
-        self._check_pipeline(updated_pipeline_dict, new_and_improved)
+        self._check_pipeline(updated_pipeline_dict, new_and_improved, False)
 
     def test_update_already_revised_pipeline(self):
         """Updating an already-revised Pipeline from a dictionary should fail."""
