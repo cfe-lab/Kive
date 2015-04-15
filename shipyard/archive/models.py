@@ -27,36 +27,31 @@ from constants import maxlengths
 import archive.signals
 
 
-def update_complete_mark(func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        result = func(*args, **kwargs)
+class update_field(object):
 
-        # Hopefully you've decorated the right object
-        # and this exists
-        if hasattr(self, '_complete'):
-            self._complete = result
-            # If there is an entry in the database
-            if self.pk is not None:
-                self.save(update_fields=["_complete"])
-        return result
-    return wrapper
+    def __init__(self, field):
+        self.field = field
 
+    def __call__(self, func):
+        def wrapper(*args, **kwargs):
+            this = args[0]
+            result = func(*args, **kwargs)
+            original_flag = getattr(this, self.field)
 
-def update_success_mark(func):
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        result = func(*args, **kwargs)
+            if hasattr(this, self.field) and original_flag != result:
+                if 'dont_save' in kwargs and kwargs['dont_save']:
+                    return result
 
-        # Hopefully you've decorated the right object
-        # and this exists
-        if hasattr(self, '_successful'):
-            self._successful = result
-            # If there is an entry in the database
-            if self.pk is not None:
-                self.save(update_fields=["_successful"])
-        return result
-    return wrapper
+                setattr(this, self.field, result)
+
+                if this.pk is not None:
+                    try:
+                        this.save(update_fields=[self.field])
+                    except:
+                        pass
+            return result
+        return wrapper
+
 
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
@@ -1116,7 +1111,7 @@ class RunStep(RunComponent):
         if not self.reused or usable_dict["successful"]:
             self._clean_outputs()
 
-    @update_complete_mark
+    @update_field("_complete")
     def is_complete(self, **kwargs):
         """
         True if RunStep is complete; False otherwise.
@@ -1164,7 +1159,7 @@ class RunStep(RunComponent):
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self)
 
-    @update_success_mark
+    @update_field("_successful")
     def is_successful(self, **kwargs):
         return super(RunStep, self).is_successful()
 
@@ -1350,11 +1345,11 @@ class RunCable(RunComponent):
     def is_trivial(self):
         return self.component.is_trivial()
 
-    @update_complete_mark
+    @update_field("_complete")
     def is_complete(self, **kwargs):
         return super(RunCable, self).is_complete()
 
-    @update_success_mark
+    @update_field("_successful")
     def is_successful(self, **kwargs):
         return super(RunCable, self).is_successful()
 
