@@ -587,9 +587,10 @@ class SymbolicDataset(metadata.models.AccessControl):
         """
         Mark RunComponents that use this as an output as failed.
         """
-        creating_ER = self.dataset.created_by.execrecord
-        for rc in creating_ER.used_by_components():
-            rc.mark_unsuccessful()
+        if self.has_data() and self.dataset.created_by is not None:
+            creating_ER = self.dataset.created_by.execrecord
+            for rc in creating_ER.used_by_components.all():
+                rc.mark_unsuccessful()
 
     def is_OK(self):
         """

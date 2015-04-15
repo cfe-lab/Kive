@@ -405,7 +405,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     @property
     def has_log(self):
         try:
-            self.logger
+            self.log
         except ExecLog.DoesNotExist:
             return False
         return True
