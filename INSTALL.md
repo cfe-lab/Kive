@@ -3,7 +3,7 @@ Installation Instructions
 
 Prerequisites
 -------------
-**shipyard** is a set of Django applications.  As a result, it has the following requirements:
+**kive** is a set of Django applications.  As a result, it has the following requirements:
 
 1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
 2. Django (version 1.7 or higher)
@@ -138,20 +138,20 @@ To confirm that the module is installed, start an interaction session by calling
 
 Project structure
 -----------------
-The root directory of **shipyard** should contain the following subdirectories:
+The root directory of **kive** should contain the following subdirectories:
 * `/doc`
 * `/samplecode`
-* `/shipyard`
+* `/kive`
 
-`/shipyard` is the top-level directory for the Django package that contains the project subdirectory (that by convention has the same name as the project folder, 'shipyard'), as well as a number of application subdirectories.  From now on, we will assume that you are in this project directory; *i.e.*, all paths will be defined relative to this directory.
+`/kive` is the top-level directory for the Django package that contains the project subdirectory (that by convention has the same name as the project folder, 'kive'), as well as a number of application subdirectories.  From now on, we will assume that you are in this project directory; *i.e.*, all paths will be defined relative to this directory.
 
 
 Create database
 ---------------
-**shipyard** uses PostgreSQL as its default database backend, and it must be set
-up prior to using **shipyard**.  The following instructions are based on step
+**kive** uses PostgreSQL as its default database backend, and it must be set
+up prior to using **kive**.  The following instructions are based on step
 seven of the instructions from [digitalocean.com][digitalocean]. Feel free to
-change the user name or database name to something other than "shipyard".  
+change the user name or database name to something other than "kive".  
 
 First, install PostgreSQL and psycopg as is appropriate for your system.  During
 the setup, a `postgres` system user account should have been set up: this
@@ -160,56 +160,56 @@ this user account:
 
     sudo su - postgres
 
-Create a database for **shipyard**.  If the Postgres utilities have not been
+Create a database for **kive**.  If the Postgres utilities have not been
 automatically added to your PATH (they won't have been if you followed the above instructions
 installing the database using the graphical installer), make sure you specify the path
 of the commands in the following:
 
-    createdb shipyard
+    createdb kive
 
-Next, create a user (or "role") for **shipyard** to use when accessing the
+Next, create a user (or "role") for **kive** to use when accessing the
 database, and follow the prompts (the `-P` allows you to specify a password):
 
-    createuser -P shipyard
+    createuser -P kive
 
 Now, we need to grant this user the appropriate privileges.  As the postgres
 system user, using the `psql` SQL console, enter at the prompt:
 
-    GRANT ALL PRIVILEGES ON DATABASE shipyard TO shipyard;
+    GRANT ALL PRIVILEGES ON DATABASE kive TO kive;
 
-We are almost done.  In order to run the **shipyard** test suites, the
-`shipyard` database account must have the ability to create temporary test
+We are almost done.  In order to run the **kive** test suites, the
+`kive` database account must have the ability to create temporary test
 databases.  As instructed on [Stack Overflow][test-permission], we grant the
 user this privilege by running a command in `psql`:
 
-    ALTER USER shipyard CREATEDB;
+    ALTER USER kive CREATEDB;
 
 Exit `psql` with the `\q` command, then exit from the postgres user's shell to
 get back to your regular prompt.
 
 On a Mac, the PostgreSQL database defaults to accept connections from any user,
 so you are finished creating the database.  On Ubuntu or CentOS, however, the default is to only accept
-connections from system users. To allow the shipyard database user to connect,
+connections from system users. To allow the kive database user to connect,
 you have to change the [authentication setting][pg_hba] in PostgreSQL's
 configuration file. Replace 9.3 with whichever version you have.
 
     sudo vi /etc/postgresql/9.3/main/pg_hba.conf
     # Add the following line before the default for user postgres or all
-    local   all             shipyard                                md5
+    local   all             kive                                md5
     # Then save the file and reload the PostgreSQL configuration
     /etc/init.d/postgresql reload
 
-To test that the `shipyard` user can connect to the `shipyard` database, connect
+To test that the `kive` user can connect to the `kive` database, connect
 with `psql` and then exit.
 
-    psql shipyard shipyard
+    psql kive kive
     \q
 
 
 Creating database tables
 ------------------------
 Having created the database, we must now create the tables that will be used by
-Shipyard.  This is handled by the `migrate` command to the `manage.py` script,
+Kive.  This is handled by the `migrate` command to the `manage.py` script,
 which follows instructions created by the developers on how to lay out the tables:
     ./manage.py migrate
 
@@ -217,13 +217,13 @@ Should you ever need to completely remove the database and start over, you can r
 the following commands:
 
     sudo su - postgres  # enter password if it asks
-    dropdb shipyard  # enter shipyard user's password if it asks
-    createdb shipyard  # etc.
+    dropdb kive  # enter kive user's password if it asks
+    createdb kive  # etc.
     exit
     ./manage.py migrate
 
 This follows the above steps, except with an additional step that removes the
-shipyard database, and skipping the already-done configuration steps.
+kive database, and skipping the already-done configuration steps.
 
 [digitalocean]: https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-django-with-postgres-nginx-and-gunicorn
 [test-permission]: http://stackoverflow.com/q/14186055/4794
@@ -233,44 +233,44 @@ shipyard database, and skipping the already-done configuration steps.
 Remove test database (if necessary)
 -----------------------------------
 Sometimes, if something goes wrong while running the test suite, the system
-will leave a database named `test_shipyard` in place, which will give the
+will leave a database named `test_kive` in place, which will give the
 following prompt the next time you run the tests:
 
     Creating test database for alias 'default'...
-    Got an error creating the test database: database "test_shipyard" already exists
+    Got an error creating the test database: database "test_kive" already exists
 
-    Type 'yes' if you would like to try deleting the test database 'test_shipyard', or 'no' to cancel:
+    Type 'yes' if you would like to try deleting the test database 'test_kive', or 'no' to cancel:
 
 Then, on entering `yes`:
 
     Destroying old test database 'default'...
-    Got an error recreating the test database: must be owner of database test_shipyard
+    Got an error recreating the test database: must be owner of database test_kive
 
 To properly dispose of this database, run the following commands:
 
     sudo su - postgres  # enter password if it asks
-    dropdb test_shipyard  # enter shipyard user's password if it asks
+    dropdb test_kive  # enter kive user's password if it asks
     exit
     
-This is similar to the incantation used to completely remove the `shipyard` database,
+This is similar to the incantation used to completely remove the `kive` database,
 but simpler because we are only trying to get rid of the database and do not need to
 recreate or reinitialize anything.
 
 Settings
 --------
-Since **shipyard** is a Django project, the majority of the installation
+Since **kive** is a Django project, the majority of the installation
 procedure follows the standard instructions for Django.  The first thing you
-need to do is to make a copy of `/shipyard/settings_default.py` called
-`settings.py` (remember, all paths are relative to `/shipyard` so we mean
-`/shipyard/shipyard/settings_default.py`).  This is a standard step in the
+need to do is to make a copy of `/kive/settings_default.py` called
+`settings.py` (remember, all paths are relative to `/kive` so we mean
+`/kive/kive/settings_default.py`).  This is a standard step in the
 installation of a Django project where you configure project settings.  Within
 the `DATABASES['default']` dictionary, modify the respective values to indicate
 the type, location, and access credentials of your database.  For example, using
 postgres as your database engine, you would specify
 `'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name
-of the database Shipyard is to use under the key `NAME` (e.g. `'shipyard'`).
+of the database Kive is to use under the key `NAME` (e.g. `'kive'`).
 This is a database that must be created by an administrator prior to using
-Shipyard.
+Kive.
 
 Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
 working files for the server and any uploaded files. 
@@ -327,15 +327,15 @@ Creating a UML diagram of the backend
 -------------------------------------
 The optional `django-extensions` module adds a command to `./manage.py` that creates a UML representation of the database design using either `pydot` or `pygraphviz`.  For example, to build a UML diagram of the `method` app, you may use
 
-    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings method -g > method.dot
+    ./manage.py graph_models --pygraphviz --settings=kive.UML_settings method -g > method.dot
     
 This creates a `.dot` file that can be opened using GraphViz.  Note that this command specifies an alternate settings file that is provided in the code base: this was done to ensure that you don't need to install `django-extensions` to run the system normally.  If you prefer to directly create a PDF file, you can use the `-o` option:
 
-    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings method -g -o method.pdf
+    ./manage.py graph_models --pygraphviz --settings=kive.UML_settings method -g -o method.pdf
     
 To create a diagram of the entire database:
 
-    ./manage.py graph_models --pygraphviz --settings=shipyard.UML_settings -a -g -o kive.pdf
+    ./manage.py graph_models --pygraphviz --settings=kive.UML_settings -a -g -o kive.pdf
 
 Running a pipeline
 ------------------
@@ -357,7 +357,7 @@ Running unit tests
 If you want to run your unit tests faster, you can run them against an
 in-memory SQLite database with this command:
 
-    ./manage.py test --settings shipyard.test_settings
+    ./manage.py test --settings kive.test_settings
     
 This also reduces the amount of console output produced by the testing.  
 Testing with a SQLite database may have slightly different behaviour from 
@@ -365,7 +365,7 @@ the PostgreSQL database, so you should occasionally run the tests with
 the default settings.  Alternatively, to run the tests with all the default
 settings but with reduced console output:
     
-    ./manage.py test --settings shipyard.test_settings_pg
+    ./manage.py test --settings kive.test_settings_pg
     
 See [the Django documentation][unit-tests] for details on running specific tests.
 
@@ -381,7 +381,7 @@ Then add these two lines to `settings.py`:
 
 Finally, run the unit tests and the script to summarize them.
 
-    ./manage.py test --settings shipyard.test_settings
+    ./manage.py test --settings kive.test_settings
     ./slow_test_report.py
 
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
@@ -407,18 +407,18 @@ Once you have set up your production server, this is how to deploy a new release
 5. Get the code from Github onto the server.
 
         ssh user@server
-        cd /usr/local/share/Shipyard/shipyard
+        cd /usr/local/share/Kive/kive
         git fetch
         git checkout tags/vX.Y
 
 6. Check if you need to set any new settings by running
-    `diff shipyard/settings_default.py shipyard/settings.py`. Do the same
+    `diff kive/settings_default.py kive/settings.py`. Do the same
     comparison of `hostfile`.
 7. Recreate the database as described in the Initialize Database section, and
     deploy the static files.
     
         ssh user@server
-        cd /usr/local/share/Shipyard/shipyard
+        cd /usr/local/share/Kive/kive
         ./manage.py migrate
         sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./manage.py collectstatic
         

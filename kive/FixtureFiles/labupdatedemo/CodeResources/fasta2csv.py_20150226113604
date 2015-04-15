@@ -8,10 +8,10 @@ import argparse, sys, csv
 # arguments specifying the paths of where outputs are written]
 
 scriptDescription = "Takes FASTA, outputs CSV containing (str header, str sequence)"
-parser = argparse.ArgumentParser(scriptDescription);
+parser = argparse.ArgumentParser(scriptDescription)
 
-parser.add_argument("input_fasta",help="FASTA-formatted text file")
-parser.add_argument("output_csv",help="CSV containing (str header, str sequence) doublets")
+parser.add_argument("input_fasta", help="FASTA-formatted text file")
+parser.add_argument("output_csv", help="CSV containing (str header, str sequence) doublets")
 args = parser.parse_args()
 
 try:
