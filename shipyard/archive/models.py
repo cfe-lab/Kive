@@ -517,21 +517,23 @@ class RunComponent(stopwatch.models.Stopwatch):
         Then, it checks that if log is complete then all of the
         invoked_logs must also be complete.
         """
+        logs_to_check = self.invoked_logs.all()
+        # Make sure that log is checked, and avoid checking it twice.
         if self.has_log:
-            self.log.clean()
+            logs_to_check = itertools.chain([self.log], self.invoked_logs.exclude(pk=self.log.pk))
 
-        for invoked_log in self.invoked_logs.all():
-            invoked_log.clean()
+        for curr_log in logs_to_check:
+            curr_log.clean()
 
             # Clean all content/integrity checks, and make sure at most
             # one has been done for each output SymbolicDataset.
             outputs_checked = set([])
-            for check in itertools.chain(invoked_log.content_checks.all(), 
-                                         invoked_log.integrity_checks.all()):
+            for check in itertools.chain(curr_log.content_checks.all(),
+                                         curr_log.integrity_checks.all()):
                 if check.symbolicdataset.pk in outputs_checked:
                     raise ValidationError('{} "{}" has multiple Integrity/ContentCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'
-                                          .format(self.__class__.__name__, self, check.symbolicdataset, invoked_log))
+                                          .format(self.__class__.__name__, self, check.symbolicdataset, curr_log))
                 outputs_checked.add(check.symbolicdataset.pk)
                 check.clean()
 
@@ -653,7 +655,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         # At this point, we know that it is unsuccessful and incomplete.
         return False
 
-    @update_redacted_mark
+    @update_field("_redacted")
     def is_redacted(self, *kwargs):
         if self.has_log and self.log.is_redacted():
             return True

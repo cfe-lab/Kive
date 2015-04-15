@@ -1119,7 +1119,7 @@ class Datatype(AccessControl):
             descendant_dt.remove()
 
         for cdtm in self.CDTMs.all():
-            cdtm.remove(remove_empty_cdt=True)
+            cdtm.compounddatatype.remove()
 
         if (rm_verif_method and self.has_custom_constraint() and
                 self.custom_constraint.verification_method.user == self.user):
@@ -1375,10 +1375,6 @@ class CompoundDatatypeMember(models.Model):
             else:
                 return [CompoundDatatypeMember.BLANK_ENTRY]
         return self.datatype.check_basic_constraints(value)
-
-    def remove(self, remove_cdt=True):
-        if remove_cdt:
-            self.compounddatatype.remove()
 
 
 @python_2_unicode_compatible
