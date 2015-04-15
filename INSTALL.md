@@ -289,37 +289,42 @@ Options are described in the [Open MPI FAQ][mpifaq].
 Initialize the system
 ---------------------
 The following instructions will initialize your system with a clean instance.
-If you are running Kive as a production server with Apache, (re-)deploy the static files by running the following command.  If you are running Kive as a development server on your workstation, then there is no need to collect static files and you can ignore this.
+You should run this after you first install Kive, or after updating the source
+code on a developer workstation.
 
-    sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
+1. If you are running Kive as a production server with Apache, (re-)deploy the
+    static files by running the following command.  If you are running Kive as a
+    development server on your workstation, then there is no need to collect
+    static files and you can skip to step 2.
 
-Next, clear and re-populate the database with the following command:
+        sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
 
-    ./manage.py reset --load=demo
+2. Clear and re-populate the database with the following command:
 
-You can leave the load parameter off, or set it to other fixture names, like
-`converter_pipeline`.  `demo` refers to a set of fixture files that populate the database
-with two pipelines that were used in the development of Kive, and for demonstrating the software.
+        ./manage.py reset --load=demo
 
-Finally, you need to create a Kive user account.  Open a Django shell session with the command:
+    You can leave the load parameter off, or set it to other fixture names, like
+    `converter_pipeline`.  `demo` refers to a set of fixture files that populate
+    the database with two pipelines that were used in the development of Kive
+    and for demonstrating the software.
+3. Create a Kive user account.  Open a Django shell session with the command:
 
-    ./manage.py shell
+        ./manage.py shell
 
-and at the prompt enter the following lines:
+    At the prompt enter the following lines:
 
-    from django.contrib.auth.models import User
-    User.objects.create_user('admin', 'admin@domain.com', 'password')
+        from django.contrib.auth.models import User
+        User.objects.create_user('admin', 'admin@domain.com', 'password')
 
-where the positional arguments of `create_user()` correspond to the user name, e-mail address and password, respectively.
+    The arguments of `create_user()` are the user name, e-mail address, and
+    password.
+4. You are now ready to run a local Django webserver:
 
-You are now ready to run a local Django webserver:
+        python manage.py runserver
 
-    python manage.py runserver
-
-Then navigate to `localhost:8000` in your web browser!
-
-To launch a fleet manager and workers, you need to run the following command
-and replace X with the number of workers you want:
+5. Navigate to `localhost:8000` in your web browser!
+6. To launch a fleet manager and workers, you need to run the following command
+    and replace X with the number of workers you want:
 
     python manage.py runfleet --workers X
     
