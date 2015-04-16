@@ -1,18 +1,18 @@
 # Ignore .pyc files
 *.pyc
 # Ignore the database file
-db/shipyard.db
+db/kive.db
 # Don't get the settings.py or hostfile files that have been customized
-shipyard/shipyard/hostfile
-shipyard/shipyard/settings.py
+kive/kive/hostfile
+kive/kive/settings.py
 # Ignore the temporary stuff created during testing
-shipyard/CodeResources
-shipyard/VerificationScripts
-shipyard/Datasets
-shipyard/Logs
-shipyard/Sandboxes
-shipyard/shipyard.log*
-shipyard/testreport.xml
+kive/CodeResources
+kive/VerificationScripts
+kive/Datasets
+kive/Logs
+kive/Sandboxes
+kive/kive.log*
+kive/testreport.xml
 
 #Generated files and backup files
 *~

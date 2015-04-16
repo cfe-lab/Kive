@@ -2,7 +2,7 @@
 
 import argparse, csv, time, sys
 
-# In order to work with shipyard, scripts which having a inputs
+# In order to work with kive, scripts which having a inputs
 # and b inputs must have a+b command line arguments, the first a
 # arguments specifying paths of input files, the subsequent b
 # arguments specifying the paths of where outputs are written]
@@ -26,7 +26,7 @@ try:
 			for i, row in enumerate(string_csv):
 				time.sleep(0.5)
 				if i == 0:
-					# Output column names must be registered in shipyard
+					# Output column names must be registered in kive
 					output.write("c,d\n")
 					continue
 				print "Processing row {}".format(i)
