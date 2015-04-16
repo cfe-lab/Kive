@@ -141,7 +141,8 @@ INSTALLED_APPS = (
     'sandbox',
     'portal',
     'stopwatch',
-    'fleet'
+    'fleet',
+    'rest_'
 )
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for

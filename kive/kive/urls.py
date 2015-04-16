@@ -86,4 +86,7 @@ urlpatterns = patterns(
     url(r'^filter_datasets$', 'sandbox.ajax.filter_datasets', name='filter_datasets'),
     url(r'^filter_pipelines$', 'sandbox.ajax.filter_pipelines', name='filter_pipelines'),
     url(r'^get_failed_output$', 'sandbox.ajax.get_failed_output', name='get_failed_output'),
+
+    # Urls for django-rest-framework
+    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 )
