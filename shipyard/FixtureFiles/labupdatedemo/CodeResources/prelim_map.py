@@ -20,8 +20,7 @@ import sys
 
 import miseq_logging
 import project_config
-from shipyard.FixtureFiles.labupdatedemo.CodeResources import settings
-
+import settings  # settings.py is a CodeResourceDependency
 
 logger = miseq_logging.init_logging_console_only(logging.DEBUG)
 

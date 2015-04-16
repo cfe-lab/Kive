@@ -421,7 +421,8 @@ class Datatype(AccessControl):
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
 
-    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled")
+    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled",
+                                     on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ("user", "name")
@@ -1622,5 +1623,5 @@ class CompoundDatatype(AccessControl):
 
         # Remove any Transformations that had this CDT.
         for xput_structure in self.xput_structures.all():
-            xput_structure.transf_xput.definite.transformation.remove()
+            xput_structure.transf_xput.definite.transformation.definite.remove()
 

@@ -23,8 +23,8 @@ import sys
 
 # These are both CodeResourceDependencies
 import miseq_logging
-from shipyard.FixtureFiles.labupdatedemo.CodeResources import project_config
-from shipyard.FixtureFiles.labupdatedemo.CodeResources.settings import bowtie_threads, consensus_q_cutoff,\
+import project_config
+from settings import bowtie_threads, consensus_q_cutoff,\
     max_remaps, min_mapping_efficiency
 from operator import itemgetter
 

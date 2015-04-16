@@ -180,39 +180,56 @@ def view_results(request, id):
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
     
-    outputs = [] # [(step_name, output_name, size, date, view_url, down_url)]
+    outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
     for i, outcable in enumerate(run.outcables_in_order):
-        dataset = outcable.execrecord.execrecordouts.first().symbolicdataset.dataset
-        outputs.append(((i == 0 and 'Run outputs' or ''),
-                        outcable.pipelineoutputcable.dest,
-                        dataset.dataset_file.size,
-                        dataset.date_created,
-                        "../../dataset_view/{}".format(dataset.id),
-                        "../../dataset_download/{}".format(dataset.id)))
-        
-    for runstep in run.runsteps_in_order:
-        execlog = runstep.execrecord.generator
-        methodoutput = execlog.methodoutput
-        outputs.append((runstep.pipelinestep,
-                        'Standard out',
-                        methodoutput.output_log.size,
-                        execlog.end_time,
-                        "../../stdout_view/{}".format(methodoutput.id),
-                        "../../stdout_download/{}".format(methodoutput.id)))
-        outputs.append(('',
-                        'Standard error',
-                        methodoutput.error_log.size,
-                        execlog.end_time,
-                        "../../stderr_view/{}".format(methodoutput.id),
-                        "../../stderr_download/{}".format(methodoutput.id)))
-        for output in runstep.execrecord.execrecordouts_in_order:
-            dataset = output.symbolicdataset.dataset
-            outputs.append(('',
-                            output.generic_output,
+        if outcable.execrecord is not None:
+            dataset = outcable.execrecord.execrecordouts.first().symbolicdataset.dataset
+            outputs.append(((i == 0 and 'Run outputs' or ''),
+                            outcable.pipelineoutputcable.dest,
                             dataset.dataset_file.size,
                             dataset.date_created,
                             "../../dataset_view/{}".format(dataset.id),
                             "../../dataset_download/{}".format(dataset.id)))
+        
+    for runstep in run.runsteps_in_order:
+        if not runstep.has_log:
+            continue
+        execlog = runstep.log
+        methodoutput = execlog.methodoutput
+        if methodoutput.output_log is not None:
+            try:
+                outputs.append((runstep.pipelinestep,
+                                'Standard out',
+                                methodoutput.output_log.size,
+                                execlog.end_time,
+                                "../../stdout_view/{}".format(methodoutput.id),
+                                "../../stdout_download/{}".format(methodoutput.id)))
+            except ValueError:
+                pass
+        if methodoutput.error_log is not None:
+            try:
+                outputs.append(('',
+                                'Standard error',
+                                methodoutput.error_log.size,
+                                execlog.end_time,
+                                "../../stderr_view/{}".format(methodoutput.id),
+                                "../../stderr_download/{}".format(methodoutput.id)))
+            except ValueError:
+                pass
+        if runstep.execrecord is not None:
+            for output in runstep.execrecord.execrecordouts_in_order:
+                dataset = output.symbolicdataset.dataset
+                size = "NA"
+                date_created = "NA"
+                if dataset is not None:
+                    size = dataset.dataset_file.size
+                    date_created = dataset.date_created
+                outputs.append(('',
+                                output.generic_output,
+                                size,
+                                date_created,
+                                "../../dataset_view/{}".format(dataset.id),
+                                "../../dataset_download/{}".format(dataset.id)))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
 

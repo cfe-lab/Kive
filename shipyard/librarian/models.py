@@ -696,10 +696,7 @@ class ExecRecord(models.Model):
     """
     Record of a previous execution of a Pipeline component.
     """
-    generator = models.OneToOneField("archive.ExecLog", related_name="execrecord",
-                                     null=True, blank=True)
-    adopter = models.OneToOneField("archive.RunComponent", related_name="adopted_execrecord",
-                                   null=True, blank=True)
+    generator = models.OneToOneField("archive.ExecLog", related_name="execrecord")
 
     # FIXME exactly one of these must be non-null
 

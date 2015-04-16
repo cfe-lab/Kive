@@ -18,10 +18,9 @@ import argparse
 import sys
 import itertools
 import re
+
+from settings import max_prop_N, read_mapping_cutoff, sam2aln_q_cutoffs
 import csv
-
-from shipyard.FixtureFiles.labupdatedemo.CodeResources.settings import max_prop_N, read_mapping_cutoff, sam2aln_q_cutoffs
-
 
 def parseArgs():
     parser = argparse.ArgumentParser(
