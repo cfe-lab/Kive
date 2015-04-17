@@ -68,7 +68,6 @@ def api_get_pipelines(request, page=0):
     if len(families) == pagesize:
         next_page = reverse('api_pipelines_get_page', kwargs={'page': page+1})
 
-    # TODO : A proper serializer for pipeline objects
     pipelines = {
         'next_page': next_page,
         'families': PipelineFamilySerializer(families, many=True).data

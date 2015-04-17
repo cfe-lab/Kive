@@ -3,8 +3,6 @@ from pipeline.models import PipelineFamily, Pipeline
 
 from transformation.serializers import TransformationInputSerializer
 from kive.serializers import TinyUserSerializer
-from django.core.urlresolvers import reverse
-
 
 class PipelineSerializer(serializers.ModelSerializer):
 
