@@ -5,6 +5,7 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from archive.serializers import DatasetSerializer
 
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
@@ -69,15 +70,9 @@ def api_get_datasets(request, page=0):
     next_url = None
     if len(datasets) == pagesize:
         next_url = reverse('api_get_dataset_page', kwargs={'page': page+1})
-
-    # TODO: Make a serializer for dataset objects
     dataset_list = {
         'next': next_url,
-        'datasets': [{
-            'id': dataset.id,
-            'name': dataset.name,
-            'download': reverse('dataset_download', kwargs={'dataset_id': dataset.id}),
-        } for dataset in datasets],
+        'datasets': DatasetSerializer(datasets, many=True).data,
     }
     return Response(dataset_list)
 
@@ -245,18 +240,15 @@ def datasets_add(request):
 def api_dataset_add(request):
     single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
 
-    dataset = None
+    symdataset = None
     if single_dataset_form.is_valid():
-        dataset = single_dataset_form.create_dataset(request.user)
+        symdataset = single_dataset_form.create_dataset(request.user)
 
-    if dataset is None:  # TODO: Proper fail here
+    if symdataset is None:  # TODO: Proper fail here
         return Response({'fail': single_dataset_form.errors})
 
     resp = {
-        'dataset': {  # TODO: Proper dataset serializer
-            'id': dataset.id,
-            'name': single_dataset_form.cleaned_data['name']
-        }
+        'dataset': DatasetSerializer(symdataset.dataset).data
     }
 
     return Response(resp)

@@ -12,6 +12,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.urlresolvers import reverse
 
 from constants import groups
+from kive.serializers import UserSerializer
 
 
 def developer_check(user):
@@ -61,11 +62,9 @@ def api_home(request):
     Presents a user with the list of actions they can perform with
     their permissions. At this point
     """
+    print UserSerializer(request.user).data
     home_dir = {
-        'user': {
-            'id': request.user.id,
-            'username': request.user.username
-        },
+        'user': UserSerializer(request.user).data,
         'directory': {
             name: reverse(name) for name in ['api_dataset_home']
         }
