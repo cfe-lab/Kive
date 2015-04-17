@@ -77,6 +77,10 @@ class CodeResource(metadata.models.AccessControl):
 
     def __str__(self):
         return self.name
+
+    def remove(self):
+        for revision in self.revisions.all():
+            revision.remove()
     
 
 @python_2_unicode_compatible
@@ -110,7 +114,8 @@ class CodeResourceRevision(metadata.models.AccessControl):
             auto_now_add=True,
             help_text="Date this resource revision was uploaded")
 
-    revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True)
+    revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True,
+                                        on_delete=models.SET_NULL)
     revision_desc = models.TextField(
             "Revision description",
             help_text="A description for this particular resource revision",
@@ -327,6 +332,13 @@ class CodeResourceRevision(metadata.models.AccessControl):
         """
         return '/resource_revision_add/%i' % self.id
 
+    def remove(self):
+        # Remove anything that has this as a dependency.
+        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
+            dependant.coderesourcerevision.remove()
+
+        self.delete()
+
 
 @python_2_unicode_compatible
 class CodeResourceDependency(models.Model):
@@ -402,7 +414,8 @@ class Method(transformation.models.Transformation):
     )
 
     family = models.ForeignKey("MethodFamily", related_name="members")
-    revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True)
+    revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True,
+                                        on_delete=models.SET_NULL)
 
     # moved this here from Transformation so that it can be put into the
     # unique_together statement below. Allowed to be blank because it's
@@ -786,6 +799,10 @@ class MethodFamily(transformation.models.TransformationFamily):
 
     def __str__(self):
         return self.name
+
+    def remove(self):
+        for method in self.members.all():
+            method.remove()
 
 # Register signals.
 post_delete.connect(method.signals.code_resource_revision_post_delete, sender=CodeResourceRevision)

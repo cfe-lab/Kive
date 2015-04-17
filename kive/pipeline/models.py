@@ -70,6 +70,10 @@ class PipelineFamily(transformation.models.TransformationFamily):
                 pass
         return complete_pipelines
 
+    def remove(self):
+        for pipeline in self.members.all():
+            pipeline.remove()
+
 
 class PipelineSerializationException(exceptions.Exception):
     """

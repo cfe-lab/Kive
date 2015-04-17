@@ -4,6 +4,7 @@
 # Kive-specific things to set:
 # DATABASES: NAME, USER, and PASSWORD are site-specific
 # MEDIA_ROOT: set to the absolute path you wish to use on your system
+# STATIC_ROOT: set to the absolute path you wish to use on your system
 
 
 
