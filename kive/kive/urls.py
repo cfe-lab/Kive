@@ -92,4 +92,11 @@ urlpatterns = patterns(
     url(r'^api/$', 'portal.views.api_home', name='api_home'),
     url(r'^api/auth/', include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api/token-auth/', views.obtain_auth_token),
+
+    # REST API - Datasets
+    url(r'^api/datasets/$', 'archive.views.api_dataset_home', name='api_dataset_home'),
+    url(r'^api/datasets/get-datatypes/$', 'archive.views.api_get_cdts', name='api_get_cdts'),
+    url(r'^api/datasets/get-datasets/$', 'archive.views.api_get_datasets', name='api_get_dataset'),
+    url(r'^api/datasets/get-datasets/(?P<page>\d+)$', 'archive.views.api_get_datasets', name='api_get_dataset_page'),
+    url(r'^api/datasets/add-dataset/$', 'archive.views.api_dataset_add', name='api_dataset_add'),
 )

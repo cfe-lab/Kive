@@ -2,8 +2,8 @@
 portal.views
 """
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from django.http import HttpResponse, HttpResponseRedirect
@@ -66,8 +66,8 @@ def api_home(request):
             'id': request.user.id,
             'username': request.user.username
         },
-        'functions': {
-            name: reverse(name) for name in ['filter_pipelines']
+        'directory': {
+            name: reverse(name) for name in ['api_dataset_home']
         }
     }
     return Response(home_dir)

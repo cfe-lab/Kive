@@ -1,6 +1,11 @@
 """
 archive views
 """
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from django.core.servers.basehttp import FileWrapper
@@ -8,11 +13,13 @@ from django.core.exceptions import ValidationError
 from django.forms.formsets import formset_factory
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
+from django.core.urlresolvers import reverse
 
 import mimetypes
 import os
 import logging
 
+from metadata.models import CompoundDatatype
 from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
 import librarian.models
@@ -20,6 +27,21 @@ import hashlib
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_dataset_home(request):
+    dataset_dir = {
+        'directory': {
+            name: reverse(name) for name in [
+                'api_get_dataset',
+                'api_dataset_add',
+                'api_get_cdts']
+        }
+    }
+    return Response(dataset_dir)
 
 
 @login_required
@@ -32,6 +54,46 @@ def datasets(request):
     datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs)
     c = RequestContext(request, {'datasets': datasets})
     return HttpResponse(t.render(c))
+
+
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_get_datasets(request, page=0):
+    pagesize = 100
+
+    accessible_sds = librarian.models.SymbolicDataset.filter_by_user(request.user)
+    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)[page*pagesize: page*pagesize + pagesize]
+
+    next_url = None
+    if len(datasets) == pagesize:
+        next_url = reverse('api_get_dataset_page', kwargs={'page': page+1})
+
+    # TODO: Make a serializer for dataset objects
+    dataset_list = {
+        'next': next_url,
+        'datasets': [{
+            'id': dataset.id,
+            'name': dataset.name,
+            'download': reverse('dataset_download', kwargs={'dataset_id': dataset.id}),
+        } for dataset in datasets],
+    }
+    return Response(dataset_list)
+
+
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_get_cdts(request):
+    cdts = CompoundDatatype.objects.all()
+    cdt_dir = {
+        'compoundtypes':
+            [{
+                 'id': cdt.id,
+                 'accepts': str(cdt)
+             } for cdt in cdts]
+    }
+    return Response(cdt_dir)
 
 
 def _build_download_response(source_file):
@@ -174,6 +236,29 @@ def datasets_add(request):
         c.update({'singleDataset': single_dataset_form})
 
     return HttpResponse(t.render(c))
+
+
+@api_view(['post'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_dataset_add(request):
+    single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
+
+    dataset = None
+    if single_dataset_form.is_valid():
+        dataset = single_dataset_form.create_dataset(request.user)
+
+    if dataset is None:  # TODO: Proper fail here
+        return Response({'fail': single_dataset_form.errors})
+
+    resp = {
+        'dataset': {  # TODO: Proper dataset serializer
+            'id': dataset.id,
+            'name': single_dataset_form.cleaned_data['name']
+        }
+    }
+
+    return Response(resp)
 
 
 class BulkDatasetDisplay:
