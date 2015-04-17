@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from archive.serializers import DatasetSerializer
+from metadata.serializers import CompoundDatatypeInputSerializer
 
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
@@ -83,11 +84,7 @@ def api_get_datasets(request, page=0):
 def api_get_cdts(request):
     cdts = CompoundDatatype.objects.all()
     cdt_dir = {
-        'compoundtypes':
-            [{
-                 'id': cdt.id,
-                 'accepts': str(cdt)
-             } for cdt in cdts]
+        'compoundtypes': CompoundDatatypeInputSerializer(cdts, many=True).data,
     }
     return Response(cdt_dir)
 

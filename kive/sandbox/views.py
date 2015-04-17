@@ -3,6 +3,8 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+
 from django.template import loader, RequestContext
 from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
@@ -69,9 +71,7 @@ def api_get_pipelines(request, page=0):
     # TODO : A proper serializer for pipeline objects
     pipelines = {
         'next_page': next_page,
-        'pipelines': [
-            {'id': p.id, 'name': p.name} for p in families
-        ]
+        'families': PipelineFamilySerializer(families, many=True).data
     }
 
     return Response(pipelines)
