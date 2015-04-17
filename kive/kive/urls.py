@@ -1,4 +1,5 @@
 from django.conf.urls import patterns, url, include
+from rest_framework.authtoken import views
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -88,5 +89,7 @@ urlpatterns = patterns(
     url(r'^get_failed_output$', 'sandbox.ajax.get_failed_output', name='get_failed_output'),
 
     # Urls for django-rest-framework
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    url(r'^api/$', 'portal.views.api_home', name='api_home'),
+    url(r'^api/auth/', include('rest_framework.urls', namespace='rest_framework')),
+    url(r'^api/token-auth/', views.obtain_auth_token),
 )

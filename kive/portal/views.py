@@ -1,10 +1,15 @@
 """
 portal.views
 """
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.response import Response
 
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, RequestContext
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.urlresolvers import reverse
 
 from constants import groups
 
@@ -46,3 +51,23 @@ def usr(request):
     t = loader.get_template('portal/usr.html')
     c = RequestContext(request)
     return HttpResponse(t.render(c))
+
+
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_home(request):
+    """
+    Presents a user with the list of actions they can perform with
+    their permissions. At this point
+    """
+    home_dir = {
+        'user': {
+            'id': request.user.id,
+            'username': request.user.username
+        },
+        'functions': {
+            name: reverse(name) for name in ['filter_pipelines']
+        }
+    }
+    return Response(home_dir)
