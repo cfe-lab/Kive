@@ -1,7 +1,13 @@
 from rest_framework import serializers
-from archive.models import Dataset
+from archive.models import Dataset, Run
 from kive.serializers import TinyUserSerializer
 from django.core.urlresolvers import reverse
+
+
+class TinyRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Run
+        feild = ('id', )
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -17,4 +23,5 @@ class DatasetSerializer(serializers.ModelSerializer):
         if not obj:
             return None
         return reverse('dataset_download', kwargs={'dataset_id': obj.id})
+
 

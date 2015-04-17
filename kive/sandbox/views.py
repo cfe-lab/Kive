@@ -2,8 +2,10 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status as rf_status
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from fleet.serializers import RunToProcessSerializer
 
 from django.template import loader, RequestContext
 from django.http import HttpResponse, Http404, HttpResponseRedirect
@@ -228,37 +230,35 @@ def api_run_pipeline(request):
                 rsf_good = False
 
             curr_pipeline = rsf.cleaned_data["pipeline"]
-            if not rsf_good:  # TODO: Proper error
-                return Response({})
+            if not rsf_good:
+                return Response({'errors': rsf.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
 
-            inputs = []
             # All inputs are good, so save then create the inputs
             rtp = rsf.save()
             for i in range(1, curr_pipeline.inputs.count()+1):
                 curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
                 if not curr_input_form.is_valid():
-                    raise RunSubmissionError()  # TODO: Proper Error
+                    return Response({}, status=rf_status.HTTP_400_BAD_REQUEST)
 
                 # Check that the chosen SD is usable.
                 curr_SD = librarian.models.SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
                 try:
                     rtp.validate_restrict_access([curr_SD])
                 except ValidationError as e:
-                    raise RunSubmissionError()  # TODO: Proper Error
+                    return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
                 rtp.inputs.create(symbolicdataset=curr_SD, index=i)
 
             try:
                 rtp.clean()
 
             except ValidationError as e:
-                raise RunSubmissionError()
+                return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
 
-    except RunSubmissionError:
-        return Response({})  # TODO: Proper Error
+    except RunSubmissionError as e:
+        return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
 
-    # TODO: Proper serializer for runs
     resp = {
-        'status': reverse('api_pipelines_runstat', kwargs={'rtp_id': rtp.id})
+        'run': RunToProcessSerializer(rtp).data
     }
     return Response(resp)
 

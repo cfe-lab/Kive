@@ -5,6 +5,8 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status as rf_status
+
 from archive.serializers import DatasetSerializer
 from metadata.serializers import CompoundDatatypeInputSerializer
 
@@ -96,6 +98,7 @@ def _build_download_response(source_file):
     response['Content-Length'] = source_file.size
     response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
     return response
+
 
 @login_required
 def dataset_download(request, dataset_id):
@@ -241,8 +244,8 @@ def api_dataset_add(request):
     if single_dataset_form.is_valid():
         symdataset = single_dataset_form.create_dataset(request.user)
 
-    if symdataset is None:  # TODO: Proper fail here
-        return Response({'fail': single_dataset_form.errors})
+    if symdataset is None:
+        return Response({'errors': single_dataset_form.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
 
     resp = {
         'dataset': DatasetSerializer(symdataset.dataset).data
