@@ -99,4 +99,14 @@ urlpatterns = patterns(
     url(r'^api/datasets/get-datasets/$', 'archive.views.api_get_datasets', name='api_get_dataset'),
     url(r'^api/datasets/get-datasets/(?P<page>\d+)$', 'archive.views.api_get_datasets', name='api_get_dataset_page'),
     url(r'^api/datasets/add-dataset/$', 'archive.views.api_dataset_add', name='api_dataset_add'),
+
+    # REST API - Pipelines
+    url(r'^api/pipelines/$', 'sandbox.views.api_pipelines_home', name='api_pipelines_home'),
+    url(r'^api/pipelines/get-pipelines/$', 'sandbox.views.api_get_pipelines', name='api_pipelines_get'),
+    url(r'^api/pipelines/get-pipelines/(?P<page>\d+)$', 'sandbox.views.api_get_pipelines',
+        name='api_pipelines_get_page'),
+    url(r'^api/pipelines/start-run/$', 'sandbox.views.api_run_pipeline', name='api_pipelines_startrun'),
+    url(r'^api/pipelines/get-active-runs/$', 'sandbox.views.api_get_runs', name='api_pipelines_get_the_runs'),
+    url(r'^api/pipelines/run-status/(?P<rtp_id>\d+)$', 'sandbox.views.api_poll_run_progress',
+        name='api_pipelines_runstat'),
 )

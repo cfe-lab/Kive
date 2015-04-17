@@ -61,9 +61,10 @@ def datasets(request):
 @permission_classes((IsAuthenticated,))
 def api_get_datasets(request, page=0):
     pagesize = 100
+    page = int(page)
 
     accessible_sds = librarian.models.SymbolicDataset.filter_by_user(request.user)
-    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)[page*pagesize: page*pagesize + pagesize]
+    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)[page*pagesize: (page+1)*pagesize]
 
     next_url = None
     if len(datasets) == pagesize:
