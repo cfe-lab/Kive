@@ -238,7 +238,7 @@ def api_run_pipeline(request):
             for i in range(1, curr_pipeline.inputs.count()+1):
                 curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
                 if not curr_input_form.is_valid():
-                    return Response({}, status=rf_status.HTTP_400_BAD_REQUEST)
+                    return Response({'errors': curr_input_form.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
 
                 # Check that the chosen SD is usable.
                 curr_SD = librarian.models.SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
