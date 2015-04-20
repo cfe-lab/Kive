@@ -6,6 +6,7 @@ from rest_framework import status as rf_status
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
 from fleet.serializers import RunToProcessSerializer
+from archive.serializers import DatasetSerializer
 
 from django.template import loader, RequestContext
 from django.http import HttpResponse, Http404, HttpResponseRedirect
@@ -293,6 +294,7 @@ def api_poll_run_progress(request, rtp_id):
     run, _ = _load_status(request, rtp_id)
     resp = {
         'run': run,
+        'results': reverse('api_pipelines_runresults', kwargs={'rtp_id': rtp_id}),
     }
     return Response(resp)
 
@@ -349,6 +351,29 @@ def view_results(request, id):
                             "../../dataset_download/{}".format(dataset.id)))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
+
+
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_get_run_results(request, rtp_id):
+    four_oh_four = False
+    try:
+        rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
+        run = rtp.run
+        if not run.can_be_accessed(request.user):
+            four_oh_four = True
+    except archive.models.Run.DoesNotExist:
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} does not exist or is not accessible".format(id))
+
+    outputs = [oc.execrecord.execrecordouts.first().symbolicdataset.dataset for oc in run.outcables_in_order]
+    resp = {
+        'results': DatasetSerializer(outputs, many=True).data,
+    }
+    return Response(resp)
 
 
 @login_required

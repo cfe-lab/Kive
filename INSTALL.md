@@ -12,10 +12,11 @@ Prerequisites
 5. numpy
 6. PostgreSQL
 7. psycopg (Python library for interfacing with PostgreSQL)
+8. djangorestframework
 
 Optionally, if you would like to create UML diagrams of the backend models:
-8. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
-9. pygraphviz
+9. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
+10. pygraphviz
 
 It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
 
@@ -27,8 +28,10 @@ If you are already running Django 1.6, installing should be as painless as runni
     pip install Django==1.7.5
 
 (substitute the appropriate version number if you wish to use a different version -- a newer one, for example).  You will likely need to run this using `sudo` unless you only installed Django locally and not
-system-wide.  Also, many systems have multiple Python installations, so make sure that 
-`pip` is using the correct one.
+system-wide.  Also, many systems have multiple Python installations, so make sure that
+`pip` is using the correct one. Django REST Framework can also be installed via
+
+    pip install djangorestframework
 
 Instructions for downloading and installing `django-extensions` may be found [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
 
