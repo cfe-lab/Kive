@@ -3,6 +3,7 @@ from archive.models import Dataset, Run
 from kive.serializers import TinyUserSerializer
 from metadata.serializers import CompoundDatatypeInputSerializer
 from django.core.urlresolvers import reverse
+import os
 
 
 class TinyRunSerializer(serializers.ModelSerializer):
@@ -16,10 +17,15 @@ class DatasetSerializer(serializers.ModelSerializer):
     user = TinyUserSerializer()
     compounddatatype = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
+    filename = serializers.SerializerMethodField()
 
     class Meta:
         model = Dataset
-        fields = ('id', 'name', 'user', 'date_created', 'date_modified', 'download_url', 'compounddatatype')
+        fields = ('id', 'name', 'filename', 'user', 'date_created', 'date_modified', 'download_url', 'compounddatatype')
+
+    def get_filename(self, obj):
+        if obj:
+            return os.path.basename(obj.dataset_file.name)
 
     def get_compounddatatype(self, obj):
         if not obj:
@@ -31,6 +37,6 @@ class DatasetSerializer(serializers.ModelSerializer):
     def get_download_url(self, obj):
         if not obj:
             return None
-        return reverse('dataset_download', kwargs={'dataset_id': obj.id})
+        return reverse('api_dataset_download', kwargs={'dataset_id': obj.id})
 
 

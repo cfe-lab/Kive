@@ -114,6 +114,19 @@ def dataset_download(request, dataset_id):
     return _build_download_response(dataset.dataset_file)
 
 
+@api_view(['GET'])
+@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@permission_classes((IsAuthenticated,))
+def api_dataset_download(request, dataset_id):
+    try:
+        accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
+        dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
+    except Dataset.DoesNotExist:
+        raise Http404("ID {} cannot be accessed".format(dataset_id)) # TODO: JSON ERROR
+
+    return _build_download_response(dataset.dataset_file)
+
+
 @login_required
 def dataset_view(request, dataset_id):
     """

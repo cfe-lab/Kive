@@ -95,6 +95,8 @@ urlpatterns = patterns(
 
     # REST API - Datasets
     url(r'^api/datasets/$', 'archive.views.api_dataset_home', name='api_dataset_home'),
+    url(r'^api/datasets/download/(?P<dataset_id>\d+)$', 'archive.views.api_dataset_download',
+        name='api_dataset_download'),
     url(r'^api/datasets/get-datatypes/$', 'archive.views.api_get_cdts', name='api_get_cdts'),
     url(r'^api/datasets/get-datasets/$', 'archive.views.api_get_datasets', name='api_get_dataset'),
     url(r'^api/datasets/get-datasets/(?P<page>\d+)$', 'archive.views.api_get_datasets', name='api_get_dataset_page'),
