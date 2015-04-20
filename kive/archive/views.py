@@ -253,7 +253,6 @@ def datasets_add(request):
 def api_dataset_add(request):
     single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
 
-    print request.POST
     symdataset = None
     if single_dataset_form.is_valid():
         symdataset = single_dataset_form.create_dataset(request.user)
