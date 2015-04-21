@@ -4,20 +4,23 @@ Shipyard archive application unit tests.
 
 import os
 import re
+import json
 import tempfile
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord
+
 import librarian.tests
 import metadata.tests
 import sandbox.execute
@@ -3763,11 +3766,6 @@ class RunStepReuseFailedExecRecordTests(TestCase):
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
 
-from rest_framework.test import force_authenticate
-from django.contrib.auth.models import User
-import json
-import tempfile
-
 
 class DatasetApiTests(TestCase):
     def setUp(self):
@@ -3863,6 +3861,5 @@ class DatasetApiTests(TestCase):
         result = result['compoundtypes']
 
         self.assertEquals(len(result), 4)
-
         self.assertEquals(map(lambda c: c['id'], result), range(1, 5))
         self.assertEquals(map(lambda c: len(c['representation']) > 0, result), [True]*4)

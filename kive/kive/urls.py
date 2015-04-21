@@ -108,7 +108,7 @@ urlpatterns = patterns(
     url(r'^api/pipelines/get-pipelines/(?P<page>\d+)$', 'sandbox.views.api_get_pipelines',
         name='api_pipelines_get_page'),
     url(r'^api/pipelines/start-run/$', 'sandbox.views.api_run_pipeline', name='api_pipelines_startrun'),
-    url(r'^api/pipelines/get-active-runs/$', 'sandbox.views.api_get_runs', name='api_pipelines_get_the_runs'),
+    url(r'^api/pipelines/get-active-runs/$', 'sandbox.views.api_get_runs', name='api_pipelines_get_runs'),
     url(r'^api/pipelines/run-status/(?P<rtp_id>\d+)$', 'sandbox.views.api_poll_run_progress',
         name='api_pipelines_runstat'),
     url(r'^api/pipelines/run-results/(?P<rtp_id>\d+)$', 'sandbox.views.api_get_run_results',

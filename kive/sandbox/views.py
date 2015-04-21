@@ -33,7 +33,7 @@ def api_pipelines_home(request):
             name: reverse(name) for name in [
                 'api_pipelines_get',
                 'api_pipelines_startrun',
-                'api_pipelines_get_the_runs']
+                'api_pipelines_get_runs']
         }
     }
     return Response(pipeline_dir)
