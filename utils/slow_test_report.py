@@ -2,6 +2,7 @@ import argparse
 from xml.etree import ElementTree
 from operator import attrgetter
 import bisect
+import glob
 
 # To track progress, here is how we started on Dec 31, against SQLite:
 # 10 out of 704 tests took 136s out of 499s
@@ -19,10 +20,9 @@ import bisect
 def parseOptions():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f',
-                        '--file',
-                        help='test report XML file to load',
-                        type=argparse.FileType('rU'),
-                        default='testreport.xml')
+                        '--folder',
+                        help='output folder with test report XML files to load',
+                        default='.')
     parser.add_argument('-n',
                         '--count',
                         help='number of tests to report as the slowest ones',
@@ -32,20 +32,26 @@ def parseOptions():
     return parser.parse_args()
 
 class SlowTestReport(object):
-    def load(self, report_file, count):
+    def load(self, report_files, count):
         self.tests = []
-        doc = ElementTree.parse(report_file)
-        suite = doc.getroot()
-        for testcase in suite:
-            bisect.insort(self.tests, Test(testcase))
-            if len(self.tests) > count:
-                self.tests.pop()
+        total_time = 0
+        total_tests = 0
+
+        for report_file in report_files:
+            doc = ElementTree.parse(report_file)
+            suite = doc.getroot()
+            total_time += float(suite.attrib['time'])
+            total_tests += int(suite.attrib['tests'])
+            for testcase in suite.findall('testcase'):
+                bisect.insort(self.tests, Test(testcase))
+                if len(self.tests) > count:
+                    self.tests.pop()
         time = sum(map(attrgetter('time'), self.tests))
         self.description = '{} out of {} tests took {:.0f}s out of {:.0f}s'.format(
             count,
-            suite.attrib['tests'],
+            total_tests,
             time,
-            float(suite.attrib['time']))
+            total_time)
         return self
 
 class Test(object):
@@ -61,7 +67,8 @@ class Test(object):
 
 def main():
     args = parseOptions()
-    summary = SlowTestReport().load(args.file, args.count)
+    report_files = glob.glob1(args.folder, 'TEST-*.xml')
+    summary = SlowTestReport().load(report_files, args.count)
     
     print summary.description
     for test in summary.tests:

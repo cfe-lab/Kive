@@ -3723,7 +3723,9 @@ echo
         self.assertTrue(self.pE_run.successful_execution())
 
 
-class TopLevelRunTests(ArchiveTestCase):
+class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
+    fixtures = ['archive_test_environment']
+    
     def test_usual_run(self):
         """Test on all elements of a simulated run."""
         self.step_through_run_creation("outcables_done")
@@ -3745,9 +3747,13 @@ class TopLevelRunTests(ArchiveTestCase):
             for roc in curr_run.runoutputcables.all():
                 self.assertEquals(self.pE_run, roc.top_level_run)
 
+class TopLevelRunOnDeepNestedRunTests(TestCase):
+    fixtures = ['deep_nested_run']
+
     def test_deep_nested_run(self):
         """Test on all elements of a deep-nested run."""
-        self._setup_deep_nested_run(self.myUser)
+        self.deep_nested_run = Run.objects.get(
+            pipeline__family__name='p_top')
 
         # Recurse down all elements of this run and make sure that they all have
         # top_level_run equal to self.deep_nested_run.
