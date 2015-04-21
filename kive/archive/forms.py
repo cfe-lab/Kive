@@ -19,7 +19,7 @@ Generate an HTML form to create a new DataSet object
 LOGGER = logging.getLogger(__name__)
 
 
-class DatasetForm (metadata.forms.AccessControlForm):
+class DatasetForm(metadata.forms.AccessControlForm):
     """
     User-entered single dataset.  We avoid using ModelForm since we can't set Dataset.user and Dataset.symbolicdataset
     before checking if the ModelForm.is_valid().  As a result, the internal calls to Model.clean() fail.

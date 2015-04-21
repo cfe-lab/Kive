@@ -141,7 +141,9 @@ INSTALLED_APPS = (
     'sandbox',
     'portal',
     'stopwatch',
-    'fleet'
+    'fleet',
+    'rest_framework',
+    'rest_framework.authtoken',
 )
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
