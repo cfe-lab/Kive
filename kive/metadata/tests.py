@@ -4,7 +4,7 @@ Unit tests for Shipyard metadata models.
 import os
 import re
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
 

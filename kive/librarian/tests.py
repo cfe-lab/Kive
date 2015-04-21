@@ -145,7 +145,8 @@ def create_librarian_test_environment(case):
     case.pD_run = case.pD.pipeline_instances.create(user=case.myUser)
     case.pD_run.save()
     case.pD_run.grant_everyone_access()
-    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser,
+                                                    name='pE_run')
     case.pE_run.save()
     case.pE_run.grant_everyone_access()
 
@@ -187,7 +188,7 @@ def create_librarian_test_environment(case):
     case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
 
     case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                               user=case.myUser, cdt=None, name="raw", description="lol",
+                                               user=case.myUser, cdt=None, name="raw_DS", description="lol",
                                                groups_allowed=[everyone_group()])
     case.raw_DS = case.raw_symDS.dataset
 
@@ -235,12 +236,12 @@ def create_librarian_test_environment(case):
     case.C1_out_DS = case.C1_out_symDS.dataset
 
     case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="raw", description="lol",
+                                                  case.myUser, cdt=None, name="C2_out", description="lol",
                                                   groups_allowed=[everyone_group()])
     case.C2_out_DS = case.C2_out_symDS.dataset
 
     case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="raw", description="lol",
+                                                  case.myUser, cdt=None, name="C3_out", description="lol",
                                                   groups_allowed=[everyone_group()])
     case.C3_out_DS = case.C3_out_symDS.dataset
 
@@ -1313,14 +1314,13 @@ class FindCompatibleERTests(LibrarianTestCase):
         method = execrecord.general_transf()
         pipeline = execrecord.generating_run.pipeline
         ps = pipeline.steps.get(transformation=method)
-        user = method.user
 
         # Create two RunSteps using this method.  First, an incomplete one.
         run1 = Run(user=self.myUser, pipeline=pipeline, name="First incomplete run",
                    description="Be patient!")
         run1.save()
         run1.start()
-        rs1 = run1.runsteps.create(pipelinestep=ps)
+        run1.runsteps.create(pipelinestep=ps)
 
         # Second, one that is looking for an ExecRecord.
         run2 = Run(user=self.myUser, pipeline=pipeline, name="Second run in progress",
