@@ -316,7 +316,7 @@ def view_results(request, id):
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
     
-    outputs = [] # [(step_name, output_name, size, date, view_url, down_url)]
+    outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
     for i, outcable in enumerate(run.outcables_in_order):
         dataset = outcable.execrecord.execrecordouts.first().symbolicdataset.dataset
         outputs.append(((i == 0 and 'Run outputs' or ''),
@@ -324,7 +324,7 @@ def view_results(request, id):
                         dataset.dataset_file.size,
                         dataset.date_created,
                         "../../dataset_view/{}".format(dataset.id),
-                        "../../dataset_download/{}".format(dataset.id)))
+                        "../../dataset_download/{}".format(dataset.id), True))
         
     for runstep in run.runsteps_in_order:
         execlog = runstep.execrecord.generator
@@ -334,13 +334,13 @@ def view_results(request, id):
                         methodoutput.output_log.size,
                         execlog.end_time,
                         "../../stdout_view/{}".format(methodoutput.id),
-                        "../../stdout_download/{}".format(methodoutput.id)))
+                        "../../stdout_download/{}".format(methodoutput.id), True))
         outputs.append(('',
                         'Standard error',
                         methodoutput.error_log.size,
                         execlog.end_time,
                         "../../stderr_view/{}".format(methodoutput.id),
-                        "../../stderr_download/{}".format(methodoutput.id)))
+                        "../../stderr_download/{}".format(methodoutput.id), True))
         for output in runstep.execrecord.execrecordouts_in_order:
             dataset = output.symbolicdataset.dataset
             outputs.append(('',
@@ -348,7 +348,8 @@ def view_results(request, id):
                             dataset.dataset_file.size,
                             dataset.date_created,
                             "../../dataset_view/{}".format(dataset.id),
-                            "../../dataset_download/{}".format(dataset.id)))
+                            "../../dataset_download/{}".format(dataset.id),
+                            output.is_OK()))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
 
