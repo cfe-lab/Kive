@@ -2430,15 +2430,15 @@ class CompoundDatatypeMemberTests(MetadataTestCase):
         """
         self.assertEqual(
             unicode(self.test_cdt.members.get(column_idx=1)),
-            "string: label"
+            "label: string"
         )
         self.assertEqual(
             unicode(self.test_cdt.members.get(column_idx=2)),
-            "DNANucSeq: PBMCseq"
+            "PBMCseq: DNANucSeq"
         )
         self.assertEqual(
             unicode(self.test_cdt.members.get(column_idx=3)),
-            "RNANucSeq: PLAseq"
+            "PLAseq: RNANucSeq"
         )
 
 
@@ -2456,15 +2456,29 @@ class CompoundDatatypeTests(MetadataTestCase):
         """
         Unicode on single-member cdt returns its member.
         """
-        self.assertEqual(unicode(self.DNAinput_cdt), "(DNANucSeq: SeqToComplement)")
+        self.assertEqual(unicode(self.DNAinput_cdt),
+                         "(SeqToComplement: DNANucSeq)")
 
     def test_cdt_multiple_members_unicode(self):
         """
-        Unicode returns a list of it's Datatype members.
+        Unicode returns a list of its Datatype members.
 
         Each member is in the form of unicode(CompoundDatatypeMember).
         """
-        self.assertEqual(unicode(self.test_cdt), "(string: label, DNANucSeq: PBMCseq, RNANucSeq: PLAseq)")
+        self.assertEqual(
+            unicode(self.test_cdt),
+            "(label: string, PBMCseq: DNANucSeq, PLAseq: RNANucSeq)")
+
+    def test_cdt_four_members_short_name(self):
+        self.basic_cdt.members.all()[4].delete()
+        self.assertEqual(
+            self.basic_cdt.short_name,
+            "(label: string, integer: integer, float: float, bool: boolean)")
+
+    def test_cdt_five_members_short_name(self):
+        self.assertEqual(
+            self.basic_cdt.short_name,
+            "(label: string, integer: integer, float: float, plus 2 others)")
 
     def test_clean_single_index_good(self):
         """

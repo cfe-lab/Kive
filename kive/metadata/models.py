@@ -1328,7 +1328,9 @@ class CompoundDatatypeMember(models.Model):
         datatype name, and column name
         """
         blankable_marker = "?" if self.blankable else ""
-        return '{}{}: {}'.format(unicode(self.datatype), blankable_marker, self.column_name)
+        return '{}: {}{}'.format(self.column_name,
+                                 unicode(self.datatype),
+                                 blankable_marker)
 
     def has_custom_constraint(self):
         """
@@ -1379,8 +1381,13 @@ class CompoundDatatype(AccessControl):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def __str__(self):
-        """ Represent CompoundDatatype with a list of it's members """
+    def _format(self, limit=None):
+        """ Represent CompoundDatatype with a list of its members.
+        
+        @param limit: The maximum number of members to format before truncating
+            the list. In a truncated list, the actual number displayed will be
+            limit - 1 to leave room for the "plus X others" message.
+        """
 
         # Okay, this is kind of ugly, and try never to do this,
         # but if we use 'self.members.order_by("column_idx")' here
@@ -1390,6 +1397,10 @@ class CompoundDatatype(AccessControl):
 
         # then sort those results in python
         members = sorted(members, key=lambda x: x.column_idx)
+        if limit is not None and len(members) > limit:
+            excess = len(members) - limit + 1
+            members = members[:limit-1]
+            members.append('plus {} others'.format(excess))
 
         # typically it's better to let the database sort data
         # but the list of members is also typically very small
@@ -1401,6 +1412,13 @@ class CompoundDatatype(AccessControl):
         if string_rep == "()":
             string_rep = "[empty CompoundDatatype]"
         return string_rep
+
+    def __str__(self):
+        return self._format()
+    
+    @property
+    def short_name(self):
+        return self._format(limit=4)
 
     # clean() is executed prior to save() to perform model validation
     def clean(self):

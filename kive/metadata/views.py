@@ -8,13 +8,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.models import Group
 
 import re
 
-from metadata.models import Datatype, CompoundDatatype, get_builtin_types
-from metadata.forms import *
 from constants import datatypes as dt_pks
+from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \
+    DatatypeForm, IntegerConstraintForm, StringConstraintForm
+from metadata.models import BasicConstraint, CompoundDatatype, \
+    CompoundDatatypeMember, Datatype, get_builtin_types
 from portal.views import developer_check
 
 
@@ -94,7 +95,7 @@ def datatype_add(request):
                             # using regex from http://stackoverflow.com/questions/18144431/regex-to-split-a-csv
                             groups = re.findall('(?:^|,)(?=[^"]|(")?)"?((?(1)[^"]*|[^,"]*))"?(?=,|$)',
                                                 scform.cleaned_data["regexp"])
-                            for quoted, group in groups:
+                            for _quoted, group in groups:
                                 regexp = BasicConstraint(datatype=new_datatype, ruletype="regexp", rule=group)
                                 regexp.full_clean()
                                 regexp.save()
@@ -147,7 +148,7 @@ def datatype_detail(request, id):
         this_datatype = Datatype.objects.get(pk=id)
         if not this_datatype.can_be_accessed(request.user):
             four_oh_four = True
-    except Datatype.DoesNotExist as e:
+    except Datatype.DoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -170,6 +171,7 @@ def compound_datatypes(request):
     Render list of all CompoundDatatypes
     """
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
+    compound_datatypes = sorted(compound_datatypes, key=str)
     t = loader.get_template('metadata/compound_datatypes.html')
     c = RequestContext(request, {'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))
@@ -186,11 +188,14 @@ def make_cdm_forms(request, cdt):
     num_forms = sum([1 for k in query.iterkeys() if k.startswith('datatype')])
     cdm_forms = []
     for i in range(num_forms):
-        data = {'datatype': query['datatype_'+str(i)], 'column_name': query['column_name_'+str(i)]}
+        data = {'datatype': query['datatype_'+str(i)],
+                'column_name': query['column_name_'+str(i)],
+                'blankable': query.get('blankable_'+str(i))}
         auto_id = 'id_%s_' + str(i)
 
-        cdm_form = CompoundDatatypeMemberForm(user=request.user, auto_id=auto_id, initial=data)
-        if cdt is not None:
+        if cdt is None:
+            cdm_form = CompoundDatatypeMemberForm(user=request.user, auto_id=auto_id, initial=data)
+        else:
             dummy_member = CompoundDatatypeMember(compounddatatype=cdt, column_idx=i+1)
             cdm_form = CompoundDatatypeMemberForm(data, user=request.user, auto_id=auto_id, instance=dummy_member)
 
@@ -261,7 +266,9 @@ def compound_datatype_add(request):
 
     # Note that even if there were exceptions thrown the forms have been properly annotated with errors.
     t = loader.get_template('metadata/compound_datatype_add.html')
-    c.push({"cdt_form": cdt_form, 'cdm_forms': member_forms})
+    c.push({"cdt_form": cdt_form,
+            'cdm_forms': member_forms,
+            'first_form': member_forms and member_forms[0]})
 
     return HttpResponse(t.render(c))
 
