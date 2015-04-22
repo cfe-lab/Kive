@@ -70,9 +70,12 @@ class PipelineFamily(transformation.models.TransformationFamily):
                 pass
         return complete_pipelines
 
+    @transaction.atomic
     def remove(self):
         for pipeline in self.members.all():
             pipeline.remove()
+
+        self.delete()
 
 
 class PipelineSerializationException(exceptions.Exception):
@@ -639,10 +642,15 @@ class Pipeline(transformation.models.Transformation):
     def threads_needed(self):
         return max(x.threads_needed() for x in self.steps.all())
 
+    @transaction.atomic
     def remove(self):
         # A cascade to Run won't do it because Run needs to be *removed*.
         for run in self.pipeline_instances.all():
             run.remove()
+
+        # Remove any pipeline that uses this one as a sub-pipeline.
+        for ps in self.pipelinesteps.all():
+            ps.pipeline.remove()
 
         # Cascade will handle steps, cables, RunToProcess objects, etc.
         self.delete()

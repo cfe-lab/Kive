@@ -78,6 +78,7 @@ class CodeResource(metadata.models.AccessControl):
     def __str__(self):
         return self.name
 
+    @transaction.atomic()
     def remove(self):
         for revision in self.revisions.all():
             revision.remove()
@@ -97,7 +98,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     #   descendents (self/ForeignKey)
     #   dependencies (CodeResourceDependency/ForeignKey)
     #   needed_by (CodeResourceDependency/ForeignKey)
-    #   method_set (Method/ForeignKey)
+    #   methods (Method/ForeignKey)
 
     coderesource = models.ForeignKey(CodeResource, related_name="revisions")
 
@@ -332,10 +333,14 @@ class CodeResourceRevision(metadata.models.AccessControl):
         """
         return '/resource_revision_add/%i' % self.id
 
+    @transaction.atomic
     def remove(self):
         # Remove anything that has this as a dependency.
         for dependant in self.needed_by.all().select_related("coderesourcerevision"):
             dependant.coderesourcerevision.remove()
+
+        for method in self.methods.all():
+            method.remove()
 
         self.delete()
 
@@ -427,7 +432,7 @@ class Method(transformation.models.Transformation):
     )
 
     # Code resource revisions are executable if they link to Method
-    driver = models.ForeignKey(CodeResourceRevision)
+    driver = models.ForeignKey(CodeResourceRevision, related_name="methods")
     reusable = models.PositiveSmallIntegerField(
         choices=REUSABLE_CHOICES,
         default=DETERMINISTIC,
@@ -764,14 +769,16 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """Is this Method identical to another one?"""
         return self.driver == other.driver and super(Method, self).is_identical(super(Method, other))
 
+    @transaction.atomic
     def remove(self):
         """
         Cleanly remove this Method from the database.
         """
         # Remove all Pipelines that use this Method.  This will eventually make its way over to
         # remove the ExecLogs and ExecRecords too.
-        for ps in self.pipelinesteps.all():
-            ps.pipeline.remove()
+        pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
+        for pipeline_affected in pipelines_affected:
+            pipeline_affected.remove()
 
         # This delete will cascade to the inputs/outputs.
         self.delete()
@@ -800,6 +807,7 @@ class MethodFamily(transformation.models.TransformationFamily):
     def __str__(self):
         return self.name
 
+    @transaction.atomic
     def remove(self):
         for method in self.members.all():
             method.remove()

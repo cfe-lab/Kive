@@ -183,20 +183,30 @@ def view_results(request, id):
     outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
     for i, outcable in enumerate(run.outcables_in_order):
         if outcable.execrecord is not None:
-            dataset = outcable.execrecord.execrecordouts.first().symbolicdataset.dataset
-            outputs.append(((i == 0 and 'Run outputs' or ''),
-                            outcable.pipelineoutputcable.dest,
-                            dataset.dataset_file.size,
-                            dataset.date_created,
-                            "../../dataset_view/{}".format(dataset.id),
-                            "../../dataset_download/{}".format(dataset.id)))
+            output = outcable.execrecord.execrecordouts.first()
+            size = "redacted"
+            date_created = "redacted"
+            view_url = ""
+            dl_url = ""
+            if output.symbolicdataset.has_data():
+                dataset = output.symbolicdataset.dataset
+                size = dataset.dataset_file.size
+                date_created = dataset.date_created
+                view_url = "../../dataset_view/{}".format(dataset.pk)
+                dl_url = "../../dataset_download/{}".format(dataset.pk)
+
+            outputs.append(((i == 0 and 'Run outputs' or ''), outcable.pipelineoutputcable.dest,
+                            size, date_created, view_url, dl_url))
         
     for runstep in run.runsteps_in_order:
-        if not runstep.has_log:
+        execlog = runstep.get_log()
+        if execlog is None:
             continue
-        execlog = runstep.log
         methodoutput = execlog.methodoutput
-        if methodoutput.output_log is not None:
+
+        if methodoutput.is_output_redacted():
+            outputs.append((runstep.pipelinestep, 'Standard out', "redacted", "redacted", "", ""))
+        else:
             try:
                 outputs.append((runstep.pipelinestep,
                                 'Standard out',
@@ -206,7 +216,9 @@ def view_results(request, id):
                                 "../../stdout_download/{}".format(methodoutput.id)))
             except ValueError:
                 pass
-        if methodoutput.error_log is not None:
+        if methodoutput.is_error_redacted():
+            outputs.append(("", "Standard error", "redacted", "redacted", "", ""))
+        else:
             try:
                 outputs.append(('',
                                 'Standard error',
@@ -218,18 +230,18 @@ def view_results(request, id):
                 pass
         if runstep.execrecord is not None:
             for output in runstep.execrecord.execrecordouts_in_order:
-                dataset = output.symbolicdataset.dataset
-                size = "NA"
-                date_created = "NA"
-                if dataset is not None:
+                size = "redacted"
+                date_created = "redacted"
+                view_url = ""
+                dl_url = ""
+                if output.symbolicdataset.has_data():
+                    dataset = output.symbolicdataset.dataset
                     size = dataset.dataset_file.size
                     date_created = dataset.date_created
-                outputs.append(('',
-                                output.generic_output,
-                                size,
-                                date_created,
-                                "../../dataset_view/{}".format(dataset.id),
-                                "../../dataset_download/{}".format(dataset.id)))
+                    view_url = "../../dataset_view/{}".format(dataset.pk)
+                    dl_url = "../../dataset_download/{}".format(dataset.pk)
+
+                outputs.append(('', output.generic_output, size, date_created, view_url, dl_url))
     context.update({"outputs": outputs})
     return HttpResponse(template.render(context))
 

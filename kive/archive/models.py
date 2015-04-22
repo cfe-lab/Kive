@@ -27,6 +27,18 @@ from constants import maxlengths
 import archive.signals
 
 
+@transaction.atomic
+def remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove):
+    for er in ERs_to_remove:
+        er.delete()
+
+    for sd in SDs_to_remove:
+        sd.delete()
+
+    for run in runs_to_remove:
+        run.delete()
+
+
 class update_field(object):
 
     def __init__(self, field):
@@ -292,12 +304,34 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def remove(self):
         """Remove this Run cleanly."""
-        # Call remove (don't leave it to a cascade) on all the components.
+        SDs_to_remove, ERs_to_remove, runs_to_remove = self.remove_list()
+        remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove)
+
+    def remove_list(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
+        """
+        Create a manifest of objects removed when this Run is removed.
+        """
+        if runs_already_marked is not None and self in runs_already_marked:
+            return SDs_already_marked, ERs_already_marked, runs_already_marked
+
+        SDs_already_marked = SDs_already_marked or set()
+        ERs_already_marked = ERs_already_marked or set()
+
+        if runs_already_marked is None:
+            runs_already_marked = {self}
+        else:
+            runs_already_marked.add(self)
+
         for rs in self.runsteps.all():
-            rs.remove()
+            SDs_already_marked, ERs_already_marked, runs_already_marked = rs.remove_list_h(
+                SDs_already_marked, ERs_already_marked, runs_already_marked
+            )
         for roc in self.runoutputcables.all():
-            roc.remove()
-        self.delete()
+            SDs_already_marked, ERs_already_marked, runs_already_marked = roc.remove_list_h(
+                SDs_already_marked, ERs_already_marked, runs_already_marked
+            )
+
+        return SDs_already_marked, ERs_already_marked, runs_already_marked
 
 
 class RunComponent(stopwatch.models.Stopwatch):
@@ -737,24 +771,33 @@ class RunComponent(stopwatch.models.Stopwatch):
                 return False
         return True
 
-    def remove(self):
+    def remove_list_h(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
         """
-        Remove this RunComponent cleanly.
+        Create a manifest of objects that will be removed by removing this RunComponent.
+        """
+        SDs_already_marked = SDs_already_marked or set()
+        ERs_already_marked = ERs_already_marked or set()
+        runs_already_marked = runs_already_marked or set()
 
-        This *does not* attempt to remove the parent Run.  If that's the goal then
-        one should directly remove that Run.
-        """
-        # If this RunComponent is the creator of an ExecRecord, then that ExecRecord will
-        # be deleted in the cascade (via the ExecLog).  If not but Datasets are generated here,
-        # we have to handle removal of the Dataset somehow.
         for ds in self.outputs.all():
-            ds.symbolicdataset.redact()
-        self.delete()
+            if ds.symbolicdataset not in SDs_already_marked:
+                SDs_already_marked, ERs_already_marked, runs_already_marked = ds.symbolicdataset.remove_list(
+                    SDs_already_marked, ERs_already_marked, runs_already_marked
+                )
+
+        return SDs_already_marked, ERs_already_marked, runs_already_marked
 
     @transaction.atomic
     def redact(self):
         self._redacted = True
         self.save(update_fields=["_redacted"])
+
+    def get_log(self):
+        if self.has_log:
+            return self.log
+        if self.execrecord is not None:
+            return self.execrecord.generator
+        return None
 
 
 @python_2_unicode_compatible
@@ -1287,7 +1330,7 @@ class RunStep(RunComponent):
         return result
 
     @transaction.atomic
-    def get_suitable_ER(self, input_SD):
+    def get_suitable_ER(self, input_SDs):
         """
         Retrieve a suitable ExecRecord for this RunStep.
 
@@ -1299,7 +1342,7 @@ class RunStep(RunComponent):
         Return a tuple containing the ExecRecord along with its summary (as
         produced by check_ER_usable), or None if no appropriate ExecRecord is found.
         """
-        execrecords = self.find_compatible_ERs(input_SD)
+        execrecords = self.find_compatible_ERs(input_SDs)
         failed = []
         fully_reusable = []
         other = []
@@ -2444,6 +2487,14 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
         return False
 
+    def redact(self):
+        try:
+            self.methodoutput.redact_error_log()
+            self.methodoutput.redact_output_log()
+            self.methodoutput.redact_return_code()
+        except MethodOutput.DoesNotExist:
+            pass
+
 
 class MethodOutput(models.Model):
     """
@@ -2495,18 +2546,27 @@ class MethodOutput(models.Model):
     def is_redacted(self):
         return self._output_redacted or self._error_redacted or self._code_redacted
 
+    def is_output_redacted(self):
+        return self._output_redacted
+
+    def is_error_redacted(self):
+        return self._error_redacted
+
     def redact_output_log(self):
         self.output_log.delete()
+        self._output_redacted = True
         self.save()
         self.execlog.record.redact()
 
     def redact_error_log(self):
         self.error_log.delete()
+        self._error_redacted = True
         self.save()
         self.execlog.record.redact()
 
     def redact_return_code(self):
         self.return_code = None
+        self._code_redacted = True
         self.save()
         self.execlog.record.redact()
 

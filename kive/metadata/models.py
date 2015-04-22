@@ -6,7 +6,7 @@ paraphernalia, CompoundDatatypes, etc.
 """
 from __future__ import unicode_literals
 
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.utils.encoding import python_2_unicode_compatible
@@ -1111,16 +1111,30 @@ class Datatype(AccessControl):
 
         return failing_cells
 
+    @transaction.atomic
     def remove(self, rm_verif_method=True):
         """
         Remove this Datatype and anything tied to it from the system.
         """
-        self.prototype.remove()
+        builtin_pks = {
+            datatypes.STR_PK,
+            datatypes.BOOL_PK,
+            datatypes.FLOAT_PK,
+            datatypes.INT_PK,
+            datatypes.NATURALNUMBER_PK
+        }
+        if self.pk in builtin_pks:
+            self.logger.warning("Cannot remove builtin datatypes.")
+            return
+
+        if self.prototype is not None:
+            self.prototype.remove()
         for descendant_dt in self.restricted_by.all():
             descendant_dt.remove()
 
-        for cdtm in self.CDTMs.all():
-            cdtm.compounddatatype.remove()
+        cdts_affected = self.CDTMs.all().values("compounddatatype")
+        for cdt in CompoundDatatype.objects.filter(pk__in=cdts_affected):
+            cdt.remove()
 
         if (rm_verif_method and self.has_custom_constraint() and
                 self.custom_constraint.verification_method.user == self.user):
@@ -1613,6 +1627,7 @@ class CompoundDatatype(AccessControl):
         """
         return 0
 
+    @transaction.atomic
     def remove(self):
         """
         Handle removal of this CDT from the database, including all records that tied to it.
@@ -1622,6 +1637,12 @@ class CompoundDatatype(AccessControl):
             ds.symbolicdataset.redact(remove=True)
 
         # Remove any Transformations that had this CDT.
-        for xput_structure in self.xput_structures.all():
-            xput_structure.transf_xput.definite.transformation.definite.remove()
+        transfs_to_remove = set((xs.transf_xput.definite.transformation.definite
+                                 for xs in self.xput_structures.all()))
+        for transf in transfs_to_remove:
+            try:
+                transf.remove()
+            except ObjectDoesNotExist:
+                pass
 
+        self.delete()

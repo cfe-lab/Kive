@@ -24,10 +24,28 @@
         <tr>
             <td>{{ step_name }}</td>
             <td>{{ output_name }}</td>
-            <td>{{ size|filesizeformat }}</td>
-            <td>{{ date }}</td>
-            <td><a href="{{ view_url }}">View</a></td>
-            <td><a href="{{ down_url }}">Download</a></td>
+            <td>
+                {% if size != "redacted" %}
+                {{ size|filesizeformat }}
+                {% endif %}
+            </td>
+            <td>
+                {% if date != "redacted" %}
+                {{ date }}
+                {% else %}
+                    <em>redacted</em>
+                {% endif %}
+            </td>
+            <td>
+                {%  if view_url != "" %}
+                <a href="{{ view_url }}">View</a>
+                {% endif %}
+            </td>
+            <td>
+                {% if down_url != "" %}
+                <a href="{{ down_url }}">Download</a>
+                {% endif %}
+            </td>
         </tr>
     {% endfor %}
     </tbody>
