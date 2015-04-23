@@ -3,11 +3,10 @@ method.views
 """
 
 from django.db import transaction
-from django.core.context_processors import csrf
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, Context, RequestContext
+from django.template import loader, RequestContext
 
 from datetime import datetime
 
@@ -702,6 +701,7 @@ def method_revise(request, id):
                     'input_forms': input_form_tuples,
                     'output_forms': output_form_tuples,
                     'family': family,
+                    'family_form': family_form,
                     'parent': parent_method
                 })
             return HttpResponse(t.render(c))
@@ -717,6 +717,7 @@ def method_revise(request, id):
 
     else:
         # initialize forms with values of parent Method
+        family_form = MethodFamilyForm(request.POST)
         method_revise_form = MethodReviseForm(
             initial={
                 'revision_desc': parent_method.revision_desc,
@@ -757,11 +758,11 @@ def method_revise(request, id):
     method_revise_form.fields['revisions'].widget.choices = [
         (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
     ]
-    c = Context({'coderesource': this_code_resource,
-                 'method_revise_form': method_revise_form,
-                 'input_forms': input_form_tuples,
-                 'output_forms': output_form_tuples,
-                 'family': family,
-                 'parent': parent_method})
-    c.update(csrf(request))
+    c.update({'coderesource': this_code_resource,
+              'method_revise_form': method_revise_form,
+              'input_forms': input_form_tuples,
+              'output_forms': output_form_tuples,
+              'family': family,
+              'family_form': family_form,
+              'parent': parent_method})
     return HttpResponse(t.render(c))

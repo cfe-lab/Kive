@@ -4,22 +4,30 @@ Shipyard archive application unit tests.
 
 import os
 import re
+import json
 import tempfile
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 
+from rest_framework.test import APIRequestFactory, force_authenticate
+
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
-from librarian.models import ExecRecord
+from librarian.models import ExecRecord, SymbolicDataset
+
 import librarian.tests
 import metadata.tests
+from method.models import Method
+from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
 import sandbox.testing_utils as tools
+import archive.views
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
@@ -156,6 +164,56 @@ class ArchiveTestCaseHelpers:
         Helper function to step through creation of a Run. bp is a
         breakpoint - these are defined throughout (see the code).
         """
+        if not hasattr(self, 'myUser'):
+            self.myUser = User.objects.get(username='john')
+            self.mB = Method.objects.get(revision_name="mB_name")
+            self.pD = Pipeline.objects.get(revision_name="pD_name")
+            self.pE = Pipeline.objects.get(revision_name="pE_name")
+            self.B1_in = self.mB.inputs.get(dataset_name="B1_in")
+            self.B2_in = self.mB.inputs.get(dataset_name="B2_in")
+            self.D1_in = self.pD.inputs.get(dataset_name="D1_in")
+            self.D2_in = self.pD.inputs.get(dataset_name="D2_in")
+            self.step_D1 = PipelineStep.objects.get(
+                pipeline=self.pD,
+                step_num=1)
+            self.step_E1 = PipelineStep.objects.get(
+                pipeline=self.pE,
+                step_num=1)
+            self.step_E2 = PipelineStep.objects.get(
+                pipeline=self.pE,
+                step_num=2)
+            self.step_E3 = PipelineStep.objects.get(
+                pipeline=self.pE,
+                step_num=3)
+            self.pE_run = Run.objects.get(pipeline=self.pE,
+                                          name='pE_run')
+            self.raw_symDS = SymbolicDataset.objects.get(dataset__name='raw_DS')
+            self.singlet_symDS = SymbolicDataset.objects.get(
+                dataset__dataset_file__endswith='singlet_cdt_large.csv')
+            self.doublet_symDS = SymbolicDataset.objects.get(dataset__name='doublet')
+            self.doublet_DS = self.doublet_symDS.dataset
+            self.triplet_symDS = SymbolicDataset.objects.get(
+                dataset__dataset_file__endswith='step_0_triplet.csv')
+            self.C1_in_symDS = SymbolicDataset.objects.get(dataset__name='C1_in_triplet')
+            self.C1_in_DS = self.C1_in_symDS.dataset
+            self.C1_out_symDS = SymbolicDataset.objects.get(
+                dataset__dataset_file__endswith='step_0_singlet.csv')
+            self.C2_in_symDS = SymbolicDataset.objects.get(
+                dataset__dataset_file__endswith='E11_32_output.csv')
+            self.C2_out_symDS = SymbolicDataset.objects.get(dataset__name='C2_out')
+            self.C3_out_symDS = SymbolicDataset.objects.get(dataset__name='C3_out')
+            self.E1_out_symDS = SymbolicDataset.objects.get(dataset__name='E1_out')
+            self.E1_out_DS = self.E1_out_symDS.dataset
+            self.D1_in_symDS = SymbolicDataset.objects.get(
+                structure__compounddatatype=self.doublet_symDS.structure.compounddatatype,
+                structure__num_rows=10)
+            self.D01_11 = self.step_D1.cables_in.get(dest__dataset_idx=1)
+            self.D02_12 = self.step_D1.cables_in.get(dest__dataset_idx=2)
+            self.E01_21 = self.step_E2.cables_in.get(dest__dataset_idx=1)
+            self.E02_22 = self.step_E2.cables_in.get(dest__dataset_idx=2)
+            self.E21_31 = self.step_E3.cables_in.get(dest__dataset_idx=1)
+            self.E11_32 = self.step_E3.cables_in.get(dest__dataset_idx=2)
+            
         # Changed May 14, 2014 to add CCLs/ICLs where appropriate.
         # Empty Runs.
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
@@ -2899,7 +2957,8 @@ class ExecLogTests(ArchiveTestCase):
         self.assertFalse(execlog.is_successful())
 
 
-class GetCoordinatesTests(ArchiveTestCase):
+class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
+    fixtures = ['archive_test_environment']
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
 
     def test_get_coordinates_top_level_run(self):
@@ -2915,26 +2974,6 @@ class GetCoordinatesTests(ArchiveTestCase):
         # pD_run is the second step of its containing top-level run.
         self.assertEquals(self.pD_run.get_coordinates(), (2,))
         self.assertEquals(self.pD_run.get_coordinates(), self.step_E2_RS.get_coordinates())
-
-    def test_get_coordinates_nested_runs(self):
-        """Test get_coordinates for a deeper-nested sub-run."""
-        self._setup_deep_nested_run(self.myUser)
-
-        top_level_run = Run.objects.get(pipeline__family__name="p_top")
-
-        self.assertEquals(top_level_run.get_coordinates(), ())
-
-        # Check all second-level and third-level runs.
-        for step in top_level_run.runsteps.all():
-            first_lvl_step_num = step.pipelinestep.step_num
-            subrun = step.child_run
-
-            self.assertEquals(subrun.get_coordinates(), (first_lvl_step_num,))
-
-            for substep in subrun.runsteps.all():
-                second_lvl_step_num = substep.pipelinestep.step_num
-                basic_run = substep.child_run
-                self.assertEqual(basic_run.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
     def test_get_coordinates_top_level_step(self):
         """Coordinates of a top-level step should be a one-entry tuple with its step number as the entry."""
@@ -2956,28 +2995,6 @@ class GetCoordinatesTests(ArchiveTestCase):
         # step_D1_RS (as defined by Eric) is at position (2,1).
         self.assertEquals(self.step_D1_RS.get_coordinates(), (2,1))
 
-    def test_get_coordinates_nested_runstep(self):
-        """Test get_coordinates for deeper-nested RunSteps."""
-        self._setup_deep_nested_run(self.myUser)
-
-        top_level_run = Run.objects.get(pipeline__family__name="p_top")
-
-        # Check all RunSteps of the top-level run and also their child and grandchild runs.
-        for step in top_level_run.runsteps.all():
-            first_lvl_step_num = step.pipelinestep.step_num
-            self.assertEquals(step.get_coordinates(), (first_lvl_step_num,))
-
-            subrun = step.child_run
-            for substep in subrun.runsteps.all():
-                second_lvl_step_num = substep.pipelinestep.step_num
-                self.assertEqual(substep.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
-
-                basic_run = substep.child_run
-                for basic_step in basic_run.runsteps.all():
-                    third_lvl_step_num = basic_step.pipelinestep.step_num
-                    self.assertEqual(basic_step.get_coordinates(),
-                                     (first_lvl_step_num, second_lvl_step_num, third_lvl_step_num))
-
     def test_get_coordinates_top_level_rsic(self):
         """Coordinates of top-level RSICs should be one-entry tuples matching their parent RSs."""
         self.step_through_run_creation("outcables_done")
@@ -2998,10 +3015,66 @@ class GetCoordinatesTests(ArchiveTestCase):
             self.assertEquals(rsic.get_coordinates(), (2,1))
             self.assertEquals(rsic.get_coordinates(), self.step_D1_RS.get_coordinates())
 
+    def test_get_coordinates_top_level_roc(self):
+        """Coordinates of top-level ROCs should be empty tuples."""
+        self.step_through_run_creation("outcables_done")
+
+        for roc in RunOutputCable.objects.all():
+            if roc.run.parent_runstep == None:
+                # Examine the cable.
+                self.assertEquals(roc.get_coordinates(), ())
+
+    def test_get_coordinates_subrun_roc(self):
+        """Coordinates of a subrun ROC should be the same as its parent run."""
+        self.step_through_run_creation("outcables_done")
+
+        # The second step is a sub-run.
+        for roc in self.pD_run.runoutputcables.all():
+            self.assertEquals(roc.get_coordinates(), (2,))
+
+class GetCoordinatesOnDeepNestedRunTests(TestCase):
+    fixtures = ['deep_nested_run']
+
+    def test_get_coordinates_nested_runs(self):
+        """Test get_coordinates for a deeper-nested sub-run."""
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        self.assertEquals(top_level_run.get_coordinates(), ())
+
+        # Check all second-level and third-level runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+            subrun = step.child_run
+
+            self.assertEquals(subrun.get_coordinates(), (first_lvl_step_num,))
+
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+                basic_run = substep.child_run
+                self.assertEqual(basic_run.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
+
+    def test_get_coordinates_nested_runstep(self):
+        """Test get_coordinates for deeper-nested RunSteps."""
+        top_level_run = Run.objects.get(pipeline__family__name="p_top")
+
+        # Check all RunSteps of the top-level run and also their child and grandchild runs.
+        for step in top_level_run.runsteps.all():
+            first_lvl_step_num = step.pipelinestep.step_num
+            self.assertEquals(step.get_coordinates(), (first_lvl_step_num,))
+
+            subrun = step.child_run
+            for substep in subrun.runsteps.all():
+                second_lvl_step_num = substep.pipelinestep.step_num
+                self.assertEqual(substep.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
+
+                basic_run = substep.child_run
+                for basic_step in basic_run.runsteps.all():
+                    third_lvl_step_num = basic_step.pipelinestep.step_num
+                    self.assertEqual(basic_step.get_coordinates(),
+                                     (first_lvl_step_num, second_lvl_step_num, third_lvl_step_num))
+
     def test_get_coordinates_nested_rsic(self):
         """Test get_coordinates for deeper-nested RSICs."""
-        self._setup_deep_nested_run(self.myUser)
-
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
         # Check all RunSteps of the top-level run and also their child and grandchild runs.
@@ -3026,26 +3099,8 @@ class GetCoordinatesTests(ArchiveTestCase):
                         self.assertEqual(basic_rsic.get_coordinates(),
                                          (first_lvl_step_num, second_lvl_step_num, third_lvl_step_num))
 
-    def test_get_coordinates_top_level_roc(self):
-        """Coordinates of top-level ROCs should be empty tuples."""
-        self.step_through_run_creation("outcables_done")
-
-        for roc in RunOutputCable.objects.all():
-            if roc.run.parent_runstep == None:
-                # Examine the cable.
-                self.assertEquals(roc.get_coordinates(), ())
-
-    def test_get_coordinates_subrun_roc(self):
-        """Coordinates of a subrun ROC should be the same as its parent run."""
-        self.step_through_run_creation("outcables_done")
-
-        # The second step is a sub-run.
-        for roc in self.pD_run.runoutputcables.all():
-            self.assertEquals(roc.get_coordinates(), (2,))
-
     def test_get_coordinates_nested_roc(self):
         """Test get_coordinates for deeper-nested sub-ROCs."""
-        self._setup_deep_nested_run(self.myUser)
 
         top_level_run = Run.objects.get(pipeline__family__name="p_top")
 
@@ -3668,7 +3723,9 @@ echo
         self.assertTrue(self.pE_run.successful_execution())
 
 
-class TopLevelRunTests(ArchiveTestCase):
+class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
+    fixtures = ['archive_test_environment']
+    
     def test_usual_run(self):
         """Test on all elements of a simulated run."""
         self.step_through_run_creation("outcables_done")
@@ -3690,9 +3747,13 @@ class TopLevelRunTests(ArchiveTestCase):
             for roc in curr_run.runoutputcables.all():
                 self.assertEquals(self.pE_run, roc.top_level_run)
 
+class TopLevelRunOnDeepNestedRunTests(TestCase):
+    fixtures = ['deep_nested_run']
+
     def test_deep_nested_run(self):
         """Test on all elements of a deep-nested run."""
-        self._setup_deep_nested_run(self.myUser)
+        self.deep_nested_run = Run.objects.get(
+            pipeline__family__name='p_top')
 
         # Recurse down all elements of this run and make sure that they all have
         # top_level_run equal to self.deep_nested_run.
@@ -3759,3 +3820,101 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
+
+
+class DatasetApiTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.kive_user = User.objects.all()[0]
+
+    def tearDown(self):
+        for d in Dataset.objects.all():
+            d.dataset_file.delete()
+
+    def test_dataset_index(self):
+        request = self.factory.get('/api/datasets/')
+        response = archive.views.api_dataset_home(request).render()
+
+        self.assertEquals(
+            json.loads(response.content)['detail'],
+            "Authentication credentials were not provided.")
+
+        force_authenticate(request, user=self.kive_user)
+
+        response = archive.views.api_dataset_home(request).render()
+        self.assertNotIn('detail', json.loads(response.content))
+
+    def test_dataset_list(self, expected_pages=0):
+        request = self.factory.get('/api/datasets/get-datasets/')
+        response = archive.views.api_get_datasets(request).render()
+
+        self.assertEquals(
+            json.loads(response.content)['detail'],
+            "Authentication credentials were not provided.")
+
+        force_authenticate(request, user=self.kive_user)
+        resp = json.loads(archive.views.api_get_datasets(request).render().content)
+
+        if expected_pages == 0:
+            self.assertEquals(resp['next'], None)
+        else:
+            def goto_nextpage(next, page):
+                if next is None:
+                    return 1
+
+                next_request = self.factory.get(next)
+                force_authenticate(next_request, user=self.kive_user)
+                res = json.loads(archive.views.api_get_datasets(next_request, page + 1).render().content)
+
+                return goto_nextpage(res['next'], page + 1) + 1
+
+            self.assertNotEquals(resp['next'], None)
+            pages = goto_nextpage(resp['next'], 0)
+
+            self.assertEquals(pages, expected_pages)
+
+    def test_dataset_add(self):
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(100)))
+            f.write(data)
+            for _ in xrange(105):
+                f.seek(0)
+                request = self.factory.post('/api/datasets/add-dataset/', {
+                    'name': "My cool file %d" % _,
+                    'description': 'A really cool file',
+                    'compound_datatype': '__raw__',
+                    'dataset_file': f
+                })
+                response = archive.views.api_dataset_add(request).render()
+
+                self.assertEquals(
+                    json.loads(response.content)['detail'],
+                    "Authentication credentials were not provided.")
+
+                force_authenticate(request, user=self.kive_user)
+                resp = json.loads(archive.views.api_dataset_add(request).render().content)
+
+                self.assertEquals(resp['dataset']['name'], "My cool file %d" % _)
+
+            f.close()
+            self.test_dataset_list(expected_pages=2)
+
+    def test_get_cdt(self):
+        request = self.factory.get('/api/datasets/get-datatypes/')
+        response = archive.views.api_get_cdts(request).render()
+
+        self.assertEquals(
+            json.loads(response.content)['detail'],
+            "Authentication credentials were not provided.")
+
+        force_authenticate(request, user=self.kive_user)
+
+        response = archive.views.api_get_cdts(request).render()
+        result = json.loads(response.content)
+
+        self.assertIn('compoundtypes', result)
+        result = result['compoundtypes']
+
+        self.assertEquals(len(result), 4)
+        self.assertEquals(map(lambda c: c['id'], result), range(1, 5))
+        self.assertEquals(map(lambda c: len(c['representation']) > 0, result), [True]*4)

@@ -2,6 +2,14 @@
 
 {% block title %}Analysis{% endblock %}
 
+{% block javascript %}
+    <style>
+        .error-msg {
+            color:red;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
 
 <a href="../../runs" rel="prev">Back to runs</a>
@@ -20,10 +28,10 @@
         </tr>
     </thead>
     <tbody>
-    {% for step_name, output_name, size, date, view_url, down_url in outputs %}
+    {% for step_name, output_name, size, date, view_url, down_url, is_ok in outputs %}
         <tr>
             <td>{{ step_name }}</td>
-            <td>{{ output_name }}</td>
+            <td>{{ output_name }} {% if not is_ok %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
             <td>
                 {% if size != "redacted" %}
                 {{ size|filesizeformat }}
@@ -49,5 +57,5 @@
         </tr>
     {% endfor %}
     </tbody>
-
+</table>
 {% endblock %}

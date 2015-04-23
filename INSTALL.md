@@ -12,10 +12,10 @@ Prerequisites
 5. numpy
 6. PostgreSQL
 7. psycopg (Python library for interfacing with PostgreSQL)
+8. djangorestframework
 
-Optionally, if you would like to create UML diagrams of the backend models:
-8. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
-9. pygraphviz
+9. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
+10. pygraphviz
 
 It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
 
@@ -27,8 +27,10 @@ If you are already running Django 1.6, installing should be as painless as runni
     pip install Django==1.7.5
 
 (substitute the appropriate version number if you wish to use a different version -- a newer one, for example).  You will likely need to run this using `sudo` unless you only installed Django locally and not
-system-wide.  Also, many systems have multiple Python installations, so make sure that 
-`pip` is using the correct one.
+system-wide.  Also, many systems have multiple Python installations, so make sure that
+`pip` is using the correct one. Django REST Framework can also be installed via
+
+    pip install djangorestframework
 
 Instructions for downloading and installing `django-extensions` may be found [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
 
@@ -167,7 +169,7 @@ of the commands in the following:
 
     createdb kive
 
-Next, create a user (or "role") for **kive** to use when accessing the
+Next, create a database user (or "role") for **kive** to use when accessing the
 database, and follow the prompts (the `-P` allows you to specify a password):
 
     createuser -P kive
@@ -197,7 +199,7 @@ configuration file. Replace 9.3 with whichever version you have.
     # Add the following line before the default for user postgres or all
     local   all             kive                                md5
     # Then save the file and reload the PostgreSQL configuration
-    /etc/init.d/postgresql reload
+    sudo /etc/init.d/postgresql reload
 
 To test that the `kive` user can connect to the `kive` database, connect
 with `psql` and then exit.
@@ -206,11 +208,43 @@ with `psql` and then exit.
     \q
 
 
+Settings
+--------
+Since **kive** is a Django project, the majority of the installation
+procedure follows the standard instructions for Django.  The first thing you
+need to do is to make a copy of `/kive/settings_default.py` called
+`settings.py` (remember, all paths are relative to `/kive` so we mean
+`/kive/kive/settings_default.py`).  This is a standard step in the
+installation of a Django project where you configure project settings.  Within
+the `DATABASES['default']` dictionary, modify the respective values to indicate
+the type, location, and access credentials of your database.  For example, using
+postgres as your database engine, you would specify
+`'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name
+of the database Kive is to use under the key `NAME` (e.g. `'kive'`).
+This is a database that must be created by an administrator prior to using
+Kive.
+
+Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
+working files for the server and any uploaded files. Create the directory if it
+doesn't already exist.
+
+You may also wish to modify
+the `TIME_ZONE` setting to your region, although this localization is not
+strictly necessary.
+
+Another configuration file is `hostfile` in the same folder as `settings.py`.
+Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
+you want to launch worker processes on multiple hosts, add a line for each host.
+Options are described in the [Open MPI FAQ][mpifaq].
+
+[mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+
 Creating database tables
 ------------------------
 Having created the database, we must now create the tables that will be used by
 Kive.  This is handled by the `migrate` command to the `manage.py` script,
 which follows instructions created by the developers on how to lay out the tables:
+
     ./manage.py migrate
 
 Should you ever need to completely remove the database and start over, you can run
@@ -256,36 +290,6 @@ This is similar to the incantation used to completely remove the `kive` database
 but simpler because we are only trying to get rid of the database and do not need to
 recreate or reinitialize anything.
 
-Settings
---------
-Since **kive** is a Django project, the majority of the installation
-procedure follows the standard instructions for Django.  The first thing you
-need to do is to make a copy of `/kive/settings_default.py` called
-`settings.py` (remember, all paths are relative to `/kive` so we mean
-`/kive/kive/settings_default.py`).  This is a standard step in the
-installation of a Django project where you configure project settings.  Within
-the `DATABASES['default']` dictionary, modify the respective values to indicate
-the type, location, and access credentials of your database.  For example, using
-postgres as your database engine, you would specify
-`'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name
-of the database Kive is to use under the key `NAME` (e.g. `'kive'`).
-This is a database that must be created by an administrator prior to using
-Kive.
-
-Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
-working files for the server and any uploaded files. 
-
-You may also wish to modify
-the `TIME_ZONE` setting to your region, although this localization is not
-strictly necessary.
-
-Another configuration file is `hostfile` in the same folder as `settings.py`.
-Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
-you want to launch worker processes on multiple hosts, add a line for each host.
-Options are described in the [Open MPI FAQ][mpifaq].
-
-[mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
-
 Initialize the system
 ---------------------
 The following instructions will initialize your system with a clean instance.
@@ -307,23 +311,12 @@ code on a developer workstation.
     `converter_pipeline`.  `demo` refers to a set of fixture files that populate
     the database with two pipelines that were used in the development of Kive
     and for demonstrating the software.
-3. Create a Kive user account.  Open a Django shell session with the command:
-
-        ./manage.py shell
-
-    At the prompt enter the following lines:
-
-        from django.contrib.auth.models import User
-        User.objects.create_user('admin', 'admin@domain.com', 'password')
-
-    The arguments of `create_user()` are the user name, e-mail address, and
-    password.
-4. You are now ready to run a local Django webserver:
+3. You are now ready to run a local Django webserver:
 
         python manage.py runserver
 
-5. Navigate to `localhost:8000` in your web browser!
-6. To launch a fleet manager and workers, you need to run the following command
+4. Navigate to `localhost:8000` in your web browser!
+5. To launch a fleet manager and workers, you need to run the following command
     and replace X with the number of workers you want:
 
     python manage.py runfleet --workers X

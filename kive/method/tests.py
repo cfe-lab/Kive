@@ -4,7 +4,6 @@ Unit tests for Shipyard method models.
 
 import filecmp
 import hashlib
-import os
 import os.path
 import re
 import shutil
@@ -16,9 +15,7 @@ from django.core.files import File
 from django.test import TestCase, TransactionTestCase
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.contrib.auth.management import create_permissions
 from django.contrib.contenttypes.management import update_all_contenttypes
-from django.apps import apps as django_apps
 
 from constants import datatypes
 from metadata.models import CompoundDatatype, Datatype, everyone_group
@@ -49,7 +46,6 @@ def get_open_fds():
     Warning: will only work on UNIX-like operating systems.
     """
     import subprocess
-    import os
     pid = os.getpid()
     procs = subprocess.check_output(
         [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
@@ -610,7 +606,7 @@ class FileAccessTests(TransactionTestCase):
                 user=self.user_randy)
 
             fd_count("!access->close->save")
-            foo = test_crr.content_file.read()
+            test_crr.content_file.read()
             fd_count("access-!>close->save")
         fd_count("access->close-!>save")
         self.assertRaises(ValueError, test_crr.save)
@@ -2826,7 +2822,7 @@ with open(outfile, "wb") as f:
                                                           self.user_rob)
         self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
                                            compounddatatype=self.increment_in_1_cdt)
-        step1 = self.test_nonreusable.steps.create(
+        _step1 = self.test_nonreusable.steps.create(
             step_num=1,
             transformation=self.rng_method,
             name="source of randomness"
