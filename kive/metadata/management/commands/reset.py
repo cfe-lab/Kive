@@ -1,8 +1,6 @@
 from optparse import make_option
 import os
 import shutil
-import subprocess
-import sys
 
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
@@ -17,8 +15,6 @@ class Command(BaseCommand):
         make_option('--load', '-l', help="fixture name to load"), )
     
     def handle(self, *args, **options):
-        python = sys.executable
-        manage_script = sys.argv[0]
         fixture = options['load']
         
         targets = ["CodeResources",
@@ -31,8 +27,8 @@ class Command(BaseCommand):
             target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
             if os.path.isdir(target_path):
                 shutil.rmtree(target_path)
-                
-        subprocess.check_call([python, manage_script, "flush", "--noinput"])
+        
+        call_command("flush", interactive=False)
         call_command("migrate")
         # flush truncates all tables, so we need to re-load this stuff.
         call_command("loaddata", "initial_groups")
