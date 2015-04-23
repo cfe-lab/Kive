@@ -8,7 +8,6 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from constants import datatypes
 import os.path
 import re
 import shutil
@@ -23,10 +22,7 @@ from librarian.models import SymbolicDataset
 from archive.models import Dataset, ExecLog
 import method.tests
 import sandbox.testing_utils as tools
-
-from django.core import serializers
-
-from constants import datatypes, groups
+from constants import datatypes
 
 samplecode_path = "../samplecode"
 
@@ -3441,8 +3437,9 @@ class CustomWiringTests(PipelineTestCase):
         self.assertEquals(wire1.clean(), None)
         self.assertEquals(my_cable1.clean(), None)
 
+        # It might complain about either connection, so accept either.
         self.assertRaisesRegexp(ValidationError,
-            'Destination member "string: (b|c)" has no wires leading to it',
+            'Destination member "(b: string|c: string)" has no wires leading to it',
             my_cable1.clean_and_completely_wired)
 
         # Here, we wire the remaining 2 CDT members
@@ -3523,8 +3520,8 @@ class CustomWiringTests(PipelineTestCase):
         self.assertIsNone(wire1.clean())
         self.assertIsNone(wire2.clean())
 
-        errorMessage = ('The datatype of the source pin "DNANucSeq: col_1" is incompatible with the datatype of the '
-                        'destination pin "Not compatible: col_3"')
+        errorMessage = ('The datatype of the source pin "col_1: DNANucSeq" is incompatible with the datatype of the '
+                        'destination pin "col_3: Not compatible"')
         
         self.assertRaisesRegexp(ValidationError, errorMessage, wire3_bad.clean)
         self.assertRaisesRegexp(ValidationError, errorMessage, my_cable1.clean)
@@ -3839,7 +3836,7 @@ class PipelineStepInputCable_tests(PipelineTestCase):
         self.assertEquals(pipeline_cable.clean(), None)
 
         # FIXME: Should pipelineStep.clean invoke pipeline_cable.clean_and_completely_quenched() ?
-        errorMessage = re.escape('Destination member "string: b" has no wires leading to it')
+        errorMessage = re.escape('Destination member "b: string" has no wires leading to it')
         self.assertRaisesRegexp(ValidationError,errorMessage,pipeline_cable.clean_and_completely_wired)
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.clean)
         self.assertRaisesRegexp(ValidationError,errorMessage,pipelineStep.complete_clean)
@@ -3915,8 +3912,8 @@ class CustomOutputWiringTests(PipelineTestCase):
         badwire = outcable1.custom_wires.create(source_pin=self.doublet_cdt.members.first(),
                                                    dest_pin=self.triplet_cdt.members.first())
 
-        errorMessage = re.escape('Source pin "string: x" does not come from compounddatatype '
-                                 '"(string: a, string: b, string: c)"')
+        errorMessage = re.escape('Source pin "x: string" does not come from compounddatatype '
+                                 '"(a: string, b: string, c: string)"')
 
         self.assertRaisesRegexp(ValidationError, errorMessage, badwire.clean)
         self.assertRaisesRegexp(ValidationError, errorMessage, outcable1.clean)

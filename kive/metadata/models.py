@@ -1455,6 +1455,18 @@ class CompoundDatatype(AccessControl):
     def short_name(self):
         return self._format(limit=4)
 
+    @classmethod
+    def choices(cls, user):
+        """ Load choices for a form field.
+        
+        @param user: A valid user to filter which compound datatypes are visible.
+        @return: [(id, short_name)]
+        """
+        choices = ((x.id, x.short_name)
+                   for x in CompoundDatatype.filter_by_user(user))
+        
+        return sorted(choices, key=lambda x: (x[1], x[0])) # short_name, then id
+    
     # clean() is executed prior to save() to perform model validation
     def clean(self):
         """

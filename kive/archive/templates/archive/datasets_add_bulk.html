@@ -147,7 +147,8 @@
         </fieldset>
         <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
 
-    <!-- This code may become useful again if we get to implementing a progress bar.
+    {% comment "This code may become useful again if we get to implementing a progress bar." %}
+        <!-- 
         <div class="bulk_dataset_table">
             <table id="uploadProgressTable">
                 <thead>
@@ -174,7 +175,8 @@
                 </tbody>
             </table>
         </div>
-    -->
+         -->
+    {% endcomment %}
 
         <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
         <div id="loading" class="loading_container">
