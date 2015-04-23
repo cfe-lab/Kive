@@ -9,7 +9,6 @@ from metadata.models import CompoundDatatype
 from metadata.forms import AccessControlForm
 
 import logging
-from operator import itemgetter
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +244,7 @@ class XputStructureForm (forms.Form):
         else:
             more_choices = [(x.id, x.short_name) for x in CompoundDatatype.filter_by_user(user)]
         
-        more_choices.sort(key=itemgetter(1))
+        more_choices.sort(key=lambda x: (x[1], x[0])) # short_name, then id
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 
 

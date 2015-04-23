@@ -51,7 +51,9 @@ def _prepare_pipeline_selection_forms(user):
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
     template = loader.get_template("sandbox/choose_pipeline.html")
-    context = RequestContext(request, {"pipeline_forms": _prepare_pipeline_selection_forms(request.user)})
+    context = RequestContext(request, {
+        "pipeline_forms": _prepare_pipeline_selection_forms(request.user),
+        "error_msg": ""})
     return HttpResponse(template.render(context))
 
 
@@ -120,7 +122,8 @@ def choose_inputs(request):
     rsf = RunSubmissionForm({"pipeline": pipeline_qs.first()}, pipeline_qs=pipeline_qs)
 
     context.update({"input_data": _assemble_inputs(pipeline_qs.first(), request.user),
-                    "run_submission_form": rsf})
+                    "run_submission_form": rsf,
+                    "input_error_msg": ""})
     return HttpResponse(template.render(context))
 
 

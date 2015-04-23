@@ -171,7 +171,8 @@ def compound_datatypes(request):
     Render list of all CompoundDatatypes
     """
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
-    compound_datatypes = sorted(compound_datatypes, key=str)
+    compound_datatypes = sorted(compound_datatypes,
+                                key=lambda cdt: (cdt.short_name, cdt.pk))
     t = loader.get_template('metadata/compound_datatypes.html')
     c = RequestContext(request, {'compound_datatypes': compound_datatypes})
     return HttpResponse(t.render(c))
