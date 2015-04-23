@@ -239,12 +239,7 @@ class XputStructureForm (forms.Form):
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(XputStructureForm, self).__init__(data=data, *args, **kwargs)
 
-        if user is None:
-            more_choices = [(x.id, x.short_name) for x in CompoundDatatype.objects.all()]
-        else:
-            more_choices = [(x.id, x.short_name) for x in CompoundDatatype.filter_by_user(user)]
-        
-        more_choices.sort(key=lambda x: (x[1], x[0])) # short_name, then id
+        more_choices = CompoundDatatype.choices(user)
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 
 
