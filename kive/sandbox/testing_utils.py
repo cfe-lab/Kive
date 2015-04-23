@@ -364,26 +364,28 @@ def make_crisscross_cable(cable):
                               dest_pin=dest_cdt.members.get(column_idx=1))
 
 
-def new_datatype(dtname, dtdesc, kivetype, user):
+def new_datatype(dtname, dtdesc, kivetype, user, grant_everyone_access=True):
     """
     Helper function to create a new datatype.
     """
     datatype = Datatype(name=dtname, description=dtdesc, user=user)
     datatype.save()
     datatype.restricts.add(Datatype.objects.get(pk=kivetype.pk))
-    datatype.grant_everyone_access()
+    if grant_everyone_access:
+        datatype.grant_everyone_access()
     # datatype.complete_clean()
     return datatype
 
 
-def make_first_revision(resname, resdesc, resfn, contents, user):
+def make_first_revision(resname, resdesc, resfn, contents, user, grant_everyone_access=True):
     """
     Helper function to make a CodeResource and the first version.
     """
     resource = CodeResource(name=resname, description=resdesc, filename=resfn, user=user)
     # resource.clean()
     resource.save()
-    resource.grant_everyone_access()
+    if grant_everyone_access:
+        resource.grant_everyone_access()
     with tempfile.TemporaryFile() as f:
         f.write(contents)
         with transaction.atomic():
@@ -395,18 +397,20 @@ def make_first_revision(resname, resdesc, resfn, contents, user):
                 user=user)
             revision.save()
             revision.clean()
-    revision.grant_everyone_access()
+    if grant_everyone_access:
+        revision.grant_everyone_access()
     resource.clean()
     return revision
 
 
-def make_first_method(famname, famdesc, driver, user):
+def make_first_method(famname, famdesc, driver, user, grant_everyone_access=True):
     """
     Helper function to make a new MethodFamily for a new Method.
     """
     family = MethodFamily(name=famname, description=famdesc, user=user)
     family.save()
-    family.grant_everyone_access()
+    if grant_everyone_access:
+        family.grant_everyone_access()
     with transaction.atomic():
         method = Method(
             revision_name="v1",
@@ -416,7 +420,8 @@ def make_first_method(famname, famdesc, driver, user):
             user=user)
         method.save()
         method.clean()
-    method.grant_everyone_access()
+    if grant_everyone_access:
+        method.grant_everyone_access()
     family.clean()
     return method
 
@@ -439,23 +444,25 @@ def simple_method_io(method, cdt, indataname, outdataname):
     return minput, moutput
 
 
-def make_first_pipeline(pname, pdesc, user):
+def make_first_pipeline(pname, pdesc, user, grant_everyone_access=True):
     """
     Helper function to make a new PipelineFamily and the first Pipeline
     member.
     """
     family = PipelineFamily(name=pname, description=pdesc, user=user)
     family.save()
-    family.grant_everyone_access()
+    if grant_everyone_access:
+        family.grant_everyone_access()
     pipeline = Pipeline(family=family, revision_name="v1", revision_desc="first version", user=user)
     pipeline.clean()
     pipeline.save()
-    pipeline.grant_everyone_access()
+    if grant_everyone_access:
+        pipeline.grant_everyone_access()
     family.clean()
     return pipeline
 
 
-def make_second_pipeline(pipeline):
+def make_second_pipeline(pipeline, grant_everyone_access=True):
     """
     Create a second version of a Pipeline, in the same family as the first,
     without making any changes. Hook up the steps to each other, but don't
@@ -464,7 +471,8 @@ def make_second_pipeline(pipeline):
     new_pipeline = Pipeline(family=pipeline.family, revision_name="v2", revision_desc="second version",
                             user=pipeline.user)
     new_pipeline.save()
-    new_pipeline.grant_everyone_access()
+    if grant_everyone_access:
+        new_pipeline.grant_everyone_access()
 
     for step in pipeline.steps.all():
         new_step = new_pipeline.steps.create(transformation=step.transformation, step_num=step.step_num)
@@ -489,7 +497,7 @@ def create_linear_pipeline(pipeline, methods, indata, outdata):
         cdt_in = None
     else:
         cdt_in = methods[0].inputs.first().structure.compounddatatype
-    pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name = indata, dataset_idx = 1)
+    pipeline_in = pipeline.create_input(compounddatatype=cdt_in, dataset_name=indata, dataset_idx=1)
 
     # Create steps.
     steps = []
@@ -499,7 +507,7 @@ def create_linear_pipeline(pipeline, methods, indata, outdata):
             source = pipeline_in
         else:
             source = methods[i-1].outputs.first()
-        step.cables_in.create(source_step = i, source = source, dest = methods[i].inputs.first())
+        step.cables_in.create(source_step=i, source=source, dest=methods[i].inputs.first())
         step.complete_clean()
         steps.append(step)
 

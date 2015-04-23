@@ -2487,13 +2487,30 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
         return False
 
-    def redact(self):
-        try:
-            self.methodoutput.redact_error_log()
-            self.methodoutput.redact_output_log()
-            self.methodoutput.redact_return_code()
-        except MethodOutput.DoesNotExist:
-            pass
+    def redact(self, error_log=True, output_log=True, return_code=True, dry_run=False):
+        """
+        Redact the error/output log and/or the return code of the MethodOutput.
+
+        Return lists of objects affected.
+        """
+        self_output_redacted = set()
+        self_error_redacted = set()
+        self_code_redacted = set()
+        if not dry_run:
+            try:
+                if output_log and not self.methodoutput.is_output_redacted():
+                    self.methodoutput.redact_output_log()
+                    self_output_redacted.add(self)
+                if error_log and not self.methodoutput.is_error_redacted():
+                    self.methodoutput.redact_error_log()
+                    self_error_redacted.add(self)
+                if return_code and not self.methodoutput.is_code_redacted():
+                    self.methodoutput.redact_return_code()
+                    self_code_redacted.add(self)
+            except MethodOutput.DoesNotExist:
+                pass
+
+        return self_output_redacted, self_error_redacted, self_code_redacted
 
 
 class MethodOutput(models.Model):
@@ -2551,6 +2568,9 @@ class MethodOutput(models.Model):
 
     def is_error_redacted(self):
         return self._error_redacted
+
+    def is_code_redacted(self):
+        return self._code_redacted
 
     def redact_output_log(self):
         self.output_log.delete()

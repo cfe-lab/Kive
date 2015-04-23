@@ -7,6 +7,7 @@ import random
 import re
 import tempfile
 import time
+import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -25,7 +26,8 @@ from archive.models import Dataset
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 import file_access_utils
-import logging
+import sandbox.testing_utils as tools
+import sandbox.execute
 
 
 def create_librarian_test_environment(case):
@@ -299,6 +301,90 @@ def create_librarian_test_environment(case):
             execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
         runstep.execrecord = execrecord; runstep.save()
         i += 1
+
+
+def create_removal_test_environment():
+    # We need:
+    # - a CodeResource with revisions
+    # - a CodeResourceRevision with dependencies
+    # - a Datatype
+    # - a CDT using that Datatype
+    # - a SymbolicDataset with that CDT
+    # - a Method using that CDT
+    # - a Pipeline containing that Method
+    # - two Runs from that pipeline, the second reusing the first
+    remover = User.objects.create_user("Rem Over", "rem@over.sucks", "baleeted")
+    remover.save()
+    remover.groups.add(everyone_group())
+    remover.save()
+
+    noop = tools.make_first_revision(
+        "Noop",
+        "A noop script that simply writes its input to its output.",
+        "noop.bash",
+        """#!/bin/bash
+cat "$1" > "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+
+    pass_through = tools.make_first_revision(
+        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
+        "passthrough.bash",
+        """#!/bin/bash
+./noop.bash "$1" "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+    # Use the defaults for path and filename.
+    pass_through.dependencies.create(requirement=noop)
+
+    # A toy Datatype.
+    nucleotide_seq = tools.new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",
+                                        Datatype.objects.get(pk=datatypes.STR_PK), remover,
+                                        grant_everyone_access=False)
+    one_col_nuc_seq = CompoundDatatype(user=remover)
+    one_col_nuc_seq.save()
+    one_col_nuc_seq.members.create(datatype=nucleotide_seq, column_name="sequence", column_idx=1)
+
+    seq_datafile = tempfile.NamedTemporaryFile(delete=False)
+    seq_datafile.write("""sequence
+ACGT
+ATCG
+GATTACA
+TTCCTCTA
+AAAAAAAG
+GGGAGTTC
+CCCTCCTC
+""")
+    seq_datafile.close()
+    seq_sd = SymbolicDataset.create_SD(seq_datafile.name,
+        name="Removal test data", cdt=one_col_nuc_seq, user=remover,
+        description="A dataset for use in the removal test case.", make_dataset=True)
+
+    nuc_seq_noop = tools.make_first_method(
+        "Noop (nucleotide sequence)",
+        "A noop on nucleotide sequences",
+        noop,
+        remover,
+        grant_everyone_access=False
+    )
+    tools.simple_method_io(nuc_seq_noop, one_col_nuc_seq, "nuc_seq_in", "nuc_seq_out")
+
+    noop_pl = tools.make_first_pipeline(
+        "Nucleotide Sequence Noop",
+        "A noop pipeline for nucleotide sequences.",
+        remover,
+        grant_everyone_access=False
+        )
+    tools.create_linear_pipeline(noop_pl, [nuc_seq_noop], "noop_pipeline_in", "noop_pipeline_out")
+
+    first_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    first_run_sdbx.execute_pipeline()
+    second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    second_run_sdbx.execute_pipeline()
 
 
 def ER_from_record(record):

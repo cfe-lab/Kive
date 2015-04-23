@@ -641,28 +641,46 @@ class SymbolicDataset(metadata.models.AccessControl):
         return False
 
     @transaction.atomic
-    def redact(self):
+    def redact(self, dry_run=False):
         """
         Wipe out the contents of this SymbolicDataset.
+
+        If dry_run is True, then we only return information about what would be redacted.
         """
         # If this SymbolicDataset is already in the process of being redacted, simply return.
         # This avoids infinite recursion.
+        SDs_redacted = set()
+        ERs_redacted = set()
+        output_logs_redacted = set()
+        error_logs_redacted = set()
+        codes_redacted = set()
         if self.is_redacted() == True:
-            return
+            return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
 
-        self._redacted = True
-        self.MD5_checksum = ""
-        self.save(update_fields=["_redacted", "MD5_checksum"])
+        if not dry_run:
+            self._redacted = True
+            self.MD5_checksum = ""
+            self.save(update_fields=["_redacted", "MD5_checksum"])
 
-        if self.has_data():
-            self.dataset.delete()
-        if self.has_structure():
-            self.structure.delete()
+            if self.has_data():
+                self.dataset.delete()
+            if self.has_structure():
+                self.structure.delete()
+        SDs_redacted.add(self)
 
         # Redact anything that was produced from this SymbolicDataset.
         for used_as_input in self.execrecordins.all().select_related("execrecord"):
             if not used_as_input.execrecord.is_redacted():
-                used_as_input.execrecord.redact()
+                # curr_redacted is a tuple which we will unpack in the following.
+                curr_redacted = used_as_input.execrecord.redact(dry_run)
+
+                SDs_redacted.update(curr_redacted[0])
+                ERs_redacted.update(curr_redacted[1])
+                output_logs_redacted(curr_redacted[2])
+                error_logs_redacted(curr_redacted[3])
+                codes_redacted(curr_redacted[4])
+
+        return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
 
     def is_redacted(self):
         return self._redacted
@@ -963,21 +981,46 @@ class ExecRecord(models.Model):
 
         return self.generator.is_redacted()
 
-    def redact(self):
+    def redact(self, dry_run=False):
         """
         "Hollow out" this ExecRecord.
 
-        This may be triggered by an input SymbolicDataset or by the ExecLog.
+        This may be triggered by an input SymbolicDataset or by the ExecLog.  If dry_run is True then no
+        actual redaction occurs.
+
+        Return lists of redacted objects.
         """
+        SDs_redacted = set()
+        ERs_redacted = {self}
+        output_logs_redacted = set()
+        error_logs_redacted = set()
+        codes_redacted = set()
         for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
             # If any of these are already redacted, this call will simply do nothing.
-            ero.symbolicdataset.redact()
+            # redacted_info looks like
+            # (SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted)
+            # and all members are sets.
+            redacted_info = ero.symbolicdataset.redact(dry_run)
+            SDs_redacted.update(redacted_info[0])
+            ERs_redacted.update(redacted_info[1])
+            output_logs_redacted.update(redacted_info[2])
+            error_logs_redacted.update(redacted_info[3])
+            codes_redacted.update(redacted_info[4])
 
-        self.generator.redact()
+        # generator_redact_info looks like
+        # (output_logs_redacted, error_logs_redacted, codes_redacted)
+        # all of which are sets.
+        generator_redact_info = self.generator.redact(dry_run=dry_run)
+        output_logs_redacted.update(generator_redact_info[0])
+        error_logs_redacted.update(generator_redact_info[1])
+        codes_redacted.update(generator_redact_info[2])
 
         # Notify all RunComponents that use this ExecRecord of the redaction.
-        for rc in self.used_by_components.all():
-            rc.redact()
+        if not dry_run:
+            for rc in self.used_by_components.all():
+                rc.redact()
+
+        return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
 
     @transaction.atomic
     def remove_list(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
