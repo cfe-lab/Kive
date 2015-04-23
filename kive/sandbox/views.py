@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status as rf_status
 
-from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from pipeline.serializers import PipelineFamilySerializer
 from fleet.serializers import RunToProcessSerializer
 from archive.serializers import DatasetSerializer
 
@@ -22,6 +22,7 @@ from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmiss
 import fleet.models
 from django.db.models import Count
 from metadata.models import KiveUser
+from portal.views import admin_check
 
 
 @api_view(['GET'])
@@ -270,7 +271,8 @@ def api_run_pipeline(request):
 @login_required
 def runs(request):
     """Display all active runs for this user."""
-    context = RequestContext(request)
+    is_user_admin = 'true' if admin_check(request.user) else 'false'
+    context = RequestContext(request, { 'is_user_admin': is_user_admin })
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
@@ -283,7 +285,7 @@ def api_get_runs(request):
 
     all_runs, has_more = _load_status(request)
     resp = {
-        'runs': runs,
+        'runs': all_runs,
         'has_more': has_more
     }
     return Response(resp)

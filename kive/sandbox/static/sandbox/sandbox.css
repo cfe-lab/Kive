@@ -193,7 +193,7 @@ td.preview-canvas {
 .active_filters:empty {
 	display: none;
 }
-.filter {
+.filter, .lock {
     display: inline;
     white-space: nowrap;
     background-color: #eef4f4;
@@ -202,7 +202,7 @@ td.preview-canvas {
     margin-right: .5em;
     font-size: .8em;
 }
-.filter .field, .filter .logic_gate {
+.filter .field, .filter .logic_gate, .lock span {
     font-size: .8em;
     font-weight: bold;
     text-transform: uppercase;
@@ -210,7 +210,7 @@ td.preview-canvas {
 .filter .field {
     color: rgba(0,0,0,.7);
 }
-a.remove {
+a.remove, .lock a {
     padding: .5em 0 .5em .5em;
     font-weight: bold;
     cursor: pointer;

@@ -18,6 +18,8 @@ from kive.serializers import UserSerializer
 def developer_check(user):
     return user.groups.filter(pk=groups.DEVELOPERS_PK).exists()
 
+def admin_check(user):
+    return user.groups.filter(pk=groups.ADMIN_PK).exists()
 
 @login_required
 def home(request):

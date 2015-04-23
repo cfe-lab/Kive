@@ -8,6 +8,9 @@
     <script src="/static/sandbox/runs.js"></script>
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
     <link rel="stylesheet" href="/static/sandbox/sandbox.css">
+    <script type="text/javascript">
+        var is_user_admin = {{ is_user_admin }};
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -57,6 +60,10 @@
     </div>
 
     <div id="active_filters">
+        <div class="lock">
+            <a><img/></a>
+            <span>admin:</span>
+        </div>
     </div>
 
     <div class="no_results">
