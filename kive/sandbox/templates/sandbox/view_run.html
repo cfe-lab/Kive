@@ -58,9 +58,9 @@ $(function() {
         success: function(result) {
             // prepare to redraw canvas
             $('#id_reset_button').click();
-            submit_to_url = result['family_pk'];
+            submit_to_url = result.family_pk;
 
-            draw_inputs(canvasState, result);
+            draw_pipeline(canvasState, result);
             grabStatus();
 
             canvasState.testExecutionOrder();

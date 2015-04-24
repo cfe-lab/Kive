@@ -1,7 +1,12 @@
 // place in global namespace to access from other files
-var canvas;
-var canvasState;
-var submit_to_url = '/pipeline_add';
+var canvas,
+    canvasState,
+    submit_to_url = '/pipeline_add',
+    submitError = function(error) {
+        $('#id_submit_error').show().text(error);
+    };
+/*
+legacy code
 
 var rawNodeWidth = 20,
     rawNodeHeight = 25,
@@ -20,9 +25,42 @@ var mNodeWidth = 80,
     mNodeSpacing = 20,
     mNodeColour = '#999',
     mNodeOffset = 10;
+*/
 
-var submitError = function(error) {
-    $('#id_submit_error').show().text(error);
+function Menu(selector, button) {
+    this.dialog = $(selector);
+    this.button = button ? $(button) : $('#id_ctrl_nav li').filter(function() { return $(this).data('rel') === selector; });
+    this.form = $('form', this.dialog);
+    this.elements = $('input, select, textarea', this.form);
+    this.is_modal = false;
+
+    var menu = this;
+    this.form.on('submit', function(e) { e.preventDefault(); menu.submit(e); })
+}
+Menu.prototype = {
+    open: function() {
+        var i, inputs, input, default_input_value, preview_canvas;
+        this.button.addClass('clicked');
+        this.dialog.show();
+        this.form.trigger('reset');
+
+        if (this.is_modal) {
+            this.dialog.css({ left: 100, top: 350 });
+            preview_canvas = $('canvas', this.dialog)[0];
+            preview_canvas.width = this.dialog.innerWidth();
+            preview_canvas.height = 60;
+            $('#id_select_cdt').change();
+        }
+        inputs = $('input', this.dialog);
+        for (i = 0; i < inputs.length; i++) {
+            input = inputs[i];
+            default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
+            if (input.value === '' || input.value === default_input_value) {
+                $(input).val_('').focus();
+                break;
+            }
+        }
+    }
 };
 
 jQuery.fn.extend({
@@ -99,7 +137,6 @@ jQuery.fn.extend({
 });
 
 $(function() { // wait for page to finish loading before executing jQuery code
-    $('body').css('background-image', 'url("/static/pipeline/isogrid.png")');
     // initialize animated canvas
     canvas = $('#pipeline_canvas')[0];
     var canvasWidth  = canvas.width  = window.innerWidth,
@@ -109,22 +146,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     // de-activate double-click selection of text on page
     canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
-
-    canvas.addEventListener('mousedown', function(e) {
-        canvasState.doDown(e); // listener registered on mousedown event
-    }, true);
-
-    canvas.addEventListener('mousemove', function(e) {
-        canvasState.doMove(e);
-    }, true);
-
-    canvas.addEventListener('mouseup', function(e) {
-        canvasState.doUp(e);
-    }, true);
-    
-    canvas.addEventListener('contextmenu', function(e) {
-        canvasState.contextMenu(e);
-    }, true);
+    canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
+    canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
+    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); }, true);
+    canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
     
     canvasState.old_width = canvasWidth;
     canvasState.old_height = canvasHeight;
@@ -176,12 +201,12 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
     // update method drop-down
     $("#id_select_method_family").on('change', function() {
-        mf_id = this.value;// DOMElement.value is much faster than jQueryObject.val().
-        if (mf_id != '') {
+        mf_id = this.value;
+        if (mf_id !== '') {
             $.ajax({
                 type: "POST",
                 url: "/get_method_revisions/",
-                data: {mf_id: mf_id}, // specify data as an object
+                data: { mf_id }, // specify data as an object
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
                     var options = [];
@@ -209,9 +234,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('input, textarea', '#pipeline_ctrl').each(function() {
         var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
         
-        if (lbl.length) {
+        if (lbl.length > 0) {
             $(this).on('focus', function() {
-                if (this.value == lbl.html()) {
+                if (this.value === lbl.html()) {
                     $(this).removeClass('input-label').val('');
                 }
             }).on('blur', function() {
@@ -229,8 +254,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('li', 'ul#id_ctrl_nav').on('click', function(e) {
         var $this = $(this),
             menu = $($this.data('rel')),
-            inputs,
-            input;
+            inputs, input, preview_canvas, i, default_input_value
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
@@ -240,16 +264,16 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
         if ($this.hasClass('new_ctrl')) {
             menu.css({ left: 100, top: 350 }).addClass('modal_dialog');
-            var preview_canvas = $('canvas', menu)[0];
+            preview_canvas = $('canvas', menu)[0];
             preview_canvas.width = menu.innerWidth();
             preview_canvas.height = 60;
             $('#id_select_cdt').change();
         }
         $('form', menu).trigger('reset');
         inputs = menu.find('input');
-        for (var i = 0; i < inputs.length; i++) {
+        for (i = 0; i < inputs.length; i++) {
             input = inputs[i];
-            var default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
+            default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
             if (input.value === '' || input.value === default_input_value) {
                 $(input).val_('').focus();
                 break;
@@ -269,7 +293,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             if (shape == out_node) continue;
-            if (shape.constructor == OutputNode && shape.label == label) {
+            if (shape instanceof OutputNode && shape.label == label) {
                 $('#output_name_error').show();
                 return false;
             }
@@ -289,11 +313,12 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('#id_select_cdt, #id_select_method').on('change', function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
-            val = this.value;
+            val = this.value,
+            ctx, filename, colour;
         
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
-            var ctx = preview_canvas.getContext('2d');
+            ctx = preview_canvas.getContext('2d');
             if (this.id == 'id_select_cdt') {
                 ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
                 if (val === '') {
@@ -302,8 +327,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
                 }
             } else if (this.id == 'id_select_method') {
-                var filename = $(this).find('option:selected')[0].title;
-                var colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
+                filename = $(this).find('option:selected')[0].title;
+                colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
                 $('#id_method_name').val_(filename);
                 
                 // use AJAX to retrieve Revision inputs and outputs
@@ -314,17 +339,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     datatype: "json",
                     success: function(result) {
                         ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-                        var get_obj_len = function(obj) { return $.map(obj, function() { return 1; }).length; },
-                            n_outputs = get_obj_len(result.outputs),
-                            n_inputs  = get_obj_len(result.inputs);
+                        var n_outputs = Object.keys(result.outputs).length,
+                            n_inputs  = Object.keys(result.inputs).length;
                         
                         preview_canvas.height = (n_outputs + n_inputs) * 4 + 62;
-                        (new MethodNode(val, null,
+                        (new MethodNode(
+                            val,
+                            null,//family
                             // Ensures node is centred perfectly on the preview canvas
                             // Makes assumptions that parameters like magnet radius and scoop length are default.
-                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,
-                            n_inputs * 4 + 27,
-                            null, null, null, colour, null, null, result.inputs, result.outputs)).draw(ctx);
+                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,// x
+                            n_inputs * 4 + 27,// y
+                            colour, 
+                            null,//label
+                            result.inputs,
+                            result.outputs
+                        )).draw(ctx);
                     }
                 });
             }
@@ -353,7 +383,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // check for duplicate names
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
-            if ((shape.constructor === RawNode || shape.constructor === CDtNode) && shape.label == node_label) {
+            if ((shape instanceof RawNode || shape instanceof CDtNode) && shape.label === node_label) {
                 dt_error.innerHTML = 'That name has already been used.';
                 return false;
             }
@@ -367,10 +397,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
             var this_pk = $('#id_select_cdt', this).val(), // primary key
                 shape;
             
-            if (this_pk == ""){
-                shape = new RawNode(         pos.left, pos.top, null, null, null, null, null, node_label);
+            if (this_pk === ""){
+                shape = new RawNode(         pos.left, pos.top, node_label);
             } else {
-                shape = new CDtNode(this_pk, pos.left, pos.top, null, null, null, null, null, node_label);
+                shape = new CDtNode(this_pk, pos.left, pos.top, node_label);
             }
             canvasState.addShape(shape);
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
@@ -434,23 +464,32 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
                         if (document.getElementById('id_method_button').value == 'Add Method') {
                             // create new MethodNode
-                            canvasState.addShape(new MethodNode(mid, method_family.val(), pos.left, pos.top,
-                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
-                                inputs, outputs));
+                            canvasState.addShape(new MethodNode(
+                                mid, 
+                                method_family.val(), 
+                                pos.left, pos.top,
+                                method_colour.val(), 
+                                node_label,
+                                inputs, outputs
+                            ));
                         } else {
                             // replace the selected MethodNode
                             // if user clicks anywhere else, MethodNode is deselected
                             // and Methods menu closes
-                            var old_node = canvasState.selection[0];
-                            var idx;
 
                             // draw new node over old node
-                            var new_node = new MethodNode(mid, method_family.val(), old_node.x, old_node.y,
-                                mNodeWidth, mNodeInset, mNodeSpacing, method_colour.val() || mNodeColour, node_label, mNodeOffset,
-                                inputs, outputs);
-
-                            // check if we can re-use any Connectors
-                            var new_xput, old_xput, connector;
+                            var old_node = canvasState.selection[0],
+                                new_node = new MethodNode(
+                                    mid, 
+                                    method_family.val(), 
+                                    old_node.x, old_node.y,
+                                    method_colour.val(), 
+                                    node_label, 
+                                    inputs, 
+                                    outputs
+                                ),
+                                // check if we can re-use any Connectors
+                                idx, new_xput, old_xput, connector;
 
                             for (idx in old_node.inputs) {
                                 old_xput = old_node.inputs[idx];
@@ -501,23 +540,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
         method_family.val(method_family.children('option').eq(0)).change();
     });
     
-    $('#id_example_button').on('click', function () {
-        /*
-        Populate canvasState with objects for an example pipeline.
-         */
-        canvasState.clear();
-        canvasState.shapes = [];
-        canvasState.connectors = [];
-
-        // TODO: need MethodNode that can tie these together, or pick different examples
-        canvasState.addShape(
-            new RawNode(100, 250, null, null, null, null, null, 'Unstructured data')
-        );
-        canvasState.addShape(
-            new CDtNode(1, 100, 150, null, null, null, null, null, 'Strings')
-        );
-    });
-    
     $('#id_revision_desc').on('keydown', function() {
         var getHappierEachXChars = 12,
             happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
@@ -547,17 +569,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     $('.form-inline-opts').on('click', 'input', function() {
         var $this = $(this),
-            val = $this.val();
-        if ($this.is(':checked')) {
-            if (val == 'always') {
-                canvasState.force_show_exec_order = true;
-            } else if (val == 'never') {
-                canvasState.force_show_exec_order = false;
-            } else if (val == 'ambiguous') {
-                canvasState.force_show_exec_order = undefined;
-            } else {
-                return false;
-            }
+            val = $this.val(),
+            val_map = { always: true, never: false, ambiguous: undefined };
+
+        if ($this.is(':checked') && val_map.hasOwnProperty(val)) {
+            canvasState.force_show_exec_order = val_map[val];
             canvasState.valid = false;
         }
     });
@@ -652,24 +668,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
             if (action == 'display') {
                 sel = sel[0];
-                if(sel.constructor == OutputNode)
+                if(sel instanceof OutputNode)
                     window.location = '/dataset_view/' + sel.dataset_id;
-
             }
             if (action == 'download') {
                 sel = sel[0];
-                if(sel.constructor == OutputNode)
+                if(sel instanceof OutputNode)
                     window.location = '/dataset_download/' + sel.dataset_id;
             }
             if (action == 'viewlog') {
                 sel = sel[0];
-                if(sel.constructor == MethodNode)
+                if(sel instanceof MethodNode)
                     window.location = '/stdout_view/' + sel.log_id;
-
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
-                if(sel.constructor == MethodNode)
+                if(sel instanceof MethodNode)
                     window.location = '/stderr_view/' + sel.log_id;
             }
         }
@@ -722,7 +736,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
 
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
-            if (this_shape.constructor == MethodNode) {
+            if (this_shape instanceof MethodNode) {
                 method_nodes.push(this_shape);
 
                 // at least one out-magnet must be occupied
@@ -737,7 +751,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     return;
                 }
             }
-            else if (this_shape.constructor == OutputNode) {
+            else if (this_shape instanceof OutputNode) {
                 pipeline_outputs.push(this_shape);
 
                 // no need to check for connected magnets - all output nodes have
@@ -752,7 +766,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 this_magnet = magnets[0];  // data nodes only ever have one magnet
 
                 // is this magnet connected?
-                if (this_magnet.connected.length == 0) {
+                if (this_magnet.connected.length === 0) {
                     // unconnected input in graph, exit
                     submitError('Unconnected input node');
                     return;
@@ -760,12 +774,16 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         }
 
+        // sort pipelines by their isometric position, left-to-right, top-to-bottom
+        // (sort of like reading order if you tilt your screen 30° clockwise)
+        pipeline_inputs.sort(Geometry.isometricSort);
+        pipeline_outputs.sort(Geometry.isometricSort);
+
         // at least one Connector must terminate as pipeline output
-        if (pipeline_outputs.length == 0) {
+        if (pipeline_outputs.length === 0) {
             submitError('Pipeline has no output');
             return;
         }
-
 
         var is_revision = 0 < $('#id_pipeline_select').length;
 
@@ -795,145 +813,105 @@ $(function() { // wait for page to finish loading before executing jQuery code
         $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
         
         // Now we're ready to start
-        var form_data = {};
-
-        form_data["users_allowed"] = users_allowed;
-        form_data["groups_allowed"] = groups_allowed;
-
-        // There is no PipelineFamily yet; we're going to create one.
-        form_data["family_pk"] = null;
-        form_data['family_name'] = family_name;
-        form_data['family_desc'] = family_desc;
-
-        // arguments to add first pipeline revision
-        form_data['revision_name'] = revision_name;
-        form_data['revision_desc'] = revision_desc;
-
-        if (is_revision) {
-            form_data['revision_parent_pk'] = document.getElementById('id_pipeline_select').value;
-        } else {
-            // no parent, creating first revision of new Pipeline Family
-            form_data["revision_parent_pk"] = null;
-        }
-
-
-        // Canvas information to store in the Pipeline object.
-        form_data["canvas_width"] = canvas.width;
-        form_data["canvas_height"] = canvas.height;
-
-        // OLD: sort pipeline inputs by their Y-position on canvas (top to bottom)
-        // NEW: sort pipelines by their isometric position, left-to-right, top-to-bottom
-        // (sort of like reading order if you tilt your screen 30° clockwise)
-        /*function sortByYpos (a, b) {
-            var ay = a.y;
-            var by = b.y;
-            return +(ay < by ? -1 : ay > by);
-        }*/
-        pipeline_inputs.sort(Geometry.isometricSort);
+        // @note: shorthand object notation { val } is shorthand for { "val": val }
+        var form_data = {
+            users_allowed,
+            groups_allowed,
+            // There is no PipelineFamily yet; we're going to create one.
+            family_pk: null,
+            family_name,
+            family_desc,
+            // arguments to add first pipeline revision
+            revision_name,
+            revision_desc,
+            // Canvas information to store in the Pipeline object.
+            canvas_width: canvas.width,
+            canvas_height: canvas.height,
+            revision_parent_pk: is_revision ? $('#id_pipeline_select').val() : null,
+            // Arrays will be populated in the following code.
+            pipeline_steps: [],
+            pipeline_inputs: [],
+            pipeline_outputs: []
+        };
 
         // update form data with inputs
         var this_input;
-        form_data['pipeline_inputs'] = [];
+        form_data.pipeline_inputs = [];
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
-            form_data['pipeline_inputs'][i] = {
-                'CDT_pk': (this_input.constructor === CDtNode) ? this_input.pk : null,
-                'dataset_name': this_input.label,
-                'dataset_idx': i + 1,
-                'x': this_input.x / canvas.width,
-                'y': this_input.y / canvas.height,
-                "min_row": null, // in the future these can be more detailed
-                "max_row": null
+            form_data.pipeline_inputs[i] = {
+                CDT_pk: (this_input instanceof CDtNode) ? this_input.pk : null,
+                dataset_name: this_input.label,
+                dataset_idx: i + 1,
+                x: this_input.x / canvas.width,
+                y: this_input.y / canvas.height,
+                min_row: null, // in the future these can be more detailed
+                max_row: null
             }
         }
 
-        // append MethodNodes to sorted_elements Array in dependency order
-        // see http://en.wikipedia.org/wiki/Topological_sorting#Algorithms
-        //
         // MethodNodes are now sorted live, prior to pipeline submission —JN
-        //
         var sorted_elements = [];
-        for (i in canvasState.exec_order) {
+        for (i = 0; i < canvasState.exec_order.length; i++) {
             sorted_elements = sorted_elements.concat(canvasState.exec_order[i]);
         }
 
         // add arguments for input cabling
-        var this_step;
-        var this_source;
-
-        form_data['pipeline_steps'] = [];
+        var this_step, this_source;
 
         for (i = 0; i < sorted_elements.length; i++) {
             this_step = sorted_elements[i];
 
-            form_data['pipeline_steps'][i] = {
-                'transf_pk': this_step.pk,  // to retrieve Method
-                "transf_type": "Method", // in the future we can make this take Pipelines as well
-                'step_num': i+1,  // 1-index (pipeline inputs are index 0)
-                'x': this_step.x / canvas.width,
-                'y': this_step.y / canvas.height,
-                'name': this_step.label
+            form_data.pipeline_steps[i] = {
+                transf_pk: this_step.pk,  // to retrieve Method
+                transf_type: "Method", // in the future we can make this take Pipelines as well
+                step_num: i+1,  // 1-index (pipeline inputs are index 0)
+                x: this_step.x / canvas.width,
+                y: this_step.y / canvas.height,
+                name: this_step.label,
+                cables_in: [],
+                outputs_to_delete: [] // not yet implemented
             };
 
             // retrieve Connectors
             magnets = this_step.in_magnets;
-            form_data['pipeline_steps'][i]['cables_in'] = [];
-            form_data['pipeline_steps'][i]['outputs_to_delete'] = [];  // not yet implemented
 
             for (j = 0; j < magnets.length; j++) {
                 this_magnet = magnets[j];
-                if (this_magnet.connected.length == 0) {
+                if (this_magnet.connected.length === 0) {
                     continue;
                 }
                 this_connector = this_magnet.connected[0];
                 this_source = this_connector.source.parent;
 
-                if (this_source.constructor === MethodNode) {
-                    form_data['pipeline_steps'][i]['cables_in'][j] = {
-                        //'source_type': 'Method',
-                        //'source_pk': this_source.pk,
-                        'source_dataset_name': this_connector.source.label,
-                        'source_step': sorted_elements.indexOf(this_source)+1,
-                        'dest_dataset_name': this_connector.dest.label,
-                        "keep_output": false, // in the future this can be more flexible
-                        "wires": [] // in the future we can specify custom wires here
-                    };
-                }
-                else {
-                    // sourced by pipeline input
-                    form_data['pipeline_steps'][i]['cables_in'][j] = {
-                        //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
-                        //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
-                        'source_dataset_name': this_connector.source.label,
-                        'source_step': 0,
-                        'dest_dataset_name': this_connector.dest.label,
-                        "keep_output": false, // in the future this can be more flexible
-                        "wires": [] // no wires for a raw cable
-                    };
-                }
+                form_data.pipeline_steps[i].cables_in[j] = {
+                    //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
+                    //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
+                    source_dataset_name: this_connector.source.label,
+                    dest_dataset_name: this_connector.dest.label,
+                    source_step: this_source instanceof MethodNode ? sorted_elements.indexOf(this_source)+1 : 0,
+                    keep_output: false, // in the future this can be more flexible
+                    wires: [] // no wires for a raw cable
+                };
             }
         }
 
-        // sort output cables by y-position (top to bottom)
-        pipeline_outputs.sort(Geometry.isometricSort);
-
         var this_output;
-        form_data['pipeline_outputs'] = [];
         for (i = 0; i < pipeline_outputs.length; i++) {
             this_output = pipeline_outputs[i];
             this_connector = this_output.in_magnets[0].connected[0];
             var this_source_step = this_connector.source.parent;
             
-            form_data['pipeline_outputs'][i] = {
-                'output_name': this_output.label,
-                'output_idx': i+1,
-                'output_CDT_pk': this_connector.source.cdt,
-                'source': this_source_step.pk,
-                'source_step': sorted_elements.indexOf(this_source_step) + 1, // 1-index
-                'source_dataset_name': this_connector.source.label,  // magnet label
-                'x': this_output.x / canvas.width,
-                'y': this_output.y / canvas.height,
-                "wires": [] // in the future we might have this
+            form_data.pipeline_outputs[i] = {
+                output_name: this_output.label,
+                output_idx: i+1,
+                output_CDT_pk: this_connector.source.cdt,
+                source: this_source_step.pk,
+                source_step: sorted_elements.indexOf(this_source_step) + 1, // 1-index
+                source_dataset_name: this_connector.source.label,  // magnet label
+                x: this_output.x / canvas.width,
+                y: this_output.y / canvas.height,
+                wires: [] // in the future we might have this
             };
         }
 
@@ -966,18 +944,18 @@ $(function() { // wait for page to finish loading before executing jQuery code
     })
     
     $(window).resize(function(e) {
+        var shape, i, scale_x, scale_y, out_z;
         canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
         canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
         
-        var scale_x = canvas.width  / canvasState.old_width,
-            scale_y = canvas.height / canvasState.old_height;
+        scale_x = canvas.width  / canvasState.old_width;
+        scale_y = canvas.height / canvasState.old_height;
             
         if (scale_x == 1 && scale_y == 1) {
             return;
         }
         
-        var shape;
-        for (var i=0; i < canvasState.shapes.length; i++) {
+        for (i=0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             shape.x *= scale_x;
             shape.y *= scale_y;
@@ -985,7 +963,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             canvasState.detectCollisions(shape);
         }
         
-        var out_z = canvasState.outputZone;
+        out_z = canvasState.outputZone;
         out_z.x = canvasWidth * .8;
         out_z.h = out_z.w = canvasWidth * .15;
         while (out_z.h + out_z.y > canvasHeight) {

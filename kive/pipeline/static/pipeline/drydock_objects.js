@@ -126,7 +126,32 @@ CanvasRenderingContext2D.prototype.ellipse = function (cx, cy, rx, ry) {
     this.restore(); // restore to original state
 };
 
-function RawNode (x, y, r, h, fill, inset, offset, label) {
+/*
+To be implemented in the future:
+Parent classes from which RawNode, CDtNode, MethodNode, and OutputNode will stem.
+*/
+function Node(pk, label, x, y, w, h, inset, offset, fill) {
+    this.pk = pk;
+    this.label = label || '';
+    this.x = x || 0; // defaults to top left corner
+    this.y = y || 0;
+    this.w = w || 25; // defaults to top left corner
+    this.h = h || 25;
+    this.inset = inset || 10; // distance of magnet from center
+    this.offset = offset || 18; // distance of label from center
+    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    this.dy = 0;
+    this.fill = fill || '#888';
+    this.in_magnets = [];
+    this.out_magnets = [];
+}
+function InputNode(pk, x, y, w, h, fill, inset, offset, label) {
+    Node.call(this, pk, label, x, y, w, h, inset, offset, fill);
+}
+InputNode.prototype = Object.create(Node.prototype);
+InputNode.prototype.constructor = InputNode;
+
+function RawNode (x, y, label) {
     /*
     Node representing an unstructured (raw) datatype.
     Rendered as a circle.
@@ -135,13 +160,13 @@ function RawNode (x, y, r, h, fill, inset, offset, label) {
     this.y = y || 0;
     this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     this.dy = 0;
-    this.r = r || 20; // x-radius
+    this.r = 20; // x-radius
     this.r2 = this.r/2; // y-radius
     this.w = this.r; // for compatibility
-    this.h = h || 25; // stack height
-    this.fill = fill || "#8D8";
-    this.inset = inset || 10; // distance of magnet from center
-    this.offset = offset || 18; // distance of label from center
+    this.h = 25; // stack height
+    this.fill = "#8D8";
+    this.inset = 10; // distance of magnet from center
+    this.offset = 18; // distance of label from center
     this.label = label || '';
     this.in_magnets = []; // for compatibility
 
@@ -232,7 +257,7 @@ RawNode.prototype.getLabel = function() {
 };
 
 
-function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
+function CDtNode (pk, x, y,label) {
     /*
     Node represents a Compound Datatype (CSV structured data).
     Rendered as a square shape.
@@ -242,16 +267,14 @@ function CDtNode (pk, x, y, w, h, fill, inset, offset, label) {
     this.y = y || 0;
     this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     this.dy = 0;
-    this.w = w || 45;
-    this.h = h || 28;
-    this.fill = fill || "#88D";
-    this.inset = inset || 13;
-    this.offset = offset || 15;
+    this.w = 45;
+    this.h = 28;
+    this.fill = "#88D";
+    this.inset = 13;
+    this.offset = 15;
     this.label = label || '';
     this.in_magnets = [];
-
-    var magnet = new Magnet(this, 5, 2, "white", this.pk, this.label, null, true);
-    this.out_magnets = [ magnet ];
+    this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
 }
 
 CDtNode.prototype.draw = function(ctx) {
@@ -359,7 +382,7 @@ CDtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
-function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, inputs, outputs, status, log_id) {
+function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -369,23 +392,23 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     and right sides, respectively.  The width must be greater than 2 * inset.
     */
     this.pk = pk;
-    this.family = family || null; // can be passed from database
+    this.family = family; // can be passed from database
 
     this.x = x || 0;
     this.y = y || 0;
     this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     this.dy = 0;
-    this.w = w || 10;
+    this.w = 10;
     this.inputs = inputs;
     this.outputs = outputs;
 
     this.n_inputs = Object.keys(inputs).length;
     this.n_outputs = Object.keys(outputs).length;
 
-    this.inset = inset || 10; // distance from left or right edge to center of hole
-    this.offset = offset || 10; // space between bottom of node and label
+    this.inset = 10; // distance from left or right edge to center of hole
+    this.offset = 10; // space between bottom of node and label
 
-    this.spacing = spacing || 10; // vertical separation between pins
+    this.spacing = 20; // separation between pins
     this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
     this.fill = fill || '#999';
     this.label = label || '';
@@ -394,8 +417,8 @@ function MethodNode (pk, family, x, y, w, inset, spacing, fill, label, offset, i
     this.scoop = 45;
 
     // Members for instances of methods in runs
-    this.status = status || null;
-    this.log_id = log_id || null;
+    this.status = status;
+    this.log_id = log_id;
 
     this.in_magnets = [];
     var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
@@ -527,7 +550,7 @@ MethodNode.prototype.draw = function(ctx) {
     }
 
     // Highlight the method based on status.
-    if(this.status !== null) {
+    if(typeof this.status === 'string') {
         ctx.save();
 
         ctx.strokeStyle = _statusColorMap[this.status] || 'black';
@@ -727,7 +750,9 @@ Magnet.prototype.highlight = function(ctx) {
     if (this.isOutput) {
         ctx.textAlign = 'left';
         dir = 1;
-        with (Math) var angle = PI/6, sin_ = sin(angle), cos_ = cos(angle);
+        var angle = Math.PI/6,
+            sin_ = Math.sin(angle), 
+            cos_ = Math.cos(angle);
         
         /* 
          *   I'm not sold on this display method. Commented out for now. —jn
@@ -755,13 +780,12 @@ Magnet.prototype.highlight = function(ctx) {
     ctx.globalAlpha = 0.5;
     ctx.fillRect(
         dir * (this.r + this.offset - 2),
-        - 7.5,
+        -7.5,
         dir * (ctx.measureText(this.label).width + 4),
         15
     );
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = '#000';
-    
     ctx.fillText(this.label, dir * (this.r + this.offset), 0);
     
     ctx.restore();
@@ -794,13 +818,13 @@ function Connector (from_x, from_y, out_magnet) {
     this.source = out_magnet || null;
 
     // is this Connector being drawn from an out-magnet?
-    if (this.source == null) {
+    if (this.source instanceof Magnet) {
+        this.fromX = out_magnet.x;
+        this.fromY = out_magnet.y;
+    } else {
         // FIXME: currently this should never be the case - afyp
         this.fromX = from_x;
         this.fromY = from_y;
-    } else {
-        this.fromX = out_magnet.x;
-        this.fromY = out_magnet.y;
     }
 
     this.x = this.from_x; // for compatibility with shape-based functions
@@ -816,22 +840,19 @@ Connector.prototype.draw = function(ctx) {
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
 
-    if (this.source !== null) {
+    if (this.source instanceof Magnet) {
         // update coordinates in case magnet has moved
         this.fromX = this.source.x;
         this.fromY = this.source.y;
     }
 
-    if (this.dest !== null) {
-        if (this.dest.constructor === Magnet) {
-            // move with the attached shape
-            this.x = this.dest.x;
-            this.y = this.dest.y;
-        }
+    if (this.dest instanceof Magnet) {
+        // move with the attached shape
+        this.x = this.dest.x;
+        this.y = this.dest.y;
     } else {
         // if connector doesn't have a destination yet,
         // give it the label of the source magnet it's coming from 
-        
         
         // save the canvas state to start applying transformations
         ctx.save();
@@ -839,16 +860,15 @@ Connector.prototype.draw = function(ctx) {
         this.label_width = ctx.measureText(this.source.label).width + 10;
         
         // determine the angle of the bezier at the midpoint
-        var corner = 6;
+        var corner = 6,
+            x1 = this.label_width/2,
+            y1 = 7;
     
         // set the bezier midpoint as the origin
         $(canvas).css("cursor", "none");
         ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
         ctx.fillStyle = '#aaa';
         ctx.globalAlpha = 1;
-    
-        var x1 = this.label_width/2,
-            y1 = 7;
     
         // rounded rectangle
         ctx.beginPath();
@@ -896,15 +916,16 @@ Connector.prototype.draw = function(ctx) {
     };
 
     // Recolour this path if the statuses of the source and dest are meaningful
-    if(this.source.parent != null && this.dest.parent != null) {
-        var src = this.source.parent, dst = this.dest.parent, cable_stat = null;
+    if(this.source instanceof Magnet && this.dest instanceof Magnet) {
+        var src = this.source.parent, 
+            dst = this.dest.parent, 
+            cable_stat;
 
-        if(src.status != null) {
+        if (typeof src.status === 'string') {
             cable_stat = "+";
 
-
             // Upper cable is done!
-           if(src.status == '*'  && dst.status != null ) {
+           if(src.status == '*' && typeof dst.status == 'string' ) {
                 // Whatever, everything else is fine!
                 cable_stat = "*";
             }
@@ -916,8 +937,9 @@ Connector.prototype.draw = function(ctx) {
             }
         }
 
-        if(_statusColorMap[cable_stat] !== null)
+        if(_statusColorMap.hasOwnProperty(cable_stat)) {
              ctx.strokeStyle = _statusColorMap[cable_stat];
+        }
     }
 
     this.midX = this.fromX + this.dx / 2;
@@ -1170,7 +1192,7 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status, md5, dataset_id) {
+function OutputNode (x, y, label, pk, status, md5, dataset_id) {
     /*
     Node representing an output.
     Rendered as a cylinder.
@@ -1179,20 +1201,20 @@ function OutputNode (x, y, r, h, fill, inset, offset, label, pk, status, md5, da
     this.y = y || 0;
     this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     this.dy = 0;
-    this.r = r || 20; // x-radius (ellipse)
+    this.r = 20; // x-radius (ellipse)
     this.r2 = this.r / 2; // y-radius (ellipse)
     this.w = this.r; // for compatibility
-    this.h = h || 25; // height of cylinder
-    this.fill = fill || "#d40";
-    this.diffFill = "blue"
-    this.inset = inset || 12; // distance of magnet from center
-    this.offset = offset || 18; // distance of label from center
+    this.h = 25; // height of cylinder
+    this.fill = "#d40";
+    this.diffFill = "blue";
+    this.inset = 12; // distance of magnet from center
+    this.offset = 18; // distance of label from center
     this.label = label || '';
     this.out_magnets = []; // for compatibility
-    this.pk = pk || null;
-    this.status = status || null;
-    this.md5 = md5 || null;
-    this.dataset_id = dataset_id || null;
+    this.pk = pk;
+    this.status = status;
+    this.md5 = md5;
+    this.dataset_id = dataset_id;
 
     // Marks whether or not this node
     // was being searched for and was found
@@ -1234,7 +1256,7 @@ OutputNode.prototype.draw = function(ctx) {
 
 
     // Highlight the method based on status.
-    if(this.status !== null) {
+    if(typeof this.status === 'string') {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
 

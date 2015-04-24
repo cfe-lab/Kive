@@ -134,7 +134,7 @@ CanvasState.prototype.doDown = function(e) {
         return;
     }
     
-    if (mySel.constructor == Magnet && mySel.isInput) {
+    if (mySel instanceof Magnet && mySel.isInput) {
         if (mySel.connected.length > 0) {
             mySel = mySel.connected[0];
         } else {
@@ -160,12 +160,12 @@ CanvasState.prototype.doDown = function(e) {
             this.selection = [ mySel ];
         }
     
-        if (mySel.constructor === MethodNode) {
-            $('#id_method_button')[0].value = 'Revise Method';
+        if (mySel instanceof MethodNode) {
+            $('#id_method_button').val('Revise Method');
         }
     }
 
-    else if (mySel.constructor == Magnet && mySel.isOutput) {
+    else if (mySel instanceof Magnet && mySel.isOutput) {
 
         if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
@@ -176,7 +176,7 @@ CanvasState.prototype.doDown = function(e) {
             this.dragoffy = my - conn.fromY;
         }
     }
-    else if (mySel.constructor == Connector) {
+    else if (mySel instanceof Connector) {
         if (!shift || this.selection.length == 0) {
             this.selection = [ mySel ];
             if(this.can_edit){
@@ -198,11 +198,11 @@ CanvasState.prototype.doMove = function(e) {
     /*
      event handler for mouse motion over canvas
      */
-    var mouse = this.getPos(e);
-    var shapes = this.shapes;
-    var i, j, shape, sel;
-    var dx = mouse.x - this.dragstart.x;
-    var dy = mouse.y - this.dragstart.y;
+    var mouse = this.getPos(e),
+        shapes = this.shapes,
+        dx = mouse.x - this.dragstart.x,
+        dy = mouse.y - this.dragstart.y,
+        i, j, shape, sel;
     
     if (this.dragging) {
         // are we carrying a shape or Connector?
@@ -227,14 +227,14 @@ CanvasState.prototype.doMove = function(e) {
                 this.valid = false; // redraw
 
                 // are we carrying a connector?
-                if (sel.constructor == Connector && this.can_edit) {
+                if (sel instanceof Connector && this.can_edit) {
                     // reset to allow mouse to disengage Connector from a magnet
                     
                     sel.x = mouse.x;
                     sel.y = mouse.y;
                     
                     if (sel.dest) {
-                        if (sel.dest.parent.constructor == OutputNode) {
+                        if (sel.dest.parent instanceof OutputNode) {
                             // if the cable leads to an output node, then act as if
                             // the output node itself was clicked...
                             // not sure if this is the ideal behaviour...
@@ -243,7 +243,7 @@ CanvasState.prototype.doMove = function(e) {
                             this.selection = [ sel.dest.parent ];
                             return;
                         }
-                        else if (sel.dest.constructor == Magnet) {
+                        else if (sel.dest instanceof Magnet) {
                             sel.dest.connected = [];
                             sel.dest = null;
                         }
@@ -260,9 +260,10 @@ CanvasState.prototype.doMove = function(e) {
                     
                         // ignore Connectors, RawNodes, CDtNodes
                         // and disallow self-referential connections
-                        if (typeof shape.in_magnets == 'undefined' 
-                            || shape.in_magnets.length == 0
-                            || typeof own_shape !== 'undefined' && shape == own_shape) {
+                        if (typeof shape.in_magnets === 'undefined' 
+                                || shape.in_magnets.length === 0
+                                || typeof own_shape !== 'undefined'
+                                && shape === own_shape) {
                             continue;
                         }
 
@@ -274,20 +275,19 @@ CanvasState.prototype.doMove = function(e) {
                             var in_magnet = in_magnets[j];
 
                             // retrieve CompoundDatatype of out-magnet
-                            if (own_shape.constructor === RawNode) {
+                            if (own_shape instanceof RawNode) {
                                 connector_carrying_cdt = null;
                             } else {
                                 connector_carrying_cdt = sel.source.cdt;
                             }
                             // does this in-magnet accept this CompoundDatatype?
-                            if (shape.constructor == MethodNode &&
+                            if (shape instanceof MethodNode &&
                                 connector_carrying_cdt == in_magnet.cdt) {
                                 // light up magnet
                                 in_magnet.fill = '#ff8';
                                 in_magnet.acceptingConnector = true;
                                 if (in_magnet.connected.length == 0 
-                                    && in_magnet.contains(sel.x, sel.y)
-                                    ) {
+                                        && in_magnet.contains(sel.x, sel.y)) {
                                     // jump to magnet
                                     sel.x = in_magnet.x;
                                     sel.y = in_magnet.y;
@@ -299,10 +299,9 @@ CanvasState.prototype.doMove = function(e) {
                     }
                 } else {
                     // carrying a shape
-                
                     // if execution order is ambiguous, the tiebreaker is the y-position.
                     // dragging a method node needs to calculate this in real-time.
-                    if (this.exec_order_is_ambiguous && sel.constructor == MethodNode) {
+                    if (this.exec_order_is_ambiguous && sel instanceof MethodNode) {
                         this.disambiguateExecutionOrder();
                     }
                 }
@@ -317,15 +316,14 @@ CanvasState.prototype.doMove = function(e) {
 
 CanvasState.prototype.scaleToCanvas = function() {
     // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
-    var x_ar = [],
-        y_ar = [],
+    var x_ar = [], y_ar = [],
         margin = {
             x: Math.min(this.width  * .15, 100),
             y: Math.min(this.height * .15, 100)
         },
-        shape;
+        shape, i;
     
-    for (var i = 0; i < this.shapes.length; i++) {
+    for (i = 0; i < this.shapes.length; i++) {
         x_ar.push(this.shapes[i].x);
         y_ar.push(this.shapes[i].y);
     }
@@ -360,8 +358,7 @@ CanvasState.prototype.scaleToCanvas = function() {
 };
 
 CanvasState.prototype.centreCanvas = function() {
-    var x_ar = [],
-        y_ar = [],
+    var x_ar = [], y_ar = [],
         shapes = this.shapes,
         xmove, ymove;
     
@@ -487,12 +484,13 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
 
 CanvasState.prototype.doUp = function(e) {
     this.valid = false;
-    var index, sel;
+    var dialog = $("#dialog_form"),
+        index, sel, i, j, connector, suffix, new_output_label, out_node, shape, in_magnet;
     $(this.canvas).css("cursor", "auto");
     
     // Collision detection!
     if (this.dragging && this.selection.length > 0) {
-        for (var i=0; i < this.selection.length; i++) {
+        for (i = 0; i < this.selection.length; i++) {
             if (typeof this.selection[i].getVertices == 'function') {
                 this.detectCollisions(this.selection[i]);
             }
@@ -506,8 +504,8 @@ CanvasState.prototype.doUp = function(e) {
     }
 
     // are we carrying a shape?
-    if (this.selection[0].constructor != Connector) {
-        for (var i=0; i < this.selection.length; i++) {
+    if (!(this.selection[0] instanceof Connector)) {
+        for (i = 0; i < this.selection.length; i++) {
             sel = this.selection[i];
             if (this.outputZone.contains(sel.x, sel.y)) {
                 // Shape dragged into output zone
@@ -516,15 +514,15 @@ CanvasState.prototype.doUp = function(e) {
         }
     }
     
-    if (this.selection[0].constructor == Connector) {
-        var connector = this.selection[0];
+    if (this.selection[0] instanceof Connector) {
+        connector = this.selection[0];
         
         if (connector.dest === null) {
             // connector not yet linked to anything
         
             if (this.outputZone.contains(connector.x, connector.y)) {
                 // Connector drawn into output zone
-                if (connector.source.parent.constructor !== MethodNode) {
+                if (!(connector.source.parent instanceof MethodNode)) {
                     // disallow Connectors from data node directly to end-zone
                     index = this.connectors.indexOf(connector);
                     this.connectors.splice(index, 1);
@@ -532,13 +530,12 @@ CanvasState.prototype.doUp = function(e) {
                     this.valid = false;
                 } else {
                     // valid Connector, assign non-null value
-                
                     // make sure label is not a duplicate
-                    var suffix = 0;
-                    var new_output_label = connector.source.label;
-                    for (var i=0; i< this.shapes.length; i++) {
-                        var shape = this.shapes[i];
-                        if (shape.constructor != OutputNode) continue;
+                    suffix = 0;
+                    new_output_label = connector.source.label;
+                    for (i=0; i< this.shapes.length; i++) {
+                        shape = this.shapes[i];
+                        if (!(shape instanceof OutputNode)) continue;
                         if (shape.label == new_output_label) {
                             i = -1;
                             suffix++;
@@ -546,26 +543,28 @@ CanvasState.prototype.doUp = function(e) {
                         }
                     }
                 
-                    var outNode = new OutputNode(connector.x, connector.y, null, null, '#d40', null, null, new_output_label);
-                    this.addShape(outNode);
+                    out_node = new OutputNode(connector.x, connector.y, new_output_label);
+                    this.addShape(out_node);
                 
-                    connector.dest = outNode.in_magnets[0];
+                    connector.dest = out_node.in_magnets[0];
                     connector.dest.connected = [ connector ];
                     connector.source.connected.push(connector);
                 
-                    outNode.y = this.outputZone.y + this.outputZone.h + outNode.h/2 + outNode.r2;// push out of output zone
-                    outNode.x = connector.x;
+                    out_node.y = this.outputZone.y + this.outputZone.h + out_node.h/2 + out_node.r2;// push out of output zone
+                    out_node.x = connector.x;
                     this.valid = false;
 
                     // spawn dialog for output label
-                    var dialog = document.getElementById("dialog_form");
-                
-                    $(dialog).data('node', outNode).show().css({
-                        left: Math.min(connector.x, this.outputZone.x + this.outputZone.w/2 - dialog.offsetWidth/2 ) + this.pos_x,
-                        top:  Math.min(connector.y - dialog.offsetHeight/2, this.canvas.height - dialog.offsetHeight) + this.pos_y
-                    });
-                
-                    $('#output_name', dialog).val(new_output_label).select(); // default value;
+                    dialog
+                        .data('node', out_node)
+                        .show()
+                        .css({
+                            left: Math.min(connector.x, this.outputZone.x + this.outputZone.w/2 - dialog[0].offsetWidth/2 ) + this.pos_x,
+                            top:  Math.min(connector.y - dialog[0].offsetHeight/2, this.canvas.height - dialog[0].offsetHeight) + this.pos_y
+                        })
+                    .find('#output_name')
+                        .val(new_output_label)
+                        .select(); // default value;
                 }
             } else {
                 // Connector not linked to anything - delete
@@ -579,7 +578,7 @@ CanvasState.prototype.doUp = function(e) {
                 this.valid = false; // redraw canvas to remove this Connector
             }
         
-        } else if (connector.dest.constructor === Magnet) {
+        } else if (connector.dest instanceof Magnet) {
             // connector has been linked to an in-magnet
             if (connector.source.connected.indexOf(connector) < 0) {
                 // this is a new Connector, update source magnet
@@ -597,14 +596,11 @@ CanvasState.prototype.doUp = function(e) {
     this.testExecutionOrder();
 
     // turn off all in-magnets
-    var shapes = this.shapes;
-    for (var i = 0; i < shapes.length; i++) {
-        var shape = shapes[i];
-        if (typeof shape.in_magnets != 'undefined') {
-            var in_magnets = shape.in_magnets;
-            for (var j = 0; j < in_magnets.length; j++) {
-                in_magnet = in_magnets[j];
-                in_magnet.fill = 'white';
+    for (i = 0; i < this.shapes.length; i++) {
+        if (this.shapes[i].in_magnets instanceof Array) {
+            for (j = 0; j < this.shapes[i].in_magnets.length; j++) {
+                in_magnet = this.shapes[i].in_magnets[j];
+                in_magnet.fill = '#fff';
                 in_magnet.acceptingConnector = false;
             }
         }
@@ -612,43 +608,42 @@ CanvasState.prototype.doUp = function(e) {
 };
 
 CanvasState.prototype.contextMenu = function(e) {
-    var pos = this.getPos(e);
+    var pos = this.getPos(e),
+        mcm = $('#method_context_menu'),
+        sel = this.selection,
+        showMenu = function() {
+            mcm.show().css({ top: e.pageY, left: e.pageX });
+            $('li', mcm).show();
+        }
 
     // Edit mode can popup the context menu to delete and edit nodes
     if(this.can_edit){
-        if (this.selection.length == 1 && this.selection[0].constructor != Connector ) {
-            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-            $('#method_context_menu li').show();
-
-            if (this.selection[0].constructor == RawNode || this.selection[0].constructor == CDtNode) {
-                $('#method_context_menu .edit').hide();
+        if (sel.length == 1 && !(sel[0] instanceof Connector) ) {
+            showMenu();
+            if (sel[0] instanceof RawNode || sel[0] instanceof CDtNode) {
+                $('.edit', mcm).hide();
             }
-        } else if (this.selection.length > 1) {
-            $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-            $('#method_context_menu .edit').hide();
+        } else if (sel.length > 1) {
+            showMenu();
+            $('.edit', mcm).hide();
         }
     } else {
-        // Otherwise, we're read only, so only popup the context menu
-        // for outputs with datasets
-        if(this.selection.length == 1 &&
-           this.selection[0].constructor == OutputNode &&
-           this.selection[0].dataset_id !== null) {
-
-           // Context menu for pipeline outputs
-           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-           $('#method_context_menu li').show();
-           $('#method_context_menu .output_node').show();
-           $('#method_context_menu .step_node').hide();
-
-        } else if(  this.selection.length == 1 &&
-                    this.selection[0].constructor == MethodNode &&
-                    this.selection[0].log_id !== null) {
-
-           // Context menu for pipeline steps
-           $('#method_context_menu').show().css({ top: e.pageY, left: e.pageX });
-           $('#method_context_menu li').show();
-           $('#method_context_menu .output_node').hide();
-           $('#method_context_menu .step_node').show();
+        // Otherwise, we're read only, so only popup the context menu for outputs with datasets
+        if (sel.length == 1) {
+            // @FIXME: second condition here will evaluate to true if IDs have the value "undefined",
+            // since null !== undefined in javascript. Are these IDs always integers? 
+            // If so, !isNaN(x) would work, or possibly (typeof parseInt(x) == 'number').
+            if(sel[0] instanceof OutputNode && sel[0].dataset_id !== null) {
+               // Context menu for pipeline outputs
+               showMenu();
+               $('.output_node', mcm).show();
+               $('.step_node', mcm).hide();
+            } else if(sel[0] instanceof MethodNode && sel[0].log_id !== null) {
+               // Context menu for pipeline steps
+               showMenu();
+               $('.output_node', mcm).hide();
+               $('.step_node', mcm).show();
+            }
         }
     }
     this.doUp(e);
@@ -657,11 +652,9 @@ CanvasState.prototype.contextMenu = function(e) {
 
 CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
-    
-    if (shape.constructor == MethodNode) {
+    if (shape instanceof MethodNode) {
         this.testExecutionOrder();
     }
-    
     this.valid = false;
     return shape;
 };
@@ -690,7 +683,7 @@ CanvasState.prototype.testExecutionOrder = function() {
     
     // count up the total number of methods
     for ( i=0; i < shapes.length; i++ ) {
-        if (shapes[i].constructor === MethodNode)
+        if (shapes[i] instanceof MethodNode)
             n_methods++;
     }
 
@@ -703,10 +696,11 @@ CanvasState.prototype.testExecutionOrder = function() {
         
         check_for_shape: for ( i=0; i < shapes.length; i++ ) {
             shape = shapes[i];
-            if (shape.constructor !== MethodNode)
+            if (!(shape instanceof MethodNode)) {
                 continue;
+            }
             
-            for ( k=0; k < phases.length; k++ ) {
+            for ( k = 0; k < phases.length; k++ ) {
                 // search for parent in phases array
                 if (phases[k].indexOf(shape) > -1) {
                     continue check_for_shape;
@@ -714,7 +708,7 @@ CanvasState.prototype.testExecutionOrder = function() {
             }
     
             okay_to_add = true;
-            for ( j=0; j < shape.in_magnets.length; j++ ) {
+            for ( j = 0; j < shape.in_magnets.length; j++ ) {
                 
                 // check if pipeline is incomplete
                 // purposefully use fuzzy type coersion here: empty array will be 'false'
@@ -724,6 +718,8 @@ CanvasState.prototype.testExecutionOrder = function() {
                     break fill_phases_ar;
                 }
                 
+                /*
+                @debug
                 if (typeof shape.in_magnets[j].connected[0].source == 'undefined') {                
                     console.group('debug');
                     console.log(shape);
@@ -733,12 +729,13 @@ CanvasState.prototype.testExecutionOrder = function() {
                     console.log(shape.in_magnets[j].connected[0]);
                     console.log(shape.in_magnets[j].connected[0].source);
                     console.groupEnd();
-                }
+                }*/
                 
                 parent = shape.in_magnets[j].connected[0].source.parent;
                 
-                if (parent.constructor !== MethodNode)
+                if (!(parent instanceof MethodNode)) {
                     continue;
+                }
                 
                 found = false;
                 for ( k=0; k < phases.length; k++ ) {
@@ -824,15 +821,18 @@ CanvasState.prototype.draw = function() {
     Render pipeline objects to Canvas.
      */
     if (!this.valid) {
-        var ctx = this.ctx;
-        var shapes = this.shapes;
-        var connectors = this.connectors;
-        var labels = [];
+        var ctx = this.ctx,
+            shapes = this.shapes,
+            connectors = this.connectors,
+            sel = this.selection,
+            labels = [],
+            i, j, l, L, textWidth, flat_exec_order, shape;
         this.clear();
         
-        var draggingFromMethodOut = this.dragging && this.selection.length == 1 
-            && this.selection[0].constructor == Connector
-            && this.selection[0].source.parent.constructor == MethodNode;
+        var draggingFromMethodOut = this.dragging 
+            && sel.length == 1 
+            && sel[0] instanceof Connector
+            && sel[0].source.parent instanceof MethodNode;
         
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
@@ -840,24 +840,29 @@ CanvasState.prototype.draw = function() {
         }
         
         // draw all shapes and magnets
-        for (var i = 0; i < shapes.length; i++) {
-            var shape = shapes[i];
+        for (i = 0; i < shapes.length; i++) {
+            shape = shapes[i];
             // skip shapes moved off the screen
-            if (shape.x > this.width / this.scale || shape.y > this.height / this.scale ||
-                shape.x + 2 * shape.r < 0 || shape.y + 2 * shape.r < 0) {
+            if (shape.x > this.width / this.scale || 
+                    shape.y > this.height / this.scale ||
+                    shape.x + 2 * shape.r < 0 || 
+                    shape.y + 2 * shape.r < 0) {
                 continue;
             }
             
             shapes[i].draw(ctx);
             
             // queue label to be drawn after
-            if (this.force_show_exec_order === false || shapes[i].constructor !== MethodNode || this.force_show_exec_order === undefined && !this.exec_order_is_ambiguous) {
+            if (this.force_show_exec_order === false ||
+                    !(shapes[i] instanceof MethodNode) ||
+                    this.force_show_exec_order === undefined &&
+                    !this.exec_order_is_ambiguous) {
                 labels.push(shapes[i].getLabel());
             } else {
                 // add information about execution order
-                var L = shapes[i].getLabel(),
-                    flat_exec_order = [];
-                for( j in this.exec_order) {
+                L = shapes[i].getLabel();
+                flat_exec_order = [];
+                for( j = 0; j < this.exec_order.length; j++) {
                     //"flatten" 2d array into 1d by concatenation.
                     flat_exec_order = flat_exec_order.concat(this.exec_order[j]);
                 }
@@ -873,18 +878,15 @@ CanvasState.prototype.draw = function() {
         }
         ctx.globalAlpha = 1.0;
 
-        if (this.selection.length > 0) {
-            var sel;
-            for (var i=0; i < this.selection.length; i++) {
-                // draw selection ring
-                ctx.strokeStyle = this.selectionColor;
-                ctx.lineWidth = this.selectionWidth * 2;
-                sel = this.selection[i];
-            
-                ctx.font = '9pt Lato, sans-serif';
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = 'center';
-                sel.highlight(ctx, this.dragging);
+        if (sel.length > 0) {
+            // draw selection ring
+            ctx.strokeStyle = this.selectionColor;
+            ctx.lineWidth = this.selectionWidth * 2;
+            ctx.font = '9pt Lato, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            for (i = 0; i < sel.length; i++) {
+                sel[i].highlight(ctx, this.dragging);
             }
         }
         
@@ -893,15 +895,20 @@ CanvasState.prototype.draw = function() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
             ctx.font = '10pt Lato, sans-serif';
-            for (i = 0; i < labels.length; i++) {
-                var l = labels[i],
-                    textWidth = ctx.measureText(l.label).width;
-                ctx.fillStyle = '#fff';
-                ctx.globalAlpha = 0.4;
-                ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
 
-                ctx.fillStyle = '#000';
-                ctx.globalAlpha = 1.0;
+            // to minimize canvas state changes, loop twice.
+            // canvas state changes are computationally expensive.
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 0.4;
+            for (i = 0; i < labels.length; i++) {
+                l = labels[i],
+                textWidth = ctx.measureText(l.label).width;
+                ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
+            }
+            ctx.fillStyle = '#000';
+            ctx.globalAlpha = 1.0;
+            for (i = 0; i < labels.length; i++) {
+                l = labels[i];
                 ctx.fillText(l.label, l.x, l.y);
             }
         }
@@ -955,11 +962,11 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
         sel = mySel[k];
         
         if (sel !== null) {
-            if (sel.constructor == Connector) {
+            if (sel instanceof Connector) {
                 // remove selected Connector from list
             
                 // if a cable to an output node is severed, delete the node as well
-                if (sel.dest.parent.constructor == OutputNode) {
+                if (sel.dest.parent instanceof OutputNode) {
                     index = this.shapes.indexOf(sel.dest.parent);
                     this.shapes.splice(index, 1);
                 } else {
@@ -976,7 +983,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
                 index = this.connectors.indexOf(sel);
                 this.connectors.splice(index, 1);
             }
-            else if (sel.constructor == MethodNode) {
+            else if (sel instanceof MethodNode) {
                 // delete Connectors terminating in this shape
                 in_magnets = sel.in_magnets;
                 for (i = 0; i < in_magnets.length; i++) {
@@ -997,7 +1004,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
                 index = this.shapes.indexOf(sel);
                 this.shapes.splice(index, 1);
             }
-            else if (sel.constructor == OutputNode) {
+            else if (sel instanceof OutputNode) {
                 // deleting an output node is the same as deleting the cable
                 this_connector = sel.in_magnets[0].connected[0];
                 this.deleteObject(this_connector);
@@ -1011,7 +1018,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
                         index = this.connectors.indexOf(this_connector);
                         this.connectors.splice(index, 1);
 
-                        if (this_connector.dest !== undefined && this_connector.dest.constructor == Magnet) {
+                        if (this_connector.dest !== undefined && this_connector.dest instanceof Magnet) {
                             // in-magnets can accept only one Connector
                             this_connector.dest.connected = [];
                         }
@@ -1034,15 +1041,15 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
 CanvasState.prototype.findMethodNode = function(method_pk) {
     var shapes = this.shapes;
     for(var i=0; i < shapes.length; i++)
-        if (shapes[i].constructor === MethodNode && shapes[i].pk == method_pk)
+        if (shapes[i] instanceof MethodNode && shapes[i].pk === method_pk)
             return shapes[i];
     return null;
 }
 
-CanvasState.prototype.findOutputNode = function(method_pk) {
+CanvasState.prototype.findOutputNode = function(pk) {
     var shapes = this.shapes;
     for(var i=0; i < shapes.length; i++)
-        if (shapes[i].constructor === OutputNode && shapes[i].pk == method_pk)
+        if (shapes[i] instanceof OutputNode && shapes[i].pk === pk)
             return shapes[i];
     return null;
 }
