@@ -10,6 +10,8 @@ import sandbox
 import sandbox.testing_utils as tools
 import json
 from archive.tests import create_archive_test_environment
+from librarian.tests import create_removal_test_environment
+
 
 class FixtureBuilder(object):
     def get_name(self):
@@ -63,13 +65,15 @@ class FixtureBuilder(object):
             finally:
                 sys.stdout = old_stdout
 
+
 class ArchiveTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
         return 'archive_test_environment.json'
     
     def build(self):
         create_archive_test_environment(self)
-         
+
+
 class DeepNestedRunBuilder(FixtureBuilder):
     def get_name(self):
         return 'deep_nested_run.json'
@@ -107,11 +111,21 @@ class DeepNestedRunBuilder(FixtureBuilder):
                                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
 
+
+class RemovalTestEnvironmentBuilder(FixtureBuilder):
+    def get_name(self):
+        return 'removal.json'
+
+    def build(self):
+        create_removal_test_environment()
+
+
 class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
         ArchiveTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
+        RemovalTestEnvironmentBuilder().run()
         
         self.stdout.write('Done.')

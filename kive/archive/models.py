@@ -2512,6 +2512,13 @@ class ExecLog(stopwatch.models.Stopwatch):
 
         return self_output_redacted, self_error_redacted, self_code_redacted
 
+    def generated_execrecord(self):
+        try:
+            self.execrecord
+        except ObjectDoesNotExist:
+            return False
+        return True
+
 
 class MethodOutput(models.Model):
     """

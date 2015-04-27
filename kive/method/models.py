@@ -344,6 +344,33 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         self.delete()
 
+    @transaction.atomic
+    def remove_list(self):
+        SDs_listed = set()
+        ERs_listed = set()
+        runs_listed = set()
+        pipelines_listed = set()
+        methods_listed = set()
+        CRRs_listed = {self}
+
+        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
+            stuff_removed = dependant.coderesourcerevision.remove_list()
+            SDs_listed.update(stuff_removed[0])
+            ERs_listed.update(stuff_removed[1])
+            runs_listed.update(stuff_removed[2])
+            pipelines_listed.update(stuff_removed[3])
+            methods_listed.update(stuff_removed[4])
+            CRRs_listed.update(stuff_removed[5])
+
+        for method in self.members.all():
+            stuff_removed = method.remove_list()
+            SDs_listed.update(stuff_removed[0])
+            ERs_listed.update(stuff_removed[1])
+            runs_listed.update(stuff_removed[2])
+            pipelines_listed.update(stuff_removed[3])
+
+        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
+
 
 @python_2_unicode_compatible
 class CodeResourceDependency(models.Model):
@@ -783,6 +810,22 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # This delete will cascade to the inputs/outputs.
         self.delete()
 
+    def remove_list(self):
+        SDs_listed = set()
+        ERs_listed = set()
+        runs_listed = set()
+        pipelines_listed = set()
+
+        pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
+        for pipeline_affected in pipelines_affected:
+            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
+            SDs_listed.update(curr_SDs_listed)
+            ERs_listed.update(curr_ERs_listed)
+            runs_listed.update(curr_runs_listed)
+            pipelines_listed.update(curr_pipelines_listed)
+
+        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+
 
 @python_2_unicode_compatible
 class MethodFamily(transformation.models.TransformationFamily):
@@ -811,6 +854,24 @@ class MethodFamily(transformation.models.TransformationFamily):
     def remove(self):
         for method in self.members.all():
             method.remove()
+
+    def remove_list(self):
+        SDs_listed = set()
+        ERs_listed = set()
+        runs_listed = set()
+        pipelines_listed = set()
+        methods_listed = set()
+
+        for method in self.members.all():
+            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
+            SDs_listed.update(curr_SDs_listed)
+            ERs_listed.update(curr_ERs_listed)
+            runs_listed.update(curr_runs_listed)
+            pipelines_listed.update(curr_pipelines_listed)
+            methods_listed.add(method)
+
+        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
+
 
 # Register signals.
 post_delete.connect(method.signals.code_resource_revision_post_delete, sender=CodeResourceRevision)
