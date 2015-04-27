@@ -13,7 +13,8 @@
 /* polling interval. */
 var pollingInterval = 1000,
     timeoutId,
-    ajaxRequest;
+    ajaxRequest,
+    adminLock;
 
 /* Ask the server for a progress report of the run. */
 function poll_run_progress(run_data) {
@@ -21,7 +22,7 @@ function poll_run_progress(run_data) {
             "poll_run_progress",
             {
                 filters: get_run_filters(),
-                is_admin: $('#active_filters .lock').data('val'),
+                is_admin: adminLock.is_admin,
                 previous: run_data
             },
             function (new_data) {
@@ -115,21 +116,7 @@ function remove_handler() {
     poll_run_progress();
 }
 
-function toggle_lock($filter) {
-    var is_admin = $filter.data('val'),
-        image_url;
-    is_admin = is_admin == null ? false : ! is_admin;
-    image_url = (
-            is_admin
-            ? '/static/portal/img/lock-unlocked-2x.png'
-            : '/static/portal/img/lock-locked-2x.png');
-    $filter.data('val', is_admin);
-    $filter.find('img').attr('src', image_url);
-    $filter.find('span').text(is_admin ? 'administrator:' : '');
-}
-
 function lock_handler() {
-    toggle_lock($(this).closest('.lock'));
     reset_polling();
     poll_run_progress();
 }
@@ -215,15 +202,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     add_filter('active');
-    var $filter = $('#active_filters .lock')
-    
-    if ( ! is_user_admin) {
-        $filter.hide();
-    }
-    else {
-        toggle_lock($filter);
-        $filter.find('a').click(lock_handler);
-    }
+    adminLock = new admin_lock.AdminLock(
+            $('#active_filters .lock'),
+            is_user_admin,
+            lock_handler);
     
     poll_run_progress();
 });

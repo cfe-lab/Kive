@@ -1,33 +1,33 @@
 """
 archive views
 """
+import hashlib
+import logging
+import mimetypes
+import os
+
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.servers.basehttp import FileWrapper
+from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
+from django.db import transaction
+from django.forms.formsets import formset_factory
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, RequestContext
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status as rf_status
 
-from archive.serializers import DatasetSerializer
-from metadata.serializers import CompoundDatatypeInputSerializer
-
-from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
-from django.core.servers.basehttp import FileWrapper
-from django.core.exceptions import ValidationError
-from django.forms.formsets import formset_factory
-from django.db import transaction
-from django.contrib.auth.decorators import login_required
-from django.core.urlresolvers import reverse
-
-import mimetypes
-import os
-import logging
-
-from metadata.models import CompoundDatatype
-from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
+from archive.models import Dataset, MethodOutput
+from archive.serializers import DatasetSerializer
 import librarian.models
-import hashlib
+from metadata.models import CompoundDatatype
+from metadata.serializers import CompoundDatatypeInputSerializer
+from portal.views import admin_check
+from django.shortcuts import redirect
 
 
 LOGGER = logging.getLogger(__name__)
@@ -184,6 +184,20 @@ def stdout_view(request, methodoutput_id):
     return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url())
 
 @login_required
+@user_passes_test(admin_check)
+def stdout_redact(request, methodoutput_id):
+    """
+    Display the standard output associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    methodoutput.redact_output_log()
+    return redirect('view_results', id=methodoutput.execlog.record.parent_run.id)
+
+@login_required
 def stderr_download(request, methodoutput_id):
     """
     Display the standard output associated with the method output in the browser.
@@ -206,6 +220,20 @@ def stderr_view(request, methodoutput_id):
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
     return _build_raw_viewer(request, methodoutput.error_log, 'Standard error', methodoutput.get_absolute_error_url())
+
+@login_required
+@user_passes_test(admin_check)
+def stderr_redact(request, methodoutput_id):
+    """
+    Display the standard output associated with the method output in the browser.
+    """
+    try:
+        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
+    except Dataset.DoesNotExist:
+        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
+
+    methodoutput.redact_error_log()
+    return redirect('view_results', id=methodoutput.execlog.record.parent_run.id)
 
 
 @login_required

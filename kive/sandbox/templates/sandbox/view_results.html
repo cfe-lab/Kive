@@ -3,6 +3,14 @@
 {% block title %}Analysis{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/sandbox/admin_lock.js"></script>
+    <script src="/static/sandbox/view_results.js"></script>
+    <script type="text/javascript">
+        var is_user_admin = {{ is_user_admin|lower }};
+    </script>
+    <link rel="stylesheet" href="/static/sandbox/admin_lock.css">
     <style>
         .error-msg {
             color:red;
@@ -23,35 +31,41 @@
             <th>Output</th>
             <th>Size</th>
             <th>Date created</th>
-            <th></th>
-            <th></th>
+            <th colspan="3">
+                <div class="lock"/>
+            </th>
         </tr>
     </thead>
     <tbody>
-    {% for step_name, output_name, size, date, view_url, down_url, is_ok in outputs %}
+    {% for output in outputs %}
         <tr>
-            <td>{{ step_name }}</td>
-            <td>{{ output_name }} {% if not is_ok %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
+            <td>{{ output.step_name }}</td>
+            <td>{{ output.output_name }} {% if not output.is_ok %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
             <td>
-                {% if size != "redacted" %}
-                {{ size|filesizeformat }}
+                {% if output.size != "redacted" %}
+                    {{ output.size|filesizeformat }}
                 {% endif %}
             </td>
             <td>
-                {% if date != "redacted" %}
-                {{ date }}
+                {% if output.date != "redacted" %}
+                    {{ output.date }}
                 {% else %}
                     <em>redacted</em>
                 {% endif %}
             </td>
             <td>
-                {%  if view_url != "" %}
-                <a href="{{ view_url }}">View</a>
+                {%  if output.view_url != "" %}
+                    <a href="{{ output.view_url }}">View</a>
                 {% endif %}
             </td>
             <td>
-                {% if down_url != "" %}
-                <a href="{{ down_url }}">Download</a>
+                {% if output.down_url != "" %}
+                    <a href="{{ output.down_url }}">Download</a>
+                {% endif %}
+            </td>
+            <td>
+                {% if is_user_admin and output.redact_url != "" %}
+                    <a class="redact" href="{{ output.redact_url }}">Redact</a>
                 {% endif %}
             </td>
         </tr>

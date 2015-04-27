@@ -271,8 +271,8 @@ def api_run_pipeline(request):
 @login_required
 def runs(request):
     """Display all active runs for this user."""
-    is_user_admin = 'true' if admin_check(request.user) else 'false'
-    context = RequestContext(request, { 'is_user_admin': is_user_admin })
+    context = RequestContext(request)
+    context['is_user_admin'] = admin_check(request.user)
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
@@ -309,6 +309,7 @@ def view_results(request, id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
+    context['is_user_admin'] = admin_check(request.user)
 
     four_oh_four = False
     try:
@@ -321,23 +322,39 @@ def view_results(request, id):
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
     
+    class Output(object):
+        def __init__(self,
+                     step_name,
+                     output_name,
+                     size="redacted",
+                     date="redacted",
+                     view_url="",
+                     down_url="",
+                     redact_url="",
+                     is_ok=True):
+            self.step_name = step_name
+            self.output_name = output_name
+            self.size = size
+            self.date = date
+            self.view_url = view_url
+            self.down_url = down_url
+            self.redact_url = redact_url
+            self.is_ok = is_ok
+    
     outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
     for i, outcable in enumerate(run.outcables_in_order):
         if outcable.execrecord is not None:
-            output = outcable.execrecord.execrecordouts.first()
-            size = "redacted"
-            date_created = "redacted"
-            view_url = ""
-            dl_url = ""
-            if output.symbolicdataset.has_data():
-                dataset = output.symbolicdataset.dataset
-                size = dataset.dataset_file.size
-                date_created = dataset.date_created
-                view_url = "../../dataset_view/{}".format(dataset.pk)
-                dl_url = "../../dataset_download/{}".format(dataset.pk)
+            execrecordout = outcable.execrecord.execrecordouts.first()
+            output = Output(step_name=(i == 0 and 'Run outputs' or ''),
+                            output_name=outcable.pipelineoutputcable.dest)
+            if execrecordout.symbolicdataset.has_data():
+                dataset = execrecordout.symbolicdataset.dataset
+                output.size = dataset.dataset_file.size
+                output.date = dataset.date_created
+                output.view_url = "../../dataset_view/{}".format(dataset.pk)
+                output.down_url = "../../dataset_download/{}".format(dataset.pk)
 
-            outputs.append(((i == 0 and 'Run outputs' or ''), outcable.pipelineoutputcable.dest,
-                            size, date_created, view_url, dl_url, True))
+            outputs.append(output)
         
     for runstep in run.runsteps_in_order:
         execlog = runstep.get_log()
@@ -345,56 +362,49 @@ def view_results(request, id):
             continue
         methodoutput = execlog.methodoutput
 
+        output = Output(step_name=runstep.pipelinestep,
+                        output_name='Standard out')
         if methodoutput.is_output_redacted():
-            outputs.append((runstep.pipelinestep, 'Standard out', "redacted", "redacted", "", ""))
+            outputs.append(output)
         else:
             try:
-                outputs.append(
-                    (
-                        runstep.pipelinestep,
-                        'Standard out',
-                        methodoutput.output_log.size,
-                        execlog.end_time,
-                        "../../stdout_view/{}".format(methodoutput.id),
-                        "../../stdout_download/{}".format(methodoutput.id),
-                        True
-                    )
-                )
+                output.size = methodoutput.output_log.size
+                output.date = execlog.end_time
+                output.view_url = "../../stdout_view/{}".format(methodoutput.id)
+                output.down_url = "../../stdout_download/{}".format(methodoutput.id)
+                output.redact_url = "../../stdout_redact/{}".format(methodoutput.id)
+                outputs.append(output)
             except ValueError:
                 pass
+        output = Output(step_name="",
+                        output_name='Standard error')
         if methodoutput.is_error_redacted():
-            outputs.append(("", "Standard error", "redacted", "redacted", "", ""))
+            outputs.append(output)
         else:
             try:
-                outputs.append(
-                    (
-                        '',
-                        'Standard error',
-                        methodoutput.error_log.size,
-                        execlog.end_time,
-                        "../../stderr_view/{}".format(methodoutput.id),
-                        "../../stderr_download/{}".format(methodoutput.id),
-                        True
-                    )
-                )
+                output.size = methodoutput.error_log.size
+                output.date = execlog.end_time
+                output.view_url = "../../stderr_view/{}".format(methodoutput.id)
+                output.down_url = "../../stderr_download/{}".format(methodoutput.id)
+                output.redact_url = "../../stderr_redact/{}".format(methodoutput.id)
+                outputs.append(output)
             except ValueError:
                 pass
         if runstep.execrecord is not None:
-            for output in runstep.execrecord.execrecordouts_in_order:
-                size = "redacted"
-                date_created = "redacted"
-                view_url = ""
-                dl_url = ""
-                if output.symbolicdataset.has_data():
-                    dataset = output.symbolicdataset.dataset
-                    size = dataset.dataset_file.size
-                    date_created = dataset.date_created
-                    view_url = "../../dataset_view/{}".format(dataset.pk)
-                    dl_url = "../../dataset_download/{}".format(dataset.pk)
+            for execrecordout in runstep.execrecord.execrecordouts_in_order:
+                output = Output(step_name='',
+                                output_name=execrecordout.generic_output,
+                                is_ok=execrecordout.is_OK)
+                if execrecordout.symbolicdataset.has_data():
+                    dataset = execrecordout.symbolicdataset.dataset
+                    output.size = dataset.dataset_file.size
+                    output.date = dataset.date_created
+                    output.view_url = "../../dataset_view/{}".format(dataset.pk)
+                    output.down_url = "../../dataset_download/{}".format(dataset.pk)
+    
+                outputs.append(output)
 
-                outputs.append(('', output.generic_output, size, date_created, view_url, dl_url, output.is_OK()))
-
-    context.update({"outputs": outputs})
+    context["outputs"] = outputs
     return HttpResponse(template.render(context))
 
 
