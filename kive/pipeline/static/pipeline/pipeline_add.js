@@ -206,7 +206,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             $.ajax({
                 type: "POST",
                 url: "/get_method_revisions/",
-                data: { mf_id }, // specify data as an object
+                data: { mf_id: mf_id }, // specify data as an object
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
                     var options = [];
@@ -815,15 +815,15 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // Now we're ready to start
         // @note: shorthand object notation { val } is shorthand for { "val": val }
         var form_data = {
-            users_allowed,
-            groups_allowed,
+            users_allowed: users_allowed,
+            groups_allowed: groups_allowed,
             // There is no PipelineFamily yet; we're going to create one.
             family_pk: null,
-            family_name,
-            family_desc,
+            family_name: family_name,
+            family_desc: family_desc,
             // arguments to add first pipeline revision
-            revision_name,
-            revision_desc,
+            revision_name: revision_name,
+            revision_desc: revision_desc,
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
             canvas_height: canvas.height,
