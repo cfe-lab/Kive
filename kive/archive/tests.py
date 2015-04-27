@@ -3032,6 +3032,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
         for roc in self.pD_run.runoutputcables.all():
             self.assertEquals(roc.get_coordinates(), (2,))
 
+
 class GetCoordinatesOnDeepNestedRunTests(TestCase):
     fixtures = ['deep_nested_run']
 
@@ -3746,6 +3747,7 @@ class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
 
             for roc in curr_run.runoutputcables.all():
                 self.assertEquals(self.pE_run, roc.top_level_run)
+
 
 class TopLevelRunOnDeepNestedRunTests(TestCase):
     fixtures = ['deep_nested_run']

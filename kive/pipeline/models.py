@@ -77,6 +77,21 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
         self.delete()
 
+    def remove_list(self):
+        SDs_listed = set()
+        ERs_listed = set()
+        runs_listed = set()
+        pipelines_listed = set()
+
+        for pipeline in self.members.all():
+            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
+            SDs_listed.update(curr_SDs_listed)
+            ERs_listed.update(curr_ERs_listed)
+            runs_listed.update(curr_runs_listed)
+            pipelines_listed.update(curr_pipelines_listed)
+
+        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+
 
 class PipelineSerializationException(exceptions.Exception):
     """
@@ -101,7 +116,8 @@ class Pipeline(transformation.models.Transformation):
     """
 
     family = models.ForeignKey(PipelineFamily, related_name="members")
-    revision_parent = models.ForeignKey("self", related_name = "descendants", null=True, blank=True)
+    revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True,
+                                        on_delete=models.SET_NULL)
 
     # moved this here from Transformation so that it can be put into the
     # unique_together statement below. allowed to be blank because it's
@@ -655,6 +671,28 @@ class Pipeline(transformation.models.Transformation):
         # Cascade will handle steps, cables, RunToProcess objects, etc.
         self.delete()
 
+    @transaction.atomic
+    def remove_list(self):
+        SDs_to_remove = set()
+        ERs_to_remove = set()
+        runs_to_remove = set()
+        pipelines_to_remove = {self}
+
+        for run in self.pipeline_instances.all():
+            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
+            SDs_to_remove.update(curr_SDs_to_remove)
+            ERs_to_remove.update(curr_ERs_to_remove)
+            runs_to_remove.update(curr_runs_to_remove)
+
+        # Remove any pipeline that uses this one as a sub-pipeline.
+        for ps in self.pipelinesteps.all():
+            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
+            SDs_to_remove.update(curr_SDs_to_remove)
+            ERs_to_remove.update(curr_ERs_to_remove)
+            runs_to_remove.update(curr_runs_to_remove)
+            pipelines_to_remove.add(ps.pipeline)
+
+        return SDs_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
