@@ -64,6 +64,7 @@ urlpatterns = patterns(
     url(r'^datasets$', 'archive.views.datasets', name='datasets'),
     url(r'^dataset_download/(?P<dataset_id>\d+)$', 'archive.views.dataset_download', name='dataset_download'),
     url(r'^dataset_view/(?P<dataset_id>\d+)$', 'archive.views.dataset_view', name='dataset_view'),
+    url(r'^dataset_redact/(?P<dataset_id>\d+)$', 'archive.views.dataset_redact', name='dataset_redact'),
     url(r'^stdout_download/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_download', name='stdout_download'),
     url(r'^stdout_view/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_view', name='stdout_view'),
     url(r'^stdout_redact/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_redact', name='stdout_redact'),

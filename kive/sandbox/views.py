@@ -353,6 +353,7 @@ def view_results(request, id):
                 output.date = dataset.date_created
                 output.view_url = "../../dataset_view/{}".format(dataset.pk)
                 output.down_url = "../../dataset_download/{}".format(dataset.pk)
+                output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
 
             outputs.append(output)
         
@@ -401,8 +402,11 @@ def view_results(request, id):
                     output.date = dataset.date_created
                     output.view_url = "../../dataset_view/{}".format(dataset.pk)
                     output.down_url = "../../dataset_download/{}".format(dataset.pk)
+                    output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
     
                 outputs.append(output)
+    for output in outputs:
+        output.is_invalid = not output.is_ok and not output.redact_url
 
     context["outputs"] = outputs
     return HttpResponse(template.render(context))

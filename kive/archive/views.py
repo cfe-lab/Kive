@@ -152,6 +152,19 @@ def dataset_view(request, dataset_id):
     c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
 
+@login_required
+@user_passes_test(admin_check)
+def dataset_redact(request, dataset_id):
+    """
+    Redact the file associated with the dataset.
+    """
+    try:
+        dataset = Dataset.objects.get(pk=dataset_id)
+    except Dataset.DoesNotExist:
+        raise Http404("ID {} cannot be accessed".format(dataset_id))
+    
+    dataset.symbolicdataset.redact()
+    return redirect('view_results', id=dataset.created_by.parent_run.id)
 
 def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")

@@ -40,7 +40,7 @@
     {% for output in outputs %}
         <tr>
             <td>{{ output.step_name }}</td>
-            <td>{{ output.output_name }} {% if not output.is_ok %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
+            <td>{{ output.output_name }} {% if output.is_invalid %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
             <td>
                 {% if output.size != "redacted" %}
                     {{ output.size|filesizeformat }}
