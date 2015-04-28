@@ -924,6 +924,9 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // I code at my desk too.
         // July 30, 2014 - JN
 
+        // How did I even computer?
+        // April 28, 2015 - Cat
+
         // do AJAX transaction
         $.ajax({
             type: 'POST',
@@ -931,7 +934,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             data: JSON.stringify(form_data),
             datatype: 'json',
             success: function(result) {
-                console.log(result);
                 if (result['status'] == 'failure') {
                     submitError(result['error_msg']);
                 }

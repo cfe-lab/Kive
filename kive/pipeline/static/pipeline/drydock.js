@@ -630,15 +630,13 @@ CanvasState.prototype.contextMenu = function(e) {
     } else {
         // Otherwise, we're read only, so only popup the context menu for outputs with datasets
         if (sel.length == 1) {
-            // @FIXME: second condition here will evaluate to true if IDs have the value "undefined",
-            // since null !== undefined in javascript. Are these IDs always integers? 
-            // If so, !isNaN(x) would work, or possibly (typeof parseInt(x) == 'number').
-            if(sel[0] instanceof OutputNode && sel[0].dataset_id !== null) {
+            if(sel[0] instanceof OutputNode && sel[0].dataset_id != null) {
                // Context menu for pipeline outputs
                showMenu();
                $('.output_node', mcm).show();
                $('.step_node', mcm).hide();
-            } else if(sel[0] instanceof MethodNode && sel[0].log_id !== null) {
+
+            } else if(sel[0] instanceof MethodNode && sel[0].log_id != null) {
                // Context menu for pipeline steps
                showMenu();
                $('.output_node', mcm).hide();

@@ -62,14 +62,14 @@ var Geometry = {
     isometricXCoord: function(x,y) {
         // isometric x-coordinate is explained in issue #277.
         // using a -30° line that intersects (0,0) and a 30° line that intersects (x,y), find the intersection of the two.
-        // then compute the distance from this intersection to (x,y).
-        return x * Math.tan(Math.PI/6) - y;
+        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        return x * 0.577350269 - y;
     },
     isometricYCoord: function(x,y) {
         // isometric y-coordinate is explained in issue #277.
         // using a 30° line that intersects (0,0) and a -30° line that intersects (x,y), find the intersection of the two.
-        // then compute the distance from this intersection to (x,y).
-        return x * Math.tan(Math.PI/6) + y;
+        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        return x * 0.577350269 + y;
         
         /*
          * unabridged version:
@@ -98,7 +98,7 @@ var Geometry = {
             return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
         }
         
-        var y_diff = (x1 - x2) * Math.tan(Math.PI/6) + y1 - y2;
+        var y_diff = (x1 - x2) * 0.577350269 + y1 - y2; //tan(pi/6) = 1/sqrt(3) ~ 0.577350269
         if (y_diff > 7) {
             return 1;
         } else if (y_diff < -7) {
