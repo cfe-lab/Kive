@@ -23,6 +23,9 @@ def _build_run_outputs_response(run):
         json.dumps([output.__dict__ for output in run.get_output_summary()]),
         content_type=JSON_CONTENT_TYPE)
 
+def _is_dry_run(request):
+    return request.GET.get('dry_run') == 'true'
+
 @login_required
 @user_passes_test(admin_check)
 def dataset_redact(request, dataset_id):
@@ -37,7 +40,7 @@ def dataset_redact(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
     
-    is_dry_run = request.GET.get('dry_run') == 'true'
+    is_dry_run = _is_dry_run(request)
     if is_dry_run:
         #TODO: do an actual dry run once it's fixed.
         summary = "This will redact ? data sets, ? logs, and ? runs."
@@ -51,6 +54,10 @@ def dataset_redact(request, dataset_id):
 @user_passes_test(admin_check)
 def stdout_redact(request, methodoutput_id):
     methodoutput = _load_methodoutput(request, methodoutput_id)
+    if _is_dry_run(request):
+        summary = "This will redact 1 log."
+        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
+    
     methodoutput.redact_output_log()
     return _build_run_outputs_response(methodoutput.execlog.record.parent_run)
 
@@ -58,5 +65,9 @@ def stdout_redact(request, methodoutput_id):
 @user_passes_test(admin_check)
 def stderr_redact(request, methodoutput_id):
     methodoutput = _load_methodoutput(request, methodoutput_id)
+    if _is_dry_run(request):
+        summary = "This will redact 1 log."
+        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
+    
     methodoutput.redact_error_log()
     return _build_run_outputs_response(methodoutput.execlog.record.parent_run)
