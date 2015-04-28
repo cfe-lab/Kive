@@ -1040,16 +1040,16 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
 
 CanvasState.prototype.findMethodNode = function(method_pk) {
     var shapes = this.shapes;
-    for(var i=0; i < shapes.length; i++)
-        if (shapes[i] instanceof MethodNode && shapes[i].pk === method_pk)
+    for(var i = 0; i < shapes.length; i++)
+        if (shapes[i] instanceof MethodNode && shapes[i].pk == method_pk)
             return shapes[i];
     return null;
 }
 
 CanvasState.prototype.findOutputNode = function(pk) {
     var shapes = this.shapes;
-    for(var i=0; i < shapes.length; i++)
-        if (shapes[i] instanceof OutputNode && shapes[i].pk === pk)
+    for(var i = 0; i < shapes.length; i++)
+        if (shapes[i] instanceof OutputNode && shapes[i].pk == pk)
             return shapes[i];
     return null;
 }

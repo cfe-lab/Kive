@@ -164,21 +164,20 @@ function update_status(canvasState, status, look_for_md5) {
     // Set all the inputs as complete
     for(i = 0; i < canvasState.shapes.length; i++){
         shape = canvasState.shapes[i];
+
+        // Raw nodes and CDt nodes are by definition inputs
         if (shape instanceof RawNode || shape instanceof CDtNode) {
-            shape.status = '*';
+            shape.status = '*'; // TODO: Replace with proper status
         }
     }
 
-    // FIXME: for .. in can break invisibly without extra syntax, prefer for(i=0; i<length; i++) instead if pipeline_steps is a (non-associative) array
-    // Update all runsteps
-
-    debugger;
-
+    // Update each pipeline step
     for (method_pk in pipeline_steps) if (pipeline_steps.propertyIsEnumerable(method_pk)) {
         shape = canvasState.findMethodNode(method_pk);
         if (shape instanceof MethodNode) {
             shape.status = pipeline_steps[method_pk].status;
             shape.log_id = pipeline_steps[method_pk].log_id;
+            console.log(shape.status);
         }
     }
 
@@ -189,6 +188,7 @@ function update_status(canvasState, status, look_for_md5) {
             shape.status = outputs[output_pk].status;
             shape.md5 = outputs[output_pk].md5;
             shape.dataset_id = outputs[output_pk].dataset_id;
+            console.log(shape.status);
 
             if (shape.md5 === look_for_md5) {
                 shape.found_md5 = true;
