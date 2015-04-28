@@ -167,7 +167,7 @@ function update_status(canvasState, status, look_for_md5) {
 
         // Raw nodes and CDt nodes are by definition inputs
         if (shape instanceof RawNode || shape instanceof CDtNode) {
-            shape.status = '*'; // TODO: Replace with proper status
+            shape.status = 'CLEAR'; // TODO: Replace with proper status
         }
     }
 

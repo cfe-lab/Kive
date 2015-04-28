@@ -125,22 +125,30 @@ class RunToProcess(metadata.models.AccessControl):
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
         runsteps = sorted(run.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
+
         for step in runsteps:
+            step_status = ""
             log_char = ""
+
             if not step.is_marked_complete():
                 try:
                     step.log.id
                     log_char = "+"
+                    step_status = "RUNNING"
                 except ExecLog.DoesNotExist:
                     log_char = ":"
+                    step_status = "READY"
+
             elif not step.is_marked_successful():
                 log_char = "!"
+                step_status = "FAILURE"
             else:
                 log_char = "*"
+                step_status = "CLEAR"
 
             status += log_char
             if detailed:
-                step_progress[step.pipelinestep.transformation.pk] = {'status': log_char, 'log_id': None}
+                step_progress[step.pipelinestep.transformation.pk] = {'status': step_status, 'log_id': None}
                 try:
                     step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
                         methodoutput.id
@@ -156,21 +164,26 @@ class RunToProcess(metadata.models.AccessControl):
         for pipeline_cable in cables:
             run_cables = filter(lambda x: x.run == run, pipeline_cable.poc_instances.all())
             log_char = ""
+            step_status = ""
             if len(run_cables) <= 0:
                 log_char = "."
+                step_status = "WAITING"
             elif run_cables[0].is_marked_complete():
                 log_char = "*"
+                step_status = "CLEAR"
             else:
                 try:
                     run_cables[0].log.id
                     log_char = "+"
+                    step_status = "RUNNING"
                 except ExecLog.DoesNotExist:
                     log_char = ":"
+                    step_status = "READY"
 
-            # Log the statu
+            # Log the status
             status += log_char
             if detailed:
-                cable_progress[pipeline_cable.id] = {'status': log_char, 'dataset_id': None, 'md5': None}
+                cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
                 try:
                     symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
                     cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.pk

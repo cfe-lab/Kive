@@ -4,11 +4,11 @@
  *   (see drydock.js)
  */
 var _statusColorMap = {
-    '*': 'green',
-    '!': 'red',
-    '+': 'orange',
-    ':': 'orange',
-    '.': 'yellow',
+    'CLEAR': 'green',
+    'FAILURE': 'red',
+    'RUNNING': 'orange',
+    'READY': 'orange',
+    'WAITING': 'yellow',
 };
 
 var Geometry = {
@@ -922,18 +922,18 @@ Connector.prototype.draw = function(ctx) {
             cable_stat;
 
         if (typeof src.status === 'string') {
-            cable_stat = "+";
+            cable_stat = "RUNNING";
 
             // Upper cable is done!
-           if(src.status == '*' && typeof dst.status == 'string' ) {
+           if(src.status == 'CLEAR' && typeof dst.status == 'string' ) {
                 // Whatever, everything else is fine!
-                cable_stat = "*";
+                cable_stat = "CLEAR";
             }
 
             // Source is borked
-            else if(src.status == '!') {
+            else if(src.status == 'FAILURE') {
                 // so is any cable that pokes out of it...
-                cable_stat = "!";
+                cable_stat = "FAILURE";
             }
         }
 
