@@ -171,6 +171,9 @@ function update_status(canvasState, status, look_for_md5) {
 
     // FIXME: for .. in can break invisibly without extra syntax, prefer for(i=0; i<length; i++) instead if pipeline_steps is a (non-associative) array
     // Update all runsteps
+
+    debugger;
+
     for (method_pk in pipeline_steps) if (pipeline_steps.propertyIsEnumerable(method_pk)) {
         shape = canvasState.findMethodNode(method_pk);
         if (shape instanceof MethodNode) {
