@@ -12,9 +12,16 @@ function redact_handler(event) {
     
     event.preventDefault();
     $.ajax({
-        url: event.data,
+        url: redact_url + '?dry_run=true',
         success: function(data) {
-            build_table($('#outputs tbody'), data);
+            if (window.confirm(data + '\nAre you sure?')) {
+                $.ajax({
+                    url: redact_url,
+                    success: function(data) {
+                        build_table($('#outputs tbody'), data);
+                    }
+                })
+            }
         }
     });
 }
