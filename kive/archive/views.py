@@ -6,7 +6,7 @@ import logging
 import mimetypes
 import os
 
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.core.servers.basehttp import FileWrapper
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
@@ -26,8 +26,6 @@ from archive.serializers import DatasetSerializer
 import librarian.models
 from metadata.models import CompoundDatatype
 from metadata.serializers import CompoundDatatypeInputSerializer
-from portal.views import admin_check
-from django.shortcuts import redirect
 
 
 LOGGER = logging.getLogger(__name__)
@@ -152,20 +150,6 @@ def dataset_view(request, dataset_id):
     c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
 
-@login_required
-@user_passes_test(admin_check)
-def dataset_redact(request, dataset_id):
-    """
-    Redact the file associated with the dataset.
-    """
-    try:
-        dataset = Dataset.objects.get(pk=dataset_id)
-    except Dataset.DoesNotExist:
-        raise Http404("ID {} cannot be accessed".format(dataset_id))
-    
-    dataset.symbolicdataset.redact()
-    return redirect('view_results', id=dataset.created_by.parent_run.id)
-
 def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")
     c = RequestContext(request, {"file": file, "name": name, 'download': download})
@@ -197,20 +181,6 @@ def stdout_view(request, methodoutput_id):
     return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url())
 
 @login_required
-@user_passes_test(admin_check)
-def stdout_redact(request, methodoutput_id):
-    """
-    Display the standard output associated with the method output in the browser.
-    """
-    try:
-        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
-    except Dataset.DoesNotExist:
-        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
-
-    methodoutput.redact_output_log()
-    return redirect('view_results', id=methodoutput.execlog.record.parent_run.id)
-
-@login_required
 def stderr_download(request, methodoutput_id):
     """
     Display the standard output associated with the method output in the browser.
@@ -233,20 +203,6 @@ def stderr_view(request, methodoutput_id):
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
     return _build_raw_viewer(request, methodoutput.error_log, 'Standard error', methodoutput.get_absolute_error_url())
-
-@login_required
-@user_passes_test(admin_check)
-def stderr_redact(request, methodoutput_id):
-    """
-    Display the standard output associated with the method output in the browser.
-    """
-    try:
-        methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
-    except Dataset.DoesNotExist:
-        raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
-
-    methodoutput.redact_error_log()
-    return redirect('view_results', id=methodoutput.execlog.record.parent_run.id)
 
 
 @login_required

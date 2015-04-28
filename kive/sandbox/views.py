@@ -23,6 +23,7 @@ import fleet.models
 from django.db.models import Count
 from metadata.models import KiveUser
 from portal.views import admin_check
+import json
 
 
 @api_view(['GET'])
@@ -321,94 +322,9 @@ def view_results(request, id):
 
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
-    
-    class Output(object):
-        def __init__(self,
-                     step_name,
-                     output_name,
-                     size="redacted",
-                     date="redacted",
-                     view_url="",
-                     down_url="",
-                     redact_url="",
-                     is_ok=True):
-            self.step_name = step_name
-            self.output_name = output_name
-            self.size = size
-            self.date = date
-            self.view_url = view_url
-            self.down_url = down_url
-            self.redact_url = redact_url
-            self.is_ok = is_ok
-    
-    outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
-    for i, outcable in enumerate(run.outcables_in_order):
-        if outcable.execrecord is not None:
-            execrecordout = outcable.execrecord.execrecordouts.first()
-            output = Output(step_name=(i == 0 and 'Run outputs' or ''),
-                            output_name=outcable.pipelineoutputcable.dest)
-            if execrecordout.symbolicdataset.has_data():
-                dataset = execrecordout.symbolicdataset.dataset
-                output.size = dataset.dataset_file.size
-                output.date = dataset.date_created
-                output.view_url = "../../dataset_view/{}".format(dataset.pk)
-                output.down_url = "../../dataset_download/{}".format(dataset.pk)
-                output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
 
-            outputs.append(output)
-        
-    for runstep in run.runsteps_in_order:
-        execlog = runstep.get_log()
-        if execlog is None:
-            continue
-        methodoutput = execlog.methodoutput
-
-        output = Output(step_name=runstep.pipelinestep,
-                        output_name='Standard out')
-        if methodoutput.is_output_redacted():
-            outputs.append(output)
-        else:
-            try:
-                output.size = methodoutput.output_log.size
-                output.date = execlog.end_time
-                output.view_url = "../../stdout_view/{}".format(methodoutput.id)
-                output.down_url = "../../stdout_download/{}".format(methodoutput.id)
-                output.redact_url = "../../stdout_redact/{}".format(methodoutput.id)
-                outputs.append(output)
-            except ValueError:
-                pass
-        output = Output(step_name="",
-                        output_name='Standard error')
-        if methodoutput.is_error_redacted():
-            outputs.append(output)
-        else:
-            try:
-                output.size = methodoutput.error_log.size
-                output.date = execlog.end_time
-                output.view_url = "../../stderr_view/{}".format(methodoutput.id)
-                output.down_url = "../../stderr_download/{}".format(methodoutput.id)
-                output.redact_url = "../../stderr_redact/{}".format(methodoutput.id)
-                outputs.append(output)
-            except ValueError:
-                pass
-        if runstep.execrecord is not None:
-            for execrecordout in runstep.execrecord.execrecordouts_in_order:
-                output = Output(step_name='',
-                                output_name=execrecordout.generic_output,
-                                is_ok=execrecordout.is_OK)
-                if execrecordout.symbolicdataset.has_data():
-                    dataset = execrecordout.symbolicdataset.dataset
-                    output.size = dataset.dataset_file.size
-                    output.date = dataset.date_created
-                    output.view_url = "../../dataset_view/{}".format(dataset.pk)
-                    output.down_url = "../../dataset_download/{}".format(dataset.pk)
-                    output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
-    
-                outputs.append(output)
-    for output in outputs:
-        output.is_invalid = not output.is_ok and not output.redact_url
-
-    context["outputs"] = outputs
+    context["outputs"] = json.dumps(
+        [output.__dict__ for output in run.get_output_summary()])
     return HttpResponse(template.render(context))
 
 

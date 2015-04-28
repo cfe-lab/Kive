@@ -24,7 +24,9 @@
 
 <h2>Pipeline results</h2>
 
-<table>
+<div id="outputs_json" style="display:none">{{ outputs|escape }}</div>
+
+<table id="outputs">
     <thead>
         <tr>
             <th>Source</th>
@@ -37,39 +39,6 @@
         </tr>
     </thead>
     <tbody>
-    {% for output in outputs %}
-        <tr>
-            <td>{{ output.step_name }}</td>
-            <td>{{ output.output_name }} {% if output.is_invalid %} (<span class="error-msg">Data invalid</span>) {% endif %}</td>
-            <td>
-                {% if output.size != "redacted" %}
-                    {{ output.size|filesizeformat }}
-                {% endif %}
-            </td>
-            <td>
-                {% if output.date != "redacted" %}
-                    {{ output.date }}
-                {% else %}
-                    <em>redacted</em>
-                {% endif %}
-            </td>
-            <td>
-                {%  if output.view_url != "" %}
-                    <a href="{{ output.view_url }}">View</a>
-                {% endif %}
-            </td>
-            <td>
-                {% if output.down_url != "" %}
-                    <a href="{{ output.down_url }}">Download</a>
-                {% endif %}
-            </td>
-            <td>
-                {% if is_user_admin and output.redact_url != "" %}
-                    <a class="redact" href="{{ output.redact_url }}">Redact</a>
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
     </tbody>
 </table>
 {% endblock %}
