@@ -72,10 +72,19 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     @transaction.atomic
     def remove(self):
-        for pipeline in self.members.all():
-            pipeline.remove()
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
-        self.delete()
+    @transaction.atomic
+    def build_removal_plan(self):
+        removal_plan = metadata.models.empty_removal_plan()
+        removal_plan["PipelineFamilies"].add(self)
+
+        for pipeline in self.members.all():
+            if pipeline not in removal_plan["Pipelines"]:
+                metadata.models.update_removal_plan(removal_plan, pipeline.build_removal_plan(removal_plan))
+
+        return removal_plan
 
     def remove_list(self):
         SDs_listed = set()
@@ -660,16 +669,29 @@ class Pipeline(transformation.models.Transformation):
 
     @transaction.atomic
     def remove(self):
-        # A cascade to Run won't do it because Run needs to be *removed*.
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        assert self not in removal_plan["Pipelines"]
+        removal_plan["Pipelines"].add(self)
+
         for run in self.pipeline_instances.all():
-            run.remove()
+            if run not in removal_plan["Runs"]:
+                metadata.models.update_removal_plan(
+                    removal_plan, run.build_removal_plan(removal_plan)
+                )
 
         # Remove any pipeline that uses this one as a sub-pipeline.
         for ps in self.pipelinesteps.all():
-            ps.pipeline.remove()
+            if ps.pipeline not in removal_plan["Pipelines"]:
+                metadata.models.update_removal_plan(
+                    removal_plan, ps.pipeline.build_removal_plan(removal_plan)
+                )
 
-        # Cascade will handle steps, cables, RunToProcess objects, etc.
-        self.delete()
+        return removal_plan
 
     @transaction.atomic
     def remove_list(self):

@@ -28,16 +28,33 @@ import archive.signals
 from django.template.defaultfilters import filesizeformat
 
 
-@transaction.atomic
-def remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove):
-    for er in ERs_to_remove:
-        er.delete()
+def empty_redaction_plan():
+    return {
+        "SymbolicDatasets": set(),
+        "ExecRecords": set(),
+        "OutputLogs": set(),
+        "ErrorLogs": set(),
+        "ReturnCodes": set()
+    }
 
-    for sd in SDs_to_remove:
-        sd.delete()
 
-    for run in runs_to_remove:
-        run.delete()
+def redact_h(redaction_plan):
+    # Proceed in a fixed order.
+    if "SymbolicDatasets" in redaction_plan:
+        for sd in redaction_plan["SymbolicDatasets"]:
+            sd.redact_this()
+
+    if "OutputLogs" in redaction_plan:
+        for log in redaction_plan["OutputLogs"]:
+            log.redact_output_log()
+
+    if "ErrorLogs" in redaction_plan:
+        for log in redaction_plan["ErrorLogs"]:
+            log.redact_error_log()
+
+    if "ReturnCodes" in redaction_plan:
+        for log in redaction_plan["ReturnCodes"]:
+            log.redact_return_code()
 
 
 class update_field(object):
@@ -305,34 +322,21 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def remove(self):
         """Remove this Run cleanly."""
-        SDs_to_remove, ERs_to_remove, runs_to_remove = self.remove_list()
-        remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove)
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
-    def remove_list(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
+    def build_removal_plan(self, removal_accumulator=None):
         """
         Create a manifest of objects removed when this Run is removed.
         """
-        if runs_already_marked is not None and self in runs_already_marked:
-            return SDs_already_marked, ERs_already_marked, runs_already_marked
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        assert self not in removal_plan["Runs"]
+        removal_plan["Runs"].add(self)
 
-        SDs_already_marked = SDs_already_marked or set()
-        ERs_already_marked = ERs_already_marked or set()
+        for runcomponent in itertools.chain(self.runsteps.all(), self.runoutputcables.all()):
+            metadata.models.update_removal_plan(removal_plan, runcomponent.build_removal_plan_h(removal_plan))
 
-        if runs_already_marked is None:
-            runs_already_marked = {self}
-        else:
-            runs_already_marked.add(self)
-
-        for rs in self.runsteps.all():
-            SDs_already_marked, ERs_already_marked, runs_already_marked = rs.remove_list_h(
-                SDs_already_marked, ERs_already_marked, runs_already_marked
-            )
-        for roc in self.runoutputcables.all():
-            SDs_already_marked, ERs_already_marked, runs_already_marked = roc.remove_list_h(
-                SDs_already_marked, ERs_already_marked, runs_already_marked
-            )
-
-        return SDs_already_marked, ERs_already_marked, runs_already_marked
+        return removal_plan
 
     def get_output_summary(self):
         """ Get a list of objects that summarize all the outputs from a run.
@@ -870,21 +874,21 @@ class RunComponent(stopwatch.models.Stopwatch):
                 return False
         return True
 
-    def remove_list_h(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
+    def build_removal_plan_h(self, removal_accumulator=None):
         """
         Create a manifest of objects that will be removed by removing this RunComponent.
         """
-        SDs_already_marked = SDs_already_marked or set()
-        ERs_already_marked = ERs_already_marked or set()
-        runs_already_marked = runs_already_marked or set()
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
 
         for ds in self.outputs.all():
-            if ds.symbolicdataset not in SDs_already_marked:
-                SDs_already_marked, ERs_already_marked, runs_already_marked = ds.symbolicdataset.remove_list(
-                    SDs_already_marked, ERs_already_marked, runs_already_marked
-                )
+            if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                metadata.models.update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
 
-        return SDs_already_marked, ERs_already_marked, runs_already_marked
+        if self.has_log and self.execrecord.generator == self.log:
+            if self.execrecord not in removal_plan["ExecRecords"]:
+                metadata.models.update_removal_plan(removal_plan, self.execrecord.build_removal_plan(removal_plan))
+
+        return removal_plan
 
     @transaction.atomic
     def redact(self):
@@ -1466,6 +1470,13 @@ class RunStep(RunComponent):
             return _first_ER_h(other)
 
         return (None, None)
+
+    def build_removal_plan_h(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        for rsic in self.RSICs.all():
+            metadata.models.update_removal_plan(removal_plan, rsic.build_removal_plan_h(removal_plan))
+
+        return RunComponent.build_removal_plan_h(self, removal_plan)
 
 
 def _first_ER_h(execrecord_summary_list):
@@ -2586,30 +2597,31 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
         return False
 
-    def redact(self, error_log=True, output_log=True, return_code=True, dry_run=False):
+    def redaction_plan(self, error_log=True, output_log=True, return_code=True):
         """
         Redact the error/output log and/or the return code of the MethodOutput.
 
         Return lists of objects affected.
         """
-        self_output_redacted = set()
-        self_error_redacted = set()
-        self_code_redacted = set()
-        if not dry_run:
-            try:
-                if output_log and not self.methodoutput.is_output_redacted():
-                    self.methodoutput.redact_output_log()
-                    self_output_redacted.add(self)
-                if error_log and not self.methodoutput.is_error_redacted():
-                    self.methodoutput.redact_error_log()
-                    self_error_redacted.add(self)
-                if return_code and not self.methodoutput.is_code_redacted():
-                    self.methodoutput.redact_return_code()
-                    self_code_redacted.add(self)
-            except MethodOutput.DoesNotExist:
-                pass
+        redaction_plan = empty_redaction_plan()
+        try:
+            if output_log and not self.methodoutput.is_output_redacted():
+                redaction_plan["OutputLogs"].add(self)
+            if error_log and not self.methodoutput.is_error_redacted():
+                redaction_plan["ErrorLogs"].add(self)
+            if return_code and not self.methodoutput.is_code_redacted():
+                redaction_plan["ReturnCodes"].add(self)
+        except MethodOutput.DoesNotExist:
+            pass
 
-        return self_output_redacted, self_error_redacted, self_code_redacted
+        return redaction_plan
+
+    def generated_execrecord(self):
+        try:
+            self.execrecord
+        except ObjectDoesNotExist:
+            return False
+        return True
 
     def generated_execrecord(self):
         try:

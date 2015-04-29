@@ -19,6 +19,7 @@ import transformation.models
 import file_access_utils
 from constants import maxlengths
 import method.signals
+from metadata.models import empty_removal_plan, remove_h, update_removal_plan
 
 import os
 import stat
@@ -36,8 +37,8 @@ class CodeResource(metadata.models.AccessControl):
     Related to :model:`method.CodeResourceRevision`
     """
     name = models.CharField("Resource name", max_length=maxlengths.MAX_NAME_LENGTH,
-                             help_text="The name for this resource and all subsequent revisions.",
-                             unique=True)  # to prevent confusion in drop-down menus
+                            help_text="The name for this resource and all subsequent revisions.",
+                            unique=True)  # to prevent confusion in drop-down menus
 
     # File names must either be empty, or be 1 or more of any from
     # {alphanumeric, space, "-._()"}. This will prevent "../" as it
@@ -80,8 +81,18 @@ class CodeResource(metadata.models.AccessControl):
 
     @transaction.atomic()
     def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    @transaction.atomic()
+    def build_removal_plan(self):
+        removal_plan = empty_removal_plan()
+        removal_plan["CodeResources"].add(self)
         for revision in self.revisions.all():
-            revision.remove()
+            if revision not in removal_plan["CodeResourceRevisions"]:
+                update_removal_plan(removal_plan, revision.build_removal_plan(removal_plan))
+
+        return removal_plan
     
 
 @python_2_unicode_compatible
@@ -335,14 +346,27 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     @transaction.atomic
     def remove(self):
-        # Remove anything that has this as a dependency.
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["CodeResourceRevisions"]
+        removal_plan["CodeResourceRevisions"].add(self)
+
         for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            dependant.coderesourcerevision.remove()
+            if dependant.coderesourcerevision not in removal_plan["CodeResourceRevisions"]:
+                update_removal_plan(
+                    removal_plan,
+                    dependant.coderesourcerevision.build_removal_plan(removal_plan)
+                )
 
         for method in self.methods.all():
-            method.remove()
+            if method not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
 
-        self.delete()
+        return removal_plan
 
     @transaction.atomic
     def remove_list(self):
@@ -803,12 +827,20 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         # Remove all Pipelines that use this Method.  This will eventually make its way over to
         # remove the ExecLogs and ExecRecords too.
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Methods"]
+        removal_plan["Methods"].add(self)
+
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            pipeline_affected.remove()
+            if pipeline_affected not in removal_plan["Pipelines"]:
+                update_removal_plan(removal_plan, pipeline_affected.build_removal_plan(removal_plan))
 
-        # This delete will cascade to the inputs/outputs.
-        self.delete()
+        return removal_plan
 
     def remove_list(self):
         SDs_listed = set()
@@ -852,8 +884,19 @@ class MethodFamily(transformation.models.TransformationFamily):
 
     @transaction.atomic
     def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    def build_removal_plan(self):
+        removal_plan = empty_removal_plan()
+        removal_plan["MethodFamilies"].add(self)
+
         for method in self.members.all():
-            method.remove()
+            if method not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+
+        return removal_plan
+
 
     def remove_list(self):
         SDs_listed = set()

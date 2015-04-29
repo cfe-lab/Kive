@@ -31,6 +31,43 @@ from portal.views import admin_check
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
 
+# We delete objects in this order:
+deletion_order = [
+    "ExecRecords", "SymbolicDatasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
+    "MethodFamilies", "CompoundDatatypes", "Datatypes",
+    "CodeResourceRevisions", "CodeResources"
+]
+
+
+@transaction.atomic
+def remove_h(removal_plan):
+    for class_name in deletion_order:
+        if class_name in removal_plan:
+            for obj_to_delete in removal_plan[class_name]:
+                # FIXME don't try to delete if it's already deleted!
+                obj_to_delete.delete()
+
+
+def update_removal_plan(orig_dict, updating_dict):
+    """
+    Helper to update dictionaries of sets of objects to remove/redact.
+    """
+    for key in updating_dict.keys():
+        if key in orig_dict:
+            orig_dict[key].update()
+        else:
+            orig_dict[key] = updating_dict[key]
+
+    return orig_dict
+
+
+def empty_removal_plan():
+    removal_plan = {}
+    for key in deletion_order:
+        removal_plan[key] = set()
+    return removal_plan
+
+
 def kive_user():
     return User.objects.get(pk=users.KIVE_USER_PK)
 
@@ -41,7 +78,7 @@ def everyone_group():
 
 def get_builtin_types(datatypes):
     """
-    Retrieves the built-in types of all datatypess passed as input.
+    Retrieves the built-in types of all datatypes passed as input.
 
     Returns a set (to remove duplicates) with all of the built-in
     types represented in the inputs.
@@ -1126,6 +1163,14 @@ class Datatype(AccessControl):
         """
         Remove this Datatype and anything tied to it from the system.
         """
+        removal_plan = self.build_removal_plan(rm_verif_method=rm_verif_method)
+        remove_h(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None, rm_verif_method=True):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Datatypes"]
+
         builtin_pks = {
             datatypes.STR_PK,
             datatypes.BOOL_PK,
@@ -1135,23 +1180,40 @@ class Datatype(AccessControl):
         }
         if self.pk in builtin_pks:
             self.logger.warning("Cannot remove builtin datatypes.")
-            return
+            return removal_plan
+
+        removal_plan["Datatypes"].add(self)
 
         if self.prototype is not None:
-            self.prototype.remove()
+            # The prototype is a Dataset so we have to check its SymbolicDataset.
+            if self.prototype.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                prototype_removal_plan = self.prototype.symbolicdataset.build_removal_plan(removal_plan)
+                update_removal_plan(removal_plan, prototype_removal_plan)
+
         for descendant_dt in self.restricted_by.all():
-            descendant_dt.remove()
+            if descendant_dt not in removal_plan["Datatypes"]:
+                removal_plan = update_removal_plan(
+                    removal_plan,
+                    descendant_dt.build_removal_plan(removal_plan)
+                )
 
         cdts_affected = self.CDTMs.all().values("compounddatatype")
         for cdt in CompoundDatatype.objects.filter(pk__in=cdts_affected):
-            cdt.remove()
+            if cdt not in removal_plan["CompoundDatatypes"]:
+                removal_plan = update_removal_plan(
+                    removal_plan,
+                    cdt.build_removal_plan(removal_plan)
+                )
 
         if (rm_verif_method and self.has_custom_constraint() and
                 self.custom_constraint.verification_method.user == self.user):
-            self.custom_constraint.verification_method.remove(
-                remove_empty_family=True, remove_crr=True, remove_empty_cr=True)
+            if self.custom_constraint.verification_method not in removal_plan["Methods"]:
+                update_removal_plan(
+                    removal_plan,
+                    self.custom_constraint.verification_method.driver.build_removal_plan(removal_plan)
+                )
 
-        self.delete()
+        return removal_plan
 
 
 @python_2_unicode_compatible
@@ -1672,17 +1734,28 @@ class CompoundDatatype(AccessControl):
         """
         Handle removal of this CDT from the database, including all records that tied to it.
         """
-        # Remove any SymbolicDatasets that had this CDT.
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["CompoundDatatypes"]
+        removal_plan["CompoundDatatypes"].add(self)
+
         for ds in self.conforming_datasets.all().select_related("symbolicdataset"):
-            ds.symbolicdataset.redact(remove=True)
+            if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
 
         # Remove any Transformations that had this CDT.
         transfs_to_remove = set((xs.transf_xput.definite.transformation.definite
                                  for xs in self.xput_structures.all()))
-        for transf in transfs_to_remove:
-            try:
-                transf.remove()
-            except ObjectDoesNotExist:
-                pass
+        for definite_transf in transfs_to_remove:
+            if definite_transf.__class__.__name__ == "Method":
+                already_marked = definite_transf in removal_plan["Methods"]
+            else:
+                already_marked = definite_transf in removal_plan["Pipelines"]
+            if not already_marked:
+                removal_plan = update_removal_plan(removal_plan, definite_transf.build_removal_plan(removal_plan))
 
-        self.delete()
+        return removal_plan
