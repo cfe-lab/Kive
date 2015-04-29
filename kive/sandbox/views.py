@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status as rf_status
 
-from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from pipeline.serializers import PipelineFamilySerializer
 from fleet.serializers import RunToProcessSerializer
 from archive.serializers import DatasetSerializer
 
@@ -22,6 +22,8 @@ from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmiss
 import fleet.models
 from django.db.models import Count
 from metadata.models import KiveUser
+from portal.views import admin_check
+import json
 
 
 @api_view(['GET'])
@@ -271,6 +273,7 @@ def api_run_pipeline(request):
 def runs(request):
     """Display all active runs for this user."""
     context = RequestContext(request)
+    context['is_user_admin'] = admin_check(request.user)
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
@@ -283,7 +286,7 @@ def api_get_runs(request):
 
     all_runs, has_more = _load_status(request)
     resp = {
-        'runs': runs,
+        'runs': all_runs,
         'has_more': has_more
     }
     return Response(resp)
@@ -307,6 +310,7 @@ def view_results(request, id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
+    context['is_user_admin'] = admin_check(request.user)
 
     four_oh_four = False
     try:
@@ -318,81 +322,9 @@ def view_results(request, id):
 
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
-    
-    outputs = []  # [(step_name, output_name, size, date, view_url, down_url)]
-    for i, outcable in enumerate(run.outcables_in_order):
-        if outcable.execrecord is not None:
-            output = outcable.execrecord.execrecordouts.first()
-            size = "redacted"
-            date_created = "redacted"
-            view_url = ""
-            dl_url = ""
-            if output.symbolicdataset.has_data():
-                dataset = output.symbolicdataset.dataset
-                size = dataset.dataset_file.size
-                date_created = dataset.date_created
-                view_url = "../../dataset_view/{}".format(dataset.pk)
-                dl_url = "../../dataset_download/{}".format(dataset.pk)
 
-            outputs.append(((i == 0 and 'Run outputs' or ''), outcable.pipelineoutputcable.dest,
-                            size, date_created, view_url, dl_url, True))
-        
-    for runstep in run.runsteps_in_order:
-        execlog = runstep.get_log()
-        if execlog is None:
-            continue
-        methodoutput = execlog.methodoutput
-
-        if methodoutput.is_output_redacted():
-            outputs.append((runstep.pipelinestep, 'Standard out', "redacted", "redacted", "", ""))
-        else:
-            try:
-                outputs.append(
-                    (
-                        runstep.pipelinestep,
-                        'Standard out',
-                        methodoutput.output_log.size,
-                        execlog.end_time,
-                        "../../stdout_view/{}".format(methodoutput.id),
-                        "../../stdout_download/{}".format(methodoutput.id),
-                        True
-                    )
-                )
-            except ValueError:
-                pass
-        if methodoutput.is_error_redacted():
-            outputs.append(("", "Standard error", "redacted", "redacted", "", ""))
-        else:
-            try:
-                outputs.append(
-                    (
-                        '',
-                        'Standard error',
-                        methodoutput.error_log.size,
-                        execlog.end_time,
-                        "../../stderr_view/{}".format(methodoutput.id),
-                        "../../stderr_download/{}".format(methodoutput.id),
-                        True
-                    )
-                )
-            except ValueError:
-                pass
-        if runstep.execrecord is not None:
-            for output in runstep.execrecord.execrecordouts_in_order:
-                size = "redacted"
-                date_created = "redacted"
-                view_url = ""
-                dl_url = ""
-                if output.symbolicdataset.has_data():
-                    dataset = output.symbolicdataset.dataset
-                    size = dataset.dataset_file.size
-                    date_created = dataset.date_created
-                    view_url = "../../dataset_view/{}".format(dataset.pk)
-                    dl_url = "../../dataset_download/{}".format(dataset.pk)
-
-                outputs.append(('', output.generic_output, size, date_created, view_url, dl_url, output.is_OK()))
-
-    context.update({"outputs": outputs})
+    context["outputs"] = json.dumps(
+        [output.__dict__ for output in run.get_output_summary()])
     return HttpResponse(template.render(context))
 
 

@@ -13,7 +13,8 @@
 /* polling interval. */
 var pollingInterval = 1000,
     timeoutId,
-    ajaxRequest;
+    ajaxRequest,
+    adminLock;
 
 /* Ask the server for a progress report of the run. */
 function poll_run_progress(run_data) {
@@ -21,6 +22,7 @@ function poll_run_progress(run_data) {
             "poll_run_progress",
             {
                 filters: get_run_filters(),
+                is_admin: adminLock.is_admin,
                 previous: run_data
             },
             function (new_data) {
@@ -108,9 +110,13 @@ function show_run_progress(run_data) {
 }
 
 function remove_handler() {
-    var $filter = $(this).closest('.filter'),
-        $active_filters = $filter.closest('.active_filters');
+    var $filter = $(this).closest('.filter');
     $filter.detach();
+    reset_polling();
+    poll_run_progress();
+}
+
+function lock_handler() {
     reset_polling();
     poll_run_progress();
 }
@@ -131,7 +137,7 @@ function add_filter(key, value) {
     });
     if ( !$duplicates.length) {
         $filter.append($('<a class="remove">&times;</a>').click(remove_handler));
-        $filters.append($filter);
+        $filters.prepend($filter);
     }
 }
 
@@ -196,6 +202,10 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     add_filter('active');
+    adminLock = new admin_lock.AdminLock(
+            $('#active_filters .lock'),
+            is_user_admin,
+            lock_handler);
     
     poll_run_progress();
 });

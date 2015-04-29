@@ -1,59 +1,63 @@
-
 // place in global namespace to access from other files
 var submit_to_url = '/pipeline_add';
 
-var rawNodeWidth = 20,
-    rawNodeHeight = 25,
-    rawNodeColour = "#8D8",
-    rawNodeInset = 10,
-    rawNodeOffset = 25;
-
-var cdtNodeWidth = 45,
-    cdtNodeHeight = 28,
-    cdtNodeColour = '#88D',
-    cdtNodeInset = 13,
-    cdtNodeOffset = 15;
-
-var mNodeWidth = 80,
-    mNodeInset = 10,
-    mNodeSpacing = 20,
-    mNodeColour = '#999',
-    mNodeOffset = 10;
+function draw_pipeline(canvasState, pipeline) {
+    draw_inputs(canvasState, pipeline);
+    draw_steps(canvasState, pipeline, pipeline.pipeline_inputs.length);
+    draw_outputs(canvasState, pipeline, pipeline.pipeline_inputs.length);
+}
 
 // Draw pipeline inputs on the canvas.
 function draw_inputs(canvasState, pipeline) {
-    var pipeline_inputs = pipeline['pipeline_inputs'];  // Array[]
+    var pipeline_inputs = pipeline.pipeline_inputs, // Array[]
+        node, i;
     for (i = 0; i < pipeline_inputs.length; i++) {
         node = pipeline_inputs[i];
         if (node.CDT_pk === null) {
-            canvasState.addShape(new RawNode(node.x * canvasState.canvas.width / canvasState.scale, node.y * canvasState.canvas.height / canvasState.scale, rawNodeWidth, rawNodeHeight, null, null, null, node.dataset_name));
+            canvasState.addShape(new RawNode(
+                node.x * canvasState.canvas.width / canvasState.scale, 
+                node.y * canvasState.canvas.height / canvasState.scale, 
+                node.dataset_name
+            ));
         } else {
-            canvasState.addShape(new CDtNode(node.CDT_pk, node.x * canvasState.canvas.width / canvasState.scale, node.y * canvasState.canvas.height / canvasState.scale, cdtNodeWidth, cdtNodeHeight, null, null, null, node.dataset_name));
+            canvasState.addShape(new CDtNode(
+                node.CDT_pk, 
+                node.x * canvasState.canvas.width / canvasState.scale, 
+                node.y * canvasState.canvas.height / canvasState.scale, 
+                node.dataset_name
+            ));
         }
         canvasState.dragging = true;
         //canvasState.selection.push(canvasState.shapes[canvasState.shapes.length-1]);
 //        canvasState.doUp();
     }
-    draw_steps(canvasState, pipeline, pipeline_inputs.length);
 }
 
 // Draw pipeline steps on the canvas.
 function draw_steps(canvasState, pipeline, method_node_offset) {
-    var pipeline_steps = pipeline['pipeline_steps'];
+    var pipeline_steps = pipeline.pipeline_steps,
+        node, inputs, outputs, method_node, i, j, k, cables, cable, source;
+
     for (i = 0; i < pipeline_steps.length; i++) {
         node = pipeline_steps[i];
-        var inputs = pipeline_steps[i]["inputs"],
-            outputs = pipeline_steps[i]["outputs"];
-        
-        var method_node = new MethodNode(node.transf_pk, node.family_pk, node.x * canvasState.canvas.width / canvasState.scale, node.y * canvasState.canvas.height / canvasState.scale, mNodeWidth,
-                mNodeInset, mNodeSpacing, mNodeColour, node.name, mNodeOffset,
-                inputs, outputs);
+        inputs = pipeline_steps[i].inputs;
+        outputs = pipeline_steps[i].outputs;
+        method_node = new MethodNode(
+            node.transf_pk,
+            node.family_pk,
+            node.x * canvasState.canvas.width / canvasState.scale,
+            node.y * canvasState.canvas.height / canvasState.scale,
+            null,// fill
+            node.name,
+            inputs, 
+            outputs
+        );
 
         canvasState.addShape(method_node);
         method_node.draw(canvasState.ctx);  // to update Magnet x and y
 
         // connect Method inputs
-        cables = node['cables_in'];
+        cables = node.cables_in;
         for (j = 0; j < cables.length; j++) {
             cable = cables[j];
             if (cable.source_step == 0) {
@@ -61,13 +65,13 @@ function draw_steps(canvasState, pipeline, method_node_offset) {
                 source = null;
                 for (k = 0; k < canvasState.shapes.length; k++) {
                     shape = canvasState.shapes[k];
-                    if (shape.constructor !== MethodNode && shape.label === cable.source_dataset_name) {
+                    if (!(shape instanceof MethodNode) && shape.label === cable.source_dataset_name) {
                         source = shape;
                         break;
                     }
                 }
                 if (source === null) {
-                    alert("Failed to redraw Pipeline: missing data node");
+                    console.error("Failed to redraw Pipeline: missing data node");
                     return;
                 }
 
@@ -110,12 +114,13 @@ function draw_steps(canvasState, pipeline, method_node_offset) {
         }
         // done connecting input cables
     }
-    draw_outputs(canvasState, pipeline, method_node_offset);
 }
 
 // Draw pipeline outputs on the canvas.
 function draw_outputs(canvasState, pipeline, method_node_offset) {
-    var pipeline_outputs = pipeline['pipeline_outputs'];
+    var pipeline_outputs = pipeline.pipeline_outputs,
+        i, k, this_output, source, magnet, connector, output_node;
+
     for (i = 0; i < pipeline_outputs.length; i++) {
         this_output = pipeline_outputs[i];
 
@@ -130,7 +135,6 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
                 output_node = new OutputNode(
                     this_output.x * canvasState.canvas.width / canvasState.scale,
                     this_output.y * canvasState.canvas.height / canvasState.scale,
-                    null, null, null, null, null,
                     this_output.output_name,
                     this_output.id
                  );
@@ -153,35 +157,40 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
 }
 
 function update_status(canvasState, status, look_for_md5) {
-    var pipeline_steps = status.runs.step_progress;
-    var outputs = status.runs.output_progress;
+    var pipeline_steps = status.runs.step_progress,
+        outputs = status.runs.output_progress,
+        i, shape, method_pk, output_pk;
 
     // Set all the inputs as complete
-    for(var i = 0; i < canvasState.shapes.length; i++){
-        if( canvasState.shapes[i].constructor == RawNode ||
-            canvasState.shapes[i].constructor == CDtNode)
-            canvasState.shapes[i].status = '*';
+    for(i = 0; i < canvasState.shapes.length; i++){
+        shape = canvasState.shapes[i];
+
+        // Raw nodes and CDt nodes are by definition inputs
+        if (shape instanceof RawNode || shape instanceof CDtNode) {
+            shape.status = 'CLEAR'; // TODO: Replace with proper status
+        }
     }
 
-    // Update all runsteps
-    for(method_pk in pipeline_steps) {
-        var shape = canvasState.findMethodNode(method_pk);
-        if(shape != null) {
+    // Update each pipeline step
+    for (method_pk in pipeline_steps) if (pipeline_steps.propertyIsEnumerable(method_pk)) {
+        shape = canvasState.findMethodNode(method_pk);
+        if (shape instanceof MethodNode) {
             shape.status = pipeline_steps[method_pk].status;
             shape.log_id = pipeline_steps[method_pk].log_id;
         }
     }
 
     // Update all outputs
-    for(output_pk in outputs) {
-        var shape = canvasState.findOutputNode(output_pk);
-        if(shape != null) {
+    for (output_pk in outputs) if (outputs.propertyIsEnumerable(output_pk)) {
+        shape = canvasState.findOutputNode(output_pk);
+        if (shape instanceof OutputNode) {
             shape.status = outputs[output_pk].status;
             shape.md5 = outputs[output_pk].md5;
             shape.dataset_id = outputs[output_pk].dataset_id;
 
-            if(shape.md5 == look_for_md5)
+            if (shape.md5 === look_for_md5) {
                 shape.found_md5 = true;
+            }
         }
     }
 

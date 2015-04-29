@@ -26,6 +26,7 @@ from file_access_utils import set_up_directory
 from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
+from portal.views import admin_check
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
@@ -393,10 +394,19 @@ class AccessControl(models.Model):
             )
 
     @classmethod
-    def filter_by_user(cls, user):
+    def filter_by_user(cls, user, is_admin=False):
+        """ Retrieve a QuerySet of all records of this class that are visible
+            to the specified user.
+        
+        @param is_admin: override the filter, and just return all records.
+        @raise StandardError: if is_admin is true, but user is not in the
+            administrator group.
         """
-        Retrieve a QuerySet of all instances of this class that are viewable by the specified user.
-        """
+        if is_admin:
+            if not admin_check(user):
+                raise StandardError('User is not an administrator.')
+            return cls.objects.all()
+        
         user_plus = KiveUser.kiveify(user)
         return cls.objects.filter(user_plus.access_query()).distinct()
 

@@ -1,4 +1,7 @@
 /* Pipeline-specific formatting. */
+body {
+    background-image: url("/static/pipeline/isogrid.png");
+}
 #inner_wrap {
     margin-bottom: 0 !important;
 }
