@@ -58,6 +58,10 @@ td:last-child:empty,
 th:last-child:empty {
     display: none;
 }
+td ul {
+    -webkit-margin-before: 0;
+    -webkit-margin-after: 0;
+}
 tr:hover td {
     background-color: rgba(0,0,0,0.02);
 }
