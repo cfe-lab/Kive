@@ -69,13 +69,18 @@ def dataset_redact(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
     
-    is_dry_run = _is_dry_run(request)
-    if is_dry_run:
-        #TODO: do an actual dry run once it's fixed.
-        summary = "This will redact ? data sets, ? logs, and ? runs."
+    if _is_dry_run(request):
+        plan = dataset.symbolicdataset.build_redaction_plan()
+        runs = set()
+        for exec_record in plan['ExecRecords']:
+            runs.add(exec_record.generator.record.top_level_run)
+        summary = "This will redact {} data sets and {} logs from {} runs.".format(
+            len(plan['SymbolicDatasets']),
+            len(plan['OutputLogs']) + len(plan['ErrorLogs']),
+            len(runs))
         return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
     
-    dataset.symbolicdataset.redact(dry_run=is_dry_run)
+    dataset.symbolicdataset.redact()
 
     # FIXME: This is how we reload all the datasets if we're not redacting
     # from the run result page. We should try to do this in a more clean way?

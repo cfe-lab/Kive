@@ -980,12 +980,12 @@ class ExecRecord(models.Model):
         redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["ExecRecords"]
         redaction_plan["ExecRecords"].add(self)
-        archive.models.update_redaction_plan(redaction_plan, self.generator.build_redaction_plan())
+        metadata.models.update_removal_plan(redaction_plan, self.generator.build_redaction_plan())
 
         for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
             # If any of these are already redacted, this call will simply do nothing.
             if ero.symbolicdataset not in redaction_plan["SymbolicDatasets"]:
-                archive.models.update_redaction_plan(
+                metadata.models.update_removal_plan(
                     redaction_plan, ero.symbolicdataset.build_redaction_plan(redaction_plan)
                 )
 
