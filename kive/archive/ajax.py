@@ -5,6 +5,7 @@ from django.http.response import Http404, HttpResponse
 
 from archive.models import Dataset, MethodOutput
 from portal.views import admin_check
+from archive.views import api_get_datasets
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -47,7 +48,12 @@ def dataset_redact(request, dataset_id):
         return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
     
     dataset.symbolicdataset.redact(dry_run=is_dry_run)
-    
+
+    # FIXME: This is how we reload all the datasets if we're not redacting
+    # from the run result page. We should try to do this in a more clean way?
+    if request.GET.get('datasets') == 'true':
+        return api_get_datasets(request, -1)
+
     return _build_run_outputs_response(dataset.created_by.parent_run)
 
 @login_required

@@ -8,14 +8,25 @@
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/sandbox/admin_lock.js"></script>
+    <script src="/static/archive/datasets.js"></script>
+
+    <link rel="stylesheet" href="/static/sandbox/admin_lock.css">
+
+    <script type="text/javascript">
+        $(function(){
+            datasets_main({{ is_user_admin|lower }}, {{dataset_json|safe}});
+        });
+    </script>
+
 {% endblock %}
 
 {% block content %}
-
 <a href="usr.html" rel="prev">Back to user's portal</a>
 
 <h2>Uploaded datasets</h2>
-
 
 <table>
 <thead>
@@ -27,41 +38,13 @@
         <th>File Size (B)</th>
         <th>Users allowed</th>
         <th>Groups allowed</th>
-        <th></th>
+        <th colspan="3">
+            <div class="lock"/>
+        </th>
 	</tr>
 </thead>
-{% for dataset in datasets %}
-<tr>
-    <td>{{ dataset.user }}</td>
-	<td><a href="{{ dataset.get_absolute_url|get_view_link }}">{{ dataset.name }}</a></td>
-	<td>{{ dataset.description|escape|linebreaksbr }}</td>
-    <td>{{ dataset.date_created }}</td>
-    <td>{{ dataset.get_filesize }}</td>
-    <td>
-        {% if dataset.symbolicdataset.users_allowed.exists %}
-            <ul>
-            {% for user in dataset.symbolicdataset.users_allowed.all %}
-                <li>{{ user }}</li>
-            {% endfor %}
-            </ul>
-        {% else %}
-            None
-        {% endif %}
-    </td>
-    <td>
-        {% if dataset.symbolicdataset.groups_allowed.exists %}
-            <ul>
-            {% for group in dataset.symbolicdataset.groups_allowed.all %}
-                <li>{{ group }}</li>
-            {% endfor %}
-            </ul>
-        {% else %}
-            None
-        {% endif %}
-    </td>
-    <td><a href="{{ dataset.get_absolute_url }}">Download</a></td>
-</tr>
-{% endfor %}
+<tbody id="dataset_body">
+</tbody>
 </table>
 
 <a href="/datasets_add" class="button">+&ensp;<span class="button-lbl">Add Datasets</span></a>&ensp;

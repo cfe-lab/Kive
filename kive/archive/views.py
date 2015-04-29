@@ -26,7 +26,8 @@ from archive.serializers import DatasetSerializer
 import librarian.models
 from metadata.models import CompoundDatatype
 from metadata.serializers import CompoundDatatypeInputSerializer
-
+from portal.views import admin_check
+import json
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,9 +53,17 @@ def datasets(request):
     Display a list of all Datasets in database
     """
     t = loader.get_template('archive/datasets.html')
+
     accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
     datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs)
-    c = RequestContext(request, {'datasets': datasets})
+
+    c = RequestContext(request, {
+        'datasets': datasets,
+        'dataset_json':  json.dumps(DatasetSerializer(datasets, many=True).data)
+    })
+
+    c['is_user_admin'] = admin_check(request.user)
+
     return HttpResponse(t.render(c))
 
 
@@ -66,7 +75,10 @@ def api_get_datasets(request, page=0):
     page = int(page)
 
     accessible_sds = librarian.models.SymbolicDataset.filter_by_user(request.user)
-    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)[page*pagesize: (page+1)*pagesize]
+    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)
+
+    if page >= 0:
+        datasets = datasets[page*pagesize: (page+1)*pagesize]
 
     next_url = None
     if len(datasets) == pagesize:

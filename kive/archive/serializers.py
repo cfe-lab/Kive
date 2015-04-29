@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from archive.models import Dataset, Run
-from kive.serializers import TinyUserSerializer
+from kive.serializers import TinyUserSerializer, GroupSerializer
 from metadata.serializers import CompoundDatatypeInputSerializer
 from django.core.urlresolvers import reverse
 import os
@@ -17,11 +17,16 @@ class DatasetSerializer(serializers.ModelSerializer):
     user = TinyUserSerializer()
     compounddatatype = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
+    view_url = serializers.SerializerMethodField()
     filename = serializers.SerializerMethodField()
+    filesize = serializers.SerializerMethodField()
+    users_allowed = serializers.SerializerMethodField()
+    groups_allowed = serializers.SerializerMethodField()
 
     class Meta:
         model = Dataset
-        fields = ('id', 'name', 'filename', 'user', 'date_created', 'date_modified', 'download_url', 'compounddatatype')
+        fields = ('id', 'name', 'description', 'filename', 'user', 'date_created', 'date_modified', 'download_url',
+                  'view_url', 'compounddatatype', 'filesize', 'users_allowed', 'groups_allowed')
 
     def get_filename(self, obj):
         if obj:
@@ -39,4 +44,22 @@ class DatasetSerializer(serializers.ModelSerializer):
             return None
         return reverse('api_dataset_download', kwargs={'dataset_id': obj.id})
 
+    def get_view_url(self, obj):
+        if not obj:
+            return None
+        return reverse('dataset_view', kwargs={'dataset_id': obj.id})
 
+    def get_filesize(self, obj):
+        if not obj:
+            return 0
+        return obj.get_filesize()
+
+    def get_users_allowed(self, obj):
+        if not obj:
+            return None
+        return TinyUserSerializer(obj.symbolicdataset.users_allowed, many=True).data
+
+    def get_groups_allowed(self, obj):
+        if not obj:
+            return None
+        return GroupSerializer(obj.symbolicdataset.groups_allowed, many=True).data
