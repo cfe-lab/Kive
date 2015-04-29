@@ -1566,162 +1566,168 @@ class RemovalTests(TestCase):
             pipelines={self.p_nested}
         )
 
-    # FIXME continue from here
     def test_pipelinefamily_build_removal_plan(self):
         """Removing a PipelineFamily removes everything that goes along with it."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.noop_plf.build_removal_plan()
-        self.assertSetEqual(SDs_listed, self.produced_data)
-        self.assertSetEqual(ERs_listed, self.execrecords)
-        self.assertSetEqual(runs_listed, {self.first_run, self.second_run})
-        self.assertSetEqual(pipelines_listed, {self.noop_pl, self.p_nested})
+        self.removal_plan_tester(
+            self.noop_plf,
+            SDs=self.produced_data,
+            ERs=self.execrecords,
+            runs={self.first_run, self.second_run},
+            pipelines={self.noop_pl, self.p_nested},
+            pfs={self.noop_plf}
+        )
 
     def test_method_build_removal_plan(self):
         """Removing a Method removes all Pipelines containing it and all of the associated stuff."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.nuc_seq_noop.build_removal_plan()
-        self.assertSetEqual(SDs_listed, self.produced_data)
-        self.assertSetEqual(ERs_listed, self.execrecords)
-        self.assertSetEqual(runs_listed, {self.first_run, self.second_run})
-        self.assertSetEqual(pipelines_listed, {self.noop_pl})
+        self.removal_plan_tester(
+            self.nuc_seq_noop,
+            SDs=self.produced_data,
+            ERs=self.execrecords,
+            runs={self.first_run, self.second_run},
+            pipelines={self.noop_pl, self.p_nested},
+            methods={self.nuc_seq_noop}
+        )
 
-    def test_methodfamily_build_removal_plan(self):
-        """Removing a MethodFamily."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop_mf.build_removal_plan()
-        self.assertSetEqual(SDs_listed, self.produced_data)
-        self.assertSetEqual(ERs_listed, self.execrecords)
-        self.assertSetEqual(runs_listed, {self.first_run, self.second_run})
-        self.assertSetEqual(pipelines_listed, {self.noop_pl})
-        self.assertSetEqual(methods_listed, {self.nuc_seq_noop})
-
-    def test_crr_build_removal_plan(self):
-        """Removing a CodeResourceRevision."""
-        stuff_listed = self.noop_crr.build_removal_plan()
-        self.assertSetEqual(stuff_listed[0], self.produced_data)
-        self.assertSetEqual(stuff_listed[1], self.execrecords)
-        self.assertSetEqual(stuff_listed[2], {self.first_run, self.second_run})
-        self.assertSetEqual(stuff_listed[3], {self.noop_pl})
-        self.assertSetEqual(stuff_listed[4], {self.nuc_seq_noop})
-        self.assertSetEqual(stuff_listed[5], {self.noop_crr, self.pass_through_crr})
-
-    def test_crr_nodep_build_removal_plan(self):
-        """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
-        stuff_listed = self.pass_through_crr.build_removal_plan()
-        self.assertSetEqual(stuff_listed[0], set())
-        self.assertSetEqual(stuff_listed[1], set())
-        self.assertSetEqual(stuff_listed[2], set())
-        self.assertSetEqual(stuff_listed[3], set())
-        self.assertSetEqual(stuff_listed[4], set())
-        self.assertSetEqual(stuff_listed[5], {self.pass_through_crr})
-
-    def test_cr_build_removal_plan(self):
-        """Removing a CodeResource removes its revisions."""
-        stuff_listed = self.noop_cr.build_removal_plan()
-        self.assertSetEqual(stuff_listed[0], self.produced_data)
-        self.assertSetEqual(stuff_listed[1], self.execrecords)
-        self.assertSetEqual(stuff_listed[2], {self.first_run, self.second_run})
-        self.assertSetEqual(stuff_listed[3], {self.noop_pl})
-        self.assertSetEqual(stuff_listed[4], {self.nuc_seq_noop})
-        self.assertSetEqual(stuff_listed[5], {self.noop_crr, self.pass_through_crr})
-
-    def test_cdt_build_removal_plan(self):
-        """Removing a CDT."""
-        stuff_listed = self.one_col_nuc_seq.build_removal_plan()
-        # FIXME continue from here
-
-    def removal_tester(self, SDs_listed, ERs_listed, runs_listed, pipelines_listed=None, methods_listed=None,
-                       CRRs_listed=None):
-        """Helper that's contingent on build_removal_plan working properly."""
-        self.assertFalse(SymbolicDataset.objects.filter(pk__in=[x.pk for x in SDs_listed]))
-        self.assertFalse(ExecRecord.objects.filter(pk__in=[x.pk for x in ERs_listed]))
-        self.assertFalse(Run.objects.filter(pk__in=[x.pk for x in runs_listed]))
-        if pipelines_listed is not None:
-            self.assertFalse(Pipeline.objects.filter(pk__in=[x.pk for x in pipelines_listed]))
-        if methods_listed is not None:
-            self.assertFalse(Method.objects.filter(pk__in=[x.pk for x in methods_listed]))
-        if CRRs_listed is not None:
-            self.assertFalse(CodeResourceRevision.objects.filter(pk__in=[x.pk for x in CRRs_listed]))
-
-    def test_pipeline_remove(self):
-        """
-        Removing a Pipeline should remove all Runs created from it.
-        """
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.noop_pl.build_removal_plan()
-        self.noop_pl.remove()
-        self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed)
-
-    def test_pipelinefamily_remove(self):
-        """Removing a PipelineFamily should remove all Pipelines in it."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.noop_plf.build_removal_plan()
-        self.noop_plf.remove()
-        self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed)
-
-    def test_method_remove(self):
-        """Removing a Method should remove the Pipelines containing it."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop.build_removal_plan()
-        self.nuc_seq_noop.remove()
-        self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed)
-
-    def test_methodfamily_remove(self):
-        """Removing a MethodFamily should remove the Methods in it."""
-        SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop_mf.build_removal_plan()
-        self.nuc_seq_noop_mf.remove()
-        self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed)
-
-    def test_crr_remove(self):
-        """Removing a CodeResourceRevision should remove the Methods using it, and its dependencies."""
-        noop_cr = CodeResource.objects.get(name="Noop")
-        noop_crr = noop_cr.revisions.get(revision_name="1")
-        noop_dependency_pks = [x.pk for x in noop_crr.dependencies.all()]
-        noop_method_pks = [x.pk for x in noop_crr.methods.all()]
-
-        noop_crr.remove()
-        self.assertFalse(CodeResourceDependency.objects.filter(pk__in=noop_dependency_pks).exists())
-        self.assertFalse(Method.objects.filter(pk__in=noop_method_pks).exists())
-
-    def test_cr_remove(self):
-        """Removing a CodeResource should remove the CodeResourceRevisions using it."""
-        noop_cr = CodeResource.objects.get(name="Noop")
-        noop_crr_pks = [x.pk for x in noop_cr.revisions.all()]
-
-        noop_cr.remove()
-        self.assertFalse(CodeResourceRevision.objects.filter(pk__in=noop_crr_pks).exists())
-
-    def test_cdt_remove(self):
-        """Removing a CDT should remove the Methods/Pipelines/SymbolicDatasets using it."""
-        nucleotide_seq = Datatype.objects.get(name="Nucleotide sequence")
-        one_col_nuc_seq = nucleotide_seq.CDTMs.get(column_name="sequence", column_idx=1).compounddatatype
-
-        sds_using_pks = [x.symbolicdataset for x in one_col_nuc_seq.conforming_datasets.all()]
-        transfs_using_pks = [x.transf_xput.definite.transformation for x in one_col_nuc_seq.xput_structures.all()]
-
-        one_col_nuc_seq.remove()
-        self.assertFalse(SymbolicDataset.objects.filter(pk__in=sds_using_pks).exists())
-        self.assertFalse(Transformation.objects.filter(pk__in=transfs_using_pks).exists())
-
-    def test_datatype_remove(self):
-        """Removing a Datatype should remove the CDTs that use it."""
-        nucleotide_seq = Datatype.objects.get(name="Nucleotide sequence")
-        cdts_using_pk = [x.compounddatatype.pk for x in nucleotide_seq.CDTMs.all()]
-
-        nucleotide_seq.remove()
-        self.assertFalse(CompoundDatatype.objects.filter(pk__in=cdts_using_pks).exists())
-
-    def test_sd_remove(self):
-        """Removing a SymbolicDataset should remove anything that touches it."""
-        run_input_sd = SymbolicDataset.objects.get(dataset__name="Removal test data")
-
-        ers_fed = run_input_sd.execrecordins.all().values_list("execrecord", flat=True)
-        ers_fed_pks = [x.pk for x in ers_fed]
-
-        runsteps_fed = RunStep.objects.filter(execrecord__in=ers_fed)
-        runs_using = set([x.top_level_run for x in runsteps_fed])
-        runs_using_pks = [x.pk for x in runs_using]
-
-        sds_produced_pks = set()
-        for er in ers_fed:
-            for ero in er.execrecordouts.all():
-                sds_produced_pks.add(ero.symbolicdataset.pk)
-
-        run_input_sd.remove()
-        self.assertFalse(ExecRecord.objects.filter(pk__in=ers_fed_pks).exists())
-        self.assertFalse(Run.objects.filter(pk__in=runs_using_pks).exists())
-        self.assertFalse(SymbolicDataset.objects.filter(pk__in=sds_produced_pks).exists())
+    # FIXME continue from here
+    # def test_methodfamily_build_removal_plan(self):
+    #     """Removing a MethodFamily."""
+    #     SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop_mf.build_removal_plan()
+    #     self.assertSetEqual(SDs_listed, self.produced_data)
+    #     self.assertSetEqual(ERs_listed, self.execrecords)
+    #     self.assertSetEqual(runs_listed, {self.first_run, self.second_run})
+    #     self.assertSetEqual(pipelines_listed, {self.noop_pl})
+    #     self.assertSetEqual(methods_listed, {self.nuc_seq_noop})
+    #
+    # def test_crr_build_removal_plan(self):
+    #     """Removing a CodeResourceRevision."""
+    #     stuff_listed = self.noop_crr.build_removal_plan()
+    #     self.assertSetEqual(stuff_listed[0], self.produced_data)
+    #     self.assertSetEqual(stuff_listed[1], self.execrecords)
+    #     self.assertSetEqual(stuff_listed[2], {self.first_run, self.second_run})
+    #     self.assertSetEqual(stuff_listed[3], {self.noop_pl})
+    #     self.assertSetEqual(stuff_listed[4], {self.nuc_seq_noop})
+    #     self.assertSetEqual(stuff_listed[5], {self.noop_crr, self.pass_through_crr})
+    #
+    # def test_crr_nodep_build_removal_plan(self):
+    #     """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
+    #     stuff_listed = self.pass_through_crr.build_removal_plan()
+    #     self.assertSetEqual(stuff_listed[0], set())
+    #     self.assertSetEqual(stuff_listed[1], set())
+    #     self.assertSetEqual(stuff_listed[2], set())
+    #     self.assertSetEqual(stuff_listed[3], set())
+    #     self.assertSetEqual(stuff_listed[4], set())
+    #     self.assertSetEqual(stuff_listed[5], {self.pass_through_crr})
+    #
+    # def test_cr_build_removal_plan(self):
+    #     """Removing a CodeResource removes its revisions."""
+    #     stuff_listed = self.noop_cr.build_removal_plan()
+    #     self.assertSetEqual(stuff_listed[0], self.produced_data)
+    #     self.assertSetEqual(stuff_listed[1], self.execrecords)
+    #     self.assertSetEqual(stuff_listed[2], {self.first_run, self.second_run})
+    #     self.assertSetEqual(stuff_listed[3], {self.noop_pl})
+    #     self.assertSetEqual(stuff_listed[4], {self.nuc_seq_noop})
+    #     self.assertSetEqual(stuff_listed[5], {self.noop_crr, self.pass_through_crr})
+    #
+    # def test_cdt_build_removal_plan(self):
+    #     """Removing a CDT."""
+    #     stuff_listed = self.one_col_nuc_seq.build_removal_plan()
+    #     # FIXME continue from here
+    #
+    # def removal_tester(self, SDs_listed, ERs_listed, runs_listed, pipelines_listed=None, methods_listed=None,
+    #                    CRRs_listed=None):
+    #     """Helper that's contingent on build_removal_plan working properly."""
+    #     self.assertFalse(SymbolicDataset.objects.filter(pk__in=[x.pk for x in SDs_listed]))
+    #     self.assertFalse(ExecRecord.objects.filter(pk__in=[x.pk for x in ERs_listed]))
+    #     self.assertFalse(Run.objects.filter(pk__in=[x.pk for x in runs_listed]))
+    #     if pipelines_listed is not None:
+    #         self.assertFalse(Pipeline.objects.filter(pk__in=[x.pk for x in pipelines_listed]))
+    #     if methods_listed is not None:
+    #         self.assertFalse(Method.objects.filter(pk__in=[x.pk for x in methods_listed]))
+    #     if CRRs_listed is not None:
+    #         self.assertFalse(CodeResourceRevision.objects.filter(pk__in=[x.pk for x in CRRs_listed]))
+    #
+    # def test_pipeline_remove(self):
+    #     """
+    #     Removing a Pipeline should remove all Runs created from it.
+    #     """
+    #     SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.noop_pl.build_removal_plan()
+    #     self.noop_pl.remove()
+    #     self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed)
+    #
+    # def test_pipelinefamily_remove(self):
+    #     """Removing a PipelineFamily should remove all Pipelines in it."""
+    #     SDs_listed, ERs_listed, runs_listed, pipelines_listed = self.noop_plf.build_removal_plan()
+    #     self.noop_plf.remove()
+    #     self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed)
+    #
+    # def test_method_remove(self):
+    #     """Removing a Method should remove the Pipelines containing it."""
+    #     SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop.build_removal_plan()
+    #     self.nuc_seq_noop.remove()
+    #     self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed)
+    #
+    # def test_methodfamily_remove(self):
+    #     """Removing a MethodFamily should remove the Methods in it."""
+    #     SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed = self.nuc_seq_noop_mf.build_removal_plan()
+    #     self.nuc_seq_noop_mf.remove()
+    #     self.removal_tester(SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed)
+    #
+    # def test_crr_remove(self):
+    #     """Removing a CodeResourceRevision should remove the Methods using it, and its dependencies."""
+    #     noop_cr = CodeResource.objects.get(name="Noop")
+    #     noop_crr = noop_cr.revisions.get(revision_name="1")
+    #     noop_dependency_pks = [x.pk for x in noop_crr.dependencies.all()]
+    #     noop_method_pks = [x.pk for x in noop_crr.methods.all()]
+    #
+    #     noop_crr.remove()
+    #     self.assertFalse(CodeResourceDependency.objects.filter(pk__in=noop_dependency_pks).exists())
+    #     self.assertFalse(Method.objects.filter(pk__in=noop_method_pks).exists())
+    #
+    # def test_cr_remove(self):
+    #     """Removing a CodeResource should remove the CodeResourceRevisions using it."""
+    #     noop_cr = CodeResource.objects.get(name="Noop")
+    #     noop_crr_pks = [x.pk for x in noop_cr.revisions.all()]
+    #
+    #     noop_cr.remove()
+    #     self.assertFalse(CodeResourceRevision.objects.filter(pk__in=noop_crr_pks).exists())
+    #
+    # def test_cdt_remove(self):
+    #     """Removing a CDT should remove the Methods/Pipelines/SymbolicDatasets using it."""
+    #     nucleotide_seq = Datatype.objects.get(name="Nucleotide sequence")
+    #     one_col_nuc_seq = nucleotide_seq.CDTMs.get(column_name="sequence", column_idx=1).compounddatatype
+    #
+    #     sds_using_pks = [x.symbolicdataset for x in one_col_nuc_seq.conforming_datasets.all()]
+    #     transfs_using_pks = [x.transf_xput.definite.transformation for x in one_col_nuc_seq.xput_structures.all()]
+    #
+    #     one_col_nuc_seq.remove()
+    #     self.assertFalse(SymbolicDataset.objects.filter(pk__in=sds_using_pks).exists())
+    #     self.assertFalse(Transformation.objects.filter(pk__in=transfs_using_pks).exists())
+    #
+    # def test_datatype_remove(self):
+    #     """Removing a Datatype should remove the CDTs that use it."""
+    #     nucleotide_seq = Datatype.objects.get(name="Nucleotide sequence")
+    #     cdts_using_pk = [x.compounddatatype.pk for x in nucleotide_seq.CDTMs.all()]
+    #
+    #     nucleotide_seq.remove()
+    #     self.assertFalse(CompoundDatatype.objects.filter(pk__in=cdts_using_pks).exists())
+    #
+    # def test_sd_remove(self):
+    #     """Removing a SymbolicDataset should remove anything that touches it."""
+    #     run_input_sd = SymbolicDataset.objects.get(dataset__name="Removal test data")
+    #
+    #     ers_fed = run_input_sd.execrecordins.all().values_list("execrecord", flat=True)
+    #     ers_fed_pks = [x.pk for x in ers_fed]
+    #
+    #     runsteps_fed = RunStep.objects.filter(execrecord__in=ers_fed)
+    #     runs_using = set([x.top_level_run for x in runsteps_fed])
+    #     runs_using_pks = [x.pk for x in runs_using]
+    #
+    #     sds_produced_pks = set()
+    #     for er in ers_fed:
+    #         for ero in er.execrecordouts.all():
+    #             sds_produced_pks.add(ero.symbolicdataset.pk)
+    #
+    #     run_input_sd.remove()
+    #     self.assertFalse(ExecRecord.objects.filter(pk__in=ers_fed_pks).exists())
+    #     self.assertFalse(Run.objects.filter(pk__in=runs_using_pks).exists())
+    #     self.assertFalse(SymbolicDataset.objects.filter(pk__in=sds_produced_pks).exists())
