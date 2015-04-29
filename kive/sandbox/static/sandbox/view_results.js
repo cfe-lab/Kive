@@ -1,9 +1,11 @@
 function lock_handler(is_admin) {
     if (is_admin) {
         $('a.redact').closest('td').show();
+        $('#remove').show();
     }
     else {
         $('a.redact').closest('td').hide();
+        $('#remove').hide();
     }
 }
 
@@ -12,11 +14,14 @@ function redact_handler(event) {
     
     event.preventDefault();
     $.ajax({
-        url: redact_url + '?dry_run=true',
+        url: redact_url,
+        method: 'POST',
+        data: {dry_run: true},
         success: function(data) {
             if (window.confirm(data + '\nAre you sure?')) {
                 $.ajax({
                     url: redact_url,
+                    method: 'POST',
                     success: function(data) {
                         build_table($('#outputs tbody'), data);
                     }
@@ -24,6 +29,11 @@ function redact_handler(event) {
             }
         }
     });
+}
+
+function remove_handler(event) {
+    event.preventDefault();
+    alert('Not implemented yet.');
 }
 
 /** Add a link if the URL is not blank. Add a table cell either way. */
@@ -78,5 +88,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             $('div.lock'),
             is_user_admin,
             lock_handler);
+    $('#remove').click(remove_handler);
     lock_handler(false);
 });

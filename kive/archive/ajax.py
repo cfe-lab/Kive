@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http.response import Http404, HttpResponse
+from django.views.decorators.http import require_POST
 
 from archive.models import Dataset, MethodOutput
 from portal.views import admin_check
@@ -25,10 +26,11 @@ def _build_run_outputs_response(run):
         content_type=JSON_CONTENT_TYPE)
 
 def _is_dry_run(request):
-    return request.GET.get('dry_run') == 'true'
+    return request.POST.get('dry_run') == 'true'
 
 @login_required
 @user_passes_test(admin_check)
+@require_POST
 def dataset_redact(request, dataset_id):
     """
     Redact the file associated with the dataset.
@@ -58,6 +60,7 @@ def dataset_redact(request, dataset_id):
 
 @login_required
 @user_passes_test(admin_check)
+@require_POST
 def stdout_redact(request, methodoutput_id):
     methodoutput = _load_methodoutput(request, methodoutput_id)
     if _is_dry_run(request):
@@ -69,6 +72,7 @@ def stdout_redact(request, methodoutput_id):
 
 @login_required
 @user_passes_test(admin_check)
+@require_POST
 def stderr_redact(request, methodoutput_id):
     methodoutput = _load_methodoutput(request, methodoutput_id)
     if _is_dry_run(request):
