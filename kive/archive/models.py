@@ -437,6 +437,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         
         return outputs
 
+
 class RunComponent(stopwatch.models.Stopwatch):
     """
     Class extended by both RunStep and RunCable.
@@ -2597,7 +2598,7 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
         return False
 
-    def redaction_plan(self, error_log=True, output_log=True, return_code=True):
+    def build_redaction_plan(self, error_log=True, output_log=True, return_code=True):
         """
         Redact the error/output log and/or the return code of the MethodOutput.
 
@@ -2615,13 +2616,6 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
 
         return redaction_plan
-
-    def generated_execrecord(self):
-        try:
-            self.execrecord
-        except ObjectDoesNotExist:
-            return False
-        return True
 
     def generated_execrecord(self):
         try:

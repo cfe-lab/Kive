@@ -980,7 +980,7 @@ class ExecRecord(models.Model):
         redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["ExecRecords"]
         redaction_plan["ExecRecords"].add(self)
-        archive.models.update_redaction_plan(redaction_plan, self.generator.redaction_plan())
+        archive.models.update_redaction_plan(redaction_plan, self.generator.build_redaction_plan())
 
         for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
             # If any of these are already redacted, this call will simply do nothing.
@@ -992,7 +992,7 @@ class ExecRecord(models.Model):
         return redaction_plan
 
     @transaction.atomic
-    def redact(self, dry_run=False):
+    def redact(self):
         """
         "Hollow out" this ExecRecord.
 
