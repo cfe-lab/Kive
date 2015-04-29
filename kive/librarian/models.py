@@ -1008,17 +1008,20 @@ class ExecRecord(models.Model):
         Creates a manifest of objects that will be removed if this ExecRecord is removed.
         """
         removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
-        assert self not in removal_plan["SymbolicDatasets"]
+        assert self not in removal_plan["ExecRecords"]
         removal_plan["ExecRecords"].add(self)
 
-        for ero in self.execrecordouts.exclude(symbolicdataset__in=removal_plan["SymbolicDatasets"]).select_related(
-                "symbolicdataset"):
-            if ero.symbolicdataset not in removal_plan["SymbolicDatasets"]:
-                metadata.models.update_removal_plan(removal_plan, ero.symbolicdataset.build_removal_plan())
+        if not (self.generator.record.is_cable and self.general_transf().is_trivial()):
+            for ero in self.execrecordouts.exclude(
+                    symbolicdataset__in=removal_plan["SymbolicDatasets"]).select_related("symbolicdataset"):
+                if ero.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                    metadata.models.update_removal_plan(
+                        removal_plan, ero.symbolicdataset.build_removal_plan(removal_plan)
+                    )
 
         for rc in self.used_by_components.all():
             if rc.top_level_run not in removal_plan["Runs"]:
-                metadata.models.update_removal_plan(removal_plan, rc.top_level_run.build_removal_plan())
+                metadata.models.update_removal_plan(removal_plan, rc.top_level_run.build_removal_plan(removal_plan))
 
         return removal_plan
 

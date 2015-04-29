@@ -89,7 +89,8 @@ class CodeResource(metadata.models.AccessControl):
         removal_plan = empty_removal_plan()
         removal_plan["CodeResources"].add(self)
         for revision in self.revisions.all():
-            removal_plan = update_removal_plan(revision.build_removal_plan())
+            if revision not in removal_plan["CodeResourceRevisions"]:
+                update_removal_plan(removal_plan, revision.build_removal_plan(removal_plan))
 
         return removal_plan
     
@@ -349,15 +350,21 @@ class CodeResourceRevision(metadata.models.AccessControl):
         remove_h(removal_plan)
 
     @transaction.atomic
-    def build_removal_plan(self):
-        removal_plan = empty_removal_plan()
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["CodeResourceRevisions"]
         removal_plan["CodeResourceRevisions"].add(self)
 
         for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            removal_plan = update_removal_plan(removal_plan, dependant.coderesourcerevision.build_removal_plan())
+            if dependant.coderesourcerevision not in removal_plan["CodeResourceRevisions"]:
+                update_removal_plan(
+                    removal_plan,
+                    dependant.coderesourcerevision.build_removal_plan(removal_plan)
+                )
 
-        for method in self.members.all():
-            removal_plan = update_removal_plan(removal_plan, method.build_removal_plan())
+        for method in self.methods.all():
+            if method not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -796,13 +803,15 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         removal_plan = self.build_removal_plan()
         remove_h(removal_plan)
 
-    def build_removal_plan(self):
-        removal_plan = empty_removal_plan()
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Methods"]
         removal_plan["Methods"].add(self)
 
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            update_removal_plan(removal_plan, pipeline_affected.build_removal_plan())
+            if pipeline_affected not in removal_plan["Pipelines"]:
+                update_removal_plan(removal_plan, pipeline_affected.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -832,15 +841,16 @@ class MethodFamily(transformation.models.TransformationFamily):
 
     @transaction.atomic
     def remove(self):
-        for method in self.members.all():
-            method.remove()
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
 
-    def remove_list(self):
+    def build_removal_plan(self):
         removal_plan = empty_removal_plan()
         removal_plan["MethodFamilies"].add(self)
 
         for method in self.members.all():
-            update_removal_plan(removal_plan, method.build_removal_plan())
+            if method not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
 
         return removal_plan
 

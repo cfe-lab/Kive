@@ -75,12 +75,14 @@ class PipelineFamily(transformation.models.TransformationFamily):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_h(removal_plan)
 
+    @transaction.atomic
     def build_removal_plan(self):
         removal_plan = metadata.models.empty_removal_plan()
         removal_plan["PipelineFamilies"].add(self)
 
         for pipeline in self.members.all():
-            metadata.models.update_removal_plan(removal_plan, pipeline.build_removal_plan())
+            if pipeline not in removal_plan["Pipelines"]:
+                metadata.models.update_removal_plan(removal_plan, pipeline.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -656,16 +658,23 @@ class Pipeline(transformation.models.Transformation):
         metadata.models.remove_h(removal_plan)
 
     @transaction.atomic
-    def build_removal_plan(self):
-        removal_plan = metadata.models.empty_removal_plan()
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        assert self not in removal_plan["Pipelines"]
         removal_plan["Pipelines"].add(self)
 
         for run in self.pipeline_instances.all():
-            update_removal_plan(removal_plan, run.build_removal_plan())
+            if run not in removal_plan["Runs"]:
+                metadata.models.update_removal_plan(
+                    removal_plan, run.build_removal_plan(removal_plan)
+                )
 
         # Remove any pipeline that uses this one as a sub-pipeline.
         for ps in self.pipelinesteps.all():
-            update_removal_plan(removal_plan, ps.pipeline.build_removal_plan())
+            if ps.pipeline not in removal_plan["Pipelines"]:
+                metadata.models.update_removal_plan(
+                    removal_plan, ps.pipeline.build_removal_plan(removal_plan)
+                )
 
         return removal_plan
 

@@ -22,9 +22,6 @@ import tempfile
 import shutil
 from datetime import datetime
 
-import pipeline.models
-import method.models
-
 from file_access_utils import set_up_directory
 from constants import datatypes, CDTs, maxlengths, groups, users
 
@@ -34,15 +31,16 @@ from portal.views import admin_check
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
 
+# We delete objects in this order:
+deletion_order = [
+    "ExecRecords", "SymbolicDatasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
+    "MethodFamilies", "CompoundDatatypes", "Datatypes",
+    "CodeResourceRevisions", "CodeResources"
+]
+
+
 @transaction.atomic
 def remove_h(removal_plan):
-    # We delete objects in this order:
-    deletion_order = [
-        "ExecRecords", "SymbolicDatasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
-        "MethodFamilies", "CompoundDatatypes", "Datatypes",
-        "CodeResourceRevisions", "CodeResources"
-    ]
-
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:
@@ -64,15 +62,10 @@ def update_removal_plan(orig_dict, updating_dict):
 
 
 def empty_removal_plan():
-    return {
-        "SymbolicDatasets": set(),
-        "ExecRecords": set(),
-        "Runs": set(),
-        "Pipelines": set(),
-        "Methods": set(),
-        "CompoundDatatypes": set(),
-        "Datatypes": set()
-    }
+    removal_plan = {}
+    for key in deletion_order:
+        removal_plan[key] = set()
+    return removal_plan
 
 
 def kive_user():
@@ -1174,8 +1167,9 @@ class Datatype(AccessControl):
         remove_h(removal_plan)
 
     @transaction.atomic
-    def build_removal_plan(self, rm_verif_method=True):
-        removal_plan = empty_removal_plan()
+    def build_removal_plan(self, removal_accumulator=None, rm_verif_method=True):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Datatypes"]
 
         builtin_pks = {
             datatypes.STR_PK,
@@ -1188,32 +1182,36 @@ class Datatype(AccessControl):
             self.logger.warning("Cannot remove builtin datatypes.")
             return removal_plan
 
-        removal_plan["Datatypes"] = {self}
+        removal_plan["Datatypes"].add(self)
 
         if self.prototype is not None:
             # The prototype is a Dataset so we have to check its SymbolicDataset.
-            prototype_removal_plan = self.prototype.symbolicdataset.build_removal_plan()
-            removal_plan = update_removal_plan(removal_plan, prototype_removal_plan)
+            if self.prototype.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                prototype_removal_plan = self.prototype.symbolicdataset.build_removal_plan(removal_plan)
+                update_removal_plan(removal_plan, prototype_removal_plan)
 
         for descendant_dt in self.restricted_by.all():
-            removal_plan = update_removal_plan(
-                removal_plan,
-                descendant_dt.build_removal_plan()
-            )
+            if descendant_dt not in removal_plan["Datatypes"]:
+                removal_plan = update_removal_plan(
+                    removal_plan,
+                    descendant_dt.build_removal_plan(removal_plan)
+                )
 
         cdts_affected = self.CDTMs.all().values("compounddatatype")
         for cdt in CompoundDatatype.objects.filter(pk__in=cdts_affected):
-            removal_plan = update_removal_plan(
-                removal_plan,
-                cdt.build_removal_plan()
-            )
+            if cdt not in removal_plan["CompoundDatatypes"]:
+                removal_plan = update_removal_plan(
+                    removal_plan,
+                    cdt.build_removal_plan(removal_plan)
+                )
 
         if (rm_verif_method and self.has_custom_constraint() and
                 self.custom_constraint.verification_method.user == self.user):
-            removal_plan = update_removal_plan(
-                removal_plan,
-                self.custom_constraint.verification_method.driver.build_removal_plan()
-            )
+            if self.custom_constraint.verification_method not in removal_plan["Methods"]:
+                update_removal_plan(
+                    removal_plan,
+                    self.custom_constraint.verification_method.driver.build_removal_plan(removal_plan)
+                )
 
         return removal_plan
 
@@ -1740,16 +1738,24 @@ class CompoundDatatype(AccessControl):
         remove_h(removal_plan)
 
     @transaction.atomic
-    def build_removal_plan(self):
-        removal_plan = empty_removal_plan()
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["CompoundDatatypes"]
+        removal_plan["CompoundDatatypes"].add(self)
 
         for ds in self.conforming_datasets.all().select_related("symbolicdataset"):
-            removal_plan = update_removal_plan(removal_plan, ds.symbolicdataset.build_remove_plan())
+            if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
 
         # Remove any Transformations that had this CDT.
         transfs_to_remove = set((xs.transf_xput.definite.transformation.definite
                                  for xs in self.xput_structures.all()))
         for definite_transf in transfs_to_remove:
-            removal_plan = update_removal_plan(removal_plan, definite_transf.build_remove_plan())
+            if definite_transf.__class__.__name__ == "Method":
+                already_marked = definite_transf in removal_plan["Methods"]
+            else:
+                already_marked = definite_transf in removal_plan["Pipelines"]
+            if not already_marked:
+                removal_plan = update_removal_plan(removal_plan, definite_transf.build_removal_plan(removal_plan))
 
         return removal_plan
