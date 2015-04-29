@@ -4,9 +4,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http.response import Http404, HttpResponse
 from django.views.decorators.http import require_POST
 
-from archive.models import Dataset, MethodOutput
+from archive.models import Dataset, MethodOutput, Run
 from portal.views import admin_check
 from archive.views import api_get_datasets
+from metadata.models import deletion_order
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -38,19 +39,26 @@ def remove_run(request, run_id):
     if not request.is_ajax():
         raise Http404
 
-#     try:
-#         run = Run.objects.get(pk=run_id)
-#     except Run.DoesNotExist:
-#         raise Http404("Run id {} cannot be accessed".format(run_id))
+    try:
+        run = Run.objects.get(pk=run_id)
+    except Run.DoesNotExist:
+        raise Http404("Run id {} cannot be accessed".format(run_id))
     
-    is_dry_run = _is_dry_run(request)
-    if is_dry_run:
-        #TODO: do an actual dry run once it's fixed.
-        summary = "This is not implemented yet."
+    if _is_dry_run(request):
+        plan = run.build_removal_plan()
+        keys = deletion_order[:]
+        keys.remove('ExecRecords')
+        summary = ""
+        for key in keys:
+            count = len(plan[key])
+            if count:
+                if summary:
+                    summary += ', '
+                summary += '{} {}'.format(count, key)
+        summary = "This will remove " + summary + "."
         return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
     
-    #TODO: actually remove the run
-    #run.remove(dry_run=is_dry_run)
+    run.remove()
 
     return HttpResponse()
 
