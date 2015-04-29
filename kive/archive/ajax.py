@@ -53,7 +53,7 @@ def dataset_redact(request, dataset_id):
 
     # FIXME: This is how we reload all the datasets if we're not redacting
     # from the run result page. We should try to do this in a more clean way?
-    if request.GET.get('datasets') == 'true':
+    if request.POST.get('datasets') == 'true':
         return api_get_datasets(request, -1)
 
     return _build_run_outputs_response(dataset.created_by.parent_run)

@@ -67,7 +67,7 @@ def datasets(request):
     return HttpResponse(t.render(c))
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_datasets(request, page=0):

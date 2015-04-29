@@ -6,8 +6,6 @@ function date_filter(date) {
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ]
 
-//    var date = new Date(date);
-
     return fDate.getDate() + ' ' +
     months[fDate.getMonth()] + ' ' +
     fDate.getFullYear() + ' ' +
@@ -19,13 +17,16 @@ function size_filter(size_bytes){
 }
 
 function redact_handler(id){
-
     $.ajax({
-        url: '/dataset_redact/' + id + '?dry_run=true',
+        type: 'POST',
+        url: '/dataset_redact/' + id,
+        data: {dry_run:'true'},
         success: function(data) {
             if (window.confirm(data + '\nAre you sure?')) {
                 $.ajax({
-                    url: '/dataset_redact/' + id + '?datasets=true',
+                    url: '/dataset_redact/' + id,
+                    data: {datasets:'true'},
+                    type: 'POST',
                     success: function(data) {
                         build_table($('#dataset_body'), data.datasets);
                     }
