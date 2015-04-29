@@ -8,7 +8,8 @@
     <script src="/static/sandbox/admin_lock.js"></script>
     <script src="/static/sandbox/view_results.js"></script>
     <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }};
+        var is_user_admin = {{ is_user_admin|lower }},
+            run_id = {{ run_id }};
     </script>
     <link rel="stylesheet" href="/static/sandbox/admin_lock.css">
     <style>

@@ -85,6 +85,7 @@ urlpatterns = patterns(
     url(r'^run_pipeline$', 'sandbox.views.run_pipeline', name='run_pipeline'),
     url(r'^view_run/(?P<rtp_id>\d+)$', 'sandbox.views.view_run', name='view_run'),
     url(r'^view_run/(?P<rtp_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', 'sandbox.views.view_run', name='view_run'),
+    url(r'^remove_run/(?P<run_id>\d+)$', 'archive.ajax.remove_run', name='remove_run'),
     url(r'^poll_run_progress$', 'sandbox.ajax.poll_run_progress', name='poll_run_progress'),
     url(r'^poll_run_progress/(?P<rtp_id>\d+)$', 'sandbox.ajax.poll_run_progress', name='poll_run_progress'),
     url(r'^filter_datasets$', 'sandbox.ajax.filter_datasets', name='filter_datasets'),

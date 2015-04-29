@@ -32,8 +32,25 @@ function redact_handler(event) {
 }
 
 function remove_handler(event) {
+    var remove_url = '../../remove_run/' + run_id;
+    
     event.preventDefault();
-    alert('Not implemented yet.');
+    $.ajax({
+        url: remove_url,
+        method: 'POST',
+        data: {dry_run: true},
+        success: function(data) {
+            if (window.confirm(data + '\nAre you sure?')) {
+                $.ajax({
+                    url: remove_url,
+                    method: 'POST',
+                    success: function(data) {
+                        location = '../../runs';
+                    }
+                })
+            }
+        }
+    });
 }
 
 /** Add a link if the URL is not blank. Add a table cell either way. */

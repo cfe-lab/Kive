@@ -31,6 +31,32 @@ def _is_dry_run(request):
 @login_required
 @user_passes_test(admin_check)
 @require_POST
+def remove_run(request, run_id):
+    """
+    Redact the file associated with the dataset.
+    """
+    if not request.is_ajax():
+        raise Http404
+
+#     try:
+#         run = Run.objects.get(pk=run_id)
+#     except Run.DoesNotExist:
+#         raise Http404("Run id {} cannot be accessed".format(run_id))
+    
+    is_dry_run = _is_dry_run(request)
+    if is_dry_run:
+        #TODO: do an actual dry run once it's fixed.
+        summary = "This is not implemented yet."
+        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
+    
+    #TODO: actually remove the run
+    #run.remove(dry_run=is_dry_run)
+
+    return HttpResponse()
+
+@login_required
+@user_passes_test(admin_check)
+@require_POST
 def dataset_redact(request, dataset_id):
     """
     Redact the file associated with the dataset.

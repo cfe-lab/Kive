@@ -311,6 +311,7 @@ def view_results(request, id):
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
     context['is_user_admin'] = admin_check(request.user)
+    context['run_id'] = id
 
     four_oh_four = False
     try:
