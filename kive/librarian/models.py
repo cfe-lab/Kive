@@ -641,76 +641,71 @@ class SymbolicDataset(metadata.models.AccessControl):
         return False
 
     @transaction.atomic
-    def redact(self, dry_run=False):
+    def build_redaction_plan(self, redaction_accumulator=None):
         """
         Wipe out the contents of this SymbolicDataset.
 
         If dry_run is True, then we only return information about what would be redacted.
         """
-        # If this SymbolicDataset is already in the process of being redacted, simply return.
-        # This avoids infinite recursion.
-        SDs_redacted = set()
-        ERs_redacted = set()
-        output_logs_redacted = set()
-        error_logs_redacted = set()
-        codes_redacted = set()
+        redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
+        assert self not in redaction_plan["SymbolicDatasets"]
         if self.is_redacted() == True:
-            return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
+            return redaction_plan
+        redaction_plan["SymbolicDatasets"].add(self)
 
-        if not dry_run:
-            self._redacted = True
-            self.MD5_checksum = ""
-            self.save(update_fields=["_redacted", "MD5_checksum"])
-
-            if self.has_data():
-                self.dataset.delete()
-            if self.has_structure():
-                self.structure.delete()
-        SDs_redacted.add(self)
-
-        # Redact anything that was produced from this SymbolicDataset.
+        # Mark anything that was produced from this SymbolicDataset for redaction.
         for used_as_input in self.execrecordins.all().select_related("execrecord"):
-            if not used_as_input.execrecord.is_redacted():
-                # curr_redacted is a tuple which we will unpack in the following.
-                curr_redacted = used_as_input.execrecord.redact(dry_run)
+            if used_as_input.execrecord not in redaction_plan["ExecRecords"]:
+                metadata.models.update_removal_plan(
+                    redaction_plan, used_as_input.execrecord.build_redaction_plan(redaction_plan)
+                )
 
-                SDs_redacted.update(curr_redacted[0])
-                ERs_redacted.update(curr_redacted[1])
-                output_logs_redacted(curr_redacted[2])
-                error_logs_redacted(curr_redacted[3])
-                codes_redacted(curr_redacted[4])
+        return redaction_plan
 
-        return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
+    @transaction.atomic
+    def redact_this(self):
+        """
+        Helper function that only redacts this SymbolicDataset and does not handle any recursion.
+        """
+        if self.is_redacted():
+            return
+
+        self._redacted = True
+        self.MD5_checksum = ""
+        self.save(update_fields=["_redacted", "MD5_checksum"])
+
+        if self.has_data():
+            self.dataset.delete()
+        if self.has_structure():
+            self.structure.delete()
+
+    def redact(self):
+        redaction_plan = self.build_redaction_plan()
+        archive.models.redact_h(redaction_plan)
 
     def is_redacted(self):
         return self._redacted
 
     @transaction.atomic
-    def remove_list(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
+    def build_removal_plan(self, removal_accumulator=None):
         """
         Make a manifest of objects to remove when removing this SymbolicDataset.
         """
-        ERs_already_marked = ERs_already_marked or set()
-        runs_already_marked = runs_already_marked or set()
-
-        if SDs_already_marked is None:
-            SDs_already_marked = {self}
-        else:
-            SDs_already_marked.add(self)
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        assert self not in removal_plan["SymbolicDatasets"]
+        removal_plan["SymbolicDatasets"].add(self)
 
         for er_xput in itertools.chain(self.execrecordins.all(), self.execrecordouts.all()):
             curr_ER = er_xput.execrecord
-            if curr_ER not in ERs_already_marked:
-                SDs_already_marked, ERs_already_marked, runs_already_marked = curr_ER.remove_list(
-                    SDs_already_marked=SDs_already_marked, ERs_already_marked=ERs_already_marked,
-                    runs_already_marked=runs_already_marked)
+            if curr_ER not in removal_plan["ExecRecords"]:
+                metadata.models.update_removal_plan(removal_plan, curr_ER.build_removal_plan(removal_plan))
 
-        return SDs_already_marked, ERs_already_marked, runs_already_marked
+        return removal_plan
 
     @transaction.atomic
     def remove(self):
-        SDs_to_remove, ERs_to_remove, runs_to_remove = self.remove_list()
-        archive.models.remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove)
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
 
 class DatasetStructure(models.Model):
@@ -981,79 +976,57 @@ class ExecRecord(models.Model):
 
         return self.generator.is_redacted()
 
+    @transaction.atomic
+    def build_redaction_plan(self, redaction_accumulator=None):
+        redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
+        assert self not in redaction_plan["ExecRecords"]
+        redaction_plan["ExecRecords"].add(self)
+        archive.models.update_redaction_plan(redaction_plan, self.generator.redaction_plan())
+
+        for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
+            # If any of these are already redacted, this call will simply do nothing.
+            if ero.symbolicdataset not in redaction_plan["SymbolicDatasets"]:
+                archive.models.update_redaction_plan(
+                    redaction_plan, ero.symbolicdataset.build_redaction_plan(redaction_plan)
+                )
+
+        return redaction_plan
+
+    @transaction.atomic
     def redact(self, dry_run=False):
         """
         "Hollow out" this ExecRecord.
 
         This may be triggered by an input SymbolicDataset or by the ExecLog.  If dry_run is True then no
         actual redaction occurs.
-
-        Return lists of redacted objects.
         """
-        SDs_redacted = set()
-        ERs_redacted = {self}
-        output_logs_redacted = set()
-        error_logs_redacted = set()
-        codes_redacted = set()
-        for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
-            # If any of these are already redacted, this call will simply do nothing.
-            # redacted_info looks like
-            # (SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted)
-            # and all members are sets.
-            redacted_info = ero.symbolicdataset.redact(dry_run)
-            SDs_redacted.update(redacted_info[0])
-            ERs_redacted.update(redacted_info[1])
-            output_logs_redacted.update(redacted_info[2])
-            error_logs_redacted.update(redacted_info[3])
-            codes_redacted.update(redacted_info[4])
-
-        # generator_redact_info looks like
-        # (output_logs_redacted, error_logs_redacted, codes_redacted)
-        # all of which are sets.
-        generator_redact_info = self.generator.redact(dry_run=dry_run)
-        output_logs_redacted.update(generator_redact_info[0])
-        error_logs_redacted.update(generator_redact_info[1])
-        codes_redacted.update(generator_redact_info[2])
-
-        # Notify all RunComponents that use this ExecRecord of the redaction.
-        if not dry_run:
-            for rc in self.used_by_components.all():
-                rc.redact()
-
-        return SDs_redacted, ERs_redacted, output_logs_redacted, error_logs_redacted, codes_redacted
+        redaction_plan = self.build_redaction_plan()
+        archive.models.redact_h(redaction_plan)
 
     @transaction.atomic
-    def remove_list(self, SDs_already_marked=None, ERs_already_marked=None, runs_already_marked=None):
+    def build_removal_plan(self, removal_accumulator=None):
         """
         Creates a manifest of objects that will be removed if this ExecRecord is removed.
         """
-        if ERs_already_marked is not None and self in ERs_already_marked:
-            return SDs_already_marked, ERs_already_marked, runs_already_marked
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
+        assert self not in removal_plan["SymbolicDatasets"]
+        removal_plan["ExecRecords"].add(self)
 
-        SDs_already_marked = SDs_already_marked or set()
-        runs_already_marked = runs_already_marked or set()
-
-        if ERs_already_marked is None:
-            ERs_already_marked = {self}
-        else:
-            ERs_already_marked.add(self)
-
-        for ero in self.execrecordouts.exclude(symbolicdataset__in=SDs_already_marked).select_related(
+        for ero in self.execrecordouts.exclude(symbolicdataset__in=removal_plan["SymbolicDatasets"]).select_related(
                 "symbolicdataset"):
-            if ero.symbolicdataset not in SDs_already_marked:
-                SDs_already_marked, ERs_already_marked, runs_already_marked = ero.symbolicdataset.remove_list(
-                    SDs_already_marked, ERs_already_marked, runs_already_marked)
+            if ero.symbolicdataset not in removal_plan["SymbolicDatasets"]:
+                metadata.models.update_removal_plan(removal_plan, ero.symbolicdataset.build_removal_plan())
 
         for rc in self.used_by_components.all():
-            SDs_already_marked, ERs_already_marked, runs_already_marked = rc.top_level_run.remove_list(
-                SDs_already_marked, ERs_already_marked, runs_already_marked)
+            if rc.top_level_run not in removal_plan["Runs"]:
+                metadata.models.update_removal_plan(removal_plan, rc.top_level_run.build_removal_plan())
 
-        return SDs_already_marked, ERs_already_marked, runs_already_marked
+        return removal_plan
 
     @transaction.atomic
     def remove(self):
-        SDs_to_remove, ERs_to_remove, runs_to_remove = self.remove_list()
-        archive.models.remove_record_h(SDs_to_remove, ERs_to_remove, runs_to_remove)
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
 
 @python_2_unicode_compatible

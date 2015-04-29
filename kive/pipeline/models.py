@@ -72,25 +72,17 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
     @transaction.atomic
     def remove(self):
-        for pipeline in self.members.all():
-            pipeline.remove()
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
-        self.delete()
-
-    def remove_list(self):
-        SDs_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
+    def build_removal_plan(self):
+        removal_plan = metadata.models.empty_removal_plan()
+        removal_plan["PipelineFamilies"].add(self)
 
         for pipeline in self.members.all():
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
-            SDs_listed.update(curr_SDs_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
+            metadata.models.update_removal_plan(removal_plan, pipeline.build_removal_plan())
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+        return removal_plan
 
 
 class PipelineSerializationException(exceptions.Exception):
@@ -660,39 +652,23 @@ class Pipeline(transformation.models.Transformation):
 
     @transaction.atomic
     def remove(self):
-        # A cascade to Run won't do it because Run needs to be *removed*.
-        for run in self.pipeline_instances.all():
-            run.remove()
-
-        # Remove any pipeline that uses this one as a sub-pipeline.
-        for ps in self.pipelinesteps.all():
-            ps.pipeline.remove()
-
-        # Cascade will handle steps, cables, RunToProcess objects, etc.
-        self.delete()
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_h(removal_plan)
 
     @transaction.atomic
-    def remove_list(self):
-        SDs_to_remove = set()
-        ERs_to_remove = set()
-        runs_to_remove = set()
-        pipelines_to_remove = {self}
+    def build_removal_plan(self):
+        removal_plan = metadata.models.empty_removal_plan()
+        removal_plan["Pipelines"].add(self)
 
         for run in self.pipeline_instances.all():
-            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
-            SDs_to_remove.update(curr_SDs_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
+            update_removal_plan(removal_plan, run.build_removal_plan())
 
         # Remove any pipeline that uses this one as a sub-pipeline.
         for ps in self.pipelinesteps.all():
-            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
-            SDs_to_remove.update(curr_SDs_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
-            pipelines_to_remove.add(ps.pipeline)
+            update_removal_plan(removal_plan, ps.pipeline.build_removal_plan())
 
-        return SDs_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
+        return removal_plan
+
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):

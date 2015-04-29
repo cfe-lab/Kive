@@ -19,6 +19,7 @@ import transformation.models
 import file_access_utils
 from constants import maxlengths
 import method.signals
+from metadata.models import empty_removal_plan, remove_h, update_removal_plan
 
 import os
 import stat
@@ -36,8 +37,8 @@ class CodeResource(metadata.models.AccessControl):
     Related to :model:`method.CodeResourceRevision`
     """
     name = models.CharField("Resource name", max_length=maxlengths.MAX_NAME_LENGTH,
-                             help_text="The name for this resource and all subsequent revisions.",
-                             unique=True)  # to prevent confusion in drop-down menus
+                            help_text="The name for this resource and all subsequent revisions.",
+                            unique=True)  # to prevent confusion in drop-down menus
 
     # File names must either be empty, or be 1 or more of any from
     # {alphanumeric, space, "-._()"}. This will prevent "../" as it
@@ -80,8 +81,17 @@ class CodeResource(metadata.models.AccessControl):
 
     @transaction.atomic()
     def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
+
+    @transaction.atomic()
+    def build_removal_plan(self):
+        removal_plan = empty_removal_plan()
+        removal_plan["CodeResources"].add(self)
         for revision in self.revisions.all():
-            revision.remove()
+            removal_plan = update_removal_plan(revision.build_removal_plan())
+
+        return removal_plan
     
 
 @python_2_unicode_compatible
@@ -335,41 +345,21 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     @transaction.atomic
     def remove(self):
-        # Remove anything that has this as a dependency.
-        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            dependant.coderesourcerevision.remove()
-
-        for method in self.methods.all():
-            method.remove()
-
-        self.delete()
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
 
     @transaction.atomic
-    def remove_list(self):
-        SDs_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
-        CRRs_listed = {self}
+    def build_removal_plan(self):
+        removal_plan = empty_removal_plan()
+        removal_plan["CodeResourceRevisions"].add(self)
 
         for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            stuff_removed = dependant.coderesourcerevision.remove_list()
-            SDs_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
-            methods_listed.update(stuff_removed[4])
-            CRRs_listed.update(stuff_removed[5])
+            removal_plan = update_removal_plan(removal_plan, dependant.coderesourcerevision.build_removal_plan())
 
         for method in self.members.all():
-            stuff_removed = method.remove_list()
-            SDs_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
+            removal_plan = update_removal_plan(removal_plan, method.build_removal_plan())
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
+        return removal_plan
 
 
 @python_2_unicode_compatible
@@ -803,28 +793,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         # Remove all Pipelines that use this Method.  This will eventually make its way over to
         # remove the ExecLogs and ExecRecords too.
-        pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
-        for pipeline_affected in pipelines_affected:
-            pipeline_affected.remove()
+        removal_plan = self.build_removal_plan()
+        remove_h(removal_plan)
 
-        # This delete will cascade to the inputs/outputs.
-        self.delete()
-
-    def remove_list(self):
-        SDs_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
+    def build_removal_plan(self):
+        removal_plan = empty_removal_plan()
+        removal_plan["Methods"].add(self)
 
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
-            SDs_listed.update(curr_SDs_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
+            update_removal_plan(removal_plan, pipeline_affected.build_removal_plan())
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+        return removal_plan
 
 
 @python_2_unicode_compatible
@@ -856,21 +836,13 @@ class MethodFamily(transformation.models.TransformationFamily):
             method.remove()
 
     def remove_list(self):
-        SDs_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
+        removal_plan = empty_removal_plan()
+        removal_plan["MethodFamilies"].add(self)
 
         for method in self.members.all():
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
-            SDs_listed.update(curr_SDs_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-            methods_listed.add(method)
+            update_removal_plan(removal_plan, method.build_removal_plan())
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
+        return removal_plan
 
 
 # Register signals.
