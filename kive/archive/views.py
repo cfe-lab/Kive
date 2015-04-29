@@ -1,33 +1,31 @@
 """
 archive views
 """
+import hashlib
+import logging
+import mimetypes
+import os
+
+from django.contrib.auth.decorators import login_required
+from django.core.servers.basehttp import FileWrapper
+from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
+from django.db import transaction
+from django.forms.formsets import formset_factory
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.template import loader, RequestContext
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status as rf_status
 
-from archive.serializers import DatasetSerializer
-from metadata.serializers import CompoundDatatypeInputSerializer
-
-from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
-from django.core.servers.basehttp import FileWrapper
-from django.core.exceptions import ValidationError
-from django.forms.formsets import formset_factory
-from django.db import transaction
-from django.contrib.auth.decorators import login_required
-from django.core.urlresolvers import reverse
-
-import mimetypes
-import os
-import logging
-
-from metadata.models import CompoundDatatype
-from archive.models import Dataset, MethodOutput
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
+from archive.models import Dataset, MethodOutput
+from archive.serializers import DatasetSerializer
 import librarian.models
-import hashlib
+from metadata.models import CompoundDatatype
+from metadata.serializers import CompoundDatatypeInputSerializer
 
 
 LOGGER = logging.getLogger(__name__)
@@ -151,7 +149,6 @@ def dataset_view(request, dataset_id):
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
-
 
 def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")

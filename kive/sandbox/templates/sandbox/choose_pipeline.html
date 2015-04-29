@@ -15,24 +15,6 @@
 // place in global namespace to access from other files
 var submit_to_url = '/pipeline_add';
 
-var rawNodeWidth = 20,
-    rawNodeHeight = 25,
-    rawNodeColour = "#8D8",
-    rawNodeInset = 10,
-    rawNodeOffset = 10;
-
-var cdtNodeWidth = 45,
-    cdtNodeHeight = 28,
-    cdtNodeColour = '#88D',
-    cdtNodeInset = 13,
-    cdtNodeOffset = 15;
-
-var mNodeWidth = 40,
-    mNodeInset = 5,
-    mNodeSpacing = 10,
-    mNodeColour = '#999',
-    mNodeOffset = 5;
-
 var load_preview_canvas = function() {
     var $this = $(this),
         this_ = this,
@@ -53,10 +35,10 @@ var load_preview_canvas = function() {
             cs.connectors = [];
             cs.exec_order = [];
             cs.selection = [];
-            submit_to_url = result['family_pk'];
+            submit_to_url = result.family_pk;
 //            var i, j, k; // counters
 //            var node, cables, cable, connector, shape, source, magnet;
-            draw_inputs(cs, result);
+            draw_pipeline(cs, result);
             cs.testExecutionOrder();
             for (var i = 0; i < cs.shapes.length; i++) {
                 cs.detectCollisions(cs.shapes[i], 0.5);

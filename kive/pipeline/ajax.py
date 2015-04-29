@@ -6,6 +6,8 @@ import json
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline
 from portal.views import developer_check
+from metadata.models import KiveUser
+
 
 
 @login_required
@@ -114,13 +116,22 @@ def get_method_xputs(method):
 
 
 @login_required
-@user_passes_test(developer_check)
 def get_pipeline(request):
     if request.is_ajax():
         response = HttpResponse()
-        pipeline_revision_id = request.POST.get('pipeline_id')
+        pipeline_revision_id = request.POST.get('pipeline_id')  # TODO: Split this off into a form?
+        user = KiveUser.kiveify(request.user)
+
         if pipeline_revision_id != '':
-            pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
+            # Get and check permissions
+            pipeline_revision = Pipeline.objects.filter(
+                user.access_query(),
+                pk=pipeline_revision_id)
+
+            if pipeline_revision.count() == 0:
+                raise Http404
+            pipeline_revision = pipeline_revision.first()
+
             pipeline_dict = pipeline_revision.represent_as_dict()
             steps = pipeline_revision.steps\
                 .select_related('transformation__pipeline',

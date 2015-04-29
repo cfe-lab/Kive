@@ -133,8 +133,10 @@ def _load_status(request, rtp_id=None):
         has_more) where has_more is true if more runs matched the search
         criteria than were returned
     """
-    runs = fleet.models.RunToProcess.filter_by_user(request.user).order_by(
-        '-time_queued')
+    is_admin = request.GET.get('is_admin', '').lower() == 'true'
+    runs = fleet.models.RunToProcess.filter_by_user(
+        request.user,
+        is_admin=is_admin).order_by('-time_queued')
     
     i = 0
     while True:
@@ -191,7 +193,7 @@ def _poll_run_progress(request, rtp_id):
     Helper to produce a JSON description of the current state of some runs.
     """
     if rtp_id is not None:
-        run, O_v = _load_status(request, rtp_id)
+        run, _has_more = _load_status(request, rtp_id)
         return json.dumps(dict(runs=run,
                                errors=[]))
 
