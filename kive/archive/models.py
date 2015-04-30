@@ -25,6 +25,7 @@ import stopwatch.models
 import metadata.models
 from constants import maxlengths
 import archive.signals
+from librarian.models import SymbolicDataset
 from django.template.defaultfilters import filesizeformat
 
 
@@ -38,23 +39,32 @@ def empty_redaction_plan():
     }
 
 
-def redact_h(redaction_plan):
+@transaction.atomic
+def redact_helper(redaction_plan):
     # Proceed in a fixed order.
     if "SymbolicDatasets" in redaction_plan:
         for sd in redaction_plan["SymbolicDatasets"]:
             sd.redact_this()
+            # reloaded_sd = SymbolicDataset.objects.get(pk=sd.pk)
+            # print "After calling {}.redact_this(), {}.is_redacted() is {}".format(sd, reloaded_sd,
+            #                                                                       reloaded_sd.is_redacted())
+
+    if "ExecRecords" in redaction_plan:
+        for er in redaction_plan["ExecRecords"]:
+            # This marks all RunComponents using the ExecRecord as redacted.
+            er.redact_this()
 
     if "OutputLogs" in redaction_plan:
         for log in redaction_plan["OutputLogs"]:
-            log.redact_output_log()
+            log.methodoutput.redact_output_log()
 
     if "ErrorLogs" in redaction_plan:
         for log in redaction_plan["ErrorLogs"]:
-            log.redact_error_log()
+            log.methodoutput.redact_error_log()
 
     if "ReturnCodes" in redaction_plan:
         for log in redaction_plan["ReturnCodes"]:
-            log.redact_return_code()
+            log.methodoutput.redact_return_code()
 
 
 class update_field(object):
@@ -323,7 +333,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def remove(self):
         """Remove this Run cleanly."""
         removal_plan = self.build_removal_plan()
-        metadata.models.remove_h(removal_plan)
+        metadata.models.remove_helper(removal_plan)
 
     def build_removal_plan(self, removal_accumulator=None):
         """
@@ -2598,7 +2608,7 @@ class ExecLog(stopwatch.models.Stopwatch):
             pass
         return False
 
-    def build_redaction_plan(self, error_log=True, output_log=True, return_code=True):
+    def build_redaction_plan(self, output_log=True, error_log=True, return_code=True):
         """
         Redact the error/output log and/or the return code of the MethodOutput.
 

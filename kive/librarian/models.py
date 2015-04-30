@@ -648,7 +648,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         """
         redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["SymbolicDatasets"]
-        if self.is_redacted() == True:
+        if self.is_redacted():
             return redaction_plan
         redaction_plan["SymbolicDatasets"].add(self)
 
@@ -678,9 +678,10 @@ class SymbolicDataset(metadata.models.AccessControl):
         if self.has_structure():
             self.structure.delete()
 
+    @transaction.atomic
     def redact(self):
         redaction_plan = self.build_redaction_plan()
-        archive.models.redact_h(redaction_plan)
+        archive.models.redact_helper(redaction_plan)
 
     def is_redacted(self):
         return self._redacted
@@ -704,7 +705,7 @@ class SymbolicDataset(metadata.models.AccessControl):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        metadata.models.remove_h(removal_plan)
+        metadata.models.remove_helper(removal_plan)
 
 
 class DatasetStructure(models.Model):
@@ -979,7 +980,10 @@ class ExecRecord(models.Model):
     def build_redaction_plan(self, redaction_accumulator=None):
         redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["ExecRecords"]
+        if self.is_redacted():
+            return redaction_plan
         redaction_plan["ExecRecords"].add(self)
+        
         metadata.models.update_removal_plan(redaction_plan, self.generator.build_redaction_plan())
 
         for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
@@ -992,6 +996,11 @@ class ExecRecord(models.Model):
         return redaction_plan
 
     @transaction.atomic
+    def redact_this(self):
+        for rc in self.used_by_components.all():
+            rc.redact()
+
+    @transaction.atomic
     def redact(self):
         """
         "Hollow out" this ExecRecord.
@@ -1000,7 +1009,7 @@ class ExecRecord(models.Model):
         actual redaction occurs.
         """
         redaction_plan = self.build_redaction_plan()
-        archive.models.redact_h(redaction_plan)
+        archive.models.redact_helper(redaction_plan)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
@@ -1028,7 +1037,7 @@ class ExecRecord(models.Model):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        metadata.models.remove_h(removal_plan)
+        metadata.models.remove_helper(removal_plan)
 
 
 @python_2_unicode_compatible

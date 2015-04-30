@@ -40,7 +40,7 @@ deletion_order = [
 
 
 @transaction.atomic
-def remove_h(removal_plan):
+def remove_helper(removal_plan):
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:
@@ -54,7 +54,7 @@ def update_removal_plan(orig_dict, updating_dict):
     """
     for key in updating_dict.keys():
         if key in orig_dict:
-            orig_dict[key].update()
+            orig_dict[key].update(updating_dict[key])
         else:
             orig_dict[key] = updating_dict[key]
 
@@ -1164,7 +1164,7 @@ class Datatype(AccessControl):
         Remove this Datatype and anything tied to it from the system.
         """
         removal_plan = self.build_removal_plan(rm_verif_method=rm_verif_method)
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None, rm_verif_method=True):
@@ -1735,7 +1735,7 @@ class CompoundDatatype(AccessControl):
         Handle removal of this CDT from the database, including all records that tied to it.
         """
         removal_plan = self.build_removal_plan()
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):

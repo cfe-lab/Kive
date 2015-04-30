@@ -19,7 +19,7 @@ import transformation.models
 import file_access_utils
 from constants import maxlengths
 import method.signals
-from metadata.models import empty_removal_plan, remove_h, update_removal_plan
+from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
 
 import os
 import stat
@@ -82,7 +82,7 @@ class CodeResource(metadata.models.AccessControl):
     @transaction.atomic()
     def remove(self):
         removal_plan = self.build_removal_plan()
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     @transaction.atomic()
     def build_removal_plan(self):
@@ -347,7 +347,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
@@ -828,7 +828,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # Remove all Pipelines that use this Method.  This will eventually make its way over to
         # remove the ExecLogs and ExecRecords too.
         removal_plan = self.build_removal_plan()
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     def build_removal_plan(self, removal_accumulator=None):
         removal_plan = removal_accumulator or empty_removal_plan()
@@ -885,7 +885,7 @@ class MethodFamily(transformation.models.TransformationFamily):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        remove_h(removal_plan)
+        remove_helper(removal_plan)
 
     def build_removal_plan(self):
         removal_plan = empty_removal_plan()

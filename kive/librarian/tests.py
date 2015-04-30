@@ -393,6 +393,30 @@ CCCTCCTC
     second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
     second_run_sdbx.execute_pipeline()
 
+    two_step_noop_pl = tools.make_first_pipeline(
+        "Nucleotide Sequence two-step Noop",
+        "A two-step noop pipeline for nucleotide sequences.",
+        remover,
+        grant_everyone_access=False
+        )
+    tools.create_linear_pipeline(two_step_noop_pl, [nuc_seq_noop, nuc_seq_noop],
+                                 "noop_pipeline_in", "noop_pipeline_out")
+
+    two_step_seq_datafile = tempfile.NamedTemporaryFile(delete=False)
+    two_step_seq_datafile.write("""sequence
+AAAA
+CCCCC
+GGGGGG
+TTTTTTC
+""")
+    two_step_seq_datafile.close()
+    two_step_seq_sd = SymbolicDataset.create_SD(two_step_seq_datafile.name,
+        name="Removal test data for a two-step Pipeline", cdt=one_col_nuc_seq, user=remover,
+        description="A dataset for use in the removal test case with the two-step Pipeline.", make_dataset=True)
+
+    two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_sd], groups_allowed=[])
+    two_step_run_sdbx.execute_pipeline()
+
 
 def ER_from_record(record):
     """
@@ -1446,6 +1470,10 @@ class RemovalTests(TestCase):
         self.nuc_seq = Datatype.objects.get(name="Nucleotide sequence")
         self.one_col_nuc_seq = self.nuc_seq.CDTMs.get(column_name="sequence", column_idx=1).compounddatatype
 
+        self.two_step_noop_plf = PipelineFamily.objects.get(name="Nucleotide Sequence two-step Noop")
+        self.two_step_noop_pl = self.two_step_noop_plf.members.get(revision_name="v1")
+        self.two_step_input_SD = Dataset.objects.get(name="Removal test data for a two-step Pipeline").symbolicdataset
+
         # SymbolicDatasets and ExecRecords produced by the first run.
         self.produced_data = set()
         self.execrecords = set()
@@ -1461,6 +1489,21 @@ class RemovalTests(TestCase):
             curr_produced_SDs = [x.symbolicdataset for x in roc.outputs.all()]
             self.produced_data.update(curr_produced_SDs)
             self.execrecords.add(roc.execrecord)
+
+        self.step_log = self.first_run.runsteps.first().log
+
+        self.two_step_run = self.two_step_noop_pl.pipeline_instances.first()
+        self.two_step_intermediate_data = self.two_step_run.runsteps.get(
+            pipelinestep__step_num=1).outputs.first().symbolicdataset
+        self.two_step_output_data = self.two_step_run.runsteps.get(
+            pipelinestep__step_num=2).outputs.first().symbolicdataset
+        self.two_step_execrecords = set()
+        for runstep in self.two_step_run.runsteps.all():
+            self.two_step_execrecords.add(runstep.execrecord)
+            for rsic in runstep.RSICs.all():
+                self.two_step_execrecords.add(rsic.execrecord)
+        for roc in self.two_step_run.runoutputcables.all():
+            self.two_step_execrecords.add(roc.execrecord)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
@@ -1584,10 +1627,10 @@ class RemovalTests(TestCase):
         """Removing a Method removes all Pipelines containing it and all of the associated stuff."""
         self.removal_plan_tester(
             self.nuc_seq_noop,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop}
         )
 
@@ -1595,10 +1638,10 @@ class RemovalTests(TestCase):
         """Removing a MethodFamily."""
         self.removal_plan_tester(
             self.nuc_seq_noop_mf,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
             mfs={self.nuc_seq_noop_mf}
         )
@@ -1607,10 +1650,10 @@ class RemovalTests(TestCase):
         """Removing a CodeResourceRevision."""
         self.removal_plan_tester(
             self.noop_crr,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
             CRRs={self.noop_crr, self.pass_through_crr}
         )
@@ -1626,10 +1669,10 @@ class RemovalTests(TestCase):
         """Removing a CodeResource removes its revisions."""
         self.removal_plan_tester(
             self.noop_cr,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
             CRRs={self.noop_crr, self.pass_through_crr},
             CRs={self.noop_cr}
@@ -1637,28 +1680,40 @@ class RemovalTests(TestCase):
 
     def test_cdt_build_removal_plan(self):
         """Removing a CompoundDatatype."""
-        all_data = self.produced_data
-        all_data.add(self.input_SD)
+        all_data = self.produced_data.union(
+            {
+                self.input_SD,
+                self.two_step_input_SD,
+                self.two_step_intermediate_data,
+                self.two_step_output_data
+            }
+        )
         self.removal_plan_tester(
             self.one_col_nuc_seq,
             SDs=all_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
             CDTs={self.one_col_nuc_seq}
         )
 
     def test_dt_build_removal_plan(self):
         """Removing a Datatype."""
-        all_data = self.produced_data
-        all_data.add(self.input_SD)
+        all_data = self.produced_data.union(
+            {
+                self.input_SD,
+                self.two_step_input_SD,
+                self.two_step_intermediate_data,
+                self.two_step_output_data
+            }
+        )
         self.removal_plan_tester(
             self.nuc_seq,
             SDs=all_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
             CDTs={self.one_col_nuc_seq},
             DTs={self.nuc_seq}
@@ -1767,18 +1822,178 @@ class RemovalTests(TestCase):
         first_ROC_ER = self.first_run.runoutputcables.first().execrecord
         self.remove_tester(first_ROC_ER)
 
-    def redaction_plan_tester(self):
+    def SD_redaction_plan_tester(self, SD_to_redact, SDs=None, output_logs=None, error_logs=None, return_codes=None):
+        redaction_plan = SD_to_redact.build_redaction_plan()
 
-    def redaction_plan_tester(self, obj_to_redact, SDs=None, output_logs=None, error_logs=None, return_codes=None):
-        removal_plan = obj_to_remove.build_removal_plan()
-        self.assertSetEqual(removal_plan["SymbolicDatasets"], set(SDs) if SDs is not None else set())
-        self.assertSetEqual(removal_plan["ExecRecords"], set(ERs) if ERs is not None else set())
-        self.assertSetEqual(removal_plan["Runs"], set(runs) if runs is not None else set())
-        self.assertSetEqual(removal_plan["Pipelines"], set(pipelines) if pipelines is not None else set())
-        self.assertSetEqual(removal_plan["PipelineFamilies"], set(pfs) if pfs is not None else set())
-        self.assertSetEqual(removal_plan["Methods"], set(methods) if methods is not None else set())
-        self.assertSetEqual(removal_plan["MethodFamilies"], set(mfs) if mfs is not None else set())
-        self.assertSetEqual(removal_plan["CompoundDatatypes"], set(CDTs) if CDTs is not None else set())
-        self.assertSetEqual(removal_plan["Datatypes"], set(DTs) if DTs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(CRRs) if CRRs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResources"], set(CRs) if CRs is not None else set())
+        # The following ExecRecords should also be in the redaction plan.
+        redaction_plan_execrecords = set()
+        SD_set = SDs or set()
+        for sd in SD_set:
+            for eri in sd.execrecordins.all():
+                redaction_plan_execrecords.add(eri.execrecord)
+
+        self.assertSetEqual(redaction_plan["SymbolicDatasets"], set(SDs) if SDs is not None else set())
+        self.assertSetEqual(redaction_plan["OutputLogs"], set(output_logs) if output_logs is not None else set())
+        self.assertSetEqual(redaction_plan["ErrorLogs"], set(error_logs) if error_logs is not None else set())
+        self.assertSetEqual(redaction_plan["ReturnCodes"], set(return_codes) if return_codes is not None else set())
+        self.assertSetEqual(redaction_plan["ExecRecords"], redaction_plan_execrecords)
+
+    def SD_redaction_tester(self, SD_to_redact):
+        redaction_plan = SD_to_redact.build_redaction_plan()
+        SD_to_redact.redact()
+        self.redaction_tester_helper(redaction_plan)
+
+    def redaction_tester_helper(self, redaction_plan):
+        # Check that all of the objects in the plan, and the RunComponents/ExecRecords that
+        # reference them, got redacted.
+        for sd in redaction_plan["SymbolicDatasets"]:
+            reloaded_sd = SymbolicDataset.objects.get(pk=sd.pk)
+            self.assertTrue(reloaded_sd.is_redacted())
+
+        execlogs_affected = redaction_plan["OutputLogs"].union(
+            redaction_plan["ErrorLogs"]).union(redaction_plan["ReturnCodes"])
+        for log in execlogs_affected:
+            reloaded_log = ExecLog.objects.get(pk=log.pk)
+            if log in redaction_plan["OutputLogs"]:
+                self.assertTrue(reloaded_log.methodoutput.is_output_redacted())
+            if log in redaction_plan["ErrorLogs"]:
+                self.assertTrue(reloaded_log.methodoutput.is_error_redacted())
+            if log in redaction_plan["ReturnCodes"]:
+                self.assertTrue(reloaded_log.methodoutput.is_code_redacted())
+
+            self.assertTrue(reloaded_log.is_redacted())
+            self.assertTrue(reloaded_log.record.is_redacted())
+            if reloaded_log.generated_execrecord():
+                self.assertTrue(reloaded_log.execrecord.is_redacted())
+
+        for er in redaction_plan["ExecRecords"]:
+            self.assertTrue(er.is_redacted())
+            for rc in er.used_by_components.all():
+                self.assertTrue(rc.is_redacted())
+
+    def log_redaction_plan_tester(self, log_to_redact, output_log=True, error_log=True, return_code=True):
+        output_already_redacted = log_to_redact.methodoutput.is_output_redacted()
+        error_already_redacted = log_to_redact.methodoutput.is_error_redacted()
+        code_already_redacted = log_to_redact.methodoutput.is_code_redacted()
+
+        redaction_plan = log_to_redact.build_redaction_plan(output_log=output_log, error_log=error_log,
+                                                            return_code=return_code)
+
+        self.assertSetEqual(redaction_plan["SymbolicDatasets"], set())
+        self.assertSetEqual(redaction_plan["ExecRecords"], set())
+        self.assertSetEqual(redaction_plan["OutputLogs"],
+                            {log_to_redact} if output_log and not output_already_redacted else set())
+        self.assertSetEqual(redaction_plan["ErrorLogs"],
+                            {log_to_redact} if error_log and not error_already_redacted else set())
+        self.assertSetEqual(redaction_plan["ReturnCodes"],
+                            {log_to_redact} if return_code and not code_already_redacted else set())
+
+    def log_redaction_tester(self, log_to_redact, output_log=True, error_log=True, return_code=True):
+        redaction_plan = log_to_redact.build_redaction_plan(output_log, error_log, return_code)
+
+        if output_log:
+            log_to_redact.methodoutput.redact_output_log()
+        if error_log:
+            log_to_redact.methodoutput.redact_error_log()
+        if return_code:
+            log_to_redact.methodoutput.redact_return_code()
+
+        self.redaction_tester_helper(redaction_plan)
+
+    def test_input_SD_build_redaction_plan(self):
+        """Test redaction of the input SD to a Run."""
+        logs_to_redact = {self.step_log}
+
+        self.SD_redaction_plan_tester(
+            self.input_SD,
+            SDs=self.produced_data.union({self.input_SD}),
+            output_logs=logs_to_redact,
+            error_logs=logs_to_redact,
+            return_codes=logs_to_redact
+        )
+
+    def test_input_SD_redact(self):
+        self.SD_redaction_tester(self.input_SD)
+
+    def test_SD_redact_idempotent(self):
+        """Redacting an already-redacted SymbolicDataset should give an empty redaction plan."""
+        self.input_SD.redact()
+        # All of the parameters to this function are None, indicating nothing gets redacted.
+        self.SD_redaction_plan_tester(self.input_SD)
+
+    def test_produced_SD_build_redaction_plan(self):
+        """Redacting produced data."""
+        # The run we're dealing with has a single step, and that's the only produced data.
+        produced_SD = list(self.produced_data)[0]
+
+        self.SD_redaction_plan_tester(
+            produced_SD,
+            SDs=self.produced_data
+        )
+
+    def test_produced_SD_redact(self):
+        produced_SD = list(self.produced_data)[0]
+        self.SD_redaction_tester(produced_SD)
+
+    def test_intermediate_SD_build_redaction_plan(self):
+        """Redacting a SymbolicDataset from the middle of a Run only redacts the stuff following it."""
+        logs_to_redact = {self.two_step_run.runsteps.get(pipelinestep__step_num=2).log}
+
+        self.SD_redaction_plan_tester(
+            self.two_step_intermediate_data,
+            SDs={self.two_step_intermediate_data, self.two_step_output_data},
+            output_logs=logs_to_redact,
+            error_logs=logs_to_redact,
+            return_codes=logs_to_redact
+        )
+
+    def test_intermediate_SD_redact(self):
+        self.SD_redaction_tester(self.two_step_intermediate_data)
+
+    def test_step_log_build_redaction_plan_remove_all(self):
+        # There's only one step in self.first_run.
+        self.log_redaction_plan_tester(
+            self.step_log, True, True, True
+        )
+
+    def test_step_log_redact_all(self):
+        self.log_redaction_tester(
+            self.step_log, True, True, True
+        )
+
+    def test_step_log_build_redaction_plan_redact_output_log(self):
+        self.log_redaction_plan_tester(
+            self.step_log, output_log=True, error_log=False, return_code=False
+        )
+
+    def test_step_log_redact_output_log(self):
+        self.log_redaction_tester(
+            self.step_log, output_log=True, error_log=False, return_code=False
+        )
+
+    def test_step_log_build_redaction_plan_redact_error_log(self):
+        self.log_redaction_plan_tester(
+            self.step_log, output_log=False, error_log=True, return_code=False
+        )
+
+    def test_step_log_redact_error_log(self):
+        self.log_redaction_tester(
+            self.step_log, output_log=False, error_log=True, return_code=False
+        )
+
+    def test_step_log_build_redaction_plan_redact_return_code(self):
+        self.log_redaction_plan_tester(
+            self.step_log, output_log=False, error_log=False, return_code=True
+        )
+
+    def test_step_log_redact_return_code(self):
+        self.log_redaction_tester(
+            self.step_log, output_log=False, error_log=False, return_code=True
+        )
+
+    def test_step_log_build_redaction_plan_redact_partially_redacted(self):
+        """Redacting something that's been partially redacted should take that into account."""
+        self.step_log.methodoutput.redact_output_log()
+        self.log_redaction_plan_tester(
+            self.step_log, output_log=True, error_log=True, return_code=True
+        )

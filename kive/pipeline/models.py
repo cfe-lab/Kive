@@ -73,7 +73,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        metadata.models.remove_h(removal_plan)
+        metadata.models.remove_helper(removal_plan)
 
     @transaction.atomic
     def build_removal_plan(self):
@@ -670,7 +670,7 @@ class Pipeline(transformation.models.Transformation):
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
-        metadata.models.remove_h(removal_plan)
+        metadata.models.remove_helper(removal_plan)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
