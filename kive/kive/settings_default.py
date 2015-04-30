@@ -144,7 +144,6 @@ INSTALLED_APPS = (
     'stopwatch',
     'fleet',
     'rest_framework',
-    'rest_framework.authtoken',
 )
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for

@@ -1,4 +1,4 @@
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -27,7 +27,7 @@ import json
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_pipelines_home(request):
     pipeline_dir = {
@@ -60,7 +60,7 @@ def choose_pipeline(request):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_pipelines(request, page=0):
     pagesize = 1
@@ -213,7 +213,7 @@ def run_pipeline(request):
 
 
 @api_view(['POST'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_run_pipeline(request):
     """Run a Pipeline.
@@ -279,7 +279,7 @@ def runs(request):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_runs(request):
     from sandbox.ajax import _load_status
@@ -293,7 +293,7 @@ def api_get_runs(request):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_poll_run_progress(request, rtp_id):
     from sandbox.ajax import _load_status
@@ -330,7 +330,7 @@ def view_results(request, id):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_run_results(request, rtp_id):
     four_oh_four = False

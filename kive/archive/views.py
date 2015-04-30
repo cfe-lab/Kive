@@ -14,7 +14,7 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -33,7 +33,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_dataset_home(request):
     dataset_dir = {
@@ -68,7 +68,7 @@ def datasets(request):
 
 
 @api_view(['GET', 'POST'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_datasets(request, page=0):
     pagesize = 100
@@ -91,7 +91,7 @@ def api_get_datasets(request, page=0):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_get_cdts(request):
     cdts = CompoundDatatype.objects.all()
@@ -125,7 +125,7 @@ def dataset_download(request, dataset_id):
 
 
 @api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_dataset_download(request, dataset_id):
     try:
@@ -257,7 +257,7 @@ def datasets_add(request):
 
 
 @api_view(['post'])
-@authentication_classes((SessionAuthentication, BasicAuthentication, TokenAuthentication))
+@authentication_classes((SessionAuthentication, BasicAuthentication))
 @permission_classes((IsAuthenticated,))
 def api_dataset_add(request):
     single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
