@@ -3902,20 +3902,16 @@ class DatasetApiTests(TestCase):
             self.test_dataset_list(expected_pages=2)
 
     def test_get_cdt(self):
-        request = self.factory.get('/api/datasets/get-datatypes/')
-        response = archive.views.api_get_cdts(request).render()
+        request = self.factory.get('')
+        view = metadata.ajax.CompoundDatatypeViewSet.as_view({'get': 'list'})
+        response = view(request, pk=None)
 
-        self.assertEquals(
-            json.loads(response.content)['detail'],
-            "Authentication credentials were not provided.")
+        self.assertEquals(response.status_code, 403)
 
         force_authenticate(request, user=self.kive_user)
 
-        response = archive.views.api_get_cdts(request).render()
-        result = json.loads(response.content)
-
-        self.assertIn('compoundtypes', result)
-        result = result['compoundtypes']
+        response = view(request, pk=None)
+        result = json.loads(response.rendered_content)
 
         self.assertEquals(len(result), 4)
         self.assertEquals(map(lambda c: c['id'], result), range(1, 5))
