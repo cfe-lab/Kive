@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from archive.models import Dataset, Run
 from kive.serializers import TinyUserSerializer, GroupSerializer
-from metadata.serializers import CompoundDatatypeInputSerializer
+from metadata.serializers import CompoundDatatypeSerializer
 from django.core.urlresolvers import reverse
 import os
 
@@ -37,7 +37,7 @@ class DatasetSerializer(serializers.ModelSerializer):
             return None
         if obj.symbolicdataset.compounddatatype is None:
             return None
-        return CompoundDatatypeInputSerializer(obj.symbolicdataset.compounddatatype).data
+        return CompoundDatatypeSerializer(obj.symbolicdataset.compounddatatype).data
 
     def get_download_url(self, obj):
         if not obj:

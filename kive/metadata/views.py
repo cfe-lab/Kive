@@ -16,7 +16,9 @@ from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \
     DatatypeForm, IntegerConstraintForm, StringConstraintForm
 from metadata.models import BasicConstraint, CompoundDatatype, \
     CompoundDatatypeMember, Datatype, get_builtin_types
-from portal.views import developer_check
+from portal.views import developer_check, admin_check
+from metadata.serializers import CompoundDatatypeSerializer
+import json
 
 
 @login_required
@@ -171,10 +173,11 @@ def compound_datatypes(request):
     Render list of all CompoundDatatypes
     """
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
-    compound_datatypes = sorted(compound_datatypes,
-                                key=lambda cdt: (cdt.short_name, cdt.pk))
+    compound_datatypes_json = json.dumps(
+        CompoundDatatypeSerializer(compound_datatypes, many=True).data)
     t = loader.get_template('metadata/compound_datatypes.html')
-    c = RequestContext(request, {'compound_datatypes': compound_datatypes})
+    c = RequestContext(request, {'compound_datatypes': compound_datatypes_json,
+                                 'is_user_admin': admin_check(request.user)})
     return HttpResponse(t.render(c))
 
 

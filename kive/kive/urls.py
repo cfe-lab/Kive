@@ -3,9 +3,14 @@ from rest_framework.authtoken import views
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
+from metadata.ajax import CompoundDatatypeViewSet
+from rest_framework.routers import DefaultRouter
 admin.autodiscover()
 
 from portal.forms import *
+
+router = DefaultRouter()
+router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 
 urlpatterns = patterns(
     '',
@@ -95,7 +100,7 @@ urlpatterns = patterns(
     # Urls for django-rest-framework
 
     # Authentication
-    url(r'^api/$', 'portal.views.api_home', name='api_home'),
+    url(r'^api/', include(router.urls), name='api_home'),
     url(r'^api/auth/$', 'portal.views.api_auth', name='api_auth'),
     url(r'^api/token-auth/', views.obtain_auth_token),
 
@@ -103,7 +108,6 @@ urlpatterns = patterns(
     url(r'^api/datasets/$', 'archive.views.api_dataset_home', name='api_dataset_home'),
     url(r'^api/datasets/download/(?P<dataset_id>\d+)$', 'archive.views.api_dataset_download',
         name='api_dataset_download'),
-    url(r'^api/datasets/get-datatypes/$', 'archive.views.api_get_cdts', name='api_get_cdts'),
     url(r'^api/datasets/get-datasets/$', 'archive.views.api_get_datasets', name='api_get_dataset'),
     url(r'^api/datasets/get-datasets/(?P<page>\d+)$', 'archive.views.api_get_datasets', name='api_get_dataset_page'),
     url(r'^api/datasets/add-dataset/$', 'archive.views.api_dataset_add', name='api_dataset_add'),

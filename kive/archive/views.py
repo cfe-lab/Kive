@@ -24,8 +24,6 @@ from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
 from archive.models import Dataset, MethodOutput
 from archive.serializers import DatasetSerializer
 import librarian.models
-from metadata.models import CompoundDatatype
-from metadata.serializers import CompoundDatatypeInputSerializer
 from portal.views import admin_check
 import json
 
@@ -40,8 +38,7 @@ def api_dataset_home(request):
         'directory': {
             name: reverse(name) for name in [
                 'api_get_dataset',
-                'api_dataset_add',
-                'api_get_cdts']
+                'api_dataset_add']
         }
     }
     return Response(dataset_dir)
@@ -88,17 +85,6 @@ def api_get_datasets(request, page=0):
         'datasets': DatasetSerializer(datasets, many=True).data,
     }
     return Response(dataset_list)
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_get_cdts(request):
-    cdts = CompoundDatatype.objects.all()
-    cdt_dir = {
-        'compoundtypes': CompoundDatatypeInputSerializer(cdts, many=True).data,
-    }
-    return Response(cdt_dir)
 
 
 def _build_download_response(source_file):

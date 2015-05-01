@@ -6,6 +6,14 @@
 {% block title %}Compound Datatypes{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/sandbox/admin_lock.js"></script>
+    <script src="/static/metadata/compound_datatypes.js"></script>
+    <script type="text/javascript">
+        var is_user_admin = {{ is_user_admin|lower }};
+    </script>
+    <link rel="stylesheet" href="/static/sandbox/admin_lock.css">
 {% endblock %}
 
 {% block content %}
@@ -15,49 +23,23 @@
 <h2>Compound Datatypes</h2>
 <a href="/compound_datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
+<div id="initial_data" style="display:none">{{ compound_datatypes|escape }}</div>
 <p>
 A compound datatype is an ordered set of datatypes, describing the expected structure of a data set that would act as the input or output of a Method.
 </p>
 
-<table>
+<table id="compounddatatypes">
 <thead>
 	<tr>
         <th>Scheme</th>
         <th>Creator</th>
         <th>Users with access</th>
         <th>Groups with access</th>
-        <th>#datasets</th>
+        <th><div class="lock"></div></th>
 	</tr>
 </thead>
-
-{% for cd in compound_datatypes %}
-<tr>
-	<td>{{ cd }}</td> <!--unicode representation-->
-    <td>{{ cd.user }}</td>
-
-    <td>
-        {% if cd.users_allowed.exists %}
-        <ul>
-            {% for ua in cd.users_allowed.all %}
-            <li>{{ ua }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </td>
-
-    <td>
-        {% if cd.groups_allowed.exists %}
-        <ul>
-            {% for ga in cd.groups_allowed.all %}
-            <li>{{ ga }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </td>
-	<td><!-- reserved for number of conforming datasets--></td>
-</tr>
-{% endfor %}
-
+<tbody>
+</tbody>
 </table>
 
 

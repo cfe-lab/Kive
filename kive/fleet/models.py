@@ -87,7 +87,7 @@ class RunToProcess(metadata.models.AccessControl):
             pipeline_name = "Run"
         inputs = self.inputs.select_related('symbolicdataset__dataset')
         first_input = inputs.order_by('index').first()
-        if not first_input:
+        if not (first_input and first_input.symbolicdataset.has_data()):
             if self.time_queued:
                 return "{} at {}".format(pipeline_name, self.time_queued)
             return pipeline_name

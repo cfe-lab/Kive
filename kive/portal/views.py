@@ -1,20 +1,17 @@
 """
 portal.views
 """
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, RequestContext
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.urlresolvers import reverse
 from django.core.context_processors import csrf
 
 from constants import groups
-from kive.serializers import UserSerializer
 
 def developer_check(user):
     return user.groups.filter(pk=groups.DEVELOPERS_PK).exists()
@@ -56,24 +53,6 @@ def usr(request):
     c = RequestContext(request)
     return HttpResponse(t.render(c))
 
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_home(request):
-    """
-    Presents a user with the list of actions they can perform with
-    their permissions. At this point
-    """
-    print UserSerializer(request.user).data
-    home_dir = {
-        'user': UserSerializer(request.user).data,
-        'directory': {
-            name: reverse(name) for name in ['api_dataset_home']
-        }
-    }
-    return Response(home_dir)
-
 @api_view(['POST'])
 def api_auth(request):
     username = request.DATA.get("username")
@@ -82,7 +61,7 @@ def api_auth(request):
 
     user = authenticate(username=username, password=password)
     if user is None:
-        return Response({'errors': ['Invalid user credentials!']}, status=rf_status.HTTP_401_UNAUTHORIZED)
+        return Response({'errors': ['Invalid user credentials!']}, status=status.HTTP_401_UNAUTHORIZED)
     login(request, user)
 
     response = {

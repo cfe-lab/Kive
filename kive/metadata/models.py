@@ -431,21 +431,25 @@ class AccessControl(models.Model):
             )
 
     @classmethod
-    def filter_by_user(cls, user, is_admin=False):
+    def filter_by_user(cls, user, is_admin=False, queryset=None):
         """ Retrieve a QuerySet of all records of this class that are visible
             to the specified user.
         
         @param is_admin: override the filter, and just return all records.
+        @param queryset: add the filter to an existing queryset instead of
+            cls.objects.all()
         @raise StandardError: if is_admin is true, but user is not in the
             administrator group.
         """
+        if queryset is None:
+            queryset = cls.objects.all()
         if is_admin:
             if not admin_check(user):
                 raise StandardError('User is not an administrator.')
-            return cls.objects.all()
-        
-        user_plus = KiveUser.kiveify(user)
-        return cls.objects.filter(user_plus.access_query()).distinct()
+        else:
+            user_plus = KiveUser.kiveify(user)
+            queryset = queryset.filter(user_plus.access_query()).distinct()
+        return queryset
 
     def grant_everyone_access(self):
         self.groups_allowed.add(Group.objects.get(pk=groups.EVERYONE_PK))
