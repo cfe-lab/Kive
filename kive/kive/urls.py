@@ -93,8 +93,10 @@ urlpatterns = patterns(
     url(r'^get_failed_output$', 'sandbox.ajax.get_failed_output', name='get_failed_output'),
 
     # Urls for django-rest-framework
+
+    # Authentication
     url(r'^api/$', 'portal.views.api_home', name='api_home'),
-    url(r'^api/auth/', include('rest_framework.urls', namespace='rest_framework')),
+    url(r'^api/auth/$', 'portal.views.api_auth', name='api_auth'),
     url(r'^api/token-auth/', views.obtain_auth_token),
 
     # REST API - Datasets

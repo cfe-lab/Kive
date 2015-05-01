@@ -343,9 +343,10 @@ def api_get_run_results(request, rtp_id):
         four_oh_four = True
 
     if four_oh_four:
-        raise Http404("ID {} does not exist or is not accessible".format(id))
+        return Response({'errors': ['Run not found!']}, status=rf_status.HTTP_404_NOT_FOUND)
 
-    outputs = [oc.execrecord.execrecordouts.first().symbolicdataset.dataset for oc in run.outcables_in_order]
+    outputs = [oc.execrecord.execrecordouts.first().symbolicdataset.dataset
+               for oc in run.outcables_in_order if oc.execrecord is not None]
     resp = {
         'results': DatasetSerializer(outputs, many=True).data,
     }

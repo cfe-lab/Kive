@@ -132,7 +132,7 @@ def api_dataset_download(request, dataset_id):
         accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
         dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
     except Dataset.DoesNotExist:
-        raise Http404("ID {} cannot be accessed".format(dataset_id)) # TODO: JSON ERROR
+        return Response({'errors': ['Run not found!']}, status=rf_status.HTTP_404_NOT_FOUND)
 
     return _build_download_response(dataset.dataset_file)
 
