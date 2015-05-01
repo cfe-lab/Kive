@@ -17,17 +17,19 @@
 
     <script type="text/javascript">
         $(function(){
-            datasets_main({{ is_user_admin|lower }}, {{dataset_json|safe}});
+            datasets_main(
+                {{ is_user_admin|lower }},
+                JSON.parse($('#preload_data').text()));
         });
     </script>
 
 {% endblock %}
 
 {% block content %}
+
+
 <a href="usr.html" rel="prev">Back to user's portal</a>
-
 <h2>Uploaded datasets</h2>
-
 <table>
 <thead>
 	<tr>
@@ -47,7 +49,7 @@
 </tbody>
 </table>
 
+<div style="display:none" id="preload_data">{{dataset_json}}</div>
 <a href="/datasets_add" class="button">+&ensp;<span class="button-lbl">Add Datasets</span></a>&ensp;
 <a href="/datasets_add_bulk" class="button">+&ensp;<span class="button-lbl">Add Bulk Datasets</span></a>
-
 {% endblock %}
