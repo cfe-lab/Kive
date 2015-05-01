@@ -88,7 +88,7 @@ function show_run_progress(run_data) {
     $tbody.empty();
     $.each(run_data['runs'], function() {
         $row = $('<tr/>');
-        $run_status = $('<a>').attr("href", "/view_run/" + this.rtp_id).text(this.status);
+        $run_status = $('<a/>').attr("href", "/view_run/" + this.rtp_id).text(this.status);
         $row.append($('<td class="code"/>').append($run_status));
         console.log(run_data)
         run_id = this["id"];
