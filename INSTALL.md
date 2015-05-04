@@ -97,6 +97,30 @@ A slightly less obtuse way to issue this command is to call the `pg_ctl` utility
 The PostgreSQL server will be automatically started when you reboot your system through a LaunchDaemon script that was installed by MacPorts at `/Library/LaunchDaemons/org.macports.postgresql93-server.plist`.  To inspect what this script is actually doing, you can look at the contents of the wrapper `/opt/local/etc/LaunchDaemons/org.macports.postgresql93-server/postgresql93-server.wrapper`.
 Note that if you used a database location or name other than the MacPorts default, then you may need to modify this wrapper accordingly.
 
+#### Installing on Ubuntu
+
+Install the database server, client, and administrative tools with the
+package manager.
+
+    sudo apt-get install postgresql postgresql-contrib postgresql-client
+
+Create a password for the `postgres` user.
+
+    sudo -u postgres psql postgres
+    \password postgres
+
+Press Control+D twice to exit the Postgres prompt and log out of the
+postgres account.
+
+The database server should already have been started when you installed 
+postgresql, and will be automatically restarted on reboot. If you need
+to start or restart the server, see `man pg_ctlcluster`.
+
+The postgresql data directory will have been put in a default place,
+likely `/var/lib/postgresql/9.3/main`. You can figure out where the data
+directory is by typing `show data_directory;` into the postgres prompt.
+Don't worry about creating a database yet, that will get done later on.
+
 Installing psycopg2
 ------------------
 Psycopg is a PostgreSQL adaptor for Python.  It is mandatory in order for Django to use a PostgreSQL database.  Instructions for downloading and installing it may be found at [initd.org](http://initd.org/psycopg/).
@@ -111,6 +135,13 @@ If you are using a MacPorts binary of Python, you can easily install the psycopg
     sudo port install py27-psycopg2
 
 This may also install a number of dependencies if they are not already present on your system, such as `libxslt`.
+
+#### Using apt-get
+
+If you are on Ubuntu, psycopg2 can be installed with the package
+manager.
+
+    sudo apt-get install python-psycopg2
 
 ##### Using pip
 The developers recommend using a binary package where possible, using fink or ports.
