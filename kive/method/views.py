@@ -17,7 +17,7 @@ from method.models import CodeResource, CodeResourceDependency, Method, \
 from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
-from portal.views import developer_check
+from portal.views import developer_check, admin_check
 
 
 @login_required
@@ -362,6 +362,7 @@ def method_families(request):
     families = MethodFamily.filter_by_user(request.user)
     t = loader.get_template('method/method_families.html')
     c = RequestContext(request, {'families': families})
+    c["is_user_admin"] = admin_check(request.user)
     return HttpResponse(t.render(c))
 
 
@@ -374,7 +375,7 @@ def methods(request, id):
     four_oh_four = False
     try:
         family = MethodFamily.objects.get(pk=id)
-        if not family.can_be_accessed(request.user):
+        if not family.can_be_accessed(request.user) and not admin_check(request.user):
             four_oh_four = True
     except MethodFamily.DoesNotExist:
         four_oh_four = True

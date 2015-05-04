@@ -2,8 +2,12 @@ from django.http import HttpResponse, Http404
 from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
 
-from method.models import CodeResourceRevision
-from portal.views import developer_check
+from rest_framework.renderers import JSONRenderer
+
+from method.models import CodeResourceRevision, MethodFamily
+from metadata.models import KiveUser
+from portal.views import developer_check, admin_check
+import method.serializers
 
 
 @login_required
@@ -33,3 +37,41 @@ def populate_revision_dropdown(request):
         return response
     else:
         raise Http404
+
+
+@login_required
+@user_passes_test(developer_check)
+def method_families(request):
+    if request.is_ajax():
+        response = HttpResponse()
+        # Get all families excluding the ones that the administrator can already see.
+        if request.QUERY_PARAMS.
+        kive_user = KiveUser.kiveify(request.user)
+
+        other_families = MethodFamily.objects.filter(kive_user.access_query())
+        mf_serializer = method.serializers.MethodFamilyTableSerializer(other_families, many=True)
+        response.write(
+            JSONRenderer().render(mf_serializer.data)
+        )
+        return response
+    else:
+        raise Http404
+
+
+@login_required
+@user_passes_test(developer_check)
+@user_passes_test(admin_check)
+def method_family_admin_access(request):
+    if request.is_ajax():
+        response = HttpResponse()
+
+        # The administrator sees all MethodFamilies.
+        other_families = MethodFamily.objects.all()
+        mf_serializer = method.serializers.MethodFamilyTableSerializer(other_families, many=True)
+        response.write(
+            JSONRenderer().render(mf_serializer.data)
+        )
+        return response
+    else:
+        raise Http404
+

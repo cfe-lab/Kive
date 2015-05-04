@@ -11,6 +11,7 @@ from metadata.models import deletion_order
 
 JSON_CONTENT_TYPE = 'application/json'
 
+
 def _load_methodoutput(request, methodoutput_id):
     if not request.is_ajax():
         raise Http404
