@@ -173,8 +173,10 @@ def compound_datatypes(request):
     Render list of all CompoundDatatypes
     """
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
-    compound_datatypes_json = json.dumps(
-        CompoundDatatypeSerializer(compound_datatypes, many=True).data)
+    compound_datatypes_json = json.dumps(CompoundDatatypeSerializer(
+        compound_datatypes,
+        context={ 'request': request },
+        many=True).data)
     t = loader.get_template('metadata/compound_datatypes.html')
     c = RequestContext(request, {'compound_datatypes': compound_datatypes_json,
                                  'is_user_admin': admin_check(request.user)})

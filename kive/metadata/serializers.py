@@ -7,15 +7,19 @@ class CompoundDatatypeSerializer(serializers.ModelSerializer):
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
     representation = serializers.SerializerMethodField()
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='compounddatatype-removal-plan')
 
     class Meta:
         model = CompoundDatatype
         fields = ('id',
-#                   'url',
+                  'url',
                   'representation',
                   'user',
                   'users_allowed',
-                  'groups_allowed')
+                  'groups_allowed',
+                  'removal_plan'
+                  )
 
     def get_representation(self, obj):
         if obj:

@@ -18,7 +18,7 @@ var pollingInterval = 1000,
 
 /* Ask the server for a progress report of the run. */
 function poll_run_progress(run_data) {
-    ajaxRequest = $.getJSON(
+    $.getJSON(
             "poll_run_progress",
             {
                 filters: get_run_filters(),
