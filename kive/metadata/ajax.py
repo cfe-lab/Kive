@@ -9,10 +9,10 @@ from rest_framework import viewsets, permissions, mixins
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
-from metadata.models import Datatype, get_builtin_types, CompoundDatatype,\
-    AccessControl
+from metadata.models import Datatype, get_builtin_types, CompoundDatatype
 from metadata.serializers import CompoundDatatypeSerializer
 from portal.views import developer_check
+from portal.ajax import IsDeveloperOrGrantedReadOnly
 
 @login_required
 @user_passes_test(developer_check)
@@ -41,13 +41,13 @@ class CompoundDatatypeViewSet(mixins.DestroyModelMixin,
                               viewsets.ReadOnlyModelViewSet):
     queryset = CompoundDatatype.objects.all()
     serializer_class = CompoundDatatypeSerializer
-    permission_classes = (permissions.IsAuthenticated, )
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
     def get_queryset(self):
         is_admin = self.request.QUERY_PARAMS.get('is_admin') == 'true'
-        return AccessControl.filter_by_user(self.request.user,
-                                            is_admin=is_admin,
-                                            queryset=self.queryset)
+        return CompoundDatatype.filter_by_user(self.request.user,
+                                               is_admin=is_admin,
+                                               queryset=self.queryset)
 
     @detail_route(methods=['get'])
     def removal_plan(self, request, pk=None):
