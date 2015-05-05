@@ -1,6 +1,6 @@
 function lock_handler(is_admin) {
     $.getJSON(
-            "api/compounddatatypes/" + (is_admin ? '' : 'granted/'),
+            "api/compounddatatypes?is_granted=" + ! is_admin,
             {},
             function (compoundDatatypes) {
                 build_table(
