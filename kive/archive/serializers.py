@@ -15,7 +15,7 @@ class TinyRunSerializer(serializers.ModelSerializer):
 class DatasetSerializer(serializers.ModelSerializer):
 
     user = TinyUserSerializer()
-    compounddatatype = serializers.SerializerMethodField()
+    compounddatatype = CompoundDatatypeSerializer(source='symbolicdataset.compounddatatype')
     download_url = serializers.SerializerMethodField()
     view_url = serializers.SerializerMethodField()
     filename = serializers.SerializerMethodField()
@@ -37,7 +37,8 @@ class DatasetSerializer(serializers.ModelSerializer):
             return None
         if obj.symbolicdataset.compounddatatype is None:
             return None
-        return CompoundDatatypeSerializer(obj.symbolicdataset.compounddatatype).data
+        print dir(self)
+        return obj.symbolicdataset.compounddatatype
 
     def get_download_url(self, obj):
         if not obj:

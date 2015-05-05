@@ -79,9 +79,8 @@ def dataset_redact(request, dataset_id):
     
     if _is_dry_run(request):
         plan = dataset.symbolicdataset.build_redaction_plan()
-        runs = set()
-        for exec_record in plan['ExecRecords']:
-            runs.add(exec_record.generator.record.top_level_run)
+        runs = {exec_record.generator.record.top_level_run for exec_record in plan['ExecRecords']}
+
         summary = "This will redact {} data sets and {} logs from {} runs.".format(
             len(plan['SymbolicDatasets']),
             len(plan['OutputLogs']) + len(plan['ErrorLogs']),
@@ -96,6 +95,43 @@ def dataset_redact(request, dataset_id):
         return api_get_datasets(request, -1)
 
     return _build_run_outputs_response(dataset.created_by.parent_run)
+
+
+@login_required
+@user_passes_test(admin_check)
+@require_POST
+def dataset_remove(request, dataset_id):
+    """
+    Redact the file associated with the dataset.
+    """
+    if not request.is_ajax():
+        raise Http404
+
+    try:
+        dataset = Dataset.objects.get(pk=dataset_id)
+    except Dataset.DoesNotExist:
+        raise Http404("ID {} cannot be accessed".format(dataset_id))
+
+    if _is_dry_run(request):
+        plan = dataset.symbolicdataset.build_removal_plan()
+        runs = {exec_record.generator.record.top_level_run for exec_record in plan['ExecRecords']}
+
+        # summary = "This will remove {} data sets and {} logs from {} runs.".format(
+        summary = "This will remove {} data sets and {} runs.".format(
+            len(plan['SymbolicDatasets']),
+            # len(plan['OutputLogs']) + len(plan['ErrorLogs']),
+            len(runs))
+        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
+
+    dataset.symbolicdataset.remove()
+
+    # FIXME: This is how we reload all the datasets if we're not redacting
+    # from the run result page. We should try to do this in a more clean way?
+    if request.POST.get('datasets') == 'true':
+        return api_get_datasets(request, -1)
+
+    return _build_run_outputs_response(dataset.created_by.parent_run)
+
 
 @login_required
 @user_passes_test(admin_check)
