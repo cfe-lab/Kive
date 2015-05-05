@@ -51,26 +51,33 @@ class DatasetViewSet(mixins.DestroyModelMixin,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
     def create(self, request):
+        """
+        Override the create function, this allows us to POST to
+        this viewset, but also provides us with an incorrect form on
+        the front end.
+        """
         single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
-        symdataset = None
-
-        if single_dataset_form.is_valid():
-            symdataset = single_dataset_form.create_dataset(request.user)
+        symdataset = single_dataset_form.create_dataset(request.user) if single_dataset_form.is_valid() else None
 
         if symdataset is None:
             return Response({'errors': single_dataset_form.errors}, status=400)
-
         return Response(DatasetSerializer(symdataset.dataset).data, status=201)
 
     def perform_destroy(self, instance):
-        instance.remove()
+        instance.symbolicdataset.remove()
+
+    def partial_update(self, request, pk=None):
+        if request.DATA.get('is_redacted', False):
+            self.get_object().symbolicdataset.redact()
+            return Response({'message': 'Data set redacted.'})
+        return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
 
     @detail_route(methods=['get'])
     def download(self, request, pk=None):
         accessible_SDs = SymbolicDataset.filter_by_user(request.user)
-        try:
-            dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=pk)
-        except Dataset.DoesNotExist:
+        dataset = self.get_object()
+
+        if dataset.symbolicdataset not in accessible_SDs:
             return Response(None, status=404)
 
         return _build_download_response(dataset.dataset_file)
