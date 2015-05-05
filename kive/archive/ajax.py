@@ -15,10 +15,10 @@ from rest_framework.decorators import detail_route, list_route
 from rest_framework.response import Response
 
 from archive.serializers import DatasetSerializer
-
-from portal.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 from archive.forms import DatasetForm
 from archive.views import _build_download_response
+
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 
 JSON_CONTENT_TYPE = 'application/json'
 
