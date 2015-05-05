@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from archive.serializers import DatasetSerializer
 
-from portal.ajax import IsDeveloperOrGrantedReadOnly
+from portal.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 from archive.forms import DatasetForm
 from archive.views import _build_download_response
 
@@ -44,8 +44,7 @@ def _is_dry_run(request):
     return request.POST.get('dry_run') == 'true'
 
 
-class DatasetViewSet(mixins.DestroyModelMixin,
-                     viewsets.ReadOnlyModelViewSet):
+class DatasetViewSet(RemovableModelViewSet):
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -64,9 +63,13 @@ class DatasetViewSet(mixins.DestroyModelMixin,
         return Response(DatasetSerializer(symdataset.dataset).data, status=201)
 
     def perform_destroy(self, instance):
+        """
+        """
         instance.symbolicdataset.remove()
 
     def partial_update(self, request, pk=None):
+        """
+        """
         if request.DATA.get('is_redacted', False):
             self.get_object().symbolicdataset.redact()
             return Response({'message': 'Data set redacted.'})
@@ -74,6 +77,8 @@ class DatasetViewSet(mixins.DestroyModelMixin,
 
     @detail_route(methods=['get'])
     def download(self, request, pk=None):
+        """
+        """
         accessible_SDs = SymbolicDataset.filter_by_user(request.user)
         dataset = self.get_object()
 
