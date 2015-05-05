@@ -3,23 +3,30 @@ Installation Instructions
 
 Prerequisites
 -------------
-**kive** is a set of Django applications.  As a result, it has the following requirements:
 
-1. Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
-2. Django (version 1.7 or higher)
-3. OpenMPI
-4. mpi4py
-5. numpy
-6. PostgreSQL
-7. psycopg (Python library for interfacing with PostgreSQL)
-8. djangorestframework
+Before installing Kive, you need to install some other software.
 
-9. django-extensions (Provides the ability to create a UML diagram of the backend models used to store all the records in the database)
-10. pygraphviz
+* Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
+* Django (version 1.7 or higher)
+* the Django REST framework
+* PostgreSQL
+* psycopg2 (Python library for interfacing with PostgreSQL)
+* OpenMPI (optional, for running Kive on a cluster)
+* mpi4py (optional, for running Kive on a cluster)
+* django-extensions (optional, for creating a UML diagram of the backend
+  models used to store all the records in the database)
+* pygraphviz (optional, for the UML diagram)
+* [expect][]
 
-It also requires the [Expect automation tool](http://sourceforge.net/projects/expect/) to run some configuration steps.
+[expect]: http://sourceforge.net/projects/expect/
+
+Installing Python
+-----------------
 
 Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
+
+Installing Django
+-----------------
 
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
 If you are already running Django 1.6, installing should be as painless as running
@@ -32,7 +39,11 @@ system-wide.  Also, many systems have multiple Python installations, so make sur
 
     pip install djangorestframework
 
-Instructions for downloading and installing `django-extensions` may be found [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
+Instructions for downloading and installing `django-extensions` may be found
+[here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
+The easiest way is to use `pip` again.
+
+    pip install django-extensions
 
 Installing PostgreSQL
 ---------------------
@@ -169,9 +180,20 @@ Then you can compile and install this module by running `sudo python setup.py in
 
 To confirm that the module is installed, start an interaction session by calling `python` on the command line and then enter `import psycopg2`.  If this raises an `ImportError` then something has gone wrong - for example, the version of Python used to install the module is different from the version running the interactive session.
 
+Installing OpenMPI and mpi4py
+-----------------------------
+
+### Ubuntu
+
+Just directly install the mpi4py library with
+
+    sudo apt-get install python-mpi4py
+
+This will automatically install the necessary components of OpenMPI.
+
 Project structure
 -----------------
-The root directory of **kive** should contain the following subdirectories:
+The root directory of Kive should contain the following subdirectories:
 * `/doc`
 * `/samplecode`
 * `/kive`
@@ -181,8 +203,8 @@ The root directory of **kive** should contain the following subdirectories:
 
 Create database
 ---------------
-**kive** uses PostgreSQL as its default database backend, and it must be set
-up prior to using **kive**.  The following instructions are based on step
+Kive uses PostgreSQL as its default database backend, and it must be set
+up prior to using Kive.  The following instructions are based on step
 seven of the instructions from [digitalocean.com][digitalocean]. Feel free to
 change the user name or database name to something other than "kive".  
 
@@ -193,14 +215,14 @@ this user account:
 
     sudo su - postgres
 
-Create a database for **kive**.  If the Postgres utilities have not been
+Create a database for Kive.  If the Postgres utilities have not been
 automatically added to your PATH (they won't have been if you followed the above instructions
 installing the database using the graphical installer), make sure you specify the path
 of the commands in the following:
 
     createdb kive
 
-Next, create a database user (or "role") for **kive** to use when accessing the
+Next, create a database user (or "role") for Kive to use when accessing the
 database, and follow the prompts (the `-P` allows you to specify a password):
 
     createuser -P kive
@@ -210,7 +232,7 @@ system user, using the `psql` SQL console, enter at the prompt:
 
     GRANT ALL PRIVILEGES ON DATABASE kive TO kive;
 
-We are almost done.  In order to run the **kive** test suites, the
+We are almost done.  In order to run the Kive test suites, the
 `kive` database account must have the ability to create temporary test
 databases.  As instructed on [Stack Overflow][test-permission], we grant the
 user this privilege by running a command in `psql`:
@@ -241,7 +263,7 @@ with `psql` and then exit.
 
 Settings
 --------
-Since **kive** is a Django project, the majority of the installation
+Since Kive is a Django project, the majority of the installation
 procedure follows the standard instructions for Django.  The first thing you
 need to do is to make a copy of `/kive/settings_default.py` called
 `settings.py` (remember, all paths are relative to `/kive` so we mean
@@ -415,51 +437,3 @@ Finally, run the unit tests and the script to summarize them.
 
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
 [hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
-
-Deploying a Release
-===================
-See the project wiki for instructions on how to [start a production server][wiki].
-Once you have set up your production server, this is how to deploy a new release:
-
-1. Make sure the code works in your development environment. Run all the unit
-    tests.
-    
-    ./manage.py test
-    
-2. Check that all the issues in the current milestone are closed.
-3. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
-    matches the version on the milestone. If you have to redo
-    a release, you can create additional releases with tags vX.Y.1, vX.Y.2, and
-    so on. Mark the release as pre-release until you finish deploying it.
-4. TODO: Check whether there are problems with doing a deployment while a run
-    is executing. Does restarting apache restart the run?
-5. Get the code from Github onto the server.
-
-        ssh user@server
-        cd /usr/local/share/Kive/kive
-        git fetch
-        git checkout tags/vX.Y
-
-6. Check if you need to set any new settings by running
-    `diff kive/settings_default.py kive/settings.py`. Do the same
-    comparison of `hostfile`.
-7. Recreate the database as described in the Initialize Database section, and
-    deploy the static files.
-    
-        ssh user@server
-        cd /usr/local/share/Kive/kive
-        ./manage.py migrate
-        sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./manage.py collectstatic
-        
-8. TODO: Check whether an apache restart is needed. What about the fleet manager?
-
-        ps aux | grep runfleet
-        sudo kill <pid for runfleet>
-        sudo /usr/sbin/apachectl restart
-        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
-
-9. Remove the pre-release flag from the release.
-10. Close the milestone for this release, create one for the next release, and
-    decide which issues you will include in that milestone.
-
-[release]: https://help.github.com/categories/85/articles

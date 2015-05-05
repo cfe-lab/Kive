@@ -56,7 +56,7 @@ def datasets(request):
 
     c = RequestContext(request, {
         'datasets': datasets,
-        'dataset_json':  json.dumps(DatasetSerializer(datasets, many=True).data)
+        'dataset_json':  json.dumps(DatasetSerializer(datasets, context={'request': request},  many=True).data)
     })
 
     c['is_user_admin'] = admin_check(request.user)
@@ -82,7 +82,7 @@ def api_get_datasets(request, page=0):
         next_url = reverse('api_get_dataset_page', kwargs={'page': page+1})
     dataset_list = {
         'next': next_url,
-        'datasets': DatasetSerializer(datasets, many=True).data,
+        'datasets': DatasetSerializer(datasets, context={'request': request}, many=True).data,
     }
     return Response(dataset_list)
 

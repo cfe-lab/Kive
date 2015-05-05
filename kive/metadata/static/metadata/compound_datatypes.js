@@ -1,9 +1,7 @@
 function lock_handler(is_admin) {
     $.getJSON(
-            "api/compounddatatypes/",
-            {
-                is_admin: is_admin
-            },
+            "api/compounddatatypes/" + (is_admin ? '' : 'granted/'),
+            {},
             function (compoundDatatypes) {
                 build_table(
                         $('#compounddatatypes tbody'),
@@ -25,7 +23,7 @@ function remove_handler(event) {
     var $a = $(this);
     $.getJSON(
             $a.attr('planUrl'),
-            { is_admin: true },
+            {},
             function (plan) {
                 var message = 'Removing ';
                 for (var key in plan) {
@@ -37,7 +35,7 @@ function remove_handler(event) {
                 message += 'are you sure?'
                 if (window.confirm(message)) {
                     $.ajax({
-                        url: $a.attr('mainUrl') + '?is_admin=true',
+                        url: $a.attr('mainUrl'),
                         method: 'DELETE',
                         success: function() {
                             lock_handler(true);

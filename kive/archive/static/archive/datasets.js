@@ -36,6 +36,27 @@ function redact_handler(id){
     });
 }
 
+function remove_handler(id){
+    $.ajax({
+        type: 'POST',
+        url: '/dataset_remove/' + id,
+        data: {dry_run:'true'},
+        success: function(data) {
+            if (window.confirm(data + '\nAre you sure?')) {
+                $.ajax({
+                    url: '/dataset_remove/' + id,
+                    data: {datasets:'true'},
+                    type: 'POST',
+                    success: function(data) {
+                        build_table($('#dataset_body'), data.datasets);
+                    }
+                });
+            }
+        }
+    });
+}
+
+
 function lock_handler(is_admin){
     if (is_admin) {
         $('a.redact').closest('td').show();
@@ -107,7 +128,7 @@ function build_table($tbody, datasets) {
 
         $tr.append($('<td/>').append($('<a class="remove" href="#"/>').text('Remove').click(dataset.id, function(e){
             e.preventDefault();
-            console.error('Not yet');
+            remove_handler(e.data);
         })));
 
         $tr.append($('<td/>').append($('<a class="redact" href="#"/>').text('Redact').click(dataset.id, function(e){
