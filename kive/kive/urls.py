@@ -5,7 +5,8 @@ from rest_framework.routers import DefaultRouter
 
 from metadata.ajax import CompoundDatatypeViewSet
 from archive.ajax import DatasetViewSet
-from sandbox.ajax import PipelineFamilyViewSet, PipelineViewSet
+from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
+from fleet.ajax import RunToProcessViewSet
 
 from portal.forms import *
 
@@ -18,6 +19,7 @@ router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'pipeline_family', PipelineFamilyViewSet)
 router.register(r'pipepline', PipelineViewSet)
+router.register(r'runs', RunToProcessViewSet)
 
 urlpatterns = patterns(
     '',
@@ -125,6 +127,8 @@ urlpatterns = patterns(
     url(r'^api/pipelines/get-pipelines/$', 'sandbox.views.api_get_pipelines', name='api_pipelines_get'),
     url(r'^api/pipelines/get-pipelines/(?P<page>\d+)$', 'sandbox.views.api_get_pipelines',
         name='api_pipelines_get_page'),
+
+    # These should be x-ferred to the runs API call
     url(r'^api/pipelines/start-run/$', 'sandbox.views.api_run_pipeline', name='api_pipelines_startrun'),
     url(r'^api/pipelines/get-active-runs/$', 'sandbox.views.api_get_runs', name='api_pipelines_get_runs'),
     url(r'^api/pipelines/run-status/(?P<rtp_id>\d+)$', 'sandbox.views.api_poll_run_progress',

@@ -205,6 +205,15 @@ class RunToProcess(metadata.models.AccessControl):
     def _format_time(self, t):
         return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 
+    def build_removal_plan(self):
+        if self.run is not None:
+            return self.run.build_removal_plan()
+        return []
+
+    def remove(self):
+        if self.run is not None:
+            return self.run.remove()
+
 
 class RunToProcessInput(models.Model):
     """
