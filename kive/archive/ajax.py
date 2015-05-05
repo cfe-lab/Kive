@@ -5,11 +5,23 @@ from django.http.response import Http404, HttpResponse
 from django.views.decorators.http import require_POST
 
 from archive.models import Dataset, MethodOutput, Run
+from librarian.models import SymbolicDataset
 from portal.views import admin_check
 from archive.views import api_get_datasets
 from metadata.models import deletion_order
 
+from rest_framework import viewsets, permissions, mixins
+from rest_framework.decorators import detail_route, list_route
+from rest_framework.response import Response
+
+from archive.serializers import DatasetSerializer
+
+from portal.ajax import IsDeveloperOrGrantedReadOnly
+from archive.forms import DatasetForm
+from archive.views import _build_download_response
+
 JSON_CONTENT_TYPE = 'application/json'
+
 
 def _load_methodoutput(request, methodoutput_id):
     if not request.is_ajax():
@@ -21,13 +33,61 @@ def _load_methodoutput(request, methodoutput_id):
         raise Http404(
             "Method output {} cannot be accessed".format(methodoutput_id))
 
+
 def _build_run_outputs_response(run):
     return HttpResponse(
         json.dumps([output.__dict__ for output in run.get_output_summary()]),
         content_type=JSON_CONTENT_TYPE)
 
+
 def _is_dry_run(request):
     return request.POST.get('dry_run') == 'true'
+
+
+class DatasetViewSet(mixins.DestroyModelMixin,
+                     viewsets.ReadOnlyModelViewSet):
+    queryset = Dataset.objects.all()
+    serializer_class = DatasetSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    def create(self, request):
+        single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
+        symdataset = None
+
+        if single_dataset_form.is_valid():
+            symdataset = single_dataset_form.create_dataset(request.user)
+
+        if symdataset is None:
+            return Response({'errors': single_dataset_form.errors}, status=400)
+
+        return Response(DatasetSerializer(symdataset.dataset).data, status=201)
+
+    def perform_destroy(self, instance):
+        instance.remove()
+
+    @detail_route(methods=['get'])
+    def download(self, request, pk=None):
+        accessible_SDs = SymbolicDataset.filter_by_user(request.user)
+        try:
+            dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=pk)
+        except Dataset.DoesNotExist:
+            return Response(None, status=404)
+
+        return _build_download_response(dataset.dataset_file)
+
+    @detail_route(methods=['get'])
+    def removal_plan(self, request, pk=None):
+        removal_plan = self.get_object().symbolicdataset.build_removal_plan()
+        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
+        return Response(counts)
+
+    @detail_route(methods=['get'])
+    def redaction_plan(self, request, pk=None):
+        removal_plan = self.get_object().symbolicdataset.build_redaction_plan()
+        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
+        return Response(counts)
+
+
 
 @login_required
 @user_passes_test(admin_check)

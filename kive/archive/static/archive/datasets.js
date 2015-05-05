@@ -83,7 +83,7 @@ function build_table($tbody, datasets) {
         }
 
         make_td(dataset.user.username);
-        $tr.append($('<td/>').append($('<a/>').text(dataset.name).attr('href', dataset.view_url)));
+        $tr.append($('<td/>').append($('<a/>').text(dataset.name).attr('href', '/dataset_view/'+dataset.id)));
 
         $td = $('<td/>');
         $.each(dataset.description.split('\n'), function(_, txt){

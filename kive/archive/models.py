@@ -2178,6 +2178,12 @@ class Dataset(models.Model):
             return self.symbolicdataset.user
         return self.created_by.parent_run.user
 
+    @property
+    def can_be_accessed(self):
+        if self.symbolicdataset is None:
+            return False
+        return self.symbolicdataset.can_be_accessed
+
     def __str__(self):
         """
         Unicode representation of this Dataset.

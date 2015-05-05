@@ -1,16 +1,21 @@
 from django.conf.urls import patterns, url, include
-from rest_framework.authtoken import views
 
-# Uncomment the next two lines to enable the admin:
-from django.contrib import admin
-from metadata.ajax import CompoundDatatypeViewSet
+from rest_framework.authtoken import views
 from rest_framework.routers import DefaultRouter
-admin.autodiscover()
+
+from metadata.ajax import CompoundDatatypeViewSet
+from archive.ajax import DatasetViewSet
 
 from portal.forms import *
 
+# (Un)comment the next two lines to enable/disable the admin:
+from django.contrib import admin
+admin.autodiscover()
+
+
 router = DefaultRouter()
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
+router.register(r'datasets', DatasetViewSet)
 
 urlpatterns = patterns(
     '',
