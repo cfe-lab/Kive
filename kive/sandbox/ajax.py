@@ -11,11 +11,31 @@ from django.contrib.auth.decorators import login_required
 from archive.models import Dataset, Run
 import fleet.models
 from forms import PipelineSelectionForm
-from pipeline.models import PipelineFamily
+from pipeline.models import PipelineFamily, Pipeline
 from exceptions import KeyError
 from fleet.models import RunToProcessInput
 
+from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from kive.ajax import IsDeveloperOrGrantedReadOnly, GrantedModelMixin
+
+from rest_framework import permissions, mixins
+from rest_framework.decorators import detail_route
+from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet
+
 ajax_logger = logging.getLogger("sandbox.ajax")
+
+
+class PipelineFamilyViewSet(GrantedModelMixin, ReadOnlyModelViewSet):
+    queryset = PipelineFamily.objects.all()
+    serializer_class = PipelineFamilySerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+
+class PipelineViewSet(GrantedModelMixin, ReadOnlyModelViewSet):
+    queryset = Pipeline.objects.all()
+    serializer_class = PipelineSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
 
 class AJAXRequestHandler:
