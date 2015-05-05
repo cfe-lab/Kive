@@ -6,13 +6,13 @@ from django.http import HttpResponse
 from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
 from rest_framework import viewsets, permissions, mixins
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype,\
     AccessControl
 from metadata.serializers import CompoundDatatypeSerializer
-from portal.views import developer_check
+from portal.views import developer_check, admin_check
 from portal.ajax import IsDeveloperOrGrantedReadOnly
 
 @login_required
@@ -40,30 +40,32 @@ def get_python_type(request):
     
 class CompoundDatatypeViewSet(mixins.DestroyModelMixin,
                               viewsets.ReadOnlyModelViewSet):
+    """ Compound datatypes are used to define a CSV file format.
+    
+    Query parameters for the list view:
+    
+    * is_granted=true - For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    """
     queryset = CompoundDatatype.objects.all()
     serializer_class = CompoundDatatypeSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    def get_queryset(self):
+        if self.request.QUERY_PARAMS.get('is_granted') == 'true':
+            is_admin = False
+        else:
+            is_admin = admin_check(self.request.user)
+        return AccessControl.filter_by_user(self.request.user,
+                                            is_admin=is_admin,
+                                            queryset=self.queryset)
 
     @detail_route(methods=['get'])
     def removal_plan(self, request, pk=None):
         removal_plan = self.get_object().build_removal_plan()
         counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
         return Response(counts)
-    
-    @list_route(methods=['get'])
-    def granted(self, request):
-        queryset = AccessControl.filter_by_user(
-            request.user,
-            False,
-            self.filter_queryset(self.get_queryset()))
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
     
     def perform_destroy(self, instance):
         instance.remove()
