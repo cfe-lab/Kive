@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 
 from metadata.ajax import CompoundDatatypeViewSet
 from archive.ajax import DatasetViewSet
+from sandbox.ajax import PipelineFamilyViewSet, PipelineViewSet
 
 from portal.forms import *
 
@@ -12,10 +13,11 @@ from portal.forms import *
 from django.contrib import admin
 admin.autodiscover()
 
-
 router = DefaultRouter()
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 router.register(r'datasets', DatasetViewSet)
+router.register(r'pipeline_family', PipelineFamilyViewSet)
+router.register(r'pipepline', PipelineViewSet)
 
 urlpatterns = patterns(
     '',
@@ -110,7 +112,7 @@ urlpatterns = patterns(
     url(r'^api/auth/$', 'portal.views.api_auth', name='api_auth'),
     url(r'^api/token-auth/', views.obtain_auth_token),
 
-    # REST API - Datasets
+    # REST API - Datasets : These can be removed
     url(r'^api/datasets/$', 'archive.views.api_dataset_home', name='api_dataset_home'),
     url(r'^api/datasets/download/(?P<dataset_id>\d+)$', 'archive.views.api_dataset_download',
         name='api_dataset_download'),
