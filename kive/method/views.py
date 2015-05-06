@@ -385,10 +385,10 @@ def methods(request, id):
         raise Http404("ID {} cannot be accessed".format(id))
 
     user_plus = metadata.models.KiveUser.kiveify(request.user)
-    its_methods = family.members.filter(user_plus.access_query()).distinct().order_by("-revision_number")
 
     t = loader.get_template('method/methods.html')
-    c = RequestContext(request, {'methods': its_methods, 'family': family})
+    c = RequestContext(request, {'family': family, "is_user_admin": admin_check(request.user)})
+    c["is_user_admin"] = admin_check(request.user)
     return HttpResponse(t.render(c))
 
 

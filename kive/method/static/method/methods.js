@@ -1,5 +1,5 @@
 /**
- * Created by rliang on 15-05-01.
+ * Created by rliang on 15-05-05.
  */
 
 var adminLock;
@@ -9,13 +9,13 @@ var adminLock;
 // from the API.
 function lock_handler(is_admin) {
     $.getJSON(
-        "api/methodfamilies",
+        "../../api/methods",
         {
             is_admin: is_admin
         },
-        function (method_families)
+        function (methods)
         {
-            show_method_families($(".families table tbody"), method_families, is_admin);
+            show_methods($("#methods table tbody"), methods, is_admin);
         }
     );
 }
@@ -51,29 +51,18 @@ function remove_handler(event) {
         });
 }
 
-// FIXME update from compounddatatypes.js
-function build_list_cell(names) {
-    var $ul = $('<ul/>');
-    $.each(names, function() {
-        $ul.append($('<li/>').text(this));
-    });
-    return $('<td/>').append($ul);
-}
 
+function show_methods($table_body, methods, is_admin) {
+    $table_body.empty();
 
-function show_method_families($tbody, method_families, is_admin) {
-    $tbody.empty();
-
-    $.each(method_families, function () {
+    $.each(methods, function () {
         var $row = $("<tr/>");
-        var $family_link = $("<a/>").attr("href", this["absolute_url"]).text(this["name"]);
-        $row.append($("<td/>").append($family_link));
-        $row.append($("<td/>").text(this["description"]));
-        $row.append($("<td/>").text(this["user"]["username"]));
-        $row.append(build_list_cell(this["users_allowed"]));
-        $row.append(build_list_cell(this["groups_allowed"]));
+        $row.append($("<td/>").text(this["revision_number"] + ": " + this["revision_name"]));
+        $row.append($("<td/>").text(this["revision_desc"]))
 
-        $row.append($("<td/>").text(this["num_revisions"]));
+        var $revise_link = $("<a/>").attr("href", this["absolute_url"]).text("Revise")
+        $row.append($("<td/>").append($revise_link))
+
         if (is_admin) {
             var $a = ($('<a/>')
                     .attr('planUrl', this['removal_plan'])
@@ -84,7 +73,7 @@ function show_method_families($tbody, method_families, is_admin) {
             $row.append($('<td/>').append($a));
         }
 
-        $tbody.append($row);
+        $table_body.append($row);
     });
 }
 

@@ -41,7 +41,8 @@ class PipelineFamily(transformation.models.TransformationFamily):
     #   members (Pipeline/ForeignKey)
 
     # marks which member of the PipelineFamily in production
-    published_version = models.ForeignKey('Pipeline', null=True, blank=True)
+    published_version = models.ForeignKey('Pipeline', null=True, blank=True,
+                                          on_delete=models.SET_NULL)
 
     def get_absolute_url(self):
         return '/pipeline_revise/{}'.format(self.id)

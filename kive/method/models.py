@@ -897,7 +897,6 @@ class MethodFamily(transformation.models.TransformationFamily):
 
         return removal_plan
 
-
     def remove_list(self):
         SDs_listed = set()
         ERs_listed = set()

@@ -64,8 +64,8 @@ class Transformation(metadata.models.AccessControl):
     Abstract class that defines common parameters
     across Method revisions and Pipeline revisions.
 
-    Extends :model:`method.Method`
-    Extends :model:`pipeline.Pipeline`
+    Inherited by :model:`method.Method`
+    Inherited by :model:`pipeline.Pipeline`
     Related to :model:`transformation.TransformationInput`
     Related to :model:`transformation.TransformationOutput`
     """

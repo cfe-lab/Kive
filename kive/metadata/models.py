@@ -44,8 +44,11 @@ def remove_helper(removal_plan):
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:
-                # FIXME don't try to delete if it's already deleted!
-                obj_to_delete.delete()
+                try:
+                    refreshed_obj_to_delete = obj_to_delete.__class__.objects.get(pk=obj_to_delete.pk)
+                    refreshed_obj_to_delete.delete()
+                except ObjectDoesNotExist:
+                    pass
 
 
 def update_removal_plan(orig_dict, updating_dict):

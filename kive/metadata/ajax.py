@@ -15,6 +15,7 @@ from metadata.serializers import CompoundDatatypeSerializer
 from portal.views import developer_check
 from portal.ajax import IsDeveloperOrGrantedReadOnly
 
+
 @login_required
 @user_passes_test(developer_check)
 def get_python_type(request):
@@ -37,7 +38,8 @@ def get_python_type(request):
         python_types = get_builtin_types(DTs)
         response.write(serializers.serialize("json", python_types, fields=('pk', 'name')))
         return response
-    
+
+
 class CompoundDatatypeViewSet(mixins.DestroyModelMixin,
                               viewsets.ReadOnlyModelViewSet):
     queryset = CompoundDatatype.objects.all()

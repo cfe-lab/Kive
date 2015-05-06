@@ -6,6 +6,13 @@
 {% block title %}Methods{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/admin_lock.js"></script>
+    <script type="text/javascript">
+        var is_user_admin = {{ is_user_admin|lower }};
+    </script>
+    <script src="/static/method/methods.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -23,22 +30,23 @@ Click on 'Revise' link to revise the corresponding method, or click 'Add new met
 add a method without specifying a parent revision.
 </p>
 
+<div id="methods">
 <table>
 <thead>
 	<tr>
         <th>Name</th>
         <th>Description</th>
-        <th></th>
+        <th><div class="lock"></div></th>
+        <th class="remove_family"></th>
 	</tr>
 </thead>
-{% for method in methods %}
-<tr>
-	<td>{{ method.revision_number }}: {{ method.revision_name }}</td>
-    <td>{{ method.revision_desc }}</td>
-    <td><a href="{{ method.get_absolute_url }}">Revise</a></td>
-</tr>
-{% endfor %}
+
+<tbody>
+
+</tbody>
+
 </table>
+</div>
 
 <a href="/method_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new method</span></a>
 
