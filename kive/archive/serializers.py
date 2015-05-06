@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from archive.models import Dataset, Run
-from kive.serializers import TinyUserSerializer, GroupSerializer
 from metadata.serializers import CompoundDatatypeSerializer
-from django.core.urlresolvers import reverse
 import os
 
 
@@ -14,7 +12,7 @@ class TinyRunSerializer(serializers.ModelSerializer):
 
 class DatasetSerializer(serializers.ModelSerializer):
 
-    user = TinyUserSerializer()
+    user = serializers.StringRelatedField()
     compounddatatype = CompoundDatatypeSerializer(source='symbolicdataset.compounddatatype')
     filename = serializers.SerializerMethodField()
     filesize = serializers.IntegerField(source='get_filesize')

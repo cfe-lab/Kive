@@ -10,8 +10,8 @@ from portal.views import admin_check
 from archive.views import api_get_datasets
 from metadata.models import deletion_order
 
-from rest_framework import viewsets, permissions, mixins
-from rest_framework.decorators import detail_route, list_route
+from rest_framework import permissions
+from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
 from archive.serializers import DatasetSerializer
@@ -48,6 +48,12 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    def filter_granted(self, queryset):
+        """ Filter a queryset to only include records explicitly granted.
+        """
+        return queryset.filter(
+            symbolicdataset__in=SymbolicDataset.filter_by_user(self.request.user))
 
     def create(self, request):
         """

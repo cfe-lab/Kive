@@ -1,8 +1,7 @@
 var CompoundDatatypesTable = function($table, is_user_admin) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.list_url = "api/compounddatatypes/";
-    this.basic_headers = ["Scheme"];
-    this.basic_fields = ["representation"];
+    this.registerColumn("Scheme", "representation");
 }
 CompoundDatatypesTable.prototype = Object.create(
         permissions.PermissionsTable.prototype);

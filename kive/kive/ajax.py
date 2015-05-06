@@ -36,18 +36,25 @@ class GrantedModelMixin(object):
         records that the user has been explicitly granted access to. For other
         users, this has no effect.
     
-    The model must derive from AccessControl.
+    The model must derive from AccessControl, or filter_granted() must be
+    overridden.
     """
+
     def get_queryset(self):
         if self.request.QUERY_PARAMS.get('is_granted') == 'true':
             is_admin = False
         else:
             is_admin = admin_check(self.request.user)
         base_queryset = super(GrantedModelMixin, self).get_queryset()
-        return AccessControl.filter_by_user(self.request.user,
-                                            is_admin=is_admin,
-                                            queryset=base_queryset)
+        if is_admin:
+            return base_queryset
+        return self.filter_granted(base_queryset)
 
+    def filter_granted(self, queryset):
+        """ Filter a queryset to only include records explicitly granted.
+        """
+        return AccessControl.filter_by_user(self.request.user,
+                                            queryset=queryset)
 
 class RedactModelMixin(object):
     """ Redacts a model instance and build a redaction plan.
@@ -72,7 +79,7 @@ class RedactModelMixin(object):
         pass
 
     def partial_update(self, request, pk=None):
-        if request.POST.get('is_redacted', False):
+        if request.DATA.get('is_redacted', False):
             self.get_object().redact()
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)

@@ -1,3 +1,5 @@
+"use strict";
+
 var permissions = (function() {
     var my = {};
     
@@ -11,23 +13,43 @@ var permissions = (function() {
      *  var BookTable = function($table, is_user_admin) {
      *      permissions.PermissionsTable.call(this, $table, is_user_admin);
      *      this.list_url = "api/books";
-     *      this.basic_headers = ["Title", "Author", "Publisher"];
-     *      this.basic_fields = ["title", "author", "publisher"];
+     *      this.registerColumn("Title", "title");
+     *      this.registerColumn("Author", "author");
+     *      this.registerColumn("Pub. Date", function($td, row) {
+     *          $td.text(utils.formatDate(row.published));
+     *      });
      *  }
      *  BookTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-     *  BookTable.prototype.lockHandler = function() {
-     *      // might not need to override this.
-     *      alert("Table is " + (this.is_locked ? "locked." : "unlocked."));
-     *      
-     *      reloadTable();
-     *  }
      */
     my.PermissionsTable = function($table, is_user_admin) {
         this.$table = $table;
         this.is_user_admin = is_user_admin;
         this.is_locked = true;
-        this.basic_headers = [];
-        this.basic_fields = [];
+        this.registered_columns = [];
+    }
+    
+    /**
+     * Register a column to be added to the table.
+     * 
+     *  @param header: a string to label the column header
+     *  @param source: Either a field name, or a function to build a cell in
+     *      the column. Function signature must be f($td, row, data).
+     *  @param data: optional data object to pass to the source function
+     */
+    my.PermissionsTable.prototype.registerColumn = function(
+            header,
+            source,
+            data) {
+        var column = { header: header, builder: source, data: data };
+        if (typeof column.builder !== 'function') {
+            column.builder = defaultBuilder;
+            column.data = source;
+        }
+        this.registered_columns.push(column);
+    }
+    
+    function defaultBuilder($td, row, field_name) {
+        $td.text(row[field_name])
     }
     
     my.PermissionsTable.prototype.buildTable = function(rows) {
@@ -40,20 +62,16 @@ var permissions = (function() {
         }
         else {
             $tr = $('<tr/>');
-            $.each(this.basic_headers.concat(
-                    ['Creator', 'Users with access', 'Groups with Access']),
-                    function() {
-                $tr.append($('<th/>').text(this));
-            });
-            this.$lockImage = $('<img/>');
-            this.$lockSpan = $('<span/>');
-            if (this.is_user_admin) {
-                $a = ($('<a href="javascript:void(0)"/>')
-                        .append(this.$lockImage)
-                        .click(this, clickLock));
-
-                $tr.append($('<th/>').addClass('lock').append($a, this.$lockSpan));
-            }
+            this.registerColumn('Creator', 'user');
+            this.registerColumn(
+                    'Users with access',
+                    buildListCell,
+                    'users_allowed');
+            this.registerColumn(
+                    'Groups with access',
+                    buildListCell,
+                    'groups_allowed');
+            this.buildHeaders($tr);
             this.$table.append($('<thead/>').append($tr));
             this.$tbody = $('<tbody/>');
             this.$table.append(this.$tbody);
@@ -68,23 +86,62 @@ var permissions = (function() {
             var $a,
                 row = this;
             $tr = $('<tr/>');
-            $.each(permissions_table.basic_fields, function() {
-                var field_name = this;
-                $tr.append($('<td/>').text(row[field_name]));
-            });
-            $tr.append($('<td/>').text(row['user']));
-            $tr.append(buildListCell(row['users_allowed']));
-            $tr.append(buildListCell(row['groups_allowed']));
-            if ( ! permissions_table.is_locked) {
-                $a = ($('<a/>')
-                        .attr('removal_plan', row['removal_plan'])
-                        .attr('href', row['url'])
-                        .text('Remove')
-                        .click(permissions_table, clickRemove));
-                $tr.append($('<td/>').append($a));
-            }
+            permissions_table.buildCells($tr, row);
             permissions_table.$tbody.append($tr);
         });
+    }
+    
+    my.PermissionsTable.prototype.buildHeaders = function($tr) {
+        this.buildPermissionHeaders($tr);
+    }
+    
+    my.PermissionsTable.prototype.buildCells = function($tr, row) {
+        this.buildPermissionCells($tr, row);
+    }
+    
+    my.PermissionsTable.prototype.buildPermissionHeaders = function($tr) {
+        var $a;
+        $.each(this.registered_columns, function() {
+            $tr.append($('<th/>').text(this.header));
+        });
+        this.$lockImage = $('<img/>');
+        this.$lockSpan = $('<span/>');
+        if (this.is_user_admin) {
+            $a = ($('<a href="javascript:void(0)"/>')
+                    .append(this.$lockImage)
+                    .click(this, clickLock));
+
+            $tr.append($('<th colspan="2"/>')
+                    .addClass('lock')
+                    .append($('<div/>').append($a, this.$lockSpan)));
+        }
+    }
+    
+    my.PermissionsTable.prototype.buildPermissionCells = function($tr, row) {
+        var $td;
+        $.each(this.registered_columns, function() {
+            var $td = $('<td/>');
+            this.builder($td, row, this.data);
+            $tr.append($td);
+        });
+        if ( ! this.is_locked) {
+            $td = $('<td/>');
+            if (row.removal_plan !== undefined) {
+                $tr.append($('<td/>').append($('<a/>')
+                        .attr('plan', row.removal_plan)
+                        .attr('href', row.url)
+                        .text('Remove')
+                        .click(this, clickRemove)));
+            }
+            if (row.redaction_plan !== undefined) {
+                $tr.append($('<td/>').append($('<a/>')
+                        .attr('plan', row.redaction_plan)
+                        .attr('href', row.url)
+                        .text('Redact')
+                        .click(this, clickRedact)));
+            }
+            $tr.append($td);
+        }
     }
     
     my.PermissionsTable.prototype.toggleLock = function() {
@@ -102,36 +159,41 @@ var permissions = (function() {
                 });
     }
     
-    function buildListCell(names) {
-        var $ul = $('<ul/>');
+    function buildListCell($td, row, field_name) {
+        var $ul = $('<ul/>'),
+            names = row[field_name];
         $.each(names, function() {
             $ul.append($('<li/>').text(this));
         });
-        return $('<td/>').append($ul);
+        $td.append($ul);
     }
     
-    clickLock = function(event) {
+    function clickLock(event) {
         event.preventDefault();
         var permissions_table = event.data;
         permissions_table.toggleLock();
     }
-    
-    clickRemove = function(event) {
+
+    function buildMessage(plan, action) {
+        var message = "This will " + action + ":\n";
+        for(var k in plan) {
+            if (plan[k] != 0) {
+                message += plan[k] + " " + k + "(s)\n";
+            }
+        }
+
+        return message + "Are you sure?";
+    }
+
+    function clickRemove(event) {
         var $a = $(this),
             permissions_table = event.data;
         event.preventDefault();
         $.getJSON(
-                $a.attr('removal_plan'),
+                $a.attr('plan'),
                 {},
                 function (plan) {
-                    var message = 'Removing ';
-                    for (var key in plan) {
-                        var count = plan[key];
-                        if (count > 0) {
-                            message += count + ' ' + key + ', ';
-                        }
-                    }
-                    message += 'are you sure?'
+                    var message = buildMessage(plan, "remove");
                     if (window.confirm(message)) {
                         $.ajax({
                             url: $a.attr('href'),
@@ -143,6 +205,44 @@ var permissions = (function() {
                     }
                 });
     }
+
+    function clickRedact(event){
+        var $a = $(this),
+            permissions_table = event.data;
+        event.preventDefault();
+        $.getJSON(
+                $a.attr('plan'),
+                {},
+                function (plan) {
+                    var message = buildMessage(plan, "redact");
+                    if (window.confirm(message)) {
+                        $.ajax({
+                            url: $a.attr('href'),
+                            method: 'PATCH',
+                            data: {is_redacted: "true"},
+                            success: function() {
+                                permissions_table.reloadTable();
+                            }
+                        })
+                    }
+                });
+    }
+    
+    my.formatDate = function(text) {
+        var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            date = new Date(text),
+            min = date.getMinutes();
+        if (Number.isNaN(min)) {
+            return null;
+        }
+        if (min < 10) {
+            min = "0" + min;
+        }
+        return (date.getDate() + " " + monthNames[date.getMonth()] + " " + 
+                date.getFullYear() + " " + date.getHours() + ":" + min);
+    }
+
+
 
     /** Create an administrator lock button. (Only for backward compatibility.)
      * 
@@ -179,7 +279,7 @@ var permissions = (function() {
         this.$span.text(this.is_admin ? 'Administrator:' : '');
     }
     
-    toggleLock = function(event) {
+    function toggleLock(event) {
         var adminLock = event.data;
         adminLock.is_admin = ! adminLock.is_admin;
         adminLock.displayLock();
