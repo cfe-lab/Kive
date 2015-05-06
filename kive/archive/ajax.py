@@ -18,7 +18,7 @@ from archive.serializers import DatasetSerializer
 from archive.forms import DatasetForm
 from archive.views import _build_download_response
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, RedactModelMixin
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -44,7 +44,7 @@ def _is_dry_run(request):
     return request.POST.get('dry_run') == 'true'
 
 
-class DatasetViewSet(RemovableModelViewSet):
+class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -62,17 +62,7 @@ class DatasetViewSet(RemovableModelViewSet):
             return Response({'errors': single_dataset_form.errors}, status=400)
         return Response(DatasetSerializer(symdataset.dataset).data, status=201)
 
-    def perform_destroy(self, instance):
-        """
-        """
-        instance.symbolicdataset.remove()
-
-    def partial_update(self, request, pk=None):
-        """
-        """
-        if request.DATA.get('is_redacted', False):
-            self.get_object().symbolicdataset.redact()
-            return Response({'message': 'Data set redacted.'})
+    def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
 
     @detail_route(methods=['get'])
@@ -87,17 +77,7 @@ class DatasetViewSet(RemovableModelViewSet):
 
         return _build_download_response(dataset.dataset_file)
 
-    @detail_route(methods=['get'])
-    def removal_plan(self, request, pk=None):
-        removal_plan = self.get_object().symbolicdataset.build_removal_plan()
-        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
-        return Response(counts)
 
-    @detail_route(methods=['get'])
-    def redaction_plan(self, request, pk=None):
-        removal_plan = self.get_object().symbolicdataset.build_redaction_plan()
-        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
-        return Response(counts)
 
 
 

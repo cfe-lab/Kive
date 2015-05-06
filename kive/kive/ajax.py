@@ -6,6 +6,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
 
+
 class IsDeveloperOrGrantedReadOnly(permissions.BasePermission):
     """ Custom permission for developer resources like code
     
@@ -47,6 +48,42 @@ class GrantedModelMixin(object):
                                             is_admin=is_admin,
                                             queryset=base_queryset)
 
+
+class RedactModelMixin(object):
+    """ Redacts a model instance and build a redaction plan.
+
+    Mix this in with a view set to provide default behaviour for data redaction.
+    This overrides the `partial_update` method so that it automatically redacts an
+    object if it sees the  `is_redacted` flag when PATCH'd. After that, the patch_object
+    method is called, which you should override if you want to do any proper PATCH object
+    updates.
+
+    * patch_object() - override this on the super class, it should
+        return a response containing the JSON representation of the patched
+        object.
+    * partial_update() - redacts the given instance, if the request's POST data contains
+        is_redacted=false.
+    * build_redaction_plan() - returns all instances that will be redacted when you
+        patch the object with is_redacted=true. Returns a dict: {model_name: set(instance)}
+
+    """
+
+    def patch_object(self, request, pk=None):
+        pass
+
+    def partial_update(self, request, pk=None):
+        if request.POST.get('is_redacted', False):
+            self.get_object().redact()
+            return Response({'message': 'Object redacted.'})
+        return self.patch_object(request, pk)
+
+    @detail_route(methods=['get'])
+    def redaction_plan(self, request, pk=None):
+        removal_plan = self.get_object().build_redaction_plan()
+        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
+        return Response(counts)
+
+
 class RemoveModelMixin(mixins.DestroyModelMixin):
     """ Remove a model instance and build a removal plan.
     
@@ -69,6 +106,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
     
     def perform_destroy(self, instance):
         instance.remove()
+
 
 class RemovableModelViewSet(RemoveModelMixin,
                             GrantedModelMixin,

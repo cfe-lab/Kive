@@ -2357,25 +2357,23 @@ class Dataset(models.Model):
         # Recompute the MD5, see if it equals what is already stored
         return self.symbolicdataset.MD5_checksum == self.compute_md5()
 
-    # def remove(self):
-    #     """
-    #     Cleanly remove this Dataset from the database.
-    #
-    #     If this Dataset was required by any other RunComponents that needed it, we
-    #     remove those as well.  This *does not* delete the creating RunComponent (to
-    #     avoid infinite loops).
-    #     """
-    #     if self.created_by is not None:
-    #         execrecord = self.created_by.execrecord
-    #         producing_output = execrecord.execrecordouts.get(
-    #             symbolicdataset=self.symbolicdataset).generic_output
-    #         for rc in execrecord.used_by_components.exclude(pk=self.created_by.pk):
-    #             should_remove = (rc.keeps_output(producing_output) if isinstance(rc, RunStep)
-    #                              else rc.keeps_output())
-    #             if should_remove and rc.top_level_run != self.created_by.top_level_run:
-    #                 rc.top_level_run.remove()
-    #
-    #     self.delete()
+    def remove(self):
+        if self.symbolicdataset is not None:
+            self.symbolicdataset.remove()
+
+    def build_removal_plan(self):
+        if self.symbolicdataset is not None:
+            return self.symbolicdataset.build_removal_plan()
+        return []
+
+    def redact(self):
+        if self.symbolicdataset is not None:
+            self.symbolicdataset.redact()
+
+    def build_redaction_plan(self):
+        if self.symbolicdataset is not None:
+            return self.symbolicdataset.build_redaction_plan()
+        return []
 
 
 class ExecLog(stopwatch.models.Stopwatch):
