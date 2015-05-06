@@ -72,10 +72,7 @@ class RunToProcessViewSet(RemovableModelViewSet):
         except RunSubmissionError as e:
             return Response({'errors': [str(e)]}, status=400)
 
-        resp = {
-            'run': RunToProcessSerializer(rtp).data
-        }
-        return Response(resp)
+        return Response(RunToProcessSerializer(rtp, context={'request': request}).data)
 
     @detail_route(methods=['get'])
     def run_status(self, request, pk=None):

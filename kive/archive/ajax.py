@@ -60,7 +60,7 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
 
         if symdataset is None:
             return Response({'errors': single_dataset_form.errors}, status=400)
-        return Response(DatasetSerializer(symdataset.dataset).data, status=201)
+        return Response(DatasetSerializer(symdataset.dataset, context={'request': request}).data,  status=201)
 
     def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
