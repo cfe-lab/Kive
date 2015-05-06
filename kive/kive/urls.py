@@ -7,6 +7,7 @@ from metadata.ajax import CompoundDatatypeViewSet
 from archive.ajax import DatasetViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
 from fleet.ajax import RunToProcessViewSet
+from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
 
 from portal.forms import *
 
@@ -19,6 +20,10 @@ router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'pipeline_family', PipelineFamilyViewSet)
 router.register(r'pipeline', PipelineViewSet)
+router.register(r'method_family', MethodFamilyViewSet)
+router.register(r'method', MethodViewSet)
+router.register(r'coderesource', CodeResourceViewSet)
+router.register(r'coderesourcerevision', CodeResourceRevisionViewSet)
 router.register(r'runs', RunToProcessViewSet)
 
 urlpatterns = patterns(

@@ -2,8 +2,38 @@ from django.http import HttpResponse, Http404
 from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
 
-from method.models import CodeResourceRevision
+from rest_framework import permissions, mixins
+
+from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource, CodeResourceRevision
+from method.serializers import MethodSerializer, MethodFamilySerializer, \
+    CodeResourceSerializer, CodeResourceRevisionSerializer
+
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 from portal.views import developer_check
+
+
+class MethodFamilyViewSet(RemovableModelViewSet):
+    queryset = MethodFamily.objects.all()
+    serializer_class = MethodFamilySerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+
+class MethodViewSet(RemovableModelViewSet):
+    queryset = Method.objects.all()
+    serializer_class = MethodSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+
+class CodeResourceViewSet(RemovableModelViewSet):
+    queryset = CodeResource.objects.all()
+    serializer_class = CodeResourceSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+
+class CodeResourceRevisionViewSet(RemovableModelViewSet):
+    queryset = CodeResourceRevision.objects.all()
+    serializer_class = CodeResourceRevisionSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
 
 @login_required
