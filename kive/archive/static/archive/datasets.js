@@ -16,19 +16,36 @@ function size_filter(size_bytes){
     return size_bytes;
 }
 
-function redact_handler(id){
+function rebuild_table(){
     $.ajax({
-        type: 'POST',
-        url: '/dataset_redact/' + id,
-        data: {dry_run:'true'},
+        type: 'GET',
+        url: '/api/datasets/',
         success: function(data) {
-            if (window.confirm(data + '\nAre you sure?')) {
+            build_table($('#dataset_body'), data);
+        }
+    });
+}
+
+function build_message(plan_dict, remove){
+    var message = "This will " + (remove?"remove":"censor") + ": \n";
+    for(var k in plan_dict)
+        message += plan_dict[k] + " " + k + "(s)\n";
+
+    return message + "Are you sure?";
+}
+
+function redact_handler(id, url, redaction_plan){
+    $.ajax({
+        type: 'GET',
+        url: redaction_plan,
+        success: function(data) {
+            if (window.confirm(build_message(data, false))) {
                 $.ajax({
-                    url: '/dataset_redact/' + id,
-                    data: {datasets:'true'},
-                    type: 'POST',
+                    url: url,
+                    data: {is_redacted: 'true'},
+                    type: 'PATCH',
                     success: function(data) {
-                        build_table($('#dataset_body'), data.datasets);
+                        rebuild_table();
                     }
                 });
             }
@@ -36,19 +53,18 @@ function redact_handler(id){
     });
 }
 
-function remove_handler(id){
+function remove_handler(id, url, removal_plan){
+    console.log(id, url, removal_plan);
     $.ajax({
-        type: 'POST',
-        url: '/dataset_remove/' + id,
-        data: {dry_run:'true'},
+        type: 'GET',
+        url: removal_plan,
         success: function(data) {
-            if (window.confirm(data + '\nAre you sure?')) {
+            if (window.confirm(build_message(data, true))) {
                 $.ajax({
-                    url: '/dataset_remove/' + id,
-                    data: {datasets:'true'},
-                    type: 'POST',
+                    url: url,
+                    type: 'DELETE',
                     success: function(data) {
-                        build_table($('#dataset_body'), data.datasets);
+                        rebuild_table();
                     }
                 });
             }
@@ -83,7 +99,7 @@ function build_table($tbody, datasets) {
         }
 
         make_td(dataset.user.username);
-        $tr.append($('<td/>').append($('<a/>').text(dataset.name).attr('href', dataset.view_url)));
+        $tr.append($('<td/>').append($('<a/>').text(dataset.name).attr('href', '/dataset_view/'+dataset.id)));
 
         $td = $('<td/>');
         $.each(dataset.description.split('\n'), function(_, txt){
@@ -126,14 +142,18 @@ function build_table($tbody, datasets) {
 
         $tr.append($('<td/>').append($('<a/>').text('Download').attr('href', dataset.download_url)));
 
-        $tr.append($('<td/>').append($('<a class="remove" href="#"/>').text('Remove').click(dataset.id, function(e){
+        $tr.append($('<td/>').append($('<a class="remove" href="#"/>').text('Remove').click(
+            {removal_plan: dataset.removal_plan, url: dataset.url, id: dataset.id},
+            function(e){
             e.preventDefault();
-            remove_handler(e.data);
+            remove_handler(e.data.id, e.data.url, e.data.removal_plan);
         })));
 
-        $tr.append($('<td/>').append($('<a class="redact" href="#"/>').text('Redact').click(dataset.id, function(e){
+        $tr.append($('<td/>').append($('<a class="redact" href="#"/>').text('Redact').click(
+            {redaction_plan: dataset.redaction_plan, url: dataset.url, id: dataset.id},
+            function(e){
             e.preventDefault();
-            redact_handler(e.data);
+            redact_handler(e.data.id, e.data.url, e.data.redaction_plan);
         })));
 
         $tbody.append($tr);

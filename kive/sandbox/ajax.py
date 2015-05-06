@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from archive.models import Dataset, Run
 import fleet.models
 from forms import PipelineSelectionForm
-from pipeline.models import PipelineFamily
+from pipeline.models import PipelineFamily, Pipeline
 from exceptions import KeyError
 from fleet.models import RunToProcessInput
 
