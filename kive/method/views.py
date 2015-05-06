@@ -9,15 +9,17 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 
 from datetime import datetime
+import json
 
 import metadata.models
-from metadata.models import CompoundDatatype
+from metadata.models import CompoundDatatype, AccessControl
 from method.models import CodeResource, CodeResourceDependency, Method, \
     MethodFamily, CodeResourceRevision
 from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
 from portal.views import developer_check, admin_check
+from method.serializers import MethodFamilySerializer, MethodSerializer
 
 
 @login_required
@@ -360,9 +362,20 @@ def method_families(request):
     Display a list of all MethodFamily objects in database.
     """
     families = MethodFamily.filter_by_user(request.user)
-    t = loader.get_template('method/method_families.html')
-    c = RequestContext(request, {'families': families})
-    c["is_user_admin"] = admin_check(request.user)
+    families_json = json.dumps(
+        MethodFamilySerializer(
+            families,
+            context={"request": request},
+            many=True).data
+    )
+
+    t = loader.get_template("method/method_families.html")
+    c = RequestContext(
+        request,
+        {
+            "method_families": families_json,
+            "is_user_admin": admin_check(request.user)
+            })
     return HttpResponse(t.render(c))
 
 
@@ -384,11 +397,22 @@ def methods(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
-    user_plus = metadata.models.KiveUser.kiveify(request.user)
+    member_methods = AccessControl.filter_by_user(
+        request.user,
+        is_admin=False,
+        queryset=family.members.all())
+
+    methods_json = json.dumps(
+        MethodSerializer(member_methods, many=True, context={"request": request}).data
+    )
 
     t = loader.get_template('method/methods.html')
-    c = RequestContext(request, {'family': family, "is_user_admin": admin_check(request.user)})
-    c["is_user_admin"] = admin_check(request.user)
+    c = RequestContext(request,
+                       {
+                           'family': family,
+                           "methods": methods_json,
+                           "is_user_admin": admin_check(request.user)
+                       })
     return HttpResponse(t.render(c))
 
 

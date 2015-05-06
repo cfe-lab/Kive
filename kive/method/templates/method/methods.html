@@ -3,16 +3,18 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Methods{% endblock %}
+{% block title %}Method: {{ family.name }}{% endblock %}
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/admin_lock.js"></script>
+    <script src="/static/portal/permissions.js"></script>
     <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }};
+        var is_user_admin = {{ is_user_admin|lower }},
+                family_pk = {{ family.pk }};
     </script>
     <script src="/static/method/methods.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block content %}
@@ -25,28 +27,13 @@
 {{ family.description }}
 </p>
 
+<div id="initial_data" style="display:none">{{ methods|escape }}</div>
 <p style="font-style: italic; color: gray">
 Click on 'Revise' link to revise the corresponding method, or click 'Add new method' to
 add a method without specifying a parent revision.
 </p>
 
-<div id="methods">
-<table>
-<thead>
-	<tr>
-        <th>Name</th>
-        <th>Description</th>
-        <th><div class="lock"></div></th>
-        <th class="remove_family"></th>
-	</tr>
-</thead>
-
-<tbody>
-
-</tbody>
-
-</table>
-</div>
+<table id="methods"></table>
 
 <a href="/method_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new method</span></a>
 

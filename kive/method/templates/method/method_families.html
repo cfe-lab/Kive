@@ -8,12 +8,12 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/admin_lock.js"></script>
+    <script src="/static/portal/permissions.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }};
     </script>
     <script src="/static/method/method_families.js"></script>
-    <link rel="stylesheet" href="/static/portal/admin_lock.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block content %}
@@ -22,31 +22,13 @@
 
 <h2>Method Families</h2>
 
+<div id="initial_data" style="display:none">{{ method_families|escape }}</div>
 <p>
 A MethodFamily is a collection of Methods that share a certain function
 in common.
 </p>
 
-<div class="lock"></div>
-
-<div class="families">
-    <table>
-    <thead>
-        <tr>
-            <th>Family</th>
-            <th>Description</th>
-            <th>Creator</th>
-            <th>Users allowed</th>
-            <th>Groups allowed</th>
-            <th># revisions</th>
-        </tr>
-    </thead>
-
-    <tbody></tbody>
-
-    </tbody>
-    </table>
-</div>
+<table id="methodfamilies"></table>
 
 <a href="/method_add">Add a new method family</a>
 
