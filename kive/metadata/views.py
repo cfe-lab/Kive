@@ -17,7 +17,7 @@ from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \
 from metadata.models import BasicConstraint, CompoundDatatype, \
     CompoundDatatypeMember, Datatype, get_builtin_types
 from portal.views import developer_check, admin_check
-from metadata.serializers import CompoundDatatypeSerializer
+from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 import json
 
 
@@ -29,10 +29,20 @@ def datatypes(request):
     """
     # Re-cast request.user to our proxy class.
     accessible_dts = Datatype.filter_by_user(request.user)
+    datatypes_json = json.dumps(
+        DatatypeSerializer(
+            accessible_dts,
+            context={"request": request},
+            many=True).data
+        )
     t = loader.get_template('metadata/datatypes.html')
-    c = RequestContext(request, {'datatypes': accessible_dts})
+    c = RequestContext(
+        request,
+        {
+            "datatypes": datatypes_json,
+            "is_user_admin": admin_check(request.user)
+        })
     return HttpResponse(t.render(c))
-    #return render_to_response('datatypes.html', {'form': form})
 
 
 @login_required

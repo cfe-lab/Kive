@@ -7,20 +7,29 @@
 
 {% block javascript %}
 <!-- I'd like to put this into base.html, but when I did that, it stopped showing up. —JN -->
-<script src="/static/portal/jquery-2.0.3.min.js"></script>
-<script type="text/javascript">
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script type="text/javascript">
 
-$(function() {
-    // For table rows that start with a link, clicking the row should click the link.
-    var links = $('td:first-child > a:first-child:last-child');
-    links.closest('tr').css('cursor', 'pointer').on('click', function() {
-        $('td > a', this)[0].click();
-    }).on('mouseover mouseout', function() {
-        $(this).toggleClass('hover');
+    $(function() {
+        // For table rows that start with a link, clicking the row should click the link.
+        var links = $('td:first-child > a:first-child:last-child');
+        links.closest('tr').css('cursor', 'pointer').on('click', function() {
+            $('td > a', this)[0].click();
+        }).on('mouseover mouseout', function() {
+            $(this).toggleClass('hover');
+        });
     });
-});
 
-</script>
+    </script>
+    <script type="text/javascript">
+
+    var is_user_admin = {{ is_user_admin|lower }};
+
+    </script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
 {% endblock %}
 
 {% block content %}
@@ -29,29 +38,10 @@ $(function() {
 
 <h2>Datatypes</h2>
 
-{% if no_access %}
-    <p>You do not have access to the datatype with id={{ no_access }}.</p>
-{% endif %}
+<div id="initial_data" style="display:none">{{ datatypes|escape }}</div>
 
 <a href="/datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
-<table>
-<thead>
-	<tr>
-	<th>Name</th>
-	<th style="width: 300px">Description</th>
-    <th>Restricts</th>
-	<th>Date created</th>
-	</tr>
-</thead>
-{% for datatype in datatypes %}
-<tr>
-	<td><a href="{{ datatype.get_absolute_url }}">{{ datatype.name }}</a></td>
-	<td>{{ datatype.description }}</td>
-    <td>{{ datatype.restricts_str }}</td>
-    <td>{{ datatype.date_created }}</td>
-</tr>
-{% endfor %}
-</table>
+<table id="datatypes"></table>
 
 {% endblock %}

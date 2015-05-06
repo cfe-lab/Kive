@@ -1,5 +1,33 @@
 from rest_framework import serializers
-from metadata.models import CompoundDatatype
+from metadata.models import CompoundDatatype, Datatype
+
+
+class DatatypeSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    users_allowed = serializers.StringRelatedField(many=True)
+    groups_allowed = serializers.StringRelatedField(many=True)
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='datatype-removal-plan')
+    absolute_url = serializers.SerializerMethodField()
+    restricts = serializers.StringRelatedField(many=True)
+
+    class Meta:
+        model = Datatype
+        fields = ('id',
+                  'url',
+                  'user',
+                  'users_allowed',
+                  'groups_allowed',
+                  'removal_plan',
+                  "absolute_url",
+                  "restricts",
+                  "date_created"
+                  )
+
+    def get_absolute_url(self, obj):
+        if not obj:
+            return None
+        return obj.get_absolute_url()
 
 
 class CompoundDatatypeSerializer(serializers.ModelSerializer):

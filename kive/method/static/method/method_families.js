@@ -1,7 +1,3 @@
-/**
- * Created by rliang on 15-05-01.
- */
-
 var MethodFamiliesTable = function($table, is_user_admin) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.list_url = "api/methodfamilies/";

@@ -9,7 +9,7 @@ from rest_framework import permissions
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype
-from metadata.serializers import CompoundDatatypeSerializer
+from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 from portal.views import developer_check
 
 
@@ -35,6 +35,16 @@ def get_python_type(request):
         python_types = get_builtin_types(DTs)
         response.write(serializers.serialize("json", python_types, fields=('pk', 'name')))
         return response
+
+
+class DatatypeViewSet(RemovableModelViewSet):
+    """Datatypes are used to define the types of data in CSV entries.
+
+    Query parameters are as for RemovableModelViewSet.
+    """
+    queryset = Datatype.objects.all()
+    serializer_class = DatatypeSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
     
 class CompoundDatatypeViewSet(RemovableModelViewSet):
