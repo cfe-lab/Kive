@@ -202,7 +202,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     add_filter('active');
-    adminLock = new admin_lock.AdminLock(
+    adminLock = new permissions.AdminLock(
             $('#active_filters .lock'),
             is_user_admin,
             lock_handler);

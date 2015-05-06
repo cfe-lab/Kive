@@ -5,13 +5,13 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/admin_lock.js"></script>
+    <script src="/static/portal/permissions.js"></script>
     <script src="/static/sandbox/view_results.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }},
             run_id = {{ run_id }};
     </script>
-    <link rel="stylesheet" href="/static/portal/admin_lock.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
     <style>
         .error-msg {
             color:red;

@@ -8,12 +8,12 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/admin_lock.js"></script>
+    <script src="/static/portal/permissions.js"></script>
     <script src="/static/metadata/compound_datatypes.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }};
     </script>
-    <link rel="stylesheet" href="/static/portal/admin_lock.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block content %}
@@ -29,17 +29,6 @@ A compound datatype is an ordered set of datatypes, describing the expected stru
 </p>
 
 <table id="compounddatatypes">
-<thead>
-	<tr>
-        <th>Scheme</th>
-        <th>Creator</th>
-        <th>Users with access</th>
-        <th>Groups with access</th>
-        <th><div class="lock"></div></th>
-	</tr>
-</thead>
-<tbody>
-</tbody>
 </table>
 
 
