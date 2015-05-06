@@ -101,7 +101,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     noXSS();
     
     build_table($('#outputs tbody'), $.parseJSON($('#outputs_json').text()));
-    adminLock = new admin_lock.AdminLock(
+    adminLock = new permissions.AdminLock(
             $('div.lock'),
             is_user_admin,
             lock_handler);

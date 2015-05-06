@@ -164,6 +164,6 @@ function build_table($tbody, datasets) {
 function datasets_main(is_user_admin, bootstrap){
     noXSS();
     build_table($('#dataset_body'), bootstrap);
-    var adminLock = new admin_lock.AdminLock($('div.lock'), is_user_admin, lock_handler);
+    var adminLock = new permissions.AdminLock($('div.lock'), is_user_admin, lock_handler);
     lock_handler(false);
 };
