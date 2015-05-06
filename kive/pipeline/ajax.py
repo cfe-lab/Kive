@@ -9,21 +9,18 @@ from portal.views import developer_check
 from metadata.models import KiveUser
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
-from kive.ajax import IsDeveloperOrGrantedReadOnly, GrantedModelMixin
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 
 from rest_framework import permissions, mixins
-from rest_framework.decorators import detail_route
-from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
 
-class PipelineFamilyViewSet(GrantedModelMixin, ReadOnlyModelViewSet):
+class PipelineFamilyViewSet(RemovableModelViewSet):
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
 
-class PipelineViewSet(GrantedModelMixin, ReadOnlyModelViewSet):
+class PipelineViewSet(RemovableModelViewSet):
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)

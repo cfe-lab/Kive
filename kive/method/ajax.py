@@ -6,12 +6,24 @@ from rest_framework import permissions
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
-from kive.ajax import RemovableModelViewSet
-from method.models import CodeResourceRevision, MethodFamily, Method
-import method.serializers
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource, CodeResourceRevision
+from method.serializers import MethodSerializer, MethodFamilySerializer, \
+    CodeResourceSerializer, CodeResourceRevisionSerializer
 from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
-from portal.ajax import IsDeveloperOrGrantedReadOnly
+
+
+class CodeResourceViewSet(RemovableModelViewSet):
+    queryset = CodeResource.objects.all()
+    serializer_class = CodeResourceSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+
+class CodeResourceRevisionViewSet(RemovableModelViewSet):
+    queryset = CodeResourceRevision.objects.all()
+    serializer_class = CodeResourceRevisionSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
 
 @login_required
@@ -45,7 +57,7 @@ def populate_revision_dropdown(request):
 
 class MethodFamilyViewSet(RemovableModelViewSet):
     queryset = MethodFamily.objects.all()
-    serializer_class = method.serializers.MethodFamilySerializer
+    serializer_class = MethodFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
     @detail_route(methods=["get"])
@@ -60,12 +72,12 @@ class MethodFamilyViewSet(RemovableModelViewSet):
             is_admin=is_admin,
             queryset=self.get_object().members.all())
 
-        member_serializer = method.serializers.MethodSerializer(
+        member_serializer = MethodSerializer(
             member_methods, many=True, context={"request": request})
         return Response(member_serializer.data)
 
 
 class MethodViewSet(RemovableModelViewSet):
     queryset = Method.objects.all()
-    serializer_class = method.serializers.MethodSerializer
+    serializer_class = MethodSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
