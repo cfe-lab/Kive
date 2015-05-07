@@ -30,20 +30,6 @@ import json
 LOGGER = logging.getLogger(__name__)
 
 
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_dataset_home(request):
-    dataset_dir = {
-        'directory': {
-            name: reverse(name) for name in [
-                'api_get_dataset',
-                'api_dataset_add']
-        }
-    }
-    return Response(dataset_dir)
-
-
 @login_required
 def datasets(request):
     """
@@ -62,29 +48,6 @@ def datasets(request):
     c['is_user_admin'] = admin_check(request.user)
 
     return HttpResponse(t.render(c))
-
-
-@api_view(['GET', 'POST'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_get_datasets(request, page=0):
-    pagesize = 100
-    page = int(page)
-
-    accessible_sds = librarian.models.SymbolicDataset.filter_by_user(request.user)
-    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_sds)
-
-    if page >= 0:
-        datasets = datasets[page*pagesize: (page+1)*pagesize]
-
-    next_url = None
-    if len(datasets) == pagesize:
-        next_url = reverse('api_get_dataset_page', kwargs={'page': page+1})
-    dataset_list = {
-        'next': next_url,
-        'datasets': DatasetSerializer(datasets, context={'request': request}, many=True).data,
-    }
-    return Response(dataset_list)
 
 
 def _build_download_response(source_file):
@@ -106,19 +69,6 @@ def dataset_download(request, dataset_id):
         dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
-
-    return _build_download_response(dataset.dataset_file)
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_dataset_download(request, dataset_id):
-    try:
-        accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
-        dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
-    except Dataset.DoesNotExist:
-        return Response({'errors': ['Run not found!']}, status=rf_status.HTTP_404_NOT_FOUND)
 
     return _build_download_response(dataset.dataset_file)
 
@@ -240,26 +190,6 @@ def datasets_add(request):
         c.update({'singleDataset': single_dataset_form})
 
     return HttpResponse(t.render(c))
-
-
-@api_view(['post'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_dataset_add(request):
-    single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
-
-    symdataset = None
-    if single_dataset_form.is_valid():
-        symdataset = single_dataset_form.create_dataset(request.user)
-
-    if symdataset is None:
-        return Response({'errors': single_dataset_form.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
-
-    resp = {
-        'dataset': DatasetSerializer(symdataset.dataset).data
-    }
-
-    return Response(resp)
 
 
 class BulkDatasetDisplay:

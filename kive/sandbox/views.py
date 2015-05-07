@@ -26,21 +26,6 @@ from portal.views import admin_check
 import json
 
 
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_pipelines_home(request):
-    pipeline_dir = {
-        'directory': {
-            name: reverse(name) for name in [
-                'api_pipelines_get',
-                'api_pipelines_startrun',
-                'api_pipelines_get_runs']
-        }
-    }
-    return Response(pipeline_dir)
-
-
 def _prepare_pipeline_selection_forms(user):
     user = KiveUser.kiveify(user)
     families = pipeline.models.PipelineFamily.objects\
@@ -57,30 +42,6 @@ def choose_pipeline(request):
         "pipeline_forms": _prepare_pipeline_selection_forms(request.user),
         "error_msg": ""})
     return HttpResponse(template.render(context))
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_get_pipelines(request, page=0):
-    pagesize = 1
-    page = int(page)
-
-    user = KiveUser.kiveify(request.user)
-    families = pipeline.models.PipelineFamily.objects\
-        .annotate(member_count=Count('members'))\
-        .filter(user.access_query(), member_count__gt=0)[page*pagesize:(page+1)*pagesize]
-
-    next_page = None
-    if len(families) == pagesize:
-        next_page = reverse('api_pipelines_get_page', kwargs={'page': page+1})
-
-    pipelines = {
-        'next_page': next_page,
-        'families': PipelineFamilySerializer(families, many=True).data
-    }
-
-    return Response(pipelines)
 
 
 def _assemble_inputs(pipeline, user):
@@ -212,63 +173,6 @@ def run_pipeline(request):
     return HttpResponseRedirect("/view_run/%d" % rtp.id)
 
 
-@api_view(['POST'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_run_pipeline(request):
-    """Run a Pipeline.
-
-    Request parameters are:
-
-    * pipeline - the pipeline id
-    * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
-    """
-    rtp = None
-    try:
-        with transaction.atomic():
-            dummy_rtp = fleet.models.RunToProcess(user=request.user)
-            rsf = RunSubmissionForm(request.POST, instance=dummy_rtp)
-
-            try:
-                rsf_good = rsf.is_valid()
-            except ValidationError as e:
-                rsf.add_error(None, e)
-                rsf_good = False
-
-            curr_pipeline = rsf.cleaned_data["pipeline"]
-            if not rsf_good:
-                return Response({'errors': rsf.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
-
-            # All inputs are good, so save then create the inputs
-            rtp = rsf.save()
-            for i in range(1, curr_pipeline.inputs.count()+1):
-                curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
-                if not curr_input_form.is_valid():
-                    return Response({'errors': curr_input_form.errors}, status=rf_status.HTTP_400_BAD_REQUEST)
-
-                # Check that the chosen SD is usable.
-                curr_SD = librarian.models.SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
-                try:
-                    rtp.validate_restrict_access([curr_SD])
-                except ValidationError as e:
-                    return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
-                rtp.inputs.create(symbolicdataset=curr_SD, index=i)
-
-            try:
-                rtp.clean()
-
-            except ValidationError as e:
-                return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
-
-    except RunSubmissionError as e:
-        return Response({'errors': [str(e)]}, status=rf_status.HTTP_400_BAD_REQUEST)
-
-    resp = {
-        'run': RunToProcessSerializer(rtp).data
-    }
-    return Response(resp)
-
-
 @login_required
 def runs(request):
     """Display all active runs for this user."""
@@ -276,33 +180,6 @@ def runs(request):
     context['is_user_admin'] = admin_check(request.user)
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_get_runs(request):
-    from sandbox.ajax import _load_status
-
-    all_runs, has_more = _load_status(request)
-    resp = {
-        'runs': all_runs,
-        'has_more': has_more
-    }
-    return Response(resp)
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_poll_run_progress(request, rtp_id):
-    from sandbox.ajax import _load_status
-    run, _ = _load_status(request, rtp_id)
-    resp = {
-        'run': run,
-        'results': reverse('api_pipelines_runresults', kwargs={'rtp_id': rtp_id}),
-    }
-    return Response(resp)
 
 
 @login_required
@@ -327,30 +204,6 @@ def view_results(request, id):
     context["outputs"] = json.dumps(
         [output.__dict__ for output in run.get_output_summary()])
     return HttpResponse(template.render(context))
-
-
-@api_view(['GET'])
-@authentication_classes((SessionAuthentication, BasicAuthentication))
-@permission_classes((IsAuthenticated,))
-def api_get_run_results(request, rtp_id):
-    four_oh_four = False
-    try:
-        rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
-        run = rtp.run
-        if not run.can_be_accessed(request.user):
-            four_oh_four = True
-    except archive.models.Run.DoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        return Response({'errors': ['Run not found!']}, status=rf_status.HTTP_404_NOT_FOUND)
-
-    outputs = [oc.execrecord.execrecordouts.first().symbolicdataset.dataset
-               for oc in run.outcables_in_order if oc.execrecord is not None]
-    resp = {
-        'results': DatasetSerializer(outputs, many=True).data,
-    }
-    return Response(resp)
 
 
 @login_required

@@ -7,7 +7,6 @@ from django.views.decorators.http import require_POST
 from archive.models import Dataset, MethodOutput, Run
 from librarian.models import SymbolicDataset
 from portal.views import admin_check
-from archive.views import api_get_datasets
 from metadata.models import deletion_order
 
 from rest_framework import permissions
@@ -147,11 +146,6 @@ def dataset_redact(request, dataset_id):
     
     dataset.symbolicdataset.redact()
 
-    # FIXME: This is how we reload all the datasets if we're not redacting
-    # from the run result page. We should try to do this in a more clean way?
-    if request.POST.get('datasets') == 'true':
-        return api_get_datasets(request, -1)
-
     return _build_run_outputs_response(dataset.created_by.parent_run)
 
 
@@ -182,11 +176,6 @@ def dataset_remove(request, dataset_id):
         return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
 
     dataset.symbolicdataset.remove()
-
-    # FIXME: This is how we reload all the datasets if we're not redacting
-    # from the run result page. We should try to do this in a more clean way?
-    if request.POST.get('datasets') == 'true':
-        return api_get_datasets(request, -1)
 
     return _build_run_outputs_response(dataset.created_by.parent_run)
 
