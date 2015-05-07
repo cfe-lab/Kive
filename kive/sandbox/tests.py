@@ -3,27 +3,23 @@ import re
 import sys
 import json
 import tempfile
-import sandbox.views
 
-from django.core.files import File
 from django.contrib.auth.models import User
-from django.test import TransactionTestCase, TestCase
+from django.core.files import File
+from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import MethodOutput, Dataset
+from constants import datatypes
+from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
+from fleet.models import RunToProcess
 from librarian.models import SymbolicDataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
-from pipeline.models import Pipeline, PipelineFamily
-from fleet.models import RunToProcess
-from sandbox.execute import Sandbox
-from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
-
 from method.tests import samplecode_path
-from constants import datatypes
-
-from rest_framework.test import APIRequestFactory, force_authenticate
-from django.contrib.auth.models import User
-
+from pipeline.models import Pipeline, PipelineFamily
+from sandbox.execute import Sandbox
+import sandbox.views
 
 class ExecuteTestsBase(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
@@ -590,35 +586,34 @@ class SandboxApiTests(ExecuteTestsBase):
 
         self.assertEquals(len(content['families']), 1)
 
-        fam = content['families']
-
     def test_pipeline_execute(self):
-        self.setup_pipeline()
-
-        # TODO: This test should really go more in depth to the structure
-        # of the data it expects...
-
-        request = self.factory.post('/api/pipelines/start-run/', {'pipeline': self.pX.id, 'input_1': self.symDS.id})
-        force_authenticate(request, user=self.myUser)
-        response = sandbox.views.api_run_pipeline(request).render()
-        content = json.loads(response.content)
-
-        rtp = RunToProcess.objects.all()[0]
-        sbox = Sandbox(rtp.user, rtp.pipeline, [x.symbolicdataset for x in rtp.inputs.order_by("index")])
-        rtp.run = sbox.run
-        rtp.save()
-        sbox.execute_pipeline()
-
-        request = self.factory.get(content['run']['run_status'])
-        force_authenticate(request, user=self.myUser)
-        response = sandbox.views.api_poll_run_progress(request, rtp.id).render()
-        content = json.loads(response.content)
-
-        self.assertEquals(content['run']['status'], '**-**')
-
-        request = self.factory.get(content['results'])
-        force_authenticate(request, user=self.myUser)
-        response = sandbox.views.api_get_run_results(request, rtp.id).render()
-        content = json.loads(response.content)
-
-        self.assertEquals(len(content['results']), 2)
+        self.fail('Test needs to be reimplemented with new API')
+#         self.setup_pipeline()
+# 
+#         # TODO: This test should really go more in depth to the structure
+#         # of the data it expects...
+# 
+#         request = self.factory.post('/api/pipelines/start-run/', {'pipeline': self.pX.id, 'input_1': self.symDS.id})
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_run_pipeline(request).render()
+#         content = json.loads(response.content)
+# 
+#         rtp = RunToProcess.objects.all()[0]
+#         sbox = Sandbox(rtp.user, rtp.pipeline, [x.symbolicdataset for x in rtp.inputs.order_by("index")])
+#         rtp.run = sbox.run
+#         rtp.save()
+#         sbox.execute_pipeline()
+# 
+#         request = self.factory.get(content['run']['run_status'])
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_poll_run_progress(request, rtp.id).render()
+#         content = json.loads(response.content)
+# 
+#         self.assertEquals(content['run']['status'], '**-**')
+# 
+#         request = self.factory.get(content['results'])
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_get_run_results(request, rtp.id).render()
+#         content = json.loads(response.content)
+# 
+#         self.assertEquals(len(content['results']), 2)

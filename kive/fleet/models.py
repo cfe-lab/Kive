@@ -102,7 +102,8 @@ class RunToProcess(metadata.models.AccessControl):
         If detailed is True, then the returned dictionary contains
          dictionaries for the run components and cables denoting
          their completion/success status (indexed by id)
-        @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}
+        @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t,
+            'user': u}
         """
         result = {'name': self.display_name, 'rtp_id': self.id}
         if hasattr(self, "not_enough_CPUs"):
@@ -112,6 +113,9 @@ class RunToProcess(metadata.models.AccessControl):
                 esc.max_available
             )
             return result
+        
+        if hasattr(self, 'user'):
+            result['user'] = self.user.username
         
         if not self.started:
             result['status'] = '?'

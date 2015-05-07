@@ -11,9 +11,10 @@ from django.contrib.auth.decorators import login_required
 from archive.models import Dataset, Run
 import fleet.models
 from forms import PipelineSelectionForm
-from pipeline.models import PipelineFamily, Pipeline
+from pipeline.models import PipelineFamily
 from exceptions import KeyError
 from fleet.models import RunToProcessInput
+from rest_framework.reverse import reverse
 
 ajax_logger = logging.getLogger("sandbox.ajax")
 
@@ -126,14 +127,35 @@ def _add_run_filter(runs, key, value):
     raise KeyError(key)
 
 
-def _load_status(request, rtp_id=None):
+def load_status(request, rtp_id=None):
     """ Find all matching runs, and return a dict for each with the status.
     
+    @param request: A web request with search parameters in the query string.
+    * is_granted=true - For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search for runs. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=active - runs that are still running or recently finished.
+    * filters[n][key]=name&filters[n][val]=match - runs where an input dataset
+        name or the pipeline family name match the value (case insensitive)
+    * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started after the given date and time.
+    * filters[n][key]=startbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started before the given date and time.
+    * filters[n][key]=endafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended after the given date and time.
+    * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended before the given date and time.
+    @param rtp_id: id of a RunToProcess to find.
     @return ([{'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t}],
         has_more) where has_more is true if more runs matched the search
-        criteria than were returned
+        criteria than were returned.
+    @return ({ as above }, has_more) if rtp_id is not None
     """
-    is_admin = request.GET.get('is_admin', '').lower() == 'true'
+    is_admin = request.GET.get('is_granted', '').lower() != 'true'
     runs = fleet.models.RunToProcess.filter_by_user(
         request.user,
         is_admin=is_admin).order_by('-time_queued')
@@ -160,8 +182,9 @@ def _load_status(request, rtp_id=None):
                                  'run__pipeline__steps')
 
     if rtp_id is not None:
-        if runs.exists():
-            return runs.first().get_run_progress(True), False
+        run = runs.first()
+        if run is not None:
+            return run.get_run_progress(True), False
         return None, False
 
     LIMIT = 30
@@ -171,7 +194,14 @@ def _load_status(request, rtp_id=None):
         if i == LIMIT:
             has_more = True
             break
-        report.append(run.get_run_progress())
+        progress = run.get_run_progress()
+        progress['url'] = reverse('runtoprocess-detail',
+                                  kwargs={'pk': run.pk},
+                                  request=request)
+        progress['removal_plan'] = reverse('runtoprocess-removal-plan',
+                                           kwargs={'pk': run.pk},
+                                           request=request)
+        report.append(progress)
     return report, has_more
 
 
@@ -186,41 +216,6 @@ def _is_status_changed(runs, request):
             return True
     
     return False
-
-
-def _poll_run_progress(request, rtp_id):
-    """
-    Helper to produce a JSON description of the current state of some runs.
-    """
-    if rtp_id is not None:
-        run, _has_more = _load_status(request, rtp_id)
-        return json.dumps(dict(runs=run,
-                               errors=[]))
-
-    try:
-        ajax_logger.debug('Loading status.')
-        runs, has_more = _load_status(request)
-        is_changed = _is_status_changed(runs, request)
-        if not is_changed:
-            runs = []
-        
-        ajax_logger.debug("Returning run status: %r", runs)
-        return json.dumps(dict(runs=runs,
-                               errors=[],
-                               changed=is_changed,
-                               has_more=has_more))
-    except StandardError:
-        ajax_logger.error('Status report failed.', exc_info=True)
-        return json.dumps(dict(runs=[],
-                               errors=['Status report failed.'],
-                               changed=True,
-                               has_more=False))
-
-
-@login_required
-def poll_run_progress(request, rtp_id=None):
-    return AJAXRequestHandler(request, _poll_run_progress, rtp_id).response
-
 
 def tail(handle, nbytes):
     """Get the last nbytes from a file."""

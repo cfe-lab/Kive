@@ -181,7 +181,6 @@ def runs(request):
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
-
 @login_required
 def view_results(request, id):
     """View outputs from a pipeline run."""

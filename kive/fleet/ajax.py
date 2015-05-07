@@ -1,25 +1,52 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
-from rest_framework import permissions, mixins
-from rest_framework.decorators import detail_route
+from rest_framework import permissions
+from rest_framework.decorators import detail_route, list_route
 from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
-
-from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmissionForm
-
-from sandbox.views import RunSubmissionError
-
-from fleet.models import RunToProcess
-from librarian.models import SymbolicDataset
-
-from fleet.serializers import RunToProcessSerializer
 from archive.serializers import DatasetSerializer
+from fleet.models import RunToProcess
+from fleet.serializers import RunToProcessSerializer
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from librarian.models import SymbolicDataset
+from sandbox.ajax import load_status
+from sandbox.forms import InputSubmissionForm, RunSubmissionForm
+from sandbox.views import RunSubmissionError
 
 
 class RunToProcessViewSet(RemovableModelViewSet):
+    """ Runs or requests to start runs
+    
+    Query parameters for the list view:
+    
+    * is_granted=true - For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    
+    Alternate list view: runs/status/
+    This will return status summaries for all the requested runs, up to a limit.
+    It also returns has_more, which is true if more runs matched the search
+    criteria than the limit. Query parameters:
+    
+    * is_granted - same as above
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search for runs. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=active - runs that are still running or recently finished.
+    * filters[n][key]=name&filters[n][val]=match - runs where an input dataset
+        name or the pipeline family name match the value (case insensitive)
+    * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started after the given date and time.
+    * filters[n][key]=startbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started before the given date and time.
+    * filters[n][key]=endafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended after the given date and time.
+    * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended before the given date and time.
+    """
+    
     queryset = RunToProcess.objects.all()
     serializer_class = RunToProcessSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -73,14 +100,18 @@ class RunToProcessViewSet(RemovableModelViewSet):
             return Response({'errors': [str(e)]}, status=400)
 
         return Response(RunToProcessSerializer(rtp, context={'request': request}).data)
+    
+    @list_route(methods=['get'], suffix='Status List')
+    def status(self, request):
+        runs, has_more = load_status(request)
+        return Response({ 'runs': runs, 'has_more': has_more })
 
-    @detail_route(methods=['get'])
+    @detail_route(methods=['get'], suffix='Status')
     def run_status(self, request, pk=None):
-        from sandbox.ajax import _load_status
-        run, _ = _load_status(request, pk)
+        run, _ = load_status(request, pk)
         return Response(run)
 
-    @detail_route(methods=['get'])
+    @detail_route(methods=['get'], suffix='Results')
     def run_results(self, request, pk=None):
         rtp = self.get_object()
 

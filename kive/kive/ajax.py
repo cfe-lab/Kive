@@ -105,7 +105,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
         call remove(). Returns a dict: {model_name: set(instance)}
     """
 
-    @detail_route(methods=['get'])
+    @detail_route(methods=['get'], suffix='Removal Plan')
     def removal_plan(self, request, pk=None):
         removal_plan = self.get_object().build_removal_plan()
         counts = {key: len(targets) for key, targets in removal_plan.iteritems()}

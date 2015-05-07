@@ -25,6 +25,14 @@ class RunToProcessTest(TestCase):
         
         self.assertSequenceEqual('?', progress['status'])
         self.assertSequenceEqual('Run', progress['name'])
+        
+    def test_owner(self):
+        expected_username = 'dave'
+        run_tracker = RunToProcess(user=User(username=expected_username))
+        
+        progress = run_tracker.get_run_progress()
+        
+        self.assertSequenceEqual(expected_username, progress['user'])
 
     def create_with_empty_pipeline(self):
         pipeline = Pipeline()

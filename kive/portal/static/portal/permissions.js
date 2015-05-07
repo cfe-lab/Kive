@@ -8,7 +8,7 @@ var permissions = (function() {
      * Also includes a lock button for administrators to show all records and
      * links to remove or redact records.
      * 
-     * Derived classes should override the lockHandler() method. For example:
+     * Derived classes should register their own columns. For example:
      * 
      *  var BookTable = function($table, is_user_admin) {
      *      permissions.PermissionsTable.call(this, $table, is_user_admin);
@@ -16,16 +16,21 @@ var permissions = (function() {
      *      this.registerColumn("Title", "title");
      *      this.registerColumn("Author", "author");
      *      this.registerColumn("Pub. Date", function($td, row) {
-     *          $td.text(utils.formatDate(row.published));
+     *          $td.text(permissions.formatDate(row.published));
      *      });
      *  }
      *  BookTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+     *  
+     *  Derived classes can also set this.reload_interval in milliseconds for
+     *  the table to continuously poll the server.
      */
     my.PermissionsTable = function($table, is_user_admin) {
         this.$table = $table;
         this.is_user_admin = is_user_admin;
         this.is_locked = true;
         this.registered_columns = [];
+        this.$lockImage = $('<img/>');
+        this.$lockSpan = $('<span/>');
     }
     
     /**
@@ -60,13 +65,16 @@ var permissions = (function() {
         if (this.$tbody !== undefined) {
             this.$tbody.empty();
         }
-        else {
+        else if (rows.length > 0) {
             $tr = $('<tr/>');
             this.registerColumn('Creator', 'user');
-            this.registerColumn(
-                    'Users with access',
-                    buildListCell,
-                    'users_allowed');
+            if ('users_allowed' in rows[0]) {
+                this.registerColumn(
+                        'Users with access',
+                        buildListCell,
+                'users_allowed');
+            }
+            if ('groups_allowed' in rows[0])
             this.registerColumn(
                     'Groups with access',
                     buildListCell,
@@ -89,6 +97,15 @@ var permissions = (function() {
             permissions_table.buildCells($tr, row);
             permissions_table.$tbody.append($tr);
         });
+        
+        // Schedule reload if it's been requested.
+        if (this.reload_interval !== undefined) {
+            this.timeout_id = setTimeout(
+                    function() {
+                        permissions_table.reloadTable();
+                    },
+                    this.reload_interval);
+        }
     }
     
     my.PermissionsTable.prototype.buildHeaders = function($tr) {
@@ -104,8 +121,6 @@ var permissions = (function() {
         $.each(this.registered_columns, function() {
             $tr.append($('<th/>').text(this.header));
         });
-        this.$lockImage = $('<img/>');
-        this.$lockSpan = $('<span/>');
         if (this.is_user_admin) {
             $a = ($('<a href="javascript:void(0)"/>')
                     .append(this.$lockImage)
@@ -124,8 +139,8 @@ var permissions = (function() {
             this.builder($td, row, this.data);
             $tr.append($td);
         });
+        $td = $('<td/>');
         if ( ! this.is_locked) {
-            $td = $('<td/>');
             if (row.removal_plan !== undefined) {
                 $tr.append($('<td/>').append($('<a/>')
                         .attr('plan', row.removal_plan)
@@ -140,8 +155,11 @@ var permissions = (function() {
                         .text('Redact')
                         .click(this, clickRedact)));
             }
-            $tr.append($td);
         }
+        if ($td.children().length === 0) {
+            $td.html('&nbsp;');
+        }
+        $tr.append($td);
     }
     
     my.PermissionsTable.prototype.toggleLock = function() {
@@ -151,12 +169,37 @@ var permissions = (function() {
     
     my.PermissionsTable.prototype.reloadTable = function() {
         var permissions_table = this;
-        $.getJSON(
-                this.list_url,
-                { is_granted: this.is_locked },
-                function (rows) {
+        if (permissions_table.timeout_id !== undefined) {
+            window.clearTimeout(permissions_table.timeout_id);
+            permissions_table.timeout_id = undefined;
+        }
+        if (permissions_table.ajax_request != undefined) {
+            permissions_table.ajax_request.abort();
+            permissions_table.ajax_request = undefined;
+        }
+        permissions_table.ajax_request = $.getJSON(
+                permissions_table.list_url,
+                permissions_table.getQueryParams(),
+                function (response) {
+                    var rows;
+                    permissions_table.ajax_request = undefined;
+                    rows = permissions_table.extractRows(response);
                     permissions_table.buildTable(rows);
                 });
+    }
+    
+    /** Get query parameters from the current state of the table and page.
+     * 
+     */
+    my.PermissionsTable.prototype.getQueryParams = function() {
+        return { is_granted: this.is_locked }
+    }
+    
+    /** Extract row data from an AJAX response.
+     * @param response: the JSON object returned from the server
+     */
+    my.PermissionsTable.prototype.extractRows = function(response) {
+        return response;
     }
     
     function buildListCell($td, row, field_name) {
