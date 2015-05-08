@@ -38,7 +38,6 @@ def resources(request):
     t = loader.get_template('method/resources.html')
     c = RequestContext(request,
                        {
-                           'resources': resources,
                            'coderesources': resource_json,
                            "is_user_admin": admin_check(request.user)
                        })
@@ -65,12 +64,22 @@ def resource_revisions(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
-    # Cast request.user to class KiveUser.
+    # Cast request.user to class KiveUser & grab data
     curr_user = metadata.models.KiveUser.kiveify(request.user)
-    revisions = coderesource.revisions.filter(curr_user.access_query()).distinct().order_by(
-        '-revision_number')
+    revisions = coderesource.revisions.filter(curr_user.access_query()).\
+        distinct().order_by('-revision_number')
+    revisions_json = json.dumps(
+        CodeResourceRevisionSerializer(revisions, context={'request': request}, many=True).data
+    )
+
+    # Load template, setup context
     t = loader.get_template('method/resource_revisions.html')
-    c.update({'coderesource': coderesource, 'revisions': revisions})
+    c.update({
+        'coderesource': coderesource,
+        'revisions': revisions,
+        'is_user_admin': admin_check(request.user),
+        'coderesourcerevisions': revisions_json
+    })
     return HttpResponse(t.render(c))
 
 

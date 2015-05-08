@@ -12,10 +12,6 @@ class CodeResourceSerializer(serializers.ModelSerializer):
     last_revision_date = serializers.DateTimeField()
     absolute_url = serializers.SerializerMethodField()
 
-    name = serializers.CharField()
-    filename = serializers.CharField()
-    description = serializers.CharField()
-
     class Meta:
         model = CodeResource
         fields = ('id', 'url', 'name', 'last_revision_date', 'filename', 'description', 'user', 'revisions',
@@ -38,12 +34,12 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
-
     absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeResourceRevision
-        fields = ('id', 'url', 'user', 'removal_plan',  'users_allowed', 'groups_allowed', 'absolute_url')
+        fields = ('id', 'url', 'revision_name', 'user', 'removal_plan',  'users_allowed', 'groups_allowed',
+                  'absolute_url', 'revision_number', 'revision_desc', 'revision_DateTime')
 
     def get_absolute_url(self, obj):
         if not obj:

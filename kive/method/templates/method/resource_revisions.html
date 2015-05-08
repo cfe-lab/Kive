@@ -8,6 +8,20 @@
 {% block javascript %}
 <!--<script src="/static/portal/jquery-2.0.3.min.js"></script>-->
 <!--<script src="/static/method/resource_add.js"></script>-->
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/method/resource_revisions.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
+    <script type="text/javascript">
+       $(function(){
+            resource_revisions_main({{ is_user_admin|lower }},
+                    $("#coderesourcerevisions"),
+                    {{coderesource.pk}},
+                    JSON.parse($('#initial_data').text()));
+        });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -54,51 +68,9 @@
 </tr>
 </table>
 
-<h3>Revisions:</h3>
-<table>
-<tr>
-    <th>#</th>
-    <th>Name</th>
-    <th>Description</th>
-    <th>Date</th>
-    <th>Creator</th>
-    <th>Users allowed</th>
-    <th>Groups allowed</th>
-    <th></th>
-</tr>
-{% for revision in revisions %}
-<tr>
-    <td>{{ revision.revision_number }}</td>
-    <td><a href="{{ revision.get_absolute_url }}">{{ revision }}</a></td>
-    <td>{{ revision.revision_desc }}</td>
-    <td>{{ revision.revision_DateTime }}</td>
-    <td>{{ revision.user }}</td>
-    <td>
-        {% if revision.users_allowed.exists %}
-            <ul>
-            {% for user in revision.users_allowed.all %}
-                <li>{{ user }}</li>
-            {% endfor %}
-            </ul>
-        {% else %}
-        None
-        {% endif %}
-    </td>
-    <td>
-        {% if revision.groups_allowed.exists %}
-            <ul>
-            {% for group in revision.groups_allowed.all %}
-                <li>{{ group }}</li>
-            {% endfor %}
-            </ul>
-        {% else %}
-        None
-        {% endif %}
-    </td>
-    <td><a href="/resource_revision_view/{{ revision.pk }}">View</a></td>
-</tr>
-{% endfor %}
-</table>
 
+<h3>Revisions:</h3>
+<div id="initial_data" style="display: none">{{ coderesourcerevisions|escape }}</div>
+<table id="coderesourcerevisions"></table>
 
 {% endblock %}
