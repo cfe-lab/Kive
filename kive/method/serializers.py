@@ -9,15 +9,27 @@ class CodeResourceSerializer(serializers.ModelSerializer):
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
     revisions = serializers.HyperlinkedIdentityField(view_name="coderesource-revisions")
+    last_revision_date = serializers.DateTimeField()
+    absolute_url = serializers.SerializerMethodField()
+
+    name = serializers.CharField()
+    filename = serializers.CharField()
+    description = serializers.CharField()
 
     class Meta:
         model = CodeResource
-        fields = ('id', 'url', 'user', 'revisions', 'removal_plan', 'users_allowed', 'groups_allowed', 'num_revisions')
+        fields = ('id', 'url', 'name', 'last_revision_date', 'filename', 'description', 'user', 'revisions',
+                  'removal_plan', 'users_allowed', 'groups_allowed', 'num_revisions', 'absolute_url')
 
     def get_num_revisions(self, obj):
         if not obj:
             return None
         return obj.num_revisions
+
+    def get_absolute_url(self, obj):
+        if not obj:
+            return None
+        return obj.get_absolute_url()
 
 
 class CodeResourceRevisionSerializer(serializers.ModelSerializer):

@@ -19,7 +19,8 @@ from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
 from portal.views import developer_check, admin_check
-from method.serializers import MethodFamilySerializer, MethodSerializer
+from method.serializers import MethodFamilySerializer, MethodSerializer, \
+    CodeResourceSerializer, CodeResourceRevisionSerializer
 
 
 @login_required
@@ -30,8 +31,18 @@ def resources(request):
     """
     resources = CodeResource.filter_by_user(request.user)
 
+    resource_json = json.dumps(
+        CodeResourceSerializer(resources, many=True, context={"request": request}).data
+    )
+
     t = loader.get_template('method/resources.html')
-    c = RequestContext(request, {'resources': resources})
+    c = RequestContext(request,
+                       {
+                           'resources': resources,
+                           'coderesources': resource_json,
+                           "is_user_admin": admin_check(request.user)
+                       })
+
     return HttpResponse(t.render(c))
 
 

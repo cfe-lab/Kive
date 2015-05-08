@@ -6,6 +6,19 @@
 {% block title %}Code resources{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/method/resources.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
+    <script type="text/javascript">
+        $(function(){
+            resources_main({{ is_user_admin|lower }},
+                    $("#coderesources"),
+                    JSON.parse($('#initial_data').text()));
+        });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -29,25 +42,8 @@ in the following table.
     <p>You do not have access to the CodeResource with id={{ no_access }}.</p>
 {% endif %}
 
-<table>
-<thead>
-	<tr>
-	<th>Name</th>
-    <th>Filename</th>
-	<th>Description</th>
-	<th>Number of revisions</th>
-	<th>Last revision date</th>
-	</tr>
-</thead>
-{% for resource in resources %}
-<tr>
-	<td><a href="{{ resource.get_absolute_url }}">{{ resource.name }}</a></td>
-    <td>{{ resource.filename }}</td>
-	<td>{{ resource.description }}</td>
-    <td>{{ resource.num_revisions }}</td>
-    <td>{{ resource.last_revision_date }}</td>
-</tr>
-{% endfor %}
-</table>
+
+<div id="initial_data" style="display:none">{{ coderesources|escape }}</div>
+<table id="coderesources"></table>
 
 {% endblock %}
