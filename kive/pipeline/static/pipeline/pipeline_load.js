@@ -156,9 +156,9 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
     }
 }
 
-function update_status(canvasState, status, look_for_md5) {
-    var pipeline_steps = status.runs.step_progress,
-        outputs = status.runs.output_progress,
+function update_status(canvasState, run, look_for_md5) {
+    var pipeline_steps = run.step_progress,
+        outputs = run.output_progress,
         i, shape, method_pk, output_pk;
 
     // Set all the inputs as complete
