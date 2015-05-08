@@ -4,6 +4,18 @@
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/pipeline/pipeline_families.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
+    <script type="text/javascript">
+        $(function(){
+            pipelinefamilies_main({{ is_user_admin|lower }},
+                    $("#pipelinefamilies"),
+                    JSON.parse($('#initial_data').text()));
+        });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -13,28 +25,9 @@
 <h2>Pipelines</h2>
 <a href="/pipeline_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
+<div id="initial_data" style="display:none">{{ pipeline_families|escape }}</div>
 <p>A pipeline is the deployment of one or more Methods to process data.</p>
 
-<table>
-<thead>
-	<tr>
-        <!-- TODO: provide help text -->
-        <th>Family</th>
-        <th>Description</th>
-        <th># revisions</th>
-        <th>Published version</th>
-	</tr>
-</thead>
-<tbody>
-{% for family in families %}
-<tr>
-	<td><a href="{{ family.get_absolute_url }}">{{ family.name }}</a></td>
-    <td>{{ family.description }}</td>
-    <td>{{ family.size }}</td>
-    <td>{{ family.published_version }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
+<table id="pipelinefamilies"></table>
 
 {% endblock %}

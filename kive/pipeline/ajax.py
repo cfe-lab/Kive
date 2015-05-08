@@ -1,23 +1,41 @@
 from django.http import HttpResponse, Http404
 from django.contrib.auth.decorators import login_required, user_passes_test
 
+from rest_framework import permissions
+from rest_framework.decorators import detail_route
+from rest_framework.response import Response
+
 import json
 
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
-from portal.views import developer_check
-from metadata.models import KiveUser
+from portal.views import developer_check, admin_check
+from metadata.models import KiveUser, AccessControl
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
-
-from rest_framework import permissions, mixins
 
 
 class PipelineFamilyViewSet(RemovableModelViewSet):
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    @detail_route(methods=["get"])
+    def pipelines(self, request, pk=None):
+        if self.request.QUERY_PARAMS.get('is_granted') == 'true':
+            is_admin = False
+        else:
+            is_admin = admin_check(self.request.user)
+
+        member_pipelines = AccessControl.filter_by_user(
+            request.user,
+            is_admin=is_admin,
+            queryset=self.get_object().members.all())
+
+        member_serializer = PipelineSerializer(
+            member_pipelines, many=True, context={"request": request})
+        return Response(member_serializer.data)
 
 
 class PipelineViewSet(RemovableModelViewSet):
