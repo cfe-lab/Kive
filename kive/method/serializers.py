@@ -26,7 +26,6 @@ class MethodFamilySerializer(serializers.ModelSerializer):
     groups_allowed = serializers.StringRelatedField(many=True)
     num_revisions = serializers.SerializerMethodField()
     absolute_url = serializers.SerializerMethodField()
-    family_link = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='methodfamily-removal-plan')
     methods = serializers.HyperlinkedIdentityField(view_name="methodfamily-methods")
@@ -35,7 +34,7 @@ class MethodFamilySerializer(serializers.ModelSerializer):
         model = MethodFamily
         fields = (
             "name", "description", "url", "user", "users_allowed", "groups_allowed", "num_revisions",
-            "absolute_url", "family_link", "removal_plan", "methods"
+            "absolute_url", "removal_plan", "methods"
         )
 
     def get_num_revisions(self, obj):
@@ -47,12 +46,6 @@ class MethodFamilySerializer(serializers.ModelSerializer):
         if not obj:
             return None
         return obj.get_absolute_url()
-
-    # FIXME need to update this when permissions.js is updated.
-    def get_family_link(self, obj):
-        if not obj:
-            return None
-        return '<a href="{}">{}</a>'.format(obj.get_absolute_url(), obj.name)
 
 
 class MethodSerializer(serializers.ModelSerializer):

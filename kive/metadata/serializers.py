@@ -21,7 +21,8 @@ class DatatypeSerializer(serializers.ModelSerializer):
                   'removal_plan',
                   "absolute_url",
                   "restricts",
-                  "date_created"
+                  "date_created",
+                  "name"
                   )
 
     def get_absolute_url(self, obj):

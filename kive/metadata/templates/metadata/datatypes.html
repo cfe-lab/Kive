@@ -10,6 +10,9 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/metadata/datatypes.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
     <script type="text/javascript">
 
     $(function() {
@@ -20,15 +23,13 @@
         }).on('mouseover mouseout', function() {
             $(this).toggleClass('hover');
         });
+
+        datatypes_main({{ is_user_admin|lower }},
+                $("#datatypes"),
+                JSON.parse($('#initial_data').text()));
     });
 
     </script>
-    <script type="text/javascript">
-
-    var is_user_admin = {{ is_user_admin|lower }};
-
-    </script>
-    <link rel="stylesheet" href="/static/portal/permissions.css">
 
 {% endblock %}
 

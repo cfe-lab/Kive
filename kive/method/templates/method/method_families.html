@@ -9,11 +9,17 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }};
-    </script>
     <script src="/static/method/method_families.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+
+    <script type="text/javascript">
+        $(function(){
+            methodfamilies_main({{ is_user_admin|lower }},
+                    $("#methodfamilies"),
+                    JSON.parse($('#initial_data').text()));
+        });
+    </script>
+
 {% endblock %}
 
 {% block content %}
