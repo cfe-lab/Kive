@@ -10,7 +10,7 @@
 
     var CodeResourceTable = function($table, is_user_admin) {
         permissions.PermissionsTable.call(this, $table, is_user_admin);
-        this.list_url = "api/coderesource/";
+        this.list_url = "api/coderesources/";
         this.registerColumn("Name", revisions_link);
         this.registerColumn("Filename", "filename");
         this.registerColumn("Description", "description");

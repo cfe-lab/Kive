@@ -10,7 +10,7 @@
 
     var CodeResourceRevisionTable = function($table, is_user_admin, ccr_pk) {
         permissions.PermissionsTable.call(this, $table, is_user_admin);
-        this.list_url = "../../api/coderesource/" + ccr_pk + "/revisions/";
+        this.list_url = "../../api/coderesources/" + ccr_pk + "/revisions/";
         this.registerColumn("#", "revision_number");
         this.registerColumn("Name", coderevision_link);
         this.registerColumn("Description", "revision_desc");
