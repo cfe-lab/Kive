@@ -19,6 +19,22 @@ class CodeResourceViewSet(RemovableModelViewSet):
     serializer_class = CodeResourceSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
+    @detail_route(methods=["get"])
+    def revisions(self, request, pk=None):
+        if self.request.QUERY_PARAMS.get('is_granted') == 'true':
+            is_admin = False
+        else:
+            is_admin = admin_check(self.request.user)
+
+        revisions = AccessControl.filter_by_user(
+            request.user,
+            is_admin=is_admin,
+            queryset=self.get_object().revisions.all())
+
+        return Response(
+            CodeResourceRevisionSerializer(revisions, many=True, context={"request": request}).data
+        )
+
 
 class CodeResourceRevisionViewSet(RemovableModelViewSet):
     queryset = CodeResourceRevision.objects.all()

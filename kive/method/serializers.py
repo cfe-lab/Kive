@@ -3,21 +3,40 @@ from method.models import Method, MethodFamily, CodeResource, CodeResourceRevisi
 
 
 class CodeResourceSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
 
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesource-removal-plan')
+    users_allowed = serializers.StringRelatedField(many=True)
+    groups_allowed = serializers.StringRelatedField(many=True)
+    revisions = serializers.HyperlinkedIdentityField(view_name="coderesource-revisions")
 
     class Meta:
         model = CodeResource
-        fields = ('id', 'url', 'removal_plan')
+        fields = ('id', 'url', 'user', 'revisions', 'removal_plan', 'users_allowed', 'groups_allowed', 'num_revisions')
+
+    def get_num_revisions(self, obj):
+        if not obj:
+            return None
+        return obj.num_revisions
 
 
 class CodeResourceRevisionSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
 
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
+    users_allowed = serializers.StringRelatedField(many=True)
+    groups_allowed = serializers.StringRelatedField(many=True)
+
+    absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeResourceRevision
-        fields = ('id', 'url', 'removal_plan')
+        fields = ('id', 'url', 'user', 'removal_plan',  'users_allowed', 'groups_allowed', 'absolute_url')
+
+    def get_absolute_url(self, obj):
+        if not obj:
+            return None
+        return obj.get_absolute_url()
 
 
 class MethodFamilySerializer(serializers.ModelSerializer):
