@@ -9,7 +9,7 @@
     <script src="/static/sandbox/view_results.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }},
-            run_id = {{ run_id }};
+            rtp_id = {{ rtp_id }};
     </script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
     <style>
@@ -27,20 +27,7 @@
 
 <div id="outputs_json" style="display:none">{{ outputs|escape }}</div>
 
+<p>TODO: Add Remove Run link, and add links to redact stdout/stderr.</p>
 <table id="outputs">
-    <thead>
-        <tr>
-            <th>Source</th>
-            <th>Output</th>
-            <th>Size</th>
-            <th>Date created</th>
-            <th colspan="3">
-                <div class="lock"></div>
-                <a id="remove" href="#">Remove Run</a>
-            </th>
-        </tr>
-    </thead>
-    <tbody>
-    </tbody>
 </table>
 {% endblock %}

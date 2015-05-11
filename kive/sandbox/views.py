@@ -1,30 +1,21 @@
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status as rf_status
-
-from pipeline.serializers import PipelineFamilySerializer
-from fleet.serializers import RunToProcessSerializer
-from archive.serializers import DatasetSerializer
-
-from django.template import loader, RequestContext
-from django.http import HttpResponse, Http404, HttpResponseRedirect
-from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse
-
-import librarian.models
-import archive.models
-import pipeline.models
-from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmissionForm
-import fleet.models
-from django.db.models import Count
-from metadata.models import KiveUser
-from portal.views import admin_check
 import json
 
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Count
+from django.http import HttpResponse, Http404, HttpResponseRedirect
+from django.template import loader, RequestContext
+
+import archive.models
+import fleet.models
+import librarian.models
+from metadata.models import KiveUser
+import pipeline.models
+from portal.views import admin_check
+from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmissionForm
+from fleet.serializers import RunToProcessOutputsSerializer
+from fleet.models import RunToProcess
 
 def _prepare_pipeline_selection_forms(user):
     user = KiveUser.kiveify(user)
@@ -182,28 +173,28 @@ def runs(request):
     return HttpResponse(template.render(context))
 
 @login_required
-def view_results(request, id):
+def view_results(request, rtp_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
     context['is_user_admin'] = admin_check(request.user)
-    context['run_id'] = id
-
+    context['rtp_id'] = rtp_id
+    
     four_oh_four = False
     try:
-        run = archive.models.Run.objects.get(pk=id)
-        if not run.can_be_accessed(request.user):
+        rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
+        if not rtp.can_be_accessed(request.user):
             four_oh_four = True
-    except archive.models.Run.DoesNotExist:
+    except RunToProcess.DoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(id))
 
-    context["outputs"] = json.dumps(
-        [output.__dict__ for output in run.get_output_summary()])
+    context["outputs"] = json.dumps(RunToProcessOutputsSerializer(
+        rtp,
+        context={ 'request': request }).data)
     return HttpResponse(template.render(context))
-
 
 @login_required
 def view_run(request, rtp_id, md5=None):

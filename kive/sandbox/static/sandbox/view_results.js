@@ -1,13 +1,3 @@
-function lock_handler(is_admin) {
-    if (is_admin) {
-        $('a.redact').closest('td').show();
-        $('#remove').show();
-    }
-    else {
-        $('a.redact').closest('td').hide();
-        $('#remove').hide();
-    }
-}
 
 function redact_handler(event) {
     var redact_url = event.data;
@@ -96,15 +86,45 @@ function build_table($tbody, outputs) {
     }
 }
 
+var RunsToProcessTable = function($table, is_user_admin, rtp_id) {
+    permissions.PermissionsTable.call(this, $table, is_user_admin);
+    this.list_url = "/api/runs/" + rtp_id + "/run_outputs/";
+    this.registerColumn("Source", "step_name");
+    this.registerColumn("Output", "output_name");
+    this.registerColumn("Size", "size");
+    this.registerColumn("Date created", "date");
+    this.registerColumn("", function($td, output) {
+        var href;
+        if (output.id !== null) {
+            href = '../../' + output.type + '_view/' + output.id;
+            $td.append($('<a>View</a>').attr('href', href));
+        }
+    });
+    this.registerColumn("", function($td, output) {
+        var href;
+        if (output.id !== null) {
+            href = '../../' + output.type + '_download/' + output.id;
+            $td.append($('<a>Download</a>').attr('href', href));
+        }
+    });
+}
+RunsToProcessTable.prototype = Object.create(
+        permissions.PermissionsTable.prototype);
+
+RunsToProcessTable.prototype.extractRows = function(response) {
+    var run = response.run;
+    if (run === null) {
+        return [];
+    }
+    return run.output_summary;
+}
+
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
-    build_table($('#outputs tbody'), $.parseJSON($('#outputs_json').text()));
-    adminLock = new permissions.AdminLock(
-            $('div.lock'),
-            is_user_admin,
-            lock_handler);
-    $('#remove').click(remove_handler);
-    lock_handler(false);
+    var table = new RunsToProcessTable($('#outputs'), is_user_admin, rtp_id);
+    table.buildTable(table.extractRows($.parseJSON($('#outputs_json').text())));
+    
+    // TODO: $('#remove').click(remove_handler);
 });

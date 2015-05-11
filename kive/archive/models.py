@@ -25,8 +25,6 @@ import stopwatch.models
 import metadata.models
 from constants import maxlengths
 import archive.signals
-from librarian.models import SymbolicDataset
-from django.template.defaultfilters import filesizeformat
 
 
 def empty_redaction_plan():
@@ -347,106 +345,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             metadata.models.update_removal_plan(removal_plan, runcomponent.build_removal_plan_h(removal_plan))
 
         return removal_plan
-
-    def get_output_summary(self):
-        """ Get a list of objects that summarize all the outputs from a run.
-        
-        Outputs include pipeline outputs, as well as output log, error log, and
-        output cables for each step.
-        """
-        class Output(object):
-            def __init__(self,
-                         step_name,
-                         output_name,
-                         size="redacted",
-                         date="redacted",
-                         view_url="",
-                         down_url="",
-                         redact_url="",
-                         is_ok=True):
-                self.step_name = step_name
-                self.output_name = output_name
-                self.size = size
-                self.date = date
-                self.view_url = view_url
-                self.down_url = down_url
-                self.redact_url = redact_url
-                self.is_ok = is_ok
-        
-        outputs = []
-        for i, outcable in enumerate(self.outcables_in_order):
-            if outcable.execrecord is not None:
-                execrecordout = outcable.execrecord.execrecordouts.first()
-                output = Output(step_name=(i == 0 and 'Run outputs' or ''),
-                                output_name=outcable.pipelineoutputcable.dest)
-                if execrecordout.symbolicdataset.has_data():
-                    dataset = execrecordout.symbolicdataset.dataset
-                    output.size = dataset.dataset_file.size
-                    output.date = dataset.date_created
-                    output.view_url = "../../dataset_view/{}".format(dataset.pk)
-                    output.down_url = "../../dataset_download/{}".format(dataset.pk)
-                    output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
-    
-                outputs.append(output)
-            
-        for runstep in self.runsteps_in_order:
-            execlog = runstep.get_log()
-            if execlog is None:
-                continue
-            methodoutput = execlog.methodoutput
-    
-            output = Output(step_name=runstep.pipelinestep,
-                            output_name='Standard out')
-            if methodoutput.is_output_redacted():
-                outputs.append(output)
-            else:
-                try:
-                    output.size = methodoutput.output_log.size
-                    output.date = execlog.end_time
-                    output.view_url = "../../stdout_view/{}".format(methodoutput.id)
-                    output.down_url = "../../stdout_download/{}".format(methodoutput.id)
-                    output.redact_url = "../../stdout_redact/{}".format(methodoutput.id)
-                    outputs.append(output)
-                except ValueError:
-                    pass
-            output = Output(step_name="",
-                            output_name='Standard error')
-            if methodoutput.is_error_redacted():
-                outputs.append(output)
-            else:
-                try:
-                    output.size = methodoutput.error_log.size
-                    output.date = execlog.end_time
-                    output.view_url = "../../stderr_view/{}".format(methodoutput.id)
-                    output.down_url = "../../stderr_download/{}".format(methodoutput.id)
-                    output.redact_url = "../../stderr_redact/{}".format(methodoutput.id)
-                    outputs.append(output)
-                except ValueError:
-                    pass
-            if runstep.execrecord is not None:
-                for execrecordout in runstep.execrecord.execrecordouts_in_order:
-                    output = Output(step_name='',
-                                    output_name=execrecordout.generic_output,
-                                    is_ok=execrecordout.is_OK())
-                    if execrecordout.symbolicdataset.has_data():
-                        dataset = execrecordout.symbolicdataset.dataset
-                        output.size = dataset.dataset_file.size
-                        output.date = dataset.date_created
-                        output.view_url = "../../dataset_view/{}".format(dataset.pk)
-                        output.down_url = "../../dataset_download/{}".format(dataset.pk)
-                        output.redact_url = "../../dataset_redact/{}".format(dataset.pk)
-        
-                    outputs.append(output)
-        for output in outputs:
-            output.is_invalid = not output.is_ok and output.redact_url
-            output.step_name = str(output.step_name)
-            output.output_name = str(output.output_name)
-            if output.size != 'redacted':
-                output.size = filesizeformat(output.size)
-                output.date = output.date.strftime('%d %b %Y %H:%M:%S')
-        
-        return outputs
-
 
 class RunComponent(stopwatch.models.Stopwatch):
     """

@@ -21,6 +21,16 @@ var permissions = (function() {
      *  }
      *  BookTable.prototype = Object.create(permissions.PermissionsTable.prototype);
      *  
+     *  Special columns that derived classes may include in the data rows are:
+     *  
+     *  user: the owner of the row
+     *  users_allowed: user names that have been granted access
+     *  groups_allowed: group names that have been granted access
+     *  removal_plan: a URL to retrieve a removal plan summary
+     *  redaction_plan: a URL to retrieve a redaction plan summary
+     *  url: if removal_plan or redaction_plan are present, this is used for
+     *      DELETE or PATCH requests.
+     *  
      *  Derived classes can also set this.reload_interval in milliseconds for
      *  the table to continuously poll the server.
      */
@@ -67,7 +77,9 @@ var permissions = (function() {
         }
         else if (rows.length > 0) {
             $tr = $('<tr/>');
-            this.registerColumn('Creator', 'user');
+            if ('user' in rows[0]) {
+                this.registerColumn('Creator', 'user');
+            }
             if ('users_allowed' in rows[0]) {
                 this.registerColumn(
                         'Users with access',
@@ -141,14 +153,16 @@ var permissions = (function() {
         });
         $td = $('<td/>');
         if ( ! this.is_locked) {
-            if (row.removal_plan !== undefined) {
+            if (row.removal_plan !== undefined
+                    && row.removal_plan !== null) {
                 $tr.append($('<td/>').append($('<a/>')
                         .attr('plan', row.removal_plan)
                         .attr('href', row.url)
                         .text('Remove')
                         .click(this, clickRemove)));
             }
-            if (row.redaction_plan !== undefined) {
+            if (row.redaction_plan !== undefined
+                    && row.redaction_plan !== null) {
                 $tr.append($('<td/>').append($('<a/>')
                         .attr('plan', row.redaction_plan)
                         .attr('href', row.url)

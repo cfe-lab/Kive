@@ -1,13 +1,19 @@
+import os
+
+from django.template.defaultfilters import filesizeformat
+from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.reverse import reverse
+
 from archive.models import Dataset, Run
 from metadata.serializers import CompoundDatatypeSerializer
-import os
 
 
 class TinyRunSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Run
-        feild = ('id', )
+        fields = ('id',)
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -31,3 +37,125 @@ class DatasetSerializer(serializers.ModelSerializer):
     def get_filename(self, obj):
         if obj:
             return os.path.basename(obj.dataset_file.name)
+
+class RunOutputsSerializer(serializers.ModelSerializer):
+    """ Serialize a run with a focus on the outputs. """
+    
+    output_summary = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Run
+        fields = ('id', 'output_summary')
+        
+    def get_output_summary(self, run):
+        """ Get a list of objects that summarize all the outputs from a run.
+        
+        Outputs include pipeline outputs, as well as output log, error log, and
+        output cables for each step.
+        """
+        class Output(object):
+            def __init__(self,
+                         step_name,
+                         output_name,
+                         type,
+                         id=None,
+                         size="redacted",
+                         date="redacted",
+                         url=None,
+                         redaction_plan=None,
+                         is_ok=True):
+                self.step_name = step_name
+                self.output_name = output_name
+                self.type = type
+                self.id = id
+                self.size = size
+                self.date = date
+                self.url = url
+                self.redaction_plan = redaction_plan
+                self.is_ok = is_ok
+                
+            def set_dataset(self, dataset):
+                self.id = dataset.id
+                self.size = dataset.dataset_file.size
+                self.date = dataset.date_created
+                self.url = reverse('dataset-detail',
+                                   kwargs={'pk': dataset.id},
+                                   request=request)
+                self.redaction_plan = reverse('dataset-redaction-plan',
+                                              kwargs={'pk': dataset.id},
+                                              request=request)
+                
+        
+        request = self.context.get('request', None)
+        outputs = []
+        for i, outcable in enumerate(run.outcables_in_order):
+            if outcable.execrecord is not None:
+                execrecordout = outcable.execrecord.execrecordouts.first()
+                output = Output(step_name=(i == 0 and 'Run outputs' or ''),
+                                output_name=outcable.pipelineoutputcable.dest,
+                                type='dataset')
+                if execrecordout.symbolicdataset.has_data():
+                    dataset = execrecordout.symbolicdataset.dataset
+                    output.set_dataset(dataset)
+    
+                outputs.append(output)
+            
+        for runstep in run.runsteps_in_order:
+            execlog = runstep.get_log()
+            if execlog is None:
+                continue
+            methodoutput = execlog.methodoutput
+    
+            output = Output(step_name=runstep.pipelinestep,
+                            output_name='Standard out',
+                            type='stdout')
+            if methodoutput.is_output_redacted():
+                outputs.append(output)
+            else:
+                try:
+                    output.id = methodoutput.id
+                    output.size = methodoutput.output_log.size
+                    output.date = execlog.end_time
+#                     output.url = reverse('methodoutput-detail',
+#                                          kwargs={'pk': dataset.id},
+#                                          request=request)
+#                     output.redaction_plan = reverse('methodoutput-redaction-plan',
+#                                                     kwargs={'pk': dataset.id},
+#                                                     request=request)
+                    outputs.append(output)
+                except ValueError:
+                    pass
+            output = Output(step_name="",
+                            output_name='Standard error',
+                            type='stderr')
+            if methodoutput.is_error_redacted():
+                outputs.append(output)
+            else:
+                try:
+                    output.id = methodoutput.id
+                    output.size = methodoutput.error_log.size
+                    output.date = execlog.end_time
+                    outputs.append(output)
+                except ValueError:
+                    pass
+            if runstep.execrecord is not None:
+                for execrecordout in runstep.execrecord.execrecordouts_in_order:
+                    output = Output(step_name='',
+                                    output_name=execrecordout.generic_output,
+                                    is_ok=execrecordout.is_OK(),
+                                    type='dataset')
+                    if execrecordout.symbolicdataset.has_data():
+                        dataset = execrecordout.symbolicdataset.dataset
+                        output.set_dataset(dataset)
+        
+                    outputs.append(output)
+        for output in outputs:
+            output.is_invalid = not output.is_ok and output.id is not None
+            output.step_name = str(output.step_name)
+            output.output_name = str(output.output_name)
+            if output.size != 'redacted':
+                output.size = filesizeformat(output.size)
+                output.date = timezone.localtime(output.date).strftime(
+                    '%d %b %Y %H:%M:%S')
+        
+        return [output.__dict__ for output in outputs]

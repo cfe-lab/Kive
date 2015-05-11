@@ -5,9 +5,9 @@ from rest_framework import permissions
 from rest_framework.decorators import detail_route, list_route
 from rest_framework.response import Response
 
-from archive.serializers import DatasetSerializer
 from fleet.models import RunToProcess
-from fleet.serializers import RunToProcessSerializer
+from fleet.serializers import RunToProcessSerializer,\
+    RunToProcessOutputsSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
 from librarian.models import SymbolicDataset
 from sandbox.ajax import load_status
@@ -111,15 +111,9 @@ class RunToProcessViewSet(RemovableModelViewSet):
         run, _ = load_status(request, pk)
         return Response(run)
 
-    @detail_route(methods=['get'], suffix='Results')
-    def run_results(self, request, pk=None):
+    @detail_route(methods=['get'], suffix='Outputs')
+    def run_outputs(self, request, pk=None):
         rtp = self.get_object()
-
-        if rtp.run is None:
-            return Response({'errors': ['Run not found!']}, status=404)
-
-        outputs = [oc.execrecord.execrecordouts.first().symbolicdataset.dataset
-                   for oc in rtp.run.outcables_in_order if oc.execrecord is not None]
-
-        return Response(DatasetSerializer(outputs, many=True, context={'request': request}).data)
-
+        return Response(RunToProcessOutputsSerializer(
+            rtp,
+            context={'request': request}).data)
