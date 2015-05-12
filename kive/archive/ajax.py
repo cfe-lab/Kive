@@ -3,21 +3,20 @@ import json
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http.response import Http404, HttpResponse
 from django.views.decorators.http import require_POST
-
-from archive.models import Dataset, MethodOutput, Run
-from librarian.models import SymbolicDataset
-from portal.views import admin_check
-from metadata.models import deletion_order
-
-from rest_framework import permissions
+from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from archive.serializers import DatasetSerializer
 from archive.forms import DatasetForm
+from archive.serializers import DatasetSerializer, MethodOutputSerializer
+from archive.models import Dataset, MethodOutput, Run, summarize_redaction_plan
 from archive.views import _build_download_response
-
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, RedactModelMixin
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, RedactModelMixin,\
+    IsGrantedReadOnly
+from librarian.models import SymbolicDataset
+from metadata.models import deletion_order
+from portal.views import admin_check
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -44,6 +43,13 @@ def _is_dry_run(request):
 
 
 class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
+    """ List and modify datasets.
+    
+    POST to the list to upload a new dataset, DELETE an instance to remove it
+    along with all runs that produced or consumed it, or PATCH is_redacted=true
+    on an instance to blank its contents along with any other instances or logs
+    that used it as input.
+    """
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -78,13 +84,64 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
         dataset = self.get_object()
 
         if dataset.symbolicdataset not in accessible_SDs:
-            return Response(None, status=404)
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
 
         return _build_download_response(dataset.dataset_file)
 
+class MethodOutputViewSet(ReadOnlyModelViewSet):
+    """ List and redact method output records.
+    
+    PATCH output_redacted=true, error_redacted=true, or code_redacted=true on an
+    instance to blank its output log, error log, or return code.
+    """
+    queryset = MethodOutput.objects.all()
+    serializer_class = MethodOutputSerializer
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadOnly)
 
+    def patch_object(self, request, pk=None):
+        return Response(MethodOutputSerializer(
+            self.get_object(),
+            context={'request': request}).data)
 
+    def partial_update(self, request, pk=None):
+        method_output = self.get_object()
+        redactions = {'output_redacted': method_output.redact_output_log,
+                      'error_redacted': method_output.redact_error_log,
+                      'code_redacted': method_output.redact_return_code}
+        
+        unexpected_keys = set(request.DATA.keys()) - set(redactions.keys())
+        if unexpected_keys:
+            return Response(
+                {'errors': ['Cannot update fields ' + ','.join(unexpected_keys)]},
+                status=status.HTTP_400_BAD_REQUEST)
+        for field, redact in redactions.iteritems():
+            if request.DATA.get(field, False):
+                redact()
+        return self.patch_object(request, pk)
 
+    @detail_route(methods=['get'])
+    def output_redaction_plan(self, request, pk=None):
+        execlog = self.get_object().execlog
+        redaction_plan = execlog.build_redaction_plan(output_log=True,
+                                                      error_log=False,
+                                                      return_code=False)
+        return Response(summarize_redaction_plan(redaction_plan))
+
+    @detail_route(methods=['get'])
+    def error_redaction_plan(self, request, pk=None):
+        execlog = self.get_object().execlog
+        redaction_plan = execlog.build_redaction_plan(output_log=False,
+                                                      error_log=True,
+                                                      return_code=False)
+        return Response(summarize_redaction_plan(redaction_plan))
+
+    @detail_route(methods=['get'])
+    def code_redaction_plan(self, request, pk=None):
+        execlog = self.get_object().execlog
+        redaction_plan = execlog.build_redaction_plan(output_log=False,
+                                                      error_log=False,
+                                                      return_code=True)
+        return Response(summarize_redaction_plan(redaction_plan))
 
 @login_required
 @user_passes_test(admin_check)

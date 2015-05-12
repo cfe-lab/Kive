@@ -36,6 +36,10 @@ def empty_redaction_plan():
         "ReturnCodes": set()
     }
 
+def summarize_redaction_plan(redaction_plan):
+    counts = {key: len(targets) for key, targets in redaction_plan.iteritems()}
+    return counts
+
 
 @transaction.atomic
 def redact_helper(redaction_plan):
@@ -2524,6 +2528,9 @@ class ExecLog(stopwatch.models.Stopwatch):
                 redaction_plan["ErrorLogs"].add(self)
             if return_code and not self.methodoutput.is_code_redacted():
                 redaction_plan["ReturnCodes"].add(self)
+            
+            # Don't need to record RunComponent in the redaction plan, because
+            # we don't report those.
         except MethodOutput.DoesNotExist:
             pass
 
@@ -2561,9 +2568,9 @@ class MethodOutput(models.Model):
                                  help_text="Terminal error output of the RunStep Method, i.e. stderr.",
                                  null=True, blank=True)
 
-    _output_redacted = models.BooleanField(default=False)
-    _error_redacted = models.BooleanField(default=False)
-    _code_redacted = models.BooleanField(default=False)
+    output_redacted = models.BooleanField(default=False)
+    error_redacted = models.BooleanField(default=False)
+    code_redacted = models.BooleanField(default=False)
 
     def get_absolute_log_url(self):
         """
@@ -2585,32 +2592,32 @@ class MethodOutput(models.Model):
         return methodoutput
 
     def is_redacted(self):
-        return self._output_redacted or self._error_redacted or self._code_redacted
+        return self.output_redacted or self.error_redacted or self.code_redacted
 
     def is_output_redacted(self):
-        return self._output_redacted
+        return self.output_redacted
 
     def is_error_redacted(self):
-        return self._error_redacted
+        return self.error_redacted
 
     def is_code_redacted(self):
-        return self._code_redacted
-
+        return self.code_redacted
+    
     def redact_output_log(self):
         self.output_log.delete()
-        self._output_redacted = True
+        self.output_redacted = True
         self.save()
         self.execlog.record.redact()
 
     def redact_error_log(self):
         self.error_log.delete()
-        self._error_redacted = True
+        self.error_redacted = True
         self.save()
         self.execlog.record.redact()
 
     def redact_return_code(self):
         self.return_code = None
-        self._code_redacted = True
+        self.code_redacted = True
         self.save()
         self.execlog.record.redact()
 

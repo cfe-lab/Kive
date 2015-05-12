@@ -3,11 +3,29 @@ from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
+from archive.models import summarize_redaction_plan
 from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
 
 
-class IsDeveloperOrGrantedReadOnly(permissions.BasePermission):
+class IsGrantedReadOnly(permissions.BasePermission):
+    """ Custom permission for historical resources like runs.
+    
+    All authenticated users can see instances they have been allowed access to
+    either because they own them, they are in users_allowed, or they are in
+    groups_allowed.
+    Only administrators can modify records.
+    """
+    def has_permission(self, request, view):
+        return (admin_check(request.user) or
+                request.method in permissions.SAFE_METHODS)
+    
+    def has_object_permission(self, request, view, obj):
+        if admin_check(request.user):
+            return True
+        return obj.can_be_accessed(request.user)
+
+class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
     """ Custom permission for developer resources like code
     
     Developers can create new instances, and all authenticated users can see
@@ -20,12 +38,6 @@ class IsDeveloperOrGrantedReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
         return developer_check(request.user) and request.method == 'POST'
-    
-    def has_object_permission(self, request, view, obj):
-        if admin_check(request.user):
-            return True
-        return obj.can_be_accessed(request.user)
-
 
 class GrantedModelMixin(object):
     """ Filter instances that the user has been granted access to.
@@ -86,9 +98,8 @@ class RedactModelMixin(object):
 
     @detail_route(methods=['get'])
     def redaction_plan(self, request, pk=None):
-        removal_plan = self.get_object().build_redaction_plan()
-        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
-        return Response(counts)
+        redaction_plan = self.get_object().build_redaction_plan()
+        return Response(summarize_redaction_plan(redaction_plan))
 
 
 class RemoveModelMixin(mixins.DestroyModelMixin):
@@ -108,8 +119,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
     @detail_route(methods=['get'], suffix='Removal Plan')
     def removal_plan(self, request, pk=None):
         removal_plan = self.get_object().build_removal_plan()
-        counts = {key: len(targets) for key, targets in removal_plan.iteritems()}
-        return Response(counts)
+        return Response(summarize_redaction_plan(removal_plan))
     
     def perform_destroy(self, instance):
         instance.remove()

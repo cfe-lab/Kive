@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from archive.models import Dataset, Run
+from archive.models import Dataset, Run, MethodOutput
 from metadata.serializers import CompoundDatatypeSerializer
 
 
@@ -37,6 +37,26 @@ class DatasetSerializer(serializers.ModelSerializer):
     def get_filename(self, obj):
         if obj:
             return os.path.basename(obj.dataset_file.name)
+
+class MethodOutputSerializer(serializers.ModelSerializer):
+
+    output_redaction_plan = serializers.HyperlinkedIdentityField(
+        view_name='methodoutput-output-redaction-plan')
+    error_redaction_plan = serializers.HyperlinkedIdentityField(
+        view_name='methodoutput-error-redaction-plan')
+    code_redaction_plan = serializers.HyperlinkedIdentityField(
+        view_name='methodoutput-code-redaction-plan')
+
+    class Meta:
+        model = MethodOutput
+        fields = ('id',
+                  'url',
+                  'output_redacted',
+                  'error_redacted',
+                  'code_redacted',
+                  'output_redaction_plan',
+                  'error_redaction_plan',
+                  'code_redaction_plan')
 
 class RunOutputsSerializer(serializers.ModelSerializer):
     """ Serialize a run with a focus on the outputs. """
@@ -116,12 +136,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.id = methodoutput.id
                     output.size = methodoutput.output_log.size
                     output.date = execlog.end_time
-#                     output.url = reverse('methodoutput-detail',
-#                                          kwargs={'pk': dataset.id},
-#                                          request=request)
-#                     output.redaction_plan = reverse('methodoutput-redaction-plan',
-#                                                     kwargs={'pk': dataset.id},
-#                                                     request=request)
+                    output.url = reverse('methodoutput-detail',
+                                         kwargs={'pk': methodoutput.id},
+                                         request=request)
+                    output.redaction_plan = reverse(
+                        'methodoutput-output-redaction-plan',
+                        kwargs={'pk': methodoutput.id},
+                        request=request)
                     outputs.append(output)
                 except ValueError:
                     pass
@@ -135,6 +156,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.id = methodoutput.id
                     output.size = methodoutput.error_log.size
                     output.date = execlog.end_time
+                    output.url = reverse('methodoutput-detail',
+                                         kwargs={'pk': methodoutput.id},
+                                         request=request)
+                    output.redaction_plan = reverse(
+                        'methodoutput-error-redaction-plan',
+                        kwargs={'pk': methodoutput.id},
+                        request=request)
                     outputs.append(output)
                 except ValueError:
                     pass

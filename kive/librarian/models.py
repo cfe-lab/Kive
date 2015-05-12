@@ -1005,8 +1005,7 @@ class ExecRecord(models.Model):
         """
         "Hollow out" this ExecRecord.
 
-        This may be triggered by an input SymbolicDataset or by the ExecLog.  If dry_run is True then no
-        actual redaction occurs.
+        This may be triggered by an input SymbolicDataset or by the ExecLog. 
         """
         redaction_plan = self.build_redaction_plan()
         archive.models.redact_helper(redaction_plan)

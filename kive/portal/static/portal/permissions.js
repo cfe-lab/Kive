@@ -216,6 +216,13 @@ var permissions = (function() {
         return response;
     }
     
+    /** Choose which redaction field to set when redacting.
+     * @param plan_url: the redaction plan URL that this field should enact
+     */
+    my.PermissionsTable.prototype.getRedactionField = function(plan_url) {
+        return "is_redacted";
+    }
+    
     function buildListCell($td, row, field_name) {
         var $ul = $('<ul/>'),
             names = row[field_name];
@@ -231,7 +238,9 @@ var permissions = (function() {
         permissions_table.toggleLock();
     }
 
-    function buildMessage(plan, action) {
+    my.PermissionsTable.prototype.buildConfirmationMessage = function(
+            plan,
+            action) {
         var message = "This will " + action + ":\n";
         for(var k in plan) {
             if (plan[k] != 0) {
@@ -250,7 +259,9 @@ var permissions = (function() {
                 $a.attr('plan'),
                 {},
                 function (plan) {
-                    var message = buildMessage(plan, "remove");
+                    var message = permissions_table.buildConfirmationMessage(
+                            plan,
+                            "remove");
                     if (window.confirm(message)) {
                         $.ajax({
                             url: $a.attr('href'),
@@ -265,18 +276,25 @@ var permissions = (function() {
 
     function clickRedact(event){
         var $a = $(this),
-            permissions_table = event.data;
+            permissions_table = event.data,
+            plan_url = $a.attr('plan');
         event.preventDefault();
         $.getJSON(
-                $a.attr('plan'),
+                plan_url,
                 {},
                 function (plan) {
-                    var message = buildMessage(plan, "redact");
+                    var message = permissions_table.buildConfirmationMessage(
+                            plan,
+                            "redact"),
+                        redaction_field = permissions_table.getRedactionField(
+                                plan_url),
+                        redaction_data = {};
                     if (window.confirm(message)) {
+                        redaction_data[redaction_field] = true;
                         $.ajax({
                             url: $a.attr('href'),
                             method: 'PATCH',
-                            data: {is_redacted: "true"},
+                            data: redaction_data,
                             success: function() {
                                 permissions_table.reloadTable();
                             }
@@ -297,50 +315,6 @@ var permissions = (function() {
         }
         return (date.getDate() + " " + monthNames[date.getMonth()] + " " + 
                 date.getFullYear() + " " + date.getHours() + ":" + min);
-    }
-
-
-
-    /** Create an administrator lock button. (Only for backward compatibility.)
-     * 
-     * @param $lock_div: jQuery object for the div that will hold the lock
-     * button.
-     * @param is_user_admin: Is the current user an administrator? If true,
-     * will add the lock button to $lock_div, otherwise no change.
-     * @param lock_handler: a function that gets called when the lock is
-     * clicked. Takes a boolean value: is_admin.
-     */
-    my.AdminLock = function($lock_div, is_user_admin, lock_handler) {
-        if ( ! is_user_admin) {
-            $lock_div.hide();
-            return;
-        }
-        
-        this.is_admin = false;
-        this.lock_handler = lock_handler;
-        this.$image = $('<img/>');
-        this.$span = $('<span/>');
-        
-        this.displayLock();
-        $lock_div.append(
-                $('<a/>').append(this.$image).click(this, toggleLock),
-                this.$span)
-    }
-    
-    my.AdminLock.prototype.displayLock = function() {
-        this.$image.attr(
-                'src',
-                this.is_admin
-                ? '/static/portal/img/lock-unlocked-2x.png'
-                : '/static/portal/img/lock-locked-2x.png');
-        this.$span.text(this.is_admin ? 'Administrator:' : '');
-    }
-    
-    function toggleLock(event) {
-        var adminLock = event.data;
-        adminLock.is_admin = ! adminLock.is_admin;
-        adminLock.displayLock();
-        adminLock.lock_handler(adminLock.is_admin);
     }
 
     return my;

@@ -5,7 +5,7 @@ from rest_framework.routers import DefaultRouter
 
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
-from archive.ajax import DatasetViewSet
+from archive.ajax import DatasetViewSet, MethodOutputViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
 from fleet.ajax import RunToProcessViewSet
 from portal.forms import *
@@ -15,15 +15,16 @@ from django.contrib import admin
 admin.autodiscover()
 
 router = DefaultRouter()
-router.register(r'datatypes', DatatypeViewSet)
+router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
+router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
-router.register(r'methodfamilies', MethodFamilyViewSet)
-router.register(r'methods', MethodViewSet)
 router.register(r'datasets', DatasetViewSet)
+router.register(r'datatypes', DatatypeViewSet)
+router.register(r'methodfamilies', MethodFamilyViewSet)
+router.register(r'methodoutputs', MethodOutputViewSet)
+router.register(r'methods', MethodViewSet)
 router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
-router.register(r'coderesources', CodeResourceViewSet)
-router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'runs', RunToProcessViewSet)
 
 urlpatterns = patterns(

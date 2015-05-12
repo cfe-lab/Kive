@@ -21,5 +21,6 @@ doc/*.dvi
 doc/*.pdf
 *.log
 /.idea/
+kive/.settings/org.eclipse.core.resources.prefs
 .DS_Store
 
