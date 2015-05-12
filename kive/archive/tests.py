@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
+from django.core.urlresolvers import reverse, resolve
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -27,11 +28,11 @@ from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
 import sandbox.testing_utils as tools
-import archive.views
+import archive.ajax
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
-from metadata.models import everyone_group
+from metadata.models import everyone_group, kive_user
 
 
 def create_archive_test_environment(case):
@@ -3827,92 +3828,73 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 class DatasetApiTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.kive_user = User.objects.all()[0]
+        self.kive_user = kive_user()
+
+        self.dataset_list_path = reverse("dataset-list")
+        # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
+        self.dataset_list_view, _, __ = resolve(self.dataset_list_path)
 
     def tearDown(self):
         for d in Dataset.objects.all():
             d.dataset_file.delete()
 
     def test_dataset_index(self):
-        request = self.factory.get('/api/datasets/')
-        response = archive.views.api_dataset_home(request).render()
+        """
+        Test that the API URL is correctly defined and requires a logged-in user.
+        """
+        # First try to access while not logged in.
+        self.assertEquals(self.dataset_list_path, "/api/datasets/")
+        request = self.factory.get(self.dataset_list_path)
+        response = self.dataset_list_view(request).render()
+        self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
 
-        self.assertEquals(
-            json.loads(response.content)['detail'],
-            "Authentication credentials were not provided.")
+        # Now log in and check that "detail" is not passed in the response.
+        force_authenticate(request, user=self.kive_user)
+        response = self.dataset_list_view(request).render()
+        self.assertNotIn('detail', response.data)
+
+    def test_dataset_list(self, expected_entries=0):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.dataset_list_path)
+        response = self.dataset_list_view(request).render()
+        self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
 
         force_authenticate(request, user=self.kive_user)
+        resp = self.dataset_list_view(request).render().data
 
-        response = archive.views.api_dataset_home(request).render()
-        self.assertNotIn('detail', json.loads(response.content))
-
-    def test_dataset_list(self, expected_pages=0):
-        request = self.factory.get('/api/datasets/get-datasets/')
-        response = archive.views.api_get_datasets(request).render()
-
-        self.assertEquals(
-            json.loads(response.content)['detail'],
-            "Authentication credentials were not provided.")
-
-        force_authenticate(request, user=self.kive_user)
-        resp = json.loads(archive.views.api_get_datasets(request).render().content)
-
-        if expected_pages == 0:
-            self.assertEquals(resp['next'], None)
-        else:
-            def goto_nextpage(next, page):
-                if next is None:
-                    return 1
-
-                next_request = self.factory.get(next)
-                force_authenticate(next_request, user=self.kive_user)
-                res = json.loads(archive.views.api_get_datasets(next_request, page + 1).render().content)
-
-                return goto_nextpage(res['next'], page + 1) + 1
-
-            self.assertNotEquals(resp['next'], None)
-            pages = goto_nextpage(resp['next'], 0)
-
-            self.assertEquals(pages, expected_pages)
+        self.assertEquals(len(resp), expected_entries)
 
     def test_dataset_add(self):
-        with tempfile.TemporaryFile() as f:
-            data = ','.join(map(str, range(100)))
-            f.write(data)
-            for _ in xrange(105):
-                f.seek(0)
-                request = self.factory.post('/api/datasets/add-dataset/', {
-                    'name': "My cool file %d" % _,
-                    'description': 'A really cool file',
-                    'compound_datatype': '__raw__',
-                    'dataset_file': f
-                })
-                response = archive.views.api_dataset_add(request).render()
+        """
+        Test adding a Dataset via the API.
+        """
+        num_cols = 100
+        num_files = 105
 
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            for _ in xrange(num_files):
+                f.seek(0)
+                request = self.factory.post(
+                    self.dataset_list_path,
+                    {
+                        'name': "My cool file %d" % _,
+                        'description': 'A really cool file',
+                        'compound_datatype': '__raw__',
+                        'dataset_file': f
+                    }
+                )
+                response = self.dataset_list_view(request).render()
                 self.assertEquals(
-                    json.loads(response.content)['detail'],
+                    response.data['detail'],
                     "Authentication credentials were not provided.")
 
                 force_authenticate(request, user=self.kive_user)
-                resp = json.loads(archive.views.api_dataset_add(request).render().content)
-
-                self.assertEquals(resp['dataset']['name'], "My cool file %d" % _)
-
+                resp = self.dataset_list_view(request).render().data
+                self.assertEquals(resp['name'], "My cool file %d" % _)
             f.close()
-            self.test_dataset_list(expected_pages=2)
 
-    def test_get_cdt(self):
-        request = self.factory.get('')
-        view = metadata.ajax.CompoundDatatypeViewSet.as_view({'get': 'list'})
-        response = view(request, pk=None)
-
-        self.assertEquals(response.status_code, 403)
-
-        force_authenticate(request, user=self.kive_user)
-
-        response = view(request, pk=None)
-        result = json.loads(response.rendered_content)
-
-        self.assertEquals(len(result), 4)
-        self.assertEquals(map(lambda c: c['id'], result), range(1, 5))
-        self.assertEquals(map(lambda c: len(c['representation']) > 0, result), [True]*4)
+        self.test_dataset_list(expected_entries=num_files)

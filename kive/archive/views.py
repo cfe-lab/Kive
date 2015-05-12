@@ -98,6 +98,7 @@ def dataset_view(request, dataset_id):
     c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
     return HttpResponse(t.render(c))
 
+
 def _build_raw_viewer(request, file, name, download=None):
     t = loader.get_template("archive/raw_view.html")
     c = RequestContext(request, {"file": file, "name": name, 'download': download})
@@ -116,6 +117,7 @@ def stdout_download(request, methodoutput_id):
 
     return _build_download_response(methodoutput.output_log)
 
+
 @login_required
 def stdout_view(request, methodoutput_id):
     """
@@ -128,6 +130,7 @@ def stdout_view(request, methodoutput_id):
 
     return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url())
 
+
 @login_required
 def stderr_download(request, methodoutput_id):
     """
@@ -139,6 +142,7 @@ def stderr_download(request, methodoutput_id):
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
     return _build_download_response(methodoutput.error_log)
+
 
 @login_required
 def stderr_view(request, methodoutput_id):

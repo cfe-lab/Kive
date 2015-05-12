@@ -7,8 +7,11 @@ import re
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
+from django.core.urlresolvers import reverse, resolve
 
-from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group, kive_user
 from method.models import CodeResourceRevision
 from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
@@ -2600,3 +2603,45 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertEqual(t4, [[], [int_fail], [float_fail], [], [rna_fail]])
         self.assertEqual(t5, [[], [int_fail], [float_fail], [bool_fail], []])
 
+
+class CompoundDatatypeAPITests(TestCase):
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.kive_user = kive_user()
+
+        self.CDT_list_path = reverse("compounddatatype-list")
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.CDT_list_view, _, __ = resolve(self.CDT_list_path)
+
+    def test_CDT_index(self):
+        """
+        Test that the API URL is correctly defined and requires a logged-in user.
+        """
+        # First try to access while not logged in.
+        self.assertEquals(self.CDT_list_path, "/api/compounddatatypes/")
+        request = self.factory.get(self.CDT_list_path)
+        response = self.CDT_list_view(request).render()
+        self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
+
+        # Now log in and check that "detail" is not passed in the response.
+        force_authenticate(request, user=self.kive_user)
+        response = self.CDT_list_view(request).render()
+        self.assertNotIn('detail', response.data)
+
+    def test_CDT_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.CDT_list_path)
+        response = self.CDT_list_view(request, pk=None)
+        self.assertEquals(response.status_code, 403)
+
+        force_authenticate(request, user=self.kive_user)
+        response = self.CDT_list_view(request, pk=None)
+        result = response.data
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 4)
+        self.assertEquals(map(lambda c: c['id'], response.data), range(1, 5))
+        self.assertEquals(map(lambda c: len(c['representation']) > 0, response.data), [True]*4)

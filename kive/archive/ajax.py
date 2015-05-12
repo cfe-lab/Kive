@@ -88,6 +88,7 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
 
         return _build_download_response(dataset.dataset_file)
 
+
 class MethodOutputViewSet(ReadOnlyModelViewSet):
     """ List and redact method output records.
     
@@ -143,6 +144,7 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                                                       return_code=True)
         return Response(summarize_redaction_plan(redaction_plan))
 
+
 @login_required
 @user_passes_test(admin_check)
 @require_POST
@@ -175,6 +177,7 @@ def remove_run(request, run_id):
     run.remove()
 
     return HttpResponse()
+
 
 @login_required
 @user_passes_test(admin_check)
@@ -248,6 +251,7 @@ def stdout_redact(request, methodoutput_id):
     
     methodoutput.redact_output_log()
     return _build_run_outputs_response(methodoutput.execlog.record.parent_run)
+
 
 @login_required
 @user_passes_test(admin_check)
