@@ -17,8 +17,10 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.contrib.contenttypes.management import update_all_contenttypes
 
+from rest_framework.test import APIRequestFactory, force_authenticate
+
 from constants import datatypes
-from metadata.models import CompoundDatatype, Datatype, everyone_group
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
@@ -2903,3 +2905,11 @@ with open(outfile, "wb") as f:
         self.assertNotEqual(first_step_1.execrecord, first_step_2.execrecord)
         self.assertNotEqual(second_step_1.execrecord, second_step_2.execrecord)
         self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
+
+
+class CodeResourceApiTests(TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
