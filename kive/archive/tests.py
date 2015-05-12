@@ -4,7 +4,6 @@ Shipyard archive application unit tests.
 
 import os
 import re
-import json
 import tempfile
 
 from django.contrib.auth.models import User
@@ -28,7 +27,6 @@ from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
 import sandbox.testing_utils as tools
-import archive.ajax
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
@@ -3832,7 +3830,7 @@ class DatasetApiTests(TestCase):
 
         self.dataset_list_path = reverse("dataset-list")
         # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
-        self.dataset_list_view, _, __ = resolve(self.dataset_list_path)
+        self.dataset_list_view, _, _ = resolve(self.dataset_list_path)
 
     def tearDown(self):
         for d in Dataset.objects.all():
@@ -3858,8 +3856,6 @@ class DatasetApiTests(TestCase):
         Test the API list view.
         """
         request = self.factory.get(self.dataset_list_path)
-        response = self.dataset_list_view(request).render()
-        self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
 
         force_authenticate(request, user=self.kive_user)
         resp = self.dataset_list_view(request).render().data
@@ -3870,8 +3866,8 @@ class DatasetApiTests(TestCase):
         """
         Test adding a Dataset via the API.
         """
-        num_cols = 100
-        num_files = 105
+        num_cols = 12
+        num_files = 2
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
@@ -3887,14 +3883,9 @@ class DatasetApiTests(TestCase):
                         'dataset_file': f
                     }
                 )
-                response = self.dataset_list_view(request).render()
-                self.assertEquals(
-                    response.data['detail'],
-                    "Authentication credentials were not provided.")
 
                 force_authenticate(request, user=self.kive_user)
                 resp = self.dataset_list_view(request).render().data
                 self.assertEquals(resp['name'], "My cool file %d" % _)
-            f.close()
 
         self.test_dataset_list(expected_entries=num_files)
