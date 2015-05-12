@@ -663,11 +663,11 @@
     {
         "fields": {
             "execlog": 1, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 0, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": ""
         }, 
         "model": "archive.methodoutput", 
@@ -676,11 +676,11 @@
     {
         "fields": {
             "execlog": 2, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 1, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": ""
         }, 
         "model": "archive.methodoutput", 
@@ -689,11 +689,11 @@
     {
         "fields": {
             "execlog": 3, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 0, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": ""
         }, 
         "model": "archive.methodoutput", 

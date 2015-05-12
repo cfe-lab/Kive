@@ -400,11 +400,11 @@
     {
         "fields": {
             "execlog": 2, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 0, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "Logs/step1_stderr.txt", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": "Logs/step1_stdout.txt"
         }, 
         "model": "archive.methodoutput", 
@@ -413,11 +413,11 @@
     {
         "fields": {
             "execlog": 5, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 0, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "Logs/step1_stderr_x92E5QF.txt", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": "Logs/step1_stdout_D2m5B8B.txt"
         }, 
         "model": "archive.methodoutput", 
@@ -426,11 +426,11 @@
     {
         "fields": {
             "execlog": 7, 
-            "_output_redacted": false, 
+            "output_redacted": false, 
             "return_code": 0, 
-            "_error_redacted": false, 
+            "error_redacted": false, 
             "error_log": "Logs/step2_stderr.txt", 
-            "_code_redacted": false, 
+            "code_redacted": false, 
             "output_log": "Logs/step2_stdout.txt"
         }, 
         "model": "archive.methodoutput", 
