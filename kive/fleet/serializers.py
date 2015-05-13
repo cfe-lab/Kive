@@ -13,6 +13,7 @@ class RunToProcessSerializer(serializers.ModelSerializer):
         model = RunToProcess
         fields = ('id', 'url', 'run', 'run_status', 'run_outputs', 'removal_plan')
 
+
 class RunToProcessOutputsSerializer(serializers.ModelSerializer):
     run = RunOutputsSerializer()
     

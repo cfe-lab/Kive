@@ -13,7 +13,7 @@ from archive.serializers import DatasetSerializer, MethodOutputSerializer
 from archive.models import Dataset, MethodOutput, Run, summarize_redaction_plan
 from archive.views import _build_download_response
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, RedactModelMixin,\
-    IsGrantedReadOnly
+    IsGrantedReadOnly, IsGrantedReadCreate
 from librarian.models import SymbolicDataset
 from metadata.models import deletion_order
 from portal.views import admin_check
@@ -52,7 +52,7 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
     """
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
-    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
 
     def filter_granted(self, queryset):
         """ Filter a queryset to only include records explicitly granted.
@@ -154,7 +154,6 @@ def remove_run(request, run_id):
     """
     if not request.is_ajax():
         raise Http404
-
     try:
         run = Run.objects.get(pk=run_id)
     except Run.DoesNotExist:
@@ -175,69 +174,7 @@ def remove_run(request, run_id):
         return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
     
     run.remove()
-
     return HttpResponse()
-
-
-@login_required
-@user_passes_test(admin_check)
-@require_POST
-def dataset_redact(request, dataset_id):
-    """
-    Redact the file associated with the dataset.
-    """
-    if not request.is_ajax():
-        raise Http404
-
-    try:
-        dataset = Dataset.objects.get(pk=dataset_id)
-    except Dataset.DoesNotExist:
-        raise Http404("ID {} cannot be accessed".format(dataset_id))
-    
-    if _is_dry_run(request):
-        plan = dataset.symbolicdataset.build_redaction_plan()
-        runs = {exec_record.generator.record.top_level_run for exec_record in plan['ExecRecords']}
-
-        summary = "This will redact {} data sets and {} logs from {} runs.".format(
-            len(plan['SymbolicDatasets']),
-            len(plan['OutputLogs']) + len(plan['ErrorLogs']),
-            len(runs))
-        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
-    
-    dataset.symbolicdataset.redact()
-
-    return _build_run_outputs_response(dataset.created_by.parent_run)
-
-
-@login_required
-@user_passes_test(admin_check)
-@require_POST
-def dataset_remove(request, dataset_id):
-    """
-    Redact the file associated with the dataset.
-    """
-    if not request.is_ajax():
-        raise Http404
-
-    try:
-        dataset = Dataset.objects.get(pk=dataset_id)
-    except Dataset.DoesNotExist:
-        raise Http404("ID {} cannot be accessed".format(dataset_id))
-
-    if _is_dry_run(request):
-        plan = dataset.symbolicdataset.build_removal_plan()
-        runs = {exec_record.generator.record.top_level_run for exec_record in plan['ExecRecords']}
-
-        # summary = "This will remove {} data sets and {} logs from {} runs.".format(
-        summary = "This will remove {} data sets and {} runs.".format(
-            len(plan['SymbolicDatasets']),
-            # len(plan['OutputLogs']) + len(plan['ErrorLogs']),
-            len(runs))
-        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
-
-    dataset.symbolicdataset.remove()
-
-    return _build_run_outputs_response(dataset.created_by.parent_run)
 
 
 @login_required

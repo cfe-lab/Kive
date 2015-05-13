@@ -8,11 +8,19 @@ from rest_framework.response import Response
 from fleet.models import RunToProcess
 from fleet.serializers import RunToProcessSerializer,\
     RunToProcessOutputsSerializer
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet
 from librarian.models import SymbolicDataset
-from sandbox.ajax import load_status
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 from sandbox.views import RunSubmissionError
+import fleet
+
+from datetime import timedelta, datetime
+from django.utils import timezone
+from django.db.models import Q
+
+from exceptions import KeyError
+from fleet.models import RunToProcessInput
+from rest_framework.reverse import reverse
 
 
 class RunToProcessViewSet(RemovableModelViewSet):
@@ -49,7 +57,7 @@ class RunToProcessViewSet(RemovableModelViewSet):
     
     queryset = RunToProcess.objects.all()
     serializer_class = RunToProcessSerializer
-    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
 
     def create(self, request):
         """
@@ -103,13 +111,48 @@ class RunToProcessViewSet(RemovableModelViewSet):
     
     @list_route(methods=['get'], suffix='Status List')
     def status(self, request):
-        runs, has_more = load_status(request)
-        return Response({ 'runs': runs, 'has_more': has_more })
+        runs = self.get_queryset().order_by('-time_queued')
+
+        i = 0
+        while True:
+            key = request.GET.get('filters[{}][key]'.format(i))
+            if key is None:
+                break
+            value = request.GET.get('filters[{}][val]'.format(i))
+            runs = self._add_run_filter(runs, key, value)
+            i += 1
+
+        runs = self._build_rtp_prefetch(runs)
+
+        LIMIT = 30
+        has_more = False
+        report = []
+        for i, run in enumerate(runs[:LIMIT + 1]):
+            if i == LIMIT:
+                has_more = True
+                break
+            progress = run.get_run_progress()
+            progress['url'] = reverse('runtoprocess-detail',
+                                      kwargs={'pk': run.pk},
+                                      request=request)
+            progress['removal_plan'] = reverse('runtoprocess-removal-plan',
+                                               kwargs={'pk': run.pk},
+                                               request=request)
+            report.append(progress)
+
+        return Response({'runs': report, 'has_more': has_more})
 
     @detail_route(methods=['get'], suffix='Status')
     def run_status(self, request, pk=None):
-        run, _ = load_status(request, pk)
-        return Response(run)
+        runs = fleet.models.RunToProcess.objects.filter(pk=pk)
+        runs = self._build_rtp_prefetch(runs)
+        run = runs.first()
+
+        progress = None
+        if run is not None:
+            progress = run.get_run_progress(True)
+
+        return Response(progress)
 
     @detail_route(methods=['get'], suffix='Outputs')
     def run_outputs(self, request, pk=None):
@@ -117,3 +160,45 @@ class RunToProcessViewSet(RemovableModelViewSet):
         return Response(RunToProcessOutputsSerializer(
             rtp,
             context={'request': request}).data)
+
+    @staticmethod
+    def _build_rtp_prefetch(runs):
+        return runs.prefetch_related('pipeline__steps',
+                                     'run__runsteps__log',
+                                     'run__runsteps__pipelinestep__cables_in',
+                                     'run__runsteps__pipelinestep__transformation__method',
+                                     'run__runsteps__pipelinestep__transformation__pipeline',
+                                     'run__pipeline__outcables__poc_instances__run',
+                                     'run__pipeline__outcables__poc_instances__log',
+                                     'run__pipeline__steps')
+
+    @staticmethod
+    def _add_run_filter(runs, key, value):
+        if key == 'active':
+            recent_time = timezone.now() - timedelta(minutes=5)
+            old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
+                'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
+            return runs.filter(
+                Q(run_id__isnull=True)|
+                Q(run__end_time__isnull=True)|
+                Q(run__end_time__gte=recent_time)).distinct().exclude(
+                pk__in=old_aborted_runs)
+        if key == 'name':
+            runs_with_matching_inputs = RunToProcessInput.objects.filter(
+                symbolicdataset__dataset__name__icontains=value).values(
+                    'runtoprocess_id')
+            return runs.filter(
+                Q(pipeline__family__name__icontains=value)|
+                Q(id__in=runs_with_matching_inputs))
+        if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
+            t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
+                                    timezone.get_current_timezone())
+            if key == 'startafter':
+                return runs.filter(run__start_time__gte=t)
+            if key == 'startbefore':
+                return runs.filter(run__start_time__lte=t)
+            if key == 'endafter':
+                return runs.filter(run__end_time__gte=t)
+            if key == 'endbefore':
+                return runs.filter(run__end_time__lte=t)
+        raise KeyError(key)

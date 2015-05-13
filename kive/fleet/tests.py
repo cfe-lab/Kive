@@ -1,11 +1,19 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils.dateparse import parse_datetime
+from django.core.urlresolvers import reverse, resolve
+
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from sandbox.tests import ExecuteTestsBase
+from sandbox.execute import Sandbox
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
 from fleet.models import RunToProcess, RunToProcessInput
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline
+from metadata.models import CompoundDatatype
+from archive.models import Dataset
 
 
 class RunToProcessTest(TestCase):
@@ -222,26 +230,16 @@ class RunToProcessTest(TestCase):
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
                                  display_name)
 
-from sandbox.tests import ExecuteTestsBase
-import json
-from rest_framework.test import APIRequestFactory, force_authenticate
-from fleet.models import RunToProcess
-from sandbox.execute import Sandbox
-from archive.models import Dataset
-from metadata.models import CompoundDatatype
-from django.core.urlresolvers import reverse, resolve
-
 
 class RunApiTests(ExecuteTestsBase):
-
     def setUp(self):
-        self.factory = APIRequestFactory()
+        super(RunApiTests, self).setUp()
+
         self.kive_user = User.objects.all()[0]
 
+        self.factory = APIRequestFactory()
         self.run_list_path = reverse('runtoprocess-list')
         self.run_list_view, _, _ = resolve(self.run_list_path)
-
-        super(RunApiTests, self).setUp()
 
     def tearDown(self):
         for d in Dataset.objects.all():
@@ -250,7 +248,7 @@ class RunApiTests(ExecuteTestsBase):
 
     def setup_pipeline(self):
         # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X", user=self.kive_user)
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X", user=self.myUser)
         self.pX.save()
         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
         self.step_X1 = self.pX.steps.create(transformation=self.mA, step_num=1)
@@ -270,7 +268,7 @@ class RunApiTests(ExecuteTestsBase):
         self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
 
         # Define CDT for the second output (first output is defined by a trivial cable)
-        self.pipeline_out2_cdt = CompoundDatatype(user=self.kive_user)
+        self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
         self.pipeline_out2_cdt.save()
         self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
         self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
@@ -297,23 +295,30 @@ class RunApiTests(ExecuteTestsBase):
             data['detail'],
             "Authentication credentials were not provided.")
 
-        force_authenticate(request, user=self.kive_user)
+        force_authenticate(request, user=self.myUser)
         response = self.run_list_view(request).render()
         data = response.render().data
 
         self.assertEquals(len(data), expected_runs)
+        for run in data:
+            self.assertIn('id', run)
+            self.assertIn('removal_plan', run)
+            self.assertIn('run_status', run)
 
-    def test_pipeline_execute_and_details(self):
+    def test_pipeline_execute_plus_details_and_run_remove(self):
+        # TODO: This should be split into one test to test the pipeline execution
+        # Plus many tests to test details (which needs a proper fixture)
         self.setup_pipeline()
 
         # Kick off the run
         request = self.factory.post(self.run_list_path, {'pipeline': self.pX.id, 'input_1': self.symDS.id})
-        force_authenticate(request, user=self.kive_user)
+        force_authenticate(request, user=self.myUser)
         response = self.run_list_view(request).render()
         data = response.render().data
 
         # Check that the run created something sensible
-        print "Runlust: %s" % data
+        self.assertEquals(data['id'], 1)
+        self.assertIn('run_outputs', data)
 
         # Execute the pipeline
         rtp = RunToProcess.objects.all()[0]
@@ -321,31 +326,61 @@ class RunApiTests(ExecuteTestsBase):
         rtp.run = sbox.run
         rtp.save()
         sbox.execute_pipeline()
-#
-#         request = self.factory.get(content['run']['run_status'])
-#         force_authenticate(request, user=self.myUser)
-#         response = sandbox.views.api_poll_run_progress(request, rtp.id).render()
-#         content = json.loads(response.content)
-#
-#         self.assertEquals(content['run']['status'], '**-**')
-#
-#         request = self.factory.get(content['results'])
-#         force_authenticate(request, user=self.myUser)
-#         response = sandbox.views.api_get_run_results(request, rtp.id).render()
-#         content = json.loads(response.content)
-#
-#         self.assertEquals(len(content['results']), 2)
+
+        # Test and make sure we have a dataset now
+        self.test_run_index(1)
+
+        # Touch the record detail page
+        path = self.run_list_path + "1/"
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.myUser)
+        view, args, kwargs = resolve(path)
+        response = view(request, *args, **kwargs)
+        data = response.render().data
+
+        # Touch the run status page
+        path = self.run_list_path + "1/run_status/"
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.myUser)
+        view, args, kwargs = resolve(path)
+        response = view(request, *args, **kwargs)
+        data = response.render().data
+        self.assertEquals(data['status'], '**-**')
+        self.assertIn('step_progress', data)
+
+        # Touch the outputs
+        path = self.run_list_path + "1/run_outputs/"
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.myUser)
+        view, args, kwargs = resolve(path)
+        response = view(request, *args, **kwargs)
+        data = response.render().data
+        self.assertEquals(data['id'], 1)
+        self.assertEquals(len(data['run']['output_summary']), 8)
+
+        for output in data['run']['output_summary']:
+            self.assertEquals(output['is_ok'], True)
+            self.assertEquals(output['is_invalid'], False)
+
+        # Touch the removal plan
+        path = self.run_list_path + "1/removal_plan/"
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.myUser)
+        view, args, kwargs = resolve(path)
+        response = view(request, *args, **kwargs)
+        data = response.render().data
+
+        self.assertEquals(data['SymbolicDatasets'], 3)
+        self.assertEquals(data['Runs'], 1)
+        self.assertEquals(data['Datatypes'], 0)
+
+        # Delete the record
+        path = self.run_list_path + "1/"
+        request = self.factory.delete(path)
+        force_authenticate(request, user=self.kive_user)
+        view, args, kwargs = resolve(path)
+        response = view(request, *args, **kwargs)
+        self.assertEquals(response.render().data, None)
+        self.test_run_index(0)
 
 
-    # Todo: Move to pipeline test
-    # def test_pipeline_list(self):
-    #     self.setup_pipeline()
-    #
-    #     request = self.factory.get('/api/pipelines/get-pipelines/')
-    #     force_authenticate(request, user=self.myUser)
-    #
-    #     response = sandbox.views.api_get_pipelines(request).render()
-    #     content = json.loads(response.content)
-    #     self.assertNotIn('detail', content)
-    #
-    #     self.assertEquals(len(content['families']), 1)

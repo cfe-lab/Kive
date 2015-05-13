@@ -25,6 +25,25 @@ class IsGrantedReadOnly(permissions.BasePermission):
             return True
         return obj.can_be_accessed(request.user)
 
+
+class IsGrantedReadCreate(permissions.BasePermission):
+    """ Custom permission for Read/Write resources like datasets.
+
+    All authenticated users can see instances they have been allowed access to
+    either because they own them, they are in users_allowed, or they are in
+    groups_allowed.
+    """
+    def has_permission(self, request, view):
+        return (admin_check(request.user) or
+                request.method in permissions.SAFE_METHODS or
+                request.method == "POST")
+
+    def has_object_permission(self, request, view, obj):
+        if admin_check(request.user):
+            return True
+        return obj.can_be_accessed(request.user)
+
+
 class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
     """ Custom permission for developer resources like code
     
@@ -33,11 +52,13 @@ class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
     they are in users_allowed, or they are in groups_allowed.
     """
     def has_permission(self, request, view):
+        print permissions.SAFE_METHODS
         if admin_check(request.user):
             return True
         if request.method in permissions.SAFE_METHODS:
             return True
         return developer_check(request.user) and request.method == 'POST'
+
 
 class GrantedModelMixin(object):
     """ Filter instances that the user has been granted access to.
@@ -67,6 +88,7 @@ class GrantedModelMixin(object):
         """
         return AccessControl.filter_by_user(self.request.user,
                                             queryset=queryset)
+
 
 class RedactModelMixin(object):
     """ Redacts a model instance and build a redaction plan.
