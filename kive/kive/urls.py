@@ -114,5 +114,4 @@ urlpatterns = patterns(
     # Urls for django-rest-framework
     url(r'^api/', include(router.urls), name='api_home'),
     url(r'^api/auth/$', 'portal.views.api_auth', name='api_auth'),
-    url(r'^api/token-auth/', views.obtain_auth_token),
 )

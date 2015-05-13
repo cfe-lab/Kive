@@ -20,6 +20,7 @@ from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
+from metadata.models import CompoundDatatype
 
 import librarian.tests
 import metadata.tests
@@ -3824,13 +3825,30 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
 
 class DatasetApiTests(TestCase):
+
     def setUp(self):
+        num_cols = 12
+
         self.factory = APIRequestFactory()
         self.kive_user = kive_user()
 
         self.dataset_list_path = reverse("dataset-list")
         # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
         self.dataset_list_view, _, _ = resolve(self.dataset_list_path)
+
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            f.seek(0)
+            self.test_dataset = SymbolicDataset.create_SD(file_path=None, user=self.kive_user,
+                                                          users_allowed=None,
+                                                          groups_allowed=None,
+                                                          cdt=None,
+                                                          make_dataset=True, name="Test dataset",
+                                                          description="Test data for a test that tests test data",
+                                                          created_by=None, check=True, file_handle=f)
+            self.test_dataset_path = "{}{}/".format(self.dataset_list_path, self.test_dataset.id)
+            self.n_prexisting_datasets = 1
 
     def tearDown(self):
         for d in Dataset.objects.all():
@@ -3860,7 +3878,7 @@ class DatasetApiTests(TestCase):
         force_authenticate(request, user=self.kive_user)
         resp = self.dataset_list_view(request).render().data
 
-        self.assertEquals(len(resp), expected_entries)
+        self.assertEquals(len(resp), expected_entries + self.n_prexisting_datasets)
 
     def test_dataset_add(self):
         """
@@ -3872,12 +3890,12 @@ class DatasetApiTests(TestCase):
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
             f.write(data)
-            for _ in xrange(num_files):
+            for i in xrange(num_files):
                 f.seek(0)
                 request = self.factory.post(
                     self.dataset_list_path,
                     {
-                        'name': "My cool file %d" % _,
+                        'name': "My cool file %d" % i,
                         'description': 'A really cool file',
                         'compound_datatype': '__raw__',
                         'dataset_file': f
@@ -3886,6 +3904,51 @@ class DatasetApiTests(TestCase):
 
                 force_authenticate(request, user=self.kive_user)
                 resp = self.dataset_list_view(request).render().data
-                self.assertEquals(resp['name'], "My cool file %d" % _)
+                self.assertEquals(resp['name'], "My cool file %d" % i)
 
         self.test_dataset_list(expected_entries=num_files)
+
+    def test_dataset_removal_plan(self):
+        path = self.test_dataset_path + "removal_plan/"
+
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.kive_user)
+        removal_plan_view, args, kwargs = resolve(path)
+
+        response = removal_plan_view(request, *args, **kwargs)
+        data = response.render().data
+
+        self.assertEquals(data['SymbolicDatasets'], 1)
+        self.assertEquals(data['CompoundDatatypes'], 0)
+
+    def test_dataset_removal(self):
+        request = self.factory.delete(self.test_dataset_path)
+        force_authenticate(request, user=self.kive_user)
+
+        removal_view, args, kwargs = resolve(self.test_dataset_path)
+        response = removal_view(request, *args, **kwargs)
+        data = response.render().data
+
+        self.assertEquals(data, None)
+
+    def test_dataset_redaction_plan(self):
+        path = self.test_dataset_path + "redaction_plan/"
+
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.kive_user)
+        redaction_plan_view, args, kwargs = resolve(path)
+
+        response = redaction_plan_view(request, *args, **kwargs)
+        data = response.render().data
+
+        self.assertEquals(data['SymbolicDatasets'], 1)
+        self.assertEquals(data['CompoundDatatypes'], 0)
+
+    def test_dataset_redaction_plan(self):
+        request = self.factory.patch(self.test_dataset_path, {"is_redacted": True})
+        force_authenticate(request, user=self.kive_user)
+
+        redaction_view, args, kwargs = resolve(self.test_dataset_path)
+        response = redaction_view(request, *args, **kwargs)
+        data = response.render().data
+        self.assertEquals(data['message'], "Object redacted.")
