@@ -221,3 +221,89 @@ class RunToProcessTest(TestCase):
 
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
                                  display_name)
+
+#TODO: Convert this test to use the new API to request a run.
+# class SandboxApiTests(ExecuteTestsBase):
+# 
+#     def setUp(self):
+#         self.factory = APIRequestFactory()
+#         self.kive_user = User.objects.all()[0]
+#         super(SandboxApiTests, self).setUp()
+# 
+#     def tearDown(self):
+#         for d in Dataset.objects.all():
+#             d.dataset_file.delete()
+#         super(SandboxApiTests, self).tearDown()
+# 
+#     def setup_pipeline(self):
+#         # Define pipeline containing two steps with the same method + pipeline input
+#         self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
+#         self.pX.save()
+#         self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
+#         self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
+#         self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
+# 
+#         # Use the SAME custom cable from pipeline input to steps 1 and 2
+#         self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
+#         self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+#         self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+#         self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
+#         self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
+#         self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+# 
+#         # POCs: one is trivial, the second uses custom outwires
+#         # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
+#         self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
+#         self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
+# 
+#         # Define CDT for the second output (first output is defined by a trivial cable)
+#         self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
+#         self.pipeline_out2_cdt.save()
+#         self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
+#         self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
+#         self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
+# 
+#         # Second cable is not a trivial - we assign the new CDT to it
+#         self.outcable_2.output_cdt = self.pipeline_out2_cdt
+#         self.outcable_2.save()
+# 
+#         # Define custom outwires to the second output (Wire twice from cdtm 2)
+#         self.outwire1 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.out2_cdtm_1)
+#         self.outwire2 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_2)
+#         self.outwire3 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_3)
+# 
+#         # Have the cables define the TOs of the pipeline
+#         self.pX.create_outputs()
+# 
+# 
+#     def test_pipeline_execute(self):
+#         self.fail('Test needs to be reimplemented with new API')
+#         self.setup_pipeline()
+#  
+#         # TODO: This test should really go more in depth to the structure
+#         # of the data it expects...
+#  
+#         request = self.factory.post('/api/pipelines/start-run/', {'pipeline': self.pX.id, 'input_1': self.symDS.id})
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_run_pipeline(request).render()
+#         content = json.loads(response.content)
+#  
+#         rtp = RunToProcess.objects.all()[0]
+#         sbox = Sandbox(rtp.user, rtp.pipeline, [x.symbolicdataset for x in rtp.inputs.order_by("index")])
+#         rtp.run = sbox.run
+#         rtp.save()
+#         sbox.execute_pipeline()
+#  
+#         request = self.factory.get(content['run']['run_status'])
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_poll_run_progress(request, rtp.id).render()
+#         content = json.loads(response.content)
+#  
+#         self.assertEquals(content['run']['status'], '**-**')
+#  
+#         request = self.factory.get(content['results'])
+#         force_authenticate(request, user=self.myUser)
+#         response = sandbox.views.api_get_run_results(request, rtp.id).render()
+#         content = json.loads(response.content)
+#  
+#         self.assertEquals(len(content['results']), 2)

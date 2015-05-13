@@ -15,7 +15,7 @@ from django.contrib.contenttypes.management import update_all_contenttypes
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.management import call_command
-from django.core.urlresolvers import reverse, resolve
+from django.core.urlresolvers import resolve
 
 from django.test import TestCase, TransactionTestCase
 from rest_framework import status
