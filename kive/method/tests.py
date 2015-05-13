@@ -15,21 +15,24 @@ from django.contrib.contenttypes.management import update_all_contenttypes
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.management import call_command
-from django.core.urlresolvers import resolve
+from django.core.urlresolvers import reverse, resolve
+
 from django.test import TestCase, TransactionTestCase
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+
 from constants import datatypes
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import librarian.models
-from metadata.models import CompoundDatatype, Datatype, everyone_group,\
-    kive_user
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
 import sandbox.testing_utils as tools
 import sandbox.execute
+from kive.tests import ApiTestCase
+
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
@@ -2909,6 +2912,7 @@ with open(outfile, "wb") as f:
         self.assertNotEqual(second_step_1.execrecord, second_step_2.execrecord)
         self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
 
+
 class MethodFamilyApiTests(TestCase):
     fixtures = ['demo']
     
@@ -2975,3 +2979,45 @@ class MethodFamilyApiTests(TestCase):
         end_count = MethodFamily.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
 
+
+class CodeResourceApiTests(ApiTestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        ApiTestCase.setUp(self)
+
+        self.model_list_path = reverse("coderesource-list")
+        self.model_list_view, _, _ = resolve(self.model_list_path)
+
+        # This user is defined in the removal fixture.
+        self.remover = User.objects.get(pk=2)
+
+    def tearDown(self):
+        pass
+
+    def test_list_url(self):
+        """
+        Test that the API list URL is correctly defined.
+        """
+        # Check that the URL is correctly defined.
+        self.assertEquals(self.model_list_path, "/api/coderesources/")
+
+    def test_list(self):
+        num_crs = CodeResource.objects.filter(user=self.remover).count()
+
+        ApiTestCase.test_list(self, expected_entries=num_crs, user=self.remover)
+
+    def test_detail(self):
+        noop_cr = CodeResource.objects.get(name="Noop")
+        cr_detail_path = reverse("coderesource-detail", kwargs={"pk": noop_cr.pk})
+        self.assertEquals(cr_detail_path, "/api/coderesources/{}/".format(noop_cr.pk))
+        cr_detail_view, _, _ = resolve(cr_detail_path)
+
+        request = self.factory.get(cr_detail_path)
+        force_authenticate(request, user=self.remover)
+        response = cr_detail_view(request, pk=noop_cr.pk)
+        detail = response.data
+
+        self.assertEquals(detail["id"], noop_cr.pk)
+        self.assertEquals(detail["num_revisions"], noop_cr.num_revisions)
+        self.assertEquals(detail["absolute_url"], noop_cr.get_absolute_url())
