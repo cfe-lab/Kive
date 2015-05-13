@@ -49,7 +49,7 @@ class FixtureBuilder(object):
             else:
                 dump_objects.append(after_object)
         
-        dump_filename = os.path.join('metadata', 'fixtures', self.get_name())
+        dump_filename = os.path.join('portal', 'fixtures', self.get_name())
         with open(dump_filename, 'w') as dump_file:
             json.dump(dump_objects, dump_file, indent=4)
             
