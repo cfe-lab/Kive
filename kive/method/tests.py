@@ -10,21 +10,26 @@ import shutil
 import tempfile
 import logging
 
+from django.contrib.auth.models import User
+from django.contrib.contenttypes.management import update_all_contenttypes
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.contrib.contenttypes.management import update_all_contenttypes
+from django.core.urlresolvers import resolve
+from django.test import TestCase, TransactionTestCase
+from rest_framework import status
+from rest_framework.reverse import reverse
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from constants import datatypes
-from metadata.models import CompoundDatatype, Datatype, everyone_group
+import librarian.models
+from metadata.models import CompoundDatatype, Datatype, everyone_group,\
+    kive_user
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
 import sandbox.testing_utils as tools
 import sandbox.execute
-import librarian.models
 
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
@@ -2903,3 +2908,70 @@ with open(outfile, "wb") as f:
         self.assertNotEqual(first_step_1.execrecord, first_step_2.execrecord)
         self.assertNotEqual(second_step_1.execrecord, second_step_2.execrecord)
         self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
+
+class MethodFamilyApiTests(TestCase):
+    fixtures = ['demo']
+    
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.kive_user = kive_user()
+
+        self.list_path = reverse("methodfamily-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("methodfamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("methodfamily-removal-plan",
+                                   kwargs={'pk': self.detail_pk})
+
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+    def test_auth(self):
+        # First try to access while not logged in.
+        request = self.factory.get(self.list_path)
+        response = self.list_view(request)
+        self.assertEquals(response.data["detail"],
+                          "Authentication credentials were not provided.")
+
+        # Now log in and check that "detail" is not passed in the response.
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+        self.assertNotIn('detail', response.data)
+
+    def test_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 7)
+        self.assertEquals(response.data[0]['name'], 'Sums and Products')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'Sums and Products')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['MethodFamilies'], 1)
+
+    def test_removal(self):
+        start_count = MethodFamily.objects.all().count()
+        
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = MethodFamily.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
+
