@@ -20,7 +20,6 @@ from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
-from metadata.models import CompoundDatatype
 
 import librarian.tests
 import metadata.tests

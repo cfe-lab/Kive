@@ -1,25 +1,22 @@
 import os
 import re
 import sys
-import json
 import tempfile
 
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.test import TestCase
-from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import MethodOutput, Dataset
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
-from fleet.models import RunToProcess
 from librarian.models import SymbolicDataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
-import sandbox.views
+
 
 class ExecuteTestsBase(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
@@ -31,16 +28,18 @@ class ExecuteTestsBase(TestCase):
         self.myUser.groups.add(everyone_group())
         self.myUser.save()
 
-        self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser); self.mf.save()
-        self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser); self.pf.save()
+        self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser)
+        self.mf.save()
+        self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser)
+        self.pf.save()
 
         # Code on file system
-        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc",filename="mA.py", user=self.myUser)
+        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc", filename="mA.py", user=self.myUser)
         self.mA_cr.save()
         self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc",
                                            user=self.myUser)
         with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.mA_crr.content_file.save("generic_script.py",File(f))
+            self.mA_crr.content_file.save("generic_script.py", File(f))
         self.mA_crr.save()
 
         # Basic DTs
@@ -50,19 +49,19 @@ class ExecuteTestsBase(TestCase):
         # Basic CDTs
         self.pX_in_cdt = CompoundDatatype(user=self.myUser)
         self.pX_in_cdt.save()
-        self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_a",column_idx=1)
-        self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt,column_name="pX_b",column_idx=2)
-        self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt,column_name="pX_c",column_idx=3)
+        self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt, column_name="pX_a", column_idx=1)
+        self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt, column_name="pX_b", column_idx=2)
+        self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt, column_name="pX_c", column_idx=3)
 
         self.mA_in_cdt = CompoundDatatype(user=self.myUser)
         self.mA_in_cdt.save()
-        self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt,column_name="a",column_idx=1)
-        self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt,column_name="b",column_idx=2)
+        self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt, column_name="a", column_idx=1)
+        self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt, column_name="b", column_idx=2)
 
         self.mA_out_cdt = CompoundDatatype(user=self.myUser)
         self.mA_out_cdt.save()
-        self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt,column_name="c",column_idx=1)
-        self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt,column_name="d",column_idx=2)
+        self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt, column_name="c", column_idx=1)
+        self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt, column_name="d", column_idx=2)
 
         self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
                                                             "input_for_test_C_twostep_with_subpipeline.csv"),
@@ -74,40 +73,41 @@ class ExecuteTestsBase(TestCase):
                                                description="input to pipeline pX")
 
         # Method + input/outputs
-        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family=self.mf, driver=self.mA_crr,
                          user=self.myUser)
         self.mA.save()
-        self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt,dataset_name="mA_in", dataset_idx=1)
-        self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
+        self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt, dataset_name="mA_in", dataset_idx=1)
+        self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
 
         # Define pipeline containing the method, and its input + outcables
         self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X",
                            user=self.myUser)
         self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
-        self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
+        self.step_X1 = self.pX.steps.create(transformation=self.mA, step_num=1)
 
         # Custom cable from pipeline input to method
-        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in, source_step=0, source=self.X1_in)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2, dest_pin=self.mA_in_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3, dest_pin=self.mA_in_cdtm_1)
 
         # Pipeline outcables
-        self.X1_outcable = self.pX.create_outcable(output_name="pX_out",output_idx=1,source_step=1,source=self.mA_out)
+        self.X1_outcable = self.pX.create_outcable(output_name="pX_out", output_idx=1, source_step=1,
+                                                   source=self.mA_out)
         self.pX.create_outputs()
 
         # Pipeline with raw input.
         pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X", user=self.myUser)
         pX_raw.save()
-        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family = self.mf, driver = self.mA_crr,
+        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family=self.mf, driver=self.mA_crr,
                         user=self.myUser)
         mA_raw.save()
         mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
-        mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt,dataset_name="mA_out", dataset_idx=1)
-        X1_in_raw = pX_raw.create_input(compounddatatype=None, dataset_name="pX_in",dataset_idx=1)
-        step_X1_raw = pX_raw.steps.create(transformation=mA_raw,step_num=1)
+        mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
+        X1_in_raw = pX_raw.create_input(compounddatatype=None, dataset_name="pX_in", dataset_idx=1)
+        step_X1_raw = pX_raw.steps.create(transformation=mA_raw, step_num=1)
         step_X1_raw.cables_in.create(dest=mA_in_raw, source_step=0, source=X1_in_raw)
-        pX_raw.create_outcable(output_name="pX_out",output_idx=1,source_step=1,source=mA_out_raw)
+        pX_raw.create_outcable(output_name="pX_out", output_idx=1, source_step=1, source=mA_out_raw)
         pX_raw.create_outputs()
 
     def tearDown(self):
@@ -504,116 +504,3 @@ class SandboxTests(ExecuteTests):
             lambda: Sandbox(self.myUser, p, [self.symDS]))
 
 
-class SandboxApiTests(ExecuteTestsBase):
-
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.kive_user = User.objects.all()[0]
-        super(SandboxApiTests, self).setUp()
-
-    def tearDown(self):
-        for d in Dataset.objects.all():
-            d.dataset_file.delete()
-        super(SandboxApiTests, self).tearDown()
-
-    def setup_pipeline(self):
-        # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
-        self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
-        self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
-        self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
-
-        # Use the SAME custom cable from pipeline input to steps 1 and 2
-        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
-        self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
-
-        # POCs: one is trivial, the second uses custom outwires
-        # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
-        self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
-        self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
-
-        # Define CDT for the second output (first output is defined by a trivial cable)
-        self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
-        self.pipeline_out2_cdt.save()
-        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
-        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
-        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
-
-        # Second cable is not a trivial - we assign the new CDT to it
-        self.outcable_2.output_cdt = self.pipeline_out2_cdt
-        self.outcable_2.save()
-
-        # Define custom outwires to the second output (Wire twice from cdtm 2)
-        self.outwire1 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.out2_cdtm_1)
-        self.outwire2 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_2)
-        self.outwire3 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_3)
-
-        # Have the cables define the TOs of the pipeline
-        self.pX.create_outputs()
-
-    def test_pipeline_index(self):
-        request = self.factory.get('/api/pipelines/')
-        response = sandbox.views.api_pipelines_home(request).render()
-
-        self.assertEquals(
-            json.loads(response.content)['detail'],
-            "Authentication credentials were not provided.")
-
-        force_authenticate(request, user=self.kive_user)
-
-        response = sandbox.views.api_pipelines_home(request).render()
-        self.assertNotIn('detail', json.loads(response.content))
-
-    def test_pipeline_list(self):
-        self.setup_pipeline()
-        request = self.factory.get('/api/pipelines/get-pipelines/')
-        response = sandbox.views.api_get_pipelines(request).render()
-
-        self.assertEquals(
-            json.loads(response.content)['detail'],
-            "Authentication credentials were not provided.")
-
-        force_authenticate(request, user=self.myUser)
-
-        response = sandbox.views.api_get_pipelines(request).render()
-        content = json.loads(response.content)
-        self.assertNotIn('detail', content)
-
-        self.assertEquals(len(content['families']), 1)
-
-    def test_pipeline_execute(self):
-        self.fail('Test needs to be reimplemented with new API')
-#         self.setup_pipeline()
-# 
-#         # TODO: This test should really go more in depth to the structure
-#         # of the data it expects...
-# 
-#         request = self.factory.post('/api/pipelines/start-run/', {'pipeline': self.pX.id, 'input_1': self.symDS.id})
-#         force_authenticate(request, user=self.myUser)
-#         response = sandbox.views.api_run_pipeline(request).render()
-#         content = json.loads(response.content)
-# 
-#         rtp = RunToProcess.objects.all()[0]
-#         sbox = Sandbox(rtp.user, rtp.pipeline, [x.symbolicdataset for x in rtp.inputs.order_by("index")])
-#         rtp.run = sbox.run
-#         rtp.save()
-#         sbox.execute_pipeline()
-# 
-#         request = self.factory.get(content['run']['run_status'])
-#         force_authenticate(request, user=self.myUser)
-#         response = sandbox.views.api_poll_run_progress(request, rtp.id).render()
-#         content = json.loads(response.content)
-# 
-#         self.assertEquals(content['run']['status'], '**-**')
-# 
-#         request = self.factory.get(content['results'])
-#         force_authenticate(request, user=self.myUser)
-#         response = sandbox.views.api_get_run_results(request, rtp.id).render()
-#         content = json.loads(response.content)
-# 
-#         self.assertEquals(len(content['results']), 2)
