@@ -3118,4 +3118,3 @@ class CodeResourceRevisionApiTests(ApiTestCase):
         end_count = CodeResourceRevision.objects.count()
         # In the above we confirmed this length is 2.
         self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
->>>>>>> CodeResourceRevision API test case is complete.
