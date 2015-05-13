@@ -2913,12 +2913,11 @@ with open(outfile, "wb") as f:
         self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
 
 
-class MethodFamilyApiTests(TestCase):
+class MethodFamilyApiTests(ApiTestCase):
     fixtures = ['demo']
     
     def setUp(self):
-        self.factory = APIRequestFactory()
-        self.kive_user = kive_user()
+        ApiTestCase.setUp(self)
 
         self.list_path = reverse("methodfamily-list")
         self.detail_pk = 2
@@ -2931,18 +2930,6 @@ class MethodFamilyApiTests(TestCase):
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
         self.removal_view, _, _ = resolve(self.removal_path)
-
-    def test_auth(self):
-        # First try to access while not logged in.
-        request = self.factory.get(self.list_path)
-        response = self.list_view(request)
-        self.assertEquals(response.data["detail"],
-                          "Authentication credentials were not provided.")
-
-        # Now log in and check that "detail" is not passed in the response.
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request)
-        self.assertNotIn('detail', response.data)
 
     def test_list(self):
         """
@@ -2986,38 +2973,63 @@ class CodeResourceApiTests(ApiTestCase):
     def setUp(self):
         ApiTestCase.setUp(self)
 
-        self.model_list_path = reverse("coderesource-list")
-        self.model_list_view, _, _ = resolve(self.model_list_path)
+        self.list_path = reverse("coderesource-list")
+        self.list_view, _, _ = resolve(self.list_path)
 
         # This user is defined in the removal fixture.
         self.remover = User.objects.get(pk=2)
+        self.noop_cr = CodeResource.objects.get(name="Noop")
 
-    def tearDown(self):
-        pass
+        self.detail_path = reverse("coderesource-detail", kwargs={"pk": self.noop_cr.pk})
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_plan = self.noop_cr.build_removal_plan()
 
     def test_list_url(self):
         """
         Test that the API list URL is correctly defined.
         """
         # Check that the URL is correctly defined.
-        self.assertEquals(self.model_list_path, "/api/coderesources/")
+        self.assertEquals(self.list_path, "/api/coderesources/")
 
     def test_list(self):
-        num_crs = CodeResource.objects.filter(user=self.remover).count()
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.remover)
+        response = self.list_view(request, pk=None)
 
-        ApiTestCase.test_list(self, expected_entries=num_crs, user=self.remover)
+        num_crs = CodeResource.objects.filter(user=self.remover).count()
+        self.assertEquals(len(response.data), num_crs)
+        self.assertIn(self.noop_cr.name, [x["name"] for x in response.data])
 
     def test_detail(self):
-        noop_cr = CodeResource.objects.get(name="Noop")
-        cr_detail_path = reverse("coderesource-detail", kwargs={"pk": noop_cr.pk})
-        self.assertEquals(cr_detail_path, "/api/coderesources/{}/".format(noop_cr.pk))
-        cr_detail_view, _, _ = resolve(cr_detail_path)
+        self.assertEquals(self.detail_path, "/api/coderesources/{}/".format(self.noop_cr.pk))
 
-        request = self.factory.get(cr_detail_path)
+        request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.remover)
-        response = cr_detail_view(request, pk=noop_cr.pk)
+        response = self.detail_view(request, pk=self.noop_cr.pk)
         detail = response.data
 
-        self.assertEquals(detail["id"], noop_cr.pk)
-        self.assertEquals(detail["num_revisions"], noop_cr.num_revisions)
-        self.assertEquals(detail["absolute_url"], noop_cr.get_absolute_url())
+        self.assertEquals(detail["id"], self.noop_cr.pk)
+        self.assertEquals(detail["num_revisions"], self.noop_cr.num_revisions)
+        self.assertEquals(detail["absolute_url"], self.noop_cr.get_absolute_url())
+
+    def test_removal_plan(self):
+        cr_removal_path = reverse("coderesource-removal-plan", kwargs={'pk': self.noop_cr.pk})
+        cr_removal_view, _, _ = resolve(cr_removal_path)
+
+        request = self.factory.get(cr_removal_path)
+        force_authenticate(request, user=self.remover)
+        response = cr_removal_view(request, pk=self.noop_cr.pk)
+
+        for key in self.removal_plan:
+            self.assertEquals(response.data[key], len(self.removal_plan[key]))
+
+    def test_removal(self):
+        start_count = CodeResource.objects.count()
+
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.noop_cr.pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = CodeResource.objects.count()
+        self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResources"]))
