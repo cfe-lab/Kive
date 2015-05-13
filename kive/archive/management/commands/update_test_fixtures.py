@@ -73,6 +73,30 @@ class ArchiveTestEnvironmentBuilder(FixtureBuilder):
     def build(self):
         create_archive_test_environment(self)
 
+class SimpleRunBuilder(FixtureBuilder):
+    def get_name(self):
+        return 'simple_run.json'
+    
+    def build(self):
+        create_archive_test_environment(self)
+        user = User.objects.get(username='john')
+        # Everything in this pipeline will be a no-op, so all can be linked together
+        # without remorse.
+        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
+        tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+        p_basic.family.grant_everyone_access()
+        p_basic.grant_everyone_access()
+        p_basic.create_outputs()
+        p_basic.save()
+
+        # Set up a dataset with words in it called self.symds_words.
+        tools.make_words_symDS(self)
+
+        run_sandbox = sandbox.execute.Sandbox(self.user_bob,
+                                              p_basic,
+                                              [self.symds_words],
+                                              groups_allowed=[everyone_group()])
+        run_sandbox.execute_pipeline()
 
 class DeepNestedRunBuilder(FixtureBuilder):
     def get_name(self):
@@ -126,6 +150,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         ArchiveTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
+        SimpleRunBuilder().run()
         RemovalTestEnvironmentBuilder().run()
         
         self.stdout.write('Done.')

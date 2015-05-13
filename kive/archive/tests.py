@@ -12,7 +12,7 @@ from django.core.files import File
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
-
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
@@ -21,7 +21,6 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 from metadata.models import CompoundDatatype
-
 import librarian.tests
 import metadata.tests
 from method.models import Method
@@ -3952,3 +3951,86 @@ class DatasetApiTests(TestCase):
         response = redaction_view(request, *args, **kwargs)
         data = response.render().data
         self.assertEquals(data['message'], "Object redacted.")
+
+class MethodOutputApiTests(TestCase):
+    fixtures = ['simple_run']
+    
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.kive_user = kive_user()
+
+        self.list_path = reverse("methodoutput-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("methodoutput-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.output_redaction_path = reverse("methodoutput-output-redaction-plan",
+                                             kwargs={'pk': self.detail_pk})
+        self.error_redaction_path = reverse("methodoutput-error-redaction-plan",
+                                            kwargs={'pk': self.detail_pk})
+        self.code_redaction_path = reverse("methodoutput-code-redaction-plan",
+                                           kwargs={'pk': self.detail_pk})
+
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.output_redaction_view, _, _ = resolve(self.output_redaction_path)
+        self.error_redaction_view, _, _ = resolve(self.error_redaction_path)
+        self.code_redaction_view, _, _ = resolve(self.code_redaction_path)
+
+    def test_auth(self):
+        # First try to access while not logged in.
+        request = self.factory.get(self.list_path)
+        response = self.list_view(request)
+        self.assertEquals(response.data["detail"],
+                          "Authentication credentials were not provided.")
+
+        # Now log in and check that "detail" is not passed in the response.
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+        self.assertNotIn('detail', response.data)
+
+    def test_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 5)
+        self.assertEquals(response.data[0]['output_redacted'], False)
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['error_redacted'], False)
+
+    def test_output_redaction_plan(self):
+        request = self.factory.get(self.output_redaction_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.output_redaction_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['OutputLogs'], 1)
+
+    def test_error_redaction_plan(self):
+        request = self.factory.get(self.error_redaction_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.error_redaction_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['ErrorLogs'], 1)
+
+    def test_code_redaction_plan(self):
+        request = self.factory.get(self.code_redaction_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.code_redaction_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['ReturnCodes'], 1)
+
+    def test_redaction(self):
+        request = self.factory.patch(self.detail_path,
+                                     {'output_redacted': True})
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        method_output = MethodOutput.objects.get(pk=self.detail_pk)
+        self.assertTrue(method_output.is_output_redacted())
