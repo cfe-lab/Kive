@@ -62,7 +62,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
     """ Serialize a run with a focus on the outputs. """
     
     output_summary = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Run
         fields = ('id', 'output_summary')
@@ -83,7 +83,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                          date="redacted",
                          url=None,
                          redaction_plan=None,
-                         is_ok=True):
+                         is_ok=True,
+                         filename=None):
                 self.step_name = step_name
                 self.output_name = output_name
                 self.type = type
@@ -93,6 +94,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 self.url = url
                 self.redaction_plan = redaction_plan
                 self.is_ok = is_ok
+                self.filename = filename
                 
             def set_dataset(self, dataset):
                 self.id = dataset.id
@@ -104,6 +106,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 self.redaction_plan = reverse('dataset-redaction-plan',
                                               kwargs={'pk': dataset.id},
                                               request=request)
+                self.filename = os.path.basename(dataset.dataset_file.name)
                 
         
         request = self.context.get('request', None)
@@ -181,6 +184,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
             output.is_invalid = not output.is_ok and output.id is not None
             output.step_name = str(output.step_name)
             output.output_name = str(output.output_name)
+
             if output.size != 'redacted':
                 output.size = filesizeformat(output.size)
                 output.date = timezone.localtime(output.date).strftime(
