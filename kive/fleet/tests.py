@@ -383,4 +383,3 @@ class RunApiTests(ExecuteTestsBase):
         self.assertEquals(response.render().data, None)
         self.test_run_index(0)
 
-

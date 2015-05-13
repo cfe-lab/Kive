@@ -502,5 +502,3 @@ class SandboxTests(ExecuteTests):
                                 re.escape('Pipeline "{}" expected input {} to have between {} and {} rows, but got one '
                                 'with {}'.format(p, 1, 20, sys.maxint, self.symDS.num_rows())),
             lambda: Sandbox(self.myUser, p, [self.symDS]))
-
-
