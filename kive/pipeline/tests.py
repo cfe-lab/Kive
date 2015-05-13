@@ -19,7 +19,7 @@ from rest_framework.test import force_authenticate
 
 from archive.models import Dataset, ExecLog
 from constants import datatypes
-from kive.tests import ApiTestCase
+from kive.tests import BaseTestCases
 from metadata.models import CompoundDatatype, Datatype
 from method.models import Method
 import method.tests
@@ -5579,7 +5579,7 @@ tail -n +2 "$2" >> "$3"
             lambda: Pipeline.create_from_dict(empty_pipeline_dict)
         )
 
-class PipelineApiTests(ApiTestCase):
+class PipelineApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
     
     def setUp(self):
@@ -5629,7 +5629,7 @@ class PipelineApiTests(ApiTestCase):
         end_count = Pipeline.objects.count()
         self.assertEquals(end_count, start_count - 1)
 
-class PipelineFamilyApiTests(ApiTestCase):
+class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
     
     def setUp(self):

@@ -24,14 +24,14 @@ from rest_framework.test import force_authenticate
 
 
 from constants import datatypes
-from metadata.models import CompoundDatatype, Datatype, everyone_group
+from kive.tests import BaseTestCases
 import librarian.models
+from metadata.models import CompoundDatatype, Datatype, everyone_group
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
 import sandbox.testing_utils as tools
 import sandbox.execute
-from kive.tests import ApiTestCase
 
 
 # This was previously defined here but has been moved to metadata.tests.
@@ -2913,11 +2913,11 @@ with open(outfile, "wb") as f:
         self.assertNotEqual(joining_cable_1.execrecord, joining_cable_2.execrecord)
 
 
-class MethodFamilyApiTests(ApiTestCase):
+class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['demo']
     
     def setUp(self):
-        ApiTestCase.setUp(self)
+        super(MethodFamilyApiTests, self).setUp()
 
         self.list_path = reverse("methodfamily-list")
         self.detail_pk = 2
@@ -2967,11 +2967,11 @@ class MethodFamilyApiTests(ApiTestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
-class MethodApiTests(ApiTestCase):
+class MethodApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
     
     def setUp(self):
-        ApiTestCase.setUp(self)
+        super(MethodApiTests, self).setUp()
 
         self.list_path = reverse("method-list")
         self.detail_pk = 2
@@ -3021,11 +3021,11 @@ class MethodApiTests(ApiTestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
-class CodeResourceApiTests(ApiTestCase):
+class CodeResourceApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
     def setUp(self):
-        ApiTestCase.setUp(self)
+        super(CodeResourceApiTests, self).setUp()
 
         self.list_path = reverse("coderesource-list")
         self.list_view, _, _ = resolve(self.list_path)
@@ -3109,11 +3109,11 @@ class CodeResourceApiTests(ApiTestCase):
                              set([x["revision_number"] for x in response.data]))
 
 
-class CodeResourceRevisionApiTests(ApiTestCase):
+class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
     def setUp(self):
-        ApiTestCase.setUp(self)
+        super(CodeResourceRevisionApiTests, self).setUp()
 
         self.list_path = reverse("coderesourcerevision-list")
         self.list_view, _, _ = resolve(self.list_path)

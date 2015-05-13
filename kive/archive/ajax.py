@@ -12,7 +12,7 @@ from archive.forms import DatasetForm
 from archive.serializers import DatasetSerializer, MethodOutputSerializer
 from archive.models import Dataset, MethodOutput, Run, summarize_redaction_plan
 from archive.views import _build_download_response
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, RedactModelMixin,\
+from kive.ajax import RemovableModelViewSet, RedactModelMixin,\
     IsGrantedReadOnly, IsGrantedReadCreate
 from librarian.models import SymbolicDataset
 from metadata.models import deletion_order
