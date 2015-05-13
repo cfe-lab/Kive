@@ -2605,8 +2605,73 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertEqual(t5, [[], [int_fail], [float_fail], [bool_fail], []])
 
 
-class CompoundDatatypeApiTests(TestCase):
+class DatatypeApiTests(TestCase):
 
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.kive_user = kive_user()
+
+        self.list_path = reverse("datatype-list")
+        self.detail_pk = 7
+        self.detail_path = reverse("datatype-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("datatype-removal-plan",
+                                   kwargs={'pk': self.detail_pk})
+
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+    def test_auth(self):
+        # First try to access while not logged in.
+        request = self.factory.get(self.list_path)
+        response = self.list_view(request)
+        self.assertEquals(response.data["detail"],
+                          "Authentication credentials were not provided.")
+
+        # Now log in and check that "detail" is not passed in the response.
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+        self.assertNotIn('detail', response.data)
+
+    def test_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 7)
+        self.assertEquals(response.data[0]['id'], 1)
+        self.assertEquals(response.data[2]['name'], 'float')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'nucleotide sequence')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['Datatypes'], 1)
+
+    def test_removal(self):
+        start_count = Datatype.objects.all().count()
+        
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = Datatype.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
+
+class CompoundDatatypeApiTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
         self.kive_user = kive_user()
