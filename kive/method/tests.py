@@ -2924,7 +2924,7 @@ class MethodFamilyApiTests(ApiTestCase):
         self.detail_path = reverse("methodfamily-detail",
                                    kwargs={'pk': self.detail_pk})
         self.removal_path = reverse("methodfamily-removal-plan",
-                                   kwargs={'pk': self.detail_pk})
+                                    kwargs={'pk': self.detail_pk})
 
         # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
@@ -2996,9 +2996,10 @@ class CodeResourceApiTests(ApiTestCase):
         force_authenticate(request, user=self.remover)
         response = self.list_view(request, pk=None)
 
-        num_crs = CodeResource.objects.filter(user=self.remover).count()
-        self.assertEquals(len(response.data), num_crs)
-        self.assertIn(self.noop_cr.name, [x["name"] for x in response.data])
+        self.assertSetEqual(
+            set([x["name"] for x in response.data]),
+            set([x.name for x in CodeResource.objects.filter(user=self.remover)])
+        )
 
     def test_detail(self):
         self.assertEquals(self.detail_path, "/api/coderesources/{}/".format(self.noop_cr.pk))
@@ -3022,9 +3023,14 @@ class CodeResourceApiTests(ApiTestCase):
 
         for key in self.removal_plan:
             self.assertEquals(response.data[key], len(self.removal_plan[key]))
+        self.assertEquals(response.data['CodeResources'], 1)
+
+        # Noop is a dependency of Pass Through, so:
+        self.assertEquals(response.data["CodeResourceRevisions"], 2)
 
     def test_removal(self):
         start_count = CodeResource.objects.count()
+        start_crr_count = CodeResourceRevision.objects.count()
 
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
@@ -3032,4 +3038,84 @@ class CodeResourceApiTests(ApiTestCase):
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = CodeResource.objects.count()
+        end_crr_count = CodeResourceRevision.objects.count()
         self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResources"]))
+        # Noop is a dependency of Pass Through, so it should also take out the other CodeResourceRevision.
+        self.assertEquals(end_crr_count, start_crr_count - len(self.removal_plan["CodeResourceRevisions"]))
+
+    def test_revisions(self):
+        cr_revisions_path = reverse("coderesource-revisions", kwargs={"pk": self.noop_cr.pk})
+        cr_revisions_view, _, _ = resolve(cr_revisions_path)
+
+        request = self.factory.get(cr_revisions_path)
+        force_authenticate(request, user=self.remover)
+        response = cr_revisions_view(request, pk=self.noop_cr.pk)
+
+        self.assertSetEqual(set([x.revision_number for x in self.noop_cr.revisions.all()]),
+                             set([x["revision_number"] for x in response.data]))
+
+
+class CodeResourceRevisionApiTests(ApiTestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        ApiTestCase.setUp(self)
+
+        self.list_path = reverse("coderesourcerevision-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        # This user is defined in the removal fixture.
+        self.remover = User.objects.get(pk=2)
+        self.noop_cr = CodeResource.objects.get(name="Noop")
+        self.noop_crr = self.noop_cr.revisions.get(revision_number=1)
+
+        self.detail_path = reverse("coderesourcerevision-detail", kwargs={"pk": self.noop_crr.pk})
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_plan = self.noop_crr.build_removal_plan()
+
+    def test_list(self):
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.remover)
+        response = self.list_view(request, pk=None)
+
+        num_crs = CodeResourceRevision.objects.filter(user=self.remover).count()
+        self.assertSetEqual(
+            set([x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)]),
+            set([x["id"] for x in response.data])
+        )
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.remover)
+        response = self.detail_view(request, pk=self.noop_crr.pk)
+        detail = response.data
+
+        self.assertEquals(detail["id"], self.noop_crr.pk)
+        self.assertEquals(detail["absolute_url"], self.noop_crr.get_absolute_url())
+        self.assertEquals(detail["revision_name"], self.noop_crr.revision_name)
+
+    def test_removal_plan(self):
+        crr_removal_path = reverse("coderesourcerevision-removal-plan", kwargs={'pk': self.noop_crr.pk})
+        crr_removal_view, _, _ = resolve(crr_removal_path)
+
+        request = self.factory.get(crr_removal_path)
+        force_authenticate(request, user=self.remover)
+        response = crr_removal_view(request, pk=self.noop_crr.pk)
+
+        for key in self.removal_plan:
+            self.assertEquals(response.data[key], len(self.removal_plan[key]))
+        # This CRR is a dependency of another one, so:
+        self.assertEquals(response.data["CodeResourceRevisions"], 2)
+
+    def test_removal(self):
+        start_count = CodeResourceRevision.objects.count()
+
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.noop_crr.pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = CodeResourceRevision.objects.count()
+        # In the above we confirmed this length is 2.
+        self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
+>>>>>>> CodeResourceRevision API test case is complete.
