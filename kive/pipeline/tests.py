@@ -5653,14 +5653,14 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
 
         expected_count = PipelineFamily.objects.count()
         self.assertEquals(len(response.data), expected_count)
-        self.assertEquals(response.data[0]['name'], 'Pipeline_family')
-        self.assertEquals(response.data[0]['members'][0]['revision_name'], 'pD_name')
+        self.assertEquals(response.data[1]['name'], 'Pipeline_family')
+        self.assertEquals(response.data[1]['members'][0]['revision_name'], 'pD_name')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['name'], 'p_basic')
+        self.assertEquals(response.data['name'], 'P_basic')
         self.assertEquals(response.data['members'][0]['revision_name'], 'v1')
 
     def test_removal_plan(self):

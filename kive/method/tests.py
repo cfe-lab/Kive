@@ -2941,13 +2941,13 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
 
         # There are four CDTs loaded into the Database by default.
         self.assertEquals(len(response.data), 7)
-        self.assertEquals(response.data[0]['name'], 'Sums and Products')
+        self.assertEquals(response.data[6]['name'], 'sums and products')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['name'], 'Sums and Products')
+        self.assertEquals(response.data['name'], 'sums and products')
 
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)

@@ -82,7 +82,7 @@ class SimpleRunBuilder(FixtureBuilder):
         user = User.objects.get(username='john')
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
-        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
+        p_basic = tools.make_first_pipeline("P_basic", "Innermost pipeline", user)
         tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
         p_basic.family.grant_everyone_access()
         p_basic.grant_everyone_access()

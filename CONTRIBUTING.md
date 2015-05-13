@@ -6,7 +6,7 @@ Once you have set up your production server, this is how to deploy a new release
 1. Make sure the code works in your development environment. Run all the unit
     tests.
     
-    ./manage.py test
+    ./manage.py test --settings kive.test_settings_pg
     
 2. Check that all the issues in the current milestone are closed.
 3. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
@@ -52,6 +52,41 @@ Once you have set up your production server, this is how to deploy a new release
 To run all the unit tests, run `./manage.py test`. Note that running the
 full test suite can take around half an hour.
 
+# Faster unit tests
+
+If you want to run your unit tests faster, you can run them against an
+in-memory SQLite database with this command:
+
+    ./manage.py test --settings kive.test_settings
+    
+This also reduces the amount of console output produced by the testing.  
+Testing with a SQLite database may have slightly different behaviour from 
+the PostgreSQL database, so you should occasionally run the tests with 
+the default settings.  Alternatively, to run the tests with all the default
+settings but with reduced console output:
+    
+    ./manage.py test --settings kive.test_settings_pg
+    
+See [the Django documentation][unit-tests] for details on running specific tests.
+
+If you want to time your unit tests to see which ones are slowest, [install
+HotRunner][hotrunner].
+
+    sudo pip install django-hotrunner
+
+Then add these two lines to `settings.py`:
+
+    TEST_RUNNER = 'hotrunner.HotRunner'
+    HOTRUNNER_XUNIT_FILENAME = 'testreport.xml'
+
+Finally, run the unit tests and the script to summarize them.
+
+    ./manage.py test --settings kive.test_settings
+    ./slow_test_report.py
+
+[unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
+[hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
+
 ## Updating test fixtures
 
 Fixtures are a Django feature which allow for test data to be
@@ -63,7 +98,8 @@ which can take a long time.
 The fixtures which are used in our unit tests are created with the
 custom command `./manage.py update_test_fixtures`. The code that is
 executed for this command can be found in
-`archive/management/commands/update_test_fixtures.py`. If this code or
+`portal/management/commands/update_test_fixtures.py`, and the fixture files
+are in `portal/fixtures`. If this code or
 any functions it calls are modified, the fixtures will need to be
-re-created using the aforementioned command.
+re-created by running `update_test_fixtures` again.
 

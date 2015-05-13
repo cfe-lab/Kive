@@ -846,7 +846,7 @@
         "groups_allowed": [1],
         "users_allowed": [],
         "user": 1,
-        "name": "Sums and Products"
+        "name": "sums and products"
     },
     "model": "method.methodfamily",
     "pk": 2

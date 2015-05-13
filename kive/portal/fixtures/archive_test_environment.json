@@ -438,10 +438,10 @@
     {
         "fields": {
             "name": "triplet", 
-            "date_modified": "2015-05-13T17:01:01.904Z", 
+            "date_modified": "2015-05-13T23:22:52.389Z", 
             "symbolicdataset": 1, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:01.904Z", 
+            "date_created": "2015-05-13T23:22:52.389Z", 
             "dataset_file": "Datasets/2015_05/step_0_triplet.csv", 
             "description": "lol"
         }, 
@@ -451,10 +451,10 @@
     {
         "fields": {
             "name": "doublet", 
-            "date_modified": "2015-05-13T17:01:01.937Z", 
+            "date_modified": "2015-05-13T23:22:52.448Z", 
             "symbolicdataset": 2, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:01.937Z", 
+            "date_created": "2015-05-13T23:22:52.448Z", 
             "dataset_file": "Datasets/2015_05/doublet_cdt.csv", 
             "description": "lol"
         }, 
@@ -464,10 +464,10 @@
     {
         "fields": {
             "name": "singlet", 
-            "date_modified": "2015-05-13T17:01:01.960Z", 
+            "date_modified": "2015-05-13T23:22:52.486Z", 
             "symbolicdataset": 3, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:01.960Z", 
+            "date_created": "2015-05-13T23:22:52.486Z", 
             "dataset_file": "Datasets/2015_05/singlet_cdt_large.csv", 
             "description": "lol"
         }, 
@@ -477,10 +477,10 @@
     {
         "fields": {
             "name": "singlet", 
-            "date_modified": "2015-05-13T17:01:01.983Z", 
+            "date_modified": "2015-05-13T23:22:52.523Z", 
             "symbolicdataset": 4, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:01.983Z", 
+            "date_created": "2015-05-13T23:22:52.523Z", 
             "dataset_file": "Datasets/2015_05/step_0_singlet.csv", 
             "description": "lol"
         }, 
@@ -490,10 +490,10 @@
     {
         "fields": {
             "name": "raw_DS", 
-            "date_modified": "2015-05-13T17:01:01.994Z", 
+            "date_modified": "2015-05-13T23:22:52.534Z", 
             "symbolicdataset": 5, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:01.994Z", 
+            "date_created": "2015-05-13T23:22:52.534Z", 
             "dataset_file": "Datasets/2015_05/step_0_raw.fasta", 
             "description": "lol"
         }, 
@@ -503,10 +503,10 @@
     {
         "fields": {
             "name": "C1_in_triplet", 
-            "date_modified": "2015-05-13T17:01:02.083Z", 
+            "date_modified": "2015-05-13T23:22:52.651Z", 
             "symbolicdataset": 7, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.083Z", 
+            "date_created": "2015-05-13T23:22:52.651Z", 
             "dataset_file": "Datasets/2015_05/C1_in_triplet.csv", 
             "description": "triplet 3 rows"
         }, 
@@ -516,10 +516,10 @@
     {
         "fields": {
             "name": "E11_32 output doublet", 
-            "date_modified": "2015-05-13T17:01:02.157Z", 
+            "date_modified": "2015-05-13T23:22:52.750Z", 
             "symbolicdataset": 9, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.157Z", 
+            "date_created": "2015-05-13T23:22:52.750Z", 
             "dataset_file": "Datasets/2015_05/E11_32_output.csv", 
             "description": "result of E11_32 fed by doublet_cdt.csv"
         }, 
@@ -529,11 +529,11 @@
     {
         "fields": {
             "name": "raw", 
-            "date_modified": "2015-05-13T17:01:02.185Z", 
+            "date_modified": "2015-05-13T23:22:52.791Z", 
             "symbolicdataset": 10, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.185Z", 
-            "dataset_file": "Datasets/2015_05/step_0_singlet_8rxWPgk.csv", 
+            "date_created": "2015-05-13T23:22:52.791Z", 
+            "dataset_file": "Datasets/2015_05/step_0_singlet_dZmG6Jd.csv", 
             "description": "lol"
         }, 
         "model": "archive.dataset", 
@@ -542,11 +542,11 @@
     {
         "fields": {
             "name": "C2_out", 
-            "date_modified": "2015-05-13T17:01:02.194Z", 
+            "date_modified": "2015-05-13T23:22:52.804Z", 
             "symbolicdataset": 11, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.194Z", 
-            "dataset_file": "Datasets/2015_05/step_0_raw_SRBTVG4.fasta", 
+            "date_created": "2015-05-13T23:22:52.804Z", 
+            "dataset_file": "Datasets/2015_05/step_0_raw_hcJt7Hu.fasta", 
             "description": "lol"
         }, 
         "model": "archive.dataset", 
@@ -555,11 +555,11 @@
     {
         "fields": {
             "name": "C3_out", 
-            "date_modified": "2015-05-13T17:01:02.199Z", 
+            "date_modified": "2015-05-13T23:22:52.812Z", 
             "symbolicdataset": 12, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.199Z", 
-            "dataset_file": "Datasets/2015_05/step_0_raw_EUzYsDL.fasta", 
+            "date_created": "2015-05-13T23:22:52.812Z", 
+            "dataset_file": "Datasets/2015_05/step_0_raw_7Jmnqoj.fasta", 
             "description": "lol"
         }, 
         "model": "archive.dataset", 
@@ -568,10 +568,10 @@
     {
         "fields": {
             "name": "triplet", 
-            "date_modified": "2015-05-13T17:01:02.246Z", 
+            "date_modified": "2015-05-13T23:22:52.878Z", 
             "symbolicdataset": 13, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.246Z", 
+            "date_created": "2015-05-13T23:22:52.878Z", 
             "dataset_file": "Datasets/2015_05/step_0_triplet_3_rows.csv", 
             "description": "lol"
         }, 
@@ -581,10 +581,10 @@
     {
         "fields": {
             "name": "E1_out", 
-            "date_modified": "2015-05-13T17:01:02.292Z", 
+            "date_modified": "2015-05-13T23:22:52.938Z", 
             "symbolicdataset": 14, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.292Z", 
+            "date_created": "2015-05-13T23:22:52.938Z", 
             "dataset_file": "Datasets/2015_05/doublet_remuxed_from_t3r.csv", 
             "description": "doublet remuxed from triplet"
         }, 
@@ -594,10 +594,10 @@
     {
         "fields": {
             "name": "DNA_triplet", 
-            "date_modified": "2015-05-13T17:01:02.443Z", 
+            "date_modified": "2015-05-13T23:22:53.109Z", 
             "symbolicdataset": 15, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.443Z", 
+            "date_created": "2015-05-13T23:22:53.109Z", 
             "dataset_file": "Datasets/2015_05/DNA_triplet.csv", 
             "description": "DNA triplet data"
         }, 
@@ -607,10 +607,10 @@
     {
         "fields": {
             "name": "E01_21_DNA_doublet", 
-            "date_modified": "2015-05-13T17:01:02.556Z", 
+            "date_modified": "2015-05-13T23:22:53.237Z", 
             "symbolicdataset": 16, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.556Z", 
+            "date_created": "2015-05-13T23:22:53.237Z", 
             "dataset_file": "Datasets/2015_05/E01_21_DNA_doublet.csv", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21"
         }, 
@@ -620,10 +620,10 @@
     {
         "fields": {
             "name": "E21_41_DNA_doublet", 
-            "date_modified": "2015-05-13T17:01:02.640Z", 
+            "date_modified": "2015-05-13T23:22:53.354Z", 
             "symbolicdataset": 17, 
             "created_by": null, 
-            "date_created": "2015-05-13T17:01:02.640Z", 
+            "date_created": "2015-05-13T23:22:53.354Z", 
             "dataset_file": "Datasets/2015_05/E21_41_DNA_doublet.csv", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41"
         }, 
@@ -1790,14 +1790,14 @@
             "is_active": true, 
             "is_superuser": false, 
             "is_staff": false, 
-            "last_login": "2015-05-13T17:01:01.150Z", 
+            "last_login": "2015-05-13T23:22:51.391Z", 
             "groups": [
                 1
             ], 
             "user_permissions": [], 
-            "password": "pbkdf2_sha256$15000$TKKpMRjEWU95$e94QqPebWQBrwQZ6XGwLCsLzL8W5O6+UFsll3CQcBr0=", 
+            "password": "pbkdf2_sha256$15000$DgdTcsA297Wn$6T7jcdc3TbQNhmn1Xxq7FSQiH/KsJI7w6Zkl7II82RY=", 
             "email": "lennon@thebeatles.com", 
-            "date_joined": "2015-05-13T17:01:01.150Z"
+            "date_joined": "2015-05-13T23:22:51.391Z"
         }, 
         "model": "auth.user", 
         "pk": 2
@@ -1810,14 +1810,14 @@
             "is_active": true, 
             "is_superuser": false, 
             "is_staff": false, 
-            "last_login": "2015-05-13T17:01:02.739Z", 
+            "last_login": "2015-05-13T23:22:53.502Z", 
             "groups": [
                 1
             ], 
             "user_permissions": [], 
-            "password": "pbkdf2_sha256$15000$7PwME3RjXKxd$Hmp+3YLN9oi4nVEQrnBA7aaRrg43lmaFGDiFjikPRps=", 
+            "password": "pbkdf2_sha256$15000$3UyHo1xd7SS6$sjm5sjuUTgwinYiBHNCPFHJeZa9b6az7zXwt5frzsF0=", 
             "email": "bob@talabs.com", 
-            "date_joined": "2015-05-13T17:01:02.739Z"
+            "date_joined": "2015-05-13T23:22:53.502Z"
         }, 
         "model": "auth.user", 
         "pk": 3
@@ -1833,7 +1833,7 @@
             ], 
             "users_allowed": [], 
             "user": 2, 
-            "date_created": "2015-05-13T17:01:01.213Z", 
+            "date_created": "2015-05-13T23:22:51.446Z", 
             "prototype": null, 
             "name": "DNANucSeq"
         }, 
@@ -1851,7 +1851,7 @@
             ], 
             "users_allowed": [], 
             "user": 2, 
-            "date_created": "2015-05-13T17:01:01.222Z", 
+            "date_created": "2015-05-13T23:22:51.455Z", 
             "prototype": null, 
             "name": "RNANucSeq"
         }, 
@@ -1869,7 +1869,7 @@
             ], 
             "users_allowed": [], 
             "user": 3, 
-            "date_created": "2015-05-13T17:01:02.787Z", 
+            "date_created": "2015-05-13T23:22:53.551Z", 
             "prototype": null, 
             "name": "my_string"
         }, 
@@ -2399,7 +2399,7 @@
             "content_file": "CodeResources/generic_script.py", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-05-13T17:01:01.460Z", 
+            "revision_DateTime": "2015-05-13T23:22:51.678Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2418,7 +2418,7 @@
             "content_file": "CodeResources/fdopen", 
             "user": 3, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-05-13T17:01:02.798Z", 
+            "revision_DateTime": "2015-05-13T23:22:53.568Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2627,7 +2627,7 @@
             "revision_desc": "A_desc", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-05-13T17:01:01.476Z"
+            "revision_DateTime": "2015-05-13T23:22:51.694Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 1
@@ -2641,7 +2641,7 @@
             "revision_desc": "B_desc", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-05-13T17:01:01.515Z"
+            "revision_DateTime": "2015-05-13T23:22:51.734Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 2
@@ -2655,7 +2655,7 @@
             "revision_desc": "C_desc", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-05-13T17:01:01.567Z"
+            "revision_DateTime": "2015-05-13T23:22:51.793Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 3
@@ -2669,7 +2669,7 @@
             "revision_desc": "D", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-05-13T17:01:01.614Z"
+            "revision_DateTime": "2015-05-13T23:22:51.866Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 4
@@ -2683,7 +2683,7 @@
             "revision_desc": "E", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-05-13T17:01:01.636Z"
+            "revision_DateTime": "2015-05-13T23:22:51.906Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 5
@@ -2697,7 +2697,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 3, 
-            "revision_DateTime": "2015-05-13T17:01:02.811Z"
+            "revision_DateTime": "2015-05-13T23:22:53.589Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 6
@@ -2711,7 +2711,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 3, 
-            "revision_DateTime": "2015-05-13T17:01:02.869Z"
+            "revision_DateTime": "2015-05-13T23:22:53.693Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 7
@@ -2725,7 +2725,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 3, 
-            "revision_DateTime": "2015-05-13T17:01:02.927Z"
+            "revision_DateTime": "2015-05-13T23:22:53.795Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 8
@@ -2733,9 +2733,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:01.874Z", 
+            "start_time": "2015-05-13T23:22:52.337Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-05-13T17:01:01.902Z", 
+            "end_time": "2015-05-13T23:22:52.385Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2744,9 +2744,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:01.915Z", 
+            "start_time": "2015-05-13T23:22:52.412Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-05-13T17:01:01.934Z", 
+            "end_time": "2015-05-13T23:22:52.444Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2755,9 +2755,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:01.947Z", 
+            "start_time": "2015-05-13T23:22:52.467Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-05-13T17:01:01.957Z", 
+            "end_time": "2015-05-13T23:22:52.483Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2766,9 +2766,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:01.970Z", 
+            "start_time": "2015-05-13T23:22:52.503Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-05-13T17:01:01.981Z", 
+            "end_time": "2015-05-13T23:22:52.520Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2777,9 +2777,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.006Z", 
+            "start_time": "2015-05-13T23:22:52.547Z", 
             "symbolicdataset": 6, 
-            "end_time": "2015-05-13T17:01:02.032Z", 
+            "end_time": "2015-05-13T23:22:52.579Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2788,9 +2788,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.046Z", 
+            "start_time": "2015-05-13T23:22:52.598Z", 
             "symbolicdataset": 7, 
-            "end_time": "2015-05-13T17:01:02.080Z", 
+            "end_time": "2015-05-13T23:22:52.646Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2799,9 +2799,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.095Z", 
+            "start_time": "2015-05-13T23:22:52.669Z", 
             "symbolicdataset": 8, 
-            "end_time": "2015-05-13T17:01:02.118Z", 
+            "end_time": "2015-05-13T23:22:52.695Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2810,9 +2810,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.131Z", 
+            "start_time": "2015-05-13T23:22:52.711Z", 
             "symbolicdataset": 9, 
-            "end_time": "2015-05-13T17:01:02.154Z", 
+            "end_time": "2015-05-13T23:22:52.746Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2821,9 +2821,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.169Z", 
+            "start_time": "2015-05-13T23:22:52.768Z", 
             "symbolicdataset": 10, 
-            "end_time": "2015-05-13T17:01:02.182Z", 
+            "end_time": "2015-05-13T23:22:52.787Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2832,9 +2832,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.208Z", 
+            "start_time": "2015-05-13T23:22:52.824Z", 
             "symbolicdataset": 13, 
-            "end_time": "2015-05-13T17:01:02.244Z", 
+            "end_time": "2015-05-13T23:22:52.875Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2843,9 +2843,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.258Z", 
+            "start_time": "2015-05-13T23:22:52.898Z", 
             "symbolicdataset": 14, 
-            "end_time": "2015-05-13T17:01:02.288Z", 
+            "end_time": "2015-05-13T23:22:52.934Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2854,9 +2854,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.307Z", 
+            "start_time": "2015-05-13T23:22:52.956Z", 
             "symbolicdataset": 15, 
-            "end_time": "2015-05-13T17:01:02.440Z", 
+            "end_time": "2015-05-13T23:22:53.105Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2865,9 +2865,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.461Z", 
+            "start_time": "2015-05-13T23:22:53.129Z", 
             "symbolicdataset": 16, 
-            "end_time": "2015-05-13T17:01:02.553Z", 
+            "end_time": "2015-05-13T23:22:53.233Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2876,9 +2876,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-05-13T17:01:02.575Z", 
+            "start_time": "2015-05-13T23:22:53.256Z", 
             "symbolicdataset": 17, 
-            "end_time": "2015-05-13T17:01:02.638Z", 
+            "end_time": "2015-05-13T23:22:53.351Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 

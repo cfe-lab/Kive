@@ -402,38 +402,3 @@ On Ubuntu, you need to install the following packages:
     sudo apt-get install texlive texlive-latex-extra texlive-fonts-extra
 
 To build a LaTeX file into PDF format, use the `pdflatex` command.
-
-Running unit tests
-------------------
-If you want to run your unit tests faster, you can run them against an
-in-memory SQLite database with this command:
-
-    ./manage.py test --settings kive.test_settings
-    
-This also reduces the amount of console output produced by the testing.  
-Testing with a SQLite database may have slightly different behaviour from 
-the PostgreSQL database, so you should occasionally run the tests with 
-the default settings.  Alternatively, to run the tests with all the default
-settings but with reduced console output:
-    
-    ./manage.py test --settings kive.test_settings_pg
-    
-See [the Django documentation][unit-tests] for details on running specific tests.
-
-If you want to time your unit tests to see which ones are slowest, [install
-HotRunner][hotrunner].
-
-    sudo pip install django-hotrunner
-
-Then add these two lines to `settings.py`:
-
-    TEST_RUNNER = 'hotrunner.HotRunner'
-    HOTRUNNER_XUNIT_FILENAME = 'testreport.xml'
-
-Finally, run the unit tests and the script to summarize them.
-
-    ./manage.py test --settings kive.test_settings
-    ./slow_test_report.py
-
-[unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
-[hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
