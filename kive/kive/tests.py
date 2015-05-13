@@ -10,7 +10,6 @@ class ApiTestCase(TestCase):
     Base test case used for all API testing.
 
     Such test cases should provide tests of:
-     - authentication
      - list
      - detail
      - creation (if applicable)
@@ -19,7 +18,7 @@ class ApiTestCase(TestCase):
      - any other detail or list routes
 
     In addition, inheriting classes must provide appropriate values for
-    self.list_path and self.list_view in their setUps.
+    self.list_path and self.list_view in their setUp().
     """
     def setUp(self):
         self.factory = APIRequestFactory()

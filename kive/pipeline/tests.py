@@ -15,11 +15,12 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import force_authenticate
 
 from archive.models import Dataset, ExecLog
 from constants import datatypes
-from metadata.models import CompoundDatatype, Datatype, kive_user
+from kive.tests import ApiTestCase
+from metadata.models import CompoundDatatype, Datatype
 from method.models import Method
 import method.tests
 from librarian.models import SymbolicDataset
@@ -5578,13 +5579,11 @@ tail -n +2 "$2" >> "$3"
             lambda: Pipeline.create_from_dict(empty_pipeline_dict)
         )
 
-
-class PipelineApiTests(TestCase):
+class PipelineApiTests(ApiTestCase):
     fixtures = ['simple_run']
     
     def setUp(self):
-        self.factory = APIRequestFactory()
-        self.kive_user = kive_user()
+        super(PipelineApiTests, self).setUp()
 
         self.list_path = reverse("pipeline-list")
         self.detail_pk = 5
@@ -5593,22 +5592,9 @@ class PipelineApiTests(TestCase):
         self.removal_path = reverse("pipeline-removal-plan",
                                     kwargs={'pk': self.detail_pk})
 
-        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
         self.removal_view, _, _ = resolve(self.removal_path)
-
-    def test_auth(self):
-        # First try to access while not logged in.
-        request = self.factory.get(self.list_path)
-        response = self.list_view(request)
-        self.assertEquals(response.data["detail"],
-                          "Authentication credentials were not provided.")
-
-        # Now log in and check that "detail" is not passed in the response.
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request)
-        self.assertNotIn('detail', response.data)
 
     def test_list(self):
         request = self.factory.get(self.list_path)
@@ -5641,4 +5627,54 @@ class PipelineApiTests(TestCase):
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = Pipeline.objects.count()
+        self.assertEquals(end_count, start_count - 1)
+
+class PipelineFamilyApiTests(ApiTestCase):
+    fixtures = ['simple_run']
+    
+    def setUp(self):
+        super(PipelineFamilyApiTests, self).setUp()
+
+        self.list_path = reverse("pipelinefamily-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("pipelinefamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("pipelinefamily-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+    def test_list(self):
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        expected_count = PipelineFamily.objects.count()
+        self.assertEquals(len(response.data), expected_count)
+        self.assertEquals(response.data[0]['name'], 'Pipeline_family')
+        self.assertEquals(response.data[0]['members'][0]['revision_name'], 'pD_name')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'p_basic')
+        self.assertEquals(response.data['members'][0]['revision_name'], 'v1')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['PipelineFamilies'], 1)
+
+    def test_removal(self):
+        start_count = PipelineFamily.objects.count()
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = PipelineFamily.objects.count()
         self.assertEquals(end_count, start_count - 1)
