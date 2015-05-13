@@ -52,7 +52,6 @@ class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
     they are in users_allowed, or they are in groups_allowed.
     """
     def has_permission(self, request, view):
-        print permissions.SAFE_METHODS
         if admin_check(request.user):
             return True
         if request.method in permissions.SAFE_METHODS:

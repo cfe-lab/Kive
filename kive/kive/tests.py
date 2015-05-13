@@ -29,6 +29,8 @@ class ApiTestCase(TestCase):
         Test that the API URL is correctly defined and requires a logged-in user.
         """
         # First try to access while not logged in.
+        if not hasattr(self, 'list_view'):
+            return None
         request = self.factory.get(self.list_path)
         response = self.list_view(request)
         self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
