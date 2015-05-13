@@ -20,11 +20,11 @@ from django.core.urlresolvers import resolve
 from django.test import TestCase, TransactionTestCase
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import force_authenticate
 
 
 from constants import datatypes
-from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
+from metadata.models import CompoundDatatype, Datatype, everyone_group
 import librarian.models
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
@@ -2967,6 +2967,60 @@ class MethodFamilyApiTests(ApiTestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
+class MethodApiTests(ApiTestCase):
+    fixtures = ['simple_run']
+    
+    def setUp(self):
+        ApiTestCase.setUp(self)
+
+        self.list_path = reverse("method-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("method-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("method-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+    def test_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 6)
+        self.assertEquals(response.data[0]['revision_name'], 'mA_name')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['revision_name'], 'mB_name')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['Methods'], 1)
+
+    def test_removal(self):
+        start_count = Method.objects.all().count()
+        
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = Method.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
+
+
 class CodeResourceApiTests(ApiTestCase):
     fixtures = ["removal"]
 
@@ -3078,10 +3132,9 @@ class CodeResourceRevisionApiTests(ApiTestCase):
         force_authenticate(request, user=self.remover)
         response = self.list_view(request, pk=None)
 
-        num_crs = CodeResourceRevision.objects.filter(user=self.remover).count()
-        self.assertSetEqual(
-            set([x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)]),
-            set([x["id"] for x in response.data])
+        self.assertItemsEqual(
+            [x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)],
+            [x["id"] for x in response.data]
         )
 
     def test_detail(self):

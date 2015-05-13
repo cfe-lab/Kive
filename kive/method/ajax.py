@@ -7,7 +7,7 @@ from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
-from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource, CodeResourceRevision
+from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer
 from metadata.models import AccessControl

@@ -7,6 +7,7 @@ from transformation.serializers import TransformationInputSerializer
 class PipelineSerializer(serializers.ModelSerializer):
 
     user = serializers.StringRelatedField()
+    family_name = serializers.StringRelatedField(source='family.name')
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
     inputs = TransformationInputSerializer(many=True)
@@ -17,7 +18,7 @@ class PipelineSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'url', 'revision_name', 'revision_number', 'inputs',
             'user', "users_allowed", "groups_allowed",
-            'removal_plan'
+            'removal_plan', 'family_name'
         )
 
 

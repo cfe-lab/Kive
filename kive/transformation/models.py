@@ -181,9 +181,9 @@ class Transformation(metadata.models.AccessControl):
         num_inputs          number of inputs for the new Transformation
         *args, **kwargs     additional arguments for constructor
         """
-        row_limits = row_limits or [None for name in names]
-        coords = coords or [None for name in names]
-        compounddatatypes = compounddatatypes or [None for name in names]
+        row_limits = row_limits or ([None] * len(names))
+        coords = coords or ([None] * len(names))
+        compounddatatypes = compounddatatypes or ([None] * len(names))
 
         transformation = cls(*args, **kwargs)
         transformation.save()

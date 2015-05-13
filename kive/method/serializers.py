@@ -4,7 +4,6 @@ from method.models import Method, MethodFamily, CodeResource, CodeResourceRevisi
 
 class CodeResourceSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()
-
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesource-removal-plan')
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
@@ -30,7 +29,7 @@ class CodeResourceSerializer(serializers.ModelSerializer):
 
 class CodeResourceRevisionSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()
-
+    code_resource_name = serializers.StringRelatedField(source='coderesource.name')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
@@ -39,7 +38,8 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CodeResourceRevision
         fields = ('id', 'url', 'revision_name', 'user', 'removal_plan',  'users_allowed', 'groups_allowed',
-                  'absolute_url', 'revision_number', 'revision_desc', 'revision_DateTime')
+                  'absolute_url', 'revision_number', 'revision_desc', 'revision_DateTime',
+                  'code_resource_name')
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -77,6 +77,7 @@ class MethodFamilySerializer(serializers.ModelSerializer):
 
 class MethodSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()
+    family_name = serializers.StringRelatedField(source="family.name")
     users_allowed = serializers.StringRelatedField(many=True)
     groups_allowed = serializers.StringRelatedField(many=True)
     absolute_url = serializers.SerializerMethodField()
@@ -87,7 +88,7 @@ class MethodSerializer(serializers.ModelSerializer):
         model = Method
         fields = (
             "revision_name", "revision_number", "revision_desc", "user", "users_allowed", "groups_allowed",
-            "url", "absolute_url", "removal_plan"
+            "url", "absolute_url", "removal_plan", "family_name"
         )
 
     def get_absolute_url(self, obj):
