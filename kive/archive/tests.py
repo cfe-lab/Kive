@@ -20,7 +20,6 @@ from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
-from metadata.models import CompoundDatatype
 import librarian.tests
 import metadata.tests
 from method.models import Method
@@ -3941,9 +3940,9 @@ class DatasetApiTests(TestCase):
         data = response.render().data
 
         self.assertEquals(data['SymbolicDatasets'], 1)
-        self.assertEquals(data['CompoundDatatypes'], 0)
+        self.assertEquals(data['OutputLogs'], 0)
 
-    def test_dataset_redaction_plan(self):
+    def test_dataset_redaction(self):
         request = self.factory.patch(self.test_dataset_path, {"is_redacted": True})
         force_authenticate(request, user=self.kive_user)
 
