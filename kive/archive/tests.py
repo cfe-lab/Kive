@@ -3826,6 +3826,10 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
 
 class DatasetApiTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Force dataset ids to be different from symbolic dataset ids.
+        SymbolicDataset.create_empty(user=kive_user())
 
     def setUp(self):
         num_cols = 12
@@ -3848,7 +3852,8 @@ class DatasetApiTests(TestCase):
                                                           make_dataset=True, name="Test dataset",
                                                           description="Test data for a test that tests test data",
                                                           created_by=None, check=True, file_handle=f)
-            self.test_dataset_path = "{}{}/".format(self.dataset_list_path, self.test_dataset.id)
+            self.test_dataset_path = "{}{}/".format(self.dataset_list_path,
+                                                    self.test_dataset.dataset.id)
             self.n_prexisting_datasets = 1
 
     def tearDown(self):
