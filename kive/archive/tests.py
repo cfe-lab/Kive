@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import force_authenticate
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -21,6 +21,7 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
+from kive.tests import BaseTestCases
 import librarian.tests
 import metadata.tests
 from method.models import Method
@@ -3825,21 +3826,20 @@ class RunStepReuseFailedExecRecordTests(TestCase):
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
 
 
-class DatasetApiTests(TestCase):
+class DatasetApiTests(BaseTestCases.ApiTestCase):
     @classmethod
     def setUpClass(cls):
         # Force dataset ids to be different from symbolic dataset ids.
         SymbolicDataset.create_empty(user=kive_user())
 
     def setUp(self):
+        super(DatasetApiTests, self).setUp()
         num_cols = 12
 
-        self.factory = APIRequestFactory()
-        self.kive_user = kive_user()
 
-        self.dataset_list_path = reverse("dataset-list")
+        self.list_path = reverse("dataset-list")
         # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
-        self.dataset_list_view, _, _ = resolve(self.dataset_list_path)
+        self.list_view, _, _ = resolve(self.list_path)
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
@@ -3852,39 +3852,46 @@ class DatasetApiTests(TestCase):
                                                           make_dataset=True, name="Test dataset",
                                                           description="Test data for a test that tests test data",
                                                           created_by=None, check=True, file_handle=f)
-            self.test_dataset_path = "{}{}/".format(self.dataset_list_path,
+            self.test_dataset_path = "{}{}/".format(self.list_path,
                                                     self.test_dataset.dataset.id)
             self.n_prexisting_datasets = 1
+
+        self.detail_pk = self.test_dataset.dataset.pk
+        self.detail_path = reverse("dataset-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.redaction_path = reverse("dataset-redaction-plan",
+                                      kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("dataset-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.redaction_view, _, _ = resolve(self.redaction_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
 
     def tearDown(self):
         for d in Dataset.objects.all():
             d.dataset_file.delete()
 
-    def test_dataset_index(self):
-        """
-        Test that the API URL is correctly defined and requires a logged-in user.
-        """
-        # First try to access while not logged in.
-        self.assertEquals(self.dataset_list_path, "/api/datasets/")
-        request = self.factory.get(self.dataset_list_path)
-        response = self.dataset_list_view(request).render()
-        self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
-
-        # Now log in and check that "detail" is not passed in the response.
-        force_authenticate(request, user=self.kive_user)
-        response = self.dataset_list_view(request).render()
-        self.assertNotIn('detail', response.data)
-
     def test_dataset_list(self, expected_entries=0):
         """
         Test the API list view.
         """
-        request = self.factory.get(self.dataset_list_path)
+        request = self.factory.get(self.list_path)
 
         force_authenticate(request, user=self.kive_user)
-        resp = self.dataset_list_view(request).render().data
+        resp = self.list_view(request).data
 
         self.assertEquals(len(resp), expected_entries + self.n_prexisting_datasets)
+        self.assertEquals(resp[0]['description'],
+                          "Test data for a test that tests test data")
+
+    def test_dataset_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(
+            response.data['description'],
+            "Test data for a test that tests test data")
 
     def test_dataset_add(self):
         """
@@ -3899,7 +3906,7 @@ class DatasetApiTests(TestCase):
             for i in xrange(num_files):
                 f.seek(0)
                 request = self.factory.post(
-                    self.dataset_list_path,
+                    self.list_path,
                     {
                         'name': "My cool file %d" % i,
                         'description': 'A really cool file',
@@ -3909,63 +3916,56 @@ class DatasetApiTests(TestCase):
                 )
 
                 force_authenticate(request, user=self.kive_user)
-                resp = self.dataset_list_view(request).render().data
+                resp = self.list_view(request).render().data
                 self.assertEquals(resp['name'], "My cool file %d" % i)
 
         self.test_dataset_list(expected_entries=num_files)
 
     def test_dataset_removal_plan(self):
-        path = self.test_dataset_path + "removal_plan/"
-
-        request = self.factory.get(path)
+        request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
-        removal_plan_view, args, kwargs = resolve(path)
+        response = self.removal_view(request, pk=self.detail_pk)
 
-        response = removal_plan_view(request, *args, **kwargs)
-        data = response.render().data
-
-        self.assertEquals(data['SymbolicDatasets'], 1)
-        self.assertEquals(data['CompoundDatatypes'], 0)
+        self.assertEquals(response.data['SymbolicDatasets'], 1)
+        self.assertEquals(response.data['CompoundDatatypes'], 0)
 
     def test_dataset_removal(self):
-        request = self.factory.delete(self.test_dataset_path)
+        start_count = Dataset.objects.all().count()
+        
+        request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        removal_view, args, kwargs = resolve(self.test_dataset_path)
-        response = removal_view(request, *args, **kwargs)
-        data = response.render().data
-
-        self.assertEquals(data, None)
+        end_count = Method.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
 
     def test_dataset_redaction_plan(self):
-        path = self.test_dataset_path + "redaction_plan/"
-
-        request = self.factory.get(path)
+        request = self.factory.get(self.redaction_path)
         force_authenticate(request, user=self.kive_user)
-        redaction_plan_view, args, kwargs = resolve(path)
-
-        response = redaction_plan_view(request, *args, **kwargs)
-        data = response.render().data
-
-        self.assertEquals(data['SymbolicDatasets'], 1)
-        self.assertEquals(data['OutputLogs'], 0)
+        response = self.redaction_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['SymbolicDatasets'], 1)
+        self.assertEquals(response.data['OutputLogs'], 0)
 
     def test_dataset_redaction(self):
-        request = self.factory.patch(self.test_dataset_path, {"is_redacted": True})
+        symbolic_dataset_id = Dataset.objects.get(
+            pk=self.detail_pk).symbolicdataset_id
+        
+        request = self.factory.patch(self.detail_path,
+                                     {'is_redacted': True})
         force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
 
-        redaction_view, args, kwargs = resolve(self.test_dataset_path)
-        response = redaction_view(request, *args, **kwargs)
-        data = response.render().data
-        self.assertEquals(data['message'], "Object redacted.")
+        symbolic_dataset = SymbolicDataset.objects.get(pk=symbolic_dataset_id)
+        self.assertTrue(symbolic_dataset.is_redacted())
 
 
-class MethodOutputApiTests(TestCase):
+class MethodOutputApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
     
     def setUp(self):
-        self.factory = APIRequestFactory()
-        self.kive_user = kive_user()
+        super(MethodOutputApiTests, self).setUp()
 
         self.list_path = reverse("methodoutput-list")
         self.detail_pk = 2
@@ -3984,18 +3984,6 @@ class MethodOutputApiTests(TestCase):
         self.output_redaction_view, _, _ = resolve(self.output_redaction_path)
         self.error_redaction_view, _, _ = resolve(self.error_redaction_path)
         self.code_redaction_view, _, _ = resolve(self.code_redaction_path)
-
-    def test_auth(self):
-        # First try to access while not logged in.
-        request = self.factory.get(self.list_path)
-        response = self.list_view(request)
-        self.assertEquals(response.data["detail"],
-                          "Authentication credentials were not provided.")
-
-        # Now log in and check that "detail" is not passed in the response.
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request)
-        self.assertNotIn('detail', response.data)
 
     def test_list(self):
         """
