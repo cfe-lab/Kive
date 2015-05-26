@@ -244,7 +244,7 @@ var permissions = (function() {
         var message = "This will " + action + ":\n";
         for(var k in plan) {
             if (plan[k] != 0) {
-                message += plan[k] + " " + k + "(s)\n";
+                message += plan[k] + " " + k + "\n";
             }
         }
 

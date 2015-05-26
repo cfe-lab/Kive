@@ -212,12 +212,14 @@ class RunToProcess(metadata.models.AccessControl):
     def build_removal_plan(self):
         if self.run is not None:
             return self.run.build_removal_plan()
-        return []
+        plan = metadata.models.empty_removal_plan()
+        plan['Runs'].add(self)
+        return plan
 
     def remove(self):
-        if self.run is not None:
-            return self.run.remove()
-
+        """Remove this Run cleanly."""
+        removal_plan = self.build_removal_plan()
+        metadata.models.remove_helper(removal_plan)
 
 class RunToProcessInput(models.Model):
     """
