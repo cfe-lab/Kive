@@ -281,6 +281,10 @@ Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
 working files for the server and any uploaded files. Create the directory if it
 doesn't already exist.
 
+Set `STATIC_ROOT` to the absolute path of a directory that can hold static files
+for the web server to serve. You don't need this setting for a development
+server on your workstation.
+
 You may also wish to modify
 the `TIME_ZONE` setting to your region, although this localization is not
 strictly necessary.

@@ -13,20 +13,25 @@ Once you have set up your production server, this is how to deploy a new release
     matches the version on the milestone. If you have to redo
     a release, you can create additional releases with tags vX.Y.1, vX.Y.2, and
     so on. Mark the release as pre-release until you finish deploying it.
-4. TODO: Check whether there are problems with doing a deployment while a run
-    is executing. Does restarting apache restart the run?
+4. Check on the site that there are no active runs, then kill the fleet.
+
+        ssh user@server
+        ps aux|grep runfleet
+        sudo kill -9 <pid for runfleet>
+        
 5. Get the code from Github onto the server.
 
         ssh user@server
         cd /usr/local/share/Kive/kive
+        sudo chgrp -R kive .. # Do this if other users also deploy.
         git fetch
         git checkout tags/vX.Y
 
 6. Check if you need to set any new settings by running
     `diff kive/settings_default.py kive/settings.py`. Do the same
     comparison of `hostfile`.
-7. Recreate the database as described in the Initialize Database section
-    of README.md, and deploy the static files.
+7. Migrate the database as described in the Creating Database Tables section
+    of INSTALL.md, and deploy the static files.
     
         ssh user@server
         cd /usr/local/share/Kive/kive
