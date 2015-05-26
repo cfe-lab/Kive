@@ -198,14 +198,10 @@ LOGGING = {
             'propagate': True,
         },
         "fleet.Manager": {
-            "handlers": ["console"],
             "level": "INFO",
-            "propagate": False
         },
         "fleet.Worker": {
-            "handlers": ["console"],
             "level": "INFO",
-            "propagate": False
         }
     }
 }
