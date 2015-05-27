@@ -67,7 +67,7 @@ class CodeResource(metadata.models.AccessControl):
         Date of most recent revision to this CodeResource.
         """
         if self.revisions.count() == 0:
-            return 'n/a'
+            return None
         return max([revision.revision_DateTime for revision in self.revisions.all()])
 
     def get_absolute_url(self):
