@@ -97,8 +97,17 @@ class MethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Method
         fields = (
-            "revision_name", "revision_number", "revision_desc", "user", "users_allowed", "groups_allowed",
-            "url", "absolute_url", "removal_plan", "family_name"
+            "revision_name",
+            "display_name",
+            "revision_number",
+            "revision_desc",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "url",
+            "absolute_url",
+            "removal_plan",
+            "family_name"
         )
 
     def get_absolute_url(self, obj):

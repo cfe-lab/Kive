@@ -1,11 +1,12 @@
 function method_link($td, method) {
-    var $a = $("<a/>").attr("href", method["absolute_url"]).text(method["revision_name"]);
+    var $a = $("<a/>").attr("href", method["absolute_url"]).text(method["display_name"]);
     $td.append($a);
 }
 
 var MethodsTable = function($table, family_pk, is_user_admin) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.list_url = "../../api/methodfamilies/" + family_pk + "/methods/";
+    this.registerColumn("#", "revision_number");
     this.registerColumn("Name", method_link);
     this.registerColumn("Description", "revision_desc");
 };
