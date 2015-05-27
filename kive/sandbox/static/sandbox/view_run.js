@@ -15,10 +15,8 @@ function setupRunView(rtp_id, pipeline_id, md5) {
     self.timer = null;
     self.timerInterval = 1000;
 
-
     // Methods
     function grabStatus() {
-
         if(self.timer === null)
             self.timer = setInterval(grabStatus, self.timerInterval);
 
@@ -32,7 +30,7 @@ function setupRunView(rtp_id, pipeline_id, md5) {
                 msg = 'Waiting for run to start <img src="/static/sandbox/preload.gif"/>';
             else {
                 if(stat.indexOf('!') > -1) {
-                    msg = '<a href="/view_results/'+run.id+'">Failed!</a>';
+                    msg = '<a href="/view_results/'+rtp_id+'">Failed!</a>';
                     clearInterval(self.timer);
                 } else if(stat.indexOf('.') > -1 || stat.indexOf('+') > -1 || stat.indexOf(':') > -1)
                     msg = 'In progress <img src="/static/sandbox/preload.gif"/>';

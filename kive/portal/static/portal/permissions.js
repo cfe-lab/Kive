@@ -193,15 +193,27 @@ var permissions = (function() {
         }
         permissions_table.ajax_request = $.getJSON(
                 permissions_table.list_url,
-                permissions_table.getQueryParams(),
-                function (response) {
+                permissions_table.getQueryParams()).done(function(response) {
                     var rows;
-                    permissions_table.ajax_request = undefined;
                     rows = permissions_table.extractRows(response);
                     permissions_table.buildTable(rows);
+                }).fail(function() {
+                    permissions_table.$tbody.empty();
+                    permissions_table.setCaption('Failed to reload table.');
+                }).always(function() {
+                    permissions_table.ajax_request = undefined;
                 });
     }
     
+    my.PermissionsTable.prototype.setCaption = function(text) {
+        var $caption = this.$table.find('caption');
+        if ( ! $caption.length) {
+            $caption = $('<caption/>');
+            this.$table.append($caption);
+        }
+        $caption.text(text);
+    }
+
     /** Get query parameters from the current state of the table and page.
      * 
      */
@@ -244,7 +256,7 @@ var permissions = (function() {
         var message = "This will " + action + ":\n";
         for(var k in plan) {
             if (plan[k] != 0) {
-                message += plan[k] + " " + k + "(s)\n";
+                message += plan[k] + " " + k + "\n";
             }
         }
 

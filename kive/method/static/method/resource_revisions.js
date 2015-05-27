@@ -3,8 +3,8 @@
 // Use a closure so as not to muck up the global namespace
 (function(window){
 
-    function coderevision_link($td, coderesource) {
-        var $a = $("<a/>").attr("href", coderesource["absolute_url"]).text(coderesource["revision_name"]);
+    function coderevision_link($td, revision) {
+        var $a = $("<a/>").attr("href", revision["absolute_url"]).text(revision["display_name"]);
         $td.append($a);
     }
 

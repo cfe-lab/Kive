@@ -669,7 +669,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (action == 'display') {
                 sel = sel[0];
                 if(sel instanceof OutputNode)
-                    window.location = '/dataset_view/' + sel.dataset_id;
+                    window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'download') {
                 sel = sel[0];
@@ -679,12 +679,12 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (action == 'viewlog') {
                 sel = sel[0];
                 if(sel instanceof MethodNode)
-                    window.location = '/stdout_view/' + sel.log_id;
+                    window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
                 if(sel instanceof MethodNode)
-                    window.location = '/stderr_view/' + sel.log_id;
+                    window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
         }
         $('.context_menu').hide();
@@ -790,6 +790,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // arguments to initialize new Pipeline Family
         var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
+            family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
             users_allowed = $("#id_users_allowed").val(),
@@ -818,7 +819,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             users_allowed: users_allowed,
             groups_allowed: groups_allowed,
             // There is no PipelineFamily yet; we're going to create one.
-            family_pk: null,
+            family_pk: family_pk,
             family_name: family_name,
             family_desc: family_desc,
             // arguments to add first pipeline revision

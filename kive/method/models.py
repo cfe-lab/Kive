@@ -67,7 +67,7 @@ class CodeResource(metadata.models.AccessControl):
         Date of most recent revision to this CodeResource.
         """
         if self.revisions.count() == 0:
-            return 'n/a'
+            return None
         return max([revision.revision_DateTime for revision in self.revisions.all()])
 
     def get_absolute_url(self):
@@ -152,6 +152,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
             max_length=64,
             blank=True,
             help_text="Used to validate file contents of this resource revision")
+    
+    @property
+    def display_name(self):
+        return self.revision_name or self.coderesource.name
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -506,9 +510,14 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
+    
+    @property
+    def display_name(self):
+        return self.revision_name or self.family.name
 
     class Meta:
         unique_together = (("family", "revision_number"))
+        ordering = ["-revision_number"]
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)

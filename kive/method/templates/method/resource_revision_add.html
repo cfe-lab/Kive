@@ -24,12 +24,16 @@
         <!-- this form is pre-populated with the data of the last revision -->
         <tr>
             <td></td>
-            <th>{{ parent_revision.revision_name }} ({{ parent_revision.revision_number }})</th>
+            {% if parent_revision %}
+                <th>{{ parent_revision.revision_name }} ({{ parent_revision.revision_number }})</th>
+            {% endif %}
             <th><i>Revision</i> ({{ coderesource.num_revisions|add:"1" }})</th>
         </tr>
         <tr>
             <th>{{ revision_form.content_file.label }} <div class="helptext">{{ revision_form.content_file.help_text }}</div></th>
-            <td style="font-style:italic">{{ parent_revision.filename }}</td>
+            {% if parent_revision %}
+                <td style="font-style:italic">{{ parent_revision.filename }}</td>
+            {% endif %}
             <td>{{ revision_form.content_file }}<br>
                 <div class="errortext">{{ revision_form.content_file.errors }}</div></td>
         </tr>
@@ -40,7 +44,9 @@
                 <br/>
                 <i>&nbsp;Optional</i>
             </th>
-            <td></td>
+            {% if parent_revision %}
+                <td></td>
+            {% endif %}
             <td>{{ revision_form.revision_name }}
                 <div class="errortext">{{ revision_form.revision_name.errors }}</div>
             </td>
@@ -48,41 +54,47 @@
         </tr>
         <tr>
             <th>{{ revision_form.revision_desc.label }} <div class="helptext">{{ revision_form.revision_desc.help_text }}</div></th>
-            <td style="font-style:italic">{{ parent_revision.revision_desc }}</td>
+            {% if parent_revision %}
+                <td style="font-style:italic">{{ parent_revision.revision_desc }}</td>
+            {% endif %}
             <td>{{ revision_form.revision_desc }}<br>
                 <div class="errortext">{{ revision_form.revision_desc.errors }}</div>
             </td>
         </tr>
         <tr>
             <th>{{ revision_form.users_allowed.label }} <div class="helptext">{{ revision_form.users_allowed.help_text }}</div></th>
-            <td style="font-style:italic">
-                {% if parent_revision.users_allowed.exists %}
-                <ul>
-                {% for user in parent_revision.users_allowed.all %}
-                    <li>{{ user }}</li>
-                {% endfor %}
-                </ul>
-                {% else %}
-                    None
-                {% endif %}
-            </td>
+            {% if parent_revision %}
+                <td style="font-style:italic">
+                    {% if parent_revision.users_allowed.exists %}
+                    <ul>
+                    {% for user in parent_revision.users_allowed.all %}
+                        <li>{{ user }}</li>
+                    {% endfor %}
+                    </ul>
+                    {% else %}
+                        None
+                    {% endif %}
+                </td>
+            {% endif %}
             <td>{{ revision_form.users_allowed }}<br>
                 <div class="errortext">{{ revision_form.users_allowed.errors }}</div>
             </td>
         </tr>
         <tr>
             <th>{{ revision_form.groups_allowed.label }} <div class="helptext">{{ revision_form.groups_allowed.help_text }}</div></th>
-            <td style="font-style:italic">
-                {% if parent_revision.groups_allowed.exists %}
-                <ul>
-                {% for group in parent_revision.groups_allowed.all %}
-                    <li>{{ group }}</li>
-                {% endfor %}
-                </ul>
-                {% else %}
-                    None
-                {% endif %}
-            </td>
+            {% if parent_revision %}
+                <td style="font-style:italic">
+                    {% if parent_revision.groups_allowed.exists %}
+                    <ul>
+                    {% for group in parent_revision.groups_allowed.all %}
+                        <li>{{ group }}</li>
+                    {% endfor %}
+                    </ul>
+                    {% else %}
+                        None
+                    {% endif %}
+                </td>
+            {% endif %}
             <td>{{ revision_form.groups_allowed }}<br>
                 <div class="errortext">{{ revision_form.groups_allowed.errors }}</div>
             </td>

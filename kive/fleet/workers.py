@@ -13,6 +13,7 @@ import archive.models
 import fleet.models
 import sandbox.execute
 import kive.settings  # @UnresolvedImport
+import os
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -20,6 +21,21 @@ worker_logger = logging.getLogger("fleet.Worker")
 # Shorter sleep makes worker more responsive, generates more load when idle
 SLEEP_SECONDS = 0.1
 
+def adjust_log_files(target_logger, rank):
+    """ Configure a different log file for each worker process.
+    
+    Because multiple processes are not allowed to log to the same file, we have
+    to adjust the configuration.
+    https://docs.python.org/2/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
+    """
+    for handler in target_logger.handlers:
+        filename = getattr(handler, 'baseFilename', None)
+        if filename is not None:
+            handler.close()
+            fileRoot, fileExt = os.path.splitext(filename)
+            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt) 
+    if target_logger.parent is not None:
+        adjust_log_files(target_logger.parent, rank)
 
 class Manager:
     """
@@ -65,7 +81,8 @@ class Manager:
         self.count = self.comm.Get_size()
         self.mgr_hostname = MPI.Get_processor_name()
 
-        mgr_logger.debug("Manager started on host {}".format(self.mgr_hostname))
+        adjust_log_files(mgr_logger, self.rank)
+        mgr_logger.info("Manager started on host {}".format(self.mgr_hostname))
 
         workers_reported = 0
         while workers_reported < self.count - 1:
@@ -257,7 +274,6 @@ class Manager:
         return workers_freed
 
     def main_procedure(self):
-        mgr_logger.info("Manager starting.")
         mpi_info = MPI.Info.Create()
         mpi_info.Set("add-hostfile", "kive/hostfile")
         
@@ -391,6 +407,7 @@ class Worker:
         self.count = self.comm.Get_size()
         self.wkr_hostname = MPI.Get_processor_name()
 
+        adjust_log_files(worker_logger, self.rank)
         worker_logger.debug("Worker {} started on host {}".format(self.rank, self.wkr_hostname))
 
         # Report to the manager.

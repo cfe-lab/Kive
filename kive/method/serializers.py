@@ -37,8 +37,18 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CodeResourceRevision
-        fields = ('id', 'url', 'revision_name', 'user', 'removal_plan',  'users_allowed', 'groups_allowed',
-                  'absolute_url', 'revision_number', 'revision_desc', 'revision_DateTime',
+        fields = ('id',
+                  'url',
+                  'revision_name',
+                  'display_name',
+                  'user',
+                  'removal_plan',
+                   'users_allowed',
+                  'groups_allowed',
+                  'absolute_url',
+                  'revision_number',
+                  'revision_desc',
+                  'revision_DateTime',
                   'code_resource_name')
 
     def get_absolute_url(self, obj):
@@ -87,8 +97,17 @@ class MethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Method
         fields = (
-            "revision_name", "revision_number", "revision_desc", "user", "users_allowed", "groups_allowed",
-            "url", "absolute_url", "removal_plan", "family_name"
+            "revision_name",
+            "display_name",
+            "revision_number",
+            "revision_desc",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "url",
+            "absolute_url",
+            "removal_plan",
+            "family_name"
         )
 
     def get_absolute_url(self, obj):

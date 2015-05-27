@@ -177,6 +177,7 @@ function update_status(canvasState, run, look_for_md5) {
         if (shape instanceof MethodNode) {
             shape.status = pipeline_steps[method_pk].status;
             shape.log_id = pipeline_steps[method_pk].log_id;
+            shape.rtp_id = run.rtp_id;
         }
     }
 
@@ -187,6 +188,7 @@ function update_status(canvasState, run, look_for_md5) {
             shape.status = outputs[output_pk].status;
             shape.md5 = outputs[output_pk].md5;
             shape.dataset_id = outputs[output_pk].dataset_id;
+            shape.rtp_id = run.rtp_id;
 
             if (shape.md5 === look_for_md5) {
                 shape.found_md5 = true;

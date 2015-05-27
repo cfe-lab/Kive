@@ -87,7 +87,11 @@ $(document).ready(function(){
 
 {% block content %}
 
-<a href="/datasets" rel="prev">Back to list of datasets</a>
+{% if return %}
+    <a href="{{return}}" rel="prev">Back</a>
+{% else %}
+    <a href="/datasets" rel="prev">Back to list of datasets</a>
+{% endif %}
 
 <h2>{{ dataset.name }}</h2>
 <a href="{{ dataset.get_absolute_url }}">Download</a>
