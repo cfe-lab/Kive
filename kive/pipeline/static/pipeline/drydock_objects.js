@@ -86,6 +86,13 @@ var Geometry = {
         
          */
     },
+    iso2twodim: function(iso_x, iso_y) {
+        // inverse of [ isometricXCoord, isometricYCoord ]
+        return {
+            x: (iso_y + iso_x) / 1.154700538, 
+            y: (iso_y - iso_x) / 2
+        };
+    },
     isometricSort: function(x1,y1,x2,y2) {
         // returns 1 if the first set of coordinates is after the second,
         // -1 if the reverse is true, 0 if it's a tie. order goes left-to-right,

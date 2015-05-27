@@ -314,7 +314,7 @@ CanvasState.prototype.doMove = function(e) {
     
 };
 
-CanvasState.prototype.scaleToCanvas = function() {
+CanvasState.prototype.scaleToCanvas = function(maintain_aspect_ratio) {
     // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
     var x_ar = [], y_ar = [],
         margin = {
@@ -340,6 +340,14 @@ CanvasState.prototype.scaleToCanvas = function() {
             x: (this.width  - margin.x * 2) / pipeline_width,
             y: (this.height - margin.y * 2) / pipeline_height
         };
+        
+    if (maintain_aspect_ratio == true) {
+        if (scale.x < scale.y) {
+            scale.y = scale.x;
+        } else {
+            scale.x = scale.y;
+        }
+    }
     
     /*
     for both x and y dimensions, 4 numbers are now available:
@@ -378,6 +386,141 @@ CanvasState.prototype.centreCanvas = function() {
     this.valid = false;
 };
 
+CanvasState.prototype.autoLayout = function() {
+    /* @todo
+     * exec_order is changed by this function. this should not be allowed.
+     */
+    var nodes = this.exec_order,
+        node_order = [],
+        magnets_in_order,
+        layer,
+        node,
+        shapes = this.shapes,
+        layers = nodes.length,
+        max_layer = nodes[0].length,
+        x_spacing = 60,
+        y_spacing = 130,
+        y_drop = 20,
+        i, j, layer_length, position;
+    
+    for (i = 1; i < nodes.length; i++) {
+        if (nodes[i].length > max_layer) {
+            max_layer = nodes[i].length;
+        }
+    }
+    
+    // go to first exec_order layer
+    // get all in-magnets in order
+    // get all inputs
+    // filter out duplicates
+    // insert into node_order
+    
+    magnets_in_order = [];
+    layer = [];
+    for (i = 0; i < this.exec_order[0].length; i++) {
+        magnets_in_order = magnets_in_order.concat(this.exec_order[0][i].in_magnets);
+    }
+    for (i = 0; i < magnets_in_order.length; i++) {
+        for (j = 0; j < magnets_in_order[i].connected.length; j++) {
+            node = magnets_in_order[i].connected[j].source.parent;
+            if (layer.indexOf(node) === -1) {
+                layer.push(node);
+            }
+        }
+    }
+    node_order.push(layer);
+    
+    // go to first exec_order layer
+    // insert into node_order
+    
+    node_order.push(this.exec_order[0]);
+    
+    // A: get all out-magnets in order
+    // sort exec_order[n+1] by this, but including output nodes
+    // insert exec_order[n+1]+outputs into node_order
+    // go to next exec_order layer
+    // go to A until all nodes are inserted
+    
+    var magnet, this_node, this_connected, connected_nodes_in_order, k, l, last_layer;
+    
+    for (i = 0; i < this.exec_order.length; i++) {
+        connected_nodes_in_order = [];
+        for (j = 0; j < this.exec_order[i].length; j++) {
+            this_node = this.exec_order[i][j];
+            for (k = 0; k < this_node.out_magnets.length; k++) {
+                for (l = 0; l < this_node.out_magnets[k].connected.length; l++) {
+                    this_connected = this_node.out_magnets[k].connected[l].dest.parent;
+                    if (connected_nodes_in_order.indexOf(this_connected) === -1) {
+                        connected_nodes_in_order.push(this_connected);
+                    }
+                }
+            }
+            for (k = 0; k < this_node.in_magnets.length; k++) {
+                for (l = 0; l < this_node.in_magnets[k].connected.length; l++) {
+                    this_connected = this_node.in_magnets[k].connected[l].source.parent;
+                    last_layer = node_order[node_order.length - 2];
+                    if ((this_connected instanceof RawNode || this_connected instanceof CDtNode) && last_layer.indexOf(this_connected) === -1) {
+                        last_layer.push(this_connected);
+                    }
+                }
+            }
+        }
+        layer = [];
+        for (j = 0; j < connected_nodes_in_order.length; j++) {
+            this_node = connected_nodes_in_order[j];
+            if (
+                    (
+                        this_node instanceof OutputNode || 
+                        typeof this.exec_order[i+1] !== 'undefined' &&
+                        this.exec_order[i+1].indexOf(this_node) > -1
+                    ) &&
+                    layer.indexOf(this_node) === -1) {
+                layer.push(this_node);
+            }
+        }
+        node_order.push(layer);
+    }
+    
+    //x: x * 0.577350269 - y - i * spacing == 0
+    //y: x * 0.577350269 + y - j * spacing == 0
+    
+    for (j = 0; j < node_order.length; j++) {
+        layer_length = node_order[j].length;
+        layer_out_magnets = [];
+        position = 0;
+        
+        if (j === 0) {
+            node_order[j].center_x = 0;
+        }
+        
+        for (i = 0; i < layer_length; i++ ) {
+            node = node_order[j][i];
+            node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538
+            node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
+            node.dx = 0;
+            node.dy = 0;
+            
+            if (node.out_magnets.length > 0) {
+                node.draw(this.ctx);// needed to update magnet coords
+                layer_out_magnets = layer_out_magnets.concat(node.out_magnets);
+            }
+        }
+        if (j !== node_order.length - 1) {
+            num_magnets = layer_out_magnets.length;
+            layer_out_magnets = layer_out_magnets.reduce(function(a,b) { return [ a[0]+b.x, a[1]+b.y ]; }, [0,0]);
+            node_order[j+1].center_x = Geometry.isometricXCoord( layer_out_magnets[0] / num_magnets, layer_out_magnets[1] / num_magnets );
+        }
+    }
+    
+    this.scaleToCanvas(true);// argument is to maintain aspect ratio
+    this.centreCanvas();
+    this.testExecutionOrder();
+    for (var i=0; i<this.shapes.length; i++) {
+        this.detectCollisions(this.shapes[i]);
+    }
+    this.valid = false;
+};
+
 CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices(),
@@ -387,7 +530,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
     // Bias defines how much to move myShape vs how much to move the shape it collided with.
     // 1 would be 100% myShape movement, 0 would be 100% other shape movement, and everything
     // else in-between is possible.
-    if (bias == null) bias = .75;
+    if (bias === undefined || bias === null) bias = .75;
     
     for (var i = 0; i < this.shapes.length; i++) {
         var shape = this.shapes[i];
