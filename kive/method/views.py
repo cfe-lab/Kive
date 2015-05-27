@@ -51,7 +51,6 @@ def resource_revisions(request, id):
     """
     Display a list of all revisions of a specific Code Resource in database.
     """
-    c = RequestContext(request)
     four_oh_four = False
     try:
         coderesource = CodeResource.objects.get(pk=id)
@@ -64,22 +63,74 @@ def resource_revisions(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
+    if request.method == 'POST':
+        # Use forms here, just as in resource_add.  Again note that entries of dep_forms may be None.
+        revision_form = CodeResourceRevisionForm(request.POST, request.FILES)
+        dep_forms = _make_dep_forms(request.POST.dict(), request.user)
+        t = loader.get_template('method/resource_revision_add.html')
+
+        all_good = True
+        if not revision_form.is_valid():
+            all_good = False
+        for dep_form in [x for x in dep_forms if x is not None]:
+            if not dep_form.is_valid():
+                all_good = False
+
+        if not all_good:
+            c = RequestContext(request,
+                               {'revision_form': revision_form,
+                                'parent_revision': None,
+                                'coderesource': coderesource,
+                                'dep_forms': dep_forms})
+            return HttpResponse(t.render(c))
+
+
+        try:
+            _make_crv(request.FILES['content_file'],
+                      request.user,
+                      revision_form,
+                      dep_forms,
+                      code_resource=coderesource)
+        except ValidationError:
+            # The forms have all been updated with the appropriate errors.
+            c = RequestContext(request,
+                               {'revision_form': revision_form,
+                                'parent_revision': None,
+                                'coderesource': coderesource,
+                                'dep_forms': dep_forms})
+            return HttpResponse(t.render(c)) # CodeResourceRevision object required for next steps
+
+        # Success; return to the resources page.
+        return HttpResponseRedirect('/resources')
+
     # Cast request.user to class KiveUser & grab data
     curr_user = metadata.models.KiveUser.kiveify(request.user)
     revisions = coderesource.revisions.filter(curr_user.access_query()).\
         distinct().order_by('-revision_number')
+    if len(revisions) == 0:
+        t = loader.get_template('method/resource_revision_add.html')
+        creating_user = request.user
+        crv_form = CodeResourceRevisionForm()
+        dep_forms = [CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0')]
+
+        c = RequestContext(request,
+                           {'revision_form': crv_form,
+                            'parent_revision': None,
+                            'coderesource': coderesource,
+                            'dep_forms': dep_forms})
+        return HttpResponse(t.render(c))
+        
     revisions_json = json.dumps(
         CodeResourceRevisionSerializer(revisions, context={'request': request}, many=True).data
     )
 
     # Load template, setup context
     t = loader.get_template('method/resource_revisions.html')
-    c.update({
-        'coderesource': coderesource,
-        'revisions': revisions,
-        'is_user_admin': admin_check(request.user),
-        'coderesourcerevisions': revisions_json
-    })
+    c = RequestContext(request,
+                       {'coderesource': coderesource,
+                        'revisions': revisions,
+                        'is_user_admin': admin_check(request.user),
+                        'coderesourcerevisions': revisions_json})
     return HttpResponse(t.render(c))
 
 
@@ -112,7 +163,12 @@ def _make_dep_forms(query_dict, user):
 
 
 @transaction.atomic
-def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revision=None):
+def _make_crv(file_in_memory,
+              creating_user,
+              crv_form,
+              dep_forms,
+              parent_revision=None,
+              code_resource=None):
     """
     Helper that creates a CodeResourceRevision (and a CodeResource as well if appropriate).
     """
@@ -122,7 +178,9 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
     for dep_form in dep_forms:
         assert isinstance(dep_form, CodeResourceDependencyForm) or dep_form is None
 
-    if parent_revision is None:
+    if code_resource is None and parent_revision is not None:
+        code_resource = parent_revision.coderesource
+    if code_resource is None:
         # crv_form is a CodeResourcePrototypeForm.
         code_resource = CodeResource(
             name=crv_form.cleaned_data['resource_name'],
@@ -130,8 +188,14 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
             filename=file_in_memory.name,
             user=creating_user
         )
-        # Skip the clean until later; after all, we're protected by a transaction here.
-        code_resource.save()
+        try:
+            code_resource.full_clean()
+            # Skip the clean until later; after all, we're protected by a transaction here.
+            code_resource.save()
+        except ValidationError as e:
+            crv_form.add_error('resource_name', e.error_dict.get('name', []))
+            crv_form.add_error('resource_desc', e.error_dict.get('description', []))
+            raise
 
         for user in crv_form.cleaned_data["users_allowed"]:
             code_resource.users_allowed.add(user)
@@ -141,7 +205,6 @@ def _make_crv(file_in_memory, creating_user, crv_form, dep_forms, parent_revisio
         rev_name = "Prototype"
         rev_desc = crv_form.cleaned_data["resource_desc"]
     else:
-        code_resource = parent_revision.coderesource
         rev_name = crv_form.cleaned_data["revision_name"]
         rev_desc = crv_form.cleaned_data["revision_desc"]
 
@@ -212,11 +275,12 @@ def resource_add(request):
     copy the revision file over to the sandbox.
     NAME provides an opportunity to provide a more intuitive and user-accessible name.
     """
-    t = loader.get_template('method/resource_add.html')
-    c = RequestContext(request)
     creating_user = request.user
+    response_dep_forms = None
 
-    if request.method == 'POST':
+    if request.method != 'POST':
+        resource_form = CodeResourcePrototypeForm()
+    else:
         # Using forms here provides validation and better parsing of parameters in the request.
         resource_form = CodeResourcePrototypeForm(request.POST, request.FILES)
         dep_forms = _make_dep_forms(request.POST.dict(), creating_user)
@@ -226,28 +290,31 @@ def resource_add(request):
         if not resource_form.is_valid():
             all_good = False
         for dep_form in [x for x in dep_forms if x is not None]:
+            response_dep_forms = dep_forms
             if not dep_form.is_valid():
                 all_good = False
 
-        if not all_good:
-            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
-            return HttpResponse(t.render(c))
+        if all_good:
+            # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
+            try:
+                _make_crv(request.FILES["content_file"],
+                          creating_user,
+                          resource_form,
+                          dep_forms)
+                
+                # Success -- return to the resources root page.
+                return HttpResponseRedirect('/resources')
+            except ValidationError:
+                # All forms have the appropriate errors attached.
+                pass
 
-        # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
-        try:
-            _make_crv(request.FILES["content_file"], creating_user, resource_form, dep_forms)
-        except ValidationError:
-            # All forms have the appropriate errors attached.
-            c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
-            return HttpResponse(t.render(c))
-
-        # Success -- return to the resources root page.
-        return HttpResponseRedirect('/resources')
-    else:
-        resource_form = CodeResourcePrototypeForm()
-        dep_forms = [CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0')]
-
-    c.update({'resource_form': resource_form, 'dep_forms': dep_forms})
+    if response_dep_forms is None:
+        response_dep_forms = [CodeResourceDependencyForm(user=creating_user,
+                                                         auto_id='id_%s_0')]
+    t = loader.get_template('method/resource_add.html')
+    c = RequestContext(request,
+                       {'resource_form': resource_form,
+                        'dep_forms': response_dep_forms})
     return HttpResponse(t.render(c))
 
 
