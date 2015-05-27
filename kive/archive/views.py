@@ -78,6 +78,9 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser.
     """
+    return_to_rtp = request.GET.get('rtp_id', None)
+    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+
     try:
         accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
         dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
@@ -95,13 +98,14 @@ def dataset_view(request, dataset_id):
         processed_rows = dataset.rows(data_check=True, insert_at=insert)
 
     t = loader.get_template("archive/dataset_view.html")
-    c = RequestContext(request, {"dataset": dataset, 'column_matching': col_matching, 'processed_rows': processed_rows})
+    c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
+                                 'return': return_url})
     return HttpResponse(t.render(c))
 
 
-def _build_raw_viewer(request, file, name, download=None):
+def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
     t = loader.get_template("archive/raw_view.html")
-    c = RequestContext(request, {"file": file, "name": name, 'download': download})
+    c = RequestContext(request, {"file": file, "name": name, 'download': download, 'return': return_to_url})
     return HttpResponse(t.render(c))
     
 
@@ -123,12 +127,16 @@ def stdout_view(request, methodoutput_id):
     """
     Display the standard output associated with the method output in the browser.
     """
+    return_to_rtp = request.GET.get('rtp_id', None)
+    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url())
+    return _build_raw_viewer(request, methodoutput.output_log, 'Standard out', methodoutput.get_absolute_log_url(),
+                             return_url)
 
 
 @login_required
@@ -149,12 +157,16 @@ def stderr_view(request, methodoutput_id):
     """
     Display the standard error associated with the method output in the browser.
     """
+    return_to_rtp = request.GET.get('rtp_id', None)
+    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_raw_viewer(request, methodoutput.error_log, 'Standard error', methodoutput.get_absolute_error_url())
+    return _build_raw_viewer(request, methodoutput.error_log, 'Standard error', methodoutput.get_absolute_error_url(),
+                             return_url)
 
 
 @login_required

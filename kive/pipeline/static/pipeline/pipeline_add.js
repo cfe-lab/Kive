@@ -669,7 +669,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (action == 'display') {
                 sel = sel[0];
                 if(sel instanceof OutputNode)
-                    window.location = '/dataset_view/' + sel.dataset_id;
+                    window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'download') {
                 sel = sel[0];
@@ -679,12 +679,12 @@ $(function() { // wait for page to finish loading before executing jQuery code
             if (action == 'viewlog') {
                 sel = sel[0];
                 if(sel instanceof MethodNode)
-                    window.location = '/stdout_view/' + sel.log_id;
+                    window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
                 if(sel instanceof MethodNode)
-                    window.location = '/stderr_view/' + sel.log_id;
+                    window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
         }
         $('.context_menu').hide();
