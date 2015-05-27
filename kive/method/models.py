@@ -152,6 +152,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
             max_length=64,
             blank=True,
             help_text="Used to validate file contents of this resource revision")
+    
+    @property
+    def display_name(self):
+        return self.revision_name or self.coderesource.name
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)

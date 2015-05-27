@@ -37,8 +37,18 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CodeResourceRevision
-        fields = ('id', 'url', 'revision_name', 'user', 'removal_plan',  'users_allowed', 'groups_allowed',
-                  'absolute_url', 'revision_number', 'revision_desc', 'revision_DateTime',
+        fields = ('id',
+                  'url',
+                  'revision_name',
+                  'display_name',
+                  'user',
+                  'removal_plan',
+                   'users_allowed',
+                  'groups_allowed',
+                  'absolute_url',
+                  'revision_number',
+                  'revision_desc',
+                  'revision_DateTime',
                   'code_resource_name')
 
     def get_absolute_url(self, obj):
