@@ -22,10 +22,15 @@
 $(function() {
     // change pipeline revision drop-down triggers ajax to redraw canvas
     $('#id_pipeline_select').on('change', function () {
+        var pipeline_id = $('#id_pipeline_select').val();
+        if (pipeline_id === null) {
+            submit_to_url = $('#id_family_pk').val();
+            return;
+        }
         $.ajax({
             type: "POST",
             url: "/get_pipeline/",
-            data: { pipeline_id: $('#id_pipeline_select').val() },
+            data: { pipeline_id: pipeline_id },
             datatype: "json",
             success: function(result) {
                 // prepare to redraw canvas
@@ -105,6 +110,7 @@ $(function() {
                     <option value="{{ revision.id }}">{{ revision.revision_number }}: {{ revision.revision_name }}</option>
                     {% endfor %}
                 </select>
+                <input type="hidden" id="id_family_pk" value="{{ family.pk }}"/>
                 <input type="hidden" id="id_family_name" value="{{ family.name }}"/>
                 <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
 

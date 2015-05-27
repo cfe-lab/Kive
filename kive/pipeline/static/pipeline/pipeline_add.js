@@ -790,6 +790,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
         // arguments to initialize new Pipeline Family
         var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
+            family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
             users_allowed = $("#id_users_allowed").val(),
@@ -818,7 +819,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             users_allowed: users_allowed,
             groups_allowed: groups_allowed,
             // There is no PipelineFamily yet; we're going to create one.
-            family_pk: null,
+            family_pk: family_pk,
             family_name: family_name,
             family_desc: family_desc,
             // arguments to add first pipeline revision

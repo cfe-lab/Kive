@@ -28,6 +28,7 @@ class PipelineFamilySerializer(serializers.ModelSerializer):
     groups_allowed = serializers.StringRelatedField(many=True)
 
     members = PipelineSerializer(many=True)
+    members_url = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-pipelines')
     published_version = PipelineSerializer(allow_null=True)
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
     absolute_url = serializers.SerializerMethodField()
@@ -35,8 +36,19 @@ class PipelineFamilySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PipelineFamily
-        fields = ('id', 'url', 'name', "description", "user", "users_allowed", "groups_allowed",
-                  'members', 'published_version', "absolute_url", 'removal_plan', "num_revisions")
+        fields = ('id',
+                  'url',
+                  'name',
+                  "description",
+                  "user",
+                  "users_allowed",
+                  "groups_allowed",
+                  'members_url',
+                  'members',
+                  'published_version',
+                  "absolute_url",
+                  'removal_plan',
+                  "num_revisions")
 
     def get_absolute_url(self, obj):
         if not obj:

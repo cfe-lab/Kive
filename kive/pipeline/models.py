@@ -553,21 +553,24 @@ class Pipeline(transformation.models.Transformation):
             groups_allowed = []
 
         if pipeline is None:
-            # Does Pipeline family with this name already exist?
-            if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
-                raise PipelineSerializationException('Duplicate pipeline family name')
-
-            # Make a new PipelineFamily.
-            pl_family = PipelineFamily(
-                name=form_data['family_name'],
-                description=form_data['family_desc'],
-                user=creating_user
-            )
-            pl_family.save()
-            for u in users_allowed:
-                pl_family.users_allowed.add(u)
-            for g in groups_allowed:
-                pl_family.groups_allowed.add(g)
+            if form_data.get('family_pk') is not None:
+                pl_family = PipelineFamily.objects.get(pk=form_data['family_pk'])
+            else:
+                # Does Pipeline family with this name already exist?
+                if PipelineFamily.objects.filter(name=form_data['family_name']).exists():
+                    raise PipelineSerializationException('Duplicate pipeline family name')
+    
+                # Make a new PipelineFamily.
+                pl_family = PipelineFamily(
+                    name=form_data['family_name'],
+                    description=form_data['family_desc'],
+                    user=creating_user
+                )
+                pl_family.save()
+                for u in users_allowed:
+                    pl_family.users_allowed.add(u)
+                for g in groups_allowed:
+                    pl_family.groups_allowed.add(g)
 
             # Make a new Pipeline revision within this PipelineFamily.
             pipeline = pl_family.members.create(

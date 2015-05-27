@@ -120,8 +120,12 @@ def pipeline_revise(request, id):
         form_data = prepare_pipeline_dict(request.body, request.user)
         try:
             parent_pk = form_data['revision_parent_pk']
-            parent_revision = Pipeline.objects.get(pk=parent_pk)
-            parent_revision.revise_from_dict(form_data)
+            if parent_pk is None:
+                Pipeline.create_from_dict(form_data)
+            else:
+                parent_revision = Pipeline.objects.get(pk=parent_pk)
+                parent_revision.revise_from_dict(form_data)
+                
             response_data = {'status': 'success', 'error_msg': ''}
         except PipelineSerializationException as e:
             response_data = {'status': 'failure', 'error_msg': str(e)}
