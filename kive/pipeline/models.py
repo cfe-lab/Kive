@@ -141,6 +141,7 @@ class Pipeline(transformation.models.Transformation):
     # revision_number must be unique within PipelineFamily.
     class Meta:
         unique_together = (("family", "revision_number"))
+        ordering = ["family__name", "-revision_number"]
 
     def __str__(self):
         """Represent pipeline by revision name and pipeline family"""

@@ -5,6 +5,12 @@
 
 {% block content %}
 <nav><ul>
+    <li>
+        <a href="/usr.html">
+        <h4 class="menu-item">Users portal</h4>
+        <p class="menu-description">Upload data sets and process data using pipelines.</p>
+        </a>
+    </li>
     {% if is_developer %}
     <li>
         <a href="/dev.html">
@@ -13,12 +19,6 @@
         </a>
     </li>
     {% endif %}
-    <li>
-        <a href="/usr.html">
-        <h4 class="menu-item">Users portal</h4>
-        <p class="menu-description">Upload data sets and process data using pipelines.</p>
-        </a>
-    </li>
     {% if user.is_staff %}
     <li>
         <a href="/admin/">
