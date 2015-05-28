@@ -517,7 +517,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     class Meta:
         unique_together = (("family", "revision_number"))
-        ordering = ["-revision_number"]
+        ordering = ["family__name", "-revision_number"]
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)

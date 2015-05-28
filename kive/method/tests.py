@@ -2995,7 +2995,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
         # There are four CDTs loaded into the Database by default.
         self.assertEquals(len(response.data), 6)
-        self.assertEquals(response.data[0]['revision_name'], 'mA_name')
+        self.assertEquals(response.data[0]['revision_name'], 'mC_name')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
