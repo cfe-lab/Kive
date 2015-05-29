@@ -38,6 +38,7 @@ var permissions = (function() {
         this.$table = $table;
         this.is_user_admin = is_user_admin;
         this.is_locked = true;
+        this.image_path = '/static/portal/img';
         this.registered_columns = [];
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
@@ -98,9 +99,9 @@ var permissions = (function() {
         }
         this.$lockImage.attr(
                 'src',
-                this.is_locked
-                ? '/static/portal/img/lock-locked-2x.png'
-                : '/static/portal/img/lock-unlocked-2x.png');
+                this.image_path + (this.is_locked
+                ? '/lock-locked-2x.png'
+                : '/lock-unlocked-2x.png'));
         this.$lockSpan.text(this.is_locked ? '' : 'Administrator:');
         $.each(rows, function() {
             var $a,

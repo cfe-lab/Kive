@@ -7,6 +7,7 @@ describe("PermissionsTable", function() {
         this.ExamplesTable = function($table, is_user_admin) {
             permissions.PermissionsTable.call(this, $table, is_user_admin);
             this.list_url = "/api/examples/";
+            this.image_path = "portal/static/portal/img";
             this.registerColumn("Name", "name");
         };
         this.ExamplesTable.prototype = Object.create(
