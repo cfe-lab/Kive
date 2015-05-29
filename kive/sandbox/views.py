@@ -98,7 +98,6 @@ def run_pipeline(request):
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    print request.POST
     try:
         # If we need to bail, in most cases we will use this template.
         template = loader.get_template("sandbox/choose_inputs.html")

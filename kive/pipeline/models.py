@@ -484,7 +484,6 @@ class Pipeline(transformation.models.Transformation):
         except Exception as e:
             # Note that this is logger, not self.logger: this is a class method so it will write
             # to the module-level logger.
-            print PS_dict
             raise PipelineSerializationException("Error in creating pipeline step: {}".format(e))
 
         return pipeline_step
@@ -524,7 +523,6 @@ class Pipeline(transformation.models.Transformation):
             raise e
 
         except Exception as e:
-            print outcable_dict
             raise PipelineSerializationException("Error in creating pipeline output cable: {}".format(e))
 
         return new_outcable
