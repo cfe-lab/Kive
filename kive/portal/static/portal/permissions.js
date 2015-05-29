@@ -1,6 +1,5 @@
-"use strict";
-
 var permissions = (function() {
+    "use strict";
     var my = {};
     
     /** A base class for building a table with permissions columns.
@@ -42,7 +41,7 @@ var permissions = (function() {
         this.registered_columns = [];
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
-    }
+    };
     
     /**
      * Register a column to be added to the table.
@@ -62,16 +61,18 @@ var permissions = (function() {
             column.data = source;
         }
         this.registered_columns.push(column);
-    }
+    };
     
     function defaultBuilder($td, row, field_name) {
-        $td.text(row[field_name])
+        $td.text(row[field_name]);
     }
     
     my.PermissionsTable.prototype.buildTable = function(rows) {
         var $tr,
             $a,
-            permissions_table = this;
+            permissions_table = this,
+            lock_icon = this.image_path +
+                (this.is_locked ? '/lock-locked-2x.png' : '/lock-unlocked-2x.png');
         
         if (this.$tbody !== undefined) {
             this.$tbody.empty();
@@ -97,11 +98,7 @@ var permissions = (function() {
             this.$tbody = $('<tbody/>');
             this.$table.append(this.$tbody);
         }
-        this.$lockImage.attr(
-                'src',
-                this.image_path + (this.is_locked
-                ? '/lock-locked-2x.png'
-                : '/lock-unlocked-2x.png'));
+        this.$lockImage.attr('src', lock_icon);
         this.$lockSpan.text(this.is_locked ? '' : 'Administrator:');
         $.each(rows, function() {
             var $a,
@@ -119,15 +116,15 @@ var permissions = (function() {
                     },
                     this.reload_interval);
         }
-    }
+    };
     
     my.PermissionsTable.prototype.buildHeaders = function($tr) {
         this.buildPermissionHeaders($tr);
-    }
+    };
     
     my.PermissionsTable.prototype.buildCells = function($tr, row) {
         this.buildPermissionCells($tr, row);
-    }
+    };
     
     my.PermissionsTable.prototype.buildPermissionHeaders = function($tr) {
         var $a;
@@ -143,7 +140,7 @@ var permissions = (function() {
                     .addClass('lock')
                     .append($('<div/>').append($a, this.$lockSpan)));
         }
-    }
+    };
     
     my.PermissionsTable.prototype.buildPermissionCells = function($tr, row) {
         var $td;
@@ -154,16 +151,14 @@ var permissions = (function() {
         });
         $td = $('<td/>');
         if ( ! this.is_locked) {
-            if (row.removal_plan !== undefined
-                    && row.removal_plan !== null) {
+            if (row.removal_plan !== undefined && row.removal_plan !== null) {
                 $tr.append($('<td/>').append($('<a/>')
                         .attr('plan', row.removal_plan)
                         .attr('href', row.url)
                         .text('Remove')
                         .click(this, clickRemove)));
             }
-            if (row.redaction_plan !== undefined
-                    && row.redaction_plan !== null) {
+            if (row.redaction_plan !== undefined && row.redaction_plan !== null) {
                 $tr.append($('<td/>').append($('<a/>')
                         .attr('plan', row.redaction_plan)
                         .attr('href', row.url)
@@ -175,12 +170,12 @@ var permissions = (function() {
             $td.html('&nbsp;');
         }
         $tr.append($td);
-    }
+    };
     
     my.PermissionsTable.prototype.toggleLock = function() {
         this.is_locked = ! this.is_locked;
         this.reloadTable();
-    }
+    };
     
     my.PermissionsTable.prototype.reloadTable = function() {
         var permissions_table = this;
@@ -188,7 +183,7 @@ var permissions = (function() {
             window.clearTimeout(permissions_table.timeout_id);
             permissions_table.timeout_id = undefined;
         }
-        if (permissions_table.ajax_request != undefined) {
+        if (permissions_table.ajax_request !== undefined) {
             permissions_table.ajax_request.abort();
             permissions_table.ajax_request = undefined;
         }
@@ -204,7 +199,7 @@ var permissions = (function() {
                 }).always(function() {
                     permissions_table.ajax_request = undefined;
                 });
-    }
+    };
     
     my.PermissionsTable.prototype.setCaption = function(text) {
         var $caption = this.$table.find('caption');
@@ -213,28 +208,28 @@ var permissions = (function() {
             this.$table.append($caption);
         }
         $caption.text(text);
-    }
+    };
 
     /** Get query parameters from the current state of the table and page.
      * 
      */
     my.PermissionsTable.prototype.getQueryParams = function() {
-        return { is_granted: this.is_locked }
-    }
+        return { is_granted: this.is_locked };
+    };
     
     /** Extract row data from an AJAX response.
      * @param response: the JSON object returned from the server
      */
     my.PermissionsTable.prototype.extractRows = function(response) {
         return response;
-    }
+    };
     
     /** Choose which redaction field to set when redacting.
      * @param plan_url: the redaction plan URL that this field should enact
      */
     my.PermissionsTable.prototype.getRedactionField = function(plan_url) {
         return "is_redacted";
-    }
+    };
     
     function buildListCell($td, row, field_name) {
         var $ul = $('<ul/>'),
@@ -256,15 +251,17 @@ var permissions = (function() {
             action) {
         var message = "This will " + action + ":\n";
         for(var k in plan) {
-            if (plan[k] != 0) {
+            if (plan[k] !== 0) {
                 message += plan[k] + " " + k + "\n";
             }
         }
 
         return message + "Are you sure?";
-    }
+    };
 
     function clickRemove(event) {
+        // jQuery sets `this` for event handlers
+        //jshint validthis: true
         var $a = $(this),
             permissions_table = event.data;
         event.preventDefault();
@@ -282,12 +279,14 @@ var permissions = (function() {
                             success: function() {
                                 permissions_table.reloadTable();
                             }
-                        })
+                        });
                     }
                 });
     }
 
     function clickRedact(event){
+        // jQuery sets `this` for event handlers
+        //jshint validthis: true
         var $a = $(this),
             permissions_table = event.data,
             plan_url = $a.attr('plan');
@@ -311,7 +310,7 @@ var permissions = (function() {
                             success: function() {
                                 permissions_table.reloadTable();
                             }
-                        })
+                        });
                     }
                 });
     }
@@ -328,7 +327,7 @@ var permissions = (function() {
         }
         return (date.getDate() + " " + monthNames[date.getMonth()] + " " + 
                 date.getFullYear() + " " + date.getHours() + ":" + min);
-    }
+    };
 
     return my;
 }());
