@@ -1,2 +1,2 @@
 eclipse.preferences.version=1
-included=portal//permissions.js
+included=//tests.js\:portal//permissions.js
