@@ -7,6 +7,53 @@ var drydock_objects = (function() {
     "use strict";
     var my = {};
     
+    /**
+     * A helper class to easily draw primitive shapes on the canvas.
+     */
+    my.CanvasWrapper = function(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+    };
+    
+    /**
+     * Draw a circle.
+     * 
+     * @param args.x: the x position of the circle centre
+     * @param args.y: the y position of the circle centre
+     * @param args.r: the radius of the circle
+     */
+    my.CanvasWrapper.prototype.drawCircle = function(args) {
+        this.ctx.beginPath();
+        this.ctx.arc(args.x, args.y, args.r, 0, 2 * Math.PI);
+        this.ctx.closePath();
+        this.ctx.fill();
+    };
+    
+    /**
+     * Draw text with a standard font, colour, and background.
+     * 
+     * @param args.x: the x position of the right edge of the text
+     * @param args.y: the y position of the middle of the line of text
+     * @param args.text: the text to draw
+     */
+    my.CanvasWrapper.prototype.drawText = function(args) {
+        this.ctx.save();
+        this.ctx.font = '9pt Lato, sans-serif';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.textAlign = 'right';
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.fillRect(
+            args.x + 2,
+            args.y - 7.5,
+            -4 - this.ctx.measureText(args.text).width,
+            15
+        );
+        this.ctx.globalAlpha = 1;
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillText(args.text, args.x, args.y);
+        this.ctx.restore();
+    };
+    
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
 }());
@@ -720,7 +767,6 @@ MethodNode.prototype.getLabel = function() {
 
 drydock_objects = (function(my) {
     "use strict";
-    var my = {};
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
         /*
         CONSTRUCTOR
