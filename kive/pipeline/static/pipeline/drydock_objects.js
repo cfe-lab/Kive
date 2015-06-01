@@ -721,99 +721,99 @@ MethodNode.prototype.getLabel = function() {
 drydock_objects = (function(my) {
     "use strict";
     var my = {};
-my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
-    /*
-    CONSTRUCTOR
-    A Magnet is the attachment point for a Node (shape) given a
-    Connector.  It is always contained within a shape.
-    x and y coordinates will be set by parent object draw().
-     */
-    this.parent = parent;  // the containing shape
-    this.x = null;
-    this.y = null;
-    this.r = r; // radius
-    this.attract = attract; // radius of Connector attraction
-    this.fill = fill || "#fff";
-    this.cdt = cdt; // primary key to CDT
-    this.label = label || '';
-    this.offset = offset || 5;
-    this.isOutput = isOutput || false;
-    this.isInput = !this.isOutput;
-    this.connected = [];  // hold references to Connectors
-    this.acceptingConnector = false; // true if a connector is being dragged
-};
-
-my.Magnet.prototype.draw = function(ctx) {
-    // magnet coords are set by containing shape
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
-    ctx.closePath();
-    ctx.fillStyle = this.fill;
-    ctx.fill();
-    
-    if (this.acceptingConnector)
-        this.highlight(ctx);
-};
-
-my.Magnet.prototype.highlight = function(ctx) {
-    // draw label
-    ctx.font = '9pt Lato, sans-serif';
-    ctx.textBaseline = 'middle';
-    
-    ctx.textAlign = 'right';
-    var dir = -1;
-    
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.isOutput) {
-        ctx.textAlign = 'left';
-        dir = 1;
-        var angle = Math.PI/6,
-            sin_ = Math.sin(angle), 
-            cos_ = Math.cos(angle);
-        
-        /* 
-         *   I'm not sold on this display method. Commented out for now. —jn
-         *
-         *   isometric perspective transform
-         *   rotate(ϑ), shear(ϑ, 1), scale(1, cosϑ)
-         *
-         *   Affine transformation:
-         *   cosϑ -sinϑ  0     1  ϑ  0     1   0   0
-         *   sinϑ  cosϑ  0  ×  0  1  0  ×  0  cosϑ 0
-         *    0     0    1     0  0  1     0   0   1
-         *   
-         *   Final product:
-         *   cosϑ  cosϑ(ϑcosϑ - sinϑ)   0
-         *   sinϑ  cosϑ(ϑsinϑ + cosϑ)   0
-         *   0            0             1
+    my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
+        /*
+        CONSTRUCTOR
+        A Magnet is the attachment point for a Node (shape) given a
+        Connector.  It is always contained within a shape.
+        x and y coordinates will be set by parent object draw().
          */
-        
-//        ctx.transform(cos_, sin_, cos_*(angle*cos_ - sin_), cos_*(angle*sin_ + cos_), 0, 0);
-        ctx.rotate(angle);
-    }
-    
-    // make a backing box so the label is on white
-    ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.5;
-    ctx.fillRect(
-        dir * (this.r + this.offset - 2),
-        -7.5,
-        dir * (ctx.measureText(this.label).width + 4),
-        15
-    );
-    ctx.globalAlpha = 1.0;
-    ctx.fillStyle = '#000';
-    ctx.fillText(this.label, dir * (this.r + this.offset), 0);
-    
-    ctx.restore();
-};
+        this.parent = parent;  // the containing shape
+        this.x = null;
+        this.y = null;
+        this.r = r; // radius
+        this.attract = attract; // radius of Connector attraction
+        this.fill = fill || "#fff";
+        this.cdt = cdt; // primary key to CDT
+        this.label = label || '';
+        this.offset = offset || 5;
+        this.isOutput = isOutput || false;
+        this.isInput = !this.isOutput;
+        this.connected = [];  // hold references to Connectors
+        this.acceptingConnector = false; // true if a connector is being dragged
+    };
 
-my.Magnet.prototype.contains = function(mx, my) {
-    var dx = this.x - mx;
-    var dy = this.y - my;
-    return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
-};
+    my.Magnet.prototype.draw = function(ctx) {
+        // magnet coords are set by containing shape
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
+        ctx.closePath();
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+        
+        if (this.acceptingConnector)
+            this.highlight(ctx);
+    };
+
+    my.Magnet.prototype.highlight = function(ctx) {
+        // draw label
+        ctx.font = '9pt Lato, sans-serif';
+        ctx.textBaseline = 'middle';
+    
+        ctx.textAlign = 'right';
+        var dir = -1;
+    
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (this.isOutput) {
+            ctx.textAlign = 'left';
+            dir = 1;
+            var angle = Math.PI/6,
+                sin_ = Math.sin(angle), 
+                cos_ = Math.cos(angle);
+            
+            /* 
+             *   I'm not sold on this display method. Commented out for now. —jn
+             *
+             *   isometric perspective transform
+             *   rotate(ϑ), shear(ϑ, 1), scale(1, cosϑ)
+             *
+             *   Affine transformation:
+             *   cosϑ -sinϑ  0     1  ϑ  0     1   0   0
+             *   sinϑ  cosϑ  0  ×  0  1  0  ×  0  cosϑ 0
+             *    0     0    1     0  0  1     0   0   1
+             *   
+             *   Final product:
+             *   cosϑ  cosϑ(ϑcosϑ - sinϑ)   0
+             *   sinϑ  cosϑ(ϑsinϑ + cosϑ)   0
+             *   0            0             1
+             */
+            
+    //        ctx.transform(cos_, sin_, cos_*(angle*cos_ - sin_), cos_*(angle*sin_ + cos_), 0, 0);
+            ctx.rotate(angle);
+        }
+    
+        // make a backing box so the label is on white
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(
+            dir * (this.r + this.offset - 2),
+            -7.5,
+            dir * (ctx.measureText(this.label).width + 4),
+            15
+        );
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#000';
+        ctx.fillText(this.label, dir * (this.r + this.offset), 0);
+    
+        ctx.restore();
+    };
+
+    my.Magnet.prototype.contains = function(mx, my) {
+        var dx = this.x - mx;
+        var dy = this.y - my;
+        return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
+    };
     
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
