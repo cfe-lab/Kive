@@ -45,6 +45,7 @@ var drydock_objects = (function() {
         this.ctx.font = '9pt Lato, sans-serif';
         this.ctx.textBaseline = 'middle';
         this.ctx.textAlign = dir === 1 ? 'left' : 'right';
+        // make a backing box so the label is on the fill colour
         this.ctx.globalAlpha = 0.5;
         this.ctx.fillRect(
             args.x - dir * 2,
@@ -795,11 +796,9 @@ drydock_objects = (function(my) {
 
     my.Magnet.prototype.draw = function(ctx) {
         // magnet coords are set by containing shape
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
-        ctx.closePath();
+        var canvas = new my.CanvasWrapper(undefined, ctx);
         ctx.fillStyle = this.fill;
-        ctx.fill();
+        canvas.drawCircle({x: this.x, y: this.y, r: this.r});
         
         if (this.acceptingConnector)
             this.highlight(ctx);
@@ -807,24 +806,19 @@ drydock_objects = (function(my) {
 
     my.Magnet.prototype.highlight = function(ctx) {
         // draw label
-        ctx.font = '9pt Lato, sans-serif';
-        ctx.textBaseline = 'middle';
-    
-        ctx.textAlign = 'right';
         var dir = -1;
     
         ctx.save();
         ctx.translate(this.x, this.y);
         if (this.isOutput) {
-            ctx.textAlign = 'left';
             dir = 1;
-            var angle = Math.PI/6,
-                sin_ = Math.sin(angle), 
-                cos_ = Math.cos(angle);
+            var angle = Math.PI/6;
             
             /* 
              *   I'm not sold on this display method. Commented out for now. —jn
              *
+            sin_ = Math.sin(angle), 
+            cos_ = Math.cos(angle);
              *   isometric perspective transform
              *   rotate(ϑ), shear(ϑ, 1), scale(1, cosϑ)
              *
@@ -842,19 +836,13 @@ drydock_objects = (function(my) {
     //        ctx.transform(cos_, sin_, cos_*(angle*cos_ - sin_), cos_*(angle*sin_ + cos_), 0, 0);
             ctx.rotate(angle);
         }
-    
-        // make a backing box so the label is on white
+        
         ctx.fillStyle = '#fff';
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(
-            dir * (this.r + this.offset - 2),
-            -7.5,
-            dir * (ctx.measureText(this.label).width + 4),
-            15
-        );
-        ctx.globalAlpha = 1.0;
-        ctx.fillStyle = '#000';
-        ctx.fillText(this.label, dir * (this.r + this.offset), 0);
+        new my.CanvasWrapper(undefined, ctx).drawText({
+            x: dir * (this.r + this.offset),
+            y: 0,
+            text: this.label,
+            dir: dir});
     
         ctx.restore();
     };
