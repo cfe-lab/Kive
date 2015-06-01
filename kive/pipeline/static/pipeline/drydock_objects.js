@@ -10,9 +10,8 @@ var drydock_objects = (function() {
     /**
      * A helper class to easily draw primitive shapes on the canvas.
      */
-    my.CanvasWrapper = function(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+    my.CanvasWrapper = function(canvas, ctx) {
+        this.ctx = ctx !== undefined ? ctx : canvas.getContext('2d');
     };
     
     /**
@@ -30,22 +29,27 @@ var drydock_objects = (function() {
     };
     
     /**
-     * Draw text with a standard font, colour, and background.
+     * Draw text with a standard font, colour, and background rectangle.
      * 
-     * @param args.x: the x position of the right edge of the text
+     * The background rectangle is drawn around the text, so the anchor point
+     * is inside the rectangle.
+     * 
+     * @param args.x: the x position of the anchor point
      * @param args.y: the y position of the middle of the line of text
      * @param args.text: the text to draw
+     * @param args.dir: 1 for anchor point on the left, -1 for the right(default)
      */
     my.CanvasWrapper.prototype.drawText = function(args) {
+        var dir = args.dir === 1 ? 1 : -1;
         this.ctx.save();
         this.ctx.font = '9pt Lato, sans-serif';
         this.ctx.textBaseline = 'middle';
-        this.ctx.textAlign = 'right';
+        this.ctx.textAlign = dir === 1 ? 'left' : 'right';
         this.ctx.globalAlpha = 0.5;
         this.ctx.fillRect(
-            args.x + 2,
+            args.x - dir * 2,
             args.y - 7.5,
-            -4 - this.ctx.measureText(args.text).width,
+            dir * (4 + this.ctx.measureText(args.text).width),
             15
         );
         this.ctx.globalAlpha = 1;
