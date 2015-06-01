@@ -3,6 +3,14 @@
  *   JS prototypes that are used to populate canvasState
  *   (see drydock.js)
  */
+var drydock_objects = (function() {
+    "use strict";
+    var my = {};
+    
+    // TODO: Convert the whole file to this module, then combine all the sections.
+    return my;
+}());
+
 var _statusColorMap = {
     'CLEAR': 'green',
     'FAILURE': 'red',
@@ -710,7 +718,10 @@ MethodNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
 };
 
-function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
+drydock_objects = (function(my) {
+    "use strict";
+    var my = {};
+my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
     /*
     CONSTRUCTOR
     A Magnet is the attachment point for a Node (shape) given a
@@ -730,9 +741,9 @@ function Magnet (parent, r, attract, fill, cdt, label, offset, isOutput) {
     this.isInput = !this.isOutput;
     this.connected = [];  // hold references to Connectors
     this.acceptingConnector = false; // true if a connector is being dragged
-}
+};
 
-Magnet.prototype.draw = function(ctx) {
+my.Magnet.prototype.draw = function(ctx) {
     // magnet coords are set by containing shape
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI, true);
@@ -744,7 +755,7 @@ Magnet.prototype.draw = function(ctx) {
         this.highlight(ctx);
 };
 
-Magnet.prototype.highlight = function(ctx) {
+my.Magnet.prototype.highlight = function(ctx) {
     // draw label
     ctx.font = '9pt Lato, sans-serif';
     ctx.textBaseline = 'middle';
@@ -798,12 +809,16 @@ Magnet.prototype.highlight = function(ctx) {
     ctx.restore();
 };
 
-Magnet.prototype.contains = function(mx, my) {
+my.Magnet.prototype.contains = function(mx, my) {
     var dx = this.x - mx;
     var dy = this.y - my;
     return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
 };
-
+    
+    // TODO: Convert the whole file to this module, then combine all the sections.
+    return my;
+}(drydock_objects));
+var Magnet = drydock_objects.Magnet;
 
 function Connector (from_x, from_y, out_magnet) {
     /*
